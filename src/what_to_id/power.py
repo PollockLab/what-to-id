@@ -27,6 +27,8 @@ from pathlib import Path
 
 import numpy as np
 
+from what_to_id.analysis import sign_flip_p
+
 DESIGNS = ("sets", "rotation")
 
 # BC needs-ID records with photos created 2025-01-01 to 2026-09-11, iNaturalist API counts
@@ -74,6 +76,14 @@ def _queue(depths, p, n, window, rng) -> tuple[int, int]:
     return a + b, a
 
 
+def _depths(sc: Scenario, n: int, rng) -> np.ndarray:
+    if sc.depths is not None:
+        depth = rng.choice(np.asarray(sc.depths, dtype=np.int64), size=n)
+    else:
+        depth = np.round(rng.lognormal(np.log(sc.depth_median), sc.depth_sigma, n))
+    return np.maximum(1, depth).astype(np.int64)
+
+
 def _effort(sc: Scenario, depth: np.ndarray, rng) -> np.ndarray:
     """Records each identifier works per arm, shape (n_identifiers, n_arms)."""
     n, k = depth.size, sc.n_arms
@@ -99,11 +109,7 @@ def simulate(sc: Scenario, reps: int, seed: int) -> dict[str, np.ndarray]:
     for r in range(reps):
         n = sc.n_identifiers
         group = rng.choice(len(counts), size=n, p=shares)
-        if sc.depths is not None:
-            depth = rng.choice(np.asarray(sc.depths, dtype=np.int64), size=n)
-        else:
-            depth = np.round(rng.lognormal(np.log(sc.depth_median), sc.depth_sigma, n))
-        depth = np.maximum(1, depth).astype(np.int64)
+        depth = _depths(sc, n, rng)
         skill = rng.beta(sc.skill_a, sc.skill_b, n)
         effort = _effort(sc, depth, rng)
         res = []
@@ -137,6 +143,30 @@ def power(sc: Scenario, *, reps: int = 2000, seed: int = 0, alpha: float = 0.05)
     return out
 
 
+def identifier_power(
+    sc: Scenario, *, reps: int = 1000, seed: int = 0, alpha: float = 0.05, flips: int = 1000
+) -> float:
+    """Power of the pre-registered per-identifier test (analysis.sign_flip_p), rotation only.
+
+    Each identifier's species-level identifications in an arm are Binomial(effort, skill *
+    lift_arm); queue competition and the window cap are ignored, which is conservative for
+    neither side and small while effort is far below the queue length.
+    """
+    if sc.design != "rotation":
+        raise ValueError("the per-identifier test needs the rotation design")
+    rng = np.random.default_rng(seed)
+    hits = 0
+    for _ in range(reps):
+        depth = _depths(sc, sc.n_identifiers, rng)
+        skill = rng.beta(sc.skill_a, sc.skill_b, sc.n_identifiers)
+        effort = _effort(sc, depth, rng)
+        control = rng.binomial(effort[:, 0], skill)
+        treated = rng.binomial(effort[:, 1], np.minimum(1.0, skill * (1.0 + sc.lift)))
+        p = sign_flip_p(treated - control, reps=flips, seed=int(rng.integers(2**32)))
+        hits += p < alpha
+    return hits / reps
+
+
 def _floats(s: str) -> list[float]:
     return [float(x) for x in s.split(",") if x.strip()]
 
@@ -153,17 +183,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     a = ap.parse_args(argv)
     depths = tuple(int(x) for x in json.loads(a.depths.read_text())) if a.depths else None
     rows = []
-    print("| design | identifiers | lift | power (pool) | power (window) | null sd (window) |")
-    print("|---|---|---|---|---|---|")
+    print(
+        "| design | identifiers | lift | power (pool) | power (window) | null sd (window) "
+        "| power (per identifier) |"
+    )
+    print("|---|---|---|---|---|---|---|")
     for design in DESIGNS:
         for n in (int(x) for x in _floats(a.identifiers)):
             for lift in _floats(a.lifts):
                 sc = Scenario(n, lift, design, window=a.window, depths=depths)
                 r = power(sc, reps=a.reps, seed=a.seed)
+                if design == "rotation":
+                    r["identifier"] = {"power": identifier_power(sc, reps=a.reps, seed=a.seed)}
                 rows.append(r)
+                ident = f"{r['identifier']['power']:.2f}" if "identifier" in r else "n/a"
                 print(
                     f"| {design} | {n} | {lift:.2f} | {r['pool']['power']:.2f} | "
-                    f"{r['window']['power']:.2f} | {r['window']['null_sd']:.0f} |"
+                    f"{r['window']['power']:.2f} | {r['window']['null_sd']:.0f} | {ident} |"
                 )
     if a.out:
         a.out.parent.mkdir(parents=True, exist_ok=True)
