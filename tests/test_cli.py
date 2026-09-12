@@ -49,6 +49,44 @@ def test_build_end_to_end(tmp_path, webapp_dir):
     assert "recency" not in (out / "site" / "index.html").read_text()
 
 
+def test_build_max_batches(tmp_path, webapp_dir):
+    pool = make_pool(300, seed=5)
+    pool_path = tmp_path / "pool.parquet"
+    pool.to_parquet(pool_path, index=False)
+    out = tmp_path / "out"
+    rc = main(
+        [
+            "build",
+            "--pool",
+            str(pool_path),
+            "--freeze",
+            "2026-09-01",
+            "--d1",
+            "2026-09-15",
+            "--seed",
+            "3",
+            "--batch-size",
+            "25",
+            "--arms",
+            "recency,gap_first",
+            "--webapp-dir",
+            str(webapp_dir),
+            "--max-batches",
+            "2",
+            "--out",
+            str(out),
+        ]
+    )
+    assert rc == 0
+    d = json.loads((out / "manifest.json").read_text())
+    validate_manifest(d)
+    assert d["max_batches"] == 2
+    b = pd.read_parquet(out / "batches.parquet")
+    assert d["served_rows"] == len(b)
+    nb = b.groupby(["arm", "group"])["batch_id"].nunique()
+    assert (nb <= 2).all()
+
+
 def test_build_rejects_bad_date(tmp_path):
     with pytest.raises(SystemExit):
         main(["build", "--freeze", "2026-13-01", "--d1", "2026-09-15", "--pool", "x"])

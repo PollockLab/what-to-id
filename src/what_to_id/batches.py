@@ -45,10 +45,17 @@ def build_batches(
     *,
     size: int,
     seed: int,
+    max_batches: int | None = None,
 ) -> pd.DataFrame:
-    """One row per (batch, position, id); batch_id is f"{arm}-{group}-{i:03d}"."""
+    """One row per (batch, position, id); batch_id is f"{arm}-{group}-{i:03d}".
+
+    max_batches keeps only the first max_batches batches of each (arm, group) cut, i.e. the
+    highest-priority records of that arm's ordering. None (the default) keeps every batch.
+    """
     if size < 1:
         raise ValueError("batch size must be >= 1")
+    if max_batches is not None and max_batches < 1:
+        raise ValueError("max_batches must be >= 1")
     missing = set(assign_df["arm"].unique()) - set(arms)
     if missing:
         raise ValueError(f"assignment references arms without an Arm object: {sorted(missing)}")
@@ -68,7 +75,10 @@ def build_batches(
             if sorted(order.tolist()) != list(range(len(sub))):
                 raise ValueError(f"arm {arm_name!r} returned an invalid permutation for {group}")
             ordered_ids = sub["id"].to_numpy(dtype=np.int64)[order]
-            for i, batch in enumerate(cut_batches(ordered_ids, size)):
+            cut = cut_batches(ordered_ids, size)
+            if max_batches is not None:
+                cut = cut[:max_batches]
+            for i, batch in enumerate(cut):
                 bid = f"{arm_name}-{group}-{i:03d}"
                 rows.extend((bid, arm_name, group, pos, oid) for pos, oid in enumerate(batch))
     df = pd.DataFrame(rows, columns=["batch_id", "arm", "group", "position", "id"])

@@ -55,3 +55,24 @@ def test_build_batches_validation(pool):
         build_batches(pool, a.head(10), {"recency": Recency()}, size=5, seed=0)
     with pytest.raises(ValueError):
         build_batches(pool, a, {"recency": Recency()}, size=0, seed=0)
+
+
+def test_build_batches_max_batches(pool):
+    pool = pool.copy()
+    pool["cell_score"] = 0.5
+    arms = {"recency": Recency(), "gap_first": GapFirst()}
+    a = assign(pool, list(arms), seed=0)
+    full = build_batches(pool, a, arms, size=7, seed=0)
+    capped = build_batches(pool, a, arms, size=7, seed=0, max_batches=2)
+    nb = capped.groupby(["arm", "group"])["batch_id"].nunique()
+    assert (nb <= 2).all()
+    # The kept batches are the highest-priority prefix of the full ordering.
+    for (arm, group), sub in capped.groupby(["arm", "group"]):
+        full_sub = full[(full["arm"] == arm) & (full["group"] == group)]
+        kept_ids = set(sub["id"])
+        full_ids_in_order = full_sub.sort_values(["batch_id", "position"])["id"].tolist()
+        assert kept_ids == set(full_ids_in_order[: len(kept_ids)])
+    unlimited = build_batches(pool, a, arms, size=7, seed=0, max_batches=None)
+    assert unlimited["id"].tolist() == full["id"].tolist()
+    with pytest.raises(ValueError):
+        build_batches(pool, a, arms, size=7, seed=0, max_batches=0)
