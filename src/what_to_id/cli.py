@@ -107,7 +107,9 @@ def build(args: argparse.Namespace) -> Path:
     emb = _embedding_paths(args.embeddings, groups)
     ref = _embedding_paths(args.reference_embeddings, groups)
     arms = _make_arms(arm_names, args.batch_size, emb, ref)
-    batches_df = build_batches(pool, assign_df, arms, size=args.batch_size, seed=args.seed)
+    batches_df = build_batches(
+        pool, assign_df, arms, size=args.batch_size, seed=args.seed, max_batches=args.max_batches
+    )
 
     for (arm, group), n in batches_df.groupby(["arm", "group"])["id"].size().items():
         nb = batches_df[(batches_df["arm"] == arm) & (batches_df["group"] == group)][
@@ -154,6 +156,8 @@ def build(args: argparse.Namespace) -> Path:
         embeddings_sha256=emb_sha,
         reference_sha256=ref_sha,
         backbone=backbone,
+        max_batches=args.max_batches,
+        served_rows=int(len(batches_df)),
         batches=batches,
     )
     out.mkdir(parents=True, exist_ok=True)
@@ -175,6 +179,12 @@ def make_parser() -> argparse.ArgumentParser:
     b.add_argument("--d1", type=_iso_date, required=True, help="first blitz day YYYY-MM-DD")
     b.add_argument("--seed", type=int, default=0)
     b.add_argument("--batch-size", type=int, default=120)
+    b.add_argument(
+        "--max-batches",
+        type=int,
+        default=None,
+        help="serve only the first N batches per arm and taxon group",
+    )
     b.add_argument("--arms", default="recency,gap_first", help="comma-separated arm names")
     b.add_argument("--embeddings", default=None, help="npz path pattern with {group}, or a dir")
     b.add_argument(
@@ -199,6 +209,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     if args.batch_size < 1:
         raise SystemExit("--batch-size must be >= 1")
+    if args.max_batches is not None and args.max_batches < 1:
+        raise SystemExit("--max-batches must be >= 1")
     args.func(args)
     return 0
 

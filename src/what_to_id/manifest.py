@@ -27,6 +27,7 @@ REQUIRED_KEYS = {
     "where_to_blitz_ref": str,
     "labelfirst_commit": str,
     "created_at": str,
+    "served_rows": int,
     "batches": dict,
 }
 BATCH_KEYS = ("arm", "group", "url", "ids")
@@ -60,6 +61,8 @@ class Manifest:
     embeddings_sha256: str | None = None
     reference_sha256: str | None = None
     backbone: str | None = None
+    max_batches: int | None = None
+    served_rows: int = 0
     created_at: str = field(default_factory=utc_now_iso)
     batches: dict[str, dict] = field(default_factory=dict)
 
