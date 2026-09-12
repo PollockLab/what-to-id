@@ -79,3 +79,41 @@ def test_identifier_power_calibrated_and_rising():
     assert alt > null + 0.3
     with pytest.raises(ValueError, match="rotation"):
         power.identifier_power(power.Scenario(50, 0.0, "sets"), reps=1)
+
+
+def test_identifier_counts_users_filter():
+    idents = _idents(
+        [
+            (1, 10, "2026-11-01T12:00:00Z", "species"),
+            (3, 11, "2026-11-01T12:00:00Z", "species"),
+        ]
+    )
+    got = analysis.identifier_counts(
+        idents, SERVED, start="2026-11-01", cutoff="2026-12-01", users=[11]
+    )
+    assert got.index.tolist() == [11]
+
+
+def test_cli_blitz_and_placebo(tmp_path, capsys):
+    idents = _idents(
+        [
+            (1, 10, "2026-10-20T12:00:00Z", "species"),
+            (3, 10, "2026-11-02T12:00:00Z", "species"),
+            (4, 12, "2026-11-02T12:00:00Z", "species"),
+        ]
+    )
+    idents.to_parquet(tmp_path / "i.parquet")
+    SERVED.to_parquet(tmp_path / "s.parquet")
+    (tmp_path / "u.txt").write_text("# participants\n10\n")
+    args = ["--idents", str(tmp_path / "i.parquet"), "--served", str(tmp_path / "s.parquet")]
+    args += ["--control", "c", "--start", "2026-11-01", "--cutoff", "2026-12-01"]
+    args += ["--users", str(tmp_path / "u.txt"), "--placebo-start", "2026-10-01"]
+    assert analysis.main(args) == 0
+    out = capsys.readouterr().out
+    assert "blitz: [2026-11-01, 2026-12-01)" in out and "placebo: [2026-10-01, 2026-11-01)" in out
+    rows = [ln for ln in out.splitlines() if ln.startswith("| t |")]
+    assert rows[0].split(" | ")[2:5] == ["1", "1", "0"]
+    assert rows[1].split(" | ")[2:5] == ["1", "0", "1"]
+    (tmp_path / "bad.txt").write_text("alice\n")
+    with pytest.raises(SystemExit, match="one iNaturalist user id"):
+        analysis.main(args[:-4] + ["--users", str(tmp_path / "bad.txt")])

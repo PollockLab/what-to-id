@@ -5,10 +5,13 @@ identifier's own count of species-level identifications in each arm is comparabl
 without knowing which records they opened. The primary test, fixed before the blitz, is a
 paired sign-flip permutation test on per-identifier differences (treatment minus control), one
 per treatment arm, Holm-adjusted across treatment arms. A record an identifier gave several
-species-level identifications counts once. Everyone with a qualifying identification on a
-served record counts, blitz participant or not: records are randomised, so identifiers who
-never saw the page add noise but no bias. The same test runs on simulated counts
-(``power.identifier_power``) and on the real read-back. Naive timestamps are read as UTC.
+species-level identifications counts once. Organic identifiers who never saw the page are
+not balanced across arms: each arm serves its own top records, and the recency arm serves the
+newest, which draw the most organic attention on iNaturalist. The test is therefore restricted
+to the blitz participants' user ids (``users``), and a placebo run over a pre-blitz period on
+the same served sets measures how far organic attention alone separates the arms. The same test
+runs on simulated counts (``power.identifier_power``) and on the real read-back. Naive
+timestamps are read as UTC.
 """
 
 from __future__ import annotations
@@ -32,7 +35,14 @@ def _utc(value) -> pd.Timestamp:
     return ts.tz_localize("UTC") if ts.tzinfo is None else ts.tz_convert("UTC")
 
 
-def identifier_counts(idents: pd.DataFrame, served: pd.DataFrame, *, start, cutoff) -> pd.DataFrame:
+def identifier_counts(
+    idents: pd.DataFrame,
+    served: pd.DataFrame,
+    *,
+    start,
+    cutoff,
+    users: Sequence[int] | None = None,
+) -> pd.DataFrame:
     """Records given a species-level identification, per identifier (rows) and arm (columns)."""
     missing = [c for c in IDENT_NEEDS if c not in idents.columns]
     if missing:
@@ -52,6 +62,8 @@ def identifier_counts(idents: pd.DataFrame, served: pd.DataFrame, *, start, cuto
         & ts.lt(t1)
         & idents["taxon_rank"].isin(SPECIES_RANKS)
     )
+    if users is not None:
+        keep &= idents["user_id"].isin({int(u) for u in users})
     sub = idents.loc[keep, ["user_id", "id"]].drop_duplicates()
     arms = sorted(arm_of.unique())
     if sub.empty:
@@ -113,6 +125,21 @@ def analyse(
     return out.assign(p_holm=out["arm"].map(adj))
 
 
+def _print(res: pd.DataFrame) -> None:
+    print("| " + " | ".join(res.columns) + " |")
+    print("|" + "|".join("---" for _ in res.columns) + "|")
+    for row in res.itertuples(index=False):
+        print("| " + " | ".join(f"{v:.4g}" if isinstance(v, float) else str(v) for v in row) + " |")
+
+
+def _users(path: Path) -> list[int]:
+    lines = [ln.strip() for ln in path.read_text().splitlines()]
+    try:
+        return [int(ln) for ln in lines if ln and not ln.startswith("#")]
+    except ValueError as e:
+        raise SystemExit(f"{path}: one iNaturalist user id per line ({e})") from e
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Pre-registered per-identifier arm comparison.")
     ap.add_argument("--idents", required=True, type=Path, help="read-back idents parquet")
@@ -120,20 +147,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap.add_argument("--control", required=True)
     ap.add_argument("--start", required=True, help="blitz start timestamp")
     ap.add_argument("--cutoff", required=True, help="count identifications made before this")
+    ap.add_argument("--users", type=Path, help="participant iNaturalist user ids, one per line")
+    ap.add_argument("--placebo-start", help="also test [placebo-start, start), e.g. the freeze")
     ap.add_argument("--reps", type=int, default=10000)
     ap.add_argument("--seed", type=int, default=0)
     a = ap.parse_args(argv)
-    counts = identifier_counts(
-        pd.read_parquet(a.idents, engine="pyarrow"),
-        pd.read_parquet(a.served, engine="pyarrow"),
-        start=a.start,
-        cutoff=a.cutoff,
-    )
-    res = analyse(counts, control=a.control, reps=a.reps, seed=a.seed)
-    print("| " + " | ".join(res.columns) + " |")
-    print("|" + "|".join("---" for _ in res.columns) + "|")
-    for row in res.itertuples(index=False):
-        print("| " + " | ".join(f"{v:.4g}" if isinstance(v, float) else str(v) for v in row) + " |")
+    idents = pd.read_parquet(a.idents, engine="pyarrow")
+    served = pd.read_parquet(a.served, engine="pyarrow")
+    users = _users(a.users) if a.users else None
+    windows = [("blitz", a.start, a.cutoff)]
+    if a.placebo_start:
+        windows.append(("placebo", a.placebo_start, a.start))
+    for label, t0, t1 in windows:
+        counts = identifier_counts(idents, served, start=t0, cutoff=t1, users=users)
+        print(f"{label}: [{t0}, {t1})" + ("" if users is not None else ", all identifiers"))
+        _print(analyse(counts, control=a.control, reps=a.reps, seed=a.seed))
     return 0
 
 
