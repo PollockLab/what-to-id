@@ -65,6 +65,7 @@ class Manifest:
     served_rows: int = 0
     created_at: str = field(default_factory=utc_now_iso)
     batches: dict[str, dict] = field(default_factory=dict)
+    design: str = "sets"
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -89,6 +90,8 @@ def validate_manifest(d: dict) -> None:
             raise ValueError(f"manifest key {key!r} must be {typ.__name__}")
     if not d["arms"]:
         raise ValueError("manifest key 'arms' must be non-empty")
+    if "design" in d and d["design"] not in ("sets", "rotation"):
+        raise ValueError("manifest key 'design' must be 'sets' or 'rotation'")
     if set(d["arm_labels"]) != set(d["arms"]):
         raise ValueError("manifest key 'arm_labels' must cover exactly the arms")
     if len(set(d["arm_labels"].values())) != len(d["arm_labels"]):

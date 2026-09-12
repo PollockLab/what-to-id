@@ -17,6 +17,7 @@ from what_to_id.cells import WEBAPP_DIR, score_records
 from what_to_id.embed import emb_cache_path
 from what_to_id.manifest import Manifest, blind_labels, sha256_file, write_manifest
 from what_to_id.page import write_site
+from what_to_id.page_rotation import write_rotation_site
 from what_to_id.signals import batch_signals, signals_by_batch
 
 log = logging.getLogger("what_to_id")
@@ -159,12 +160,16 @@ def build(args: argparse.Namespace) -> Path:
         max_batches=args.max_batches,
         served_rows=int(len(batches_df)),
         batches=batches,
+        design=args.design,
     )
     out.mkdir(parents=True, exist_ok=True)
     write_manifest(m, out / "manifest.json")
     assign_df.to_parquet(out / "assign.parquet", index=False)
     batches_df.to_parquet(out / "batches.parquet", index=False)
-    write_site(out / "site", m, batches_df, pool=pool)
+    if args.design == "rotation":
+        write_rotation_site(out / "site", m)
+    else:
+        write_site(out / "site", m, batches_df, pool=pool)
     log.info("wrote %s (%d batches)", out, len(batches))
     return out
 
@@ -194,6 +199,13 @@ def make_parser() -> argparse.ArgumentParser:
     )
     b.add_argument(
         "--webapp-dir", default=str(WEBAPP_DIR), help="where-to-blitz cluster_results/ca"
+    )
+    b.add_argument(
+        "--design",
+        choices=["sets", "rotation"],
+        default="sets",
+        help="'sets' (default) pages one list per browser; 'rotation' cycles every identifier "
+        "through all lists",
     )
     b.add_argument("--out", default="out")
     b.set_defaults(func=build)

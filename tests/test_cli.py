@@ -87,6 +87,77 @@ def test_build_max_batches(tmp_path, webapp_dir):
     assert (nb <= 2).all()
 
 
+def test_build_design_rotation_writes_only_index(tmp_path, webapp_dir):
+    pool = make_pool(300, seed=5)
+    pool_path = tmp_path / "pool.parquet"
+    pool.to_parquet(pool_path, index=False)
+    out = tmp_path / "out"
+    rc = main(
+        [
+            "build",
+            "--pool",
+            str(pool_path),
+            "--freeze",
+            "2026-09-01",
+            "--d1",
+            "2026-09-15",
+            "--seed",
+            "3",
+            "--batch-size",
+            "25",
+            "--arms",
+            "recency,gap_first",
+            "--webapp-dir",
+            str(webapp_dir),
+            "--design",
+            "rotation",
+            "--out",
+            str(out),
+        ]
+    )
+    assert rc == 0
+    d = json.loads((out / "manifest.json").read_text())
+    validate_manifest(d)
+    assert d["design"] == "rotation"
+    site = out / "site"
+    assert sorted(p.name for p in site.iterdir()) == ["index.html"]
+    html = (site / "index.html").read_text().lower()
+    for word in ("recency", "gap_first", "novelty", "batch_id"):
+        assert word not in html
+
+
+def test_build_default_design_is_sets(tmp_path, webapp_dir):
+    pool = make_pool(300, seed=5)
+    pool_path = tmp_path / "pool.parquet"
+    pool.to_parquet(pool_path, index=False)
+    out = tmp_path / "out"
+    main(
+        [
+            "build",
+            "--pool",
+            str(pool_path),
+            "--freeze",
+            "2026-09-01",
+            "--d1",
+            "2026-09-15",
+            "--seed",
+            "3",
+            "--batch-size",
+            "25",
+            "--arms",
+            "recency,gap_first",
+            "--webapp-dir",
+            str(webapp_dir),
+            "--out",
+            str(out),
+        ]
+    )
+    d = json.loads((out / "manifest.json").read_text())
+    assert d["design"] == "sets"
+    for name in ["index.html", "arm_A.html", "arm_B.html"]:
+        assert (out / "site" / name).exists()
+
+
 def test_build_rejects_bad_date(tmp_path):
     with pytest.raises(SystemExit):
         main(["build", "--freeze", "2026-13-01", "--d1", "2026-09-15", "--pool", "x"])
