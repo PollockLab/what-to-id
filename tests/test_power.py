@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from what_to_id.power import Scenario, _queue, power, simulate
+from what_to_id.power import Scenario, _queue, _queue_random_start, power, simulate
 
 SMALL = {"group_counts": (4000, 2000), "window": 300, "depth_median": 60.0}
 
@@ -36,9 +36,45 @@ def test_lift_moves_the_difference_and_is_deterministic():
 
 
 @pytest.mark.parametrize(
-    "kw", [{"design": "cohort"}, {"n_identifiers": 0}, {"background": 1.0}, {"lift": -1.0}]
+    "kw",
+    [
+        {"design": "cohort"},
+        {"n_identifiers": 0},
+        {"background": 1.0},
+        {"lift": -1.0},
+        {"dealing": "shuffled"},
+    ],
 )
 def test_scenario_rejects_bad_input(kw):
     base = {"n_identifiers": 5, "lift": 0.1}
     with pytest.raises(ValueError):
         Scenario(**{**base, **kw})
+
+
+def test_stacked_dealing_is_unchanged_for_a_fixed_seed():
+    # Captured from simulate() before the `dealing` option existed, same seed and scenario.
+    sc = Scenario(15, 0.3, "rotation", **SMALL)
+    out = simulate(sc, 50, seed=7)
+    assert out["window"][:5].tolist() == [8.0, 39.0, 6.0, 17.0, 72.0]
+    assert out["window"].sum() == 1537.0
+    # dealing="stacked" is the default and must give bit-for-bit identical draws.
+    explicit = simulate(Scenario(15, 0.3, "rotation", dealing="stacked", **SMALL), 50, seed=7)
+    assert np.array_equal(out["window"], explicit["window"])
+
+
+def test_random_start_covers_union_of_stretches():
+    # With p=1 every dealt position resolves, so the count is the size of the union of stretches.
+    rng = np.random.default_rng(0)
+    assert _queue_random_start(np.array([50]), np.ones(1), window=200, rng=rng) == 50
+    assert _queue_random_start(np.array([500]), np.ones(1), window=200, rng=rng) == 200
+    got = [_queue_random_start(np.array([50, 30, 20]), np.ones(3), 200, rng) for _ in range(200)]
+    assert max(got) <= 100 and min(got) >= 50 and np.mean(got) < 100
+    assert _queue_random_start(np.array([50]), np.zeros(1), window=200, rng=rng) == 0
+
+
+def test_random_start_null_size():
+    sc = Scenario(8, 0.0, "rotation", dealing="random-start", **SMALL)
+    ref = simulate(sc, 300, seed=1)["window"]
+    new = simulate(sc, 300, seed=2)["window"]
+    thr = np.quantile(np.abs(ref), 0.95)
+    assert 0.01 <= (np.abs(new) > thr).mean() <= 0.10
