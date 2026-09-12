@@ -4,6 +4,7 @@
 assignment arms and the pool and tallies per-arm shares. ``--dry-run`` skips the fetch and
 reports the unengaged share per iconic group from the pool alone. Identifications keep their
 timestamps, rank and ``current`` flag, so ``analysis`` can cut them at any date before the fetch.
+``reviewed_by`` lists every user who marked the record reviewed; it carries no timestamp.
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ OBS_COLUMNS = (
     "ident_count",
     "n_identifiers",
     "last_ident_at",
+    "reviewed_by",
 )
 IDENT_COLUMNS = ("id", "user_id", "created_at", "taxon_id", "taxon_rank", "current")
 OUTCOME_COLUMNS = (
@@ -62,6 +64,7 @@ def summarise(obs: dict) -> dict:
         "ident_count": int(obs.get("identifications_count") or len(flat)),
         "n_identifiers": len(users),
         "last_ident_at": max(stamps) if stamps else None,
+        "reviewed_by": sorted(int(u) for u in obs.get("reviewed_by") or []),
         "identifications": flat,
     }
 

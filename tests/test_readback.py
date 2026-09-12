@@ -19,6 +19,7 @@ OBS = {
     "community_taxon": {"id": 1, "rank": "species"},
     "taxon": {"id": 1, "rank": "species"},
     "identifications_count": 3,
+    "reviewed_by": [3, 1, 2],
     "identifications": [
         _ident(1, "2026-09-12T00:00:00Z", 1),
         _ident(2, "2026-09-20T00:00:00Z", 2, rank="genus", current=False),
@@ -36,6 +37,7 @@ def test_summarise():
     assert s["ident_count"] == 3
     assert s["n_identifiers"] == 2
     assert s["last_ident_at"] == "2026-09-25T00:00:00Z"
+    assert s["reviewed_by"] == [1, 2, 3]
     assert len(s["identifications"]) == 3
     assert s["identifications"][0] == {
         "user_id": 1,
@@ -54,6 +56,7 @@ def test_summarise_sparse():
     assert s["ident_count"] == 0 and s["n_identifiers"] == 0
     assert s["last_ident_at"] is None
     assert s["identifications"] == []
+    assert s["reviewed_by"] == []
 
 
 def test_readback_missing_ids_get_none_row():
@@ -63,6 +66,8 @@ def test_readback_missing_ids_get_none_row():
     assert pd.isna(obs_df.loc[1, "quality_grade"])
     assert pd.isna(obs_df.loc[1, "ident_count"])
     assert obs_df.loc[0, "n_identifiers"] == 2
+    assert obs_df.loc[0, "reviewed_by"] == [1, 2, 3]
+    assert obs_df.loc[1, "reviewed_by"] is None
     assert list(idents_df.columns) == list(readback.IDENT_COLUMNS)
     assert len(idents_df) == 3
     assert (idents_df["id"] == 11).all()
@@ -151,3 +156,12 @@ def test_readback_idents_feed_analysis():
     served = pd.DataFrame({"id": [11], "arm": ["A"]})
     counts = analysis.identifier_counts(idents_df, served, start="2026-09-01", cutoff="2026-10-01")
     assert counts["A"].to_dict() == {1: 1, 2: 1}
+
+
+def test_readback_reviewed_by_survives_parquet(tmp_path):
+    obs_df, _ = readback.readback([11, 99], fetch=lambda ids: [OBS])
+    p = tmp_path / "obs.parquet"
+    obs_df.to_parquet(p, engine="pyarrow", index=False)
+    back = pd.read_parquet(p, engine="pyarrow")
+    assert list(back.loc[0, "reviewed_by"]) == [1, 2, 3]
+    assert back.loc[1, "reviewed_by"] is None
