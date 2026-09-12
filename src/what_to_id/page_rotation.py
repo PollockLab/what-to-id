@@ -3,9 +3,11 @@
 Unlike the "sets" design (page.py), no browser is stuck on one list: each click on "Next batch"
 advances a per-browser, per-group cycle through the blind list labels in a random permutation
 drawn once and stored in localStorage. Every label gets the same share of every identifier's
-effort. The embedded data maps opaque list labels (the same letters as manifest.arm_labels) to
-per-group ordered lists of Identify URLs; nothing else. No arm name, batch_id, card fact, or
-thumbnail ever reaches this page.
+effort. Each browser also starts every list and group at its own random batch and wraps around,
+so identifiers working the same group spread over the served window instead of all opening the
+same first batches (disjoint dealing). The embedded data maps opaque list labels (the same
+letters as manifest.arm_labels) to per-group ordered lists of Identify URLs; nothing else. No
+arm name, batch_id, card fact, or thumbnail ever reaches this page.
 """
 
 from __future__ import annotations
@@ -63,11 +65,13 @@ function nextBatch(state, data, group) {
     };
   }
   pointers[foundLabel] = foundIdx + 1;
+  var urls = data[foundLabel][group];
+  var offset = ((state.offsets || {})[foundLabel] || {})[group] || 0;
   var served = prev.served + 1;
   next[group] = {step: prev.step + attempt + 1, pointers: pointers, served: served};
   return {
     state: Object.assign({}, state, {progress: next}),
-    url: data[foundLabel][group][foundIdx],
+    url: urls[(offset + foundIdx) % urls.length],
     label: foundLabel,
     done: false,
     batchNumber: served
@@ -103,6 +107,15 @@ function leftInGroup(data, state, group) {
   try { state = JSON.parse(localStorage.getItem(SKEY) || 'null'); } catch (e) {}
   if (!state || !Array.isArray(state.perm) || state.perm.length !== labels.length) {
     state = {perm: shuffled(labels), progress: {}};
+  }
+  if (!state.offsets) {
+    state.offsets = {};
+    labels.forEach(function(l){
+      state.offsets[l] = {};
+      Object.keys(DATA[l]).forEach(function(g){
+        state.offsets[l][g] = Math.floor(Math.random() * DATA[l][g].length);
+      });
+    });
   }
   var group = null;
   try { group = localStorage.getItem(GKEY); } catch (e) {}
