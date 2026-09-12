@@ -39,6 +39,8 @@ python -m what_to_id.inat --d1 2025-01-01 --freeze YYYY-MM-DD --quality research
 
 # Build assignment, batches, manifest and site. --max-batches serves only the first N
 # batches per arm and taxon group, so the read-back denominator is fixed before the blitz.
+# --design rotation (opt-in) writes one page where each "Next batch" press takes the identifier
+# to the next list, so every identifier's work splits evenly across lists.
 what-to-id build --pool data/pool_YYYY-MM-DD.parquet --freeze YYYY-MM-DD --d1 YYYY-MM-DD --seed <private-seed> --max-batches N --out out/build
 
 # Read back outcomes 30 days after the blitz
@@ -54,7 +56,7 @@ The similarity and novelty arms need image embeddings: embed the records assigne
 
 ## Publish
 
-The live page is the `site/` folder, served at https://pollocklab.github.io/what-to-id/ by the Pages workflow on every push to main that touches it. After a build, copy `out/build/site/*.html` over `site/`. The workflow refuses any file that is not HTML and any page that names an arm. Keep a real build's manifest and seed out of the repo: with the public code and the same pool, the seed recovers which set is which.
+The live page is the `site/` folder, served at https://pollocklab.github.io/what-to-id/ by the Pages workflow on every push to main that touches it. After a build, copy `out/build/site/*.html` over `site/`; a rotation build writes only `index.html`, so delete the old `arm_*.html` pages when switching. The workflow refuses any file that is not HTML and any page that names an arm. Keep a real build's manifest and seed out of the repo: with the public code and the same pool, the seed recovers which set is which.
 
 The current page is a preview built from a 10,000-record sample frozen on 2026-09-11 (seed 7), not the blitz build.
 
