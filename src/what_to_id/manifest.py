@@ -1,0 +1,125 @@
+"""Exposure manifest: everything needed to reproduce and read back a build."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from collections.abc import Sequence
+from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
+from pathlib import Path
+
+import numpy as np
+
+WHERE_TO_BLITZ_REF = "grid-outputs-v1@3bdcc68"
+LABELFIRST_COMMIT = "5fed14e1870fb8e6ad390d60a9b12e60eaa549f2"
+BLIND_LABELS = "ABCDEFGH"
+
+REQUIRED_KEYS = {
+    "freeze": str,
+    "d1": str,
+    "seed": int,
+    "batch_size": int,
+    "arms": list,
+    "arm_labels": dict,
+    "pool_sha256": str,
+    "pool_rows": int,
+    "where_to_blitz_ref": str,
+    "labelfirst_commit": str,
+    "created_at": str,
+    "batches": dict,
+}
+BATCH_KEYS = ("arm", "group", "url", "ids")
+
+
+def blind_labels(arms: Sequence[str], seed: int) -> dict[str, str]:
+    """arm -> "A"/"B"/... in an order shuffled from seed, so pages never leak the arm name."""
+    arms = list(arms)
+    if len(arms) > len(BLIND_LABELS):
+        raise ValueError(f"at most {len(BLIND_LABELS)} arms supported")
+    perm = np.random.default_rng([int(seed), 0xB11D]).permutation(len(arms))
+    return {arm: BLIND_LABELS[int(p)] for arm, p in zip(arms, perm, strict=True)}
+
+
+def utc_now_iso() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat()
+
+
+@dataclass
+class Manifest:
+    freeze: str
+    d1: str
+    seed: int
+    batch_size: int
+    arms: list[str]
+    arm_labels: dict[str, str]
+    pool_sha256: str
+    pool_rows: int
+    where_to_blitz_ref: str = WHERE_TO_BLITZ_REF
+    labelfirst_commit: str = LABELFIRST_COMMIT
+    embeddings_sha256: str | None = None
+    reference_sha256: str | None = None
+    backbone: str | None = None
+    created_at: str = field(default_factory=utc_now_iso)
+    batches: dict[str, dict] = field(default_factory=dict)
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+def sha256_file(path: Path | str) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def validate_manifest(d: dict) -> None:
+    """Raise ValueError naming the offending key when the manifest dict is malformed."""
+    if not isinstance(d, dict):
+        raise ValueError("manifest must be a dict")
+    for key, typ in REQUIRED_KEYS.items():
+        if key not in d:
+            raise ValueError(f"manifest missing key {key!r}")
+        if not isinstance(d[key], typ) or (typ is int and isinstance(d[key], bool)):
+            raise ValueError(f"manifest key {key!r} must be {typ.__name__}")
+    if not d["arms"]:
+        raise ValueError("manifest key 'arms' must be non-empty")
+    if set(d["arm_labels"]) != set(d["arms"]):
+        raise ValueError("manifest key 'arm_labels' must cover exactly the arms")
+    if len(set(d["arm_labels"].values())) != len(d["arm_labels"]):
+        raise ValueError("manifest key 'arm_labels' must have unique labels")
+    seen: set[int] = set()
+    for bid, b in d["batches"].items():
+        if not isinstance(b, dict):
+            raise ValueError(f"batches[{bid!r}] must be a dict")
+        for k in BATCH_KEYS:
+            if k not in b:
+                raise ValueError(f"batches[{bid!r}] missing key {k!r}")
+        if b["arm"] not in d["arm_labels"]:
+            raise ValueError(f"batches[{bid!r}] arm {b['arm']!r} not in arm_labels")
+        if not isinstance(b["ids"], list) or not b["ids"]:
+            raise ValueError(f"batches[{bid!r}] ids must be a non-empty list")
+        for i in b["ids"]:
+            if not isinstance(i, int) or isinstance(i, bool):
+                raise ValueError(f"batches[{bid!r}] ids must be ints, got {i!r}")
+            if i in seen:
+                raise ValueError(f"batches[{bid!r}] id {i} appears in more than one batch")
+            seen.add(i)
+
+
+def write_manifest(m: Manifest, path: Path | str) -> None:
+    d = m.to_dict()
+    validate_manifest(d)
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w") as fh:
+        json.dump(d, fh, indent=1, sort_keys=True)
+        fh.write("\n")
+
+
+def read_manifest(path: Path | str) -> Manifest:
+    with open(path) as fh:
+        d = json.load(fh)
+    validate_manifest(d)
+    return Manifest(**d)
