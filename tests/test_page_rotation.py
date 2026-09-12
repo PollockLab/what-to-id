@@ -103,14 +103,7 @@ def node_available():
         pytest.skip("node not available")
 
 
-def test_next_batch_js_logic(tmp_path, node_available):
-    """Extract the pure nextBatch() step function and drive it with a small node script."""
-    fn_match = re.search(r"function nextBatch\(state, data, group\) \{.*?\n\}", ROTATION_JS, re.S)
-    assert fn_match, "nextBatch function not found in ROTATION_JS"
-    script = tmp_path / "drive.js"
-    script.write_text(
-        fn_match.group(0)
-        + """
+DRIVER = """
 var labels = ["A", "B", "C", "D"];
 var data = {
   A: {G: ["A-0", "A-1"]},
@@ -118,7 +111,7 @@ var data = {
   C: {G: []},
   D: {G: ["D-0"]}
 };
-var state = {perm: labels, progress: {}};
+var state = {perm: labels, progress: {}, offsets: OFFSETS};
 var served = [];
 var results = [];
 for (var i = 0; i < 12; i++) {
@@ -129,11 +122,29 @@ for (var i = 0; i < 12; i++) {
 }
 console.log(JSON.stringify({results: results, served: served}));
 """
-    )
+
+
+def _drive(tmp_path, offsets):
+    """Extract the pure nextBatch() step function and drive it with a small node script."""
     import subprocess
 
+    fn_match = re.search(r"function nextBatch\(state, data, group\) \{.*?\n\}", ROTATION_JS, re.S)
+    assert fn_match, "nextBatch function not found in ROTATION_JS"
+    script = tmp_path / "drive.js"
+    script.write_text(fn_match.group(0) + DRIVER.replace("OFFSETS", json.dumps(offsets)))
     out = subprocess.run(["node", str(script)], capture_output=True, text=True, check=True)
-    payload = json.loads(out.stdout)
+    return json.loads(out.stdout)
+
+
+def test_next_batch_js_offsets_deal_disjoint_starts(tmp_path, node_available):
+    payload = _drive(tmp_path, {"A": {"G": 1}, "B": {"G": 2}})
+    urls = [r["url"] for r in payload["results"] if not r["done"]]
+    assert urls == ["A-1", "B-2", "D-0", "A-0", "B-0", "B-1"]
+    assert sorted(urls) == ["A-0", "A-1", "B-0", "B-1", "B-2", "D-0"]
+
+
+def test_next_batch_js_logic(tmp_path, node_available):
+    payload = _drive(tmp_path, {})
     results = payload["results"]
     served = payload["served"]
 
