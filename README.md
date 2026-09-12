@@ -47,7 +47,7 @@ what-to-id build --pool data/pool_YYYY-MM-DD.parquet --freeze YYYY-MM-DD --d1 YY
 python -m what_to_id.readback --pool data/pool_YYYY-MM-DD.parquet --assign out/build/batches.parquet --out out/build/outcomes.parquet
 
 # Pre-registered per-identifier comparison for the rotation design: participants only, plus a pre-blitz placebo
-python -m what_to_id.analysis --idents out/build/outcomes_idents.parquet --served out/build/batches.parquet --control recency --start <blitz-start> --cutoff <read-back-cutoff> --users participants.txt --placebo-start <freeze>
+python -m what_to_id.analysis --idents out/build/outcomes_idents.parquet --served out/build/batches.parquet --control recency --start <blitz-start> --cutoff <read-back-cutoff> --users participants.txt --placebo-start <freeze> --obs out/build/outcomes_obs.parquet
 ```
 
 The read-back denominator is the served records only: `assign.parquet` covers the whole frozen pool, but `batches.parquet` holds just the records placed in a served batch, and it carries the `id` and `arm` columns readback needs.

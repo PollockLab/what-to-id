@@ -11,7 +11,9 @@ newest, which draw the most organic attention on iNaturalist. The test is theref
 to the blitz participants' user ids (``users``), and a placebo run over a pre-blitz period on
 the same served sets measures how far organic attention alone separates the arms. The same test
 runs on simulated counts (``power.identifier_power``) and on the real read-back. Naive
-timestamps are read as UTC.
+timestamps are read as UTC. ``exposure`` counts the served records each participant marked
+reviewed, per arm, from the read-back's ``reviewed_by``; it has no timestamps, so it is a
+compliance check on the equal share rotation assumes, not an input to the test.
 """
 
 from __future__ import annotations
@@ -35,6 +37,24 @@ def _utc(value) -> pd.Timestamp:
     return ts.tz_localize("UTC") if ts.tzinfo is None else ts.tz_convert("UTC")
 
 
+def _arm_of(served: pd.DataFrame) -> pd.Series:
+    missing = [c for c in ("id", "arm") if c not in served.columns]
+    if missing:
+        raise ValueError(f"served missing columns {missing}")
+    return served.drop_duplicates("id").set_index("id")["arm"]
+
+
+def _by_arm(pairs: pd.DataFrame, arm_of: pd.Series) -> pd.DataFrame:
+    """Distinct (user_id, id) pairs to a users-by-arms count frame with every served arm."""
+    arms = sorted(arm_of.unique())
+    if pairs.empty:
+        return pd.DataFrame(columns=arms, dtype="int64")
+    pairs = pairs.drop_duplicates().reset_index(drop=True)
+    pairs = pairs.assign(arm=pairs["id"].map(arm_of))
+    out = pairs.groupby(["user_id", "arm"]).size().unstack("arm", fill_value=0)
+    return out.reindex(columns=arms, fill_value=0).astype("int64")
+
+
 def identifier_counts(
     idents: pd.DataFrame,
     served: pd.DataFrame,
@@ -47,13 +67,10 @@ def identifier_counts(
     missing = [c for c in IDENT_NEEDS if c not in idents.columns]
     if missing:
         raise ValueError(f"idents missing columns {missing}; read back with taxon_rank")
-    missing = [c for c in ("id", "arm") if c not in served.columns]
-    if missing:
-        raise ValueError(f"served missing columns {missing}")
+    arm_of = _arm_of(served)
     t0, t1 = _utc(start), _utc(cutoff)
     if t1 <= t0:
         raise ValueError(f"cutoff {cutoff} is not after start {start}")
-    arm_of = served.drop_duplicates("id").set_index("id")["arm"]
     ts = pd.to_datetime(idents["created_at"], utc=True, errors="coerce")
     keep = (
         idents["id"].isin(arm_of.index)
@@ -64,13 +81,36 @@ def identifier_counts(
     )
     if users is not None:
         keep &= idents["user_id"].isin({int(u) for u in users})
-    sub = idents.loc[keep, ["user_id", "id"]].drop_duplicates()
-    arms = sorted(arm_of.unique())
-    if sub.empty:
-        return pd.DataFrame(columns=arms, dtype="int64")
-    sub = sub.assign(arm=sub["id"].map(arm_of))
-    out = sub.groupby(["user_id", "arm"]).size().unstack("arm", fill_value=0)
-    return out.reindex(columns=arms, fill_value=0).astype("int64")
+    return _by_arm(idents.loc[keep, ["user_id", "id"]], arm_of)
+
+
+def exposure(
+    obs: pd.DataFrame, served: pd.DataFrame, *, users: Sequence[int] | None = None
+) -> pd.DataFrame:
+    """Served records each user marked reviewed, per user (rows) and arm (columns)."""
+    missing = [c for c in ("id", "reviewed_by") if c not in obs.columns]
+    if missing:
+        raise ValueError(f"obs missing columns {missing}; read back with reviewed_by")
+    arm_of = _arm_of(served)
+    sub = obs.loc[obs["id"].isin(arm_of.index), ["id", "reviewed_by"]]
+    sub = sub.dropna(subset=["reviewed_by"]).explode("reviewed_by").dropna(subset=["reviewed_by"])
+    sub = sub.rename(columns={"reviewed_by": "user_id"}).astype({"user_id": "int64"})
+    if users is not None:
+        sub = sub[sub["user_id"].isin({int(u) for u in users})]
+    return _by_arm(sub[["user_id", "id"]], arm_of)
+
+
+def exposure_summary(expo: pd.DataFrame) -> pd.DataFrame:
+    """Per arm: users who reviewed any of its records, records reviewed, share of all reviews."""
+    total = int(expo.to_numpy().sum())
+    return pd.DataFrame(
+        {
+            "arm": list(expo.columns),
+            "n_users": [int((expo[a] > 0).sum()) for a in expo.columns],
+            "reviewed": [int(expo[a].sum()) for a in expo.columns],
+            "share": [float(expo[a].sum() / total) if total else 0.0 for a in expo.columns],
+        }
+    )
 
 
 def sign_flip_p(diff: Sequence[float], *, reps: int = 10000, seed: int = 0) -> float:
@@ -149,6 +189,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap.add_argument("--cutoff", required=True, help="count identifications made before this")
     ap.add_argument("--users", type=Path, help="participant iNaturalist user ids, one per line")
     ap.add_argument("--placebo-start", help="also test [placebo-start, start), e.g. the freeze")
+    ap.add_argument("--obs", type=Path, help="read-back obs parquet; adds the exposure check")
     ap.add_argument("--reps", type=int, default=10000)
     ap.add_argument("--seed", type=int, default=0)
     a = ap.parse_args(argv)
@@ -162,6 +203,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         counts = identifier_counts(idents, served, start=t0, cutoff=t1, users=users)
         print(f"{label}: [{t0}, {t1})" + ("" if users is not None else ", all identifiers"))
         _print(analyse(counts, control=a.control, reps=a.reps, seed=a.seed))
+    if a.obs:
+        expo = exposure(pd.read_parquet(a.obs, engine="pyarrow"), served, users=users)
+        who = "participants" if users is not None else "all users"
+        print(f"exposure: served records marked reviewed, {who}, no timestamps")
+        _print(exposure_summary(expo))
     return 0
 
 

@@ -117,3 +117,52 @@ def test_cli_blitz_and_placebo(tmp_path, capsys):
     (tmp_path / "bad.txt").write_text("alice\n")
     with pytest.raises(SystemExit, match="one iNaturalist user id"):
         analysis.main(args[:-4] + ["--users", str(tmp_path / "bad.txt")])
+
+
+def _obs(rows):
+    return pd.DataFrame(rows, columns=["id", "reviewed_by"])
+
+
+def test_exposure_counts_reviews_per_user_and_arm(tmp_path):
+    obs = _obs([(1, [10, 11]), (2, [10]), (3, [10, 10]), (4, None), (9, [10])])
+    p = tmp_path / "obs.parquet"
+    obs.to_parquet(p)
+    for frame in (obs, pd.read_parquet(p)):
+        got = analysis.exposure(frame, SERVED)
+        assert list(got.columns) == ["c", "t"]
+        assert got.loc[10].tolist() == [2, 1]
+        assert got.loc[11].tolist() == [1, 0]
+    assert analysis.exposure(obs, SERVED, users=[11]).index.tolist() == [11]
+
+
+def test_exposure_empty_and_bad_input():
+    empty = analysis.exposure(_obs([(1, []), (2, None)]), SERVED)
+    assert empty.empty and list(empty.columns) == ["c", "t"]
+    with pytest.raises(ValueError, match="reviewed_by"):
+        analysis.exposure(pd.DataFrame({"id": [1]}), SERVED)
+    with pytest.raises(ValueError, match="served missing"):
+        analysis.exposure(_obs([(1, [10])]), pd.DataFrame({"id": [1]}))
+
+
+def test_exposure_summary_shares():
+    expo = analysis.exposure(_obs([(1, [10, 11]), (2, [10]), (3, [10])]), SERVED)
+    s = analysis.exposure_summary(expo)
+    assert s["arm"].tolist() == ["c", "t"]
+    assert s["n_users"].tolist() == [2, 1]
+    assert s["reviewed"].tolist() == [3, 1]
+    assert s["share"].tolist() == [0.75, 0.25]
+    assert analysis.exposure_summary(expo.iloc[0:0])["share"].tolist() == [0.0, 0.0]
+
+
+def test_cli_exposure(tmp_path, capsys):
+    _idents([(1, 10, "2026-11-02T12:00:00Z", "species")]).to_parquet(tmp_path / "i.parquet")
+    _obs([(1, [10, 12]), (3, [10])]).to_parquet(tmp_path / "o.parquet")
+    SERVED.to_parquet(tmp_path / "s.parquet")
+    (tmp_path / "u.txt").write_text("10\n")
+    args = ["--idents", str(tmp_path / "i.parquet"), "--served", str(tmp_path / "s.parquet")]
+    args += ["--control", "c", "--start", "2026-11-01", "--cutoff", "2026-12-01"]
+    args += ["--users", str(tmp_path / "u.txt"), "--obs", str(tmp_path / "o.parquet")]
+    assert analysis.main(args) == 0
+    out = capsys.readouterr().out
+    assert "exposure: served records marked reviewed, participants" in out
+    assert "| c | 1 | 1 | 0.5 |" in out and "| t | 1 | 1 | 0.5 |" in out
