@@ -22,7 +22,8 @@ import numpy as np
 import pandas as pd
 import requests
 
-USER_AGENT = "what-to-id (17180130+wietzesuijker@users.noreply.github.com)"
+from what_to_id.inat import USER_AGENT
+
 INSTALL_HINT = 'uv pip install -e ".[embed]"'
 
 # name -> (loader kind, model id, embedding dim)

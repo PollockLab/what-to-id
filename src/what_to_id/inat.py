@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shutil
 import time
@@ -26,7 +27,9 @@ SLEEP = 0.5
 TIMEOUT = 60
 RETRIES = 5
 RETRY_STATUS = (429, 500, 502, 503, 504)
-USER_AGENT = "what-to-id (17180130+wietzesuijker@users.noreply.github.com)"
+USER_AGENT = os.environ.get(
+    "WHAT_TO_ID_USER_AGENT", "what-to-id (+https://github.com/PollockLab/what-to-id)"
+)
 GROUPS = (
     "Actinopterygii",
     "Amphibia",
