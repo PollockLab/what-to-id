@@ -160,6 +160,49 @@ def test_pull_pool_dedupes_and_writes(tmp_path):
     assert len(back) == 3
 
 
+class FlakySession(FakeSession):
+    """Serves its pages, then fails the way a dropped connection would."""
+
+    def get(self, url, params=None, timeout=None):
+        if not self.pages:
+            raise inat.requests.ConnectionError("dropped")
+        return super().get(url, params=params, timeout=timeout)
+
+
+def _pool(out, sess, groups=("Aves", "Insecta"), **over):
+    kw = {"d1": "2025-01-01", "freeze": "2026-09-11", "out": out, "session": sess, "sleep": 0}
+    kw.update(over)
+    return inat.pull_pool(list(groups), log=lambda _: None, **kw)
+
+
+def test_pull_pool_resumes_after_failure(tmp_path):
+    out = tmp_path / "pool.parquet"
+    with pytest.raises(inat.requests.ConnectionError):
+        _pool(out, FlakySession([[_obs(5), _obs(6)]]))
+    assert not out.exists()
+    assert (tmp_path / "pool.parquet.parts" / "Aves.parquet").exists()
+    sess = FakeSession([[_obs(7)]])
+    df = _pool(out, sess)
+    assert [c["iconic_taxa"] for c in sess.calls] == ["Insecta"]
+    assert sorted(df["id"]) == [5, 6, 7]
+    assert str(df["taxon_id"].dtype) == "Int64"
+    assert not (tmp_path / "pool.parquet.parts").exists()
+
+
+def test_pull_pool_refuses_mismatched_resume(tmp_path):
+    out = tmp_path / "pool.parquet"
+    with pytest.raises(inat.requests.ConnectionError):
+        _pool(out, FlakySession([[_obs(5)]]))
+    with pytest.raises(ValueError, match="remove it first"):
+        _pool(out, FakeSession([]), freeze="2026-10-15")
+
+
+def test_make_session_retries_transient_errors():
+    retry = inat.make_session().get_adapter(inat.INAT).max_retries
+    assert retry.total == inat.RETRIES
+    assert set(retry.status_forcelist) == {429, 500, 502, 503, 504}
+
+
 def test_load_pool_missing_columns(tmp_path):
     p = tmp_path / "bad.parquet"
     pd.DataFrame({"id": [1], "lat": [0.0]}).to_parquet(p)

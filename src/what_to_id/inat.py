@@ -7,19 +7,25 @@ set of observations (iNat keeps regrading and backfilling, so a pull without it 
 from __future__ import annotations
 
 import argparse
+import json
 import re
+import shutil
 import time
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
 import pandas as pd
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 INAT = "https://api.inaturalist.org/v1/observations"
 BC_PLACE_ID = 7085
 PER_PAGE = 200
 SLEEP = 0.5
 TIMEOUT = 60
+RETRIES = 5
+RETRY_STATUS = (429, 500, 502, 503, 504)
 USER_AGENT = "what-to-id (17180130+wietzesuijker@users.noreply.github.com)"
 GROUPS = (
     "Actinopterygii",
@@ -128,6 +134,8 @@ def flatten(obs: dict) -> dict | None:
 def make_session() -> requests.Session:
     s = requests.Session()
     s.headers["User-Agent"] = USER_AGENT
+    retry = Retry(total=RETRIES, backoff_factor=2, status_forcelist=RETRY_STATUS)
+    s.mount("https://", HTTPAdapter(max_retries=retry))
     return s
 
 
@@ -180,15 +188,46 @@ def pull_pool(
     d1: str,
     freeze: str,
     out: Path,
+    quality: str = "needs_id",
+    cap_pages: int | None = None,
+    log: Callable[[str], None] = print,
     **kw,
 ) -> pd.DataFrame:
-    """Pull every group, dedupe on id, write parquet to ``out`` and return the frame."""
-    frames = [pull_group(g, d1=d1, freeze=freeze, **kw) for g in groups]
+    """Pull every group, dedupe on id, write parquet to ``out`` and return the frame.
+
+    Each finished group is checkpointed under ``<out>.parts/``, so a rerun with the same
+    arguments after a failure skips the groups already pulled. The parts are removed once
+    ``out`` is written.
+    """
+    out = Path(out)
+    parts = out.with_name(out.name + ".parts")
+    parts.mkdir(parents=True, exist_ok=True)
+    params = {"d1": d1, "freeze": freeze, "quality": quality, "cap_pages": cap_pages}
+    params_path = parts / "params.json"
+    if params_path.exists():
+        prev = json.loads(params_path.read_text())
+        if prev != params:
+            raise ValueError(f"{parts} holds a pull with {prev}, not {params}; remove it first")
+    else:
+        params_path.write_text(json.dumps(params))
+    frames = []
+    for g in groups:
+        part = parts / f"{g}.parquet"
+        if part.exists():
+            frames.append(pd.read_parquet(part, engine="pyarrow"))
+            log(f"{g}: resumed {len(frames[-1])} rows from {part}")
+            continue
+        frame = pull_group(
+            g, d1=d1, freeze=freeze, quality=quality, cap_pages=cap_pages, log=log, **kw
+        )
+        tmp = part.with_name(part.name + ".tmp")
+        frame.to_parquet(tmp, engine="pyarrow", index=False)
+        tmp.replace(part)
+        frames.append(frame)
     df = pd.concat(frames, ignore_index=True) if frames else _frame([])
     df = df.drop_duplicates("id").reset_index(drop=True)
-    out = Path(out)
-    out.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(out, engine="pyarrow", index=False)
+    shutil.rmtree(parts)
     return df
 
 
