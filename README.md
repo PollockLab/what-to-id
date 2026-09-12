@@ -46,6 +46,10 @@ what-to-id build --pool data/pool_YYYY-MM-DD.parquet --freeze YYYY-MM-DD --d1 YY
 # Read back outcomes 30 days after the blitz
 python -m what_to_id.readback --pool data/pool_YYYY-MM-DD.parquet --assign out/build/batches.parquet --out out/build/outcomes.parquet
 
+# Build the participants file --users reads below, from project members or a sign-up form's logins
+python -m what_to_id.participants --project ID_OR_SLUG --out participants.txt
+python -m what_to_id.participants --logins signups.txt --out participants.txt
+
 # Pre-registered per-identifier comparison for the rotation design: participants only, plus a pre-blitz placebo
 python -m what_to_id.analysis --idents out/build/outcomes_idents.parquet --served out/build/batches.parquet --control recency --start <blitz-start> --cutoff <read-back-cutoff> --users participants.txt --placebo-start <freeze> --obs out/build/outcomes_obs.parquet
 ```
