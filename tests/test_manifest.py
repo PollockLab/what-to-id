@@ -85,6 +85,22 @@ def test_validation_errors(mutate, key):
         validate_manifest(d)
 
 
+def test_design_defaults_to_sets_and_old_manifests_still_validate():
+    m = _manifest()
+    assert m.design == "sets"
+    d = m.to_dict()
+    validate_manifest(d)
+    d.pop("design")  # an old manifest written before "design" existed
+    validate_manifest(d)
+
+
+def test_design_must_be_sets_or_rotation():
+    d = _manifest().to_dict()
+    d["design"] = "bogus"
+    with pytest.raises(ValueError, match="design"):
+        validate_manifest(d)
+
+
 def test_write_rejects_invalid(tmp_path):
     m = _manifest()
     m.batches["recency-Aves-001"] = {"arm": "recency", "group": "Aves", "url": "u", "ids": [1]}
