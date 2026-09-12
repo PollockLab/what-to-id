@@ -1,0 +1,45 @@
+name: pages
+
+# Publishes site/ (a built what-to-id page, copied from out/<build>/site) to GitHub Pages.
+# The build itself runs off-CI because it needs the frozen pool and image embeddings; the
+# manifest with the arm map and the seed never enters site/.
+on:
+  push:
+    branches: [main]
+    paths: ["site/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the site is present and blinded
+        run: |
+          set -euo pipefail
+          test -s site/index.html
+          if find site -type f ! -name '*.html' | grep -q .; then
+            echo "site/ must hold only HTML pages"; find site -type f ! -name '*.html'; exit 1
+          fi
+          if grep -ril -E 'recency|gap_first|gap first|similarity|novelty' site; then
+            echo "an arm name leaked into site/"; exit 1
+          fi
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4

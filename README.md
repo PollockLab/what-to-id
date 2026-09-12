@@ -38,13 +38,19 @@ python -m what_to_id.inat --d1 2025-01-01 --freeze YYYY-MM-DD --out data/pool_YY
 python -m what_to_id.inat --d1 2025-01-01 --freeze YYYY-MM-DD --quality research --out data/ref_YYYY-MM-DD.parquet
 
 # Build assignment, batches, manifest and site
-what-to-id build --pool data/pool_YYYY-MM-DD.parquet --freeze YYYY-MM-DD --d1 YYYY-MM-DD --seed 7 --out out/build
+what-to-id build --pool data/pool_YYYY-MM-DD.parquet --freeze YYYY-MM-DD --d1 YYYY-MM-DD --seed <private-seed> --out out/build
 
 # Read back outcomes 30 days after the blitz
 python -m what_to_id.readback --pool data/pool_YYYY-MM-DD.parquet --assign out/build/assign.parquet --out out/build/outcomes.parquet
 ```
 
 The similarity and novelty arms need image embeddings: embed the records assigned to them with `python -m what_to_id.embed` (a GPU job, see `slurm/embed_mila.sbatch`), then pass `--embeddings` and `--reference-embeddings` to `build`. The `gap_first` arm reads where-to-blitz's `cluster_results/ca`; point `--webapp-dir` or the `WHERE_TO_BLITZ_CA` environment variable at a checkout of it.
+
+## Publish
+
+The live page is the `site/` folder, served at https://pollocklab.github.io/what-to-id/ by the Pages workflow on every push to main that touches it. After a build, copy `out/build/site/*.html` over `site/`. The workflow refuses any file that is not HTML and any page that names an arm. Keep a real build's manifest and seed out of the repo: with the public code and the same pool, the seed recovers which set is which.
+
+The current page is a preview built from a 10,000-record sample frozen on 2026-09-11 (seed 7), not the blitz build.
 
 ## Tests
 
