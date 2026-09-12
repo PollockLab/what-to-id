@@ -1,8 +1,9 @@
-"""Outcome read-back for served records, meant to run at freeze plus 30 days.
+"""Outcome read-back for served records, run once the window after blitz end has closed.
 
 ``readback`` fetches the current state of served ids, ``outcomes`` joins that state to the
 assignment arms and the pool and tallies per-arm shares. ``--dry-run`` skips the fetch and
-reports the unengaged share per iconic group from the pool alone.
+reports the unengaged share per iconic group from the pool alone. Identifications keep their
+timestamps, rank and ``current`` flag, so ``analysis`` can cut them at any date before the fetch.
 """
 
 from __future__ import annotations
@@ -25,7 +26,7 @@ OBS_COLUMNS = (
     "n_identifiers",
     "last_ident_at",
 )
-IDENT_COLUMNS = ("id", "user_id", "created_at", "taxon_id")
+IDENT_COLUMNS = ("id", "user_id", "created_at", "taxon_id", "taxon_rank", "current")
 OUTCOME_COLUMNS = (
     "arm",
     "n_served",
@@ -46,6 +47,8 @@ def summarise(obs: dict) -> dict:
             "user_id": (i.get("user") or {}).get("id"),
             "created_at": i.get("created_at"),
             "taxon_id": (i.get("taxon") or {}).get("id"),
+            "taxon_rank": (i.get("taxon") or {}).get("rank"),
+            "current": i.get("current"),
         }
         for i in idents
     ]

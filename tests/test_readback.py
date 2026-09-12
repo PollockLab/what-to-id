@@ -1,11 +1,16 @@
 import pandas as pd
 import pytest
 
-from what_to_id import readback
+from what_to_id import analysis, readback
 
 
-def _ident(user, ts, taxon):
-    return {"user": {"id": user}, "created_at": ts, "taxon": {"id": taxon}}
+def _ident(user, ts, taxon, rank="species", current=True):
+    return {
+        "user": {"id": user},
+        "created_at": ts,
+        "taxon": {"id": taxon, "rank": rank},
+        "current": current,
+    }
 
 
 OBS = {
@@ -16,7 +21,7 @@ OBS = {
     "identifications_count": 3,
     "identifications": [
         _ident(1, "2026-09-12T00:00:00Z", 1),
-        _ident(2, "2026-09-20T00:00:00Z", 1),
+        _ident(2, "2026-09-20T00:00:00Z", 2, rank="genus", current=False),
         _ident(2, "2026-09-25T00:00:00Z", 1),
     ],
 }
@@ -36,7 +41,11 @@ def test_summarise():
         "user_id": 1,
         "created_at": "2026-09-12T00:00:00Z",
         "taxon_id": 1,
+        "taxon_rank": "species",
+        "current": True,
     }
+    assert s["identifications"][1]["taxon_rank"] == "genus"
+    assert s["identifications"][1]["current"] is False
 
 
 def test_summarise_sparse():
@@ -135,3 +144,10 @@ def test_cli_dry_run(tmp_path, capsys):
     pool.to_parquet(p)
     assert readback.main(["--pool", str(p), "--dry-run"]) == 0
     assert "| Aves |" in capsys.readouterr().out
+
+
+def test_readback_idents_feed_analysis():
+    _, idents_df = readback.readback([11], fetch=lambda ids: [OBS])
+    served = pd.DataFrame({"id": [11], "arm": ["A"]})
+    counts = analysis.identifier_counts(idents_df, served, start="2026-09-01", cutoff="2026-10-01")
+    assert counts["A"].to_dict() == {1: 1, 2: 1}
