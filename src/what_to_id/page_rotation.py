@@ -38,6 +38,17 @@ font-family:"Space Grotesk",Inter,system-ui,sans-serif;transition:filter .12s}
 .nextbtn:hover{filter:brightness(1.08)}
 .nextbtn:disabled{opacity:.5;cursor:default;filter:none}
 #doneMsg{color:var(--mut);margin-top:1rem}
+.flow{display:flex;align-items:center;gap:.6rem;margin:1.2rem 0 0}
+.flow div{flex:1 1 0;display:flex;flex-direction:column;gap:.1rem;padding:.7rem .9rem;
+background:var(--panel);border:1px solid #2a3a4d;border-radius:12px}
+.flow b,.cycle .n{font-family:"Space Grotesk",Inter,system-ui,sans-serif;font-weight:700}
+.flow span{color:var(--mut);font-size:.88rem}
+.flow i,.cycle i{font-style:normal;color:var(--acc);font-size:1.2rem}
+.cycle{display:flex;align-items:center;gap:.5rem;margin:.4rem 0 .8rem}
+.cycle .n{width:2.2rem;height:2.2rem;display:grid;place-items:center;border-radius:50%;
+background:var(--card);color:var(--acc-ink)}
+@media(max-width:44rem){.flow{flex-direction:column;align-items:stretch}
+.flow i{align-self:center;transform:rotate(90deg)}}
 """.strip()
 
 # nextBatch is the one pure function driving the rotation: given the per-browser state, the
@@ -197,9 +208,16 @@ def render_rotation_index(manifest: Manifest, *, title: str) -> str:
         else ""
     )
     sub_html = f'<p class="sub">{sub}</p>\n' if sub else ""
+    arrow = '<i aria-hidden="true">&rarr;</i>'
+    steps = (
+        ("Pick a group", "one you know"),
+        ("Next batch", f"up to {int(manifest.batch_size)} records open in iNaturalist"),
+        ("ID what you can", "skip the rest, then come back"),
+    )
+    flow = arrow.join(f"<div><b>{b}</b><span>{s}</span></div>" for b, s in steps)
+    cycle = arrow.join(f'<span class="n">{i}</span>' for i in range(1, len(data) + 1))
     body = (
-        '<p class="lede">Work through each batch in iNaturalist, then come back for the next '
-        "one.</p>\n"
+        f'<div class="flow">{flow}</div>\n'
         '<section id="picker"><div class="cards" id="groupList"></div></section>\n'
         '<section id="runner" hidden>'
         '<p class="crumbs"><a href="#" id="changeGroup">Change group</a></p>'
@@ -207,6 +225,12 @@ def render_rotation_index(manifest: Manifest, *, title: str) -> str:
         '<button class="nextbtn" id="nextBtn" type="button">Next batch</button>'
         '<p id="doneMsg" hidden>All batches in this group are done.</p>'
         "</section>\n"
+        f'<section class="why"><h2>{len(data)} lists, in turn</h2>'
+        f'<div class="cycle" aria-hidden="true">{cycle}<i>&#8634;</i></div>'
+        f"<p>Each press takes the next of {len(data)} lists, so your batches spread evenly over "
+        "all of them. The lists split one pool of records at random and differ only in the order "
+        "they show them. After the blitz we compare, identifier by identifier, which order led to "
+        "more species-level IDs.</p></section>\n"
     )
     script = (
         f"var DATA={json.dumps(data, sort_keys=True)};"

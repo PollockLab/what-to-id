@@ -65,6 +65,13 @@ def test_render_rotation_index_blind_and_minimal():
     assert "Batch 0" in html
 
 
+def test_render_rotation_index_explains_the_cycle():
+    html = render_rotation_index(_manifest(), title="t")
+    assert html.count('<span class="n">') == 2
+    assert "up to 2 records" in html
+    assert "next of 2 lists" in html
+
+
 def test_render_rotation_index_data_has_every_url_once_in_order():
     m = _manifest()
     html = render_rotation_index(m, title="t")
