@@ -14,6 +14,7 @@ from what_to_id.arms import Arm, build_arm, load_embeddings
 from what_to_id.assign import assign
 from what_to_id.batches import build_batches, identify_url
 from what_to_id.cells import WEBAPP_DIR, score_records
+from what_to_id.embed import emb_cache_path
 from what_to_id.manifest import Manifest, blind_labels, sha256_file, write_manifest
 from what_to_id.page import write_site
 from what_to_id.signals import batch_signals, signals_by_batch
@@ -42,9 +43,17 @@ def _embedding_paths(spec: str | None, groups: list[str]) -> dict[str, Path]:
         d = Path(spec)
         if d.is_dir():
             for g in groups:
-                p = d / f"emb_{g}.npz"
-                if p.exists():
-                    out[g] = p
+                # The embed step writes emb_<group>_<backbone>.npz; emb_<group>.npz also works.
+                hits = sorted(d.glob(emb_cache_path(d, g, "*").name)) or sorted(
+                    d.glob(f"emb_{g}.npz")
+                )
+                if len(hits) > 1:
+                    names = ", ".join(h.name for h in hits)
+                    raise SystemExit(
+                        f"{d}: several embedding files for {g} ({names}); pass a {{group}} pattern"
+                    )
+                if hits:
+                    out[g] = hits[0]
         elif d.exists():
             out = {"*": d}
     if not out:

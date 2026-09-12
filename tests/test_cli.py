@@ -120,3 +120,20 @@ def test_similarity_requires_embeddings(tmp_path, webapp_dir):
                 str(tmp_path / "o"),
             ]
         )
+
+
+def test_embeddings_directory_finds_embed_step_output(tmp_path):
+    from what_to_id.cli import _embedding_paths
+
+    (tmp_path / "emb_Aves_bioclip25.npz").touch()
+    (tmp_path / "emb_Insecta.npz").touch()
+    out = _embedding_paths(str(tmp_path), ["Aves", "Insecta", "Fungi"])
+    assert out == {
+        "Aves": tmp_path / "emb_Aves_bioclip25.npz",
+        "Insecta": tmp_path / "emb_Insecta.npz",
+    }
+    (tmp_path / "emb_Aves_dinov2.npz").touch()
+    with pytest.raises(SystemExit, match="several embedding files for Aves"):
+        _embedding_paths(str(tmp_path), ["Aves"])
+    with pytest.raises(FileNotFoundError):
+        _embedding_paths(str(tmp_path / "empty"), ["Aves"])
