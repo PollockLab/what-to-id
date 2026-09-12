@@ -188,12 +188,17 @@ def identifier_power(
 ) -> float:
     """Power of the pre-registered per-identifier test (analysis.sign_flip_p), rotation only.
 
+    One treatment arm is compared with control at Holm's first-step level, alpha / (n_arms - 1),
+    the bar the smallest p value must clear when only one arm differs, so the result is slightly
+    conservative for the Holm-corrected analysis.
+
     Each identifier's species-level identifications in an arm are Binomial(effort, skill *
     lift_arm); queue competition and the window cap are ignored, which is conservative for
     neither side and small while effort is far below the queue length.
     """
     if sc.design != "rotation":
         raise ValueError("the per-identifier test needs the rotation design")
+    level = alpha / (sc.n_arms - 1)
     rng = np.random.default_rng(seed)
     hits = 0
     for _ in range(reps):
@@ -203,7 +208,7 @@ def identifier_power(
         control = rng.binomial(effort[:, 0], skill)
         treated = rng.binomial(effort[:, 1], np.minimum(1.0, skill * (1.0 + sc.lift)))
         p = sign_flip_p(treated - control, reps=flips, seed=int(rng.integers(2**32)))
-        hits += p < alpha
+        hits += p < level
     return hits / reps
 
 

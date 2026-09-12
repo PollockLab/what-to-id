@@ -73,10 +73,13 @@ def test_analyse_rows_and_control():
 
 
 def test_identifier_power_calibrated_and_rising():
-    null = power.identifier_power(power.Scenario(50, 0.0, "rotation"), reps=300, seed=3)
-    alt = power.identifier_power(power.Scenario(50, 0.3, "rotation"), reps=300, seed=3)
+    null = power.identifier_power(power.Scenario(50, 0.0, "rotation", n_arms=2), reps=300, seed=3)
+    alt = power.identifier_power(power.Scenario(50, 0.3, "rotation", n_arms=2), reps=300, seed=3)
     assert 0.01 <= null <= 0.10
     assert alt > null + 0.3
+    # Four arms test at alpha / 3, so alpha = 0.15 gives a 0.05 level.
+    four = power.identifier_power(power.Scenario(50, 0.0, "rotation"), alpha=0.15, reps=300, seed=3)
+    assert 0.01 <= four <= 0.10
     with pytest.raises(ValueError, match="rotation"):
         power.identifier_power(power.Scenario(50, 0.0, "sets"), reps=1)
 
