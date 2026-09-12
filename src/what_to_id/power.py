@@ -15,6 +15,13 @@ queue (``window``, a denominator fixed before the blitz). Its null distribution 
 under the same design with no lift, so the test is calibrated to the design. That is an oracle
 test: a real analysis must estimate the null spread, which is harder with few identifier
 clusters, so power for ``sets`` is an upper bound.
+
+Within a queue, ``dealing`` controls how identifiers share out the records they work.
+``stacked`` (default) has every identifier work the top ``depth_j`` records of the queue, so
+identifiers overlap completely (the model above). ``random-start`` matches the served page
+(page_rotation): each identifier gets an independent random start offset within the queue's
+served window and works ``effort`` consecutive positions from there, wrapping around, so
+identifiers spread out and overlap only where their stretches happen to meet.
 """
 
 from __future__ import annotations
@@ -30,6 +37,7 @@ import numpy as np
 from what_to_id.analysis import sign_flip_p
 
 DESIGNS = ("sets", "rotation")
+DEALINGS = ("stacked", "random-start")
 
 # BC needs-ID records with photos created 2025-01-01 to 2026-09-11, iNaturalist API counts
 # per iconic group taken 2026-09-12 (Plantae, Insecta, Fungi, Arachnida, Mollusca, Aves,
@@ -42,6 +50,7 @@ class Scenario:
     n_identifiers: int
     lift: float
     design: str = "sets"
+    dealing: str = "stacked"
     n_arms: int = 4
     group_counts: tuple[int, ...] = BC_GROUP_COUNTS
     window: int = 3000
@@ -55,6 +64,8 @@ class Scenario:
     def __post_init__(self):
         if self.design not in DESIGNS:
             raise ValueError(f"design must be one of {DESIGNS}, got {self.design!r}")
+        if self.dealing not in DEALINGS:
+            raise ValueError(f"dealing must be one of {DEALINGS}, got {self.dealing!r}")
         if self.n_identifiers < 1 or self.n_arms < 2 or self.window < 1:
             raise ValueError("need n_identifiers >= 1, n_arms >= 2, window >= 1")
         if self.lift <= -1 or not 0 <= self.background < 1:
@@ -74,6 +85,31 @@ def _queue(depths, p, n, window, rng) -> tuple[int, int]:
     a = int(rng.binomial(inside, p_res).sum())
     b = int(rng.binomial(d - lo - inside, p_res).sum())
     return a + b, a
+
+
+def _queue_random_start(effort: np.ndarray, p: np.ndarray, window: int, rng) -> int:
+    """Blitz-resolved records within the served window, each identifier from a random start.
+
+    Each identifier works a contiguous, ``effort``-long stretch of window positions from an
+    independent uniform start, wrapping around at ``window``, as page_rotation deals each
+    browser. Unlike ``_queue``, no identified work reaches past the window, since the page only
+    ever serves a ``window``-sized list.
+    """
+    if effort.size == 0 or window <= 0:
+        return 0
+    length = np.minimum(effort, window)
+    total = int(length.sum())
+    if total == 0:
+        return 0
+    starts = rng.integers(window, size=length.size)
+    within = np.arange(total) - np.repeat(np.cumsum(length) - length, length)
+    positions = (np.repeat(starts, length) + within) % window
+    log_survive = np.zeros(window)
+    with np.errstate(divide="ignore"):
+        # log1p(-1) = -inf for p == 1 (certain resolution), which is a legitimate skill value.
+        np.add.at(log_survive, positions, np.repeat(np.log1p(-p), length))
+        p_res = -np.expm1(log_survive)
+    return int(rng.binomial(1, p_res).sum())
 
 
 def _depths(sc: Scenario, n: int, rng) -> np.ndarray:
@@ -118,7 +154,11 @@ def simulate(sc: Scenario, reps: int, seed: int) -> dict[str, np.ndarray]:
             whole = win = 0
             for g, qn in enumerate(queue_n):
                 m = (group == g) & (effort[:, arm] > 0)
-                w, i = _queue(effort[m, arm], p[m], qn, sc.window, rng)
+                if sc.dealing == "stacked":
+                    w, i = _queue(effort[m, arm], p[m], qn, sc.window, rng)
+                else:
+                    i = _queue_random_start(effort[m, arm], p[m], min(qn, sc.window), rng)
+                    w = i
                 whole, win = whole + w, win + i
             bg_in = rng.binomial(win_total - win, sc.background)
             bg_out = rng.binomial(arm_total - win_total - (whole - win), sc.background)
@@ -178,27 +218,28 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap.add_argument("--reps", type=int, default=2000)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--window", type=int, default=3000)
+    ap.add_argument("--dealing", choices=DEALINGS, default="stacked")
     ap.add_argument("--depths", type=Path, help="JSON list of per-identifier record counts")
     ap.add_argument("--out", type=Path, help="write all results as JSON")
     a = ap.parse_args(argv)
     depths = tuple(int(x) for x in json.loads(a.depths.read_text())) if a.depths else None
     rows = []
     print(
-        "| design | identifiers | lift | power (pool) | power (window) | null sd (window) "
-        "| power (per identifier) |"
+        "| design | dealing | identifiers | lift | power (pool) | power (window) | "
+        "null sd (window) | power (per identifier) |"
     )
-    print("|---|---|---|---|---|---|---|")
+    print("|---|---|---|---|---|---|---|---|")
     for design in DESIGNS:
         for n in (int(x) for x in _floats(a.identifiers)):
             for lift in _floats(a.lifts):
-                sc = Scenario(n, lift, design, window=a.window, depths=depths)
+                sc = Scenario(n, lift, design, dealing=a.dealing, window=a.window, depths=depths)
                 r = power(sc, reps=a.reps, seed=a.seed)
                 if design == "rotation":
                     r["identifier"] = {"power": identifier_power(sc, reps=a.reps, seed=a.seed)}
                 rows.append(r)
                 ident = f"{r['identifier']['power']:.2f}" if "identifier" in r else "n/a"
                 print(
-                    f"| {design} | {n} | {lift:.2f} | {r['pool']['power']:.2f} | "
+                    f"| {design} | {a.dealing} | {n} | {lift:.2f} | {r['pool']['power']:.2f} | "
                     f"{r['window']['power']:.2f} | {r['window']['null_sd']:.0f} | {ident} |"
                 )
     if a.out:
