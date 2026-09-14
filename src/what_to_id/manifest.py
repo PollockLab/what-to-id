@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import json
 import os
+import subprocess
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
@@ -189,3 +190,57 @@ def read_manifest(path: Path | str) -> Manifest:
         d = json.load(fh)
     validate_manifest(d)
     return Manifest(**d)
+
+
+# The public subset of the manifest: everything needed to rerun a build, and nothing that maps
+# list letters to arms (arm_labels, batches) or the key. Single source of truth for build_record.
+PUBLIC_BUILD_RECORD_FIELDS = (
+    "freeze",
+    "d1",
+    "seed",
+    "batch_size",
+    "max_batches",
+    "design",
+    "assignment",
+    "arms",
+    "key_fingerprint",
+    "pool_sha256",
+    "pool_rows",
+    "served_rows",
+    "where_to_blitz_ref",
+    "where_to_blitz_grid",
+    "embeddings_sha256",
+    "reference_sha256",
+    "created_at",
+)
+
+
+def code_commit() -> str | None:
+    """The running code's commit: `git rev-parse HEAD` of this package's repo, else $GITHUB_SHA.
+
+    The checkout comes first because the daily job may run a pinned CODE_REF, and then
+    $GITHUB_SHA names the commit that triggered the run, not the code that ran. Never raises: a
+    build record with a missing code_commit is still useful.
+    """
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=Path(__file__).resolve().parent,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=True,
+        )
+        if out.stdout.strip():
+            return out.stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return os.environ.get("GITHUB_SHA") or None
+
+
+def build_record(m: Manifest) -> dict:
+    """The public per-build record: everything needed to rerun this build, safe to publish."""
+    d = m.to_dict()
+    record = {k: d[k] for k in PUBLIC_BUILD_RECORD_FIELDS}
+    record["code_commit"] = code_commit()
+    return record

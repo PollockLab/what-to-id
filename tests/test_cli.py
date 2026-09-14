@@ -228,6 +228,44 @@ def test_build_records_the_grid_it_read(tmp_path, webapp_dir, monkeypatch):
     assert d["where_to_blitz_grid"] == "f67acf37"
 
 
+def test_build_writes_a_public_build_record(tmp_path, webapp_dir, monkeypatch):
+    monkeypatch.setenv("WHAT_TO_ID_KEY", "ab" * 32)
+    pool_path = tmp_path / "pool.parquet"
+    make_pool(100, seed=5).to_parquet(pool_path, index=False)
+    log_path = tmp_path / "served.parquet"
+    out = tmp_path / "o1"
+    assert _keyed_build(pool_path, webapp_dir, out, "2026-11-03", log_path) == 0
+    manifest = json.loads((out / "manifest.json").read_text())
+    record = json.loads((out / "build_record.json").read_text())
+
+    assert "arm_labels" not in record
+    assert "batches" not in record
+    assert manifest["arm_labels"] not in record.values()
+    assert record["pool_sha256"] == manifest["pool_sha256"]
+    assert record["arms"] == manifest["arms"]
+    for key in (
+        "freeze",
+        "d1",
+        "seed",
+        "batch_size",
+        "max_batches",
+        "design",
+        "assignment",
+        "arms",
+        "key_fingerprint",
+        "pool_sha256",
+        "pool_rows",
+        "served_rows",
+        "where_to_blitz_ref",
+        "where_to_blitz_grid",
+        "embeddings_sha256",
+        "reference_sha256",
+        "created_at",
+        "code_commit",
+    ):
+        assert key in record
+
+
 def test_build_rejects_bad_date(tmp_path):
     with pytest.raises(SystemExit):
         main(["build", "--freeze", "2026-13-01", "--d1", "2026-09-15", "--pool", "x"])

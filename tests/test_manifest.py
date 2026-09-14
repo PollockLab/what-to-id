@@ -1,4 +1,6 @@
 import json
+import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -7,6 +9,7 @@ from what_to_id.manifest import (
     Manifest,
     blind_labels,
     blind_labels_keyed,
+    code_commit,
     key_fingerprint,
     key_from_env,
     read_manifest,
@@ -184,3 +187,14 @@ def test_key_fingerprint_does_not_contain_key_hex():
     assert fp not in KEY.hex()
     assert fp == key_fingerprint(KEY)
     assert fp != key_fingerprint(KEY2)
+
+
+def test_code_commit_names_the_checkout_not_the_trigger(monkeypatch):
+    # With CODE_REF pinned, GITHUB_SHA is the commit that triggered the run, not the code that ran.
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=Path(__file__).parent, capture_output=True, text=True
+    )
+    if head.returncode != 0:
+        pytest.skip("not a git checkout")
+    monkeypatch.setenv("GITHUB_SHA", "0" * 40)
+    assert code_commit() == head.stdout.strip()
