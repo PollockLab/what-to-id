@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
+import os
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
@@ -42,6 +44,46 @@ def blind_labels(arms: Sequence[str], seed: int) -> dict[str, str]:
     return {arm: BLIND_LABELS[int(p)] for arm, p in zip(arms, perm, strict=True)}
 
 
+def blind_labels_keyed(arms: Sequence[str], key: bytes) -> dict[str, str]:
+    """Like `blind_labels`, but the permutation comes from the key, not a public seed.
+
+    Deterministic for a given (key, arms): depends on neither the pool nor a public
+    seed, so the blind label mapping cannot be reconstructed without the key.
+    """
+    arms = list(arms)
+    if len(arms) > len(BLIND_LABELS):
+        raise ValueError(f"at most {len(BLIND_LABELS)} arms supported")
+    digest = hmac.new(key, b"what-to-id labels", hashlib.sha256).digest()
+    seed = int.from_bytes(digest[:8], "big")
+    perm = np.random.default_rng(seed).permutation(len(arms))
+    return {arm: BLIND_LABELS[int(p)] for arm, p in zip(arms, perm, strict=True)}
+
+
+def key_from_env(name: str = "WHAT_TO_ID_KEY") -> bytes:
+    """Read a hex-encoded key from an environment variable.
+
+    Requires at least 32 hex chars (16 bytes). Error messages never include the
+    variable's value, so a raised error is always safe to log.
+    """
+    raw = os.environ.get(name)
+    if raw is None:
+        raise ValueError(f"environment variable {name!r} is not set")
+    raw = raw.strip()
+    if not raw:
+        raise ValueError(f"environment variable {name!r} is empty")
+    if len(raw) < 32:
+        raise ValueError(f"environment variable {name!r} must be at least 32 hex chars")
+    try:
+        return bytes.fromhex(raw)
+    except ValueError as exc:
+        raise ValueError(f"environment variable {name!r} must be valid hex") from exc
+
+
+def key_fingerprint(key: bytes) -> str:
+    """First 12 hex chars of sha256(b"what-to-id fingerprint" + key). Safe to publish."""
+    return hashlib.sha256(b"what-to-id fingerprint" + key).hexdigest()[:12]
+
+
 def utc_now_iso() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat()
 
@@ -66,6 +108,8 @@ class Manifest:
     created_at: str = field(default_factory=utc_now_iso)
     batches: dict[str, dict] = field(default_factory=dict)
     design: str = "sets"
+    assignment: str = "stratified"
+    key_fingerprint: str | None = None
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -92,6 +136,8 @@ def validate_manifest(d: dict) -> None:
         raise ValueError("manifest key 'arms' must be non-empty")
     if "design" in d and d["design"] not in ("sets", "rotation"):
         raise ValueError("manifest key 'design' must be 'sets' or 'rotation'")
+    if "assignment" in d and d["assignment"] not in ("stratified", "keyed"):
+        raise ValueError("manifest key 'assignment' must be 'stratified' or 'keyed'")
     if set(d["arm_labels"]) != set(d["arms"]):
         raise ValueError("manifest key 'arm_labels' must cover exactly the arms")
     if len(set(d["arm_labels"].values())) != len(d["arm_labels"]):

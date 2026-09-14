@@ -6,11 +6,17 @@ from what_to_id.manifest import (
     LABELFIRST_COMMIT,
     Manifest,
     blind_labels,
+    blind_labels_keyed,
+    key_fingerprint,
+    key_from_env,
     read_manifest,
     sha256_file,
     validate_manifest,
     write_manifest,
 )
+
+KEY = bytes.fromhex("00112233445566778899aabbccddeeff00112233445566778899aabbccddee")
+KEY2 = bytes.fromhex("ff112233445566778899aabbccddeeff00112233445566778899aabbccddee")
 
 
 def _manifest():
@@ -106,3 +112,75 @@ def test_write_rejects_invalid(tmp_path):
     m.batches["recency-Aves-001"] = {"arm": "recency", "group": "Aves", "url": "u", "ids": [1]}
     with pytest.raises(ValueError):
         write_manifest(m, tmp_path / "m.json")
+
+
+def test_assignment_and_key_fingerprint_defaults():
+    m = _manifest()
+    assert m.assignment == "stratified"
+    assert m.key_fingerprint is None
+    d = m.to_dict()
+    validate_manifest(d)
+    d.pop("assignment")
+    d.pop("key_fingerprint")
+    validate_manifest(d)  # old manifests written before these keys existed still validate
+
+
+def test_assignment_must_be_stratified_or_keyed():
+    d = _manifest().to_dict()
+    d["assignment"] = "bogus"
+    with pytest.raises(ValueError, match="assignment"):
+        validate_manifest(d)
+
+
+def test_blind_labels_keyed_deterministic_and_pool_independent():
+    lab = blind_labels_keyed(["recency", "gap_first", "similarity"], KEY)
+    assert set(lab.values()) == {"A", "B", "C"}
+    assert lab == blind_labels_keyed(["recency", "gap_first", "similarity"], KEY)
+
+
+def test_blind_labels_keyed_depends_on_key():
+    lab = blind_labels_keyed(["recency", "gap_first", "similarity"], KEY)
+    lab2 = blind_labels_keyed(["recency", "gap_first", "similarity"], KEY2)
+    assert lab != lab2
+
+
+def test_key_from_env_missing(monkeypatch):
+    monkeypatch.delenv("WHAT_TO_ID_KEY", raising=False)
+    with pytest.raises(ValueError, match="not set"):
+        key_from_env()
+
+
+def test_key_from_env_too_short(monkeypatch):
+    monkeypatch.setenv("WHAT_TO_ID_KEY", "abcd")
+    with pytest.raises(ValueError, match="32 hex"):
+        key_from_env()
+
+
+def test_key_from_env_non_hex(monkeypatch):
+    short_secret = "zz" * 16
+    monkeypatch.setenv("WHAT_TO_ID_KEY", short_secret)
+    with pytest.raises(ValueError) as exc_info:
+        key_from_env()
+    assert short_secret not in str(exc_info.value)
+
+
+def test_key_from_env_error_never_leaks_value(monkeypatch):
+    secret = "ab" * 16
+    monkeypatch.setenv("WHAT_TO_ID_KEY", "nothex" + secret)
+    with pytest.raises(ValueError) as exc_info:
+        key_from_env()
+    assert secret not in str(exc_info.value)
+
+
+def test_key_from_env_reads_hex(monkeypatch):
+    monkeypatch.setenv("WHAT_TO_ID_KEY", "  " + KEY.hex() + "  ")
+    assert key_from_env() == KEY
+
+
+def test_key_fingerprint_does_not_contain_key_hex():
+    fp = key_fingerprint(KEY)
+    assert len(fp) == 12
+    assert KEY.hex() not in fp
+    assert fp not in KEY.hex()
+    assert fp == key_fingerprint(KEY)
+    assert fp != key_fingerprint(KEY2)
