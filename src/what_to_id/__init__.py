@@ -1,3 +1,3 @@
-"""what-to-id: batch-composition arms for the BC iNaturalist identification blitz."""
+"""what-to-id: randomised identification-queue orders for iNaturalist, first run in BC."""
 
 __version__ = "0.1.0"
