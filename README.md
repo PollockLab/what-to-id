@@ -74,10 +74,10 @@ The first run is a BC identification blitz in autumn 2026, with Blitz the Gap. T
 
 ```bash
 uv venv && source .venv/bin/activate
-uv pip install -e ".[dev]"      # add ,embed for the image-embedding step
+uv pip install -e ".[dev]"      # add ,embed for the image-embedding step, ,similarity for look-alike batches
 ```
 
-One dependency, `labelfirst`, is a private repository pinned by commit in `pyproject.toml`, so installing needs access to it. It is used only by the similarity arm's seed picker and the separability report.
+The `similarity` extra installs `labelfirst`, a private repository pinned by commit in `pyproject.toml`, so it needs access to that repository. Only the look-alike list's seed picker and the separability report use it; the two-list build and the daily job run without it.
 
 ## Use
 

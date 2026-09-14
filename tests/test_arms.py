@@ -72,6 +72,7 @@ def _mean_intra_batch_distance(E_by_id, batches):
 
 
 def test_similarity_groups_similar_records(tmp_path, pool):
+    pytest.importorskip("labelfirst")
     pool = pool[pool["iconic_taxon"] == "Aves"].reset_index(drop=True)
     ids = pool["id"].to_numpy()
     embedded_ids = ids[:-5]  # last five records have no embedding
@@ -104,6 +105,7 @@ def test_similarity_groups_similar_records(tmp_path, pool):
 
 
 def test_similarity_centre_order_by_cell_score(tmp_path):
+    pytest.importorskip("labelfirst")
     n = 40
     pool = make_pool(n, groups=["Aves"])
     npz = tmp_path / "e.npz"
@@ -115,6 +117,7 @@ def test_similarity_centre_order_by_cell_score(tmp_path):
 
 
 def test_similarity_no_embeddings_falls_back_to_recency(tmp_path, pool):
+    pytest.importorskip("labelfirst")
     npz = tmp_path / "e.npz"
     _two_cluster_npz(npz, [1, 2, 3, 4])
     sub = pool.head(20)
