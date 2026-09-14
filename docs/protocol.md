@@ -75,7 +75,7 @@ Simulated on BC identifier effort from August 2026, two lists with 25 participan
 
 ## Reproducibility
 
-Each daily build comes from a pull of the iNaturalist API at a recorded time, the private list key, and the published where-to-blitz grid release. Every day's served batches and record ids are logged by list letter, so exposure is fully known and the read-back is a join, not a reconstruction. The key maps letters to lists after the read-back.
+Each daily build comes from a pull of the iNaturalist API at a recorded time, the private list key, and a pinned where-to-blitz commit whose grid is recorded by its hash in every build. Every day's served batches and record ids are logged by list letter, so exposure is fully known and the read-back is a join, not a reconstruction. The key maps letters to lists after the read-back.
 
 ## Open with the BC team
 
