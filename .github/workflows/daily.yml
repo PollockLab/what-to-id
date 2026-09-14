@@ -1,0 +1,127 @@
+name: daily
+
+# Rebuilds the rotation page every morning from the day's BC needs-ID pool and deploys it to
+# GitHub Pages. The repository is public, so nothing here may print or upload the list key or
+# anything that maps list letters to lists: the only files kept are the pool and the served log
+# (letters only), as assets on the pool-state release. out/ holds the manifest with the map and
+# is never uploaded.
+on:
+  schedule:
+    - cron: "17 13 * * *" # about 06:17 in Vancouver
+  workflow_dispatch:
+    inputs:
+      full_pull:
+        description: "Pull the whole pool (hours) instead of the records created since the last run"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# Shared with pages.yml so two deploys never race.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  D1: "2025-01-01" # earliest observed_on in the pool
+  WTB_SHA: 3bdcc68f8d9d17aa5c6060dcbcd965a597dfadc7 # where-to-blitz grid behind the cell scores
+  STATE_TAG: pool-state
+  WHAT_TO_ID_USER_AGENT: what-to-id daily build (https://github.com/PollockLab/what-to-id)
+
+jobs:
+  build:
+    # The schedule stays off until the repository variable DAILY_ENABLED is "true".
+    if: github.event_name == 'workflow_dispatch' || vars.DAILY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BLITZ_D1: ${{ vars.BLITZ_D1 || '2026-11-01' }}
+      FULL_PULL: ${{ inputs.full_pull }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: PollockLab/where-to-blitz
+          ref: ${{ env.WTB_SHA }}
+          path: wtb
+          sparse-checkout: cluster_results/ca
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install .
+      - name: Check the list key is set
+        env:
+          WHAT_TO_ID_KEY: ${{ secrets.WHAT_TO_ID_KEY }}
+        run: |
+          if [ -z "$WHAT_TO_ID_KEY" ]; then
+            echo "::error::Repository secret WHAT_TO_ID_KEY is not set; run the setup wizard"
+            exit 1
+          fi
+      - name: Fetch the pool state
+        run: |
+          set -euo pipefail
+          echo "TODAY=$(date -u +%F)" >> "$GITHUB_ENV"
+          mkdir -p state
+          if gh release view "$STATE_TAG" >/dev/null 2>&1; then
+            gh release download "$STATE_TAG" -D state -p pool.parquet -p served.parquet --clobber || true
+          fi
+          ls -la state
+      - name: Update the pool
+        run: |
+          set -euo pipefail
+          if [ "$FULL_PULL" = "true" ] || [ ! -s state/pool.parquet ]; then
+            python -m what_to_id.inat --d1 "$D1" --freeze "$TODAY" --out state/pool.parquet
+          else
+            python -m what_to_id.pool_state update --pool state/pool.parquet --d1 "$D1"
+          fi
+      - name: Build, drop records identified since the pull, rebuild
+        env:
+          WHAT_TO_ID_KEY: ${{ secrets.WHAT_TO_ID_KEY }}
+        run: |
+          set -euo pipefail
+          common=(--pool state/pool.parquet --freeze "$TODAY" --d1 "$BLITZ_D1"
+            --design rotation --max-batches 20 --key-env WHAT_TO_ID_KEY
+            --webapp-dir wtb/cluster_results/ca)
+          what-to-id build "${common[@]}" --out out/draft
+          python -m what_to_id.pool_state refresh --pool state/pool.parquet --ids out/draft/batches.parquet
+          what-to-id build "${common[@]}" --out out/final --served-log state/served.parquet
+      - name: Check nothing maps letters to lists
+        env:
+          WHAT_TO_ID_KEY: ${{ secrets.WHAT_TO_ID_KEY }}
+        run: |
+          set -euo pipefail
+          site=out/final/site
+          test -s "$site/index.html"
+          if find "$site" -type f ! -name '*.html' | grep -q .; then
+            echo "the site must hold only HTML pages"; exit 1
+          fi
+          if grep -ril -E 'recency|gap_first|gap first|similarity|novelty' "$site"; then
+            echo "an arm name leaked into the site"; exit 1
+          fi
+          if grep -rlF "$WHAT_TO_ID_KEY" "$site" state; then
+            echo "the list key leaked into an uploaded file"; exit 1
+          fi
+          python -c "import pandas as pd; c = list(pd.read_parquet('state/served.parquet').columns); assert 'arm' not in c, c"
+      - name: Save the pool state
+        run: |
+          set -euo pipefail
+          gh release view "$STATE_TAG" >/dev/null 2>&1 || gh release create "$STATE_TAG" \
+            --prerelease --latest=false --title "Daily pool state" \
+            --notes "Pool and served log (list letters only) kept between daily builds."
+          gh release upload "$STATE_TAG" state/pool.parquet state/served.parquet --clobber
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: out/final/site
+      - id: deployment
+        uses: actions/deploy-pages@v4
