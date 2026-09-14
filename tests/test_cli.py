@@ -213,6 +213,21 @@ def test_keyed_daily_builds_keep_lists_and_log_letters_only(
         assert word not in text
 
 
+def test_build_records_the_grid_it_read(tmp_path, webapp_dir, monkeypatch):
+    monkeypatch.setenv("WHAT_TO_ID_KEY", "ab" * 32)
+    pool_path = tmp_path / "pool.parquet"
+    make_pool(100, seed=5).to_parquet(pool_path, index=False)
+    log_path = tmp_path / "served.parquet"
+    assert _keyed_build(pool_path, webapp_dir, tmp_path / "o1", "2026-11-03", log_path) == 0
+    assert (
+        json.loads((tmp_path / "o1" / "manifest.json").read_text())["where_to_blitz_grid"] is None
+    )
+    (webapp_dir / "provenance.json").write_text(json.dumps({"manifest_hash": "f67acf37"}))
+    assert _keyed_build(pool_path, webapp_dir, tmp_path / "o2", "2026-11-04", log_path) == 0
+    d = json.loads((tmp_path / "o2" / "manifest.json").read_text())
+    assert d["where_to_blitz_grid"] == "f67acf37"
+
+
 def test_build_rejects_bad_date(tmp_path):
     with pytest.raises(SystemExit):
         main(["build", "--freeze", "2026-13-01", "--d1", "2026-09-15", "--pool", "x"])

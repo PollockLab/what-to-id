@@ -13,7 +13,9 @@ from pathlib import Path
 
 import numpy as np
 
-WHERE_TO_BLITZ_REF = "grid-outputs-v1@3bdcc68"
+# The where-to-blitz commit whose cluster_results/ca the cell scores are read from. Not the
+# grid-outputs-v1 release: that tag predates the 25 km equal-area lattice the scores use.
+WHERE_TO_BLITZ_REF = "where-to-blitz@3bdcc68f8d9d17aa5c6060dcbcd965a597dfadc7"
 LABELFIRST_COMMIT = "5fed14e1870fb8e6ad390d60a9b12e60eaa549f2"
 BLIND_LABELS = "ABCDEFGH"
 
@@ -84,6 +86,17 @@ def key_fingerprint(key: bytes) -> str:
     return hashlib.sha256(b"what-to-id fingerprint" + key).hexdigest()[:12]
 
 
+def grid_hash(webapp_dir: Path | str) -> str | None:
+    """The where-to-blitz grid's manifest_hash from its provenance.json, None if absent.
+
+    Names the grid the cell scores were actually read from, whatever commit was checked out.
+    """
+    path = Path(webapp_dir) / "provenance.json"
+    if not path.exists():
+        return None
+    return json.loads(path.read_text()).get("manifest_hash")
+
+
 def utc_now_iso() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat()
 
@@ -110,6 +123,7 @@ class Manifest:
     design: str = "sets"
     assignment: str = "stratified"
     key_fingerprint: str | None = None
+    where_to_blitz_grid: str | None = None
 
     def to_dict(self) -> dict:
         return asdict(self)
