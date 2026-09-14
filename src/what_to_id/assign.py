@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import zlib
 from collections.abc import Sequence
 
@@ -65,4 +67,40 @@ def assign(pool: pd.DataFrame, arms: Sequence[str], *, seed: int) -> pd.DataFram
     df["arm"] = df["arm"].astype(str)
     df["stratum"] = df["stratum"].astype(str)
     df["seed"] = np.int64(seed)
+    return df.sort_values("id", kind="stable").reset_index(drop=True)
+
+
+def _keyed_arm(uid: int, arms: Sequence[str], key: bytes) -> str:
+    digest = hmac.new(key, str(int(uid)).encode(), hashlib.sha256).digest()
+    return arms[int.from_bytes(digest[:8], "big") % len(arms)]
+
+
+def assign_keyed(pool: pd.DataFrame, arms: Sequence[str], *, key: bytes) -> pd.DataFrame:
+    """Per record: arm = HMAC-SHA256(key, id) mod len(arms), stable across pool changes.
+
+    A record's arm depends only on its id and the key, never on the rest of the pool,
+    so it stays on the same list across builds as the pool grows or shrinks. Returns
+    columns id, arm, stratum, seed (seed is always -1, marking a keyed assignment;
+    stratum is still filled in, for information, via the same strata helper as `assign`).
+    """
+    arms = list(arms)
+    if not arms:
+        raise ValueError("arms must be non-empty")
+    if len(set(arms)) != len(arms):
+        raise ValueError(f"arms must be unique, got {arms}")
+    if not key:
+        raise ValueError("key must be non-empty")
+    if pool["id"].duplicated().any():
+        raise ValueError("pool ids must be unique")
+    st = strata(pool)
+    df = pd.DataFrame(
+        {
+            "id": pool["id"].to_numpy(dtype=np.int64),
+            "arm": [_keyed_arm(uid, arms, key) for uid in pool["id"]],
+            "stratum": st.to_numpy(dtype=object),
+        }
+    )
+    df["arm"] = df["arm"].astype(str)
+    df["stratum"] = df["stratum"].astype(str)
+    df["seed"] = np.int64(-1)
     return df.sort_values("id", kind="stable").reset_index(drop=True)

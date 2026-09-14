@@ -2,11 +2,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from what_to_id.assign import assign, strata
+from what_to_id.assign import assign, assign_keyed, strata
 
 from .conftest import make_pool
 
 ARMS = ["recency", "gap_first", "similarity"]
+KEY = bytes.fromhex("00112233445566778899aabbccddeeff00112233445566778899aabbccddee")
+KEY2 = bytes.fromhex("ff112233445566778899aabbccddeeff00112233445566778899aabbccddee")
 
 
 def test_strata_format():
@@ -77,3 +79,60 @@ def test_validation(pool):
     dup = pd.concat([pool, pool.head(1)], ignore_index=True)
     with pytest.raises(ValueError):
         assign(dup, ARMS, seed=0)
+
+
+def test_keyed_schema_and_seed_marker(pool):
+    a = assign_keyed(pool, ARMS, key=KEY)
+    assert list(a.columns) == ["id", "arm", "stratum", "seed"]
+    assert len(a) == len(pool)
+    assert set(a["id"]) == set(pool["id"])
+    assert (a["seed"] == -1).all()
+    assert set(a["arm"]) <= set(ARMS)
+    assert list(a["id"]) == sorted(a["id"])
+
+
+def test_keyed_deterministic(pool):
+    a = assign_keyed(pool, ARMS, key=KEY)
+    b = assign_keyed(pool, ARMS, key=KEY)
+    pd.testing.assert_frame_equal(a, b)
+
+
+def test_keyed_different_keys_differ(pool):
+    a = assign_keyed(pool, ARMS, key=KEY)
+    b = assign_keyed(pool, ARMS, key=KEY2)
+    assert not a["arm"].equals(b["arm"])
+
+
+def test_keyed_stable_across_pool_changes(pool):
+    a = assign_keyed(pool, ARMS, key=KEY)
+    shrunk = pool.iloc[: len(pool) // 2].reset_index(drop=True)
+    extra = make_pool(30, seed=9, groups=["Mollusca"])
+    extra["id"] += 100000
+    grown = pd.concat([pool, extra], ignore_index=True)
+    b_shrunk = assign_keyed(shrunk, ARMS, key=KEY)
+    b_grown = assign_keyed(grown, ARMS, key=KEY)
+    merged_shrunk = a.merge(b_shrunk, on="id", suffixes=("_a", "_b"))
+    merged_grown = a.merge(b_grown, on="id", suffixes=("_a", "_b"))
+    assert (merged_shrunk["arm_a"] == merged_shrunk["arm_b"]).all()
+    assert (merged_grown["arm_a"] == merged_grown["arm_b"]).all()
+
+
+def test_keyed_roughly_balanced():
+    pool = make_pool(20000, groups=["Aves"], n_users=200)
+    two_arms = ["a", "b"]
+    a = assign_keyed(pool, two_arms, key=KEY)
+    share = a["arm"].value_counts(normalize=True)
+    assert abs(share["a"] - 0.5) < 0.02
+    assert abs(share["b"] - 0.5) < 0.02
+
+
+def test_keyed_validation(pool):
+    with pytest.raises(ValueError):
+        assign_keyed(pool, [], key=KEY)
+    with pytest.raises(ValueError):
+        assign_keyed(pool, ["a", "a"], key=KEY)
+    with pytest.raises(ValueError):
+        assign_keyed(pool, ARMS, key=b"")
+    dup = pd.concat([pool, pool.head(1)], ignore_index=True)
+    with pytest.raises(ValueError):
+        assign_keyed(dup, ARMS, key=KEY)
