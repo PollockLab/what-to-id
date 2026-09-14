@@ -204,7 +204,9 @@ def test_next_batch_js_logic(tmp_path, node_available):
 
 def test_runner_offers_start_over_with_undo():
     html = render_rotation_index(_manifest(), title="t")
-    assert 'id="startOver"' in html and "Start over" in html
+    button = re.search(r'<button[^>]*id="startOver"[^>]*>', html)
+    assert button and "Start over" in html
+    assert " hidden" not in button.group(0), "Start over must stay visible"
     assert 'id="undoBtn"' in html
     _assert_blind(html)
 

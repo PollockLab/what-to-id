@@ -38,10 +38,11 @@ font-family:"Space Grotesk",Inter,system-ui,sans-serif;transition:filter .12s}
 .nextbtn:hover{filter:brightness(1.08)}
 .nextbtn:disabled{opacity:.5;cursor:default;filter:none}
 #doneMsg{color:var(--mut);margin-top:1rem}
-#runner .crumbs{display:flex;justify-content:space-between;align-items:center}
+#runner .crumbs{display:flex;gap:1.4rem;align-items:center}
 .linkbtn{background:none;border:0;padding:.2rem 0;font:inherit;font-size:.9rem;color:var(--mut);
 cursor:pointer;transition:color .12s}
-.linkbtn:hover{color:var(--acc)}
+.linkbtn:hover:not(:disabled){color:var(--acc)}
+.linkbtn:disabled{opacity:.4;cursor:default}
 .linkbtn[hidden],.undo[hidden]{display:none}
 .undo{display:flex;align-items:center;justify-content:space-between;gap:.8rem;margin-top:1rem;
 padding:.7rem 1rem;background:var(--panel);border:1px solid #2a3a4d;border-radius:12px;
@@ -191,7 +192,7 @@ function startOver(state, group) {
     var left = leftInGroup(DATA, state, group);
     doneMsg.hidden = left > 0;
     nextBtn.disabled = left === 0;
-    startOverBtn.hidden = served === 0;
+    startOverBtn.disabled = served === 0;
   }
   nextBtn.addEventListener('click', function(){
     hideUndo();
@@ -204,7 +205,7 @@ function startOver(state, group) {
       return;
     }
     runnerCode.textContent = 'Batch ' + res.batchNumber;
-    startOverBtn.hidden = false;
+    startOverBtn.disabled = false;
     window.open(res.url, '_blank', 'noopener');
     if (leftInGroup(DATA, state, group) === 0) {
       doneMsg.hidden = false;
@@ -299,7 +300,8 @@ def render_rotation_index(manifest: Manifest, *, title: str) -> str:
         '<section id="picker"><div class="cards" id="groupList"></div></section>\n'
         '<section id="runner" hidden>'
         '<p class="crumbs"><a href="#" id="changeGroup">Change group</a>'
-        '<button class="linkbtn" id="startOver" type="button" hidden>'
+        '<button class="linkbtn" id="startOver" type="button" disabled'
+        ' title="Put this group\'s batches back">'
         "&#8634; Start over</button></p>"
         '<p class="runcode" id="runnerCode">Batch 0</p>'
         '<button class="nextbtn" id="nextBtn" type="button">Next batch</button>'
