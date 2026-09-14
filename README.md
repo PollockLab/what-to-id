@@ -20,10 +20,10 @@ Each family is judged on its own measure: speed lists on species-level IDs per i
 
 ```mermaid
 flowchart TB
-  pool["<b>One frozen pool</b><br/>records that need an ID"]
+  pool["<b>The day's pool</b><br/>records that need an ID"]
   split(["`each record goes to one list 
-  at random, balanced by 
-  taxon group and observer`"])
+  by a keyed hash of its id, 
+  the same list every day`"])
   pool --> split
   split --> L1["<b>List 1</b><br/>newest first<br/><i>the control</i>"]
   split --> L2["<b>List 2</b><br/>data-poor places first"]
@@ -35,7 +35,7 @@ flowchart TB
   count --> cmp["<b>Compare</b> each list with List 1<br/>within each identifier"]
 ```
 
-Each record sits on exactly one list. The split gives every list a like mix of taxon groups and of the observers who posted the records, so the lists differ only in the order they show their records. That order is the one thing under test.
+Each record sits on exactly one list and keeps it in every daily build. Because the list comes from a keyed hash of the record id, every list gets a like mix of taxon groups and of the observers who posted the records on average, so the lists differ only in the order they show their records. That order is the one thing under test.
 
 The lists are unlabelled rather than blind: the page never names them, but a batch of look-alike photos shows which list it came from.
 
@@ -56,15 +56,15 @@ IDs are credited to iNaturalist accounts and each record's list is fixed, so a s
 
 ## How it works
 
-1. **Pull.** Freeze the pool of needs-ID records with a photo, observed since a start date and created before a freeze date, so a rerun reproduces the same pool. The region is BC (iNaturalist place 7085), set in `inat.py` and `batches.py`.
-2. **Assign.** Each record goes to one arm at random, balanced within taxon group and observer.
+1. **Pull.** Pull the needs-ID records with a photo, observed since a start date. The daily job then adds only the records created since its last run and, before each build, drops served records that no longer need an ID. The region is BC (iNaturalist place 7085), set in `inat.py` and `batches.py`.
+2. **Assign.** Each record goes to one list by a keyed hash of its record id (`--key-env`), so it stays on that list in every daily build. The key is private. Without it, a one-off build randomises once with a seed, balanced within taxon group and observer.
 3. **Compose.** Each arm orders its records into batches:
-   - `recency`: newest first as of the freeze, close to what an identifier gets from iNaturalist today.
+   - `recency`: newest first as of the build, close to what an identifier gets from iNaturalist today.
    - `gap_first`: records from data-poor places first, using the where-to-blitz cell scores.
    - `similarity`: look-alike photos together, from BioCLIP 2.5 image embeddings.
    - `novelty`: photos least like any Research Grade photo of the same group and region first.
-4. **Serve.** A static page shows lists labelled A to D, each a stack of Identify links. The arm behind each letter is recorded only in the build's `manifest.json`, never on the page. By default each identifier takes one list; `--design rotation` serves the one-page rotation pictured above.
-5. **Read back.** Every served record is fetched again. Identifications keep their own timestamps, so the per-identifier comparison is fixed when the blitz ends and is read back within a week of it; the record-level outcomes are read back 30 days after.
+4. **Serve.** A static page shows lists labelled A to D, each a stack of Identify links. The arm behind each letter is recorded only in the build's `manifest.json`, never on the page. By default each identifier takes one list; `--design rotation` serves the one-page rotation pictured above. Each daily build appends its served records, by letter, to a served log (`--served-log`).
+5. **Read back.** Every served record, from every daily build, is fetched again. Identifications keep their own timestamps, so the per-identifier comparison is fixed when the blitz ends and is read back within a week of it; the record-level outcomes are read back 30 days after.
 
 ## First deployment: British Columbia
 
@@ -95,24 +95,37 @@ python -m what_to_id.inat --d1 2025-01-01 --freeze YYYY-MM-DD --quality research
 # to the next list, so every identifier's work splits evenly across lists.
 what-to-id build --pool data/pool_YYYY-MM-DD.parquet --freeze YYYY-MM-DD --d1 YYYY-MM-DD --seed <private-seed> --max-batches N --out out/build
 
+# Daily build, as .github/workflows/daily.yml runs it: add new records, build with the private key,
+# drop served records that no longer need an ID, rebuild and log what was served
+python -m what_to_id.pool_state update --pool state/pool.parquet --d1 2025-01-01
+what-to-id build --pool state/pool.parquet --freeze $(date -u +%F) --d1 <blitz-start> --design rotation --max-batches 20 --key-env WHAT_TO_ID_KEY --out out/draft
+python -m what_to_id.pool_state refresh --pool state/pool.parquet --ids out/draft/batches.parquet
+what-to-id build --pool state/pool.parquet --freeze $(date -u +%F) --d1 <blitz-start> --design rotation --max-batches 20 --key-env WHAT_TO_ID_KEY --out out/final --served-log state/served.parquet
+
+# After the blitz, open the key: letter -> list map for the read-back and the analysis
+python -c "import json; from what_to_id.manifest import blind_labels_keyed as b, key_from_env as k; print(json.dumps({v: a for a, v in b(['recency', 'gap_first'], k()).items()}))" > labels.json
+
 # Read back outcomes after the blitz: within a week for the per-identifier comparison, again at 30 days
-python -m what_to_id.readback --pool data/pool_YYYY-MM-DD.parquet --assign out/build/batches.parquet --out out/build/outcomes.parquet
+python -m what_to_id.readback --pool state/pool.parquet --assign state/served.parquet --label-map labels.json --out out/outcomes.parquet
 
 # Build the participants file --users reads below, from project members or a sign-up form's logins
 python -m what_to_id.participants --project ID_OR_SLUG --out participants.txt
 python -m what_to_id.participants --logins signups.txt --out participants.txt
 
-# Pre-registered per-identifier comparison for the rotation design: participants only, plus a pre-blitz placebo
-python -m what_to_id.analysis --idents out/build/outcomes_idents.parquet --served out/build/batches.parquet --control recency --start <blitz-start> --cutoff <read-back-cutoff> --users participants.txt --placebo-start <freeze> --obs out/build/outcomes_obs.parquet
+# Pre-registered per-identifier comparison for the rotation design: participants only, plus a pre-blitz placebo.
+# --weight cell_score gives the weighted count, the primary for gap_first; each run also reports a sign test (p_sign)
+python -m what_to_id.analysis --idents out/outcomes_idents.parquet --served state/served.parquet --label-map labels.json --weight cell_score --control recency --start <blitz-start> --cutoff <read-back-cutoff> --users participants.txt --placebo-start <placebo-start> --obs out/outcomes_obs.parquet
 ```
 
-The read-back denominator is the served records only: `assign.parquet` covers the whole frozen pool, but `batches.parquet` holds just the records placed in a served batch, and it carries the `id` and `arm` columns readback needs.
+The read-back denominator is the served records only: `assign.parquet` covers the whole pool, but `batches.parquet` (one build) and the served log (every daily build) hold just the records placed in a served batch. Both work as `--assign` and `--served`; the served log needs `--label-map`.
 
 The similarity and novelty arms need image embeddings: embed the records assigned to them with `python -m what_to_id.embed` (a GPU job, see `slurm/embed_mila.sbatch`), then pass `--embeddings` and `--reference-embeddings` to `build`. The `gap_first` arm reads where-to-blitz's `cluster_results/ca`; point `--webapp-dir` or the `WHERE_TO_BLITZ_CA` environment variable at a checkout of it.
 
 ## Publish
 
-The live page is the `site/` folder, served at https://pollocklab.github.io/what-to-id/ by the Pages workflow on every push to main that touches it. After a build, copy `out/build/site/*.html` over `site/`; a rotation build writes only `index.html`, so delete the old `arm_*.html` pages when switching. The workflow refuses any file that is not HTML and any page that names an arm. Keep a real build's manifest and seed out of the repo: with the public code and the same pool, the seed recovers which set is which.
+The live page is served at https://pollocklab.github.io/what-to-id/. The daily workflow (`.github/workflows/daily.yml`) rebuilds and deploys it every morning once the repository variable `DAILY_ENABLED` is `true`, and on demand from the Actions tab. It reads the key from the `WHAT_TO_ID_KEY` secret and the blitz start from the `BLITZ_D1` variable, keeps the pool and the served log (letters only) as assets on the `pool-state` release, and refuses to deploy a page that names a list. GitHub turns a schedule off after 60 days without a push to the repository, so push at least once in that window while it runs.
+
+A one-off build is published instead by copying `out/build/site/*.html` over `site/`, which the Pages workflow deploys on a push to main; a rotation build writes only `index.html`, so delete the old `arm_*.html` pages when switching. Both workflows refuse any file that is not HTML and any page that names an arm. Keep the key, and a real build's manifest and seed, out of the repo: with the public code and the same pool, any of them recovers which list is which.
 
 The current page is a preview built from a 10,000-record sample frozen on 2026-09-11 (seed 7), not the blitz build.
 
