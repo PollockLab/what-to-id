@@ -21,7 +21,7 @@ jobs:
     # Once the daily build is on, a push to site/ would overwrite its page until the next
     # morning, so only a manual run deploys site/.
     if: github.event_name == 'workflow_dispatch' || vars.DAILY_ENABLED != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       pages: write
       id-token: write
