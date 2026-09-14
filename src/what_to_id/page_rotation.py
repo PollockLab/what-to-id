@@ -119,6 +119,11 @@ function leftInGroup(data, state, group) {
   if (!state || !Array.isArray(state.perm) || state.perm.length !== labels.length) {
     state = {perm: shuffled(labels), progress: {}};
   }
+  // A new daily build re-cuts every list, so old pointers and offsets point at other batches.
+  // Keep the browser's list cycle, start the batches afresh.
+  if (state.build !== BUILD) {
+    state = {perm: state.perm, progress: {}, build: BUILD};
+  }
   if (!state.offsets) {
     state.offsets = {};
     labels.forEach(function(l){
@@ -233,6 +238,7 @@ def render_rotation_index(manifest: Manifest, *, title: str) -> str:
         "more species-level IDs.</p></section>\n"
     )
     script = (
+        f"var BUILD={json.dumps(manifest.created_at)};"
         f"var DATA={json.dumps(data, sort_keys=True)};"
         f"var GROUP_NAMES={json.dumps(group_names, sort_keys=True)};"
         f"{ROTATION_JS}"
