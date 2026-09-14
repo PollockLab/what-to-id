@@ -11,13 +11,22 @@ from pathlib import Path
 import pandas as pd
 
 from what_to_id.arms import Arm, build_arm, load_embeddings
-from what_to_id.assign import assign
+from what_to_id.assign import assign, assign_keyed
 from what_to_id.batches import build_batches, identify_url
 from what_to_id.cells import WEBAPP_DIR, score_records
 from what_to_id.embed import emb_cache_path
-from what_to_id.manifest import Manifest, blind_labels, sha256_file, write_manifest
+from what_to_id.manifest import (
+    Manifest,
+    blind_labels,
+    blind_labels_keyed,
+    key_fingerprint,
+    key_from_env,
+    sha256_file,
+    write_manifest,
+)
 from what_to_id.page import write_site
 from what_to_id.page_rotation import write_rotation_site
+from what_to_id.served_log import append_served, served_rows
 from what_to_id.signals import batch_signals, signals_by_batch
 
 log = logging.getLogger("what_to_id")
@@ -103,7 +112,16 @@ def build(args: argparse.Namespace) -> Path:
     pool["cell_score"] = score_records(pool, webapp_dir=Path(args.webapp_dir)).to_numpy()
     log.info("cell_score present for %d rows", int(pool["cell_score"].notna().sum()))
 
-    assign_df = assign(pool, arm_names, seed=args.seed)
+    key = key_from_env(args.key_env) if args.key_env else None
+    if key is None:
+        assign_df = assign(pool, arm_names, seed=args.seed)
+        labels = blind_labels(arm_names, args.seed)
+    else:
+        assign_df = assign_keyed(pool, arm_names, key=key)
+        labels = blind_labels_keyed(arm_names, key)
+    # A keyed build runs in public CI next to a public served log: per-arm counts in the log
+    # would give the letter-to-list map away, so it names lists by letter only.
+    shown = labels if key is not None else {a: a for a in arm_names}
     groups = sorted(pool["iconic_taxon"].dropna().astype(str).unique())
     emb = _embedding_paths(args.embeddings, groups)
     ref = _embedding_paths(args.reference_embeddings, groups)
@@ -116,7 +134,7 @@ def build(args: argparse.Namespace) -> Path:
         nb = batches_df[(batches_df["arm"] == arm) & (batches_df["group"] == group)][
             "batch_id"
         ].nunique()
-        log.info("%-11s %-16s %5d records in %3d batches", arm, group, n, nb)
+        log.info("%-11s %-16s %5d records in %3d batches", shown[arm], group, n, nb)
 
     emb_sha = _sha_if_single(emb)
     ref_sha = _sha_if_single(ref)
@@ -133,7 +151,10 @@ def build(args: argparse.Namespace) -> Path:
         ).groupby("arm")[["cohesion", "novelty"]]
         for arm, row in per_arm.mean().iterrows():
             log.info(
-                "%-11s mean cohesion %.3f  mean novelty %.3f", arm, row["cohesion"], row["novelty"]
+                "%-11s mean cohesion %.3f  mean novelty %.3f",
+                shown[arm],
+                row["cohesion"],
+                row["novelty"],
             )
     batches = {}
     for bid, sub in batches_df.groupby("batch_id", sort=True):
@@ -151,7 +172,7 @@ def build(args: argparse.Namespace) -> Path:
         seed=int(args.seed),
         batch_size=int(args.batch_size),
         arms=arm_names,
-        arm_labels=blind_labels(arm_names, args.seed),
+        arm_labels=labels,
         pool_sha256=sha256_file(pool_path),
         pool_rows=int(len(pool)),
         embeddings_sha256=emb_sha,
@@ -161,6 +182,8 @@ def build(args: argparse.Namespace) -> Path:
         served_rows=int(len(batches_df)),
         batches=batches,
         design=args.design,
+        assignment="keyed" if key is not None else "stratified",
+        key_fingerprint=key_fingerprint(key) if key is not None else None,
     )
     out.mkdir(parents=True, exist_ok=True)
     write_manifest(m, out / "manifest.json")
@@ -170,6 +193,10 @@ def build(args: argparse.Namespace) -> Path:
         write_rotation_site(out / "site", m)
     else:
         write_site(out / "site", m, batches_df, pool=pool)
+    if args.served_log:
+        rows = served_rows(batches_df, labels, pool, args.freeze)
+        total = append_served(args.served_log, rows)
+        log.info("served log %s: %d rows today, %d in all", args.served_log, len(rows), len(total))
     log.info("wrote %s (%d batches)", out, len(batches))
     return out
 
@@ -206,6 +233,18 @@ def make_parser() -> argparse.ArgumentParser:
         default="sets",
         help="'sets' (default) pages one list per browser; 'rotation' cycles every identifier "
         "through all lists",
+    )
+    b.add_argument(
+        "--key-env",
+        default=None,
+        metavar="NAME",
+        help="assign lists by a keyed hash of the record id, with the hex key read from the "
+        "environment variable NAME, so a record keeps its list across daily builds",
+    )
+    b.add_argument(
+        "--served-log",
+        default=None,
+        help="append this build's served records, by list letter, to this parquet",
     )
     b.add_argument("--out", default="out")
     b.set_defaults(func=build)

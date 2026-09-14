@@ -158,6 +158,61 @@ def test_build_default_design_is_sets(tmp_path, webapp_dir):
         assert (out / "site" / name).exists()
 
 
+def _keyed_build(pool_path, webapp_dir, out, freeze, log_path):
+    return main(
+        [
+            "build",
+            "--pool",
+            str(pool_path),
+            "--freeze",
+            freeze,
+            "--d1",
+            "2026-11-01",
+            "--batch-size",
+            "25",
+            "--webapp-dir",
+            str(webapp_dir),
+            "--design",
+            "rotation",
+            "--key-env",
+            "WHAT_TO_ID_KEY",
+            "--served-log",
+            str(log_path),
+            "--out",
+            str(out),
+        ]
+    )
+
+
+def test_keyed_daily_builds_keep_lists_and_log_letters_only(
+    tmp_path, webapp_dir, monkeypatch, caplog
+):
+    monkeypatch.setenv("WHAT_TO_ID_KEY", "ab" * 32)
+    caplog.set_level("INFO", logger="what_to_id")
+    pool = make_pool(300, seed=5)
+    day1, day2 = tmp_path / "pool1.parquet", tmp_path / "pool2.parquet"
+    pool.iloc[:200].to_parquet(day1, index=False)
+    pool.iloc[50:].to_parquet(day2, index=False)
+    log_path = tmp_path / "state" / "served.parquet"
+    assert _keyed_build(day1, webapp_dir, tmp_path / "o1", "2026-11-03", log_path) == 0
+    assert _keyed_build(day2, webapp_dir, tmp_path / "o2", "2026-11-04", log_path) == 0
+
+    d = json.loads((tmp_path / "o2" / "manifest.json").read_text())
+    validate_manifest(d)
+    assert d["assignment"] == "keyed" and len(d["key_fingerprint"]) == 12
+    a1 = pd.read_parquet(tmp_path / "o1" / "assign.parquet").set_index("id")["arm"]
+    a2 = pd.read_parquet(tmp_path / "o2" / "assign.parquet").set_index("id")["arm"]
+    shared = a1.index.intersection(a2.index)
+    assert len(shared) == 150 and (a1[shared] == a2[shared]).all()
+
+    served = pd.read_parquet(log_path)
+    assert sorted(served["build_date"].unique()) == ["2026-11-03", "2026-11-04"]
+    assert set(served["label"]) == set(d["arm_labels"].values())
+    text = caplog.text + served.astype(str).to_csv()
+    for word in ("recency", "gap_first", "ab" * 32):
+        assert word not in text
+
+
 def test_build_rejects_bad_date(tmp_path):
     with pytest.raises(SystemExit):
         main(["build", "--freeze", "2026-13-01", "--d1", "2026-09-15", "--pool", "x"])
