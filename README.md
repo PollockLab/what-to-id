@@ -1,19 +1,31 @@
 # what-to-id
 
-Which iNaturalist records should a British Columbia identification blitz work on? what-to-id builds the batches, serves them as blinded lists of iNaturalist Identify links, and reads the outcome back 30 days later to see which way of composing batches got more records identified.
+Does the order of the iNaturalist identification queue change how much gets identified, and what? what-to-id tests this with unlabelled, randomised lists and reads the answer back from iNaturalist. First deployment: British Columbia, autumn 2026, with Blitz the Gap.
+
+It is a method, tested first in BC. A result from one blitz holds for that blitz's region and identifiers; other regions have to run it to know.
 
 Companion to [where-to-blitz](https://github.com/PollockLab/where-to-blitz), which answers where to go and record. Both serve Blitz the Gap.
+
+## What the lists test
+
+Every list holds the same kind of records and differs only in order. The orders fall into two families, each with its own question:
+
+- **Speed** lists change how many IDs an hour of identifier effort gives. `similarity` puts look-alike photos together, on the hypothesis that fewer context switches make identifying faster.
+- **Value** lists change which gaps the IDs fill. `gap_first` puts records from data-poor places first, aimed at the gap in where species are known to occur (the Wallacean shortfall, [Hortal et al. 2015](https://doi.org/10.1146/annurev-ecolsys-112414-054400)). `novelty` puts the photos least like any verified photo of their group first, aimed at the gap in what verified photos cover.
+- `recency`, newest first, is the control for both.
+
+Each family is judged on its own measure: speed lists on species-level IDs per identifier, value lists on the same count weighted by how data-poor the record's place is (`gap_first`) or on new species per grid cell (`novelty`).
 
 ## The experiment in one picture
 
 ```mermaid
 flowchart TB
-  pool["<b>One frozen pool</b><br/>BC records that need an ID"]
+  pool["<b>One frozen pool</b><br/>records that need an ID"]
   split(["`each record goes to one list 
   at random, balanced by 
   taxon group and observer`"])
   pool --> split
-  split --> L1["<b>List 1</b><br/>newest first<br/><i>today's default</i>"]
+  split --> L1["<b>List 1</b><br/>newest first<br/><i>the control</i>"]
   split --> L2["<b>List 2</b><br/>data-poor places first"]
   split --> L3["<b>List 3</b><br/>look-alikes together"]
   split --> L4["<b>List 4</b><br/>unfamiliar photos first"]
@@ -24,6 +36,8 @@ flowchart TB
 ```
 
 Each record sits on exactly one list. The split gives every list a like mix of taxon groups and of the observers who posted the records, so the lists differ only in the order they show their records. That order is the one thing under test.
+
+The lists are unlabelled rather than blind: the page never names them, but a batch of look-alike photos shows which list it came from.
 
 **Every identifier works every list.** A few identifiers make most of the IDs. If each identifier kept one list, the list that drew the busiest identifier would win whatever its order. So each browser draws its own random cycle of the four lists once, and every press of Next batch takes the next list in that cycle:
 
@@ -42,17 +56,19 @@ IDs are credited to iNaturalist accounts and each record's list is fixed, so a s
 
 ## How it works
 
-1. **Pull.** Freeze the BC pool of needs-ID records with a photo, observed since a start date and created before a freeze date, so a rerun reproduces the same pool.
+1. **Pull.** Freeze the pool of needs-ID records with a photo, observed since a start date and created before a freeze date, so a rerun reproduces the same pool. The region is BC (iNaturalist place 7085), set in `inat.py` and `batches.py`.
 2. **Assign.** Each record goes to one arm at random, balanced within taxon group and observer.
 3. **Compose.** Each arm orders its records into batches:
-   - `recency`: newest first. This is what an identifier gets from iNaturalist today.
+   - `recency`: newest first as of the freeze, close to what an identifier gets from iNaturalist today.
    - `gap_first`: records from data-poor places first, using the where-to-blitz cell scores.
    - `similarity`: look-alike photos together, from BioCLIP 2.5 image embeddings.
-   - `novelty`: photos least like any Research Grade BC photo of the same group first.
+   - `novelty`: photos least like any Research Grade photo of the same group and region first.
 4. **Serve.** A static page shows lists labelled A to D, each a stack of Identify links. The arm behind each letter is recorded only in the build's `manifest.json`, never on the page. By default each identifier takes one list; `--design rotation` serves the one-page rotation pictured above.
-5. **Read back.** After 30 days every served record is fetched again and outcomes are compared per arm.
+5. **Read back.** Every served record is fetched again. Identifications keep their own timestamps, so the per-identifier comparison is fixed when the blitz ends and is read back within a week of it; the record-level outcomes are read back 30 days after.
 
-The protocol and the outcomes fixed before the blitz are in [docs/protocol.md](docs/protocol.md), a draft for co-design with the BC team.
+## First deployment: British Columbia
+
+The first run is a BC identification blitz in autumn 2026, with Blitz the Gap. The protocol and the outcomes fixed before the blitz are in [docs/protocol.md](docs/protocol.md), a draft for co-design with the BC team. The proposed set-up is two lists, `recency` and `gap_first`, over four weeks, with the look-alike and unfamiliar-photo lists left to a later round.
 
 ## Install
 
@@ -79,7 +95,7 @@ python -m what_to_id.inat --d1 2025-01-01 --freeze YYYY-MM-DD --quality research
 # to the next list, so every identifier's work splits evenly across lists.
 what-to-id build --pool data/pool_YYYY-MM-DD.parquet --freeze YYYY-MM-DD --d1 YYYY-MM-DD --seed <private-seed> --max-batches N --out out/build
 
-# Read back outcomes 30 days after the blitz
+# Read back outcomes after the blitz: within a week for the per-identifier comparison, again at 30 days
 python -m what_to_id.readback --pool data/pool_YYYY-MM-DD.parquet --assign out/build/batches.parquet --out out/build/outcomes.parquet
 
 # Build the participants file --users reads below, from project members or a sign-up form's logins
@@ -106,3 +122,7 @@ The current page is a preview built from a 10,000-record sample frozen on 2026-0
 pytest              # network tests are skipped by default
 pytest -m network   # hits the live iNaturalist API
 ```
+
+## References
+
+- Hortal J, de Bello F, Diniz-Filho JAF, Lewinsohn TM, Lobo JM, Ladle RJ (2015). Seven shortfalls that beset large-scale knowledge of biodiversity. Annual Review of Ecology, Evolution, and Systematics 46:523-549. [doi:10.1146/annurev-ecolsys-112414-054400](https://doi.org/10.1146/annurev-ecolsys-112414-054400).

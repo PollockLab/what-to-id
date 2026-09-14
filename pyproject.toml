@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "what-to-id"
 version = "0.1.0"
-description = "Identification queue for the BC iNaturalist ID blitz: batch composition arms, exposure manifest, 30-day read-back"
+description = "Tests whether the order of the iNaturalist identification queue changes what gets identified: randomised lists, exposure manifest, read-back"
 requires-python = ">=3.11"
 license = "MIT"
 authors = [{ name = "Wietze Suijker", email = "17180130+wietzesuijker@users.noreply.github.com" }]

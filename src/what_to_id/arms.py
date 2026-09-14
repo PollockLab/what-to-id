@@ -220,8 +220,8 @@ class Novelty:
     with no reference embeddings, go last in recency order.
 
     This is the discovery arm: a large distance means the photo sits in a part of image space
-    with no verified BC record nearby, so an ID there is more likely to add a species or a
-    look that the reference does not cover yet.
+    with no verified record from the region nearby, so an ID there is more likely to add a
+    species or a look that the reference does not cover yet.
     """
 
     name = "novelty"
