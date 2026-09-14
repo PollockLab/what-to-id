@@ -7,6 +7,7 @@ set of observations (iNat keeps regrading and backfilling, so a pull without it 
 from __future__ import annotations
 
 import argparse
+import datetime
 import json
 import os
 import re
@@ -83,18 +84,42 @@ def _check_date(name: str, value: object) -> str:
     return value
 
 
+def _check_created_d1(value: object) -> str:
+    """Normalize created_d1 to the ISO string the API expects; accepts a date or datetime."""
+    if isinstance(value, str):
+        s = value.strip()
+        if not s:
+            raise ValueError(f"created_d1 must be an ISO date or datetime, got {value!r}")
+        try:
+            pd.Timestamp(s)
+        except (ValueError, TypeError) as exc:
+            raise ValueError(f"created_d1 must be an ISO date or datetime, got {value!r}") from exc
+        return s
+    if isinstance(value, pd.Timestamp | datetime.date):
+        return pd.Timestamp(value).isoformat()
+    raise ValueError(f"created_d1 must be a string, date, or datetime, got {value!r}")
+
+
 QUALITY_GRADES = ("needs_id", "research")
 
 
-def pool_params(group: str, *, d1: str, freeze: str, quality: str = "needs_id") -> dict:
+def pool_params(
+    group: str,
+    *,
+    d1: str,
+    freeze: str,
+    quality: str = "needs_id",
+    created_d1: str | datetime.date | pd.Timestamp | None = None,
+) -> dict:
     """Query parameters for one iconic group of the BC pool.
 
     ``quality="needs_id"`` is the pool identifiers work on; ``quality="research"`` pulls the
-    verified reference pool the novelty arm measures distance from.
+    verified reference pool the novelty arm measures distance from. ``created_d1`` restricts to
+    records created on or after that date/datetime, for a cheap incremental pull.
     """
     if quality not in QUALITY_GRADES:
         raise ValueError(f"quality must be one of {QUALITY_GRADES}, got {quality!r}")
-    return {
+    params = {
         "place_id": BC_PLACE_ID,
         "quality_grade": quality,
         "photos": "true",
@@ -105,6 +130,9 @@ def pool_params(group: str, *, d1: str, freeze: str, quality: str = "needs_id") 
         "order_by": "id",
         "order": "desc",
     }
+    if created_d1 is not None:
+        params["created_d1"] = _check_created_d1(created_d1)
+    return params
 
 
 def flatten(obs: dict) -> dict | None:
@@ -157,10 +185,11 @@ def pull_group(
     sleep: float = SLEEP,
     log: Callable[[str], None] = print,
     quality: str = "needs_id",
+    created_d1: str | datetime.date | pd.Timestamp | None = None,
 ) -> pd.DataFrame:
     """Page through one iconic group with an ``id_below`` cursor."""
     session = session or make_session()
-    params = pool_params(group, d1=d1, freeze=freeze, quality=quality)
+    params = pool_params(group, d1=d1, freeze=freeze, quality=quality, created_d1=created_d1)
     rows: list[dict] = []
     id_below = None
     pages = 0
@@ -194,18 +223,27 @@ def pull_pool(
     quality: str = "needs_id",
     cap_pages: int | None = None,
     log: Callable[[str], None] = print,
+    created_d1: str | datetime.date | pd.Timestamp | None = None,
     **kw,
 ) -> pd.DataFrame:
     """Pull every group, dedupe on id, write parquet to ``out`` and return the frame.
 
     Each finished group is checkpointed under ``<out>.parts/``, so a rerun with the same
     arguments after a failure skips the groups already pulled. The parts are removed once
-    ``out`` is written.
+    ``out`` is written. ``created_d1`` restricts the pull to records created since that
+    date/datetime, for a cheap incremental update instead of pulling the whole pool.
     """
     out = Path(out)
     parts = out.with_name(out.name + ".parts")
     parts.mkdir(parents=True, exist_ok=True)
-    params = {"d1": d1, "freeze": freeze, "quality": quality, "cap_pages": cap_pages}
+    created_d1_str = _check_created_d1(created_d1) if created_d1 is not None else None
+    params = {
+        "d1": d1,
+        "freeze": freeze,
+        "quality": quality,
+        "cap_pages": cap_pages,
+        "created_d1": created_d1_str,
+    }
     params_path = parts / "params.json"
     if params_path.exists():
         prev = json.loads(params_path.read_text())
@@ -221,7 +259,14 @@ def pull_pool(
             log(f"{g}: resumed {len(frames[-1])} rows from {part}")
             continue
         frame = pull_group(
-            g, d1=d1, freeze=freeze, quality=quality, cap_pages=cap_pages, log=log, **kw
+            g,
+            d1=d1,
+            freeze=freeze,
+            quality=quality,
+            cap_pages=cap_pages,
+            log=log,
+            created_d1=created_d1,
+            **kw,
         )
         tmp = part.with_name(part.name + ".tmp")
         frame.to_parquet(tmp, engine="pyarrow", index=False)
@@ -270,6 +315,36 @@ def fetch_by_ids(
     return out
 
 
+def still_open(ids: Sequence[int], *, session: requests.Session | None = None) -> set[int]:
+    """Which of ``ids`` are still needs-ID with a photo in the BC pool.
+
+    Queries in chunks of ``PER_PAGE`` ids per request; an empty input makes no request.
+    """
+    cleaned = sorted({int(i) for i in ids})
+    if not cleaned:
+        return set()
+    session = session or make_session()
+    open_ids: set[int] = set()
+    for start in range(0, len(cleaned), PER_PAGE):
+        batch = cleaned[start : start + PER_PAGE]
+        r = session.get(
+            INAT,
+            params={
+                "id": ",".join(map(str, batch)),
+                "per_page": PER_PAGE,
+                "quality_grade": "needs_id",
+                "photos": "true",
+                "place_id": BC_PLACE_ID,
+            },
+            timeout=TIMEOUT,
+        )
+        r.raise_for_status()
+        open_ids.update(int(o["id"]) for o in r.json().get("results", []))
+        if start + PER_PAGE < len(cleaned):
+            time.sleep(SLEEP)
+    return open_ids
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Pull the BC needs-ID pool to parquet.")
     ap.add_argument("--d1", required=True, help="earliest observed_on, YYYY-MM-DD")
@@ -283,13 +358,25 @@ def main(argv: Sequence[str] | None = None) -> int:
         choices=QUALITY_GRADES,
         help="needs_id for the ID pool, research for the novelty arm's reference pool",
     )
+    ap.add_argument(
+        "--created-d1",
+        default=None,
+        help="only pull records created on or after this date/datetime (ISO); for a cheap "
+        "incremental pull instead of the full pool",
+    )
     a = ap.parse_args(argv)
     groups = [g.strip() for g in a.groups.split(",") if g.strip()]
     unknown = sorted(set(groups) - set(GROUPS))
     if unknown:
         ap.error(f"unknown groups {unknown}; choose from {list(GROUPS)}")
     df = pull_pool(
-        groups, d1=a.d1, freeze=a.freeze, out=a.out, cap_pages=a.cap_pages, quality=a.quality
+        groups,
+        d1=a.d1,
+        freeze=a.freeze,
+        out=a.out,
+        cap_pages=a.cap_pages,
+        quality=a.quality,
+        created_d1=a.created_d1,
     )
     print(f"{len(df)} rows -> {a.out}")
     return 0

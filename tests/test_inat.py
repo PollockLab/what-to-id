@@ -210,6 +210,54 @@ def test_load_pool_missing_columns(tmp_path):
         inat.load_pool(p)
 
 
+def test_pool_params_created_d1():
+    p = inat.pool_params("Aves", d1="2025-01-01", freeze="2026-09-11", created_d1="2026-09-10")
+    assert p["created_d1"] == "2026-09-10"
+    p_default = inat.pool_params("Aves", d1="2025-01-01", freeze="2026-09-11")
+    assert "created_d1" not in p_default
+
+
+def test_pool_params_created_d1_accepts_timestamp():
+    ts = pd.Timestamp("2026-09-10T08:00:00", tz="UTC")
+    p = inat.pool_params("Aves", d1="2025-01-01", freeze="2026-09-11", created_d1=ts)
+    assert p["created_d1"] == ts.isoformat()
+
+
+def test_pool_params_rejects_bad_created_d1():
+    with pytest.raises(ValueError, match="created_d1"):
+        inat.pool_params("Aves", d1="2025-01-01", freeze="2026-09-11", created_d1="not-a-date")
+
+
+def test_pull_group_passes_created_d1():
+    sess = FakeSession([[]])
+    inat.pull_group(
+        "Aves",
+        d1="2025-01-01",
+        freeze="2026-09-11",
+        session=sess,
+        sleep=0,
+        log=lambda _: None,
+        created_d1="2026-09-10",
+    )
+    assert sess.calls[0]["created_d1"] == "2026-09-10"
+
+
+def test_pull_pool_passes_created_d1(tmp_path):
+    sess = FakeSession([[_obs(5)], []])
+    out = tmp_path / "pool.parquet"
+    inat.pull_pool(
+        ["Aves"],
+        d1="2025-01-01",
+        freeze="2026-09-11",
+        out=out,
+        session=sess,
+        sleep=0,
+        log=lambda _: None,
+        created_d1="2026-09-10",
+    )
+    assert all(c["created_d1"] == "2026-09-10" for c in sess.calls)
+
+
 def test_fetch_by_ids_chunks():
     sess = FakeSession([[_obs(1)], [_obs(2)]])
     res = inat.fetch_by_ids([1, 2, 3], session=sess, chunk=2, sleep=0)
@@ -217,6 +265,38 @@ def test_fetch_by_ids_chunks():
     assert sess.calls[0]["id"] == "1,2" and sess.calls[1]["id"] == "3"
     with pytest.raises(ValueError):
         inat.fetch_by_ids([1], session=sess, chunk=201)
+
+
+def test_still_open_chunks_and_returns_ids():
+    ids = list(range(1, 451))  # 450 ids -> 3 chunks of <=200
+    pages = [
+        [_obs(i) for i in ids[0:200:20]],  # subset "still open" from chunk 1
+        [_obs(i) for i in ids[200:400:20]],  # subset from chunk 2
+        [],  # nothing open in the last, short chunk
+    ]
+    sess = FakeSession(pages)
+    result = inat.still_open(ids, session=sess)
+    assert len(sess.calls) == 3
+    assert [len(c["id"].split(",")) for c in sess.calls] == [200, 200, 50]
+    assert all(c["quality_grade"] == "needs_id" for c in sess.calls)
+    assert all(c["photos"] == "true" for c in sess.calls)
+    assert all(c["place_id"] == inat.BC_PLACE_ID for c in sess.calls)
+    expected = set(ids[0:200:20]) | set(ids[200:400:20])
+    assert result == expected
+
+
+def test_still_open_dedupes_and_casts_ids():
+    sess = FakeSession([[_obs(1)]])
+    result = inat.still_open(["1", 1, 2.0], session=sess)
+    assert len(sess.calls) == 1
+    assert sess.calls[0]["id"] == "1,2"
+    assert result == {1}
+
+
+def test_still_open_empty_input_makes_no_request():
+    sess = FakeSession([[_obs(1)]])
+    assert inat.still_open([], session=sess) == set()
+    assert sess.calls == []
 
 
 @pytest.mark.network
