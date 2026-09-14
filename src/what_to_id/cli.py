@@ -19,6 +19,7 @@ from what_to_id.manifest import (
     Manifest,
     blind_labels,
     blind_labels_keyed,
+    grid_hash,
     key_fingerprint,
     key_from_env,
     sha256_file,
@@ -184,6 +185,7 @@ def build(args: argparse.Namespace) -> Path:
         design=args.design,
         assignment="keyed" if key is not None else "stratified",
         key_fingerprint=key_fingerprint(key) if key is not None else None,
+        where_to_blitz_grid=grid_hash(args.webapp_dir),
     )
     out.mkdir(parents=True, exist_ok=True)
     write_manifest(m, out / "manifest.json")
