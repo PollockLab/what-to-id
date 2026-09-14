@@ -158,6 +158,27 @@ def test_readback_idents_feed_analysis():
     assert counts["A"].to_dict() == {1: 1, 2: 1}
 
 
+def test_readback_from_served_log_union_with_label_map(tiny):
+    """served_arms folds two daily served logs into the assign frame readback/outcomes expect."""
+    pool, _, _ = tiny
+    day1 = pd.DataFrame({"build_date": ["2026-09-01"] * 2, "label": ["A"] * 2, "id": [1, 2]})
+    day2 = pd.DataFrame({"build_date": ["2026-09-02"] * 2, "label": ["B"] * 2, "id": [3, 4]})
+    log = pd.concat([day1, day2], ignore_index=True)
+    assign = analysis.served_arms(log, {"A": "recency", "B": "gap_first"})
+    ids = assign["id"].drop_duplicates().tolist()
+    assert sorted(ids) == [1, 2, 3, 4]
+
+    def fake_fetch(ids_, **kw):
+        return [{"id": i, "quality_grade": "needs_id", "identifications_count": 0} for i in ids_]
+
+    obs_df, idents_df = readback.readback(ids, fetch=fake_fetch)
+    assert sorted(obs_df["id"]) == [1, 2, 3, 4]
+    assert idents_df.empty
+    out = readback.outcomes(obs_df, assign, pool).set_index("arm")
+    assert out.loc["recency", "n_served"] == 2
+    assert out.loc["gap_first", "n_served"] == 2
+
+
 def test_readback_reviewed_by_survives_parquet(tmp_path):
     obs_df, _ = readback.readback([11, 99], fetch=lambda ids: [OBS])
     p = tmp_path / "obs.parquet"

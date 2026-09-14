@@ -4,12 +4,16 @@
 assignment arms and the pool and tallies per-arm shares. ``--dry-run`` skips the fetch and
 reports the unengaged share per iconic group from the pool alone. Identifications keep their
 timestamps, rank and ``current`` flag, so ``analysis`` can cut them at any date before the fetch.
-``reviewed_by`` lists every user who marked the record reviewed; it carries no timestamp.
+``reviewed_by`` lists every user who marked the record reviewed; it carries no timestamp. The
+``--assign`` input accepts one or more single-build batches parquets (``id``, ``arm``) or
+cumulative served-log parquets (``id``, ``label``, mapped through ``--label-map``);
+``analysis.served_arms`` folds them into the union of every served id, one row each.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
@@ -17,6 +21,7 @@ import numpy as np
 import pandas as pd
 
 from what_to_id import inat
+from what_to_id.analysis import served_arms
 
 OBS_COLUMNS = (
     "id",
@@ -172,7 +177,15 @@ def dry_run(pool_df: pd.DataFrame) -> pd.DataFrame:
 def main(argv: Sequence[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Read back outcomes for served records.")
     ap.add_argument("--pool", required=True, type=Path)
-    ap.add_argument("--assign", type=Path, help="assignment parquet with id and arm columns")
+    ap.add_argument(
+        "--assign",
+        type=Path,
+        nargs="+",
+        help="assignment parquet(s) with id/arm, or served-log(s) with id/label plus --label-map",
+    )
+    ap.add_argument(
+        "--label-map", type=Path, help="JSON {label: arm}, required if --assign files are logs"
+    )
     ap.add_argument("--out", type=Path, help="outcomes parquet; idents written next to it")
     ap.add_argument("--dry-run", action="store_true", help="pool only, no fetch")
     a = ap.parse_args(argv)
@@ -183,7 +196,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     if a.assign is None or a.out is None:
         ap.error("--assign and --out are required unless --dry-run")
-    assign = pd.read_parquet(a.assign, engine="pyarrow")
+    assign_raw = pd.concat(
+        [pd.read_parquet(p, engine="pyarrow") for p in a.assign], ignore_index=True
+    )
+    label_map = json.loads(a.label_map.read_text()) if a.label_map else None
+    assign = served_arms(assign_raw, label_map)
     ids = assign["id"].drop_duplicates().tolist()
     obs_df, idents_df = readback(ids)
     res = outcomes(obs_df, assign, pool)

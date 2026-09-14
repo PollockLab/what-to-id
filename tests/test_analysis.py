@@ -1,3 +1,5 @@
+import json
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -155,6 +157,112 @@ def test_exposure_summary_shares():
     assert s["reviewed"].tolist() == [3, 1]
     assert s["share"].tolist() == [0.75, 0.25]
     assert analysis.exposure_summary(expo.iloc[0:0])["share"].tolist() == [0.0, 0.0]
+
+
+def test_served_arms_from_batches_frame():
+    got = analysis.served_arms(SERVED)
+    assert list(got.columns) == ["id", "arm", "cell_score"]
+    assert got.set_index("id")["arm"].to_dict() == {1: "c", 2: "c", 3: "t", 4: "t"}
+    assert got["cell_score"].isna().all()
+
+
+def test_served_arms_from_log_repeated_ids_and_cell_score():
+    log = pd.DataFrame(
+        {
+            "build_date": ["2026-11-01", "2026-11-01", "2026-11-02", "2026-11-02"],
+            "label": ["A", "B", "A", "B"],
+            "id": [1, 3, 1, 4],
+            "cell_score": [float("nan"), 0.5, 0.9, 1.5],
+        }
+    )
+    got = analysis.served_arms(log, {"A": "recency", "B": "gap_first"})
+    got = got.set_index("id")
+    assert got.loc[1, "arm"] == "recency"
+    assert got.loc[1, "cell_score"] == pytest.approx(0.9)  # first non-null wins
+    assert got.loc[3, "arm"] == "gap_first" and got.loc[3, "cell_score"] == pytest.approx(0.5)
+    assert got.loc[4, "arm"] == "gap_first"
+    assert sorted(got.index) == [1, 3, 4]
+
+
+def test_served_arms_requires_label_map():
+    log = pd.DataFrame({"label": ["A"], "id": [1]})
+    with pytest.raises(ValueError, match="label_map"):
+        analysis.served_arms(log)
+    with pytest.raises(ValueError, match="labels not in label_map"):
+        analysis.served_arms(log, {"B": "gap_first"})
+
+
+def test_served_arms_conflict_raises():
+    log = pd.DataFrame({"label": ["A", "B"], "id": [1, 1]})
+    with pytest.raises(ValueError, match="more than one arm"):
+        analysis.served_arms(log, {"A": "recency", "B": "gap_first"})
+
+
+def test_identifier_counts_weighted_by_cell_score():
+    served = pd.DataFrame(
+        {
+            "id": [1, 2, 3, 4],
+            "arm": ["c", "c", "t", "t"],
+            "cell_score": [0.5, float("nan"), 2.0, 1.0],
+        }
+    )
+    idents = _idents(
+        [
+            (1, 10, "2026-11-01T12:00:00Z", "species"),
+            (2, 10, "2026-11-01T12:00:00Z", "species"),
+            (3, 10, "2026-11-01T12:00:00Z", "species"),
+            (1, 10, "2026-11-02T12:00:00Z", "species"),  # duplicate (user, id), not double-counted
+        ]
+    )
+    got = analysis.identifier_counts(
+        idents, served, start="2026-11-01", cutoff="2026-12-01", weight="cell_score"
+    )
+    assert got["c"].dtype == np.float64
+    assert got.loc[10].tolist() == pytest.approx([0.5, 2.0])  # NaN cell_score treated as 0
+
+
+def test_sign_test_p_known_cases():
+    assert analysis.sign_test_p([1] * 8) == pytest.approx(2 * 0.5**8)
+    assert analysis.sign_test_p([0, 0]) == 1.0
+    assert analysis.sign_test_p([]) == 1.0
+    assert analysis.sign_test_p([1, -1]) == 1.0
+    assert analysis.sign_test_p([1, 1, -1]) == pytest.approx(1.0)
+
+
+def test_analyse_has_p_sign_column():
+    counts = pd.DataFrame({"c": [1, 2, 0], "t": [3, 4, 2]}, index=[10, 11, 12])
+    res = analysis.analyse(counts, control="c")
+    assert "p_sign" in res.columns
+    d = (counts["t"] - counts["c"]).to_numpy()
+    assert res.loc[0, "p_sign"] == pytest.approx(analysis.sign_test_p(d))
+
+
+def test_cli_multi_served_logs_with_label_map(tmp_path, capsys):
+    idents = _idents(
+        [
+            (1, 10, "2026-11-01T12:00:00Z", "species"),
+            (3, 10, "2026-11-02T12:00:00Z", "species"),
+        ]
+    )
+    idents.to_parquet(tmp_path / "i.parquet")
+    day1 = pd.DataFrame(
+        {"build_date": ["2026-10-20"], "label": ["A"], "id": [1], "cell_score": [0.4]}
+    )
+    day2 = pd.DataFrame(
+        {"build_date": ["2026-10-21"], "label": ["B"], "id": [3], "cell_score": [1.1]}
+    )
+    day1.to_parquet(tmp_path / "s1.parquet")
+    day2.to_parquet(tmp_path / "s2.parquet")
+    label_map = tmp_path / "labels.json"
+    label_map.write_text(json.dumps({"A": "c", "B": "t"}))
+    args = ["--idents", str(tmp_path / "i.parquet")]
+    args += ["--served", str(tmp_path / "s1.parquet"), str(tmp_path / "s2.parquet")]
+    args += ["--label-map", str(label_map), "--weight", "cell_score"]
+    args += ["--control", "c", "--start", "2026-11-01", "--cutoff", "2026-12-01"]
+    assert analysis.main(args) == 0
+    out = capsys.readouterr().out
+    assert "0 served record(s) with no cell_score" in out
+    assert "blitz: [2026-11-01, 2026-12-01)" in out
 
 
 def test_cli_exposure(tmp_path, capsys):
