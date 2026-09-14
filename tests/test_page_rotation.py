@@ -4,7 +4,13 @@ import re
 import pytest
 
 from what_to_id.manifest import Manifest
-from what_to_id.page_rotation import ROTATION_JS, render_rotation_index, write_rotation_site
+from what_to_id.page import ARM_WORDS
+from what_to_id.page_rotation import (
+    ORDER_TEXT,
+    ROTATION_JS,
+    render_rotation_index,
+    write_rotation_site,
+)
 
 ARM_NAMES = ["recency", "gap_first", "similarity", "novelty"]
 
@@ -70,6 +76,27 @@ def test_render_rotation_index_explains_the_cycle():
     assert html.count('<span class="n">') == 2
     assert "up to 2 records" in html
     assert "next of 2 lists" in html
+
+
+def test_render_rotation_index_explains_the_method_for_this_builds_orders():
+    html = render_rotation_index(_manifest(), title="t")
+    assert "How the test works" in html
+    assert "Newest first." in html and "Data-poor places first." in html
+    assert "Look-alike" not in html and "Unfamiliar" not in html
+    _assert_blind(html)
+
+
+def test_every_order_has_page_words_that_do_not_name_the_arm():
+    assert set(ORDER_TEXT) == set(ARM_NAMES)
+    for text in ORDER_TEXT.values():
+        assert not any(w in text.lower() for w in ARM_WORDS)
+
+
+def test_render_rotation_index_refuses_an_order_without_page_words():
+    m = _manifest()
+    m.arms = ["recency", "mystery"]
+    with pytest.raises(ValueError, match="mystery"):
+        render_rotation_index(m, title="t")
 
 
 def test_render_rotation_index_data_has_every_url_once_in_order():

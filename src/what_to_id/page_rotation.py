@@ -45,6 +45,7 @@ background:var(--panel);border:1px solid #2a3a4d;border-radius:12px}
 .flow span{color:var(--mut);font-size:.88rem}
 .flow i,.cycle i{font-style:normal;color:var(--acc);font-size:1.2rem}
 .cycle{display:flex;align-items:center;gap:.5rem;margin:.4rem 0 .8rem}
+.how ul{margin:.3rem 0;padding-left:1.1rem}
 .cycle .n{width:2.2rem;height:2.2rem;display:grid;place-items:center;border-radius:50%;
 background:var(--card);color:var(--acc-ink)}
 @media(max-width:44rem){.flow{flex-direction:column;align-items:stretch}
@@ -193,6 +194,37 @@ function leftInGroup(data, state, group) {
 """.strip()
 
 
+# Plain words for each order in the method section. Never the arm names, which ARM_WORDS guards.
+ORDER_TEXT = {
+    "recency": "<b>Newest first.</b> The control, close to what iNaturalist shows today.",
+    "gap_first": "<b>Data-poor places first.</b> Records from areas with few or old records.",
+    "similarity": "<b>Look-alike photos together.</b> Similar photos sit in the same batch.",
+    "novelty": "<b>Unfamiliar photos first.</b> Photos least like any Research Grade photo.",
+}
+
+
+def _method(manifest: Manifest) -> str:
+    """The test in five steps, with one line per order in this build."""
+    missing = [a for a in manifest.arms if a not in ORDER_TEXT]
+    if missing:
+        raise ValueError(f"no page words for list order(s) {missing}; add them to ORDER_TEXT")
+    orders = "".join(f"<li>{ORDER_TEXT[a]}</li>" for a in manifest.arms)
+    steps = (
+        "<b>The question.</b> Does the order of records change how many get an ID, and which?",
+        "<b>The lists.</b> Each record goes to one list at random, so every list holds the same "
+        f"mix of species and observers. Only the order is different:<ul>{orders}</ul>",
+        "<b>Your batches.</b> Each press of Next batch takes the next list in turn. Your browser "
+        "picks the turn order at random. The page does not say which list a batch is from.",
+        "<b>The count.</b> After the blitz, we count each participant's species-level IDs on each "
+        "list and compare each person with themself. A fast identifier adds the same to every "
+        "list.",
+        "<b>Nothing else changes.</b> You identify in iNaturalist as usual. Your IDs carry your "
+        "name, count toward Research Grade and go to GBIF.",
+    )
+    items = "".join(f"<li>{s}</li>" for s in steps)
+    return f'<section class="how"><h2>How the test works</h2><ol>{items}</ol></section>\n'
+
+
 def _rotation_data(manifest: Manifest) -> dict[str, dict[str, list[str]]]:
     """label -> group -> ordered Identify URLs, in the order batches were cut."""
     data: dict[str, dict[str, list[str]]] = {}
@@ -233,9 +265,8 @@ def render_rotation_index(manifest: Manifest, *, title: str) -> str:
         f'<section class="why"><h2>{len(data)} lists, in turn</h2>'
         f'<div class="cycle" aria-hidden="true">{cycle}<i>&#8634;</i></div>'
         f"<p>Each press takes the next of {len(data)} lists, so your batches spread evenly over "
-        "all of them. The lists split one pool of records at random and differ only in the order "
-        "they show them. After the blitz we compare, identifier by identifier, which order led to "
-        "more species-level IDs.</p></section>\n"
+        "all of them.</p></section>\n"
+        f"{_method(manifest)}"
     )
     script = (
         f"var BUILD={json.dumps(manifest.created_at)};"
