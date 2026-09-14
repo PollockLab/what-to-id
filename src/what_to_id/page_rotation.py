@@ -38,6 +38,15 @@ font-family:"Space Grotesk",Inter,system-ui,sans-serif;transition:filter .12s}
 .nextbtn:hover{filter:brightness(1.08)}
 .nextbtn:disabled{opacity:.5;cursor:default;filter:none}
 #doneMsg{color:var(--mut);margin-top:1rem}
+#runner .crumbs{display:flex;justify-content:space-between;align-items:center}
+.linkbtn{background:none;border:0;padding:.2rem 0;font:inherit;font-size:.9rem;color:var(--mut);
+cursor:pointer;transition:color .12s}
+.linkbtn:hover{color:var(--acc)}
+.linkbtn[hidden],.undo[hidden]{display:none}
+.undo{display:flex;align-items:center;justify-content:space-between;gap:.8rem;margin-top:1rem;
+padding:.7rem 1rem;background:var(--panel);border:1px solid #2a3a4d;border-radius:12px;
+color:var(--ink)}
+.undo .linkbtn{color:var(--acc);font-weight:700}
 .flow{display:flex;align-items:center;gap:.6rem;margin:1.2rem 0 0}
 .flow div{flex:1 1 0;display:flex;flex-direction:column;gap:.1rem;padding:.7rem .9rem;
 background:var(--panel);border:1px solid #2a3a4d;border-radius:12px}
@@ -98,6 +107,11 @@ function leftInGroup(data, state, group) {
   });
   return left;
 }
+function startOver(state, group) {
+  var progress = Object.assign({}, state.progress || {});
+  delete progress[group];
+  return Object.assign({}, state, {progress: progress});
+}
 (function(){
   var SKEY = 'what-to-id-rotation';
   var GKEY = 'what-to-id-rotation-group';
@@ -149,6 +163,12 @@ function leftInGroup(data, state, group) {
   var nextBtn = document.getElementById('nextBtn');
   var doneMsg = document.getElementById('doneMsg');
   var changeGroup = document.getElementById('changeGroup');
+  var startOverBtn = document.getElementById('startOver');
+  var undoMsg = document.getElementById('undoMsg');
+  var undoText = document.getElementById('undoText');
+  var undoBtn = document.getElementById('undoBtn');
+  var undoState = null, undoTimer = null;
+  function hideUndo() { undoMsg.hidden = true; undoState = null; clearTimeout(undoTimer); }
   function renderPicker() {
     groupList.innerHTML = '';
     groups.forEach(function(g){
@@ -171,8 +191,10 @@ function leftInGroup(data, state, group) {
     var left = leftInGroup(DATA, state, group);
     doneMsg.hidden = left > 0;
     nextBtn.disabled = left === 0;
+    startOverBtn.hidden = served === 0;
   }
   nextBtn.addEventListener('click', function(){
+    hideUndo();
     var res = nextBatch(state, DATA, group);
     state = res.state;
     save();
@@ -182,13 +204,32 @@ function leftInGroup(data, state, group) {
       return;
     }
     runnerCode.textContent = 'Batch ' + res.batchNumber;
+    startOverBtn.hidden = false;
     window.open(res.url, '_blank', 'noopener');
     if (leftInGroup(DATA, state, group) === 0) {
       doneMsg.hidden = false;
       nextBtn.disabled = true;
     }
   });
-  changeGroup.addEventListener('click', function(ev){ ev.preventDefault(); renderPicker(); });
+  changeGroup.addEventListener('click', function(ev){
+    ev.preventDefault(); hideUndo(); renderPicker();
+  });
+  // Start over puts this group's batches back, keeps the list cycle, and offers Undo for 10 s.
+  startOverBtn.addEventListener('click', function(){
+    undoState = state;
+    state = startOver(state, group);
+    save();
+    renderRunner();
+    undoText.textContent = 'Started over. All ' + leftInGroup(DATA, state, group) +
+      ' batches in ' + (GROUP_NAMES[group] || group) + ' are back.';
+    undoMsg.hidden = false;
+    clearTimeout(undoTimer);
+    undoTimer = setTimeout(hideUndo, 10000);
+  });
+  undoBtn.addEventListener('click', function(){
+    if (undoState) { state = undoState; save(); renderRunner(); }
+    hideUndo();
+  });
   if (group && groups.indexOf(group) !== -1) { renderRunner(); } else { renderPicker(); }
 })();
 """.strip()
@@ -257,10 +298,14 @@ def render_rotation_index(manifest: Manifest, *, title: str) -> str:
         f'<div class="flow">{flow}</div>\n'
         '<section id="picker"><div class="cards" id="groupList"></div></section>\n'
         '<section id="runner" hidden>'
-        '<p class="crumbs"><a href="#" id="changeGroup">Change group</a></p>'
+        '<p class="crumbs"><a href="#" id="changeGroup">Change group</a>'
+        '<button class="linkbtn" id="startOver" type="button" hidden>'
+        "&#8634; Start over</button></p>"
         '<p class="runcode" id="runnerCode">Batch 0</p>'
         '<button class="nextbtn" id="nextBtn" type="button">Next batch</button>'
         '<p id="doneMsg" hidden>All batches in this group are done.</p>'
+        '<p class="undo" id="undoMsg" aria-live="polite" hidden><span id="undoText"></span>'
+        '<button class="linkbtn" id="undoBtn" type="button">Undo</button></p>'
         "</section>\n"
         f'<section class="why"><h2>{len(data)} lists, in turn</h2>'
         f'<div class="cycle" aria-hidden="true">{cycle}<i>&#8634;</i></div>'

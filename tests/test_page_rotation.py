@@ -202,6 +202,47 @@ def test_next_batch_js_logic(tmp_path, node_available):
     assert all(r["batchNumber"] == 6 for r in results if r["done"])
 
 
+def test_runner_offers_start_over_with_undo():
+    html = render_rotation_index(_manifest(), title="t")
+    assert 'id="startOver"' in html and "Start over" in html
+    assert 'id="undoBtn"' in html
+    _assert_blind(html)
+
+
+def test_start_over_js_resets_only_that_group(tmp_path, node_available):
+    import subprocess
+
+    fns = [
+        re.search(rf"function {name}\(state, [a-z]+(, group)?\) \{{.*?\n\}}", ROTATION_JS, re.S)
+        for name in ("nextBatch", "startOver")
+    ]
+    assert all(fns), "nextBatch or startOver not found in ROTATION_JS"
+    script = tmp_path / "start_over.js"
+    script.write_text(
+        "\n".join(f.group(0) for f in fns)
+        + """
+var data = {A: {G: ["A-0", "A-1"], H: ["A-h"]}, B: {G: ["B-0"]}};
+var state = {perm: ["A", "B"], progress: {}, offsets: {}, build: "d1"};
+state = nextBatch(state, data, "G").state;
+state = nextBatch(state, data, "G").state;
+state = nextBatch(state, data, "H").state;
+var before = JSON.stringify(state);
+var reset = startOver(state, "G");
+var again = nextBatch(reset, data, "G");
+console.log(JSON.stringify({same: JSON.stringify(state) === before, reset: reset,
+  url: again.url, n: again.batchNumber}));
+"""
+    )
+    out = json.loads(
+        subprocess.run(["node", str(script)], capture_output=True, text=True, check=True).stdout
+    )
+    assert out["same"], "startOver mutated its input"
+    assert "G" not in out["reset"]["progress"]
+    assert out["reset"]["progress"]["H"]["served"] == 1
+    assert out["reset"]["perm"] == ["A", "B"] and out["reset"]["build"] == "d1"
+    assert (out["url"], out["n"]) == ("A-0", 1)
+
+
 def test_page_embeds_build_id():
     m = _manifest()
     m.created_at = "2026-11-03T06:00:00Z"
