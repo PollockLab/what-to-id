@@ -132,7 +132,7 @@ The live page is served at https://pollocklab.github.io/what-to-id/. The daily w
 
 A one-off build is published instead by copying `out/build/site/*.html` over `site/`, which the Pages workflow deploys on a push to main (while `DAILY_ENABLED` is `true`, only when run by hand from the Actions tab, so a push never overwrites the daily page); a rotation build writes only `index.html`, so delete the old `arm_*.html` pages when switching. Both workflows refuse any file that is not HTML and any page that names an arm. Keep the key, and a real build's manifest and seed, out of the repo: with the public code and the same pool, any of them recovers which list is which.
 
-The current page is a preview built from a 10,000-record sample frozen on 2026-09-11 (seed 7), not the blitz build.
+The current page is a rotation preview of the two proposed lists, built from a 10,000-record sample frozen on 2026-09-11 (seed 7, `--max-batches 20`), not the blitz build.
 
 ## Tests
 
