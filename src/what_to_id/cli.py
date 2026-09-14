@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import sys
 from datetime import date
@@ -19,6 +20,7 @@ from what_to_id.manifest import (
     Manifest,
     blind_labels,
     blind_labels_keyed,
+    build_record,
     grid_hash,
     key_fingerprint,
     key_from_env,
@@ -189,6 +191,9 @@ def build(args: argparse.Namespace) -> Path:
     )
     out.mkdir(parents=True, exist_ok=True)
     write_manifest(m, out / "manifest.json")
+    with open(out / "build_record.json", "w") as fh:
+        json.dump(build_record(m), fh, indent=1, sort_keys=True)
+        fh.write("\n")
     assign_df.to_parquet(out / "assign.parquet", index=False)
     batches_df.to_parquet(out / "batches.parquet", index=False)
     if args.design == "rotation":
