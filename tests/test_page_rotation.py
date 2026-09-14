@@ -173,3 +173,33 @@ def test_next_batch_js_logic(tmp_path, node_available):
     assert [r["batchNumber"] for r in results if not r["done"]] == [1, 2, 3, 4, 5, 6]
     # once exhausted, done stays true and batchNumber stays at the last served count
     assert all(r["batchNumber"] == 6 for r in results if r["done"])
+
+
+def test_page_embeds_build_id():
+    m = _manifest()
+    m.created_at = "2026-11-03T06:00:00Z"
+    html = render_rotation_index(m, title="t")
+    assert 'var BUILD="2026-11-03T06:00:00Z";' in html
+
+
+def test_new_build_keeps_cycle_and_resets_batches(tmp_path, node_available):
+    import subprocess
+
+    block = re.search(r"  if \(state\.build !== BUILD\) \{.*?\n  \}", ROTATION_JS, re.S)
+    assert block, "build reset block not found in ROTATION_JS"
+    old = {"perm": ["B", "A"], "progress": {"Aves": {"step": 3}}, "offsets": {"A": {"Aves": 1}}}
+    script = tmp_path / "reset.js"
+    script.write_text(
+        "var out = [];\n"
+        f"[['day1', 'day2'], ['day2', 'day2']].forEach(function(p){{\n"
+        f"  var state = Object.assign({json.dumps(old)}, {{build: p[0]}}), BUILD = p[1];\n"
+        f"{block.group(0)}\n"
+        "  out.push(state);\n"
+        "});\n"
+        "console.log(JSON.stringify(out));\n"
+    )
+    new_build, same_build = json.loads(
+        subprocess.run(["node", str(script)], capture_output=True, text=True, check=True).stdout
+    )
+    assert new_build == {"perm": ["B", "A"], "progress": {}, "build": "day2"}
+    assert same_build["progress"] == old["progress"] and same_build["offsets"] == old["offsets"]
