@@ -63,6 +63,7 @@ IDs are credited to iNaturalist accounts and each record's list is fixed, so a s
    - `gap_first`: records from data-poor places first, using the where-to-blitz cell scores.
    - `similarity`: look-alike photos together, from BioCLIP 2.5 image embeddings.
    - `novelty`: photos least like any Research Grade photo of the same group and region first.
+   - `surprise` (opt-in, not in the default build): records whose proposed species is least expected where, or in what climate, it was seen, from a per-species tail probability against Research Grade records (`surprise.py`). Pass the scores with `--surprise-scores`.
 4. **Serve.** A static page shows lists labelled A to D, each a stack of Identify links. The arm behind each letter is recorded only in the build's `manifest.json`, never on the page. By default each identifier takes one list; `--design rotation` serves the one-page rotation pictured above. Each daily build appends its served records, by letter, to a served log (`--served-log`).
 5. **Read back.** Every served record, from every daily build, is fetched again. Identifications keep their own timestamps, so the per-identifier comparison is fixed when the blitz ends and is read back within a week of it; the record-level outcomes are read back 30 days after.
 

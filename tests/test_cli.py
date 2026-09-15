@@ -126,6 +126,28 @@ def test_build_design_rotation_writes_only_index(tmp_path, webapp_dir):
         assert word not in html
 
 
+def test_build_surprise_arm_reads_scores_and_stays_blind(tmp_path, webapp_dir):
+    pool = make_pool(300, seed=5)
+    pool_path, scores = tmp_path / "pool.parquet", tmp_path / "surprise.parquet"
+    pool.to_parquet(pool_path, index=False)
+    s = np.linspace(0, 1, 300)
+    pd.DataFrame({"id": pool["id"], "surprise": s}).to_parquet(scores, index=False)
+    args = ["build", "--pool", str(pool_path), "--freeze", "2026-09-01", "--d1", "2026-09-15"]
+    args += ["--batch-size", "25", "--arms", "recency,surprise", "--design", "rotation"]
+    args += ["--webapp-dir", str(webapp_dir), "--out", str(tmp_path / "out")]
+    with pytest.raises(SystemExit, match="surprise-scores"):
+        main(args)
+    assert main([*args, "--surprise-scores", str(scores)]) == 0
+    b = pd.read_parquet(tmp_path / "out" / "batches.parquet")
+    first = b[b["batch_id"].str.endswith("-000") & (b["arm"] == "surprise") & (b["position"] == 0)]
+    by_id = dict(zip(pool["id"], s, strict=True))
+    for _, row in first.iterrows():
+        rest = b[(b["arm"] == "surprise") & (b["group"] == row["group"])]
+        assert by_id[row["id"]] == max(by_id[i] for i in rest["id"])
+    html = (tmp_path / "out" / "site" / "index.html").read_text().lower()
+    assert "surprise" not in html and "unexpected sightings first" in html
+
+
 def test_build_default_design_is_sets(tmp_path, webapp_dir):
     pool = make_pool(300, seed=5)
     pool_path = tmp_path / "pool.parquet"

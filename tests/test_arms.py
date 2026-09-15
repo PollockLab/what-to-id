@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from what_to_id.arms import ARMS, GapFirst, Novelty, Recency, Similarity, build_arm
+from what_to_id.arms import ARMS, GapFirst, Novelty, Recency, Similarity, Surprise, build_arm
 
 from .conftest import make_pool
 
@@ -179,8 +179,20 @@ def test_novelty_rejects_dim_mismatch(tmp_path):
         Novelty(emb, ref, chunk=0)
 
 
+def test_surprise_orders_by_score_nan_last(pool):
+    score = np.random.default_rng(1).random(len(pool))
+    score[:20] = np.nan
+    order = Surprise().order(pool.assign(surprise=score), seed=0)
+    assert sorted(order.tolist()) == list(range(len(pool)))
+    s = score[order]
+    n_ok = int(np.isfinite(score).sum())
+    assert (s[: n_ok - 1] >= s[1:n_ok]).all() and np.isnan(s[n_ok:]).all()
+    with pytest.raises(ValueError, match="surprise-scores"):
+        Surprise().order(pool, seed=0)
+
+
 def test_build_arm():
-    assert set(ARMS) == {"recency", "gap_first", "similarity", "novelty"}
+    assert set(ARMS) == {"recency", "gap_first", "similarity", "novelty", "surprise"}
     assert build_arm("recency").name == "recency"
     with pytest.raises(ValueError):
         build_arm("nope")
