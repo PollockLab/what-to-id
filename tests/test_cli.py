@@ -162,6 +162,45 @@ def test_build_surprise_arm_accepts_scores_with_n_ref(tmp_path, webapp_dir):
     assert main(args) == 0
 
 
+def test_build_surprise_arm_accepts_sinr_scores(tmp_path, webapp_dir):
+    pool = make_pool(300, seed=5)
+    pool_path = tmp_path / "pool.parquet"
+    surprise_scores = tmp_path / "surprise.parquet"
+    sinr_scores = tmp_path / "sinr.parquet"
+    pool.to_parquet(pool_path, index=False)
+    pd.DataFrame({"id": pool["id"], "surprise": np.linspace(0, 1, 300)}).to_parquet(
+        surprise_scores, index=False
+    )
+    pd.DataFrame({"id": pool["id"], "sinr_rel": np.linspace(0, 2, 300)}).to_parquet(
+        sinr_scores, index=False
+    )
+    args = ["build", "--pool", str(pool_path), "--freeze", "2026-09-01", "--d1", "2026-09-15"]
+    args += ["--batch-size", "25", "--arms", "recency,surprise", "--design", "rotation"]
+    args += ["--webapp-dir", str(webapp_dir), "--out", str(tmp_path / "out")]
+    args += ["--surprise-scores", str(surprise_scores), "--sinr-scores", str(sinr_scores)]
+    assert main(args) == 0
+
+
+def test_build_sinr_scores_requires_id_and_sinr_rel(tmp_path, webapp_dir):
+    pool = make_pool(300, seed=5)
+    pool_path = tmp_path / "pool.parquet"
+    surprise_scores = tmp_path / "surprise.parquet"
+    sinr_scores = tmp_path / "sinr.parquet"
+    pool.to_parquet(pool_path, index=False)
+    pd.DataFrame({"id": pool["id"], "surprise": np.linspace(0, 1, 300)}).to_parquet(
+        surprise_scores, index=False
+    )
+    pd.DataFrame({"id": pool["id"], "rel": np.linspace(0, 2, 300)}).to_parquet(
+        sinr_scores, index=False
+    )
+    args = ["build", "--pool", str(pool_path), "--freeze", "2026-09-01", "--d1", "2026-09-15"]
+    args += ["--batch-size", "25", "--arms", "recency,surprise", "--design", "rotation"]
+    args += ["--webapp-dir", str(webapp_dir), "--out", str(tmp_path / "out")]
+    args += ["--surprise-scores", str(surprise_scores), "--sinr-scores", str(sinr_scores)]
+    with pytest.raises(SystemExit, match="sinr_rel"):
+        main(args)
+
+
 def test_build_default_design_is_sets(tmp_path, webapp_dir):
     pool = make_pool(300, seed=5)
     pool_path = tmp_path / "pool.parquet"

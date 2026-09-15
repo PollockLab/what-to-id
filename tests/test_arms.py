@@ -209,6 +209,43 @@ def test_surprise_without_n_ref_column_keeps_old_order(pool):
     assert (without_col == tied_n_ref).all()
 
 
+def test_surprise_tie_break_by_sinr(pool):
+    pool = pool.iloc[:4].copy()
+    pool["surprise"] = [1.0, 1.0, 1.0, 0.5]
+    pool["surprise_sinr"] = [0.2, 0.9, 0.5, 1.0]
+    order = Surprise().order(pool, seed=0)
+    # Higher surprise_sinr first among the surprise==1 tie, the surprise==0.5 record still last.
+    assert pool["id"].to_numpy()[order].tolist() == pool["id"].iloc[[1, 2, 0, 3]].tolist()
+
+
+def test_surprise_sinr_nan_falls_back_to_n_ref(pool):
+    pool = pool.iloc[:4].copy()
+    pool["surprise"] = 1.0
+    pool["surprise_sinr"] = [0.9, np.nan, np.nan, 0.9]
+    pool["surprise_n_ref"] = [5.0, 1.0, 3.0, 2.0]
+    order = Surprise().order(pool, seed=0)
+    # Scored SINR goes before unscored SINR; within each group, fewer n_ref first.
+    assert pool["id"].to_numpy()[order].tolist() == pool["id"].iloc[[3, 0, 1, 2]].tolist()
+
+
+def test_surprise_sinr_never_overrides_higher_surprise(pool):
+    pool = pool.iloc[:2].copy()
+    pool["surprise"] = [0.9, 0.5]
+    pool["surprise_sinr"] = [0.1, 1.0]
+    order = Surprise().order(pool, seed=0)
+    assert pool["id"].to_numpy()[order].tolist() == pool["id"].tolist()
+
+
+def test_surprise_without_sinr_column_keeps_old_order(pool):
+    score = np.random.default_rng(1).random(len(pool))
+    n_ref = np.random.default_rng(2).random(len(pool))
+    pool = pool.assign(surprise=score, surprise_n_ref=n_ref)
+    without_col = Surprise().order(pool, seed=0)
+    # A pool where every row ties on surprise_sinr falls back to the same n_ref tie-break.
+    tied_sinr = Surprise().order(pool.assign(surprise_sinr=0.0), seed=0)
+    assert (without_col == tied_sinr).all()
+
+
 def test_build_arm():
     assert set(ARMS) == {"recency", "gap_first", "similarity", "novelty", "surprise"}
     assert build_arm("recency").name == "recency"

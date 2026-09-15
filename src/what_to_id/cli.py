@@ -129,6 +129,19 @@ def build(args: argparse.Namespace) -> Path:
         log.info("surprise present for %d rows", int(pool["surprise"].notna().sum()))
         if has_n_ref:
             pool["surprise_n_ref"] = pool["id"].map(s["n_ref"]).astype("float64").to_numpy()
+    if args.sinr_scores:
+        cols = pd.read_parquet(args.sinr_scores).columns
+        missing = {"id", "sinr_rel"} - set(cols)
+        if missing:
+            raise SystemExit(f"{args.sinr_scores}: missing column(s) {sorted(missing)}")
+        r = (
+            pd.read_parquet(args.sinr_scores, columns=["id", "sinr_rel"])
+            .drop_duplicates("id")
+            .set_index("id")
+        )
+        sinr_rel = pool["id"].map(r["sinr_rel"]).astype("float64")
+        pool["surprise_sinr"] = (1 - sinr_rel.clip(upper=1)).to_numpy()
+        log.info("surprise_sinr present for %d rows", int(pool["surprise_sinr"].notna().sum()))
 
     key = key_from_env(args.key_env) if args.key_env else None
     if key is None:
@@ -250,6 +263,11 @@ def make_parser() -> argparse.ArgumentParser:
         "--surprise-scores",
         default=None,
         help="parquet with id and surprise columns (surprise arm)",
+    )
+    b.add_argument(
+        "--sinr-scores",
+        default=None,
+        help="parquet with id and sinr_rel columns; breaks surprise ties by range-model score",
     )
     b.add_argument(
         "--webapp-dir", default=str(WEBAPP_DIR), help="where-to-blitz cluster_results/ca"
