@@ -16,7 +16,7 @@ import pandas as pd
 from what_to_id.manifest import Manifest
 from what_to_id.page_style import CSS, FONTS, JS
 
-ARM_WORDS = ("recency", "gap_first", "similarity", "novelty", "gap first")
+ARM_WORDS = ("recency", "gap_first", "similarity", "novelty", "gap first", "surprise")
 THUMBS_PER_BATCH = 4
 
 GROUP_NAMES = {

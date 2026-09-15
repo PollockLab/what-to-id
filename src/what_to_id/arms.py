@@ -40,6 +40,16 @@ class Recency:
         return _recency_order(pool)
 
 
+def _score_order(pool: pd.DataFrame, col: str) -> np.ndarray:
+    score = pool[col].to_numpy(dtype=np.float64)
+    created = _created_ns(pool)
+    ids = pool["id"].to_numpy(dtype=np.int64)
+    missing = ~np.isfinite(score)
+    score = np.where(missing, -np.inf, score)
+    # lexsort sorts by the last key first: NaN last, then score desc, created desc, id desc.
+    return np.lexsort((-ids, -created, -score, missing.astype(np.int8)))
+
+
 @dataclass(frozen=True)
 class GapFirst:
     name: str = "gap_first"
@@ -49,13 +59,23 @@ class GapFirst:
             raise ValueError(
                 "gap_first requires pool['cell_score'] (run cells.score_records first)"
             )
-        score = pool["cell_score"].to_numpy(dtype=np.float64)
-        created = _created_ns(pool)
-        ids = pool["id"].to_numpy(dtype=np.int64)
-        missing = ~np.isfinite(score)
-        score = np.where(missing, -np.inf, score)
-        # lexsort sorts by the last key first: NaN last, then score desc, created desc, id desc.
-        return np.lexsort((-ids, -created, -score, missing.astype(np.int8)))
+        return _score_order(pool, "cell_score")
+
+
+@dataclass(frozen=True)
+class Surprise:
+    """Records whose proposed taxon is least expected where, or in what climate, it was seen.
+
+    Orders by pool['surprise'] (what_to_id.surprise.score, a per-taxon tail probability) desc,
+    NaN last in recency order. Opt-in: not in the default build.
+    """
+
+    name: str = "surprise"
+
+    def order(self, pool: pd.DataFrame, *, seed: int) -> np.ndarray:
+        if "surprise" not in pool.columns:
+            raise ValueError("surprise requires pool['surprise'] (pass --surprise-scores)")
+        return _score_order(pool, "surprise")
 
 
 def load_embeddings(path: Path) -> tuple[np.ndarray, np.ndarray, str]:
@@ -272,6 +292,7 @@ ARMS: dict[str, type] = {
     "gap_first": GapFirst,
     "similarity": Similarity,
     "novelty": Novelty,
+    "surprise": Surprise,
 }
 
 

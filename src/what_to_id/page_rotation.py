@@ -313,6 +313,8 @@ ORDER_TEXT = {
     "gap_first": "<b>Data-poor places first.</b> Records from areas with few or old records.",
     "similarity": "<b>Look-alike photos together.</b> Similar photos sit in the same batch.",
     "novelty": "<b>Unfamiliar photos first.</b> Photos least like any Research Grade photo.",
+    "surprise": "<b>Unexpected sightings first.</b> Species seen where, or in a climate where, "
+    "few Research Grade records of that species are.",
 }
 
 

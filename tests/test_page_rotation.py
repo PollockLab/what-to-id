@@ -12,7 +12,7 @@ from what_to_id.page_rotation import (
     write_rotation_site,
 )
 
-ARM_NAMES = ["recency", "gap_first", "similarity", "novelty"]
+ARM_NAMES = ["recency", "gap_first", "similarity", "novelty", "surprise"]
 
 
 def _manifest():

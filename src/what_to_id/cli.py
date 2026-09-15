@@ -114,6 +114,13 @@ def build(args: argparse.Namespace) -> Path:
 
     pool["cell_score"] = score_records(pool, webapp_dir=Path(args.webapp_dir)).to_numpy()
     log.info("cell_score present for %d rows", int(pool["cell_score"].notna().sum()))
+    if "surprise" in arm_names:
+        if not args.surprise_scores:
+            raise SystemExit("--surprise-scores is required for the surprise arm")
+        s = pd.read_parquet(args.surprise_scores, columns=["id", "surprise"])
+        s = s.drop_duplicates("id").set_index("id")["surprise"]
+        pool["surprise"] = pool["id"].map(s).astype("float64").to_numpy()
+        log.info("surprise present for %d rows", int(pool["surprise"].notna().sum()))
 
     key = key_from_env(args.key_env) if args.key_env else None
     if key is None:
@@ -230,6 +237,11 @@ def make_parser() -> argparse.ArgumentParser:
         "--reference-embeddings",
         default=None,
         help="Research Grade reference npz pattern with {group}, or a dir (novelty arm)",
+    )
+    b.add_argument(
+        "--surprise-scores",
+        default=None,
+        help="parquet with id and surprise columns (surprise arm)",
     )
     b.add_argument(
         "--webapp-dir", default=str(WEBAPP_DIR), help="where-to-blitz cluster_results/ca"
