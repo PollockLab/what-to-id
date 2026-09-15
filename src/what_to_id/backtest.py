@@ -18,15 +18,20 @@ FAST_DAYS = 30
 
 def outcomes(q: pd.DataFrame) -> pd.DataFrame:
     """Per record, 0/1 columns: fast (research grade within FAST_DAYS of T), slow (later), stuck
-    (still needs ID now), corrected (taxon now on another branch), refined (now more precise)."""
+    (still needs ID now), corrected (taxon now on another branch), coarsened (taxon now an
+    ancestor of the taxon at T), misid (corrected or coarsened: the taxon at T did not hold),
+    refined (now more precise)."""
     d = q["days_to_rg"]
+    rel = q["relation"]
     return pd.DataFrame(
         {
             "fast": (d <= FAST_DAYS),
             "slow": (d > FAST_DAYS),
             "stuck": q["grade_now"] != "research",
-            "corrected": q["relation"] == "corrected",
-            "refined": q["relation"] == "refined",
+            "corrected": rel == "corrected",
+            "coarsened": rel == "coarsened",
+            "misid": rel.isin(["corrected", "coarsened"]),
+            "refined": rel == "refined",
         },
         index=q.index,
     ).astype(float)
