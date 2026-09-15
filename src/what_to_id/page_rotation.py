@@ -62,7 +62,7 @@ text-decoration:underline;text-underline-offset:3px;transition:color .12s}}
 .linkbtn:hover:not(:disabled){{color:var(--acc)}}
 .linkbtn:disabled{{opacity:.4;cursor:default}}
 .subhint{{width:100%;margin:0;color:var(--cmut);font-size:.8rem}}
-.pickhead{{font:700 1rem/1.3 {_SG};margin:0 0 .5rem;color:var(--ink);text-transform:none;
+.pickhead{{font:700 1rem/1.3 {_SG};margin:1.2rem 0 .5rem;color:var(--ink);text-transform:none;
 letter-spacing:normal}}
 .reopenrow{{margin:.5rem 0 0}}
 .reopenrow a{{font-weight:600}}
