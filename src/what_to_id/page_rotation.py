@@ -18,6 +18,7 @@ from pathlib import Path
 
 from what_to_id.manifest import Manifest
 from what_to_id.page import ARM_WORDS, group_name
+from what_to_id.page_method import METHOD_CSS, method_section
 from what_to_id.page_style import CSS, FONTS
 
 _SG = '"Space Grotesk",Inter,system-ui,sans-serif'
@@ -83,11 +84,6 @@ background:var(--panel);border:1px solid #2a3a4d;border-radius:12px}}
 .cycle{{display:flex;align-items:center;gap:.5rem;margin:.4rem 0 .8rem}}
 .cycle .n{{width:2.2rem;height:2.2rem;display:grid;place-items:center;border-radius:50%;
 background:var(--card);color:var(--acc-ink)}}
-details.how{{margin-top:2rem}}
-details.how summary{{cursor:pointer;font-family:{_SG};font-size:.8rem;font-weight:700;
-text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}}
-details.how summary:hover{{color:var(--acc)}}
-.how ul{{margin:.3rem 0;padding-left:1.1rem}}
 @media(max-width:44rem){{.flow{{flex-direction:column;align-items:stretch;gap:.35rem}}
 .flow i{{display:none}}
 .flow div{{flex-direction:row;flex-wrap:wrap;column-gap:.5rem;padding:.5rem .8rem}}}}
@@ -317,43 +313,6 @@ function startOver(state, group) {
 """.strip()
 
 
-# Plain words for each order in the method section. Never the arm names, which ARM_WORDS guards.
-ORDER_TEXT = {
-    "recency": "<b>Newest first.</b> The control, close to what iNaturalist shows today.",
-    "gap_first": "<b>Data-poor places first.</b> Records from areas with few or old records.",
-    "similarity": "<b>Look-alike photos together.</b> Similar photos sit in the same batch.",
-    "novelty": "<b>Unfamiliar photos first.</b> Photos least like any Research Grade photo.",
-    "surprise": "<b>Unexpected sightings first.</b> Species seen where, or in a climate where, "
-    "few Research Grade records of that species are.",
-}
-
-
-def _method(manifest: Manifest, n_lists: int) -> str:
-    """The test in five steps, with one line per order in this build, folded by default."""
-    missing = [a for a in manifest.arms if a not in ORDER_TEXT]
-    if missing:
-        raise ValueError(f"no page words for list order(s) {missing}; add them to ORDER_TEXT")
-    orders = "".join(f"<li>{ORDER_TEXT[a]}</li>" for a in manifest.arms)
-    cycle = "".join(f'<span class="n">{i}</span>' for i in range(1, n_lists + 1))
-    cycle_html = f'<div class="cycle" aria-hidden="true">{cycle}<i>&#8634;</i></div>'
-    steps = (
-        "<b>The question.</b> Does the order of records change how many get an ID, and which?",
-        "<b>The lists.</b> Each record goes to one list at random, so every list holds the same "
-        f"mix of species and observers. Only the order is different:<ul>{orders}</ul>",
-        "<b>Your batches.</b> Each press of Next batch takes the next of "
-        f"{n_lists} lists, so your batches spread evenly over all of them.{cycle_html}"
-        "<p>Your browser picks the turn order at random. The page does not say which list a "
-        "batch is from.</p>",
-        "<b>The count.</b> After the blitz, we count each participant's species-level IDs on each "
-        "list and compare each person with themself. A fast identifier adds the same to every "
-        "list.",
-        "<b>Nothing else changes.</b> You identify in iNaturalist as usual. Your IDs carry your "
-        "name, count toward Research Grade and go to GBIF.",
-    )
-    items = "".join(f"<li>{s}</li>" for s in steps)
-    return f'<details class="how"><summary>How the test works</summary><ol>{items}</ol></details>\n'
-
-
 def _rotation_data(manifest: Manifest) -> dict[str, dict[str, list[str]]]:
     """label -> group -> ordered Identify URLs, in the order batches were cut."""
     data: dict[str, dict[str, list[str]]] = {}
@@ -428,7 +387,7 @@ def render_rotation_index(manifest: Manifest, *, title: str) -> str:
         '<h2 class="pickhead">Pick a group</h2>'
         '<div id="groupList"></div></section>\n'
         f"{_runner(int(manifest.batch_size))}"
-        f"{_method(manifest, len(data))}"
+        f"{method_section(manifest, len(data))}"
     )
     script = (
         f"var BUILD={json.dumps(manifest.created_at)};"
@@ -439,7 +398,7 @@ def render_rotation_index(manifest: Manifest, *, title: str) -> str:
     return (
         '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width,initial-scale=1">\n'
-        f"<title>{title}</title>\n{FONTS}<style>{CSS}{ROTATION_CSS}</style>\n</head>\n<body>\n"
+        f"<title>{title}</title>\n{FONTS}<style>{CSS}{ROTATION_CSS}{METHOD_CSS}</style>\n</head>\n<body>\n"
         "<noscript><p>This page needs JavaScript to deal batches.</p></noscript>\n"
         f"<main>\n<h1>{title}</h1>\n{sub_html}{body}"
         f"</main>\n<script>{script}</script>\n</body>\n</html>\n"

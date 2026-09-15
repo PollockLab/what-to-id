@@ -5,8 +5,8 @@ import pytest
 
 from what_to_id.manifest import Manifest
 from what_to_id.page import ARM_WORDS
+from what_to_id.page_method import ORDER_TEXT
 from what_to_id.page_rotation import (
-    ORDER_TEXT,
     ROTATION_JS,
     render_rotation_index,
     write_rotation_site,
