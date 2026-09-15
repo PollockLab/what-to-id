@@ -125,6 +125,7 @@ class Manifest:
     assignment: str = "stratified"
     key_fingerprint: str | None = None
     where_to_blitz_grid: str | None = None
+    code_commit: str | None = None
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -242,5 +243,5 @@ def build_record(m: Manifest) -> dict:
     """The public per-build record: everything needed to rerun this build, safe to publish."""
     d = m.to_dict()
     record = {k: d[k] for k in PUBLIC_BUILD_RECORD_FIELDS}
-    record["code_commit"] = code_commit()
+    record["code_commit"] = m.code_commit or code_commit()
     return record

@@ -11,7 +11,7 @@ Companion to [where-to-blitz](https://github.com/PollockLab/where-to-blitz), whi
 Every list holds the same kind of records and differs only in order. The orders fall into two families, each with its own question:
 
 - **Speed** lists change how many IDs an hour of identifier effort gives. `similarity` puts look-alike photos together, on the hypothesis that fewer context switches make identifying faster.
-- **Value** lists change which gaps the IDs fill. `gap_first` puts records from data-poor places first, aimed at the gap in where species are known to occur (the Wallacean shortfall, [Hortal et al. 2015](https://doi.org/10.1146/annurev-ecolsys-112414-054400)). `novelty` puts the photos least like any verified photo of their group first, aimed at the gap in what verified photos cover.
+- **Value** lists change which gaps the IDs fill. `gap_first` puts records from data-poor places first, aimed at the gap in where species are known to occur (the Wallacean shortfall, [Hortal et al. 2015](https://doi.org/10.1146/annurev-ecolsys-112414-054400)) and in how recent the records are, which the score weights by record age. Blitz the Gap calls these spatial and temporal gaps ([Hébert et al. 2026](https://doi.org/10.32942/X2T09G)). `novelty` puts the photos least like any verified photo of their group first, aimed at the gap in what verified photos cover.
 - `recency`, newest first, is the control for both.
 
 Each family is judged on its own measure: speed lists on species-level IDs per identifier, value lists on the same count weighted by how data-poor the record's place is (`gap_first`) or on new species per grid cell (`novelty`).

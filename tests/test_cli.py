@@ -303,6 +303,17 @@ def test_build_records_the_grid_it_read(tmp_path, webapp_dir, monkeypatch):
     assert d["where_to_blitz_grid"] == "f67acf37"
 
 
+def test_build_writes_the_code_commit_into_the_manifest(tmp_path, webapp_dir, monkeypatch):
+    monkeypatch.setenv("WHAT_TO_ID_KEY", "ab" * 32)
+    pool_path = tmp_path / "pool.parquet"
+    make_pool(100, seed=5).to_parquet(pool_path, index=False)
+    out = tmp_path / "o1"
+    assert _keyed_build(pool_path, webapp_dir, out, "2026-11-03", tmp_path / "s.parquet") == 0
+    manifest = json.loads((out / "manifest.json").read_text())
+    record = json.loads((out / "build_record.json").read_text())
+    assert manifest["code_commit"] == record["code_commit"]
+
+
 def test_build_writes_a_public_build_record(tmp_path, webapp_dir, monkeypatch):
     monkeypatch.setenv("WHAT_TO_ID_KEY", "ab" * 32)
     pool_path = tmp_path / "pool.parquet"

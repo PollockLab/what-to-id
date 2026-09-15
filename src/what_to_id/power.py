@@ -223,6 +223,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap.add_argument("--reps", type=int, default=2000)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--window", type=int, default=3000)
+    ap.add_argument("--n-arms", type=int, default=4, help="number of lists, the control included")
     ap.add_argument("--dealing", choices=DEALINGS, default="stacked")
     ap.add_argument("--depths", type=Path, help="JSON list of per-identifier record counts")
     ap.add_argument("--out", type=Path, help="write all results as JSON")
@@ -237,7 +238,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     for design in DESIGNS:
         for n in (int(x) for x in _floats(a.identifiers)):
             for lift in _floats(a.lifts):
-                sc = Scenario(n, lift, design, dealing=a.dealing, window=a.window, depths=depths)
+                sc = Scenario(
+                    n,
+                    lift,
+                    design,
+                    dealing=a.dealing,
+                    n_arms=a.n_arms,
+                    window=a.window,
+                    depths=depths,
+                )
                 r = power(sc, reps=a.reps, seed=a.seed)
                 if design == "rotation":
                     r["identifier"] = {"power": identifier_power(sc, reps=a.reps, seed=a.seed)}

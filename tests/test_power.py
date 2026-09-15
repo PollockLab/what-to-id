@@ -1,9 +1,20 @@
+import json
+
 import numpy as np
 import pytest
 
-from what_to_id.power import Scenario, _queue, _queue_random_start, power, simulate
+from what_to_id.power import Scenario, _queue, _queue_random_start, main, power, simulate
 
 SMALL = {"group_counts": (4000, 2000), "window": 300, "depth_median": 60.0}
+
+
+@pytest.mark.parametrize("argv, want", [([], 4), (["--n-arms", "2"], 2)])
+def test_cli_passes_the_number_of_lists_to_the_scenario(tmp_path, argv, want):
+    out = tmp_path / "power.json"
+    base = ["--identifiers", "3", "--lifts", "0.2", "--reps", "5", "--window", "50"]
+    assert main([*base, *argv, "--out", str(out)]) == 0
+    rows = json.loads(out.read_text())
+    assert [r["scenario"]["n_arms"] for r in rows] == [want, want]
 
 
 def test_queue_counts_positions_once():

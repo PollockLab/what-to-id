@@ -21,6 +21,7 @@ from what_to_id.manifest import (
     blind_labels,
     blind_labels_keyed,
     build_record,
+    code_commit,
     grid_hash,
     key_fingerprint,
     key_from_env,
@@ -216,6 +217,7 @@ def build(args: argparse.Namespace) -> Path:
         assignment="keyed" if key is not None else "stratified",
         key_fingerprint=key_fingerprint(key) if key is not None else None,
         where_to_blitz_grid=grid_hash(args.webapp_dir),
+        code_commit=code_commit(),
     )
     out.mkdir(parents=True, exist_ok=True)
     write_manifest(m, out / "manifest.json")

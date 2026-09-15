@@ -124,12 +124,11 @@ def test_every_order_has_detail_words_that_do_not_name_the_arm():
         assert not any(w in text.lower() for w in ARM_WORDS)
 
 
-def test_method_has_pipeline_a_more_block_per_step_and_a_rotation_example():
+def test_method_has_pipeline_short_version_and_numbered_methods_without_folds():
     how = method_section(_manifest(), 2)
-    assert how.count('<details class="more">') == 5
+    assert '<details class="more">' not in how and "More on" not in how
     assert how.count("<li><b>") >= 6 and '<ol class="pipe"' in how
-    assert how.count('<th scope="col">Press') == 4
-    assert "10 batches from each list" in how and "1 batch from each list" in how
+    assert re.findall(r"<h3>(\d+)\. ", how) == [str(i) for i in range(1, 12)]
     assert "Why every identifier works every list" in how
     assert "batches of up to 2 records" in how
     _assert_blind(how)
@@ -139,10 +138,10 @@ def test_method_describes_this_builds_assignment():
     m = _manifest()
     assert m.assignment == "stratified"
     seeded = method_section(m, 2)
-    assert "private seed" in seeded and "HMAC" not in seeded
+    assert "a seed shuffles" in seeded and "HMAC" not in seeded
     m.assignment = "keyed"
     keyed = method_section(m, 2)
-    assert "HMAC-SHA256" in keyed and "private seed" not in keyed
+    assert "HMAC-SHA256" in keyed and "seed shuffles" not in keyed
 
 
 def test_method_keeps_claims_the_code_does_not_make_off_the_page():
