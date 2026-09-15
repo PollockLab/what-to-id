@@ -10,7 +10,7 @@ def queue():
             "created_at": ["2025-09-01T00:00:00Z", "2025-09-03T00:00:00Z", "2025-09-02T00:00:00Z"],
             "days_to_rg": [5.0, 60.0, np.nan],
             "grade_now": ["research", "research", "needs_id"],
-            "relation": ["same", "corrected", "none"],
+            "relation": ["same", "corrected", "coarsened"],
             "s": [0.2, np.nan, 0.9],
         }
     )
@@ -20,6 +20,7 @@ def test_outcomes():
     o = outcomes(queue())
     assert o.fast.tolist() == [1, 0, 0] and o.slow.tolist() == [0, 1, 0]
     assert o.stuck.tolist() == [0, 0, 1] and o.corrected.tolist() == [0, 1, 0]
+    assert o.coarsened.tolist() == [0, 0, 1] and o.misid.tolist() == [0, 1, 1]
 
 
 def test_orders_and_nan_last():
