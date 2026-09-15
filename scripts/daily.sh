@@ -62,7 +62,7 @@ check_leaks() {
   if find "$site" -type f ! -name '*.html' | grep -q .; then
     die "the site must hold only HTML pages"
   fi
-  if grep -ril -E 'recency|gap_first|gap first|similarity|novelty' "$site"; then
+  if grep -ril -E 'recency|gap_first|gap first|similarity|novelty|surprise' "$site"; then
     die "a list name leaked into the site"
   fi
   if grep -rlF "$WHAT_TO_ID_KEY" "$site" "$STATE"; then
