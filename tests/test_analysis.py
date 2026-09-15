@@ -277,3 +277,72 @@ def test_cli_exposure(tmp_path, capsys):
     out = capsys.readouterr().out
     assert "exposure: served records marked reviewed, participants" in out
     assert "| c | 1 | 1 | 0.5 |" in out and "| t | 1 | 1 | 0.5 |" in out
+
+
+def test_record_totals_collapse_to_the_summed_paired_difference():
+    idents = _idents(
+        [
+            (1, 10, "2026-11-01T12:00:00Z", "species"),
+            (1, 11, "2026-11-01T12:00:00Z", "species"),
+            (3, 10, "2026-11-01T12:00:00Z", "species"),
+            (4, 11, "2026-11-01T12:00:00Z", "species"),
+            (4, 11, "2026-11-02T12:00:00Z", "subspecies"),
+            (2, 10, "2026-10-01T12:00:00Z", "species"),
+        ]
+    )
+    kw = {"start": "2026-11-01", "cutoff": "2026-12-01"}
+    totals = analysis.record_totals(idents, SERVED, **kw)
+    assert sorted(totals.index) == [1, 2, 3, 4]
+    assert totals.loc[1] == 2.0 and totals.loc[2] == 0.0
+    counts = analysis.identifier_counts(idents, SERVED, **kw)
+    paired = float((counts["t"] - counts["c"]).sum())
+    arm_of = SERVED.set_index("id")["arm"]
+    collapsed = float(totals[arm_of == "t"].sum() - totals[arm_of == "c"].sum())
+    assert collapsed == paired
+
+
+def test_record_totals_weighted_uses_the_cell_score():
+    served = SERVED.assign(cell_score=[0.0, 0.5, 0.25, np.nan])
+    idents = _idents(
+        [
+            (3, 10, "2026-11-01T12:00:00Z", "species"),
+            (3, 11, "2026-11-01T12:00:00Z", "species"),
+            (4, 10, "2026-11-01T12:00:00Z", "species"),
+        ]
+    )
+    kw = {"start": "2026-11-01", "cutoff": "2026-12-01"}
+    totals = analysis.record_totals(idents, served, weight="cell_score", **kw)
+    assert totals.loc[3] == 0.5 and totals.loc[4] == 0.0
+    with pytest.raises(ValueError, match="weight must be"):
+        analysis.record_totals(idents, served, weight="nope", **kw)
+
+
+def test_record_shuffle_p_is_large_with_no_signal_and_small_with_a_strong_one():
+    served = pd.DataFrame({"id": range(200), "arm": ["c", "t"] * 100})
+    flat = pd.Series(1.0, index=range(200))
+    kw = {"arm": "t", "control": "c", "reps": 200, "seed": 0}
+    assert analysis.record_shuffle_p(flat, served, **kw) > 0.2
+    loaded = pd.Series([0.0 if a == "c" else 10.0 for a in served["arm"]], index=served["id"])
+    assert analysis.record_shuffle_p(loaded, served, **kw) < 0.05
+
+
+def test_record_shuffle_p_strata_permute_within_a_stratum_only():
+    served = pd.DataFrame({"id": [1, 2, 3, 4], "arm": ["c", "t", "c", "t"]})
+    strata = pd.Series({1: "a", 2: "a", 3: "b", 4: "b"})
+    totals = pd.Series({1: 0.0, 2: 5.0, 3: 0.0, 4: 5.0})
+    p = analysis.record_shuffle_p(
+        totals, served, arm="t", control="c", strata=strata, reps=400, seed=1
+    )
+    assert 0.2 < p <= 1.0
+    with pytest.raises(ValueError, match="strata is missing"):
+        analysis.record_shuffle_p(
+            totals, served, arm="t", control="c", strata=strata.drop(4), reps=10
+        )
+
+
+def test_record_shuffle_p_rejects_bad_arms_and_reps():
+    flat = pd.Series(1.0, index=[1, 2, 3, 4])
+    with pytest.raises(ValueError, match="not in"):
+        analysis.record_shuffle_p(flat, SERVED, arm="zz", control="c", reps=10)
+    with pytest.raises(ValueError, match="reps must be"):
+        analysis.record_shuffle_p(flat, SERVED, arm="t", control="c", reps=0)

@@ -152,3 +152,29 @@ ORDER_CAPTION = {
 
 def order_name(arm: str) -> str:
     return re.match(r"<b>(.*?)\.</b>", ORDER_TEXT[arm]).group(1)
+
+
+# The read-back and analysis code computes one set of outcomes per list. Nothing in it is
+# specific to one list, so every row says the same, with the draft protocol's role added.
+PER_LIST_ANY = (
+    "The outcome is the same species-level ID count as every list, plain and weighted, plus the "
+    "read-back shares: records served, share at species or Research Grade, share with any ID by "
+    "a participant, records with none, and weighted Research Grade. This list's predicted "
+    "direction is not stated in the draft protocol."
+)
+PER_LIST = {
+    "recency": "Nothing of its own. It is the control that every other list is compared with. "
+    "The same read-back shares are computed for it.",
+    "gap_first": "The same outcomes as every other list. The draft protocol names the weighted "
+    "count as the primary outcome for this list, and predicts that this list wins on the "
+    "weighted count and likely loses on the plain count.",
+    "similarity": "The outcome is the same species-level ID count as every list, plain and "
+    "weighted. The draft protocol's hypothesis for this list is that fewer switches between kinds "
+    "of photo make identifying faster, and it names the plain count for speed orders. It does not "
+    "state a direction for the count in words. Nothing in the code measures time, so the count "
+    "is what is tested, not speed.",
+    "novelty": "The outcome is the same species-level ID count as every list, plain and "
+    "weighted. The draft protocol's own measure for this list, a species reaching Research Grade "
+    "in a grid cell with no Research Grade record of it before, is not in the code. This list's "
+    "predicted direction on the count is not stated in the draft protocol.",
+}

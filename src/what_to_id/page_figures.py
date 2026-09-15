@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 
 from what_to_id import assign as assign_mod
-from what_to_id.analysis import sign_flip_p
+from what_to_id.analysis import record_shuffle_p, sign_flip_p
 from what_to_id.page_svg import (
     W,
     arrow,
@@ -283,6 +283,32 @@ def serving_figure(k: int, n_batches: int) -> str:
         "at a random batch and wraps around."
     )
     return svg(y + 14, label, "".join(parts), max_px=620)
+
+
+SHUFFLE_TOTALS = (0, 1, 1, 2, 2, 3, 4, 5)
+SHUFFLE_ARMS = ("c", "c", "c", "c", "t", "t", "t", "t")
+SHUFFLE_REPS = 2000
+
+
+def shuffle_example() -> dict:
+    """The record-level worked example: 8 made-up records, their totals, and the real p."""
+    served = pd.DataFrame({"id": range(len(SHUFFLE_ARMS)), "arm": list(SHUFFLE_ARMS)})
+    totals = pd.Series(np.asarray(SHUFFLE_TOTALS, dtype=np.float64), index=served["id"])
+    on = served["arm"].to_numpy()
+    obs = float(totals.to_numpy()[on == "t"].sum() - totals.to_numpy()[on == "c"].sum())
+    return {
+        "totals": SHUFFLE_TOTALS,
+        "totals_text": ", ".join(str(t) for t in SHUFFLE_TOTALS),
+        "control": int(
+            sum(t for t, a in zip(SHUFFLE_TOTALS, SHUFFLE_ARMS, strict=True) if a == "c")
+        ),
+        "treated": int(
+            sum(t for t, a in zip(SHUFFLE_TOTALS, SHUFFLE_ARMS, strict=True) if a == "t")
+        ),
+        "obs": obs,
+        "reps": SHUFFLE_REPS,
+        "p": record_shuffle_p(totals, served, arm="t", control="c", reps=SHUFFLE_REPS, seed=0),
+    }
 
 
 SIGNFLIP_DIFFS = (4, 7, -2, 3, 9, 1, -3, 5)

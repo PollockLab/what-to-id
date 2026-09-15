@@ -6,7 +6,10 @@ without knowing which records they opened. The primary test, fixed before the bl
 paired sign-flip permutation test on per-identifier differences (treatment minus control), one
 per treatment arm, Holm-adjusted across treatment arms; ``sign_test_p`` runs the same paired
 comparison as an exact binomial sign test (positive vs negative differences, zeros dropped) and
-is reported alongside it, unadjusted. A record an identifier gave several species-level
+is reported alongside it, unadjusted. ``record_totals`` and ``record_shuffle_p`` add a
+secondary, pre-registered check that re-randomises the unit the design randomises, the record,
+instead of the sign within an identifier, and recomputes the same summed difference; it is not
+a replacement for the primary test. A record an identifier gave several species-level
 identifications counts once, unless ``identifier_counts`` is weighted by ``cell_score``, in
 which case each distinct (user, record) pair contributes that record's cell score (0 when
 missing) instead of 1, so the primary count favours identifications in data-poor cells. Organic
@@ -202,6 +205,102 @@ def sign_flip_p(diff: Sequence[float], *, reps: int = 10000, seed: int = 0) -> f
     rng = np.random.default_rng(seed)
     signs = rng.choice((-1.0, 1.0), size=(reps, d.size))
     return float((1 + (np.abs(signs @ d) >= obs - 1e-9).sum()) / (reps + 1))
+
+
+def record_totals(
+    idents: pd.DataFrame,
+    served: pd.DataFrame,
+    *,
+    start,
+    cutoff,
+    users: Sequence[int] | None = None,
+    weight: str | None = None,
+) -> pd.Series:
+    """Per served record: what it contributes to the summed per-identifier difference.
+
+    The primary statistic, the sum over identifiers of (count on an arm minus count on the
+    control), collapses to a per-record total: distinct (user, record) pairs on the arm's
+    records minus those on the control's. This returns that per-record total, indexed by served
+    id and 0 for a served record nobody identified, so the record-level re-randomisation check
+    can recompute the same statistic under a redrawn assignment.
+    """
+    if weight is not None and weight not in WEIGHTS:
+        raise ValueError(f"weight must be one of {WEIGHTS}, got {weight!r}")
+    missing = [c for c in IDENT_NEEDS if c not in idents.columns]
+    if missing:
+        raise ValueError(f"idents missing columns {missing}; read back with taxon_rank")
+    lookup = _served_lookup(served)
+    ids = lookup.index
+    t0, t1 = _utc(start), _utc(cutoff)
+    if t1 <= t0:
+        raise ValueError(f"cutoff {cutoff} is not after start {start}")
+    ts = pd.to_datetime(idents["created_at"], utc=True, errors="coerce")
+    keep = (
+        idents["id"].isin(ids)
+        & idents["user_id"].notna()
+        & ts.ge(t0)
+        & ts.lt(t1)
+        & idents["taxon_rank"].isin(SPECIES_RANKS)
+    )
+    if users is not None:
+        keep &= idents["user_id"].isin({int(u) for u in users})
+    pairs = idents.loc[keep, ["user_id", "id"]].drop_duplicates()
+    per_id = pairs.groupby("id").size().astype("float64")
+    if weight == "cell_score":
+        per_id = per_id * lookup["cell_score"].reindex(per_id.index).fillna(0.0)
+    return per_id.reindex(ids).fillna(0.0).astype("float64")
+
+
+def record_shuffle_p(
+    totals: pd.Series,
+    served: pd.DataFrame,
+    *,
+    arm: str,
+    control: str,
+    strata: pd.Series | None = None,
+    reps: int = 10000,
+    seed: int = 0,
+) -> float:
+    """Two-sided p of the same summed difference under a redrawn record-to-arm assignment.
+
+    The primary test re-randomises signs within identifiers, the unit of analysis. This
+    re-randomises the unit the design actually randomises, the record. With ``strata`` None it
+    draws each record's arm on its own and uniformly, which is what ``assign.assign_keyed``
+    does. With ``strata`` given, one label per served id, it permutes the observed arms inside
+    each stratum, which is what ``assign.assign`` does. It is a secondary check, not the
+    primary test: it asks whether the observed difference is unusual when only the split of
+    records changes, with each record's identifications held fixed.
+    """
+    if reps < 1:
+        raise ValueError("reps must be >= 1")
+    served = served_arms(served)
+    arms = sorted(served["arm"].unique())
+    missing = [name for name in (arm, control) if name not in arms]
+    if missing:
+        raise ValueError(f"arms {missing} not in {arms}")
+    w = served["id"].map(totals).fillna(0.0).to_numpy(dtype=np.float64)
+    code = served["arm"].map({a: i for i, a in enumerate(arms)}).to_numpy(dtype=np.int64)
+    i_arm, i_ctl = arms.index(arm), arms.index(control)
+    obs = abs(float(w[code == i_arm].sum() - w[code == i_ctl].sum()))
+    rng = np.random.default_rng(seed)
+    if strata is None:
+        blocks = None
+    else:
+        labels = served["id"].map(strata)
+        if labels.isna().any():
+            raise ValueError("strata is missing a label for at least one served id")
+        blocks = [np.flatnonzero(labels.to_numpy() == s) for s in sorted(labels.unique())]
+    hits = 0
+    for _ in range(reps):
+        if blocks is None:
+            drawn = rng.integers(len(arms), size=w.size)
+        else:
+            drawn = code.copy()
+            for block in blocks:
+                drawn[block] = rng.permutation(code[block])
+        stat = w[drawn == i_arm].sum() - w[drawn == i_ctl].sum()
+        hits += abs(stat) >= obs - 1e-9
+    return float((1 + hits) / (reps + 1))
 
 
 def sign_test_p(diff: Sequence[float]) -> float:

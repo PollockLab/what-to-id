@@ -269,9 +269,30 @@ def test_batches_are_cut_up_to_the_batch_size(full):
     assert "the last group takes the photos left" in full
 
 
-def test_four_lists_here_and_two_in_the_draft_protocol(full):
-    assert "This preview has 5 lists. The draft protocol plans 2 for the blitz" in full
+def test_the_number_of_lists_is_settled_not_a_preview(full):
+    assert "This design uses 5 lists. An earlier draft of the protocol proposed 2" in full
     assert "The BC team fixes these values before the blitz" in full
+    assert "This preview has" not in full
+    assert "The draft protocol plans 2" not in full
+
+
+def test_record_level_rerandomisation_is_a_secondary_test(full):
+    assert "A second test, on the records" in full
+    assert "redraws which list each record would have gone to" in full
+    assert "This is the check the sign-flip test cannot give" in full
+    assert "does not replace the primary test" in full
+    assert "Over 2,000 redrawn splits the code returns p = 0.2629" in full
+
+
+def test_table_six_pins_an_outcome_for_every_list(full):
+    assert "Open." not in full
+    assert (
+        "The outcome is the same species-level ID count as every list, plain and weighted" in full
+    )
+    assert "fewer switches between kinds of photo make identifying faster" in full
+    assert "predicts more IDs" not in full
+    assert "predicted direction on the count is not stated in the draft protocol" in full
+    assert "It states none for the other lists, and this page does not supply one" in full
 
 
 def test_inaturalist_source_reference_renders_and_is_cited(full):

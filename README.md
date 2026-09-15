@@ -69,7 +69,7 @@ IDs are credited to iNaturalist accounts and each record's list is fixed, so a s
 
 ## First deployment: British Columbia
 
-The first run is a BC identification blitz in autumn 2026, with Blitz the Gap. The protocol and the outcomes fixed before the blitz are in [docs/protocol.md](docs/protocol.md), a draft for co-design with the BC team. The proposed set-up is two lists, `recency` and `gap_first`, over four weeks, with the look-alike and unfamiliar-photo lists left to a later round.
+The first run is a BC identification blitz in autumn 2026, with Blitz the Gap. The protocol and the outcomes fixed before the blitz are in [docs/protocol.md](docs/protocol.md), a draft for co-design with the BC team. The set-up is four lists, `recency`, `gap_first`, `similarity` and `novelty`, over four weeks. An earlier draft of the protocol proposed two lists, `recency` and `gap_first`, and left the other two to a later round.
 
 ## Install
 

@@ -12,34 +12,15 @@ from what_to_id.page_figures import (
     POWER,
     POWER_COMMAND,
     power_figure,
+    shuffle_example,
     signflip_example,
     signflip_figure,
 )
-from what_to_id.page_order_text import order_name
+from what_to_id.page_order_text import PER_LIST, PER_LIST_ANY, order_name
 from what_to_id.page_svg import fmt, range_words
 
 _PROTOCOL = "docs/protocol.md#what-we-measure-decided-before-the-blitz"
 _RANKS = "species, subspecies, variety, form, hybrid or infrahybrid"
-
-# The read-back and analysis code computes one set of outcomes per list. Nothing in it is
-# specific to one list, so every row says the same, with the draft protocol's role added.
-_PER_LIST_ANY = (
-    "The weighted count, the plain count and the sign test, each against the control, plus the "
-    "read-back shares: records served, share at species or Research Grade, share with any ID by "
-    "a participant, records with none, and weighted Research Grade. The draft protocol does not "
-    "name a primary outcome for this list. Open."
-)
-_PER_LIST = {
-    "recency": "Nothing of its own. It is the control that every other list is compared with. "
-    "The same read-back shares are computed for it.",
-    "gap_first": "The same outcomes as every other list. The draft protocol names the weighted "
-    "count as the primary outcome for this list.",
-    "similarity": "The same outcomes as every other list. The draft protocol names the plain "
-    'count for speed orders. Nothing in the code measures time, so "faster" is not measured.',
-    "novelty": "The same outcomes as every other list. The draft protocol's measure for this "
-    "list, a species reaching Research Grade in a grid cell with no Research Grade record of it "
-    "before, is not in the code. Open.",
-}
 
 
 def outcomes_section(m: Manifest, f: dict, doc: Doc) -> str:
@@ -110,7 +91,7 @@ def outcomes_section(m: Manifest, f: dict, doc: Doc) -> str:
     per_list = doc.table(
         "What the analysis code computes for each list.",
         ["List", "What the code computes for it"],
-        [[order_name(arm), _PER_LIST.get(arm, _PER_LIST_ANY)] for arm in m.arms],
+        [[order_name(arm), PER_LIST.get(arm, PER_LIST_ANY)] for arm in m.arms],
         wrap=True,
     )
     return (
@@ -131,15 +112,17 @@ def outcomes_section(m: Manifest, f: dict, doc: Doc) -> str:
         "iNaturalist, after the blitz, for every served record and its IDs.</p>"
         f"{table}{per_list}"
         "<p>The code computes the same outcomes for every list. No outcome in the code belongs "
-        "to one list. Which outcome is the primary one for which list is a draft-protocol "
-        "choice, and the draft protocol leaves it open for every list other than data-poor "
-        f"places first.</p><p>The plan is in {a(_PROTOCOL, 'the draft protocol')}.</p>"
+        "to one list. Which count is the primary one, and which way it is expected to go, is a "
+        "draft-protocol choice. The draft protocol states a direction for data-poor places "
+        "first. For look-alike photos together it states a hypothesis, faster identifying, and "
+        "names the plain count. It states none for the other lists, and this "
+        f"page does not supply one.</p><p>The plan is in {a(_PROTOCOL, 'the draft protocol')}.</p>"
         + codes("readback", "participants", "analysis")
     )
 
 
 def analysis_section(m: Manifest, f: dict, doc: Doc) -> str:
-    ex = signflip_example()
+    ex, shuf = signflip_example(), shuffle_example()
     n = len(ex["diffs"])
     cap = (
         "In this build a cap binds, so the lists also serve different records."
@@ -165,7 +148,8 @@ def analysis_section(m: Manifest, f: dict, doc: Doc) -> str:
         "as likely to be positive as negative. The test assumes that and nothing more. It does "
         "not cover a difference that all people share, for example one that comes from the lists "
         "holding different numbers of records, or a different mix of records, by chance. Flipping "
-        "signs within people cannot show such a difference apart from the order's effect.</p>"
+        "signs within people cannot show such a difference apart from the order's effect. The "
+        "second test below redraws the split itself, which is the check for this.</p>"
         "<p><b>The sign flips.</b> The test flips the sign of each difference and adds again, "
         f"many times {doc.cite('good2005')}. With 12 or fewer people left, it tries every sign "
         "pattern, and "
@@ -178,6 +162,27 @@ def analysis_section(m: Manifest, f: dict, doc: Doc) -> str:
         "records it serves: when a cap on batches binds, a list serves only the records its "
         f"order puts first. {cap}</p>"
         f"{fig}"
+        "<p><b>A second test, on the records.</b> The sign-flip test flips signs inside each "
+        "person, so it treats the person as the unit. The design draws the split record by "
+        "record. A secondary test, fixed before the blitz, draws the split again instead: it "
+        "holds each record's IDs fixed, redraws which list each record would have gone to by "
+        "the same rule the build used, and works out the same summed difference. In a keyed "
+        "build each record is drawn on its own and evenly over the lists, as the assignment "
+        "code does. In a seeded build the lists of the records in one stratum are shuffled "
+        "among them, as the deal does. p is the share of redrawn splits whose summed difference "
+        "is at least as far from zero as the real one, counting the real split.</p>"
+        "<p>This is the check the sign-flip test cannot give. Chance in how the lists were "
+        "drawn can make every person lean the same way, because the lists hold a different "
+        "number of records and a different mix. Flipping signs inside a person leaves the "
+        "split alone, so it cannot separate that from the order's effect. Redrawing the split "
+        "can. It is secondary and does not replace the primary test, which stays the weighted "
+        "count with the sign-flip p.</p>"
+        "<p><b>Worked example.</b> Eight made-up records, four on the control and four on the "
+        f"tested list, with {shuf['totals_text']} participant IDs on them in that order. The "
+        f"control's four hold {shuf['control']} IDs and the tested list's four hold "
+        f"{shuf['treated']}, a difference of {int(shuf['obs'])}. Over {fmt(shuf['reps'])} "
+        f"redrawn splits the code returns p = {shuf['p']:.4f}, so with only eight records a gap "
+        "of that size is common when nothing but the split changes.</p>"
         "<p><b>More than one list.</b> Each list other than the control is compared with the "
         f"control, so this build gives {n_cmp} comparisons, and those {n_cmp} p values are "
         f"adjusted by Holm's method {doc.cite('holm1979')}. Holm's method keeps the chance "
@@ -242,9 +247,10 @@ def size_section(m: Manifest, f: dict, doc: Doc) -> str:
     fig = doc.figure(
         power_figure(POWER),
         "Simulated power to find a 20 percent lift, 2,000 runs per point. This is a simulation, "
-        "not BC data. The draft protocol plans 2 lists. This preview has 4. With 5 identifiers "
-        "the every-list lines are at 0: there are only 32 sign patterns, so the smallest "
-        "two-sided p is 2/32 = 0.0625, above the level of 0.05 with 2 lists and 0.05/3 with 4. "
+        f"not BC data. This design uses {f['k']} lists. The 2-list line is from the earlier "
+        "2-list draft and is kept for comparison. With 5 identifiers the every-list lines are "
+        "at 0: there are only 32 sign patterns, so the smallest two-sided p is 2/32 = 0.0625, "
+        "above the level of 0.05 with 2 lists and 0.05/3 with 4. "
         f"Dashed line: power 0.8. To reproduce, run {runs}. The every-list values are the "
         '"power (per identifier)" column of the rotation rows. The one-list values are the '
         '"power (window)" column of the sets rows of the 4-list run.',
@@ -253,9 +259,10 @@ def size_section(m: Manifest, f: dict, doc: Doc) -> str:
     peak = max(r["power"] for r in POWER if r["series"] == "one-4")
     return (
         intro + model + f"{fig}<p>In this simulation, with every identifier on every list, power "
-        f"reaches 0.8 by {two} identifiers with 2 lists and by {four} with 4 lists. With one list "
-        f"per identifier it stays at {peak:.2f} or below up to 100 identifiers.</p>"
-        + codes("power")
+        f"reaches 0.8 by {four} identifiers with this design's 4 lists, and by {two} with the "
+        "earlier 2-list draft. Four lists need more identifiers, because Holm's correction "
+        "splits the level over three comparisons. With one list per identifier power stays at "
+        f"{peak:.2f} or below up to 100 identifiers.</p>" + codes("power")
     )
 
 
@@ -356,7 +363,9 @@ def threats_section(m: Manifest, f: dict, doc: Doc) -> str:
             "test does not separate it from the order's effect.",
             "The split is at random, so such a difference is as likely to help any list. This "
             f"build's range of list sizes per taxon group is in {doc.ref('sizes')} and "
-            f"{doc.ref('shares')}. No test on this page corrects for it.",
+            f"{doc.ref('shares')}. The secondary test in Section 7 redraws the split and "
+            "recomputes the same difference, which is the check for exactly this. It is "
+            "secondary: the primary test does not correct for it.",
         ],
         [
             "Who takes part",

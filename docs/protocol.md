@@ -15,7 +15,7 @@ Newest first, close to what iNaturalist shows today, is the control for both.
 
 ## Proposed set-up for BC
 
-- Two lists: newest first (the control) and data-poor places first. Look-alikes together and unfamiliar photos first are left to a later round.
+- Four lists: newest first (the control), data-poor places first, look-alikes together, and unfamiliar photos first. An earlier draft of this protocol proposed two lists, newest first and data-poor places first, and left the other two to a later round. The four-list design replaces it.
 - Four weeks in November 2026.
 - All ten iNaturalist taxon groups.
 - Participants join an iNaturalist project, so the analysis knows who took part.
@@ -39,8 +39,8 @@ The page is rebuilt every day from the British Columbia records that need an ID 
 
 - Newest first: batches are the newest records, as iNaturalist shows them today.
 - Data-poor places first: batches are drawn from cells where iNaturalist has few or old records, using the where-to-blitz map scores. An ID there is often the only species record for that cell and goes straight into the models the lab uses to name 2027 field sites.
-- Later round, look-alikes together: batches are built so photos that look alike by an image model sit together, on the hypothesis that fewer context switches make identifying faster. The image model is BioCLIP 2.5, chosen on a 10,000-record BC sample where it placed same-species photos closer together than BioCLIP 2, DINOv2 and DINOv3 in every taxon group. It is weakest on fungi and fish (nearest-neighbour species agreement 43 and 53 percent, against 84 for amphibians), so look-alike batches in those groups will be looser.
-- Later round, unfamiliar photos first: each photo is compared by the same image model with every Research Grade BC photo of the same group, and batches are drawn from the records that look least like anything already verified. An ID there is the most likely to add a species, or a look of a species, that the verified record does not cover yet.
+- Look-alikes together: batches are built so photos that look alike by an image model sit together, on the hypothesis that fewer context switches make identifying faster. The image model is BioCLIP 2.5, chosen on a 10,000-record BC sample where it placed same-species photos closer together than BioCLIP 2, DINOv2 and DINOv3 in every taxon group. It is weakest on fungi and fish (nearest-neighbour species agreement 43 and 53 percent, against 84 for amphibians), so look-alike batches in those groups will be looser.
+- Unfamiliar photos first: each photo is compared by the same image model with every Research Grade BC photo of the same group, and batches are drawn from the records that look least like anything already verified. An ID there is the most likely to add a species, or a look of a species, that the verified record does not cover yet.
 
 Every batch also carries two numbers in the build record, kept as information and never used to filter: how much its photos resemble each other, and how far they sit from verified photos of the same group. They are only available once the image embeddings are.
 
@@ -56,14 +56,15 @@ Each order is judged on the measure for its question. For each participant and l
 
 For BC:
 
-1. Primary: per participant, the weighted count on data-poor places first minus the weighted count on newest first. The test is a paired sign-flip permutation test on the sum of these differences, two-sided at 0.05. Busy identifiers add the same effort to both lists, so their skill cancels out.
+1. Primary: per participant, the weighted count on data-poor places first minus the weighted count on newest first. The test is a paired sign-flip permutation test on the sum of these differences, two-sided at 0.05, Holm-adjusted over the three comparisons with the control. Busy identifiers add the same effort to every list, so their skill cancels out.
 2. Secondary: the same comparison on the plain count, and a sign test on how many participants did better on each list.
-3. Secondary, at 30 days: share of served records whose community taxon reached species, and Research Grade records added, weighted by cell score, per list.
-4. Checks: the same test over the days before the blitz, when participants had not seen the page, should find nothing; and each participant's reviewed records should split about evenly over the lists, which is what the rotation assumes.
+3. Secondary: a record-level re-randomisation of the same summed difference. The sign-flip test re-randomises signs inside each participant, but the design randomises the record. This check holds each record's identifications fixed, draws each record's list again by the same keyed rule the build uses, and recomputes the summed difference, so it asks whether the result is unusual when only the split of records changes. It is secondary and does not replace the primary test.
+4. Secondary, at 30 days: share of served records whose community taxon reached species, and Research Grade records added, weighted by cell score, per list.
+5. Checks: the same test over the days before the blitz, when participants had not seen the page, should find nothing; and each participant's reviewed records should split about evenly over the lists, which is what the rotation assumes.
 
 Expectation stated up front: newest first will likely win on the plain count, because records from remote cells have worse photos and are skipped more. Data-poor places first should win on the weighted count. If it loses on both, it is dropped.
 
-Simulated on BC identifier effort from August 2026, two lists with 25 participants detect a 20 percent difference almost always over a month of effort (power 1.00) and about 6 times in 10 over one week (0.62).
+In a simulation with made-up identifier effort (lognormal, median 100 records, sigma 1.5), four lists with 25 participants detect a 20 percent difference with power 0.80, and 40 participants reach 0.98. The earlier two-list draft, simulated on BC identifier effort from August 2026, gave 1.00 over a month of effort and 0.62 over one week. Four lists need more participants, because Holm's correction splits the level over three comparisons.
 
 ## What we are not claiming
 
@@ -80,6 +81,5 @@ Each daily build comes from a pull of the iNaturalist API at a recorded time, th
 ## Open with the BC team
 
 - Blitz dates.
-- Whether data-poor places first is the one order to test against newest first, or another.
 - Which taxon groups identifiers will cover, if not all ten.
 - The iNaturalist project participants join.

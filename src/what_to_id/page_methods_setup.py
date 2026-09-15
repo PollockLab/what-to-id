@@ -117,9 +117,10 @@ def design_section(m: Manifest, f: dict, doc: Doc) -> str:
         f"{doc.cite('hebert2026')}. Expert identification blitzes have been run and studied "
         f"before {doc.cite('mesaglio2025')}. This test asks a narrower question: whether the "
         "order of records changes what gets identified.</p>"
-        f"<p>This preview has {f['k']} lists. The draft protocol plans 2 for the blitz: newest "
-        "first and data-poor places first. Every value this page gives from the draft protocol, "
-        "in this table and later, is a draft. The BC team fixes these values before the blitz.</p>"
+        f"<p>This design uses {f['k']} lists. An earlier draft of the protocol proposed 2, newest "
+        "first and data-poor places first, and left the rest to a later round. Every value this "
+        "page gives from the draft protocol, in this table and later, is a draft. The BC team "
+        "fixes these values before the blitz.</p>"
     )
     table = doc.table("The design in one table.", ["Part", "This test"], rows, wrap=True)
     fig = doc.figure(
