@@ -1,11 +1,12 @@
 import json
 import re
+from pathlib import Path
 
 import pytest
 
 from what_to_id.manifest import Manifest
 from what_to_id.page import ARM_WORDS
-from what_to_id.page_method import ORDER_TEXT
+from what_to_id.page_method import ORDER_DETAIL, ORDER_TEXT, method_section
 from what_to_id.page_rotation import (
     ROTATION_JS,
     render_rotation_index,
@@ -115,6 +116,63 @@ def test_render_rotation_index_refuses_an_order_without_page_words():
     m.arms = ["recency", "mystery"]
     with pytest.raises(ValueError, match="mystery"):
         render_rotation_index(m, title="t")
+
+
+def test_every_order_has_detail_words_that_do_not_name_the_arm():
+    assert set(ORDER_DETAIL) == set(ARM_NAMES)
+    for text in ORDER_DETAIL.values():
+        assert not any(w in text.lower() for w in ARM_WORDS)
+
+
+def test_method_has_pipeline_a_more_block_per_step_and_a_rotation_example():
+    how = method_section(_manifest(), 2)
+    assert how.count('<details class="more">') == 5
+    assert how.count("<li><b>") >= 6 and '<ol class="pipe"' in how
+    assert how.count('<th scope="col">Press') == 4
+    assert "10 batches from each list" in how and "1 batch from each list" in how
+    assert "Why every identifier works every list" in how
+    assert "batches of up to 2 records" in how
+    _assert_blind(how)
+
+
+def test_method_describes_this_builds_assignment():
+    m = _manifest()
+    assert m.assignment == "stratified"
+    seeded = method_section(m, 2)
+    assert "private seed" in seeded and "HMAC" not in seeded
+    m.assignment = "keyed"
+    keyed = method_section(m, 2)
+    assert "HMAC-SHA256" in keyed and "private seed" not in keyed
+
+
+def test_method_keeps_claims_the_code_does_not_make_off_the_page():
+    # Each phrase was on the page once and is false or overstated against the code.
+    how = method_section(_manifest(), 2)
+    for claim in (
+        "nobody had",  # the placebo is before participants got the page; the page is public
+        "private build file",  # keyed builds take the letters from the key
+        "sit in the same batch",  # arms.py re-sorts groups by map score; cuts cross groups
+        "shows only the records",  # Identify also hides records the viewer reviewed
+        "Blitz the Gap map",  # the score is where-to-blitz's (cells.py)
+        "up to 12 participants",  # 12 counts non-zero differences (analysis.sign_flip_p)
+        "is set before",  # the protocol is a draft
+    ):
+        assert claim not in how, claim
+    assert "counts 0" in how and "People with no difference drop out" in how
+
+
+def test_method_links_point_at_files_and_headings_in_the_repo():
+    root = Path(__file__).resolve().parents[1]
+    how = method_section(_manifest(), 2)
+    urls = re.findall(r'href="https://github\.com/PollockLab/what-to-id/blob/main/([^"]+)"', how)
+    assert len(urls) >= 10
+    for url in urls:
+        path, _, anchor = url.partition("#")
+        assert (root / path).is_file(), url
+        if anchor:
+            heads = re.findall(r"^#+ (.+)$", (root / path).read_text(), re.M)
+            slugs = {re.sub(r"[^\w\- ]", "", h.lower()).replace(" ", "-") for h in heads}
+            assert anchor in slugs, url
 
 
 def test_render_rotation_index_data_has_every_url_once_in_order():
