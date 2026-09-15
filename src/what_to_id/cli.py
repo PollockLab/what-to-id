@@ -117,10 +117,18 @@ def build(args: argparse.Namespace) -> Path:
     if "surprise" in arm_names:
         if not args.surprise_scores:
             raise SystemExit("--surprise-scores is required for the surprise arm")
-        s = pd.read_parquet(args.surprise_scores, columns=["id", "surprise"])
-        s = s.drop_duplicates("id").set_index("id")["surprise"]
-        pool["surprise"] = pool["id"].map(s).astype("float64").to_numpy()
+        cols = pd.read_parquet(args.surprise_scores).columns
+        has_n_ref = "n_ref" in cols
+        want = ["id", "surprise", "n_ref"] if has_n_ref else ["id", "surprise"]
+        s = (
+            pd.read_parquet(args.surprise_scores, columns=want)
+            .drop_duplicates("id")
+            .set_index("id")
+        )
+        pool["surprise"] = pool["id"].map(s["surprise"]).astype("float64").to_numpy()
         log.info("surprise present for %d rows", int(pool["surprise"].notna().sum()))
+        if has_n_ref:
+            pool["surprise_n_ref"] = pool["id"].map(s["n_ref"]).astype("float64").to_numpy()
 
     key = key_from_env(args.key_env) if args.key_env else None
     if key is None:

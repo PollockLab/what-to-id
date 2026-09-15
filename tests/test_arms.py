@@ -191,6 +191,24 @@ def test_surprise_orders_by_score_nan_last(pool):
         Surprise().order(pool, seed=0)
 
 
+def test_surprise_tie_break_by_fewest_n_ref(pool):
+    pool = pool.iloc[:4].copy()
+    pool["surprise"] = [1.0, 1.0, 1.0, 0.5]
+    pool["surprise_n_ref"] = [3.0, 0.0, np.nan, 1.0]
+    order = Surprise().order(pool, seed=0)
+    # Fewer n_ref first among the surprise==1 tie (0 < 3 < NaN), the surprise==0.5 record last.
+    assert pool["id"].to_numpy()[order].tolist() == pool["id"].iloc[[1, 0, 2, 3]].tolist()
+
+
+def test_surprise_without_n_ref_column_keeps_old_order(pool):
+    score = np.random.default_rng(1).random(len(pool))
+    pool = pool.assign(surprise=score)
+    without_col = Surprise().order(pool, seed=0)
+    # A pool where every row ties on n_ref falls back to the same recency/id tie-break.
+    tied_n_ref = Surprise().order(pool.assign(surprise_n_ref=0.0), seed=0)
+    assert (without_col == tied_n_ref).all()
+
+
 def test_build_arm():
     assert set(ARMS) == {"recency", "gap_first", "similarity", "novelty", "surprise"}
     assert build_arm("recency").name == "recency"

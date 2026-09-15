@@ -148,6 +148,20 @@ def test_build_surprise_arm_reads_scores_and_stays_blind(tmp_path, webapp_dir):
     assert "surprise" not in html and "unexpected sightings first" in html
 
 
+def test_build_surprise_arm_accepts_scores_with_n_ref(tmp_path, webapp_dir):
+    pool = make_pool(300, seed=5)
+    pool_path, scores = tmp_path / "pool.parquet", tmp_path / "surprise.parquet"
+    pool.to_parquet(pool_path, index=False)
+    s = np.linspace(0, 1, 300)
+    n_ref = np.arange(300, dtype=float)
+    pd.DataFrame({"id": pool["id"], "surprise": s, "n_ref": n_ref}).to_parquet(scores, index=False)
+    args = ["build", "--pool", str(pool_path), "--freeze", "2026-09-01", "--d1", "2026-09-15"]
+    args += ["--batch-size", "25", "--arms", "recency,surprise", "--design", "rotation"]
+    args += ["--webapp-dir", str(webapp_dir), "--out", str(tmp_path / "out")]
+    args += ["--surprise-scores", str(scores)]
+    assert main(args) == 0
+
+
 def test_build_default_design_is_sets(tmp_path, webapp_dir):
     pool = make_pool(300, seed=5)
     pool_path = tmp_path / "pool.parquet"

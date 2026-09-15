@@ -95,7 +95,9 @@ def geo_scores(
 ) -> pd.DataFrame:
     """Geo surprise of each pool record's taxon (`id`, `lat`, `lon`, `taxon_id`) against
     iNat Open Data rows (`REF_COLS`) that are research grade, observed before `before` and placed
-    within 2 km. A reference row counts for its species and for its genus."""
+    within 2 km. A reference row counts for its species and for its genus. `n_ref` is how many of
+    those reference rows carry the record's own key: 0 when the key has none, NaN when the record
+    has no key."""
     rl = dict(zip(taxa.taxon_id, taxa.rank_level, strict=True))
     anc = dict(zip(taxa.taxon_id, taxa.ancestry, strict=True))
 
@@ -122,7 +124,9 @@ def geo_scores(
         xy = to_km(d[la].to_numpy(float), d[lo].to_numpy(float))
         d["x"], d["y"] = xy[:, 0], xy[:, 1]
     p["surprise"] = score(p, long, ["x", "y"], h=h)
-    return p[["id", "surprise"]]
+    n_ref = p["key"].map(long.groupby("key").size())
+    p["n_ref"] = np.where(p["key"].isna(), np.nan, n_ref.fillna(0.0))
+    return p[["id", "surprise", "n_ref"]]
 
 
 def main(argv: list[str] | None = None) -> int:
