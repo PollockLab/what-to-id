@@ -122,6 +122,7 @@ text-decoration:underline;text-underline-offset:3px;transition:color .12s}
 .subhint{width:100%;margin:0;color:var(--cmut);font-size:.8rem}
 .pickhead{font:700 1rem/1.3 "Space Grotesk",Inter,system-ui,sans-serif;margin:1.2rem 0 .5rem;color:var(--ink);text-transform:none;
 letter-spacing:normal}
+.resumerow{margin:1.2rem 0 0}
 .reopenrow{margin:.5rem 0 0}
 .reopenrow a{font-weight:600}
 .donebox,.undo{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
@@ -155,7 +156,7 @@ details.how summary:hover{color:var(--acc)}
 <h1>What to ID next in BC</h1>
 <p class="sub">Records that needed an ID in British Columbia on 2026-09-11.</p>
 <p class="undo" id="buildMsg" aria-live="polite" hidden><span>New batches today. Your count starts again.</span><button class="linkbtn" id="buildMsgClose" type="button">Got it</button></p>
-<section id="picker"><div class="flow"><div><b>Pick a group</b><span>one you know</span></div><i aria-hidden="true">&rarr;</i><div><b>Next batch</b><span>up to 120 records open in iNaturalist</span></div><i aria-hidden="true">&rarr;</i><div><b>ID what you can</b><span>skip the rest, then come back</span></div></div><h2 class="pickhead">Pick a group</h2><div id="groupList"></div></section>
+<section id="picker"><p class="resumerow" id="resumeRow" hidden><button class="nextbtn" id="resumeBtn" type="button">Continue</button></p><div class="flow"><div><b>Pick a group</b><span>one you know</span></div><i aria-hidden="true">&rarr;</i><div><b>Next batch</b><span>up to 120 records open in iNaturalist</span></div><i aria-hidden="true">&rarr;</i><div><b>ID what you can</b><span>skip the rest, then come back</span></div></div><h2 class="pickhead">Pick a group</h2><div id="groupList"></div></section>
 <section id="runner" hidden><div class="runhead"><h2 class="rungroup" id="runGroup"></h2><p class="crumbs"><button class="linkbtn" id="changeGroup" type="button">Change group</button><button class="linkbtn" id="startOver" type="button" disabled aria-describedby="startOverHint">&#8634; Start over</button><span class="subhint" id="startOverHint">Start over puts this group's batches back.</span></p></div><p class="runcode" id="runnerCode" aria-live="polite">Batch 0</p><div class="bar" aria-hidden="true"><span id="bar"></span></div><button class="nextbtn" id="nextBtn" type="button" aria-keyshortcuts="n">Next batch</button><p class="hint" id="hintBox"><span>Opens up to 120 records in a new iNaturalist tab. ID what you can, then come back.</span><span>Sign in to iNaturalist first. Some records may no longer need an ID, so a batch can show fewer than 120.</span><span>Your place is saved in this browser only.</span><span class="keys">Press <kbd>N</kbd> for the next batch.</span></p><p class="reopenrow"><a id="reopen" href="#" target="_blank" rel="noopener" hidden>Open this batch again</a></p><p class="donebox" id="doneMsg" hidden><span>You opened every batch in this group. To go back to one, use Open again or Start over.</span><button class="pillbtn" id="pickOther" type="button">Pick another group</button></p><p class="undo" id="undoMsg" aria-live="polite" hidden><span id="undoText"></span><button class="linkbtn" id="undoBtn" type="button">Undo</button></p></section>
 <details class="how"><summary>How the test works</summary><ol><li><b>The question.</b> Does the order of records change how many get an ID, and which?</li><li><b>The lists.</b> Each record goes to one list at random, so every list holds the same mix of species and observers. Only the order is different:<ul><li><b>Newest first.</b> The control, close to what iNaturalist shows today.</li><li><b>Data-poor places first.</b> Records from areas with few or old records.</li><li><b>Look-alike photos together.</b> Similar photos sit in the same batch.</li><li><b>Unfamiliar photos first.</b> Photos least like any Research Grade photo.</li></ul></li><li><b>Your batches.</b> Each press of Next batch takes the next of 4 lists, so your batches spread evenly over all of them.<div class="cycle" aria-hidden="true"><span class="n">1</span><span class="n">2</span><span class="n">3</span><span class="n">4</span><i>&#8634;</i></div><p>Your browser picks the turn order at random. The page does not say which list a batch is from.</p></li><li><b>The count.</b> After the blitz, we count each participant's species-level IDs on each list and compare each person with themself. A fast identifier adds the same to every list.</li><li><b>Nothing else changes.</b> You identify in iNaturalist as usual. Your IDs carry your name, count toward Research Grade and go to GBIF.</li></ol></details>
 </main>
@@ -274,7 +275,7 @@ function startOver(state, group) {
   var runGroup = $('runGroup'), runnerCode = $('runnerCode'), bar = $('bar');
   var nextBtn = $('nextBtn'), reopen = $('reopen'), doneMsg = $('doneMsg'), hintBox = $('hintBox');
   var startOverBtn = $('startOver'), undoMsg = $('undoMsg'), undoText = $('undoText');
-  var buildMsg = $('buildMsg');
+  var buildMsg = $('buildMsg'), resumeRow = $('resumeRow'), resumeBtn = $('resumeBtn');
   var undoState = null, undoTimer = null;
   if (newBuildNotice) buildMsg.hidden = false;
   $('buildMsgClose').addEventListener('click', function(){ buildMsg.hidden = true; });
@@ -300,6 +301,12 @@ function startOver(state, group) {
       b.addEventListener('click', function(){ group = g; save(); renderRunner(true); });
       groupList.appendChild(b);
     });
+    var known = group && groups.indexOf(group) !== -1;
+    resumeRow.hidden = !known;
+    if (known) {
+      var r = /^(.*) \((.*)\)$/.exec(name(group));
+      resumeBtn.textContent = 'Continue with ' + (r ? r[1] : name(group));
+    }
     picker.hidden = false;
     runner.hidden = true;
   }
@@ -363,7 +370,10 @@ function startOver(state, group) {
     if (undoState) { state = undoState; save(); renderRunner(false); }
     hideUndo();
   });
-  if (group && groups.indexOf(group) !== -1) { renderRunner(false); } else { renderPicker(); }
+  // Every visit opens on the picker, so a new visitor or the next person on a shared computer
+  // sees every group; a returning identifier resumes with one tap.
+  resumeBtn.addEventListener('click', function(){ renderRunner(true); });
+  renderPicker();
 })();</script>
 </body>
 </html>

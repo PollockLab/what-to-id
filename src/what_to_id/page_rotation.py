@@ -64,6 +64,7 @@ text-decoration:underline;text-underline-offset:3px;transition:color .12s}}
 .subhint{{width:100%;margin:0;color:var(--cmut);font-size:.8rem}}
 .pickhead{{font:700 1rem/1.3 {_SG};margin:1.2rem 0 .5rem;color:var(--ink);text-transform:none;
 letter-spacing:normal}}
+.resumerow{{margin:1.2rem 0 0}}
 .reopenrow{{margin:.5rem 0 0}}
 .reopenrow a{{font-weight:600}}
 .donebox,.undo{{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
@@ -213,7 +214,7 @@ function startOver(state, group) {
   var runGroup = $('runGroup'), runnerCode = $('runnerCode'), bar = $('bar');
   var nextBtn = $('nextBtn'), reopen = $('reopen'), doneMsg = $('doneMsg'), hintBox = $('hintBox');
   var startOverBtn = $('startOver'), undoMsg = $('undoMsg'), undoText = $('undoText');
-  var buildMsg = $('buildMsg');
+  var buildMsg = $('buildMsg'), resumeRow = $('resumeRow'), resumeBtn = $('resumeBtn');
   var undoState = null, undoTimer = null;
   if (newBuildNotice) buildMsg.hidden = false;
   $('buildMsgClose').addEventListener('click', function(){ buildMsg.hidden = true; });
@@ -239,6 +240,12 @@ function startOver(state, group) {
       b.addEventListener('click', function(){ group = g; save(); renderRunner(true); });
       groupList.appendChild(b);
     });
+    var known = group && groups.indexOf(group) !== -1;
+    resumeRow.hidden = !known;
+    if (known) {
+      var r = /^(.*) \\((.*)\\)$/.exec(name(group));
+      resumeBtn.textContent = 'Continue with ' + (r ? r[1] : name(group));
+    }
     picker.hidden = false;
     runner.hidden = true;
   }
@@ -302,7 +309,10 @@ function startOver(state, group) {
     if (undoState) { state = undoState; save(); renderRunner(false); }
     hideUndo();
   });
-  if (group && groups.indexOf(group) !== -1) { renderRunner(false); } else { renderPicker(); }
+  // Every visit opens on the picker, so a new visitor or the next person on a shared computer
+  // sees every group; a returning identifier resumes with one tap.
+  resumeBtn.addEventListener('click', function(){ renderRunner(true); });
+  renderPicker();
 })();
 """.strip()
 
@@ -412,7 +422,9 @@ def render_rotation_index(manifest: Manifest, *, title: str) -> str:
     )
     body = (
         f"{build_msg}"
-        f'<section id="picker"><div class="flow">{flow}</div>'
+        '<section id="picker"><p class="resumerow" id="resumeRow" hidden>'
+        '<button class="nextbtn" id="resumeBtn" type="button">Continue</button></p>'
+        f'<div class="flow">{flow}</div>'
         '<h2 class="pickhead">Pick a group</h2>'
         '<div id="groupList"></div></section>\n'
         f"{_runner(int(manifest.batch_size))}"

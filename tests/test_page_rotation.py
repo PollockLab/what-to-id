@@ -88,6 +88,14 @@ def test_render_rotation_index_sets_expectations_and_structure():
     assert re.search(r'<p class="undo" id="buildMsg"[^>]*\bhidden\b', html)
 
 
+def test_every_visit_opens_on_the_picker_with_a_resume_button():
+    html = render_rotation_index(_manifest(), title="t")
+    assert re.search(r'<p class="resumerow" id="resumeRow"[^>]*\bhidden\b', html)
+    assert "'Continue with '" in html
+    assert re.search(r"renderPicker\(\);\s*\}\)\(\);", html)
+    assert "renderRunner(false); } else { renderPicker(); }" not in html
+
+
 def test_render_rotation_index_explains_the_method_for_this_builds_orders():
     html = render_rotation_index(_manifest(), title="t")
     assert "How the test works" in html
