@@ -24,7 +24,9 @@ import pandas as pd
 MIN_REF = 5
 MAX_REF = 1500
 CHUNK = 2000
-SPECIES, GENUS = 10, 20
+SPECIES, GENUS, FAMILY, ORDER = 10, 20, 30, 40
+PRIOR_START = "2018-01-01"
+PRIOR_MIN_N = 30
 
 
 def to_km(lat: np.ndarray, lon: np.ndarray, lat0: float = 54.0) -> np.ndarray:
@@ -90,14 +92,8 @@ REF_COLS = ["latitude", "longitude", "positional_accuracy", "taxon_id", "quality
 REF_COLS += ["observed_on"]
 
 
-def geo_scores(
-    pool: pd.DataFrame, ref: pd.DataFrame, taxa: pd.DataFrame, before: str, h: float = 25.0
-) -> pd.DataFrame:
-    """Geo surprise of each pool record's taxon (`id`, `lat`, `lon`, `taxon_id`) against
-    iNat Open Data rows (`REF_COLS`) that are research grade, observed before `before` and placed
-    within 2 km. A reference row counts for its species and for its genus. `n_ref` is how many of
-    those reference rows carry the record's own key: 0 when the key has none, NaN when the record
-    has no key."""
+def _lineage_fns(taxa: pd.DataFrame):
+    """(rank_level lookup, lineage-of-taxon, first-ancestor-at-rank) from a taxa table."""
     rl = dict(zip(taxa.taxon_id, taxa.rank_level, strict=True))
     anc = dict(zip(taxa.taxon_id, taxa.ancestry, strict=True))
 
@@ -108,6 +104,18 @@ def geo_scores(
     def at(t: int, want: int) -> int | None:
         return next((x for x in reversed(lin(t)) if rl.get(x) == want), None)
 
+    return rl, lin, at
+
+
+def geo_scores(
+    pool: pd.DataFrame, ref: pd.DataFrame, taxa: pd.DataFrame, before: str, h: float = 25.0
+) -> pd.DataFrame:
+    """Geo surprise of each pool record's taxon (`id`, `lat`, `lon`, `taxon_id`) against
+    iNat Open Data rows (`REF_COLS`) that are research grade, observed before `before` and placed
+    within 2 km. A reference row counts for its species and for its genus. `n_ref` is how many of
+    those reference rows carry the record's own key: 0 when the key has none, NaN when the record
+    has no key."""
+    rl, lin, at = _lineage_fns(taxa)
     tid = pd.to_numeric(pool["taxon_id"], errors="coerce")
     p = pd.DataFrame({"id": pool["id"].to_numpy(), "lat": pool["lat"], "lon": pool["lon"]})
     p["key"] = [taxon_key(lin(int(t)), rl) if pd.notna(t) else None for t in tid]
@@ -129,18 +137,78 @@ def geo_scores(
     return p[["id", "surprise", "n_ref"]]
 
 
+def prior_scores(
+    pool: pd.DataFrame,
+    ref: pd.DataFrame,
+    taxa: pd.DataFrame,
+    before: str,
+    start: str = PRIOR_START,
+    min_n: int = PRIOR_MIN_N,
+) -> pd.Series:
+    """Prior probability that each pool record's taxon (`taxon_id`) reaches research grade: the
+    share of research grade among research-grade and needs-ID Open Data rows observed from
+    `start` to before `before`, inside the pool's own lat/lon box, at genus level, falling back to
+    family then order when the finer level has under `min_n` rows there. A taxon with no level
+    reaching `min_n` scores NaN.
+
+    Unlike the backtest this rule was copied from, this has no pulled-record set to exclude: a
+    live pool has no such set, so every qualifying reference row counts."""
+    _, _, at = _lineage_fns(taxa)
+    lat_lo, lat_hi = pool["lat"].min(), pool["lat"].max()
+    lon_lo, lon_hi = pool["lon"].min(), pool["lon"].max()
+    r = ref[
+        ref.quality_grade.isin(["research", "needs_id"])
+        & ref.latitude.between(lat_lo, lat_hi)
+        & ref.longitude.between(lon_lo, lon_hi)
+        & (ref.observed_on >= start)
+        & (ref.observed_on < before)
+    ].copy()
+    r["rg"] = (r.quality_grade == "research").astype(float)
+    r = r.dropna(subset=["taxon_id"])
+    r["taxon_id"] = r["taxon_id"].astype(int)
+    rates = {}
+    for level, want in (("gen", GENUS), ("fam", FAMILY), ("ord", ORDER)):
+        r[level] = [at(t, want) for t in r["taxon_id"]]
+        g = r.dropna(subset=[level]).groupby(level).rg.agg(["mean", "size"])
+        rates[level] = g.loc[g["size"] >= min_n, "mean"].to_dict()
+
+    tid = pd.to_numeric(pool["taxon_id"], errors="coerce")
+    prior = [
+        np.nan
+        if pd.isna(t)
+        else rates["gen"].get(
+            at(int(t), GENUS),
+            rates["fam"].get(at(int(t), FAMILY), rates["ord"].get(at(int(t), ORDER), np.nan)),
+        )
+        for t in tid
+    ]
+    return pd.Series(prior, index=pool.index, dtype=float)
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Geo surprise scores for a pool (--surprise-scores)")
     ap.add_argument("pool", help="pool parquet with id, lat, lon, taxon_id")
     ap.add_argument("--ref", required=True, help="iNat Open Data observations (tsv, may be .gz)")
     ap.add_argument("--taxa", required=True, help="iNat Open Data taxa.csv.gz")
     ap.add_argument("--before", required=True, help="only references observed before YYYY-MM-DD")
+    ap.add_argument(
+        "--skip-below",
+        type=float,
+        default=None,
+        help="write prior/skip columns and NaN out surprise for records whose taxon's prior "
+        "(see prior_scores) is below this",
+    )
     ap.add_argument("--out", required=True)
     a = ap.parse_args(argv)
     pool = pd.read_parquet(a.pool)
     ref = pd.read_csv(a.ref, sep="\t", usecols=REF_COLS)
     taxa = pd.read_csv(a.taxa, sep="\t", usecols=["taxon_id", "ancestry", "rank_level"])
     s = geo_scores(pool, ref, taxa, a.before)
+    if a.skip_below is not None:
+        # geo_scores keeps pool's row order, so prior_scores lines up by position, not index.
+        s["prior"] = prior_scores(pool, ref, taxa, a.before).to_numpy()
+        s["skip"] = s["prior"] < a.skip_below
+        s.loc[s["skip"], "surprise"] = np.nan
     s.to_parquet(a.out, index=False)
     print(
         f"{len(s)} records, {int(s.surprise.notna().sum())} scored, {(s.surprise == 1).sum()} at 1"
