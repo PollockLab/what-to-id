@@ -67,6 +67,10 @@ def test_geo_scores_against_open_data_rows():
     assert s.id.tolist() == [1, 2, 3, 4]
     got = s.surprise.to_numpy()
     assert got[0] < 0.5 and got[1] == 1.0 and got[2] == 1.0 and np.isnan(got[3])
+    # id 1 and 2 share key 30, with 98 qualifying references (100 rows minus one needs_id and
+    # one observed after the freeze); id 3's key (31) has no reference rows; id 4 has no key.
+    n_ref = s.n_ref.to_numpy()
+    assert n_ref[0] == 98 and n_ref[1] == 98 and n_ref[2] == 0 and np.isnan(n_ref[3])
 
 
 def test_main_writes_id_and_surprise(tmp_path):
@@ -77,7 +81,7 @@ def test_main_writes_id_and_surprise(tmp_path):
     args = [str(tmp_path / "pool.parquet"), "--ref", str(tmp_path / "obs.tsv.gz")]
     args += ["--taxa", str(tmp_path / "taxa.csv.gz"), "--before", "2025-01-01"]
     assert main([*args, "--out", str(tmp_path / "s.parquet")]) == 0
-    assert pd.read_parquet(tmp_path / "s.parquet").columns.tolist() == ["id", "surprise"]
+    assert pd.read_parquet(tmp_path / "s.parquet").columns.tolist() == ["id", "surprise", "n_ref"]
 
 
 def test_score_groups_by_key():

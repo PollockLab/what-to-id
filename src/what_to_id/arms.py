@@ -67,7 +67,12 @@ class Surprise:
     """Records whose proposed taxon is least expected where, or in what climate, it was seen.
 
     Orders by pool['surprise'] (what_to_id.surprise.score, a per-taxon tail probability) desc,
-    NaN last in recency order. Opt-in: not in the default build.
+    NaN last. Most records that score 1 (the maximum) tie there because their taxon has too few
+    regional references to say anything: among those ties, and any other tie at the same
+    surprise, the record with fewer regional references (pool['surprise_n_ref'], NaN treated as
+    more unknown than any count) goes first, so the least-attested taxa surface before merely
+    unusual sightings of well-attested ones. Remaining ties fall back to recency, then id. Pools
+    built before surprise_n_ref existed order by surprise, recency and id only.
     """
 
     name: str = "surprise"
@@ -75,7 +80,19 @@ class Surprise:
     def order(self, pool: pd.DataFrame, *, seed: int) -> np.ndarray:
         if "surprise" not in pool.columns:
             raise ValueError("surprise requires pool['surprise'] (pass --surprise-scores)")
-        return _score_order(pool, "surprise")
+        if "surprise_n_ref" not in pool.columns:
+            return _score_order(pool, "surprise")
+        score = pool["surprise"].to_numpy(dtype=np.float64)
+        n_ref = pool["surprise_n_ref"].to_numpy(dtype=np.float64)
+        created = _created_ns(pool)
+        ids = pool["id"].to_numpy(dtype=np.int64)
+        missing_score = ~np.isfinite(score)
+        score = np.where(missing_score, -np.inf, score)
+        missing_ref = ~np.isfinite(n_ref)
+        n_ref = np.where(missing_ref, np.inf, n_ref)
+        # lexsort sorts by the last key first: NaN surprise last, then surprise desc,
+        # then n_ref asc (NaN n_ref after known n_ref), then created desc, then id desc.
+        return np.lexsort((-ids, -created, n_ref, -score, missing_score.astype(np.int8)))
 
 
 def load_embeddings(path: Path) -> tuple[np.ndarray, np.ndarray, str]:
