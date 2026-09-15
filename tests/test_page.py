@@ -1,8 +1,12 @@
+import re
+from pathlib import Path
+
 import pandas as pd
 import pytest
 
+from what_to_id.arms import ARMS
 from what_to_id.manifest import Manifest
-from what_to_id.page import group_name, render_arm_page, render_index, write_site
+from what_to_id.page import ARM_WORDS, group_name, render_arm_page, render_index, write_site
 
 ARM_NAMES = ["recency", "gap_first", "similarity"]
 
@@ -130,3 +134,13 @@ def test_write_site_refuses_leaked_arm_name(tmp_path):
     m.arm_labels = {"recency": "recency", "gap_first": "A"}
     with pytest.raises(ValueError, match="leaked"):
         write_site(tmp_path, m, _batches())
+
+
+def test_leak_checks_cover_every_list_name():
+    # The published-page greps in CI and the daily build must know every list name.
+    assert set(ARMS) <= set(ARM_WORDS)
+    root = Path(__file__).resolve().parents[1]
+    for rel in (".github/workflows/pages.yml", "scripts/daily.sh"):
+        m = re.search(r"grep -ril -E '([^']+)'", (root / rel).read_text())
+        assert m, rel
+        assert [w for w in ARM_WORDS if not re.search(m.group(1), w)] == [], rel
