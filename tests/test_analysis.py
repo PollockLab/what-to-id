@@ -340,6 +340,43 @@ def test_record_shuffle_p_strata_permute_within_a_stratum_only():
         )
 
 
+def test_cli_reports_p_record_next_to_the_primary_p(tmp_path, capsys):
+    idents = _idents(
+        [
+            (1, 10, "2026-11-02T12:00:00Z", "species"),
+            (3, 10, "2026-11-02T12:00:00Z", "species"),
+            (4, 10, "2026-11-02T12:00:00Z", "species"),
+            (4, 11, "2026-11-03T12:00:00Z", "species"),
+        ]
+    )
+    idents.to_parquet(tmp_path / "i.parquet")
+    SERVED.to_parquet(tmp_path / "s.parquet")
+    args = ["--idents", str(tmp_path / "i.parquet"), "--served", str(tmp_path / "s.parquet")]
+    args += ["--control", "c", "--start", "2026-11-01", "--cutoff", "2026-12-01"]
+    args += ["--reps", "200", "--seed", "3"]
+    assert analysis.main(args) == 0
+    out = capsys.readouterr().out
+    assert analysis.RECORD_NOTE in out
+    head = next(ln for ln in out.splitlines() if ln.startswith("| arm |"))
+    cols = [c.strip() for c in head.strip("|").split("|")]
+    assert cols[-2:] == ["p_holm", "p_record"]
+    row = next(ln for ln in out.splitlines() if ln.startswith("| t |"))
+    got = float(row.strip("|").split("|")[-1])
+    kw = {"start": "2026-11-01", "cutoff": "2026-12-01"}
+    totals = analysis.record_totals(idents, SERVED, **kw)
+    want = analysis.record_shuffle_p(totals, SERVED, arm="t", control="c", reps=200, seed=3)
+    assert got == pytest.approx(want, abs=5e-4)
+
+
+def test_cli_help_says_p_record_is_secondary_and_needs_no_binding_cap(capsys):
+    with pytest.raises(SystemExit):
+        analysis.main(["--help"])
+    text = " ".join(capsys.readouterr().out.split())
+    assert "secondary" in text and "not Holm-adjusted" in text
+    assert "no cap on batches binds" in text and "cannot show this" in text
+    assert "cannot check this" in analysis.__doc__
+
+
 def test_record_shuffle_p_rejects_bad_arms_and_reps():
     flat = pd.Series(1.0, index=[1, 2, 3, 4])
     with pytest.raises(ValueError, match="not in"):

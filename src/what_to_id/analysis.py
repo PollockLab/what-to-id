@@ -25,6 +25,16 @@ share rotation assumes, not an input to the test. ``served_arms`` normalises eit
 single-build batches frame or a cumulative served log (mapped through a label -> arm map) to
 one row per served id, and is shared by the analysis and read-back CLIs so a build served under
 several daily labels is read as one arm assignment.
+
+The CLI prints ``p_record`` after ``p_holm`` for every comparison: the record-level check's p
+with the same users, weighting, window, reps and seed. It is secondary and not Holm-adjusted. It
+redraws the split as the keyed build does (``strata`` None), because the served inputs carry no
+stratum. It is valid only when every record in a list is served: when a cap on batches binds,
+which records a list serves depends on the split, and holding each record's identifications
+fixed under a redrawn split no longer matches the design. The CLI cannot check this: a batches
+frame or a served log holds only the served records, not the pool, and not the cap. Check the
+build record (every list and taxon group has fewer batches than ``max_batches``, or no cap)
+before reading ``p_record``.
 """
 
 from __future__ import annotations
@@ -52,6 +62,11 @@ RESULT_COLUMNS = (
     "mean_diff",
     "p",
     "p_sign",
+)
+RECORD_NOTE = (
+    "p_record: secondary record-level re-randomisation check, keyed split, not Holm-adjusted. "
+    "Valid only if every record in a list is served (no cap on batches binds); the served "
+    "files cannot show this, so check the build record."
 )
 
 
@@ -375,7 +390,9 @@ def _label_map(path: Path | None) -> dict[str, str] | None:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Pre-registered per-identifier arm comparison.")
+    ap = argparse.ArgumentParser(
+        description="Pre-registered per-identifier arm comparison.", epilog=RECORD_NOTE
+    )
     ap.add_argument("--idents", required=True, type=Path, help="read-back idents parquet")
     ap.add_argument(
         "--served",
@@ -415,10 +432,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     windows = [("blitz", a.start, a.cutoff)]
     if a.placebo_start:
         windows.append(("placebo", a.placebo_start, a.start))
+    print(RECORD_NOTE)
     for label, t0, t1 in windows:
-        counts = identifier_counts(idents, served, start=t0, cutoff=t1, users=users, weight=weight)
+        kw = {"start": t0, "cutoff": t1, "users": users, "weight": weight}
+        counts = identifier_counts(idents, served, **kw)
         print(f"{label}: [{t0}, {t1})" + ("" if users is not None else ", all identifiers"))
-        _print(analyse(counts, control=a.control, reps=a.reps, seed=a.seed))
+        res = analyse(counts, control=a.control, reps=a.reps, seed=a.seed)
+        totals = record_totals(idents, served, **kw)
+        res["p_record"] = [
+            record_shuffle_p(totals, served, arm=arm, control=a.control, reps=a.reps, seed=a.seed)
+            for arm in res["arm"]
+        ]
+        _print(res)
     if a.obs:
         expo = exposure(pd.read_parquet(a.obs, engine="pyarrow"), served, users=users)
         who = "participants" if users is not None else "all users"
