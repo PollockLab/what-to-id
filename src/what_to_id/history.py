@@ -134,6 +134,7 @@ def row(obs: Mapping, t: datetime, rank_level: Mapping[int, float]) -> dict:
     photos = obs.get("photos") or []
     return {
         "id": obs["id"],
+        "uuid": obs.get("uuid"),
         "created_at": obs["created_at"],
         "observed_on": obs.get("observed_on"),
         "lat": lat,
