@@ -55,11 +55,17 @@ margin:.6rem 0 0}}
 kbd{{font:600 .8rem/1 {_SG};padding:.15rem .4rem;border:1px solid #2a3a4d;border-bottom-width:2px;
 border-radius:5px;background:var(--panel);color:var(--ink)}}
 @media(hover:none){{.keys{{display:none}}}}
-#runner .crumbs{{display:flex;gap:1.2rem;align-items:center}}
-.linkbtn{{background:none;border:0;padding:.35rem 0;font:inherit;font-size:.9rem;color:var(--mut);
-cursor:pointer;text-decoration:underline;text-underline-offset:3px;transition:color .12s}}
+#runner .crumbs{{display:flex;flex-wrap:wrap;gap:.3rem 1.2rem;align-items:center}}
+.linkbtn{{display:inline-flex;align-items:center;min-height:2.75rem;background:none;border:0;
+padding:.35rem .5rem;font:inherit;font-size:.9rem;color:var(--mut);cursor:pointer;
+text-decoration:underline;text-underline-offset:3px;transition:color .12s}}
 .linkbtn:hover:not(:disabled){{color:var(--acc)}}
 .linkbtn:disabled{{opacity:.4;cursor:default}}
+.subhint{{width:100%;margin:0;color:var(--cmut);font-size:.8rem}}
+.pickhead{{font:700 1rem/1.3 {_SG};margin:0 0 .5rem;color:var(--ink);text-transform:none;
+letter-spacing:normal}}
+.reopenrow{{margin:.5rem 0 0}}
+.reopenrow a{{font-weight:600}}
 .donebox,.undo{{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
 gap:.6rem;margin-top:1rem;padding:.7rem 1rem;background:var(--panel);border:1px solid #2a3a4d;
 border-radius:12px;color:var(--ink)}}
@@ -172,15 +178,18 @@ function startOver(state, group) {
     }
     return a;
   }
-  var state = null;
+  var state = null, newBuildNotice = false;
   try { state = JSON.parse(localStorage.getItem(SKEY) || 'null'); } catch (e) {}
   if (!state || !Array.isArray(state.perm) || state.perm.length !== labels.length) {
     state = {perm: shuffled(labels), progress: {}};
   }
   // A new daily build re-cuts every list, so old pointers and offsets point at other batches.
-  // Keep the browser's list cycle, start the batches afresh.
+  // Keep the browser's list cycle, start the batches afresh. Tell a returning identifier once,
+  // only if they had progress to lose.
   if (state.build !== BUILD) {
+    var hadProgress = Object.keys(state.progress || {}).length > 0;
     state = {perm: state.perm, progress: {}, build: BUILD};
+    if (hadProgress) newBuildNotice = true;
   }
   if (!state.offsets) {
     state.offsets = {};
@@ -202,9 +211,12 @@ function startOver(state, group) {
   function $(id) { return document.getElementById(id); }
   var picker = $('picker'), runner = $('runner'), groupList = $('groupList');
   var runGroup = $('runGroup'), runnerCode = $('runnerCode'), bar = $('bar');
-  var nextBtn = $('nextBtn'), reopen = $('reopen'), doneMsg = $('doneMsg');
+  var nextBtn = $('nextBtn'), reopen = $('reopen'), doneMsg = $('doneMsg'), hintBox = $('hintBox');
   var startOverBtn = $('startOver'), undoMsg = $('undoMsg'), undoText = $('undoText');
+  var buildMsg = $('buildMsg');
   var undoState = null, undoTimer = null;
+  if (newBuildNotice) buildMsg.hidden = false;
+  $('buildMsgClose').addEventListener('click', function(){ buildMsg.hidden = true; });
   function hideUndo() { undoMsg.hidden = true; undoState = null; clearTimeout(undoTimer); }
   function el(tag, cls, text) {
     var e = document.createElement(tag);
@@ -222,7 +234,8 @@ function startOver(state, group) {
       b.type = 'button';
       b.appendChild(el('b', '', m ? m[1] : name(g)));
       if (m) b.appendChild(el('span', 'lat', m[2]));
-      b.appendChild(el('span', 'left', left === 0 ? 'All done' : left + ' batches left'));
+      b.appendChild(el('span', 'left', left === 0 ? 'All opened' : left + ' batches left'));
+      if (g === group) b.appendChild(el('span', 'left', 'Last used'));
       b.addEventListener('click', function(){ group = g; save(); renderRunner(true); });
       groupList.appendChild(b);
     });
@@ -235,13 +248,16 @@ function startOver(state, group) {
     var p = groupProgress(state, DATA, group);
     runGroup.textContent = name(group);
     runnerCode.textContent = p.opened === 0 ? p.total + ' batches to go' :
-      'Batch ' + p.opened + ' of ' + p.total;
+      p.opened + ' of ' + p.total + ' batches opened';
     bar.style.width = (p.total ? 100 * p.opened / p.total : 0) + '%';
     var url = (state.last || {})[group];
     reopen.hidden = !url || p.opened === 0;
     if (url) { reopen.href = url; reopen.textContent = 'Open batch ' + p.opened + ' again'; }
-    doneMsg.hidden = p.left > 0;
-    nextBtn.disabled = p.left === 0;
+    var isDone = p.left === 0;
+    doneMsg.hidden = !isDone;
+    nextBtn.hidden = isDone;
+    nextBtn.disabled = isDone;
+    hintBox.hidden = isDone;
     startOverBtn.disabled = p.opened === 0;
     if (focus && !nextBtn.disabled) nextBtn.focus();
   }
@@ -258,11 +274,16 @@ function startOver(state, group) {
     if ((ev.key !== 'n' && ev.key !== 'N') || ev.repeat) return;
     if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
     if (/^(INPUT|TEXTAREA|SELECT)$/.test((ev.target || {}).tagName || '')) return;
-    if (runner.hidden || nextBtn.disabled) return;
+    if (runner.hidden || nextBtn.hidden || nextBtn.disabled) return;
     ev.preventDefault();
     nextBtn.click();
   });
-  function toPicker() { hideUndo(); renderPicker(); }
+  function toPicker() {
+    hideUndo();
+    renderPicker();
+    var cur = groupList.querySelector('.gbtn.is-current');
+    if (cur) cur.focus();
+  }
   $('changeGroup').addEventListener('click', toPicker);
   $('pickOther').addEventListener('click', toPicker);
   // Start over puts this group's batches back, keeps the list cycle, and offers Undo for 10 s.
@@ -295,18 +316,22 @@ ORDER_TEXT = {
 }
 
 
-def _method(manifest: Manifest) -> str:
+def _method(manifest: Manifest, n_lists: int) -> str:
     """The test in five steps, with one line per order in this build, folded by default."""
     missing = [a for a in manifest.arms if a not in ORDER_TEXT]
     if missing:
         raise ValueError(f"no page words for list order(s) {missing}; add them to ORDER_TEXT")
     orders = "".join(f"<li>{ORDER_TEXT[a]}</li>" for a in manifest.arms)
+    cycle = "".join(f'<span class="n">{i}</span>' for i in range(1, n_lists + 1))
+    cycle_html = f'<div class="cycle" aria-hidden="true">{cycle}<i>&#8634;</i></div>'
     steps = (
         "<b>The question.</b> Does the order of records change how many get an ID, and which?",
         "<b>The lists.</b> Each record goes to one list at random, so every list holds the same "
         f"mix of species and observers. Only the order is different:<ul>{orders}</ul>",
-        "<b>Your batches.</b> Each press of Next batch takes the next list in turn. Your browser "
-        "picks the turn order at random. The page does not say which list a batch is from.",
+        "<b>Your batches.</b> Each press of Next batch takes the next of "
+        f"{n_lists} lists, so your batches spread evenly over all of them.{cycle_html}"
+        "<p>Your browser picks the turn order at random. The page does not say which list a "
+        "batch is from.</p>",
         "<b>The count.</b> After the blitz, we count each participant's species-level IDs on each "
         "list and compare each person with themself. A fast identifier adds the same to every "
         "list.",
@@ -330,22 +355,29 @@ def _runner(batch_size: int) -> str:
     """The batch runner. Identical for every list: nothing in it depends on the list served."""
     return (
         '<section id="runner" hidden>'
-        '<div class="runhead"><p class="rungroup" id="runGroup"></p>'
+        '<div class="runhead"><h2 class="rungroup" id="runGroup"></h2>'
         '<p class="crumbs"><button class="linkbtn" id="changeGroup" type="button">'
         "Change group</button>"
         '<button class="linkbtn" id="startOver" type="button" disabled'
-        ' title="Put this group\'s batches back">'
-        "&#8634; Start over</button></p></div>"
+        ' aria-describedby="startOverHint">'
+        "&#8634; Start over</button>"
+        '<span class="subhint" id="startOverHint">Start over puts this group\'s batches back.'
+        "</span></p></div>"
         '<p class="runcode" id="runnerCode" aria-live="polite">Batch 0</p>'
         '<div class="bar" aria-hidden="true"><span id="bar"></span></div>'
         '<button class="nextbtn" id="nextBtn" type="button" aria-keyshortcuts="n">'
         "Next batch</button>"
-        f'<p class="hint"><span>Opens up to {batch_size} records in a new iNaturalist tab. '
-        "ID what you can, then come back.</span>"
-        '<span class="keys">Press <kbd>N</kbd> for the next batch.</span>'
-        '<a id="reopen" href="#" target="_blank" rel="noopener" hidden>Open this batch again</a>'
-        "</p>"
-        '<p class="donebox" id="doneMsg" hidden><span>All batches in this group are done.</span>'
+        f'<p class="hint" id="hintBox"><span>Opens up to {batch_size} records in a new '
+        "iNaturalist tab. ID what you can, then come back.</span>"
+        "<span>Sign in to iNaturalist first. Some records may no longer need an ID, so a batch "
+        f"can show fewer than {batch_size}.</span>"
+        "<span>Your place is saved in this browser only.</span>"
+        '<span class="keys">Press <kbd>N</kbd> for the next batch.</span></p>'
+        '<p class="reopenrow"><a id="reopen" href="#" target="_blank" rel="noopener" hidden>'
+        "Open this batch again</a></p>"
+        '<p class="donebox" id="doneMsg" hidden>'
+        "<span>You opened every batch in this group. To go back to one, use Open again or "
+        "Start over.</span>"
         '<button class="pillbtn" id="pickOther" type="button">Pick another group</button></p>'
         '<p class="undo" id="undoMsg" aria-live="polite" hidden><span id="undoText"></span>'
         '<button class="linkbtn" id="undoBtn" type="button">Undo</button></p>'
@@ -371,16 +403,18 @@ def render_rotation_index(manifest: Manifest, *, title: str) -> str:
         ("ID what you can", "skip the rest, then come back"),
     )
     flow = arrow.join(f"<div><b>{b}</b><span>{s}</span></div>" for b, s in steps)
-    cycle = arrow.join(f'<span class="n">{i}</span>' for i in range(1, len(data) + 1))
+    build_msg = (
+        '<p class="undo" id="buildMsg" aria-live="polite" hidden>'
+        "<span>New batches today. Your count starts again.</span>"
+        '<button class="linkbtn" id="buildMsgClose" type="button">Got it</button></p>\n'
+    )
     body = (
+        f"{build_msg}"
         f'<section id="picker"><div class="flow">{flow}</div>'
+        '<h2 class="pickhead">Pick a group</h2>'
         '<div id="groupList"></div></section>\n'
         f"{_runner(int(manifest.batch_size))}"
-        f'<section class="why"><h2>{len(data)} lists, in turn</h2>'
-        f'<div class="cycle" aria-hidden="true">{cycle}<i>&#8634;</i></div>'
-        f"<p>Each press takes the next of {len(data)} lists, so your batches spread evenly over "
-        "all of them.</p></section>\n"
-        f"{_method(manifest)}"
+        f"{_method(manifest, len(data))}"
     )
     script = (
         f"var BUILD={json.dumps(manifest.created_at)};"
@@ -392,6 +426,7 @@ def render_rotation_index(manifest: Manifest, *, title: str) -> str:
         '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width,initial-scale=1">\n'
         f"<title>{title}</title>\n{FONTS}<style>{CSS}{ROTATION_CSS}</style>\n</head>\n<body>\n"
+        "<noscript><p>This page needs JavaScript to deal batches.</p></noscript>\n"
         f"<main>\n<h1>{title}</h1>\n{sub_html}{body}"
         f"</main>\n<script>{script}</script>\n</body>\n</html>\n"
     )
