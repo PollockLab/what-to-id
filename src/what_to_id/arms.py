@@ -69,10 +69,13 @@ class Surprise:
     Orders by pool['surprise'] (what_to_id.surprise.score, a per-taxon tail probability) desc,
     NaN last. Most records that score 1 (the maximum) tie there because their taxon has too few
     regional references to say anything: among those ties, and any other tie at the same
-    surprise, the record with fewer regional references (pool['surprise_n_ref'], NaN treated as
-    more unknown than any count) goes first, so the least-attested taxa surface before merely
+    surprise, records are broken first by pool['surprise_sinr'] desc when present (a precomputed
+    range-model score; a higher value means the location is less expected for the taxon, and
+    NaN goes after any scored record), then by fewest regional references (pool['surprise_n_ref'],
+    NaN treated as more unknown than any count), so the least-attested taxa surface before merely
     unusual sightings of well-attested ones. Remaining ties fall back to recency, then id. Pools
-    built before surprise_n_ref existed order by surprise, recency and id only.
+    missing surprise_sinr or surprise_n_ref order by whichever of the two is present, falling
+    back to surprise, recency and id only when neither is.
     """
 
     name: str = "surprise"
@@ -80,19 +83,30 @@ class Surprise:
     def order(self, pool: pd.DataFrame, *, seed: int) -> np.ndarray:
         if "surprise" not in pool.columns:
             raise ValueError("surprise requires pool['surprise'] (pass --surprise-scores)")
-        if "surprise_n_ref" not in pool.columns:
+        has_sinr = "surprise_sinr" in pool.columns
+        has_n_ref = "surprise_n_ref" in pool.columns
+        if not has_sinr and not has_n_ref:
             return _score_order(pool, "surprise")
         score = pool["surprise"].to_numpy(dtype=np.float64)
-        n_ref = pool["surprise_n_ref"].to_numpy(dtype=np.float64)
         created = _created_ns(pool)
         ids = pool["id"].to_numpy(dtype=np.int64)
         missing_score = ~np.isfinite(score)
         score = np.where(missing_score, -np.inf, score)
-        missing_ref = ~np.isfinite(n_ref)
-        n_ref = np.where(missing_ref, np.inf, n_ref)
-        # lexsort sorts by the last key first: NaN surprise last, then surprise desc,
-        # then n_ref asc (NaN n_ref after known n_ref), then created desc, then id desc.
-        return np.lexsort((-ids, -created, n_ref, -score, missing_score.astype(np.int8)))
+        keys = [-ids, -created]
+        if has_n_ref:
+            n_ref = pool["surprise_n_ref"].to_numpy(dtype=np.float64)
+            missing_ref = ~np.isfinite(n_ref)
+            keys.append(np.where(missing_ref, np.inf, n_ref))
+        if has_sinr:
+            sinr = pool["surprise_sinr"].to_numpy(dtype=np.float64)
+            missing_sinr = ~np.isfinite(sinr)
+            keys.append(-np.where(missing_sinr, -np.inf, sinr))
+        keys.append(-score)
+        keys.append(missing_score.astype(np.int8))
+        # lexsort sorts by the last key first: NaN surprise last, then surprise desc, then (when
+        # present) surprise_sinr desc with NaN after any scored record, then (when present)
+        # n_ref asc with NaN after known n_ref, then created desc, then id desc.
+        return np.lexsort(tuple(keys))
 
 
 def load_embeddings(path: Path) -> tuple[np.ndarray, np.ndarray, str]:
