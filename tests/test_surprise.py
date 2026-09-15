@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from what_to_id.surprise import score, tail_prob, taxon_key
+from what_to_id.surprise import geo_scores, main, score, tail_prob, taxon_key
 
 RNG = np.random.default_rng(0)
 
@@ -29,6 +29,55 @@ def test_taxon_key_prefers_species_then_genus():
     assert taxon_key((1, 2, 3, 4), rl) == 3
     assert taxon_key((1, 2, 5), rl) == 2
     assert taxon_key((1,), rl) is None
+
+
+def _geo_inputs():
+    taxa = pd.DataFrame(
+        {
+            "taxon_id": [1, 20, 30, 31],
+            "ancestry": [None, "1", "1/20", "1/20"],
+            "rank_level": [70, 20, 10, 10],
+        }
+    )
+    n = 100
+    ref = pd.DataFrame(
+        {
+            "latitude": 49 + RNG.normal(0, 0.05, n),
+            "longitude": -123 + RNG.normal(0, 0.05, n),
+            "positional_accuracy": [10] * n,
+            "taxon_id": [30] * n,
+            "quality_grade": ["research"] * (n - 2) + ["needs_id", "research"],
+            "observed_on": ["2024-06-01"] * (n - 1) + ["2026-01-01"],
+        }
+    )
+    pool = pd.DataFrame(
+        {
+            "id": [1, 2, 3, 4],
+            "lat": [49.0, 55.0, 49.0, 49.0],
+            "lon": [-123.0, -130.0, -123.0, -123.0],
+            "taxon_id": pd.array([30, 30, 31, None], dtype="Int64"),
+        }
+    )
+    return pool, ref, taxa
+
+
+def test_geo_scores_against_open_data_rows():
+    pool, ref, taxa = _geo_inputs()
+    s = geo_scores(pool, ref, taxa, before="2025-01-01")
+    assert s.id.tolist() == [1, 2, 3, 4]
+    got = s.surprise.to_numpy()
+    assert got[0] < 0.5 and got[1] == 1.0 and got[2] == 1.0 and np.isnan(got[3])
+
+
+def test_main_writes_id_and_surprise(tmp_path):
+    pool, ref, taxa = _geo_inputs()
+    pool.to_parquet(tmp_path / "pool.parquet", index=False)
+    ref.to_csv(tmp_path / "obs.tsv.gz", sep="\t", index=False)
+    taxa.to_csv(tmp_path / "taxa.csv.gz", sep="\t", index=False)
+    args = [str(tmp_path / "pool.parquet"), "--ref", str(tmp_path / "obs.tsv.gz")]
+    args += ["--taxa", str(tmp_path / "taxa.csv.gz"), "--before", "2025-01-01"]
+    assert main([*args, "--out", str(tmp_path / "s.parquet")]) == 0
+    assert pd.read_parquet(tmp_path / "s.parquet").columns.tolist() == ["id", "surprise"]
 
 
 def test_score_groups_by_key():

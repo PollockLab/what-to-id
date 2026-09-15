@@ -14,6 +14,7 @@ look at and never marks one as wrong.
 
 from __future__ import annotations
 
+import argparse
 import math
 from collections.abc import Mapping, Sequence
 
@@ -83,3 +84,65 @@ def score(
         r = groups[k][list(cols)].to_numpy(float) if k in groups else empty
         out[rows.index] = tail_prob(r, rows[list(cols)].to_numpy(float), h, seed)
     return out
+
+
+REF_COLS = ["latitude", "longitude", "positional_accuracy", "taxon_id", "quality_grade"]
+REF_COLS += ["observed_on"]
+
+
+def geo_scores(
+    pool: pd.DataFrame, ref: pd.DataFrame, taxa: pd.DataFrame, before: str, h: float = 25.0
+) -> pd.DataFrame:
+    """Geo surprise of each pool record's taxon (`id`, `lat`, `lon`, `taxon_id`) against
+    iNat Open Data rows (`REF_COLS`) that are research grade, observed before `before` and placed
+    within 2 km. A reference row counts for its species and for its genus."""
+    rl = dict(zip(taxa.taxon_id, taxa.rank_level, strict=True))
+    anc = dict(zip(taxa.taxon_id, taxa.ancestry, strict=True))
+
+    def lin(t: int) -> tuple[int, ...]:
+        a = anc.get(t)
+        return (tuple(int(x) for x in a.split("/")) if isinstance(a, str) else ()) + (t,)
+
+    def at(t: int, want: int) -> int | None:
+        return next((x for x in reversed(lin(t)) if rl.get(x) == want), None)
+
+    tid = pd.to_numeric(pool["taxon_id"], errors="coerce")
+    p = pd.DataFrame({"id": pool["id"].to_numpy(), "lat": pool["lat"], "lon": pool["lon"]})
+    p["key"] = [taxon_key(lin(int(t)), rl) if pd.notna(t) else None for t in tid]
+    r = ref[
+        (ref.quality_grade == "research")
+        & (ref.observed_on < before)
+        & (ref.positional_accuracy.isna() | (ref.positional_accuracy <= 2000))
+    ]
+    ut = r.taxon_id.dropna().astype(int).unique()
+    sp, ge = {t: at(t, SPECIES) for t in ut}, {t: at(t, GENUS) for t in ut}
+    long = pd.concat([r.assign(key=r.taxon_id.map(sp)), r.assign(key=r.taxon_id.map(ge))])
+    long = long[long.key.isin(set(p.key.dropna()))]
+    for d, la, lo in ((p, "lat", "lon"), (long, "latitude", "longitude")):
+        xy = to_km(d[la].to_numpy(float), d[lo].to_numpy(float))
+        d["x"], d["y"] = xy[:, 0], xy[:, 1]
+    p["surprise"] = score(p, long, ["x", "y"], h=h)
+    return p[["id", "surprise"]]
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description="Geo surprise scores for a pool (--surprise-scores)")
+    ap.add_argument("pool", help="pool parquet with id, lat, lon, taxon_id")
+    ap.add_argument("--ref", required=True, help="iNat Open Data observations (tsv, may be .gz)")
+    ap.add_argument("--taxa", required=True, help="iNat Open Data taxa.csv.gz")
+    ap.add_argument("--before", required=True, help="only references observed before YYYY-MM-DD")
+    ap.add_argument("--out", required=True)
+    a = ap.parse_args(argv)
+    pool = pd.read_parquet(a.pool)
+    ref = pd.read_csv(a.ref, sep="\t", usecols=REF_COLS)
+    taxa = pd.read_csv(a.taxa, sep="\t", usecols=["taxon_id", "ancestry", "rank_level"])
+    s = geo_scores(pool, ref, taxa, a.before)
+    s.to_parquet(a.out, index=False)
+    print(
+        f"{len(s)} records, {int(s.surprise.notna().sum())} scored, {(s.surprise == 1).sum()} at 1"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
