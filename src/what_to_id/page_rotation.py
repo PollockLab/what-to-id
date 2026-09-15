@@ -7,7 +7,8 @@ effort. Each browser also starts every list and group at its own random batch an
 so identifiers working the same group spread over the served window instead of all opening the
 same first batches (disjoint dealing). The embedded data maps opaque list labels (the same
 letters as manifest.arm_labels) to per-group ordered lists of Identify URLs; nothing else. No
-arm name, batch_id, card fact, or thumbnail ever reaches this page.
+arm name, batch_id, card fact, or thumbnail ever reaches this page, so a batch from any list
+renders the same: a group name, a batch count and one Identify link.
 """
 
 from __future__ import annotations
@@ -19,52 +20,77 @@ from what_to_id.manifest import Manifest
 from what_to_id.page import ARM_WORDS, group_name
 from what_to_id.page_style import CSS, FONTS
 
-ROTATION_CSS = """
-#groupList{display:flex;gap:.8rem;flex-wrap:wrap;margin:1.4rem 0}
-.gbtn{flex:1 1 11rem;display:flex;flex-direction:column;gap:.1rem;padding:.9rem 1rem;
-background:var(--card);color:var(--cink);border:1px solid var(--line);border-radius:12px;
-font:inherit;text-align:left;cursor:pointer;box-shadow:0 6px 22px rgba(0,0,0,.5);
-transition:border-color .12s}
-.gbtn:hover{border-color:var(--acc)}
-.gbtn b{font-size:1.1rem;color:var(--acc-ink);font-family:"Space Grotesk",Inter,system-ui,
-sans-serif}
-.gbtn span{color:var(--cmut);font-size:.9rem}
-#runner{margin-top:1.4rem}
-.runcode{font-family:"Space Grotesk",Inter,system-ui,sans-serif;font-size:1.3rem;font-weight:700;
-color:var(--acc);margin:0 0 1rem}
-.nextbtn{display:block;width:100%;padding:1.1rem;font-size:1.15rem;font-weight:700;
+_SG = '"Space Grotesk",Inter,system-ui,sans-serif'
+
+ROTATION_CSS = f"""
+[hidden]{{display:none!important}}
+#groupList{{display:grid;grid-template-columns:repeat(auto-fill,minmax(10.5rem,1fr));gap:.7rem;
+margin:1.2rem 0}}
+.gbtn{{display:flex;flex-direction:column;gap:.1rem;padding:.8rem .9rem;background:var(--card);
+color:var(--cink);border:1px solid var(--line);border-radius:12px;font:inherit;text-align:left;
+cursor:pointer;box-shadow:0 6px 22px rgba(0,0,0,.5);transition:border-color .12s}}
+.gbtn:hover{{border-color:var(--acc)}}
+.gbtn.is-current{{border-color:var(--acc);
+box-shadow:0 0 0 2px var(--acc),0 6px 22px rgba(0,0,0,.5)}}
+.gbtn.is-empty{{opacity:.6}}
+.gbtn b{{font-size:1.1rem;color:var(--acc-ink);font-family:{_SG}}}
+.gbtn .lat{{color:var(--cmut);font-size:.8rem}}
+.gbtn .left{{color:var(--cmut);font-size:.88rem;margin-top:.3rem}}
+#runner{{margin-top:1.2rem}}
+.runhead{{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;
+gap:.3rem 1.2rem;margin:0 0 .5rem}}
+.rungroup{{font-family:{_SG};font-size:1.3rem;font-weight:700;margin:0;color:var(--ink)}}
+.runcode{{font-family:{_SG};font-size:1rem;font-weight:700;color:var(--acc);margin:0 0 .4rem}}
+.bar{{height:.4rem;background:var(--panel);border-radius:4px;overflow:hidden;margin:0 0 1rem}}
+.bar span{{display:block;height:100%;width:0;background:var(--acc)}}
+.nextbtn{{display:block;width:100%;padding:1.1rem;font-size:1.15rem;font-weight:700;
 background:var(--gd);color:#062a12;border:0;border-radius:12px;cursor:pointer;
-font-family:"Space Grotesk",Inter,system-ui,sans-serif;transition:filter .12s}
-.nextbtn:hover{filter:brightness(1.08)}
-.nextbtn:disabled{opacity:.5;cursor:default;filter:none}
-#doneMsg{color:var(--mut);margin-top:1rem}
-#runner .crumbs{display:flex;gap:1.4rem;align-items:center}
-.linkbtn{background:none;border:0;padding:.2rem 0;font:inherit;font-size:.9rem;color:var(--mut);
-cursor:pointer;transition:color .12s}
-.linkbtn:hover:not(:disabled){color:var(--acc)}
-.linkbtn:disabled{opacity:.4;cursor:default}
-.linkbtn[hidden],.undo[hidden]{display:none}
-.undo{display:flex;align-items:center;justify-content:space-between;gap:.8rem;margin-top:1rem;
-padding:.7rem 1rem;background:var(--panel);border:1px solid #2a3a4d;border-radius:12px;
-color:var(--ink)}
-.undo .linkbtn{color:var(--acc);font-weight:700}
-.flow{display:flex;align-items:center;gap:.6rem;margin:1.2rem 0 0}
-.flow div{flex:1 1 0;display:flex;flex-direction:column;gap:.1rem;padding:.7rem .9rem;
-background:var(--panel);border:1px solid #2a3a4d;border-radius:12px}
-.flow b,.cycle .n{font-family:"Space Grotesk",Inter,system-ui,sans-serif;font-weight:700}
-.flow span{color:var(--mut);font-size:.88rem}
-.flow i,.cycle i{font-style:normal;color:var(--acc);font-size:1.2rem}
-.cycle{display:flex;align-items:center;gap:.5rem;margin:.4rem 0 .8rem}
-.how ul{margin:.3rem 0;padding-left:1.1rem}
-.cycle .n{width:2.2rem;height:2.2rem;display:grid;place-items:center;border-radius:50%;
-background:var(--card);color:var(--acc-ink)}
-@media(max-width:44rem){.flow{flex-direction:column;align-items:stretch}
-.flow i{align-self:center;transform:rotate(90deg)}}
+font-family:{_SG};transition:filter .12s}}
+.nextbtn:hover{{filter:brightness(1.08)}}
+.nextbtn:disabled{{opacity:.5;cursor:default;filter:none}}
+.nextbtn:focus-visible{{outline:3px solid var(--ink);outline-offset:3px}}
+.hint{{display:flex;flex-wrap:wrap;gap:.3rem 1rem;color:var(--mut);font-size:.88rem;
+margin:.6rem 0 0}}
+.hint a{{font-weight:600}}
+kbd{{font:600 .8rem/1 {_SG};padding:.15rem .4rem;border:1px solid #2a3a4d;border-bottom-width:2px;
+border-radius:5px;background:var(--panel);color:var(--ink)}}
+@media(hover:none){{.keys{{display:none}}}}
+#runner .crumbs{{display:flex;gap:1.2rem;align-items:center}}
+.linkbtn{{background:none;border:0;padding:.35rem 0;font:inherit;font-size:.9rem;color:var(--mut);
+cursor:pointer;text-decoration:underline;text-underline-offset:3px;transition:color .12s}}
+.linkbtn:hover:not(:disabled){{color:var(--acc)}}
+.linkbtn:disabled{{opacity:.4;cursor:default}}
+.donebox,.undo{{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
+gap:.6rem;margin-top:1rem;padding:.7rem 1rem;background:var(--panel);border:1px solid #2a3a4d;
+border-radius:12px;color:var(--ink)}}
+.donebox{{border-color:var(--gd)}}
+.pillbtn{{padding:.5rem .9rem;background:var(--card);color:var(--cink);border:0;border-radius:8px;
+font:inherit;font-weight:600;cursor:pointer}}
+.undo .linkbtn{{color:var(--acc);font-weight:700}}
+.flow{{display:flex;align-items:center;gap:.6rem;margin:1.2rem 0 0}}
+.flow div{{flex:1 1 0;display:flex;flex-direction:column;gap:.1rem;padding:.7rem .9rem;
+background:var(--panel);border:1px solid #2a3a4d;border-radius:12px}}
+.flow b,.cycle .n{{font-family:{_SG};font-weight:700}}
+.flow span{{color:var(--mut);font-size:.88rem}}
+.flow i,.cycle i{{font-style:normal;color:var(--acc);font-size:1.2rem}}
+.cycle{{display:flex;align-items:center;gap:.5rem;margin:.4rem 0 .8rem}}
+.cycle .n{{width:2.2rem;height:2.2rem;display:grid;place-items:center;border-radius:50%;
+background:var(--card);color:var(--acc-ink)}}
+details.how{{margin-top:2rem}}
+details.how summary{{cursor:pointer;font-family:{_SG};font-size:.8rem;font-weight:700;
+text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}}
+details.how summary:hover{{color:var(--acc)}}
+.how ul{{margin:.3rem 0;padding-left:1.1rem}}
+@media(max-width:44rem){{.flow{{flex-direction:column;align-items:stretch;gap:.35rem}}
+.flow i{{display:none}}
+.flow div{{flex-direction:row;flex-wrap:wrap;column-gap:.5rem;padding:.5rem .8rem}}}}
 """.strip()
 
 # nextBatch is the one pure function driving the rotation: given the per-browser state, the
 # embedded label -> group -> urls data, and the chosen group, it returns the next url (or done)
 # and a new state. It never mutates its inputs, so it can be unit-tested outside the browser.
+# groupProgress and withLast are pure helpers for the progress line and "Open again" link; they
+# count batches over all lists together, so they say nothing about any one list.
 ROTATION_JS = """
 function nextBatch(state, data, group) {
   var perm = state.perm, K = perm.length;
@@ -108,10 +134,25 @@ function leftInGroup(data, state, group) {
   });
   return left;
 }
+function groupProgress(state, data, group) {
+  var total = 0;
+  Object.keys(data).forEach(function(label){
+    total += ((data[label] && data[label][group]) || []).length;
+  });
+  var left = leftInGroup(data, state, group);
+  return {opened: total - left, left: left, total: total};
+}
+function withLast(state, group, url) {
+  var last = Object.assign({}, state.last || {});
+  last[group] = url;
+  return Object.assign({}, state, {last: last});
+}
 function startOver(state, group) {
   var progress = Object.assign({}, state.progress || {});
   delete progress[group];
-  return Object.assign({}, state, {progress: progress});
+  var last = Object.assign({}, state.last || {});
+  delete last[group];
+  return Object.assign({}, state, {progress: progress, last: last});
 }
 (function(){
   var SKEY = 'what-to-id-rotation';
@@ -121,7 +162,8 @@ function startOver(state, group) {
   labels.forEach(function(l){Object.keys(DATA[l]).forEach(function(g){
     if (groups.indexOf(g) === -1) groups.push(g);
   });});
-  groups.sort();
+  function name(g) { return GROUP_NAMES[g] || g; }
+  groups.sort(function(a, b){ return name(a).localeCompare(name(b)); });
   function shuffled(arr) {
     var a = arr.slice();
     for (var i = a.length - 1; i > 0; i--) {
@@ -157,81 +199,89 @@ function startOver(state, group) {
       if (group) localStorage.setItem(GKEY, group);
     } catch (e) {}
   }
-  var picker = document.getElementById('picker');
-  var runner = document.getElementById('runner');
-  var groupList = document.getElementById('groupList');
-  var runnerCode = document.getElementById('runnerCode');
-  var nextBtn = document.getElementById('nextBtn');
-  var doneMsg = document.getElementById('doneMsg');
-  var changeGroup = document.getElementById('changeGroup');
-  var startOverBtn = document.getElementById('startOver');
-  var undoMsg = document.getElementById('undoMsg');
-  var undoText = document.getElementById('undoText');
-  var undoBtn = document.getElementById('undoBtn');
+  function $(id) { return document.getElementById(id); }
+  var picker = $('picker'), runner = $('runner'), groupList = $('groupList');
+  var runGroup = $('runGroup'), runnerCode = $('runnerCode'), bar = $('bar');
+  var nextBtn = $('nextBtn'), reopen = $('reopen'), doneMsg = $('doneMsg');
+  var startOverBtn = $('startOver'), undoMsg = $('undoMsg'), undoText = $('undoText');
   var undoState = null, undoTimer = null;
   function hideUndo() { undoMsg.hidden = true; undoState = null; clearTimeout(undoTimer); }
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text) e.textContent = text;
+    return e;
+  }
   function renderPicker() {
     groupList.innerHTML = '';
     groups.forEach(function(g){
       var left = leftInGroup(DATA, state, g);
-      var b = document.createElement('button');
+      var m = /^(.*) \\((.*)\\)$/.exec(name(g));
+      var b = el('button', 'gbtn' + (g === group ? ' is-current' : '') +
+        (left === 0 ? ' is-empty' : ''));
       b.type = 'button';
-      b.className = 'gbtn';
-      b.innerHTML = '<b>' + (GROUP_NAMES[g] || g) + '</b><span>' + left + ' batches left</span>';
-      b.addEventListener('click', function(){ group = g; save(); renderRunner(); });
+      b.appendChild(el('b', '', m ? m[1] : name(g)));
+      if (m) b.appendChild(el('span', 'lat', m[2]));
+      b.appendChild(el('span', 'left', left === 0 ? 'All done' : left + ' batches left'));
+      b.addEventListener('click', function(){ group = g; save(); renderRunner(true); });
       groupList.appendChild(b);
     });
     picker.hidden = false;
     runner.hidden = true;
   }
-  function renderRunner() {
+  function renderRunner(focus) {
     picker.hidden = true;
     runner.hidden = false;
-    var served = ((state.progress || {})[group] || {}).served || 0;
-    runnerCode.textContent = 'Batch ' + served;
-    var left = leftInGroup(DATA, state, group);
-    doneMsg.hidden = left > 0;
-    nextBtn.disabled = left === 0;
-    startOverBtn.disabled = served === 0;
+    var p = groupProgress(state, DATA, group);
+    runGroup.textContent = name(group);
+    runnerCode.textContent = p.opened === 0 ? p.total + ' batches to go' :
+      'Batch ' + p.opened + ' of ' + p.total;
+    bar.style.width = (p.total ? 100 * p.opened / p.total : 0) + '%';
+    var url = (state.last || {})[group];
+    reopen.hidden = !url || p.opened === 0;
+    if (url) { reopen.href = url; reopen.textContent = 'Open batch ' + p.opened + ' again'; }
+    doneMsg.hidden = p.left > 0;
+    nextBtn.disabled = p.left === 0;
+    startOverBtn.disabled = p.opened === 0;
+    if (focus && !nextBtn.disabled) nextBtn.focus();
   }
   nextBtn.addEventListener('click', function(){
     hideUndo();
     var res = nextBatch(state, DATA, group);
-    state = res.state;
+    state = res.done ? res.state : withLast(res.state, group, res.url);
+    if (!res.done) window.open(res.url, '_blank', 'noopener');
     save();
-    if (res.done) {
-      doneMsg.hidden = false;
-      nextBtn.disabled = true;
-      return;
-    }
-    runnerCode.textContent = 'Batch ' + res.batchNumber;
-    startOverBtn.disabled = false;
-    window.open(res.url, '_blank', 'noopener');
-    if (leftInGroup(DATA, state, group) === 0) {
-      doneMsg.hidden = false;
-      nextBtn.disabled = true;
-    }
+    renderRunner(false);
   });
-  changeGroup.addEventListener('click', function(ev){
-    ev.preventDefault(); hideUndo(); renderPicker();
+  // N opens the next batch. Held keys do not repeat, so one press is one batch.
+  document.addEventListener('keydown', function(ev){
+    if ((ev.key !== 'n' && ev.key !== 'N') || ev.repeat) return;
+    if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test((ev.target || {}).tagName || '')) return;
+    if (runner.hidden || nextBtn.disabled) return;
+    ev.preventDefault();
+    nextBtn.click();
   });
+  function toPicker() { hideUndo(); renderPicker(); }
+  $('changeGroup').addEventListener('click', toPicker);
+  $('pickOther').addEventListener('click', toPicker);
   // Start over puts this group's batches back, keeps the list cycle, and offers Undo for 10 s.
   startOverBtn.addEventListener('click', function(){
     undoState = state;
     state = startOver(state, group);
     save();
-    renderRunner();
+    renderRunner(false);
     undoText.textContent = 'Started over. All ' + leftInGroup(DATA, state, group) +
-      ' batches in ' + (GROUP_NAMES[group] || group) + ' are back.';
+      ' batches in ' + name(group) + ' are back.';
     undoMsg.hidden = false;
     clearTimeout(undoTimer);
     undoTimer = setTimeout(hideUndo, 10000);
   });
-  undoBtn.addEventListener('click', function(){
-    if (undoState) { state = undoState; save(); renderRunner(); }
+  $('undoBtn').addEventListener('click', function(){
+    if (undoState) { state = undoState; save(); renderRunner(false); }
     hideUndo();
   });
-  if (group && groups.indexOf(group) !== -1) { renderRunner(); } else { renderPicker(); }
+  if (group && groups.indexOf(group) !== -1) { renderRunner(false); } else { renderPicker(); }
 })();
 """.strip()
 
@@ -246,7 +296,7 @@ ORDER_TEXT = {
 
 
 def _method(manifest: Manifest) -> str:
-    """The test in five steps, with one line per order in this build."""
+    """The test in five steps, with one line per order in this build, folded by default."""
     missing = [a for a in manifest.arms if a not in ORDER_TEXT]
     if missing:
         raise ValueError(f"no page words for list order(s) {missing}; add them to ORDER_TEXT")
@@ -264,7 +314,7 @@ def _method(manifest: Manifest) -> str:
         "name, count toward Research Grade and go to GBIF.",
     )
     items = "".join(f"<li>{s}</li>" for s in steps)
-    return f'<section class="how"><h2>How the test works</h2><ol>{items}</ol></section>\n'
+    return f'<details class="how"><summary>How the test works</summary><ol>{items}</ol></details>\n'
 
 
 def _rotation_data(manifest: Manifest) -> dict[str, dict[str, list[str]]]:
@@ -274,6 +324,33 @@ def _rotation_data(manifest: Manifest) -> dict[str, dict[str, list[str]]]:
         label = manifest.arm_labels[b["arm"]]
         data.setdefault(label, {}).setdefault(str(b["group"]), []).append(b["url"])
     return data
+
+
+def _runner(batch_size: int) -> str:
+    """The batch runner. Identical for every list: nothing in it depends on the list served."""
+    return (
+        '<section id="runner" hidden>'
+        '<div class="runhead"><p class="rungroup" id="runGroup"></p>'
+        '<p class="crumbs"><button class="linkbtn" id="changeGroup" type="button">'
+        "Change group</button>"
+        '<button class="linkbtn" id="startOver" type="button" disabled'
+        ' title="Put this group\'s batches back">'
+        "&#8634; Start over</button></p></div>"
+        '<p class="runcode" id="runnerCode" aria-live="polite">Batch 0</p>'
+        '<div class="bar" aria-hidden="true"><span id="bar"></span></div>'
+        '<button class="nextbtn" id="nextBtn" type="button" aria-keyshortcuts="n">'
+        "Next batch</button>"
+        f'<p class="hint"><span>Opens up to {batch_size} records in a new iNaturalist tab. '
+        "ID what you can, then come back.</span>"
+        '<span class="keys">Press <kbd>N</kbd> for the next batch.</span>'
+        '<a id="reopen" href="#" target="_blank" rel="noopener" hidden>Open this batch again</a>'
+        "</p>"
+        '<p class="donebox" id="doneMsg" hidden><span>All batches in this group are done.</span>'
+        '<button class="pillbtn" id="pickOther" type="button">Pick another group</button></p>'
+        '<p class="undo" id="undoMsg" aria-live="polite" hidden><span id="undoText"></span>'
+        '<button class="linkbtn" id="undoBtn" type="button">Undo</button></p>'
+        "</section>\n"
+    )
 
 
 def render_rotation_index(manifest: Manifest, *, title: str) -> str:
@@ -296,19 +373,9 @@ def render_rotation_index(manifest: Manifest, *, title: str) -> str:
     flow = arrow.join(f"<div><b>{b}</b><span>{s}</span></div>" for b, s in steps)
     cycle = arrow.join(f'<span class="n">{i}</span>' for i in range(1, len(data) + 1))
     body = (
-        f'<div class="flow">{flow}</div>\n'
-        '<section id="picker"><div class="cards" id="groupList"></div></section>\n'
-        '<section id="runner" hidden>'
-        '<p class="crumbs"><a href="#" id="changeGroup">Change group</a>'
-        '<button class="linkbtn" id="startOver" type="button" disabled'
-        ' title="Put this group\'s batches back">'
-        "&#8634; Start over</button></p>"
-        '<p class="runcode" id="runnerCode">Batch 0</p>'
-        '<button class="nextbtn" id="nextBtn" type="button">Next batch</button>'
-        '<p id="doneMsg" hidden>All batches in this group are done.</p>'
-        '<p class="undo" id="undoMsg" aria-live="polite" hidden><span id="undoText"></span>'
-        '<button class="linkbtn" id="undoBtn" type="button">Undo</button></p>'
-        "</section>\n"
+        f'<section id="picker"><div class="flow">{flow}</div>'
+        '<div id="groupList"></div></section>\n'
+        f"{_runner(int(manifest.batch_size))}"
         f'<section class="why"><h2>{len(data)} lists, in turn</h2>'
         f'<div class="cycle" aria-hidden="true">{cycle}<i>&#8634;</i></div>'
         f"<p>Each press takes the next of {len(data)} lists, so your batches spread evenly over "

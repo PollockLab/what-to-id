@@ -245,6 +245,72 @@ console.log(JSON.stringify({same: JSON.stringify(state) === before, reset: reset
     assert (out["url"], out["n"]) == ("A-0", 1)
 
 
+def _pure_fns(*names):
+    """Top-level pure functions from ROTATION_JS, by name, as one script."""
+    found = [re.search(rf"function {n}\([^)]*\) \{{.*?\n\}}", ROTATION_JS, re.S) for n in names]
+    assert all(found), f"one of {names} not found in ROTATION_JS"
+    return "\n".join(f.group(0) for f in found)
+
+
+def _node(tmp_path, source):
+    import subprocess
+
+    script = tmp_path / "pure.js"
+    script.write_text(source)
+    out = subprocess.run(["node", str(script)], capture_output=True, text=True, check=True)
+    return json.loads(out.stdout)
+
+
+def test_group_progress_counts_all_lists_together(tmp_path, node_available):
+    out = _node(
+        tmp_path,
+        _pure_fns("nextBatch", "leftInGroup", "groupProgress")
+        + """
+var data = {A: {G: ["A-0", "A-1"], H: ["A-h"]}, B: {G: ["B-0"]}, C: {}};
+var state = {perm: ["A", "B", "C"], progress: {}, offsets: {}};
+var out = [groupProgress(state, data, "G"), groupProgress(state, data, "none")];
+state = nextBatch(state, data, "G").state;
+out.push(groupProgress(state, data, "G"));
+state = nextBatch(nextBatch(nextBatch(state, data, "G").state, data, "G").state, data, "G").state;
+out.push(groupProgress(state, data, "G"));
+console.log(JSON.stringify(out));
+""",
+    )
+    assert out == [
+        {"opened": 0, "left": 3, "total": 3},
+        {"opened": 0, "left": 0, "total": 0},
+        {"opened": 1, "left": 2, "total": 3},
+        {"opened": 3, "left": 0, "total": 3},
+    ]
+
+
+def test_with_last_and_start_over_track_the_open_batch_per_group(tmp_path, node_available):
+    out = _node(
+        tmp_path,
+        _pure_fns("withLast", "startOver")
+        + """
+var s0 = {perm: ["A"], progress: {G: {served: 1}, H: {served: 1}}};
+var s1 = withLast(withLast(s0, "G", "u-g"), "H", "u-h");
+var s2 = startOver(s1, "G");
+console.log(JSON.stringify({s0: s0, s1: s1.last, s2: s2.last, p2: Object.keys(s2.progress)}));
+""",
+    )
+    assert "last" not in out["s0"], "withLast mutated its input"
+    assert out["s1"] == {"G": "u-g", "H": "u-h"}
+    assert out["s2"] == {"H": "u-h"} and out["p2"] == ["H"]
+
+
+def test_runner_is_the_same_for_every_list():
+    html = render_rotation_index(_manifest(), title="t")
+    runner = re.search(r'<section id="runner".*?</section>', html, re.S).group(0)
+    assert 'aria-keyshortcuts="n"' in runner and "<kbd>N</kbd>" in runner
+    assert 'id="reopen"' in runner and 'id="pickOther"' in runner
+    for label in ("A", "B"):
+        assert f'"{label}"' not in runner and f"list {label}" not in runner
+    assert "<details" in html and "<summary>How the test works</summary>" in html
+    _assert_blind(html)
+
+
 def test_page_embeds_build_id():
     m = _manifest()
     m.created_at = "2026-11-03T06:00:00Z"
