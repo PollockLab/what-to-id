@@ -143,6 +143,20 @@ def chance_band(n: int, k: int) -> tuple[int, int, float]:
     return int(lo), int(hi), float(((c.min(1) < lo) | (c.max(1) > hi)).mean())
 
 
+def chance_outside(sizes: list[int], k: int) -> tuple[int, float]:
+    """How many of these k list sizes fall outside the chance band, and how many chance puts there.
+
+    The band is chance_band's, as the share figure draws it. The second value is the mean, over
+    the same CHANCE_SIMS seeded splits, of the number of lists below or above it, so both counts
+    use one band and one rule.
+    """
+    n = sum(sizes)
+    c = np.random.default_rng(0).multinomial(n, [1 / k] * k, size=CHANCE_SIMS)
+    lo, hi = chance_band(n, k)[:2]
+    seen = sum(1 for s in sizes if s < lo or s > hi)
+    return seen, float(((c < lo) | (c > hi)).sum(1).mean())
+
+
 def list_share_figure(groups: list[dict], k: int, band: bool) -> str:
     """Per taxon group: the smallest to the largest list as a share of the group's records.
 
@@ -167,7 +181,7 @@ def list_share_figure(groups: list[dict], k: int, band: bool) -> str:
     if band:
         parts += [
             rect(x0, 4, 18, 11, "band"),
-            text(x0 + 23, 13, "chance, middle 95%", "m"),
+            text(x0 + 23, 13, "chance, 2.5 to 97.5%", "m"),
             line(x0 + 150, 9.5, x0 + 168, 9.5, "rng"),
             text(x0 + 173, 13, "this build", "m"),
         ]

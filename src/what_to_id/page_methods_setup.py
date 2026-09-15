@@ -11,9 +11,10 @@ from collections import Counter
 
 from what_to_id.manifest import Manifest
 from what_to_id.page import group_name
-from what_to_id.page_doc import Doc, codes
+from what_to_id.page_doc import Doc, a, codes, fold, see
 from what_to_id.page_figures import (
     CHANCE_SIMS,
+    chance_outside,
     deal_figure,
     flow_figure,
     list_share_figure,
@@ -29,6 +30,8 @@ from what_to_id.page_order_text import (
     order_name,
 )
 from what_to_id.page_svg import fmt, range_words
+
+_SETUP = "docs/protocol.md#proposed-set-up-for-bc"
 
 
 def _span(lo: int, hi: int) -> str:
@@ -54,6 +57,7 @@ def build_facts(m: Manifest) -> dict:
                 "name": group_name(g),
                 "records": sum(recs),
                 "recs": (min(recs), max(recs)),
+                "list_recs": sorted(recs),
                 "batches": (min(nb), max(nb)),
                 "sizes": (min(sizes), max(sizes)),
             }
@@ -79,29 +83,47 @@ def build_facts(m: Manifest) -> dict:
 def design_section(m: Manifest, f: dict, doc: Doc) -> str:
     primary = (
         "Draft protocol: per participant, species-level IDs on data-poor places first, each "
-        "weighted by its map score, minus the same on newest first."
+        "weighted by its map score, minus the same on newest first"
         if "gap_first" in m.arms
-        else "Draft protocol: species-level IDs per participant and list."
+        else "Draft protocol: species-level IDs per participant and list"
     )
     rows = [
-        ["Question", "Does the order of records change how many get an ID, and which?"],
-        ["Randomised", f"Each record, to one of {f['k']} lists."],
+        [
+            "Question",
+            "Does the order of records change how many get an ID, and which? More in "
+            f"{a('README.md#what-the-lists-test', 'the README')}.",
+        ],
+        [
+            "Randomised",
+            f"Each record, to one of {f['k']} lists ({see('methods-split', 'Section 3')}).",
+        ],
         [
             "Compared",
             "Each participant with themself: their count on each list against their "
-            "count on the control.",
+            f"count on the control ({see('methods-analysis', 'Section 7')}).",
         ],
-        ["Lists differ in", "Only the order: how records are sorted and cut into batches."],
+        [
+            "Lists differ in",
+            "Only the order: how records are sorted and cut into batches "
+            f"({see('methods-orders', 'Section 4')}).",
+        ],
         [
             "Control",
-            "Newest first. Identify shows records newest first by default (iNaturalist source "
-            f"{doc.cite('inatsource')}).",
+            '<span id="identify-default">Newest first. Identify shows records newest first by '
+            f"default (iNaturalist source {doc.cite('inatsource')}), so identifiers who do not "
+            "use this page likely meet the newest records first, which is the control's "
+            "order.</span>",
         ],
-        ["Primary outcome", primary],
+        [
+            "Effect measured",
+            "Meeting records in one list's batches in place of newest-first batches, served with "
+            f"random starts ({see('methods-estimand', 'Section 5')}).",
+        ],
+        ["Primary outcome", f"{primary} ({see('methods-outcomes', 'Section 6')})."],
         [
             "Test",
             "Paired sign-flip permutation test, Holm-adjusted when more than one list is "
-            "compared with the control. The draft protocol says two-sided at 0.05.",
+            f"compared with the control ({see('methods-analysis', 'Section 7')}).",
         ],
         [
             "Dates",
@@ -117,41 +139,42 @@ def design_section(m: Manifest, f: dict, doc: Doc) -> str:
         f"{doc.cite('hebert2026')}. Expert identification blitzes have been run and studied "
         f"before {doc.cite('mesaglio2025')}. This test asks a narrower question: whether the "
         "order of records changes what gets identified.</p>"
-        f"<p>This design uses {f['k']} lists. An earlier draft of the protocol proposed 2, newest "
-        "first and data-poor places first, and left the rest to a later round. Every value this "
-        "page gives from the draft protocol, in this table and later, is a draft. The BC team "
-        "fixes these values before the blitz.</p>"
+        f'<p id="methods-draft">This design uses {f["k"]} lists. An earlier draft of the protocol '
+        "proposed 2, newest first and data-poor places first, and left the rest to a later round. "
+        "Every value this page gives from the draft protocol, in this table and later, is a "
+        "draft. The BC team fixes these values before the blitz. The set-up is in "
+        f"{a(_SETUP, 'the draft protocol')}.</p>"
     )
-    table = doc.table("The design in one table.", ["Part", "This test"], rows, wrap=True)
+    table = doc.table(
+        "The design in one table.", ["Part", "This test"], rows, wrap=True, name="design"
+    )
     fig = doc.figure(
         flow_figure(f),
         "Flow of records through this build, drawn in the style of a CONSORT flow diagram "
         f"{doc.cite('schulz2010')}. The counts are this build's. The lists are not named.",
     )
-    return (
-        f"{premise}<p>The test is a randomised comparison inside each person. Records are split "
-        f"at random over {f['k']} lists that differ only in their order. Each participant works "
-        "all lists in turn, and their count on each list is compared with their own count on the "
-        f"control list.</p>{table}{fig}"
-        + codes("manifest", "assign", "batches", "page", "analysis")
-    )
+    return f"{premise}{table}{fig}" + codes("manifest", "assign", "batches", "page", "analysis")
 
 
 def records_section(m: Manifest, f: dict, doc: Doc) -> str:
     sizes = sorted({g["records"] for g in f["groups"]}) or [0]
     if len(sizes) == 1 and sizes[0] > 0 and sizes[0] % 200 == 0:
         frame = (
-            "<p><b>This build is a preview sample.</b> Every taxon group has exactly "
-            f"{fmt(sizes[0])} served records, a whole number of pages of 200, so its pull most "
-            "likely stopped after a page cap. So it holds the newest records, by record number, "
-            "of each taxon group added up to the freeze date. It is not the blitz build and not a "
-            "random sample of BC records.</p>"
+            "<p><b>This build is a preview sample.</b> It is not the blitz build and not a random "
+            "sample of BC records.</p>"
+        )
+        why = (
+            f"<p>Every taxon group has exactly {fmt(sizes[0])} served records, a whole number of "
+            "pages of 200, so its pull most likely stopped after a page cap. So it holds the "
+            "newest records, by record number, of each taxon group added up to the freeze "
+            "date.</p>"
         )
     else:
         frame = (
             "<p>This page cannot tell from the build record whether this pull stopped early. "
             "The blitz's daily job pulls with no page cap.</p>"
         )
+        why = ""
     asks = (
         "in British Columbia (iNaturalist place 7085)",
         "need an ID (quality grade Needs ID)",
@@ -159,7 +182,7 @@ def records_section(m: Manifest, f: dict, doc: Doc) -> str:
         "were observed on or after the pull's <code>d1</code> date. The daily job uses 2025-01-01.",
         f"were added to iNaturalist up to the freeze date, {m.freeze}",
     )
-    return (
+    detail = (
         "<p>The pull asks the iNaturalist API, one taxon group at a time, for records that are:"
         f"</p><ul>{''.join(f'<li>{s}</li>' for s in asks)}</ul>"
         "<p>It asks for the highest record numbers first, which are the newest records, 200 per "
@@ -167,37 +190,54 @@ def records_section(m: Manifest, f: dict, doc: Doc) -> str:
         "coordinates or no photo, and a record number that comes twice. The build record also "
         f"has a field named <code>d1</code>, but it holds another date: the blitz start given to "
         f"the build, {m.d1}. The build record does not keep the pull's <code>d1</code> or page "
-        f"cap.</p>{frame}"
+        f"cap.</p>{why}"
         "<p>A taxon group is one of iNaturalist's iconic taxa, for example Birds (Aves). Each "
         "taxon group gets its own batches, and you pick one on this page.</p>"
-        f"<p>This build holds {fmt(f['pool_rows'])} records and serves {fmt(f['served_rows'])} "
-        f"of them in {fmt(f['n_batches'])} batches, at most {f['b_max']} per list and taxon "
-        "group. In the blitz, the daily job adds new records, drops served records that no "
-        "longer need an ID, and builds again.</p>" + codes("inat", "pool_state", "daily")
+    )
+    return (
+        "<p>The pull takes the BC records in iNaturalist that need an ID and have a photo, one "
+        f"taxon group at a time. This build holds {fmt(f['pool_rows'])} records and serves "
+        f"{fmt(f['served_rows'])} of them in {fmt(f['n_batches'])} batches.</p>"
+        f"<p>This page is one build, of records added up to {m.freeze}, and it does not change "
+        "by itself. In the blitz, a daily job adds new records, drops served records that no "
+        "longer need an ID, and builds again each day "
+        f"({a('README.md#how-it-works', 'the README')}). As written, the daily job builds only "
+        "two lists, newest first and data-poor places first, because it does not name the "
+        "lists to build.</p>"
+        f"{frame}"
+        + fold("what the pull asks for, and what the build record keeps", detail)
+        + codes("inat", "pool_state", "daily")
     )
 
 
 def split_section(m: Manifest, f: dict, doc: Doc) -> str:
     k = f["k"]
+    same = (
+        f"<p>Each record goes to one of {k} lists at random, so on average every list holds the "
+        "same mix of taxon groups and observers, and only the order differs. "
+    )
     if m.assignment == "keyed":
+        lead = same + (
+            "This build is keyed: a keyed hash of the record number (HMAC-SHA256 with a private "
+            "key) picks the list, and a record stays on its list in every daily build.</p>"
+        )
         how = (
-            "<p><b>Keyed</b> means the split is decided by a hash that takes a private key as "
-            "well as the record number, so nobody without the key can work out which list a "
-            "record is on. A keyed hash of the record number (HMAC-SHA256 with a private key) "
-            f"picks the record's list: the first 8 bytes of the hash, read as a number, modulo "
-            f"{k}. The list "
-            "depends only on the record number and the key, so the same record stays on the same "
-            "list in every daily build as the pool grows and shrinks. On average each list gets "
-            "the same mix of taxon groups and observers. The key is kept private and, by the "
-            "draft protocol, opened only after the read-back.</p>"
+            "<p>The list is the first 8 bytes of the hash, read as a number, modulo "
+            f"{k}. It depends only on the record number and the key, not on the rest of the pool, "
+            "so it does not change as the pool grows and shrinks. The key is kept private and, by "
+            "the draft protocol, opened only after the read-back.</p>"
         )
     else:
+        lead = same + (
+            "This build is seeded: inside "
+            "each stratum of taxon group and observer bucket, a seed shuffles the records, and "
+            "the records are dealt to the lists in turn.</p>"
+        )
         how = (
             "<p>This build split the records inside strata. A stratum is one taxon group and one "
             "observer bucket. An observer bucket is one of 3 groups made from a checksum (CRC-32) "
             "of the observer's user number, or a fourth bucket for records with no user. The "
-            "buckets keep the mix of observers alike across lists. In each stratum, a seed "
-            "shuffles the records, and the records are dealt to the lists in turn. Each "
+            "buckets keep the mix of observers alike across lists. Each "
             "stratum's deal starts one list later than the one before, so left-over records do "
             "not all go to the same list. Inside a stratum, list sizes differ by one record at "
             "most.</p>"
@@ -226,17 +266,15 @@ def split_section(m: Manifest, f: dict, doc: Doc) -> str:
         name="sizes",
     )
     band = m.assignment == "keyed" and not f["cap_reached"]
-    extra = ""
-    if m.assignment == "keyed":
-        extra = _chance_text(f)
     fig = doc.figure(
         list_share_figure(f["groups"], k, band),
         "The smallest and the largest list in each taxon group, as a share of that group's "
         "served records. The line joins the two. The upright line marks the even share, "
         f"{100 / k:.4g} percent."
         + (
-            f" The band is the middle 95% of {fmt(CHANCE_SIMS)} simulated fair splits of the "
-            "same number of records over the same number of lists, so a line that reaches past "
+            f" The band comes from {fmt(CHANCE_SIMS)} simulated fair splits of the same number of "
+            "records over the same number of lists: it runs from the 2.5th percentile of the "
+            "smallest list to the 97.5th percentile of the largest, so a line that reaches past "
             "it is wider than chance usually gives. See the "
             f'<a href="#methods-threats">threats</a> section.'
             if band
@@ -244,12 +282,24 @@ def split_section(m: Manifest, f: dict, doc: Doc) -> str:
         ),
         name="shares",
     )
-    return how + table + extra + fig + codes("assign")
+    extra = _chance_text(f, doc) if m.assignment == "keyed" else ""
+    return (
+        lead
+        + table
+        + fold(
+            "how the split is drawn, and how much list sizes differ by chance", how + fig + extra
+        )
+        + codes("assign")
+    )
 
 
-def _chance_text(f: dict) -> str:
-    """One plain sentence on how much list sizes differ by chance under the keyed split."""
+def _chance_text(f: dict, doc: Doc) -> str:
+    """How much list sizes differ by chance under the keyed split, and how many lists fall
+    outside the chance band against how many a fair split puts there."""
     k, gs = f["k"], f["groups"]
+    outs = [chance_outside(g["list_recs"], k) for g in gs]
+    seen, expect = sum(o[0] for o in outs), sum(o[1] for o in outs)
+    fall = "falls" if seen == 1 else "fall"
     big = max(gs, key=lambda g: g["recs"][1] - g["recs"][0])
     small = min(gs, key=lambda g: g["recs"][1] - g["recs"][0])
     sd = math.sqrt(big["records"] * (1 / k) * (1 - 1 / k))
@@ -261,9 +311,11 @@ def _chance_text(f: dict) -> str:
         f"and the largest list is {fmt(big['recs'][1] - big['recs'][0])} records in "
         f"{big['name'].split(' (')[0]}, and the smallest is "
         f"{fmt(small['recs'][1] - small['recs'][0])} records in "
-        f"{small['name'].split(' (')[0]}. Differences of this size are what a fair draw gives. "
-        'See the row on chance differences between lists in the <a href="#methods-threats">'
-        "threats</a> section.</p>"
+        f"{small['name'].split(' (')[0]}. Over all {len(gs)} taxon groups, {seen} of the "
+        f"{k * len(gs)} lists {fall} outside their group's band in {doc.ref('shares')}. A fair "
+        f"split puts {expect:.1f} lists outside on average, over the same {fmt(CHANCE_SIMS)} "
+        "simulated splits. See the row on chance differences between lists in the "
+        '<a href="#methods-threats">threats</a> section.</p>'
     )
 
 
@@ -286,7 +338,9 @@ def cap_text(f: dict) -> str:
 
 def orders_section(m: Manifest, f: dict, doc: Doc) -> str:
     cap = " " + cap_text(f)
+    listed = "".join(f"<li>{ORDER_TEXT[x]}</li>" for x in m.arms)
     parts = [
+        f"<p>This build has {f['k']} lists, each with its own order:</p><ul>{listed}</ul>"
         "<p>Each list sorts its records one taxon group at a time, then cuts the sorted records "
         f"into batches of up to {f['batch_size']} records, in that order.{cap} The figures run "
         f"the order code on made-up records and cut the result into batches of up to {BS}.</p>"
@@ -294,11 +348,14 @@ def orders_section(m: Manifest, f: dict, doc: Doc) -> str:
     for i, arm in enumerate(m.arms, 1):
         name = order_name(arm)
         fig = doc.figure(ORDER_FIGURES[arm](), f"{name}, {ORDER_CAPTION[arm]}")
+        rule = (
+            f'<dl class="rule"><dt>Rule</dt><dd>{ORDER_DETAIL[arm]}</dd>'
+            f"<dt>Parameters</dt><dd>{ORDER_PARAMS[arm](doc)}</dd></dl>"
+        )
         parts.append(
             f'<h4 id="order-{i}">{name}</h4>{fig}<dl class="rule">'
-            f"<dt>Rule</dt><dd>{ORDER_DETAIL[arm]}</dd>"
-            f"<dt>Parameters</dt><dd>{ORDER_PARAMS[arm](doc)}</dd>"
             f"<dt>Why</dt><dd>{ORDER_WHY[arm](doc)}</dd></dl>"
+            + fold(f"the rule and settings for {name[0].lower()}{name[1:]}", rule)
         )
     keys = ["arms", "cells"] if "gap_first" in m.arms or "similarity" in m.arms else ["arms"]
     if "similarity" in m.arms or "novelty" in m.arms:
@@ -316,9 +373,6 @@ _WHY_ROTATE = [
 def serving_section(m: Manifest, f: dict, doc: Doc) -> str:
     k, n = f["k"], f["modal_batches"]
     lo, hi = min((g["batches"][0] for g in f["groups"]), default=0), f["b_max"]
-    served = (
-        "" if f["cap_reached"] else " No list in this build reaches the cap, so here it does not."
-    )
     fig = doc.figure(
         serving_figure(k, n),
         "Serving, with made-up identifiers. Turn order: each press of Next batch takes the next "
@@ -326,6 +380,12 @@ def serving_section(m: Manifest, f: dict, doc: Doc) -> str:
         "turn orders. Start batch: inside one list and taxon group, each browser starts at a "
         "random batch and wraps around. In this build a list has "
         f"{range_words(lo, hi)} batches in a taxon group, most often {n}.",
+        name="serving",
+    )
+    why = doc.table(
+        "Why each identifier's batches rotate over the lists.",
+        ["", "One list per identifier", "Batches rotate over the lists"],
+        _WHY_ROTATE,
     )
     rows = [[g["name"], _span(*g["batches"]), _span(*g["sizes"])] for g in f["groups"]]
     batches = doc.table(
@@ -333,6 +393,7 @@ def serving_section(m: Manifest, f: dict, doc: Doc) -> str:
         "are not named, so the table gives the range over lists.",
         ["Taxon group", "Batches per list", "Records per batch"],
         rows,
+        name="batches",
     )
     s_lo = min(g["sizes"][0] for g in f["groups"])
     s_hi = max(g["sizes"][1] for g in f["groups"])
@@ -342,51 +403,62 @@ def serving_section(m: Manifest, f: dict, doc: Doc) -> str:
         "taxon group takes the records left, so it is usually smaller. How many records you see "
         "in a batch also depends on how many of them still need an ID when you open it.</p>"
     )
-    why = doc.table(
-        "Why every identifier works every list.",
-        ["", "One list per identifier", "Every identifier works every list"],
-        _WHY_ROTATE,
-    )
     edges = (
         "<li>A list with no batches left in a taxon group: the press goes to the next list in "
-        "the turn order. So the share stays even only while every list has batches.</li>"
+        "the turn order.</li>"
         "<li>No list with batches left: the page says you opened every batch in the group.</li>"
         "<li>A second device or browser draws its own turn order and start batches. Each one "
         "is even on its own.</li>"
-        "<li>A new daily build: your batches start again and your start batches are drawn "
-        "again. Your turn order stays.</li>"
+        "<li>A new daily build: your place in each taxon group resets and your start batches "
+        "are drawn again. Your turn order stays.</li>"
         "<li>Start over puts one group's batches back. The turn order and start batches "
         "stay.</li>"
         "<li>Your place is saved in this browser only.</li>"
     )
-    return (
+    cycle = "".join(f'<span class="n">{i}</span>' for i in range(1, k + 1))
+    lead = (
+        f"<p>Each press of Next batch takes the next of {k} lists, in a turn order your browser "
+        "draws at random once, so within one build your batches split evenly over the lists "
+        f'while every list has batches.</p><div class="cycle" aria-hidden="true">{cycle}'
+        f"<i>&#8634;</i></div><p>So a person who opens {k} or more batches in a taxon group "
+        "within one build gets every list in turn, while every list has batches. This matters "
+        f"because a few identifiers make most of the IDs {doc.cite('hebert2026')}: if each "
+        "person kept one list, the list that drew the busiest identifier would win whatever its "
+        "order. Inside each list and taxon group your "
+        "browser starts at a random batch.</p>"
+        "<p>The page shows no list name or letter on a batch, only its number. Your IDs carry "
+        "your name and count toward Research Grade, and Research Grade records can go on to "
+        "GBIF.</p>"
+    )
+    estimand = (
+        '<h4 id="methods-estimand">What a list changes, as you see it</h4>'
+        "<p>A list decides which records share a batch and the order of its batches after your "
+        "random start. When the build serves only the first batches of each list, it also "
+        f"decides which records are served ({see('methods-orders', 'Section 4')} says whether "
+        "this build does). It does not decide which batch you get first, or the order inside a "
+        "batch. So the test measures the effect of a list's batches, each met from a random "
+        "start, against newest-first batches met the same way.</p>"
+    )
+    detail = (
         "<p>Each batch is one iNaturalist Identify link that lists its record numbers and the BC "
         "place, and nothing else. Identify hides records that no longer need an ID (checked in a "
         "browser on 2026-09-11), so a batch can show fewer records than it holds. The draft "
         "protocol says Identify also hides records you already reviewed. This was not "
         "checked.</p>"
-        f"<p>Your browser draws a random turn order of the {k} lists once. Each press of Next "
-        "batch takes the next list in that order. The turn order is the same for every taxon "
-        "group, and each group keeps its own place in it. Inside each list and group, your "
-        "browser also draws a random start batch, goes on from there and wraps around to the "
-        "first batch.</p>"
-        f"{fig}{batches}"
-        f"<p>A few identifiers make most of the IDs {doc.cite('hebert2026')}. If each person "
-        "kept one list, the list that "
-        "drew the busiest identifier would win whatever its order. The design borrows the "
-        f"within-person comparison of interleaved search tests {doc.cite('chapelle2012')}.</p>"
-        f"{why}<h4>Edge cases</h4><ul>{edges}</ul>"
-        '<h4 id="methods-estimand">What a list changes, as you see it</h4>'
-        "<p>A list decides which records share a batch and the order of its batches after your "
-        "random start. When the build serves only the first batches of each list, it also "
-        f"decides which records are served.{served} It does not decide which batch you get "
-        "first: your browser picks that at random. It does not decide the order inside a batch: "
-        "the batch link carries no order, so Identify sets it, and you can skip. So the test "
-        "measures the effect of meeting records in one list's batches in place of newest-first "
-        "batches, served with random starts. In this build a list has "
-        f"{range_words(lo, hi)} batches in a taxon group, so a random start lands on one of "
-        "them, and a person who opens all of a list's batches in one group meets all its records "
-        "that still need an ID.</p>" + codes("page", "batches")
+        "<p>The turn order is the same for every taxon group, and each group keeps its own place "
+        "in it. Inside each list and group, your browser goes on from its random start batch and "
+        "wraps around to the first batch. The design borrows the within-person comparison of "
+        f"interleaved search tests {doc.cite('chapelle2012')}. "
+        f"{a('README.md#experiment-diagram', 'The README')} draws the turn order for two made-up "
+        f"identifiers.</p>{batches}<h4>Edge cases</h4><ul>{edges}</ul>"
+        "<p>The batch link carries no order, so Identify sets the order inside a batch, and you "
+        "can skip. A person who opens all of a list's batches in one group meets all its records "
+        "that still need an ID.</p>"
+    )
+    return (
+        f"{lead}{fig}{why}{estimand}"
+        + fold("batch links, batch sizes and edge cases", detail, "more-batches")
+        + codes("page", "batches")
     )
 
 

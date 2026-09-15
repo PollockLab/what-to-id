@@ -1,11 +1,14 @@
 """Code links, references and figure/table numbering for the method section.
 
-`Doc` numbers figures and tables in the order they are rendered and numbers references in the
-order they are first cited, so the section can grow or drop parts (an order that is not in the
-build) without renumbering by hand.
+`Doc` numbers figures and tables in the order they are rendered. It numbers references in the
+order they first appear in the finished HTML, not in the order the code cites them, so a cite in
+a fold built before the text above it still gets the next number. The section can grow or drop
+parts (an order that is not in the build) without renumbering by hand.
 """
 
 from __future__ import annotations
+
+import re
 
 REPO = "https://github.com/PollockLab/what-to-id"
 
@@ -140,14 +143,37 @@ def codes(*keys: str) -> str:
     return '<p class="src">Code: ' + ", ".join(code(k) for k in keys) + ".</p>"
 
 
+def fold(title: str, body: str, anchor: str | None = None) -> str:
+    """A native fold for the detail under a part's short opening. Closed by default."""
+    at = f' id="{anchor}"' if anchor else ""
+    return f'<details class="more"{at}><summary>More detail: {title}</summary>{body}</details>'
+
+
+def see(anchor: str, text: str) -> str:
+    """A link to a heading or paragraph earlier or later on this page."""
+    return f'<a href="#{anchor}">{text}</a>'
+
+
+# A cite is written as a marker holding its key, and `Doc.finish` swaps each for its number.
+_MARK = re.compile("\x00ref:([^\x00]+)\x00")
+_REFS = "\x00refs\x00"
+
+
 class Doc:
     """Figure, table and reference counters for one rendering of the section."""
 
     def __init__(self) -> None:
         self.n_fig = 0
         self.n_tab = 0
-        self.cited: list[str] = []
         self.named: dict[str, tuple[str, int]] = {}
+        self.seen: set[str] = set()
+
+    def first(self, key: str) -> bool:
+        """True only the first time, so a block is stated once and later mentions link to it."""
+        if key in self.seen:
+            return False
+        self.seen.add(key)
+        return True
 
     def ref(self, name: str) -> str:
         """A link to a figure or table rendered earlier under `name`, e.g. "Table 2"."""
@@ -157,15 +183,11 @@ class Doc:
         return f'<a href="#{kind[:3].lower()}-{n}">{kind} {n}</a>'
 
     def cite(self, *keys: str) -> str:
-        nums = []
         for k in keys:
             if k not in _REF:
                 raise KeyError(f"no reference {k!r} in REFERENCES")
-            if k not in self.cited:
-                self.cited.append(k)
-            n = self.cited.index(k) + 1
-            nums.append(f'<a href="#ref-{n}">{n}</a>')
-        return f'<span class="cite">[{", ".join(nums)}]</span>'
+        nums = ", ".join(f'<a href="#ref-\x00ref:{k}\x00">\x00ref:{k}\x00</a>' for k in keys)
+        return f'<span class="cite">[{nums}]</span>'
 
     def figure(self, svg: str, caption: str, *, name: str | None = None) -> str:
         self.n_fig += 1
@@ -202,9 +224,17 @@ class Doc:
         )
 
     def references(self) -> str:
+        """A marker for the reference list, which `finish` fills once every cite is placed."""
+        return _REFS
+
+    def finish(self, html: str) -> str:
+        """Number the cites in `html` by first appearance and fill in the reference list."""
+        order = list(dict.fromkeys(_MARK.findall(html)))
+        num = {k: i for i, k in enumerate(order, 1)}
         items = []
-        for i, k in enumerate(self.cited, 1):
+        for k in order:
             r = _REF[k]
             more = f" ({ext(r['extra'][1], r['extra'][0])})" if "extra" in r else ""
-            items.append(f'<li id="ref-{i}">{r["text"]} {ext(r["url"], r["url"])}{more}</li>')
-        return f'<ol class="refs">{"".join(items)}</ol>'
+            items.append(f'<li id="ref-{num[k]}">{r["text"]} {ext(r["url"], r["url"])}{more}</li>')
+        html = html.replace(_REFS, f'<ol class="refs">{"".join(items)}</ol>')
+        return _MARK.sub(lambda mt: str(num[mt.group(1)]), html)

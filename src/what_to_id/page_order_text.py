@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 
-from what_to_id.page_doc import Doc
+from what_to_id.page_doc import Doc, see
 
 # Plain words for each order. Never the arm names, which ARM_WORDS guards.
 ORDER_TEXT = {
@@ -61,7 +61,11 @@ _MODEL = (
 
 
 def _model(d: Doc) -> str:
-    return _MODEL.format(gu=d.cite("gu2025"), card=d.cite("bioclip25card"))
+    """The image model in full the first time, then a link back to it."""
+    if d.first("image-model"):
+        body = _MODEL.format(gu=d.cite("gu2025"), card=d.cite("bioclip25card"))
+        return f'<span id="image-model">{body}</span>'
+    return f"the same image model as {see('image-model', 'above')}"
 
 
 ORDER_PARAMS = {
@@ -77,9 +81,9 @@ ORDER_PARAMS = {
     ),
     "similarity": lambda d: (
         f"Image model: {_model(d)}. Number of start photos: the records in the list and taxon "
-        "group that have numbers that the image model computes from each photo, divided by the "
-        "batch size, rounded up. Start photos are picked farthest-first in cosine distance, the "
-        f"first at random {d.cite('gonzalez1985', 'sener2018')}. A start photo already taken by "
+        "group with image-model numbers for their first photo, divided by the batch size, "
+        "rounded up. Start photos are picked farthest-first in cosine distance, the first at "
+        f"random {d.cite('gonzalez1985', 'sener2018')}. A start photo already taken by "
         "an earlier group is replaced by the closest free photo. Each start grows to one batch "
         "size, and the last group takes the photos left, so it can be smaller. Groups with no "
         "scored record go last. Inside a group, photos closest to the group centre come first. "
@@ -106,15 +110,16 @@ ORDER_PARAMS = {
 }
 ORDER_WHY = {
     "recency": lambda d: (
-        "The control. Identify shows records newest first by default (iNaturalist source "
-        f"{d.cite('inatsource')}), so this list is close to what identifiers meet today."
+        "The control. Identify shows records newest first by default "
+        '(<a href="#identify-default">Section 1</a>), so this list is close to what identifiers '
+        "meet today."
     ),
     "gap_first": lambda d: (
         "The value question. The idea to test: an ID in a data-poor place helps fill a gap in "
         f"where species are known to occur, the Wallacean shortfall {d.cite('hortal2015')}, and "
         "in how recent the records are. Blitz the Gap calls these spatial and temporal gaps "
-        f"{d.cite('hebert2026')}. The draft protocol expects this list to lose on the plain "
-        "count and to win on the weighted count."
+        f"{d.cite('hebert2026')}. Its predicted direction is in "
+        f"{see('methods-outcomes', 'Section 6')}."
     ),
     "similarity": lambda d: (
         "The speed question. The idea to test: fewer switches between kinds "
@@ -171,8 +176,7 @@ PER_LIST = {
     "similarity": "The outcome is the same species-level ID count as every list, plain and "
     "weighted. The draft protocol's hypothesis for this list is that fewer switches between kinds "
     "of photo make identifying faster, and it names the plain count for speed orders. It does not "
-    "state a direction for the count in words. Nothing in the code measures time, so the count "
-    "is what is tested, not speed.",
+    "state a direction for the count in words. The count is what is tested, not speed.",
     "novelty": "The outcome is the same species-level ID count as every list, plain and "
     "weighted. The draft protocol's own measure for this list, a species reaching Research Grade "
     "in a grid cell with no Research Grade record of it before, is not in the code. This list's "

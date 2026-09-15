@@ -9,6 +9,7 @@ from what_to_id.manifest import Manifest
 from what_to_id.page_doc import Doc
 from what_to_id.page_figures import (
     SIGNFLIP_DIFFS,
+    chance_outside,
     deal_example,
     deal_figure,
     power_figure,
@@ -250,7 +251,9 @@ def test_code_commit_row_shows_the_manifest_value_when_present():
 
 
 def test_placebo_caution_and_not_stated_timing(full):
-    assert full.count("does not prove") >= 2
+    # Stated once, in Section 7; the outcomes table and the threats table link to it.
+    assert full.count("does not prove") == 1
+    assert full.count('href="#methods-placebo"') >= 2
     assert "Not stated" in full
     assert "With the count" not in full
 
@@ -258,7 +261,7 @@ def test_placebo_caution_and_not_stated_timing(full):
 def test_per_list_outcome_table_and_holm_comparisons(full):
     assert "What the analysis code computes for each list" in full
     assert "It is the control that every other list is compared with" in full
-    assert "The code computes the same outcomes for every list" in full
+    assert "It computes the same outcomes for every list" in full
     assert "so this build gives 4 comparisons" in full
     assert "the code does not adjust across runs" in full
 
@@ -292,18 +295,51 @@ def test_table_six_pins_an_outcome_for_every_list(full):
     assert "fewer switches between kinds of photo make identifying faster" in full
     assert "predicts more IDs" not in full
     assert "predicted direction on the count is not stated in the draft protocol" in full
-    assert "It states none for the other lists, and this page does not supply one" in full
+    assert "Where the draft protocol states no direction for a list, this page does not" in full
 
 
 def test_inaturalist_source_reference_renders_and_is_cited(full):
     item = re.search(r'<li id="ref-(\d+)">iNaturalist source code[^<]*<a href="([^"]+)"', full)
     assert item
     assert "search_params_reducer.js#L10-L21" in item.group(2)
-    assert full.count(f'<a href="#ref-{item.group(1)}">') >= 5
+    # Cited once, where Table 1 explains the Identify default; other mentions link there.
+    assert full.count(f'<a href="#ref-{item.group(1)}">') == 1
+    assert full.count('href="#identify-default"') >= 2
+
+
+def _sections(html):
+    return dict(re.findall(r'<section id="(methods-[a-z]+)">(.*?)</section>', html, re.S))
+
+
+def test_facts_from_the_old_short_list_are_stated_once_in_their_home(full):
+    sec = _sections(full)
+    for fact, home in (
+        ("next of 5 lists", "methods-serving"),
+        ("go on to GBIF", "methods-serving"),
+        ("only its number", "methods-serving"),
+        ("A fast identifier adds IDs to every list, not only to one", "methods-analysis"),
+        ("<b>Newest first.</b>", "methods-orders"),
+        ("README.md#what-the-lists-test", "methods-design"),
+        ("two-sided, at 0.05", "methods-analysis"),
+    ):
+        assert full.count(fact) == 1 and fact in sec[home], fact
+    assert sec["methods-serving"].count('<span class="n">') == 5
+
+
+def test_second_test_fold_says_it_needs_every_record_served():
+    line = "It assumes that every record in a list is served ("
+    free = method_section(_manifest(), 2)
+    assert line in free and "A cap binds in this build" not in free
+    m = _manifest()
+    m.max_batches = 1
+    capped = method_section(m, 2)
+    assert line not in capped and "A cap binds in this build" in capped
+    assert "<code>p_record</code>" in capped
 
 
 def test_gbif_and_participants_and_window_wording(full):
-    assert "Records that reach Research Grade, with an open licence, go to GBIF." in full
+    assert "Research Grade records can go on to GBIF." in full
+    assert "open licence" not in full
     assert "reads one of the two, the project or the sign-up list" in full
     assert "A withdrawn ID still counts." in full
     assert "meets all its records that still need an ID" in full
@@ -316,3 +352,98 @@ def test_power_gloss_uses_the_builds_batch_cap():
     assert "draws 1,000 random sign patterns per test, where the analysis draws 10,000" in html
     assert "serves at most 6 records per list and taxon group" in html
     assert "no cap on batches, so it serves every record" in method_section(_manifest(), 2)
+
+
+def _visible(html):
+    """The text outside every "More detail" fold."""
+    return re.sub(r'<details class="more".*?</details>', "", html, flags=re.S)
+
+
+def test_reference_numbers_follow_first_use_in_the_finished_html(full):
+    for html in (full, method_section(_manifest(assignment="keyed"), 2)):
+        body = html.split('<ol class="refs">')[0]
+        firsts = list(dict.fromkeys(int(n) for n in re.findall(r'href="#ref-(\d+)"', body)))
+        assert firsts == list(range(1, len(firsts) + 1))
+        assert "\x00" not in html
+    doc = Doc()
+    later, earlier = doc.cite("good2005"), doc.cite("holm1979")
+    out = doc.finish(earlier + later + doc.references())
+    assert re.search(r'<li id="ref-1">Holm S', out) and re.search(r'<li id="ref-2">Good PI', out)
+
+
+def test_chance_text_counts_lists_outside_the_band_from_the_build():
+    assert chance_outside([500, 500, 500, 500], 4)[0] == 0
+    seen, expect = chance_outside([400, 600, 500, 500], 4)
+    assert seen == 2 and 0 < expect < 4
+    m = _manifest(assignment="keyed")
+    f = build_facts(m)
+    outs = [chance_outside(g["list_recs"], f["k"]) for g in f["groups"]]
+    html = method_section(m, 2)
+    n_lists = f["k"] * len(f["groups"])
+    assert re.search(rf"{sum(o[0] for o in outs)} of the {n_lists} lists falls? outside", html)
+    assert f"puts {sum(o[1] for o in outs):.1f} lists outside on average" in html
+    assert "what a fair draw gives" not in html
+
+
+def test_second_test_fold_shows_only_this_builds_redraw():
+    keyed = method_section(_manifest(assignment="keyed"), 2)
+    seeded = method_section(_manifest(), 2)
+    assert "In this keyed build each record is drawn" in keyed
+    assert "stratum" not in keyed and "seeded build" not in keyed
+    assert "In this seeded build the lists of the records in one stratum" in seeded
+
+
+def test_stated_once_image_model_direction_time_cap_and_effect(full):
+    body = full.split('<ol class="refs">')[0]
+    assert body.count("BioCLIP 2.5 Huge") == 1 and 'href="#image-model"' in body
+    assert "numbers that the image model computes" not in full
+    assert "with image-model numbers for their first photo" in full
+    assert full.count("likely loses on the plain count") == 1
+    assert "expects this list to lose" not in full
+    assert full.count("Nothing in the code measures time") == 1
+    assert full.count("No list reaches it") + full.count("no cap on batches, so every") == 1
+    assert "In this build it does not" not in full and "Which records a list serves" not in full
+    sec = _sections(full)
+    effect = "in place of newest-first batches, served with random starts"
+    assert full.count(effect) == 1 and effect in sec["methods-design"]
+    assert 'href="#methods-estimand"' in sec["methods-design"]
+
+
+def test_records_say_once_this_page_is_one_build_and_the_blitz_rebuilds_daily(full):
+    sec = _sections(full)
+    for fact in ("This page is one build, of records added up to 2026-09-01", "builds again each"):
+        assert full.count(fact) == 1 and fact in _visible(sec["methods-records"]), fact
+
+
+def test_serving_splits_the_rotation_claim_from_the_hidden_letter(full):
+    serving = _sections(full)["methods-serving"]
+    turn = re.search(
+        r"<p>So a person who opens 5 or more batches in a taxon group within one build gets "
+        r"every list in turn, while every list has batches\..*?</p>",
+        serving,
+        re.S,
+    )
+    assert turn and "only its number" not in turn.group(0)
+    assert "So every participant works every list" not in full
+    assert "Every participant works every list" not in full
+
+
+def test_analysis_states_exact_and_drawn_p_outside_the_fold(full):
+    visible = _visible(_sections(full)["methods-analysis"])
+    assert "With 12 or fewer people left, p is exact" in visible
+    assert "p comes from 10,000 random sign patterns" in visible
+    assert "p = (1 + count) / (10,000 + 1)" not in visible
+    assert "p = (1 + count) / (10,000 + 1)" in full
+
+
+def test_threat_rows_state_depletion_time_and_where_batches_are(full):
+    rows = dict(re.findall(r'<th scope="row">([^<]+)</th>(.*?)</tr>', full, re.S))
+    other = rows["Other identifiers"]
+    assert "likely meet the newest records first, the control's order" in other
+    assert "which favours the tested lists" in other and "Not corrected in this design" in other
+    assert "when the analysis is given the participants file" in other
+    assert "each other list places them by its own order" in rows["Change over time"]
+    assert "only newest first puts them" not in full
+    assert "touches all lists alike" in rows["Change over time"]
+    assert 'href="#more-batches"' in rows["A list runs out"]
+    assert 'id="more-batches"' in full

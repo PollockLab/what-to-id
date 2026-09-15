@@ -1,8 +1,8 @@
 """The "How the test works" section of the rotation page: CSS, the short version and assembly.
 
 Every word here reaches the public page, so it names no list order (ARM_WORDS guards that) and
-never pairs a list letter with anything that depends on the order. The short version keeps five
-lines. "Methods in full" follows, one numbered section per part of the method, built in
+never pairs a list letter with anything that depends on the order. The six-step flow is the only
+summary. "Methods in full" follows, one numbered section per part of the method, built in
 page_methods_setup (sections 1 to 5) and page_methods_analysis (6 to 11). Each section says
 what the code does and links to it, so a reader can check each claim.
 """
@@ -10,14 +10,13 @@ what the code does and links to it, so a reader can check each claim.
 from __future__ import annotations
 
 from what_to_id.manifest import Manifest
-from what_to_id.page_doc import REPO, Doc, a
+from what_to_id.page_doc import REPO, Doc
 from what_to_id.page_methods_analysis import (
     analysis_section,
     outcomes_section,
     references_section,
     repro_section,
     size_section,
-    threats_section,
 )
 from what_to_id.page_methods_setup import (
     ORDER_DETAIL,
@@ -29,6 +28,7 @@ from what_to_id.page_methods_setup import (
     serving_section,
     split_section,
 )
+from what_to_id.page_methods_threats import threats_section
 
 __all__ = ["METHOD_CSS", "ORDER_DETAIL", "ORDER_TEXT", "method_section"]
 
@@ -38,17 +38,29 @@ _SG = '"Space Grotesk",Inter,system-ui,sans-serif'
 # Batch shades do step from light to dark, because batches do come in order.
 METHOD_CSS = f"""
 details.how{{margin-top:2rem}}
-details.how summary{{cursor:pointer;font-family:{_SG};font-size:.8rem;font-weight:700;
+details.how>summary{{cursor:pointer;font-family:{_SG};font-size:.8rem;font-weight:700;
 text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}}
-details.how summary:hover{{color:var(--acc)}}
+details.how>summary:hover{{color:var(--acc)}}
+.how details.more{{margin:.6rem 0 1.1rem;padding:.15rem 0 .15rem .8rem;
+border-left:2px solid #2a3a4d}}
+.how details.more>summary{{cursor:pointer;font-size:.86rem;font-weight:600;color:var(--acc);
+line-height:1.4;overflow-wrap:anywhere}}
+.how details.more>summary:hover{{text-decoration:underline}}
+.how details.more[open]>summary{{margin-bottom:.4rem}}
+.how details.more[open]{{border-left-color:var(--acc)}}
+@media (max-width:30rem){{.how details.more{{padding-left:0;border-left:0;
+border-top:2px solid #2a3a4d}}.how details.more[open]{{border-top-color:var(--acc)}}}}
 .how ul{{margin:.3rem 0;padding-left:1.1rem}}
-.how .pipe{{list-style:none;display:flex;flex-wrap:wrap;gap:.5rem 1.2rem;padding:0;
-margin:1rem 0 1.2rem}}
+.how .pipe{{display:flex;flex-wrap:wrap;gap:.9rem 1.2rem;margin:1rem 0 1.2rem}}
+.pipe .stage{{flex:1 1 15rem;min-width:0}}
+.pipe ol{{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1.1rem}}
 .how .pipe li{{position:relative;margin:0;padding:.4rem .7rem;background:var(--panel);
 border:1px solid #2a3a4d;border-radius:10px;line-height:1.3}}
-.how .pipe li+li::before{{content:"\\2192";position:absolute;left:-1rem;top:50%;
-transform:translateY(-50%);color:var(--acc)}}
+.how .pipe li+li::before{{content:"\\2193";position:absolute;left:1rem;top:-1.05rem;
+line-height:1;color:var(--acc)}}
 .pipe b{{display:block;font-family:{_SG}}}
+.pipe i.when{{display:block;font-style:normal;font-size:.68rem;font-weight:700;
+text-transform:uppercase;letter-spacing:.06em;color:var(--acc);margin-bottom:.35rem}}
 .pipe span{{font-size:.8rem}}
 .how h3{{font-family:{_SG};font-size:1.08rem;margin:2.2rem 0 .5rem;scroll-margin-top:1rem}}
 .how h4{{font-family:{_SG};font-size:.95rem;margin:1.6rem 0 .4rem;scroll-margin-top:1rem}}
@@ -139,49 +151,47 @@ SECTIONS = (
 )
 
 
-def _pipeline() -> str:
-    steps = (
-        ("Pull", "BC records that need an ID, with a photo"),
-        ("Split", "each record to one list, at random"),
-        ("Order", "each list sorts its records its own way"),
-        ("Deal", "Next batch takes the next list"),
-        ("Identify", "in iNaturalist, as usual"),
-        ("Compare", "each person with themself"),
+def _pipeline(manifest: Manifest, n_lists: int) -> str:
+    """Six steps, saying who does each: we build the lists, you identify, we count."""
+    stages = (
+        (
+            "Each build",
+            ("We collect", "BC records that need an ID and have a photo"),
+            (
+                f"We split them into {n_lists} lists",
+                "each record goes to one list by chance, so the lists hold a similar mix",
+            ),
+            ("Each list gets its own order", "one is newest first, like iNaturalist today"),
+        ),
+        (
+            "During the blitz",
+            (
+                "You press Next batch",
+                f"each press opens up to {manifest.batch_size} records from the next list in turn",
+            ),
+            ("You identify", "in iNaturalist, as usual"),
+        ),
+        (
+            "After",
+            (
+                "We count",
+                "each person's species-level IDs on each list, against newest first, and whether "
+                "the gap is bigger than chance",
+            ),
+        ),
     )
-    items = "".join(f"<li><b>{b}</b><span>{s}</span></li>" for b, s in steps)
-    return f'<ol class="pipe" aria-label="The test from start to end">{items}</ol>'
-
-
-def _in_short(manifest: Manifest, n_lists: int, doc: Doc) -> str:
-    orders = "".join(f"<li>{ORDER_TEXT[x]}</li>" for x in manifest.arms)
-    cycle = "".join(f'<span class="n">{i}</span>' for i in range(1, n_lists + 1))
-    cycle_html = f'<div class="cycle" aria-hidden="true">{cycle}<i>&#8634;</i></div>'
-    readme = a("README.md#what-the-lists-test", "the README")
-    steps = (
-        "<b>The question.</b> Does the order of records change how many get an ID, and which? "
-        "Newest first, close to what iNaturalist shows today, is the control. Identify shows "
-        f"records newest first by default (iNaturalist source {doc.cite('inatsource')}). More in "
-        f"{readme}.",
-        "<b>The lists.</b> Each record goes to one list at random, so on average every list "
-        "holds the same mix of taxon groups and observers. Only the order is different:"
-        f"<ul>{orders}</ul>",
-        "<b>Your batches.</b> Each press of Next batch takes the next of "
-        f"{n_lists} lists, so your batches split evenly over the lists while every list has "
-        f"batches.{cycle_html}"
-        "<p>Your browser picks the turn order at random. The page does not say which list a "
-        "batch is from.</p>",
-        "<b>The count.</b> After the blitz, we count the records each participant gave a "
-        "species-level ID on each list and compare each person with themself. A fast identifier "
-        "adds IDs to every list, not only to one.",
-        "<b>Nothing else changes.</b> You identify in iNaturalist as usual. Your IDs carry your "
-        "name and count toward Research Grade. Records that reach Research Grade, with an open "
-        "licence, go to GBIF.",
+    # One column per stage, so a stage's steps never wrap into the next stage's row.
+    cols = "".join(
+        f'<div class="stage"><i class="when">{when}</i><ol>'
+        + "".join(f"<li><b>{b}</b><span>{s}</span></li>" for b, s in steps)
+        + "</ol></div>"
+        for when, *steps in stages
     )
-    return "".join(f"<li>{s}</li>" for s in steps)
+    return f'<div class="pipe" aria-label="The test from start to end">{cols}</div>'
 
 
 def method_section(manifest: Manifest, n_lists: int) -> str:
-    """The test in five short lines, then the methods in full. Folded by default."""
+    """The test in six steps, then the methods in full. Folded by default."""
     for table, name in ((ORDER_TEXT, "ORDER_TEXT"), (ORDER_DETAIL, "ORDER_DETAIL")):
         missing = [x for x in manifest.arms if x not in table]
         if missing:
@@ -193,9 +203,9 @@ def method_section(manifest: Manifest, n_lists: int) -> str:
         f'<section id="{sid}"><h3>{i}. {title}</h3>{fn(manifest, facts, doc)}</section>'
         for i, (sid, title, fn) in enumerate(SECTIONS, 1)
     )
-    return (
+    return doc.finish(
         '<details class="how"><summary>How the test works</summary>'
-        f"{_pipeline()}<h3>In short</h3><ol>{_in_short(manifest, n_lists, doc)}</ol>"
+        f"{_pipeline(manifest, n_lists)}"
         '<h3 id="methods">Methods in full</h3>'
         f'<nav class="toc" aria-label="Methods in full"><ol>{toc}</ol></nav>{body}'
         f'<p class="src">All the code and the draft protocol: '

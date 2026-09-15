@@ -124,12 +124,41 @@ def test_every_order_has_detail_words_that_do_not_name_the_arm():
         assert not any(w in text.lower() for w in ARM_WORDS)
 
 
-def test_method_has_pipeline_short_version_and_numbered_methods_without_folds():
+def test_pipeline_steps_and_group_labels_come_from_the_build():
+    m = _manifest()
+    m.batch_size = 7
+    how = method_section(m, 2)
+    pipe = re.search(r'<div class="pipe".*?</ol></div></div>', how, re.S).group(0)
+    assert re.findall(r"<b>([^<]+)</b>", pipe) == [
+        "We collect",
+        "We split them into 2 lists",
+        "Each list gets its own order",
+        "You press Next batch",
+        "You identify",
+        "We count",
+    ]
+    assert re.findall(r'<i class="when">([^<]+)</i>', pipe) == [
+        "Each build",
+        "During the blitz",
+        "After",
+    ]
+    assert "up to 7 records" in pipe
+    assert "species-level IDs on each list, against newest first, and whether the gap" in pipe
+    assert "Every day" not in pipe and "Only the order differs" not in pipe
+    # Each stage holds its own steps: 3, 2 and 1.
+    stages = re.findall(r'<div class="stage">.*?</ol></div>', pipe, re.S)
+    assert [s.count("<li>") for s in stages] == [3, 2, 1]
+    _assert_blind(pipe)
+
+
+def test_method_has_one_summary_numbered_methods_and_folds():
     how = method_section(_manifest(), 2)
-    assert '<details class="more">' not in how and "More on" not in how
-    assert how.count("<li><b>") >= 6 and '<ol class="pipe"' in how
+    # The six-step flow is the only summary; detail sits in "More detail" folds.
+    assert "In short" not in how
+    assert how.count('<details class="more"><summary>More detail: ') >= 10
+    assert '<div class="pipe"' in how
     assert re.findall(r"<h3>(\d+)\. ", how) == [str(i) for i in range(1, 12)]
-    assert "Why every identifier works every list" in how
+    assert "Why each identifier's batches rotate over the lists" in how
     assert "batches of up to 2 records" in how
     _assert_blind(how)
 
