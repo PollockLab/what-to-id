@@ -78,6 +78,16 @@ def test_render_rotation_index_explains_the_cycle():
     assert "next of 2 lists" in html
 
 
+def test_render_rotation_index_sets_expectations_and_structure():
+    html = render_rotation_index(_manifest(), title="t")
+    assert "<noscript>" in html
+    assert '<h2 class="rungroup" id="runGroup">' in html
+    assert '<h2 class="pickhead">Pick a group</h2>' in html
+    assert "Sign in to iNaturalist first" in html
+    assert "in this browser only" in html
+    assert re.search(r'<p class="undo" id="buildMsg"[^>]*\bhidden\b', html)
+
+
 def test_render_rotation_index_explains_the_method_for_this_builds_orders():
     html = render_rotation_index(_manifest(), title="t")
     assert "How the test works" in html
