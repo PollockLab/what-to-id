@@ -42,6 +42,18 @@ DEALINGS = ("stacked", "random-start")
 # BC needs-ID records with photos created 2025-01-01 to 2026-09-11, iNaturalist API counts
 # per iconic group taken 2026-09-12 (Plantae, Insecta, Fungi, Arachnida, Mollusca, Aves,
 # Mammalia, Actinopterygii, Reptilia, Amphibia).
+BC_GROUPS = (
+    "Plantae",
+    "Insecta",
+    "Fungi",
+    "Arachnida",
+    "Mollusca",
+    "Aves",
+    "Mammalia",
+    "Actinopterygii",
+    "Reptilia",
+    "Amphibia",
+)
 BC_GROUP_COUNTS = (605259, 286993, 218592, 42923, 30061, 26184, 12869, 4047, 2472, 2080)
 
 
@@ -219,7 +231,7 @@ def _floats(s: str) -> list[float]:
 def main(argv: Sequence[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Simulated power of the arm comparison.")
     ap.add_argument("--identifiers", default="10,25,50,100")
-    ap.add_argument("--lifts", default="0.1,0.2,0.3")
+    ap.add_argument("--lifts", default="0.1,0.2,0.3", help="planning values, not measured")
     ap.add_argument("--reps", type=int, default=2000)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--window", type=int, default=3000)
