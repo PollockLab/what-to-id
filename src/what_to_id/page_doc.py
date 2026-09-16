@@ -26,6 +26,7 @@ CODE = {
     "readback": "src/what_to_id/readback.py",
     "analysis": "src/what_to_id/analysis.py",
     "power": "src/what_to_id/power.py",
+    "power_weighted": "src/what_to_id/power_weighted.py",
     "replay": "src/what_to_id/replay.py",
     "daily": "scripts/daily.sh",
 }

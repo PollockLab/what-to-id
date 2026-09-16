@@ -1,24 +1,17 @@
-"""Methods sections 6, 7, 8, 10 and 11: outcomes, analysis, sample size, reproducibility, refs.
+"""Methods sections 6, 7, 10 and 11: outcomes, analysis, reproducibility and references.
 
 Each part opens with what the step does and why it matters. The rest sits in a "More detail"
 fold. The analysis plan is a draft. Where the page states a plan and not code, it says "the
-draft protocol says". Numbers in the worked examples and the power figure come from the real
-code. Section 9, threats, is in page_methods_threats.
+draft protocol says". Numbers in the worked examples come from the real code. Section 8, sample
+size, is in page_methods_size, and section 9, threats, in page_methods_threats.
 """
 
 from __future__ import annotations
 
 from what_to_id.manifest import Manifest
 from what_to_id.page_doc import Doc, a, codes, fold, see
-from what_to_id.page_figures import (
-    POWER,
-    POWER_COMMAND,
-    power_figure,
-    shuffle_example,
-    signflip_example,
-    signflip_figure,
-)
-from what_to_id.page_order_text import PER_LIST, PER_LIST_ANY, order_name
+from what_to_id.page_figures import shuffle_example, signflip_example, signflip_figure
+from what_to_id.page_order_text import PER_LIST, PER_LIST_ANY, count_role, order_name
 from what_to_id.page_svg import fmt
 
 _PROTOCOL = "docs/protocol.md#what-we-measure-decided-before-the-blitz"
@@ -32,14 +25,13 @@ def outcomes_section(m: Manifest, f: dict, doc: Doc) -> str:
             "Per participant and list: served records the participant gave an ID at species "
             "level or below, each counting its map score, from 0 to 1, in place of 1. A record "
             "with no score counts 0.",
-            "Primary, for data-poor places first",
+            count_role(m.arms, "cell_score"),
             "Within a week of the end",
         ],
         [
             "Plain count",
             "The same records, each counting 1. A record counts once per person.",
-            'Secondary. The draft protocol says: "Speed orders: the plain count." Nothing in the '
-            "code measures time.",
+            f"{count_role(m.arms, 'none')} Nothing in the code measures time.",
             "Within a week of the end",
         ],
         [
@@ -59,7 +51,9 @@ def outcomes_section(m: Manifest, f: dict, doc: Doc) -> str:
             "Research Grade in a new cell",
             "Species that reached Research Grade in a grid cell with no Research Grade record of "
             "that species before the blitz. In the draft protocol, not yet in the code.",
-            "The draft protocol's measure for unfamiliar photos first",
+            "Not tested. Unfamiliar photos first is judged on the plain count"
+            if "novelty" in m.arms
+            else "Not tested",
             "Not in the code",
         ],
         [
@@ -82,17 +76,25 @@ def outcomes_section(m: Manifest, f: dict, doc: Doc) -> str:
             "Check",
             "Not stated",
         ],
+        [
+            "Outsider share",
+            "Per list, the share of served records a non-participant identified first, against "
+            f"newest first's ({see('methods-outsider', 'Section 7')}).",
+            "Check",
+            "Not stated",
+        ],
     ]
     table = doc.table(
-        "Outcomes. Definitions are from the code. Roles and timing are from the draft protocol.",
+        "Outcomes. Definitions are from the code. Roles are from the draft protocol and are fixed "
+        "in the analysis code. Timing is from the draft protocol.",
         ["Outcome", "What is counted", "Role", "Read back"],
         rows,
         wrap=True,
         name="outcomes",
     )
     per_list = doc.table(
-        "What the analysis code computes for each list. It computes the same outcomes for every "
-        "list.",
+        "What the analysis code computes for each list. It computes both counts for every list "
+        "and holds each tested list to its own primary count.",
         ["List", "What the code computes for it"],
         [[order_name(arm), PER_LIST.get(arm, PER_LIST_ANY)] for arm in m.arms],
         wrap=True,
@@ -153,9 +155,9 @@ def analysis_section(m: Manifest, f: dict, doc: Doc) -> str:
     )
     n_cmp = max(f["k"] - 1, 1)
     flips = (
-        "<p><b>The assumption.</b> The test assumes that each difference is as likely to be "
-        "positive as negative, and nothing more. It does not cover a difference that all people "
-        f"share. The {see('methods-record-test', 'second test')} is the check for this.</p>"
+        "<p><b>The assumption.</b> With no effect, each person's difference is symmetric about "
+        "zero: +3 is as likely as -3. The sign test needs less, only that a difference is as "
+        "likely positive as negative.</p>"
         "<p><b>The drawn p.</b> With more than 12 people left, p = (1 + count) / (10,000 + 1), "
         "where count is the number of drawn patterns at least as far out. The 1 counts the real "
         f"pattern, so p is never 0 {doc.cite('phipson2010')}.</p>"
@@ -170,17 +172,19 @@ def analysis_section(m: Manifest, f: dict, doc: Doc) -> str:
         "<p><b>Worked example.</b> Eight made-up records, four on the control and four on the "
         f"tested list, with {shuf['totals_text']} participant IDs on them in that order. The "
         f"control's four hold {shuf['control']} IDs and the tested list's four hold "
-        f"{shuf['treated']}, a difference of {int(shuf['obs'])}. Over {fmt(shuf['reps'])} "
+        f"{shuf['treated']}, a difference of {int(shuf['obs'])}. In this two-list example each "
+        "record is redrawn to either list at even odds. The build redraws over all its lists. "
+        f"Over {fmt(shuf['reps'])} "
         f"redrawn splits the code returns p = {shuf['p']:.4f}, so with only eight records a gap "
         "of that size is common when nothing but the split changes.</p>"
     )
     holm = (
         "<p>Holm's method keeps the chance of any false finding at or below the test level over "
         "those comparisons. The smallest p is multiplied by the number of tests, the next by one "
-        "less, and so on, and no adjusted p is smaller than the one before. Holm runs over one "
-        "run of the analysis, which uses one weighting, and over one window. A second weighting, "
-        "or the placebo window, is a separate run with its own Holm step, and the code does not "
-        "adjust across runs.</p>"
+        "less, and so on, and no adjusted p is smaller than the one before. By default the "
+        "analysis command runs Holm over the primary p values only, one per tested list. Each "
+        "list's other count is reported next to it, marked secondary, without adjustment. Each "
+        "window gets its own Holm step, and the code does not adjust across windows.</p>"
         "<p>The sum adds up every person's difference, so people who make many IDs count for "
         "more. The sign test gives each person one vote, so the two together show whether a lift "
         "comes from a few people or from most.</p>"
@@ -190,7 +194,7 @@ def analysis_section(m: Manifest, f: dict, doc: Doc) -> str:
         "list minus their count on the control. A fast identifier adds IDs to every list, not "
         "only to one. People with no difference drop out. The "
         "statistic is the sum of the differences over the people left. If the list makes no "
-        "difference, each difference is as likely to be positive as negative, so the test flips "
+        "difference, each person's difference is symmetric about zero, so the test flips "
         f"the sign of each difference and adds again, many times {doc.cite('good2005')}. p is "
         "the share of sign patterns whose sum is at least as far from zero as the real sum. With "
         "12 or fewer people left, p is exact, from every sign pattern. With more, p comes from "
@@ -200,13 +204,16 @@ def analysis_section(m: Manifest, f: dict, doc: Doc) -> str:
         "<p>The sign-flip test treats the person as the unit, but the design draws the split "
         "record by record. By chance the lists hold a different number of records and a "
         "different mix, which can make every person lean the same way, and flipping signs inside "
-        "a person cannot separate that from the order's effect. This is the check the sign-flip "
-        "test cannot give. A secondary test, fixed before the blitz, redraws the split and works "
-        "out the same summed difference. It does not replace the primary test, which stays the "
-        "weighted count with the sign-flip p.</p>"
+        "a person cannot separate that from the order's effect. In the power simulation this "
+        "made false findings more common than the test's level "
+        f"({see('methods-null-rate', 'Section 8')}). "
+        "A secondary test, fixed before the blitz, redraws the split and works "
+        "out the same summed difference. It does not replace the primary test, which stays each "
+        "list's primary count with the sign-flip p.</p>"
         + fold("how the second test redraws the split, with a worked example", record)
         + "<p><b>More than one list.</b> Each list other than the control is compared with the "
-        f"control, so this build gives {n_cmp} comparisons, and those {n_cmp} p values are "
+        f"control on its own primary count ({doc.ref('per-list')}), so this build gives {n_cmp} "
+        f"comparisons, and those {n_cmp} p values are "
         f"adjusted by Holm's method {doc.cite('holm1979')}. <b>Sign test.</b> An exact binomial "
         "test on how many people had a positive difference, zeros dropped. It is reported "
         "without adjustment.</p>"
@@ -214,75 +221,18 @@ def analysis_section(m: Manifest, f: dict, doc: Doc) -> str:
         + '<p id="methods-placebo"><b>Placebo.</b> The same test on IDs from a start given to '
         "the analysis, for example the freeze date, up to the blitz start. A quiet placebo "
         "window does not prove that a finding in the blitz window is real. It only fails to "
-        "show one kind of difference, one that is there without the page.</p>" + codes("analysis")
-    )
-
-
-def _reach(series: str) -> int | None:
-    """The fewest simulated identifiers with power 0.8 or more on one line of the figure."""
-    ns = [r["identifiers"] for r in POWER if r["series"] == series and r["power"] >= 0.8]
-    return min(ns, default=None)
-
-
-def size_section(m: Manifest, f: dict, doc: Doc) -> str:
-    window = (
-        f"serves at most {fmt(f['batch_size'] * f['max_batches'])} records per list and taxon group"
-        if f["max_batches"]
-        else "has no cap on batches, so it serves every record of a list and taxon group"
-    )
-    intro = (
-        "<p>Power is the chance that the test finds a lift that is really there. The power code "
-        "simulates made-up identifiers and runs the test many times. It uses a lift of 20 "
-        "percent: the treatment list gets 20 percent more IDs per record worked. This size is "
-        "assumed to show the design. It is not an expected effect.</p>"
-    )
-    if not POWER:
-        return (
-            intro
-            + "<p>The power simulation has not been run for this page yet.</p>"
-            + codes("power")
-        )
-    model = (
-        "<ul><li><b>Every list</b> lines. Each identifier's effort is lognormal, with a median "
-        "of 100 records and sigma 1.5, split evenly over the lists. Skill is Beta(2, 3). The "
-        "IDs on a list are Binomial(effort on the list, skill), with skill times 1.2 on the "
-        "treatment list. The test is the per-identifier sign-flip test at 0.05 divided by the "
-        "number of lists other than the control, the first Holm step for the draft protocol's "
-        "0.05. This model leaves out batches, other identifiers and the cap. The simulation "
-        "draws 1,000 random sign patterns per test, where the analysis draws 10,000, so a "
-        "simulated p is coarser than the one the analysis reports.</li>"
-        "<li><b>One list each</b> line. Each identifier works one list, with the same effort "
-        "and skill. The test compares list totals over the first 3,000 records of each list and "
-        "taxon group, with other IDs at 0.05 per record, against a null simulated the same way. "
-        "Each identifier starts at a random record within the first 3,000 and wraps around. This "
-        f"is close to, but not the same as, this page's random start batch, which {window}. The "
-        "test knows the true null spread, so this line is an upper bound.</li></ul>"
-    )
-    runs = " and ".join(f"<code>{c}</code>" for c in POWER_COMMAND)
-    fig = doc.figure(
-        power_figure(POWER),
-        "Simulated power to find a 20 percent lift, 2,000 runs per point. This is a simulation, "
-        f"not BC data. This design uses {f['k']} lists. The 2-list line is from the earlier "
-        "2-list draft and is kept for comparison. Dashed line: power 0.8.",
-        name="power",
-    )
-    rerun = (
-        f"{model}<p>With 5 identifiers the every-list lines are at 0: there are only 32 sign "
-        "patterns, so the smallest two-sided p is 2/32 = 0.0625, above the level of 0.05 with 2 "
-        f"lists and 0.05/3 with 4.</p><p>To reproduce {doc.ref('power')}, run {runs}. The "
-        'every-list values are the "power (per identifier)" column of the rotation rows. The '
-        'one-list values are the "power (window)" column of the sets rows of the 4-list run.</p>'
-    )
-    two, four = _reach("every-2"), _reach("every-4")
-    peak = max(r["power"] for r in POWER if r["series"] == "one-4")
-    return (
-        intro + f"{fig}<p>In this simulation, with every identifier on every list, power "
-        f"reaches 0.8 by {four} identifiers with this design's 4 lists, and by {two} with the "
-        "earlier 2-list draft. Four lists need more identifiers, because Holm's correction "
-        "splits the level over three comparisons. With one list per identifier power stays at "
-        f"{peak:.2f} or below up to 100 identifiers.</p>"
-        + fold("the simulation model, and how to rerun it", rerun)
-        + codes("power")
+        "show one kind of difference, one that is there without the page.</p>"
+        '<p id="methods-outsider"><b>Other identifiers.</b> For each list, the read-back command, '
+        "when it is given the participants, a start and a cut-off (<code>--users</code>, "
+        "<code>--start</code>, <code>--cutoff</code>), gives the share of served records that "
+        "someone other than a participant identified, at any rank, in the window, before any "
+        "participant did, and that share minus newest first's. The observer's IDs on their own "
+        "record are left out on both sides: a record added during the blitz gets its observer's ID"
+        " at upload, which would otherwise count as found first by someone else. The draft"
+        " protocol expects newest first to lose more records this way, which favours the tested "
+        "lists. The read-back keeps the time of each ID but not the time a record reached Research"
+        " Grade, so this check counts IDs only. It is a check, not an outcome, and has no "
+        "test.</p>" + codes("analysis", "readback")
     )
 
 

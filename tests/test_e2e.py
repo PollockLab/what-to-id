@@ -192,6 +192,8 @@ def _run_chain(tmp_path: Path, out: Path, batches: pd.DataFrame, *, lift: float)
                 str(users_path),
                 "--obs",
                 str(obs_path),
+                "--weight",
+                "none",
             ]
         )
     assert rc == 0

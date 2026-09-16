@@ -17,9 +17,7 @@ import pandas as pd
 from what_to_id import assign as assign_mod
 from what_to_id.analysis import record_shuffle_p, sign_flip_p
 from what_to_id.page_svg import (
-    W,
     arrow,
-    circle,
     fmt,
     line,
     lines,
@@ -29,33 +27,6 @@ from what_to_id.page_svg import (
     text,
     wrap,
 )
-
-# Power by simulation (power.py), lift 0.2, 2000 replicates, seed 0, from the two POWER_COMMAND
-# runs. "every" lines: the "power (per identifier)" column of the rotation rows (the sign-flip
-# test at Holm's first-step level; identifier_power ignores dealing, competition and the cap).
-# "one" line: the "power (window)" column of the sets rows of the 4-list run (window-total test,
-# simulated null, random-start dealing).
-_IDS = (5, 10, 15, 25, 40, 60, 100)
-_POWER_ROWS = {
-    "every-2": (0.00, 0.63, 0.89, 0.99, 1.00, 1.00, 1.00),
-    "every-4": (0.00, 0.22, 0.46, 0.80, 0.98, 1.00, 1.00),
-    "one-4": (0.06, 0.06, 0.07, 0.07, 0.08, 0.08, 0.09),
-}
-POWER: list[dict] = [
-    {"series": key, "identifiers": n, "lift": 0.2, "power": p}
-    for key, row in _POWER_ROWS.items()
-    for n, p in zip(_IDS, row, strict=True)
-]
-POWER_COMMAND = tuple(
-    "uv run python -m what_to_id.power --identifiers 5,10,15,25,40,60,100 --lifts 0.2 "
-    f"--reps 2000 --seed 0 --dealing random-start --n-arms {k}"
-    for k in (4, 2)
-)
-SERIES_NAMES = {
-    "every-2": "Every list, 2 lists",
-    "every-4": "Every list, 4 lists",
-    "one-4": "One list each, 4 lists",
-}
 
 
 def _box(x: float, y: float, w: float, title: str, body: str, cls: str = "bx"):
@@ -384,48 +355,3 @@ def signflip_figure() -> str:
         f"all {len(sums)} sign-flipped sums; {ex['extreme']} are at least {int(obs)} from zero."
     )
     return svg(max(base + 22, axis + 34), label, "".join(parts), max_px=640)
-
-
-def power_figure(results: list[dict]) -> str:
-    """Power against identifiers, one line per series, a legend and a dashed 0.8 line."""
-    if not results:
-        raise ValueError("power_figure needs at least one result")
-    x0, x1, y0, y1 = 44, 388, 26, 206
-    top_n = max(r["identifiers"] for r in results)
-
-    def px(n: float) -> float:
-        return x0 + (x1 - x0) * n / top_n
-
-    def py(p: float) -> float:
-        return y1 - (y1 - y0) * p
-
-    parts = []
-    for p in (0, 0.2, 0.4, 0.6, 0.8, 1.0):
-        parts.append(line(x0, py(p), x1, py(p), "grid"))
-        parts.append(text(x0 - 5, py(p) + 4, f"{p:.1f}", "m", anchor="end"))
-    for n in sorted({r["identifiers"] for r in results}):
-        parts.append(text(px(n), y1 + 15, str(n), "m", anchor="middle"))
-    parts.append(line(x0, py(0.8), x1, py(0.8), "lvl"))
-    parts.append(line(x0, y1, x1, y1, "ax") + line(x0, y0, x0, y1, "ax"))
-    parts.append(text((x0 + x1) / 2, y1 + 31, "identifiers taking part", "m", anchor="middle"))
-    parts.append(
-        f'<text x="12" y="{(y0 + y1) / 2:g}" class="m" font-size="11" text-anchor="middle" '
-        f'transform="rotate(-90 12 {(y0 + y1) / 2:g})">power</text>'
-    )
-    # The legend sits in the empty lower right: past 25 identifiers the rising lines are near 1.
-    lx, ly = 196, py(0.62)
-    for i, key in enumerate(dict.fromkeys(r["series"] for r in results)):
-        pts = sorted((r["identifiers"], r["power"]) for r in results if r["series"] == key)
-        cls = f"pw{i + 1}"
-        path = " ".join(f"{px(n):.1f},{py(p):.1f}" for n, p in pts)
-        parts.append(f'<polyline points="{path}" class="{cls}"/>')
-        parts.extend(circle(px(n), py(p), 3, f"{cls}d") for n, p in pts)
-        y = ly + i * 18
-        parts.append(line(lx, y - 4, lx + 22, y - 4, cls) + circle(lx + 11, y - 4, 3, f"{cls}d"))
-        parts.append(text(lx + 28, y, SERIES_NAMES.get(key, key), cls + "t"))
-    label = "Simulated power against number of identifiers: " + "; ".join(
-        f"{SERIES_NAMES.get(r['series'], r['series'])}, {r['identifiers']} identifiers, "
-        f"{r['power']:.2f}"
-        for r in results
-    )
-    return svg(y1 + 36, label, "".join(parts), w=W, max_px=640)

@@ -16,7 +16,6 @@ from what_to_id.page_methods_analysis import (
     outcomes_section,
     references_section,
     repro_section,
-    size_section,
 )
 from what_to_id.page_methods_setup import (
     ORDER_DETAIL,
@@ -28,7 +27,9 @@ from what_to_id.page_methods_setup import (
     serving_section,
     split_section,
 )
+from what_to_id.page_methods_size import size_section
 from what_to_id.page_methods_threats import threats_section
+from what_to_id.page_order_text import order_name
 
 __all__ = ["METHOD_CSS", "ORDER_DETAIL", "ORDER_TEXT", "method_section"]
 
@@ -153,6 +154,11 @@ SECTIONS = (
 
 def _pipeline(manifest: Manifest, n_lists: int) -> str:
     """Six steps, saying who does each: we build the lists, you identify, we count."""
+    weighted = (
+        f"; {order_name('gap_first').lower()} is judged on IDs weighted by map score"
+        if "gap_first" in manifest.arms
+        else ""
+    )
     stages = (
         (
             "Each build",
@@ -176,7 +182,7 @@ def _pipeline(manifest: Manifest, n_lists: int) -> str:
             (
                 "We count",
                 "each person's species-level IDs on each list, against newest first, and whether "
-                "the gap is bigger than chance",
+                f"the gap is bigger than chance{weighted}",
             ),
         ),
     )

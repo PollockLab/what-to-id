@@ -28,6 +28,7 @@ from what_to_id.page_order_text import (
     ORDER_TEXT,
     ORDER_WHY,
     order_name,
+    primary_text,
 )
 from what_to_id.page_svg import fmt, range_words
 
@@ -81,12 +82,7 @@ def build_facts(m: Manifest) -> dict:
 
 
 def design_section(m: Manifest, f: dict, doc: Doc) -> str:
-    primary = (
-        "Draft protocol: per participant, species-level IDs on data-poor places first, each "
-        "weighted by its map score, minus the same on newest first"
-        if "gap_first" in m.arms
-        else "Draft protocol: species-level IDs per participant and list"
-    )
+    primary = primary_text(m.arms)
     rows = [
         [
             "Question",
@@ -104,8 +100,8 @@ def design_section(m: Manifest, f: dict, doc: Doc) -> str:
         ],
         [
             "Lists differ in",
-            "Only the order: how records are sorted and cut into batches "
-            f"({see('methods-orders', 'Section 4')}).",
+            "The order: how records are sorted and cut into batches, and so, under a cap on "
+            f"batches, which records are served ({see('methods-orders', 'Section 4')}).",
         ],
         [
             "Control",
@@ -214,7 +210,8 @@ def split_section(m: Manifest, f: dict, doc: Doc) -> str:
     k = f["k"]
     same = (
         f"<p>Each record goes to one of {k} lists at random, so on average every list holds the "
-        "same mix of taxon groups and observers, and only the order differs. "
+        "same mix of taxon groups and observers. The lists differ in their order and so, under a "
+        "cap on batches, in which records are served. "
     )
     if m.assignment == "keyed":
         lead = same + (

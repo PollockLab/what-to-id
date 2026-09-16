@@ -12,7 +12,6 @@ from what_to_id.page_figures import (
     chance_outside,
     deal_example,
     deal_figure,
-    power_figure,
     signflip_example,
 )
 from what_to_id.page_method import method_section
@@ -109,16 +108,6 @@ def test_worked_sign_flip_p_is_the_analysis_codes(full):
     assert f"= {ex['p']:.4f}" in full
 
 
-def test_power_figure_needs_rows_and_the_page_skips_it_without_them(monkeypatch, full):
-    with pytest.raises(ValueError):
-        power_figure([])
-    assert "Simulated power" in full
-    monkeypatch.setattr(page_methods_analysis, "POWER", [])
-    bare = method_section(_manifest(ALL_ARMS), 5)
-    assert "Simulated power" not in bare
-    assert bare.count('<figure class="fig"') == full.count('<figure class="fig"') - 1
-
-
 def test_keyed_build_has_no_deal_figure_and_no_seed_words():
     seeded = method_section(_manifest(), 2)
     keyed = method_section(_manifest(assignment="keyed"), 2)
@@ -199,6 +188,7 @@ def test_only_this_builds_orders_get_a_subsection():
     two = method_section(_manifest(), 2)
     assert two.count('<h4 id="order-') == 2
     assert "Look-alike" not in two and "Unfamiliar" not in two
+    assert "for the draft protocol's lists judged on the plain count, a lift of 0.3" in two
 
 
 def test_chance_sentence_and_band_only_in_keyed_builds():
@@ -261,9 +251,9 @@ def test_placebo_caution_and_not_stated_timing(full):
 def test_per_list_outcome_table_and_holm_comparisons(full):
     assert "What the analysis code computes for each list" in full
     assert "It is the control that every other list is compared with" in full
-    assert "It computes the same outcomes for every list" in full
+    assert "It computes both counts for every list and holds each tested list" in full
     assert "so this build gives 4 comparisons" in full
-    assert "the code does not adjust across runs" in full
+    assert "the code does not adjust across windows" in full
 
 
 def test_batches_are_cut_up_to_the_batch_size(full):
@@ -282,16 +272,15 @@ def test_the_number_of_lists_is_settled_not_a_preview(full):
 def test_record_level_rerandomisation_is_a_secondary_test(full):
     assert "A second test, on the records" in full
     assert "redraws which list each record would have gone to" in full
-    assert "This is the check the sign-flip test cannot give" in full
+    assert "In the power simulation this made false findings more common" in full
     assert "does not replace the primary test" in full
     assert "Over 2,000 redrawn splits the code returns p = 0.2629" in full
 
 
 def test_table_six_pins_an_outcome_for_every_list(full):
     assert "Open." not in full
-    assert (
-        "The outcome is the same species-level ID count as every list, plain and weighted" in full
-    )
+    assert "Primary: the weighted count, against newest first" in full
+    assert full.count("Primary: the plain count, against newest first") == 2
     assert "fewer switches between kinds of photo make identifying faster" in full
     assert "predicts more IDs" not in full
     assert "predicted direction on the count is not stated in the draft protocol" in full
@@ -343,15 +332,6 @@ def test_gbif_and_participants_and_window_wording(full):
     assert "reads one of the two, the project or the sign-up list" in full
     assert "A withdrawn ID still counts." in full
     assert "meets all its records that still need an ID" in full
-
-
-def test_power_gloss_uses_the_builds_batch_cap():
-    m = _manifest()
-    m.max_batches = 3
-    html = method_section(m, 2)
-    assert "draws 1,000 random sign patterns per test, where the analysis draws 10,000" in html
-    assert "serves at most 6 records per list and taxon group" in html
-    assert "no cap on batches, so it serves every record" in method_section(_manifest(), 2)
 
 
 def _visible(html):
@@ -428,6 +408,15 @@ def test_serving_splits_the_rotation_claim_from_the_hidden_letter(full):
     assert "Every participant works every list" not in full
 
 
+def test_lists_differ_in_order_and_served_records_symmetry_and_even_odds(full):
+    rows = dict(re.findall(r'<th scope="row">([^<]+)</th>(.*?)</tr>', full, re.S))
+    assert "and so, under a cap on batches, which records are served" in rows["Lists differ in"]
+    assert "only the order differs" not in full and "Only the order" not in full
+    assert "in which records are served" in _sections(full)["methods-split"]
+    assert "symmetric about zero" in _visible(_sections(full)["methods-analysis"])
+    assert "each record is redrawn to either list at even odds" in full
+
+
 def test_analysis_states_exact_and_drawn_p_outside_the_fold(full):
     visible = _visible(_sections(full)["methods-analysis"])
     assert "With 12 or fewer people left, p is exact" in visible
@@ -439,11 +428,43 @@ def test_analysis_states_exact_and_drawn_p_outside_the_fold(full):
 def test_threat_rows_state_depletion_time_and_where_batches_are(full):
     rows = dict(re.findall(r'<th scope="row">([^<]+)</th>(.*?)</tr>', full, re.S))
     other = rows["Other identifiers"]
-    assert "likely meet the newest records first, the control's order" in other
-    assert "which favours the tested lists" in other and "Not corrected in this design" in other
-    assert "when the analysis is given the participants file" in other
+    assert 'likely meet the newest records first (<a href="#identify-default">' in other
+    assert "which favours the tested lists" in other and "Checked, not corrected" in other
+    off = rows["Participants' IDs off the page"]
+    assert "mostly newest first's served records" in off
+    assert "Not corrected. This favours the control" in off
     assert "each other list places them by its own order" in rows["Change over time"]
     assert "only newest first puts them" not in full
     assert "touches all lists alike" in rows["Change over time"]
     assert 'href="#more-batches"' in rows["A list runs out"]
     assert 'id="more-batches"' in full
+
+
+def test_each_list_has_its_pinned_primary_count_on_the_page(full):
+    rows = dict(re.findall(r'<th scope="row">([^<]+)</th>(.*?)</tr>', full, re.S))
+    prim = rows["Primary outcome"]
+    assert "the weighted count for data-poor places first" in prim
+    assert "the plain count for look-alike photos together and unfamiliar photos first" in prim
+    assert "The analysis code stops on unexpected sightings first" in prim
+    both = "look-alike photos together and unfamiliar photos first"
+    assert f"Primary for data-poor places first. Secondary for {both}" in rows["Weighted count"]
+    assert f"Primary for {both}. Secondary for data-poor places first" in rows["Plain count"]
+    assert page_methods_analysis.PER_LIST_ANY in full
+    assert "on its own primary count" in _visible(_sections(full)["methods-analysis"])
+    assert "runs Holm over the primary p values only" in full
+    two = method_section(_manifest(), 2)
+    assert "the weighted count for data-poor places first" in two and "stops on" not in two
+
+
+def test_outsider_check_is_stated_where_the_checks_are(full):
+    sec = _sections(full)
+    rows = dict(re.findall(r'<th scope="row">([^<]+)</th>(.*?)</tr>', full, re.S))
+    assert 'id="methods-outsider"' in sec["methods-analysis"]
+    assert "so this check counts IDs only" in sec["methods-analysis"]
+    assert "own record are left out on both sides" in sec["methods-analysis"]
+    assert "<code>--users</code>, <code>--start</code>, <code>--cutoff</code>" in full
+    # The full statement is in Section 7 only; the table row and the threat row link to it.
+    assert full.count("own record are left out") == 1
+    assert "count as a non-participant" not in full
+    assert 'href="#methods-outsider"' in rows["Other identifiers"]
+    assert 'href="#methods-outsider"' in rows["Outsider share"]

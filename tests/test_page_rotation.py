@@ -144,7 +144,12 @@ def test_pipeline_steps_and_group_labels_come_from_the_build():
     ]
     assert "up to 7 records" in pipe
     assert "species-level IDs on each list, against newest first, and whether the gap" in pipe
+    assert "data-poor places first is judged on IDs weighted by map score" in pipe
     assert "Every day" not in pipe and "Only the order differs" not in pipe
+    from what_to_id.page_method import _pipeline
+
+    m.arms = ["recency", "similarity"]
+    assert "weighted by map score" not in _pipeline(m, 2)
     # Each stage holds its own steps: 3, 2 and 1.
     stages = re.findall(r'<div class="stage">.*?</ol></div>', pipe, re.S)
     assert [s.count("<li>") for s in stages] == [3, 2, 1]

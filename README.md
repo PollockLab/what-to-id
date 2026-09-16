@@ -119,8 +119,8 @@ python -m what_to_id.participants --project ID_OR_SLUG --out participants.txt
 python -m what_to_id.participants --logins signups.txt --out participants.txt
 
 # Pre-registered per-identifier comparison for the rotation design: participants only, plus a pre-blitz placebo.
-# --weight cell_score gives the weighted count, the primary for gap_first; each run also reports a sign test (p_sign)
-python -m what_to_id.analysis --idents out/outcomes_idents.parquet --served state/served.parquet --label-map labels.json --weight cell_score --control recency --start <blitz-start> --cutoff <read-back-cutoff> --users participants.txt --placebo-start <placebo-start> --obs out/outcomes_obs.parquet
+# The default --weight primary holds each list to its pinned count (weighted for gap_first, plain for similarity and novelty), Holm over those, the other count as secondary; each run also reports a sign test (p_sign)
+python -m what_to_id.analysis --idents out/outcomes_idents.parquet --served state/served.parquet --label-map labels.json --control recency --start <blitz-start> --cutoff <read-back-cutoff> --users participants.txt --placebo-start <placebo-start> --obs out/outcomes_obs.parquet
 ```
 
 The read-back denominator is the served records only: `assign.parquet` covers the whole pool, but `batches.parquet` (one build) and the served log (every daily build) hold just the records placed in a served batch. Both work as `--assign` and `--served`; the served log needs `--label-map`.

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 
+from what_to_id.confirmatory import PRIMARY
 from what_to_id.page_doc import Doc, see
 
 # Plain words for each order. Never the arm names, which ARM_WORDS guards.
@@ -159,26 +160,62 @@ def order_name(arm: str) -> str:
     return re.match(r"<b>(.*?)\.</b>", ORDER_TEXT[arm]).group(1)
 
 
-# The read-back and analysis code computes one set of outcomes per list. Nothing in it is
-# specific to one list, so every row says the same, with the draft protocol's role added.
+# The analysis code computes both counts for every list and holds each tested list to the count
+# confirmatory.PRIMARY pins for it. A tested list with no pinned count stops the analysis.
 PER_LIST_ANY = (
-    "The outcome is the same species-level ID count as every list, plain and weighted, plus the "
-    "read-back shares: records served, share at species or Research Grade, share with any ID by "
-    "a participant, records with none, and weighted Research Grade. This list's predicted "
-    "direction is not stated in the draft protocol."
+    "No primary count is pinned for this list, so the analysis code stops with an error that "
+    "names it. The read-back shares are computed for it as for every list. This list's "
+    "predicted direction is not stated in the draft protocol."
 )
 PER_LIST = {
     "recency": "Nothing of its own. It is the control that every other list is compared with. "
     "The same read-back shares are computed for it.",
-    "gap_first": "The same outcomes as every other list. The draft protocol names the weighted "
-    "count as the primary outcome for this list, and predicts that this list wins on the "
-    "weighted count and likely loses on the plain count.",
-    "similarity": "The outcome is the same species-level ID count as every list, plain and "
-    "weighted. The draft protocol's hypothesis for this list is that fewer switches between kinds "
-    "of photo make identifying faster, and it names the plain count for speed orders. It does not "
-    "state a direction for the count in words. The count is what is tested, not speed.",
-    "novelty": "The outcome is the same species-level ID count as every list, plain and "
-    "weighted. The draft protocol's own measure for this list, a species reaching Research Grade "
-    "in a grid cell with no Research Grade record of it before, is not in the code. This list's "
-    "predicted direction on the count is not stated in the draft protocol.",
+    "gap_first": "Primary: the weighted count, against newest first. Secondary: the plain count, "
+    "not adjusted. The draft protocol predicts that this list wins on the weighted count and "
+    "likely loses on the plain count.",
+    "similarity": "Primary: the plain count, against newest first. Secondary: the weighted "
+    "count, not adjusted. The draft protocol's hypothesis for this list is that fewer switches "
+    "between kinds of photo make identifying faster. It does not state a direction for the count "
+    "in words. The count is what is tested, not speed.",
+    "novelty": "Primary: the plain count, against newest first. Secondary: the weighted count, "
+    "not adjusted. A species reaching Research Grade in a grid cell with no Research Grade record "
+    "of it before is not in the code. This list's predicted direction on the count is not stated "
+    "in the draft protocol.",
 }
+
+_COUNT = {"cell_score": "the weighted count", "none": "the plain count"}
+
+
+def _names(arms: list[str]) -> str:
+    words = [order_name(arm)[0].lower() + order_name(arm)[1:] for arm in arms]
+    return words[0] if len(words) == 1 else ", ".join(words[:-1]) + " and " + words[-1]
+
+
+def _tested(arms, weight: str) -> list[str]:
+    return [arm for arm in arms if arm != "recency" and PRIMARY.get(arm) == weight]
+
+
+def primary_text(arms) -> str:
+    """Table 1's primary outcome: each tested list of this build on the count pinned for it."""
+    parts = [f"{_COUNT[w]} for {_names(_tested(arms, w))}" for w in _COUNT if _tested(arms, w)]
+    text = (
+        "Per participant, IDs at species level or below on a tested list minus the same on newest "
+        "first, each list on its own count, fixed in the analysis code: " + "; ".join(parts)
+        if parts
+        else "No tested list of this build has a pinned count"
+    )
+    unpinned = [arm for arm in arms if arm != "recency" and arm not in PRIMARY]
+    if unpinned:
+        text += f". The analysis code stops on {_names(unpinned)}, with no pinned count"
+    return text
+
+
+def count_role(arms, weight: str) -> str:
+    """Table 5's role for one count: primary for the lists pinned to it, secondary for the rest."""
+    mine = _tested(arms, weight)
+    rest = [arm for arm in arms if arm != "recency" and arm in PRIMARY and arm not in mine]
+    role = [
+        f"Primary for {_names(mine)}." if mine else "",
+        f"Secondary for {_names(rest)}, not adjusted." if rest else "",
+    ]
+    return " ".join(r for r in role if r) or "Secondary"

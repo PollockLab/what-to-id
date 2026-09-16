@@ -12,6 +12,7 @@ from what_to_id.page_doc import Doc, codes, fold, see
 
 def threats_section(m: Manifest, f: dict, doc: Doc) -> str:
     serving = see("methods-serving", "Section 5")
+    outsider = see("methods-outsider", "Section 7")
     daily = (
         f"This build is keyed, so a record stays on its list ({see('methods-split', 'Section 3')})."
         if m.assignment == "keyed"
@@ -22,12 +23,10 @@ def threats_section(m: Manifest, f: dict, doc: Doc) -> str:
     rows = [
         [
             "Other identifiers",
-            "People who do not use this page likely meet the newest records first, the "
-            f"control's order ({see('identify-default', 'Section 1')}). Under a cap on batches, "
-            "which the draft protocol plans for the blitz, they can then ID and remove more of "
-            "the control's served records than of other lists', which favours the tested lists.",
-            "Not corrected in this design. Their own IDs do not count: only participants count, "
-            "when the analysis is given the participants file "
+            "People who do not use this page likely meet the newest records first "
+            f"({see('identify-default', 'Section 1')}). Under a cap they can remove more of the "
+            "control's served records, which favours the tested lists.",
+            f"Checked, not corrected ({outsider}). Their IDs do not count in the outcomes "
             f"({see('methods-outcomes', 'Section 6')}). The "
             f"{see('methods-placebo', 'placebo window')} is a partial check.",
         ],
@@ -54,10 +53,11 @@ def threats_section(m: Manifest, f: dict, doc: Doc) -> str:
             f"Batches carry no list name ({serving}), and each person is compared with themself.",
         ],
         [
-            "IDs made outside the page",
-            "A participant can ID a served record from normal Identify.",
-            "These IDs count too: the count keeps any species-level ID by a participant on a "
-            "served record in the window, however it was made.",
+            "Participants' IDs off the page",
+            "In normal Identify participants likely meet the newest records first too, and under "
+            "a cap those are mostly newest first's served records. A participant's ID on a served "
+            "record counts however it was made.",
+            "Not corrected. This favours the control, so it works against the tested lists.",
         ],
         [
             "A list runs out",
