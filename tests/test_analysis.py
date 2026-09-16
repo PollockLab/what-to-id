@@ -111,7 +111,16 @@ def test_cli_blitz_and_placebo(tmp_path, capsys):
     SERVED.to_parquet(tmp_path / "s.parquet")
     (tmp_path / "u.txt").write_text("# participants\n10\n")
     args = ["--idents", str(tmp_path / "i.parquet"), "--served", str(tmp_path / "s.parquet")]
-    args += ["--control", "c", "--start", "2026-11-01", "--cutoff", "2026-12-01"]
+    args += [
+        "--control",
+        "c",
+        "--start",
+        "2026-11-01",
+        "--cutoff",
+        "2026-12-01",
+        "--weight",
+        "none",
+    ]
     args += ["--users", str(tmp_path / "u.txt"), "--placebo-start", "2026-10-01"]
     assert analysis.main(args) == 0
     out = capsys.readouterr().out
@@ -271,7 +280,16 @@ def test_cli_exposure(tmp_path, capsys):
     SERVED.to_parquet(tmp_path / "s.parquet")
     (tmp_path / "u.txt").write_text("10\n")
     args = ["--idents", str(tmp_path / "i.parquet"), "--served", str(tmp_path / "s.parquet")]
-    args += ["--control", "c", "--start", "2026-11-01", "--cutoff", "2026-12-01"]
+    args += [
+        "--control",
+        "c",
+        "--start",
+        "2026-11-01",
+        "--cutoff",
+        "2026-12-01",
+        "--weight",
+        "none",
+    ]
     args += ["--users", str(tmp_path / "u.txt"), "--obs", str(tmp_path / "o.parquet")]
     assert analysis.main(args) == 0
     out = capsys.readouterr().out
@@ -353,7 +371,7 @@ def test_cli_reports_p_record_next_to_the_primary_p(tmp_path, capsys):
     SERVED.to_parquet(tmp_path / "s.parquet")
     args = ["--idents", str(tmp_path / "i.parquet"), "--served", str(tmp_path / "s.parquet")]
     args += ["--control", "c", "--start", "2026-11-01", "--cutoff", "2026-12-01"]
-    args += ["--reps", "200", "--seed", "3"]
+    args += ["--reps", "200", "--seed", "3", "--weight", "none"]
     assert analysis.main(args) == 0
     out = capsys.readouterr().out
     assert analysis.RECORD_NOTE in out

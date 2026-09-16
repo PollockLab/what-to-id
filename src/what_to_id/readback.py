@@ -8,6 +8,17 @@ timestamps, rank and ``current`` flag, so ``analysis`` can cut them at any date 
 ``--assign`` input accepts one or more single-build batches parquets (``id``, ``arm``) or
 cumulative served-log parquets (``id``, ``label``, mapped through ``--label-map``);
 ``analysis.served_arms`` folds them into the union of every served id, one row each.
+
+``outsiders`` is the check on other identifiers, stated before the blitz: per arm, the share of
+served records that someone not in ``users`` identified, at any rank and within the window,
+before any participant did, and that share minus the control's. Newest first is expected to lose
+more records this way. It reads each identification's user and time and each record's observer
+(``user_id`` in the obs table). Every identification the observer made on their own record is
+left out before choosing who identified first, on both sides: the upload ID falls inside the
+window for a record added during the blitz and would otherwise count as an outsider's, and a
+participant's IDs on their own record do not count as a participant's. The read-back does not
+keep the time a record reached Research Grade, so records that reached it first are not counted
+on that ground.
 """
 
 from __future__ import annotations
@@ -21,10 +32,11 @@ import numpy as np
 import pandas as pd
 
 from what_to_id import inat
-from what_to_id.analysis import served_arms
+from what_to_id.analysis import _users, _utc, served_arms
 
 OBS_COLUMNS = (
     "id",
+    "user_id",
     "quality_grade",
     "community_rank",
     "taxon_rank",
@@ -63,6 +75,7 @@ def summarise(obs: dict) -> dict:
     stamps = [f["created_at"] for f in flat if f["created_at"]]
     return {
         "id": int(obs["id"]),
+        "user_id": (obs.get("user") or {}).get("id"),
         "quality_grade": obs.get("quality_grade"),
         "community_rank": community.get("rank") or None,
         "taxon_rank": taxon.get("rank") if taxon else None,
@@ -92,7 +105,7 @@ def readback(
         obs_rows.append({c: s[c] for c in OBS_COLUMNS})
         ident_rows.extend({"id": i, **f} for f in s["identifications"])
     obs_df = pd.DataFrame(obs_rows, columns=list(OBS_COLUMNS))
-    for c in ("ident_count", "n_identifiers"):
+    for c in ("user_id", "ident_count", "n_identifiers"):
         obs_df[c] = obs_df[c].astype("Int64")
     idents_df = pd.DataFrame(ident_rows, columns=list(IDENT_COLUMNS))
     return obs_df, idents_df
@@ -148,6 +161,59 @@ def outcomes(
     return out[list(OUTCOME_COLUMNS)]
 
 
+def outsiders(
+    idents_df: pd.DataFrame,
+    assign_df: pd.DataFrame,
+    *,
+    obs_df: pd.DataFrame,
+    users: Sequence[int],
+    start,
+    cutoff,
+    control: str,
+) -> pd.DataFrame:
+    """Per arm: served records a non-participant identified first in the window, and the share.
+
+    ``obs_df`` gives each record's observer (``id``, ``user_id``). Every identification the
+    observer made on their own record is dropped first, so neither side counts it: the upload ID
+    does not make a new record an outsider's, and a participant's IDs on their own record are not
+    participant IDs. ``diff`` is the arm's share minus the control's: its size and sign give the
+    size and direction of the check. Identifications at any rank count, withdrawn ones too.
+    """
+    missing = [c for c in ("id", "user_id", "created_at") if c not in idents_df.columns]
+    if missing:
+        raise ValueError(f"idents missing columns {missing}")
+    missing = [c for c in ("id", "arm") if c not in assign_df.columns]
+    if missing:
+        raise ValueError(f"assign_df missing columns {missing}")
+    missing = [c for c in ("id", "user_id") if c not in obs_df.columns]
+    if missing:
+        raise ValueError(f"obs_df missing columns {missing}")
+    arms = assign_df[["id", "arm"]].drop_duplicates("id")
+    if control not in set(arms["arm"]):
+        raise ValueError(f"control arm {control!r} not in {sorted(arms['arm'].unique())}")
+    t0, t1 = _utc(start), _utc(cutoff)
+    if t1 <= t0:
+        raise ValueError(f"cutoff {cutoff} is not after start {start}")
+    ts = pd.to_datetime(idents_df["created_at"], utc=True, errors="coerce")
+    observer = obs_df.drop_duplicates("id").set_index("id")["user_id"]
+    by = pd.to_numeric(idents_df["user_id"], errors="coerce")
+    # A record with no known observer has no own IDs to drop, so every ID on it is kept.
+    own = by.eq(idents_df["id"].map(pd.to_numeric(observer, errors="coerce")))
+    own = own.fillna(False).astype(bool)
+    keep = idents_df["id"].isin(arms["id"]) & by.notna() & ~own & ts.ge(t0) & ts.lt(t1)
+    win = idents_df.loc[keep, ["id", "user_id"]].assign(ts=ts[keep])
+    is_part = win["user_id"].isin({int(u) for u in users})
+    first_part = win[is_part].groupby("id")["ts"].min()
+    first_out = win[~is_part].groupby("id")["ts"].min()
+    part = first_part.reindex(first_out.index)
+    lost = set(first_out.index[part.isna() | (first_out < part)])
+    df = arms.assign(_lost=arms["id"].isin(lost).astype(float))
+    g = df.groupby("arm", sort=True)["_lost"]
+    out = pd.DataFrame({"n_served": g.size(), "outsider": g.sum().astype(int), "share": g.mean()})
+    out["diff"] = out["share"] - out.loc[control, "share"]
+    return out.reset_index()
+
+
 def to_markdown(outcomes_df: pd.DataFrame) -> str:
     """Simple pipe table, shares as percentages."""
     cols = list(outcomes_df.columns)
@@ -188,7 +254,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     ap.add_argument("--out", type=Path, help="outcomes parquet; idents written next to it")
     ap.add_argument("--dry-run", action="store_true", help="pool only, no fetch")
+    ap.add_argument(
+        "--users",
+        type=Path,
+        help="participant user ids; with --start/--cutoff adds the outsider check",
+    )
+    ap.add_argument("--start", help="blitz start timestamp, for the outsider check")
+    ap.add_argument("--cutoff", help="outsider check counts identifications made before this")
+    ap.add_argument("--control", default="recency", help="control arm for the outsider check")
     a = ap.parse_args(argv)
+    if a.users and not (a.start and a.cutoff):
+        ap.error("--users needs --start and --cutoff for the outsider check")
     pool = inat.load_pool(a.pool)
     if a.dry_run:
         res = dry_run(pool)
@@ -211,6 +287,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         a.out.with_name(a.out.stem + "_idents.parquet"), engine="pyarrow", index=False
     )
     print(to_markdown(res))
+    if a.users:
+        kw = {"start": a.start, "cutoff": a.cutoff, "control": a.control}
+        check = outsiders(idents_df, assign, obs_df=obs_df, users=_users(a.users), **kw)
+        print("outsiders: served records a non-participant identified before any participant")
+        print(to_markdown(check))
     print(f"-> {a.out}")
     return 0
 

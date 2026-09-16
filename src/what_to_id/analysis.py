@@ -35,6 +35,11 @@ fixed under a redrawn split no longer matches the design. The CLI cannot check t
 frame or a served log holds only the served records, not the pool, and not the cap. Check the
 build record (every list and taxon group has fewer batches than ``max_batches``, or no cap)
 before reading ``p_record``.
+
+The CLI's default ``--weight primary`` runs the confirmatory family (``confirmatory``): each
+tested list on its own pinned outcome, Holm over those primary p values only, and each list's
+other count as an unadjusted secondary row. ``--weight none`` or ``cell_score`` runs every list
+on one count with Holm over all of them, as ``analyse`` does.
 """
 
 from __future__ import annotations
@@ -406,9 +411,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     ap.add_argument(
         "--weight",
-        choices=WEIGHTS,
-        default="none",
-        help="cell_score sums each identifier's served cell_score instead of counting records",
+        choices=("primary", *WEIGHTS),
+        default="primary",
+        help="primary: each list on its pinned outcome, Holm over those; none or cell_score: "
+        "every list on one count (cell_score sums each identifier's served cell_score)",
     )
     ap.add_argument("--control", required=True)
     ap.add_argument("--start", required=True, help="blitz start timestamp")
@@ -424,8 +430,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         [pd.read_parquet(p, engine="pyarrow") for p in a.served], ignore_index=True
     )
     served = served_arms(served_raw, _label_map(a.label_map))
-    weight = None if a.weight == "none" else a.weight
-    if weight is not None:
+    if a.weight != "none":
         n_missing = int(served["cell_score"].isna().sum())
         print(f"{n_missing} served record(s) with no cell_score (weighted as 0)")
     users = _users(a.users) if a.users else None
@@ -434,14 +439,25 @@ def main(argv: Sequence[str] | None = None) -> int:
         windows.append(("placebo", a.placebo_start, a.start))
     print(RECORD_NOTE)
     for label, t0, t1 in windows:
-        kw = {"start": t0, "cutoff": t1, "users": users, "weight": weight}
-        counts = identifier_counts(idents, served, **kw)
+        kw = {"start": t0, "cutoff": t1, "users": users}
         print(f"{label}: [{t0}, {t1})" + ("" if users is not None else ", all identifiers"))
-        res = analyse(counts, control=a.control, reps=a.reps, seed=a.seed)
-        totals = record_totals(idents, served, **kw)
+        if a.weight == "primary":
+            # Imported here: confirmatory builds on this module.
+            from what_to_id.confirmatory import confirmatory
+
+            res = confirmatory(idents, served, control=a.control, reps=a.reps, seed=a.seed, **kw)
+            weights = [None if o == "plain" else "cell_score" for o in res["outcome"]]
+        else:
+            weight = None if a.weight == "none" else a.weight
+            counts = identifier_counts(idents, served, weight=weight, **kw)
+            res = analyse(counts, control=a.control, reps=a.reps, seed=a.seed)
+            weights = [weight] * len(res)
+        totals = {w: record_totals(idents, served, weight=w, **kw) for w in set(weights)}
         res["p_record"] = [
-            record_shuffle_p(totals, served, arm=arm, control=a.control, reps=a.reps, seed=a.seed)
-            for arm in res["arm"]
+            record_shuffle_p(
+                totals[w], served, arm=arm, control=a.control, reps=a.reps, seed=a.seed
+            )
+            for arm, w in zip(res["arm"], weights, strict=True)
         ]
         _print(res)
     if a.obs:
