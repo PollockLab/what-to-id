@@ -160,7 +160,7 @@ def test_method_has_one_summary_numbered_methods_and_folds():
     how = method_section(_manifest(), 2)
     # The workflow and orders are readable without opening the technical sections.
     assert "In short" not in how
-    assert how.count('<details class="more"><summary>More detail: ') >= 10
+    assert '<details class="more"><summary>More detail: ' in how
     assert '<div class="pipe"' in how
     assert re.findall(r"<h3>(\d+)\. ", how) == [str(i) for i in range(1, 12)]
     assert "Why each identifier's batches rotate over the lists" not in how

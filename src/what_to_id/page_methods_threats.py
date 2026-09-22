@@ -7,7 +7,7 @@ explains the response, the row links to it in place of saying it again.
 from __future__ import annotations
 
 from what_to_id.manifest import Manifest
-from what_to_id.page_doc import Doc, codes, fold, see
+from what_to_id.page_doc import Doc, codes, see
 
 
 def threats_section(m: Manifest, f: dict, doc: Doc) -> str:
@@ -125,22 +125,4 @@ def threats_section(m: Manifest, f: dict, doc: Doc) -> str:
         rows,
         wrap=True,
     )
-    reasons = (
-        "<li><b>Shared pool.</b> Counts are per person and records are split at random. IDs by "
-        "others remove records from batches, and an order can change how fast others reach its "
-        "records.</li>"
-        "<li><b>Knowing the list.</b> The lists are unlabelled, not blind.</li>"
-        "<li><b>Other identifiers.</b> The placebo window is only a partial check: daily builds "
-        "add records created during the blitz, which do not exist in the placebo window.</li>"
-        "<li><b>Change over time.</b> Blitz the Gap found that observers outside the programme "
-        "made 1.15 times more observations per active day from June to October 2025 than in the "
-        f"same months of 2024 {doc.cite('hebert2026')}.</li>"
-        "<li><b>Chance differences between lists.</b> The split is at random, so such a "
-        "difference is as likely to help any list. This build's range of list sizes per taxon "
-        f"group is in {doc.ref('sizes')} and {doc.ref('shares')}.</li>"
-    )
-    return (
-        table
-        + fold("the reasoning behind the responses", f"<ul>{reasons}</ul>")
-        + codes("analysis", "assign", "page")
-    )
+    return table + codes("analysis", "assign", "page")

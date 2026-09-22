@@ -2,20 +2,18 @@
 
 Each function returns one inline <svg>. Where the build's own data would be private (which list
 is which, who identified what), the figure runs the real code on a small made-up input instead:
-the deal calls assign.assign, the test figure calls analysis.sign_flip_p.
+the deal calls assign.assign.
 """
 
 from __future__ import annotations
 
 import random
 import zlib
-from itertools import product
 
 import numpy as np
 import pandas as pd
 
 from what_to_id import assign as assign_mod
-from what_to_id.analysis import record_shuffle_p, sign_flip_p
 from what_to_id.page_svg import (
     arrow,
     fmt,
@@ -268,90 +266,3 @@ def serving_figure(k: int, n_batches: int) -> str:
         "at a random batch and wraps around."
     )
     return svg(y + 14, label, "".join(parts), max_px=620)
-
-
-SHUFFLE_TOTALS = (0, 1, 1, 2, 2, 3, 4, 5)
-SHUFFLE_ARMS = ("c", "c", "c", "c", "t", "t", "t", "t")
-SHUFFLE_REPS = 2000
-
-
-def shuffle_example() -> dict:
-    """The record-level worked example: 8 made-up records, their totals, and the real p."""
-    served = pd.DataFrame({"id": range(len(SHUFFLE_ARMS)), "arm": list(SHUFFLE_ARMS)})
-    totals = pd.Series(np.asarray(SHUFFLE_TOTALS, dtype=np.float64), index=served["id"])
-    on = served["arm"].to_numpy()
-    obs = float(totals.to_numpy()[on == "t"].sum() - totals.to_numpy()[on == "c"].sum())
-    return {
-        "totals": SHUFFLE_TOTALS,
-        "totals_text": ", ".join(str(t) for t in SHUFFLE_TOTALS),
-        "control": int(
-            sum(t for t, a in zip(SHUFFLE_TOTALS, SHUFFLE_ARMS, strict=True) if a == "c")
-        ),
-        "treated": int(
-            sum(t for t, a in zip(SHUFFLE_TOTALS, SHUFFLE_ARMS, strict=True) if a == "t")
-        ),
-        "obs": obs,
-        "reps": SHUFFLE_REPS,
-        "p": record_shuffle_p(totals, served, arm="t", control="c", reps=SHUFFLE_REPS, seed=0),
-    }
-
-
-SIGNFLIP_DIFFS = (4, 7, -2, 3, 9, 1, -3, 5)
-
-
-def signflip_example() -> dict:
-    """The worked example: 8 made-up differences, every sign pattern, and the real p."""
-    d = np.asarray(SIGNFLIP_DIFFS, dtype=np.float64)
-    sums = np.array(list(product((-1.0, 1.0), repeat=d.size))) @ d
-    obs = abs(float(d.sum()))
-    return {
-        "diffs": d,
-        "sums": sums,
-        "obs": obs,
-        "extreme": int((np.abs(sums) >= obs - 1e-9).sum()),
-        "p": sign_flip_p(d),
-    }
-
-
-def signflip_figure() -> str:
-    ex = signflip_example()
-    d, sums, obs = ex["diffs"], ex["sums"], ex["obs"]
-    parts = [text(6, 12, "Difference per person", "tb", size=11)]
-    zx, unit, top = 78, 60 / float(np.abs(d).max()), 24
-    for i, v in enumerate(d):
-        y = top + i * 17
-        x, w = (zx, v * unit) if v > 0 else (zx + v * unit, -v * unit)
-        parts.append(text(8, y + 10, f"P{i + 1}", "m"))
-        parts.append(rect(x, y, w, 12, "pos" if v > 0 else "neg"))
-        lx, anchor = (x + w + 3, "start") if v > 0 else (x - 3, "end")
-        parts.append(text(lx, y + 10, f"{int(v):+d}", "m", anchor=anchor))
-    base = top + len(d) * 17
-    parts.append(line(zx, top - 4, zx, base, "ax"))
-    parts.append(text(zx, base + 14, f"sum {int(d.sum()):+d}", "t", anchor="middle"))
-    values, counts = np.unique(sums, return_counts=True)
-    x0, x1, hb, hy = 182, 392, 150, 36
-    span = float(np.abs(values).max())
-    bw = (x1 - x0) / (len(values) + 1)
-    parts.append(text(x0, 12, f"All {len(sums)} sign patterns", "tb", size=11))
-
-    def sx(v: float) -> float:
-        return x0 + (v + span) / (2 * span) * (x1 - x0 - bw) + bw / 2
-
-    peak = counts.max()
-    for v, c in zip(values, counts, strict=True):
-        h = (hb - 20) * c / peak
-        cls = "tail" if abs(v) >= obs - 1e-9 else "hist"
-        parts.append(rect(sx(v) - bw / 2 + 0.5, hy + hb - 20 - h, bw - 1, h, cls))
-    axis = hy + hb - 20
-    parts.append(line(x0, axis, x1, axis, "ax"))
-    for v in (-obs, obs):
-        parts.append(line(sx(v), hy + 4, sx(v), axis, "obs"))
-    parts.append(text(sx(obs), hy - 3, f"observed sum {int(obs)}", "t", anchor="end"))
-    for v in (-obs, 0, obs):
-        parts.append(text(sx(v), axis + 13, f"{int(v):+d}" if v else "0", "m", anchor="middle"))
-    parts.append(text((x0 + x1) / 2, axis + 27, "sum after flipping signs", "m", anchor="middle"))
-    label = (
-        f"Left: made-up differences for 8 people, summing to {int(d.sum())}. Right: histogram of "
-        f"all {len(sums)} sign-flipped sums; {ex['extreme']} are at least {int(obs)} from zero."
-    )
-    return svg(max(base + 22, axis + 34), label, "".join(parts), max_px=640)

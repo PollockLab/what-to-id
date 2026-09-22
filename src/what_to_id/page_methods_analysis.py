@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from what_to_id.manifest import Manifest
 from what_to_id.page_doc import Doc, a, codes, fold, see
-from what_to_id.page_figures import shuffle_example, signflip_example, signflip_figure
 from what_to_id.page_order_text import PER_LIST, PER_LIST_ANY, count_role, order_name
 from what_to_id.page_svg import fmt
 
@@ -127,8 +126,6 @@ def outcomes_section(m: Manifest, f: dict, doc: Doc) -> str:
 
 
 def analysis_section(m: Manifest, f: dict, doc: Doc) -> str:
-    ex, shuf = signflip_example(), shuffle_example()
-    n = len(ex["diffs"])
     orders = see("methods-orders", "Section 4")
     all_served = (
         f"It assumes that every record in a list is served. A cap binds in this build ({orders}), "
@@ -143,15 +140,6 @@ def analysis_section(m: Manifest, f: dict, doc: Doc) -> str:
         if m.assignment == "keyed"
         else "In this seeded build the lists of the records in one stratum "
         f"({see('methods-split', 'Section 3')}) are shuffled among them, as the deal does."
-    )
-    diffs = ", ".join(f"{int(d):+d}" for d in ex["diffs"])
-    fig = doc.figure(
-        signflip_figure(),
-        f"A worked example with {n} made-up people. Their differences are {diffs}, and the sum "
-        f"is {int(ex['diffs'].sum())}. Of the {len(ex['sums'])} sign patterns, {ex['extreme']} "
-        f"give a sum at least {int(ex['obs'])} from zero (shaded), so p = {ex['extreme']}/"
-        f"{len(ex['sums'])} = {ex['p']:.4f}. This is the value the analysis code returns for "
-        "these numbers.",
     )
     n_cmp = max(f["k"] - 1, 1)
     flips = (
@@ -169,14 +157,6 @@ def analysis_section(m: Manifest, f: dict, doc: Doc) -> str:
         "difference is at least as far from zero as the real one, counting the real split. "
         f"{all_served} The analysis command reports this p as <code>p_record</code>, with the "
         "keyed redraw, next to each comparison's p, and does not Holm-adjust it.</p>"
-        "<p><b>Worked example.</b> Eight made-up records, four on the control and four on the "
-        f"tested list, with {shuf['totals_text']} participant IDs on them in that order. The "
-        f"control's four hold {shuf['control']} IDs and the tested list's four hold "
-        f"{shuf['treated']}, a difference of {int(shuf['obs'])}. In this two-list example each "
-        "record is redrawn to either list at even odds. The build redraws over all its lists. "
-        f"Over {fmt(shuf['reps'])} "
-        f"redrawn splits the code returns p = {shuf['p']:.4f}, so with only eight records a gap "
-        "of that size is common when nothing but the split changes.</p>"
     )
     holm = (
         "<p>Holm's method keeps the chance of any false finding at or below the test level over "
@@ -199,7 +179,8 @@ def analysis_section(m: Manifest, f: dict, doc: Doc) -> str:
         "the share of sign patterns whose sum is at least as far from zero as the real sum. With "
         "12 or fewer people left, p is exact, from every sign pattern. With more, p comes from "
         "10,000 random sign patterns. The draft protocol says the test is two-sided, at 0.05.</p>"
-        f"{fig}" + fold("the drawn p, and what the test assumes", flips) + ""
+        + fold("the drawn p, and what the test assumes", flips)
+        + ""
         '<h4 id="methods-record-test">A second test, on the records</h4>'
         "<p>The sign-flip test treats the person as the unit, but the design draws the split "
         "record by record. By chance the lists hold a different number of records and a "
@@ -210,7 +191,7 @@ def analysis_section(m: Manifest, f: dict, doc: Doc) -> str:
         "A secondary test, fixed before the blitz, redraws the split and works "
         "out the same summed difference. It does not replace the primary test, which stays each "
         "list's primary count with the sign-flip p.</p>"
-        + fold("how the second test redraws the split, with a worked example", record)
+        + fold("how the second test redraws the split", record)
         + "<p><b>More than one list.</b> Each list other than the control is compared with the "
         f"control on its own primary count ({doc.ref('per-list')}), so this build gives {n_cmp} "
         f"comparisons, and those {n_cmp} p values are "
