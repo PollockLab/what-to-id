@@ -35,6 +35,22 @@ __all__ = ["METHOD_CSS", "ORDER_DETAIL", "ORDER_TEXT", "method_section"]
 
 _SG = '"Space Grotesk",Inter,system-ui,sans-serif'
 
+METHOD_JS = """
+(function() {
+  function openOrders() {
+    if (!['#orders', '#methods-orders'].includes(window.location.hash)) return;
+    var target = document.getElementById('methods-orders');
+    if (!target) return;
+    for (var parent = target.parentElement; parent; parent = parent.parentElement) {
+      if (parent.tagName === 'DETAILS') parent.open = true;
+    }
+    requestAnimationFrame(function() { target.scrollIntoView(); });
+  }
+  window.addEventListener('hashchange', openOrders);
+  openOrders();
+})();
+""".strip()
+
 # List colours (Okabe-Ito): none is lighter, darker or "first", so none suggests an order.
 # Batch shades do step from light to dark, because batches do come in order.
 METHOD_CSS = f"""
@@ -206,7 +222,9 @@ def method_section(manifest: Manifest, n_lists: int) -> str:
     doc = Doc()
     toc = "".join(f'<li><a href="#{sid}">{title}</a></li>' for sid, title, _ in SECTIONS)
     body = "".join(
-        f'<section id="{sid}"><h3>{i}. {title}</h3>{fn(manifest, facts, doc)}</section>'
+        f'<section id="{sid}"><h3>{i}. '
+        + (f'<a href="#{sid}">{title}</a>' if sid == "methods-orders" else title)
+        + f"</h3>{fn(manifest, facts, doc)}</section>"
         for i, (sid, title, fn) in enumerate(SECTIONS, 1)
     )
     return doc.finish(

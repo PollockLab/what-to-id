@@ -18,7 +18,7 @@ from pathlib import Path
 
 from what_to_id.manifest import Manifest
 from what_to_id.page import ARM_WORDS, group_name
-from what_to_id.page_method import METHOD_CSS, method_section
+from what_to_id.page_method import METHOD_CSS, METHOD_JS, method_section
 from what_to_id.page_style import CSS, FONTS
 
 _SG = '"Space Grotesk",Inter,system-ui,sans-serif'
@@ -394,6 +394,7 @@ def render_rotation_index(manifest: Manifest, *, title: str) -> str:
         f"var DATA={json.dumps(data, sort_keys=True)};"
         f"var GROUP_NAMES={json.dumps(group_names, sort_keys=True)};"
         f"{ROTATION_JS}"
+        f"{METHOD_JS}"
     )
     return (
         '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
