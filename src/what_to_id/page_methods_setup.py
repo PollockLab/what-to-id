@@ -335,13 +335,12 @@ def cap_text(f: dict) -> str:
 
 def orders_section(m: Manifest, f: dict, doc: Doc) -> str:
     cap = " " + cap_text(f)
-    listed = "".join(f"<li>{ORDER_TEXT[x]}</li>" for x in m.arms)
-    parts = [
-        f"<p>This build has {f['k']} lists, each with its own order:</p><ul>{listed}</ul>"
+    parts = [f"<p>This build has {f['k']} lists, each with its own order:</p>"]
+    batch_detail = (
         "<p>Each list sorts its records one taxon group at a time, then cuts the sorted records "
         f"into batches of up to {f['batch_size']} records, in that order.{cap} The figures run "
         f"the order code on made-up records and cut the result into batches of up to {BS}.</p>"
-    ]
+    )
     for i, arm in enumerate(m.arms, 1):
         name = order_name(arm)
         fig = doc.figure(ORDER_FIGURES[arm](), f"{name}, {ORDER_CAPTION[arm]}")
@@ -350,21 +349,14 @@ def orders_section(m: Manifest, f: dict, doc: Doc) -> str:
             f"<dt>Parameters</dt><dd>{ORDER_PARAMS[arm](doc)}</dd></dl>"
         )
         parts.append(
-            f'<h4 id="order-{i}">{name}</h4>{fig}<dl class="rule">'
-            f"<dt>Why</dt><dd>{ORDER_WHY[arm](doc)}</dd></dl>"
-            + fold(f"the rule and settings for {name[0].lower()}{name[1:]}", rule)
+            f'<details class="order" id="order-{i}"><summary>{ORDER_TEXT[arm]}</summary>'
+            f'{fig}<dl class="rule">'
+            f"<dt>Why</dt><dd>{ORDER_WHY[arm](doc)}</dd></dl>" + rule + "</details>"
         )
     keys = ["arms", "cells"] if "gap_first" in m.arms or "similarity" in m.arms else ["arms"]
     if "similarity" in m.arms or "novelty" in m.arms:
         keys.append("embed")
-    return "".join(parts) + codes(*keys, "batches")
-
-
-_WHY_ROTATE = [
-    ["A busy identifier's effort goes to", "one list", "all lists, equally"],
-    ["A list scores high because of", "who landed on it", "its order"],
-    ["What is compared", "list totals", "each identifier with themself"],
-]
+    return "".join(parts) + fold("batch sizes and examples", batch_detail) + codes(*keys, "batches")
 
 
 def serving_section(m: Manifest, f: dict, doc: Doc) -> str:
@@ -378,11 +370,6 @@ def serving_section(m: Manifest, f: dict, doc: Doc) -> str:
         "random batch and wraps around. In this build a list has "
         f"{range_words(lo, hi)} batches in a taxon group, most often {n}.",
         name="serving",
-    )
-    why = doc.table(
-        "Why each identifier's batches rotate over the lists.",
-        ["", "One list per identifier", "Batches rotate over the lists"],
-        _WHY_ROTATE,
     )
     rows = [[g["name"], _span(*g["batches"]), _span(*g["sizes"])] for g in f["groups"]]
     batches = doc.table(
@@ -453,7 +440,7 @@ def serving_section(m: Manifest, f: dict, doc: Doc) -> str:
         "that still need an ID.</p>"
     )
     return (
-        f"{lead}{fig}{why}{estimand}"
+        f"{lead}{fig}{estimand}"
         + fold("batch links, batch sizes and edge cases", detail, "more-batches")
         + codes("page", "batches")
     )

@@ -37,17 +37,22 @@ _SG = '"Space Grotesk",Inter,system-ui,sans-serif'
 
 METHOD_JS = """
 (function() {
-  function openOrders() {
-    if (!['#orders', '#methods-orders'].includes(window.location.hash)) return;
-    var target = document.getElementById('methods-orders');
-    if (!target) return;
+  function openMethod() {
+    var id;
+    try { id = decodeURIComponent(window.location.hash.slice(1)); }
+    catch (e) { return; }
+    var target = document.getElementById(id === 'orders' ? 'methods-orders' : id);
+    if (!target || !target.closest('details.how')) return;
     for (var parent = target.parentElement; parent; parent = parent.parentElement) {
       if (parent.tagName === 'DETAILS') parent.open = true;
     }
+    if (target.tagName === 'DETAILS') target.open = true;
+    var content = target.querySelector('details.method');
+    if (content) content.open = true;
     requestAnimationFrame(function() { target.scrollIntoView(); });
   }
-  window.addEventListener('hashchange', openOrders);
-  openOrders();
+  window.addEventListener('hashchange', openMethod);
+  openMethod();
 })();
 """.strip()
 
@@ -71,10 +76,7 @@ border-top:2px solid #2a3a4d}}.how details.more[open]{{border-top-color:var(--ac
 .how .pipe{{display:flex;flex-wrap:wrap;gap:.9rem 1.2rem;margin:1rem 0 1.2rem}}
 .pipe .stage{{flex:1 1 15rem;min-width:0}}
 .pipe ol{{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1.1rem}}
-.how .pipe li{{position:relative;margin:0;padding:.4rem .7rem;background:var(--panel);
-border:1px solid #2a3a4d;border-radius:10px;line-height:1.3}}
-.how .pipe li+li::before{{content:"\\2193";position:absolute;left:1rem;top:-1.05rem;
-line-height:1;color:var(--acc)}}
+.how .pipe li{{margin:0;line-height:1.4}}
 .pipe b{{display:block;font-family:{_SG}}}
 .pipe i.when{{display:block;font-style:normal;font-size:.68rem;font-weight:700;
 text-transform:uppercase;letter-spacing:.06em;color:var(--acc);margin-bottom:.35rem}}
@@ -82,8 +84,16 @@ text-transform:uppercase;letter-spacing:.06em;color:var(--acc);margin-bottom:.35
 .how h3{{font-family:{_SG};font-size:1.08rem;margin:2.2rem 0 .5rem;scroll-margin-top:1rem}}
 .how h4{{font-family:{_SG};font-size:.95rem;margin:1.6rem 0 .4rem;scroll-margin-top:1rem}}
 .how section p,.how section li{{line-height:1.55}}
-.how .toc ol{{columns:2 14rem;margin:.4rem 0 1rem;padding-left:1.4rem}}
-.how .toc li{{margin:.15rem 0}}
+.how section{{border-top:1px solid #2a3a4d;scroll-margin-top:1rem}}
+.how details.method>summary{{cursor:pointer;padding:.65rem 0;color:var(--ink)}}
+.how details.method>summary h3{{display:inline;font-size:1rem;margin:0}}
+.how details.method>summary a{{color:var(--acc);margin-left:.5rem;text-decoration:none}}
+.how details.method>summary a:hover{{text-decoration:underline}}
+.how details.method[open]{{padding-bottom:.8rem}}
+.how summary:focus-visible{{outline:2px solid var(--acc);outline-offset:3px}}
+.how details.order{{margin:.6rem 0;border-top:1px solid #2a3a4d}}
+.how details.order>summary{{padding:.6rem 0;cursor:pointer;color:var(--acc);
+font-size:.95rem;font-weight:400}}
 .how .cite{{white-space:nowrap}}
 .how dl.rule{{margin:.5rem 0 1rem}}
 .how dl.rule dt{{font-weight:600;color:var(--ink);margin-top:.5rem}}
@@ -220,18 +230,19 @@ def method_section(manifest: Manifest, n_lists: int) -> str:
             raise ValueError(f"no page words for list order(s) {missing}; add them to {name}")
     facts = build_facts(manifest)
     doc = Doc()
-    toc = "".join(f'<li><a href="#{sid}">{title}</a></li>' for sid, title, _ in SECTIONS)
     body = "".join(
-        f'<section id="{sid}"><h3>{i}. '
-        + (f'<a href="#{sid}">{title}</a>' if sid == "methods-orders" else title)
-        + f"</h3>{fn(manifest, facts, doc)}</section>"
+        f'<section id="{sid}"><details class="method"'
+        + (" open" if sid == "methods-orders" else "")
+        + f"><summary><h3>{i}. {title}</h3>"
+        + f'<a href="#{sid}" aria-label="Link to {title}">#</a></summary>'
+        + f"{fn(manifest, facts, doc)}</details></section>"
         for i, (sid, title, fn) in enumerate(SECTIONS, 1)
     )
     return doc.finish(
         '<details class="how"><summary>How the test works</summary>'
         f"{_pipeline(manifest, n_lists)}"
         '<h3 id="methods">Methods in full</h3>'
-        f'<nav class="toc" aria-label="Methods in full"><ol>{toc}</ol></nav>{body}'
+        f"{body}"
         f'<p class="src">All the code and the draft protocol: '
         f'<a href="{REPO}" target="_blank" rel="noopener">PollockLab/what-to-id</a>. '
         "Code links point at the main branch.</p>"

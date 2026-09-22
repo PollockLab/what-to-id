@@ -25,14 +25,14 @@ _SG = '"Space Grotesk",Inter,system-ui,sans-serif'
 
 ROTATION_CSS = f"""
 [hidden]{{display:none!important}}
-#groupList{{display:grid;grid-template-columns:repeat(auto-fill,minmax(10.5rem,1fr));gap:.7rem;
-margin:1.2rem 0}}
-.gbtn{{display:flex;flex-direction:column;gap:.1rem;padding:.8rem .9rem;background:var(--card);
+#groupList{{display:grid;grid-template-columns:repeat(auto-fill,minmax(10rem,1fr));gap:.5rem;
+margin:.8rem 0}}
+.gbtn{{display:flex;flex-direction:column;gap:.1rem;padding:.65rem .8rem;background:var(--card);
 color:var(--cink);border:1px solid var(--line);border-radius:12px;font:inherit;text-align:left;
-cursor:pointer;box-shadow:0 6px 22px rgba(0,0,0,.5);transition:border-color .12s}}
+cursor:pointer;transition:border-color .12s}}
 .gbtn:hover{{border-color:var(--acc)}}
 .gbtn.is-current{{border-color:var(--acc);
-box-shadow:0 0 0 2px var(--acc),0 6px 22px rgba(0,0,0,.5)}}
+box-shadow:0 0 0 2px var(--acc)}}
 .gbtn.is-empty{{opacity:.6}}
 .gbtn b{{font-size:1.1rem;color:var(--acc-ink);font-family:{_SG}}}
 .gbtn .lat{{color:var(--cmut);font-size:.8rem}}
@@ -62,7 +62,7 @@ padding:.35rem .5rem;font:inherit;font-size:.9rem;color:var(--mut);cursor:pointe
 text-decoration:underline;text-underline-offset:3px;transition:color .12s}}
 .linkbtn:hover:not(:disabled){{color:var(--acc)}}
 .linkbtn:disabled{{opacity:.4;cursor:default}}
-.subhint{{width:100%;margin:0;color:var(--cmut);font-size:.8rem}}
+.subhint{{width:100%;margin:0;color:var(--mut);font-size:.88rem}}
 .pickhead{{font:700 1rem/1.3 {_SG};margin:1.2rem 0 .5rem;color:var(--ink);text-transform:none;
 letter-spacing:normal}}
 .resumerow{{margin:1.2rem 0 0}}
@@ -75,18 +75,11 @@ border-radius:12px;color:var(--ink)}}
 .pillbtn{{padding:.5rem .9rem;background:var(--card);color:var(--cink);border:0;border-radius:8px;
 font:inherit;font-weight:600;cursor:pointer}}
 .undo .linkbtn{{color:var(--acc);font-weight:700}}
-.flow{{display:flex;align-items:center;gap:.6rem;margin:1.2rem 0 0}}
-.flow div{{flex:1 1 0;display:flex;flex-direction:column;gap:.1rem;padding:.7rem .9rem;
-background:var(--panel);border:1px solid #2a3a4d;border-radius:12px}}
-.flow b,.cycle .n{{font-family:{_SG};font-weight:700}}
-.flow span{{color:var(--mut);font-size:.88rem}}
-.flow i,.cycle i{{font-style:normal;color:var(--acc);font-size:1.2rem}}
+.cycle .n{{font-family:{_SG};font-weight:700}}
+.cycle i{{font-style:normal;color:var(--acc);font-size:1.2rem}}
 .cycle{{display:flex;align-items:center;gap:.5rem;margin:.4rem 0 .8rem}}
 .cycle .n{{width:2.2rem;height:2.2rem;display:grid;place-items:center;border-radius:50%;
 background:var(--card);color:var(--acc-ink)}}
-@media(max-width:44rem){{.flow{{flex-direction:column;align-items:stretch;gap:.35rem}}
-.flow i{{display:none}}
-.flow div{{flex-direction:row;flex-wrap:wrap;column-gap:.5rem;padding:.5rem .8rem}}}}
 """.strip()
 
 # nextBatch is the one pure function driving the rotation: given the per-browser state, the
@@ -367,13 +360,6 @@ def render_rotation_index(manifest: Manifest, *, title: str) -> str:
         else ""
     )
     sub_html = f'<p class="sub">{sub}</p>\n' if sub else ""
-    arrow = '<i aria-hidden="true">&rarr;</i>'
-    steps = (
-        ("Pick a group", "one you know"),
-        ("Next batch", f"up to {int(manifest.batch_size)} records open in iNaturalist"),
-        ("ID what you can", "skip the rest, then come back"),
-    )
-    flow = arrow.join(f"<div><b>{b}</b><span>{s}</span></div>" for b, s in steps)
     build_msg = (
         '<p class="undo" id="buildMsg" aria-live="polite" hidden>'
         "<span>New batches today. Your count starts again.</span>"
@@ -383,8 +369,9 @@ def render_rotation_index(manifest: Manifest, *, title: str) -> str:
         f"{build_msg}"
         '<section id="picker"><p class="resumerow" id="resumeRow" hidden>'
         '<button class="nextbtn" id="resumeBtn" type="button">Continue</button></p>'
-        f'<div class="flow">{flow}</div>'
         '<h2 class="pickhead">Pick a group</h2>'
+        '<p class="hint">Choose a group you know. Open a batch in iNaturalist, '
+        "ID what you can, then return.</p>"
         '<div id="groupList"></div></section>\n'
         f"{_runner(int(manifest.batch_size))}"
         f"{method_section(manifest, len(data))}"

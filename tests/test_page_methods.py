@@ -186,7 +186,7 @@ def test_sum_and_sign_test_sentence_and_change_over_time_row(full):
 
 def test_only_this_builds_orders_get_a_subsection():
     two = method_section(_manifest(), 2)
-    assert two.count('<h4 id="order-') == 2
+    assert two.count('<details class="order" id="order-') == 2
     assert "Look-alike" not in two and "Unfamiliar" not in two
     assert "for the draft protocol's lists judged on the plain count, a lift of 0.3" in two
 

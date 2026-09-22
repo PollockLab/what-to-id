@@ -13,10 +13,13 @@ from what_to_id.page_doc import Doc, see
 
 # Plain words for each order. Never the arm names, which ARM_WORDS guards.
 ORDER_TEXT = {
-    "recency": "<b>Newest first.</b> The control, close to what iNaturalist shows today.",
-    "gap_first": "<b>Data-poor places first.</b> Records from areas with few or old records.",
-    "similarity": "<b>Look-alike photos together.</b> Similar photos come in groups.",
-    "novelty": "<b>Unfamiliar photos first.</b> Photos least like any Research Grade photo.",
+    "recency": "<b>Newest first.</b> Records uploaded most recently. The control for comparison.",
+    "gap_first": "<b>Data-poor places first.</b> Records from places with few observations "
+    "or little recent recording.",
+    "similarity": "<b>Look-alike photos together.</b> Groups similar photos to test whether "
+    "fewer changes of context help identifiers.",
+    "novelty": "<b>Unfamiliar photos first.</b> Photos least like the Research Grade reference "
+    "sample.",
     "surprise": "<b>Unexpected sightings first.</b> Species seen where, or in a climate where, "
     "few Research Grade records of that species are.",
 }
@@ -44,7 +47,7 @@ ORDER_DETAIL = {
     "next.",
     "novelty": "<b>Unfamiliar photos first</b> compares each photo, with the same image model, "
     "with every Research Grade photo of its taxon group in the reference pull. Records whose "
-    "closest verified photo is least alike come first.",
+    "closest reference photo is least alike come first.",
     "surprise": "<b>Unexpected sightings first</b> gives each record a tail probability: how "
     "far out its place, or its climate, is for the proposed species, against that species' "
     "Research Grade records. Least expected first. Ties go to a range-model score if the build "
@@ -116,20 +119,19 @@ ORDER_WHY = {
         "meet today."
     ),
     "gap_first": lambda d: (
-        "The value question. The idea to test: an ID in a data-poor place helps fill a gap in "
+        "Aims to fill gaps in "
         f"where species are known to occur, the Wallacean shortfall {d.cite('hortal2015')}, and "
         "in how recent the records are. Blitz the Gap calls these spatial and temporal gaps "
         f"{d.cite('hebert2026')}. Its predicted direction is in "
         f"{see('methods-outcomes', 'Section 6')}."
     ),
     "similarity": lambda d: (
-        "The speed question. The idea to test: fewer switches between kinds "
-        "of photo make identifying faster."
+        "Aims to reduce changes between kinds of photo. This trial compares ID counts, not speed."
     ),
     "novelty": lambda d: (
-        "The value question. The idea to test: an ID on a photo unlike any verified photo is "
-        "more likely to add a species, or a look of a species, that the verified record does not "
-        "cover yet."
+        "Aims to draw attention to photos unlike the reference sample. This trial compares "
+        "ID counts. An unfamiliar photo can show an ordinary species from a "
+        "different angle."
     ),
     "surprise": lambda d: (
         "The idea to test: a record far from where its species is known is "
