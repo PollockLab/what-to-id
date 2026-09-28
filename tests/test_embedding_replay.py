@@ -139,7 +139,6 @@ def test_bundle_rejects_missing_groups(embedding_build, tmp_path):
 
 def test_offline_daily_four_list_build(embedding_build, webapp_dir, tmp_path):
     import os
-    import shutil
     import subprocess
     import sys
     from pathlib import Path
@@ -151,7 +150,8 @@ def test_offline_daily_four_list_build(embedding_build, webapp_dir, tmp_path):
     bundle = pack_bundle(pool, str(candidates), str(references), tmp_path / "bundle")
     state, output = tmp_path / "state", tmp_path / "out"
     state.mkdir()
-    shutil.copyfile(pool, state / "pool.parquet")
+    # A first production build needs no separately seeded state pool.
+    assert not (state / "pool.parquet").exists()
     (webapp_dir / "provenance.json").write_text(json.dumps({"manifest_hash": "synthetic"}))
     # Only the remote grid checkout check is stubbed; the full build/replay code runs.
     binaries = tmp_path / "bin"
@@ -247,3 +247,14 @@ def test_bundle_rejects_unknown_taxon_group(embedding_build, tmp_path):
     rows.to_parquet(pool, index=False)
     with pytest.raises(ValueError, match="known taxon group"):
         pack_bundle(pool, str(candidates), str(references), tmp_path / "bundle")
+
+
+def test_bundle_detects_changed_prepared_pool(embedding_build, tmp_path):
+    from what_to_id.artifacts import load_bundle, pack_bundle
+
+    pool, _, _, candidates, references = embedding_build
+    bundle = pack_bundle(pool, str(candidates), str(references), tmp_path / "bundle")
+    with (bundle / "pool.parquet").open("ab") as stream:
+        stream.write(b"modified")
+    with pytest.raises(ValueError, match="prepared pool"):
+        load_bundle(bundle)

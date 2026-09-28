@@ -98,7 +98,7 @@ python -m what_to_id.inat --d1 2025-01-01 --freeze YYYY-MM-DD --quality research
 # to the next list, so every identifier's work splits evenly across lists.
 what-to-id build --pool data/pool_YYYY-MM-DD.parquet --freeze YYYY-MM-DD --d1 YYYY-MM-DD --seed <private-seed> --max-batches N --out out/build
 
-# Daily build, the same script .github/workflows/daily.yml runs: fetch the pool state, add new records,
+# Daily build, the same script .github/workflows/daily.yml runs: fetch state and a prepared pool,
 # build with the private key, drop served records that no longer need an ID, rebuild, log what was served,
 # keep the day's pool and build record, check for leaks and replay the build. WTB_DIR is a where-to-blitz
 # checkout at the commit in what_to_id.manifest.WHERE_TO_BLITZ_REF. OFFLINE=1 rehearses on a saved pool.
@@ -136,9 +136,9 @@ python -m what_to_id.artifacts verify data/embedding-bundle
 what-to-id build --pool data/pool_YYYY-MM-DD.parquet --freeze YYYY-MM-DD --d1 YYYY-MM-DD --seed 0 --key-env WHAT_TO_ID_KEY --arms recency,gap_first,similarity,novelty --design rotation --embedding-bundle data/embedding-bundle --out out/build
 ```
 
-Publish `embedding_bundle.json` and the accompanying NPZ files together as assets of a versioned release, then configure `EMBEDDING_RELEASE` and, if hosted elsewhere, `EMBEDDING_REPO`. `EMBEDDING_BUNDLE` defaults to `data/embedding-bundle`; downloading requires a fresh destination. The operator must provide release access where needed. Production rollout still requires embedding preparation, release upload, secret configuration and deployment.
+Publish `embedding_bundle.json`, `pool.parquet` and the accompanying NPZ files together as assets of a versioned release, then configure `EMBEDDING_RELEASE` and, if hosted elsewhere, `EMBEDDING_REPO`. `EMBEDDING_BUNDLE` defaults to `data/embedding-bundle`; downloading requires a fresh destination. The operator must provide release access where needed. Production rollout still requires embedding preparation, release upload, secret configuration and deployment.
 
-A build records each candidate/reference file's content hash, dimensions, row count and backbone by taxon group. Replay accepts the original bundle or matching `--embeddings` and `--reference-embeddings` inputs; it refuses changed files. Builds using score files also require the original `--surprise-scores` or `--sinr-scores`. Older image-list build records without complete per-file fingerprints must be rebuilt before this replay path can verify them. Production bundles require candidate embeddings for every pool ID and nonempty references for each group. A growing pool therefore needs a refreshed bundle; the daily job stops with an explicit error if coverage is stale. Exploratory builds with individual cache inputs retain the arm's recency fallback for missing candidates.
+A build records each candidate/reference file's content hash, dimensions, row count and backbone by taxon group. Replay accepts the original bundle or matching `--embeddings` and `--reference-embeddings` inputs; it refuses changed files. Builds using score files also require the original `--surprise-scores` or `--sinr-scores`. Older image-list build records without complete per-file fingerprints must be rebuilt before this replay path can verify them. Production bundles require candidate embeddings for every pool ID and nonempty references for each group. The daily job uses the bundle's exact pool snapshot and removes served observations that no longer need identification. Add new observations during preparation, encode their images, and publish the updated pool and embeddings together as a new bundle. The daily job never adds observations ahead of their embeddings. Exploratory builds with individual cache inputs retain the arm's recency fallback for missing candidates.
 
 The `gap_first` arm reads where-to-blitz's `cluster_results/ca`; point `--webapp-dir` or the `WHERE_TO_BLITZ_CA` environment variable at a checkout of it.
 

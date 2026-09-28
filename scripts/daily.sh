@@ -3,7 +3,7 @@
 # exactly these steps, and so can a laptop:
 #
 #   scripts/daily.sh fetch   download the pool and served log from the pool-state release
-#   scripts/daily.sh build   update the pool, build, drop records identified since, rebuild,
+#   scripts/daily.sh build   load the prepared pool, build, drop identified records, rebuild,
 #                            keep the day's pool and build record, check for leaks, replay
 #   scripts/daily.sh save    upload the state back to the release
 #
@@ -55,7 +55,7 @@ fetch_embeddings() {
   [ ! -e "$EMBEDDING_BUNDLE" ] || die "embedding destination exists; use a fresh EMBEDDING_BUNDLE path"
   mkdir -p "$EMBEDDING_BUNDLE"
   gh release download "$EMBEDDING_RELEASE" --repo "$source_repo" -D "$EMBEDDING_BUNDLE" \
-    -p embedding_bundle.json -p 'embeddings_*.npz' -p 'reference_embeddings_*.npz'
+    -p embedding_bundle.json -p pool.parquet -p 'embeddings_*.npz' -p 'reference_embeddings_*.npz'
   $PY -m what_to_id.artifacts verify "$EMBEDDING_BUNDLE"
 }
 
@@ -109,7 +109,13 @@ build() {
   embedding_args
 
   mkdir -p "$STATE/days"
-  if [ "${OFFLINE:-}" = 1 ]; then
+  if [ "${#EMBEDDING_ARGS[@]}" -gt 0 ]; then
+    [ "${FULL_PULL:-}" != true ] || die "prepare and publish a fresh bundle for a full pool pull"
+    [ -s "$EMBEDDING_BUNDLE/pool.parquet" ] || die "bundle has no prepared pool; repack it"
+    # Publish a complete snapshot and its embeddings together. Adding observations here
+    # would race preparation and make their embeddings unavailable to this build.
+    cp "$EMBEDDING_BUNDLE/pool.parquet" "$STATE/pool.parquet"
+  elif [ "${OFFLINE:-}" = 1 ]; then
     [ -s "$STATE/pool.parquet" ] || die "OFFLINE=1 needs a saved $STATE/pool.parquet"
   elif [ "${FULL_PULL:-}" = true ] || [ ! -s "$STATE/pool.parquet" ]; then
     $PY -m what_to_id.inat --d1 "$D1" --freeze "$TODAY" --out "$STATE/pool.parquet"

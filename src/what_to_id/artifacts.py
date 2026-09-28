@@ -74,6 +74,17 @@ def load_bundle(root: str | Path) -> tuple[dict[str, Path], dict[str, Path]]:
     manifest = json.loads((root / "embedding_bundle.json").read_text())
     if manifest.get("schema_version") != 1:
         raise ValueError("unsupported embedding bundle schema_version")
+    pool_info = manifest.get("pool")
+    if not isinstance(pool_info, dict):
+        raise ValueError("embedding bundle needs a recorded prepared pool")
+    path = root / "pool.parquet"
+    if (
+        pool_info.get("file") != "pool.parquet"
+        or path.is_symlink()
+        or not path.is_file()
+        or sha256_file(path) != pool_info.get("sha256")
+    ):
+        raise ValueError("prepared pool does not match the embedding bundle record")
     expected = manifest.get("files", {})
     if set(expected) != {"embeddings", "reference_embeddings"}:
         raise ValueError("bundle needs candidate and reference embeddings")
@@ -192,8 +203,14 @@ def pack_bundle(pool: str | Path, embeddings: str, reference: str, out: str | Pa
                     "file": filename,
                     **describe_files({group: stage / filename}, embeddings=True)[group],
                 }
+        shutil.copyfile(pool, stage / "pool.parquet")
+        manifest = {
+            "schema_version": 1,
+            "files": files,
+            "pool": {"file": "pool.parquet", "sha256": sha256_file(stage / "pool.parquet")},
+        }
         (stage / "embedding_bundle.json").write_text(
-            json.dumps({"schema_version": 1, "files": files}, indent=2, sort_keys=True) + "\n"
+            json.dumps(manifest, indent=2, sort_keys=True) + "\n"
         )
         load_bundle(stage)
         stage.rename(out)
