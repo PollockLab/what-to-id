@@ -100,6 +100,14 @@ def _verify_snapshot(path: Path) -> dict[str, str]:
     return hashes
 
 
+def _write_preparation(record: Path, identity: dict) -> None:
+    """Keep the last readable preparation identity if writing its replacement fails."""
+    with tempfile.TemporaryDirectory(prefix=".preparation-", dir=record.parent) as temporary:
+        staged = Path(temporary) / record.name
+        staged.write_text(json.dumps(identity, indent=2, sort_keys=True) + "\n")
+        staged.replace(record)
+
+
 def verify_reference_cache(cache: Path, source: Path, model_snapshot: Path) -> None:
     """Refuse to reuse reference vectors without matching source/model attestation."""
     files = sorted(cache.glob("*.npz"))
@@ -213,14 +221,28 @@ def prepare(
         ):
             raise ValueError("previous cache lacks matching model, pool and output attestation")
     record = work_dir / "preparation.json"
-    if work_dir.exists():
-        saved = json.loads(record.read_text()) if record.is_file() else {}
+    directories = [(work_dir, "work")]
+    if checkpoint_dir is not None:
+        directories.append((checkpoint_dir, "checkpoint"))
+    # Validate every existing destination before creating or changing either one.
+    for directory, label in directories:
+        if not directory.exists():
+            continue
+        saved_record = directory / record.name
+        if label == "checkpoint" and not any(directory.iterdir()):
+            continue
+        saved = json.loads(saved_record.read_text()) if saved_record.is_file() else {}
         saved.pop("output_candidate_sha256", None)
         if saved != identity:
-            raise ValueError("work directory belongs to different preparation inputs")
-    else:
+            raise ValueError(f"{label} directory belongs to different preparation inputs")
+    if not work_dir.exists():
         work_dir.mkdir(parents=True)
-        record.write_text(json.dumps(identity, indent=2, sort_keys=True) + "\n")
+        _write_preparation(record, identity)
+    if checkpoint_dir is not None:
+        checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        checkpoint_record = checkpoint_dir / record.name
+        if not checkpoint_record.exists():
+            _write_preparation(checkpoint_record, identity)
     cache = work_dir / "candidates"
     if photo_cache is not None:
         cache.mkdir(exist_ok=True)
@@ -278,12 +300,11 @@ def prepare(
             partial = destination.with_suffix(".partial")
             shutil.copy2(target, partial)
             partial.replace(destination)
-            shutil.copy2(record, checkpoint_dir / record.name)
     candidate_spec = str(cache / "emb_{group}_bioclip25.npz")
     identity["output_candidate_sha256"] = {
         g: sha256_file(p) for g, p in embedding_paths(candidate_spec, groups).items()
     }
-    record.write_text(json.dumps(identity, indent=2, sort_keys=True) + "\n")
+    _write_preparation(record, identity)
     return pack_bundle(pool, candidate_spec, reference_embeddings, out, preparation=record)
 
 

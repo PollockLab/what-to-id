@@ -362,3 +362,97 @@ def test_photo_cache_and_archives_are_mutually_exclusive(tmp_path):
             photo_cache=tmp_path,
             photo_archive_dir=tmp_path,
         )
+
+
+def test_checkpoint_refuses_new_pool_before_mutating_existing_vectors(tmp_path, monkeypatch):
+    rows = pd.DataFrame(
+        {
+            "id": [1, 2],
+            "iconic_taxon": ["Aves", "Mammalia"],
+            "photo_url": ["old", "old"],
+            "lat": [0.0, 0.0],
+            "lon": [0.0, 0.0],
+        }
+    )
+    original, changed = tmp_path / "original.parquet", tmp_path / "changed.parquet"
+    rows.to_parquet(original)
+    rows.assign(photo_url="changed").to_parquet(changed)
+    reference = tmp_path / "reference.npz"
+    _cache(reference, [99])
+    encoded = []
+
+    def encode(current, *, cache_dir, backbone, **kwargs):
+        target = emb_cache_path(cache_dir, current.iconic_taxon.iloc[0], backbone)
+        if not target.exists():
+            encoded.extend(current.id)
+            _cache(target, current.id)
+        return target
+
+    monkeypatch.setattr(prep, "embed_group", encode)
+    args = dict(reference_embeddings=str(reference), model_snapshot=tmp_path / "model")
+    checkpoint = tmp_path / "durable"
+    prep.prepare(
+        original,
+        **args,
+        work_dir=tmp_path / "first",
+        out=tmp_path / "first-bundle",
+        checkpoint_dir=checkpoint,
+    )
+    snapshot = {
+        p.relative_to(checkpoint): p.read_bytes() for p in checkpoint.rglob("*") if p.is_file()
+    }
+    encoded.clear()
+    with pytest.raises(ValueError, match="checkpoint.*different preparation inputs"):
+        prep.prepare(
+            changed,
+            **args,
+            work_dir=tmp_path / "second",
+            out=tmp_path / "second-bundle",
+            checkpoint_dir=checkpoint,
+        )
+    assert not encoded
+    assert not (tmp_path / "second").exists()
+    assert snapshot == {
+        p.relative_to(checkpoint): p.read_bytes() for p in checkpoint.rglob("*") if p.is_file()
+    }
+    prep.prepare(original, **args, work_dir=checkpoint, out=tmp_path / "resumed-bundle")
+    assert not encoded
+
+
+def test_checkpoint_rejects_unattested_vectors_before_work_creation(tmp_path, monkeypatch):
+    pool = tmp_path / "pool.parquet"
+    pd.DataFrame(
+        {"id": [1], "iconic_taxon": ["Aves"], "photo_url": ["a"], "lat": [0.0], "lon": [0.0]}
+    ).to_parquet(pool)
+    reference = tmp_path / "reference.npz"
+    _cache(reference, [99])
+    checkpoint = tmp_path / "checkpoint"
+    _cache(checkpoint / "candidates/emb_Aves_bioclip25.npz", [1])
+    with pytest.raises(ValueError, match="checkpoint.*different preparation inputs"):
+        prep.prepare(
+            pool,
+            reference_embeddings=str(reference),
+            model_snapshot=tmp_path / "model",
+            work_dir=tmp_path / "work",
+            out=tmp_path / "bundle",
+            checkpoint_dir=checkpoint,
+        )
+    assert not (tmp_path / "work").exists()
+    assert not (checkpoint / "preparation.json").exists()
+
+
+def test_preparation_identity_survives_interrupted_replacement(tmp_path, monkeypatch):
+    record = tmp_path / "preparation.json"
+    record.write_text('{"original": true}\n')
+    original = record.read_bytes()
+    write_text = Path.write_text
+
+    def interrupted(path, *args, **kwargs):
+        write_text(path, "incomplete")
+        raise OSError("interrupted identity write")
+
+    monkeypatch.setattr(Path, "write_text", interrupted)
+    with pytest.raises(OSError, match="interrupted identity write"):
+        prep._write_preparation(record, {"replacement": True})
+    assert record.read_bytes() == original
+    assert list(tmp_path.iterdir()) == [record]

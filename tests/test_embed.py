@@ -376,3 +376,34 @@ def test_corrupt_download_is_removed_before_archiving_then_refetched(tmp_path, m
     staged = embed.stage_images(pool, tmp_path)
     assert embed.validate_staged_images(staged) == []
     assert get.calls == {pool.photo_url.iloc[0]: 2}
+
+
+def test_save_embeddings_keeps_previous_cache_when_compression_fails(tmp_path, monkeypatch):
+    target = tmp_path / "emb_Aves_bioclip25.npz"
+    args = dict(
+        ids=np.array([1]),
+        E=np.array([[1.0, 0.0]]),
+        lat=np.array([0.0]),
+        lon=np.array([0.0]),
+        backbone="bioclip25",
+        emb_device="fixture",
+        failed_ids=[],
+    )
+    embed.save_embeddings(target, **args)
+    previous = target.read_bytes()
+    previous_metadata = target.with_suffix(".json").read_bytes()
+
+    def broken_save(destination, **kwargs):
+        if hasattr(destination, "write"):
+            destination.write(b"incomplete zip")
+        else:
+            Path(destination).write_bytes(b"incomplete zip")
+        raise OSError("interrupted compression")
+
+    monkeypatch.setattr(embed.np, "savez_compressed", broken_save)
+    with pytest.raises(OSError, match="interrupted compression"):
+        embed.save_embeddings(target, **args)
+    assert target.read_bytes() == previous
+    assert target.with_suffix(".json").read_bytes() == previous_metadata
+    np.testing.assert_array_equal(embed.load_embeddings(target)[0], [1])
+    assert set(tmp_path.iterdir()) == {target, target.with_suffix(".json")}

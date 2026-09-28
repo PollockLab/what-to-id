@@ -13,6 +13,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import tempfile
 import time
 from collections import deque
 from collections.abc import Callable, Sequence
@@ -359,15 +360,6 @@ def save_embeddings(
 ) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    np.savez_compressed(
-        path,
-        ids=np.asarray(ids, dtype=np.int64),
-        E=np.asarray(E, dtype=np.float32),
-        lat=np.asarray(lat, dtype=float),
-        lon=np.asarray(lon, dtype=float),
-        backbone=backbone,
-        emb_device=emb_device,
-    )
     model_id = BACKBONES[backbone][1] if backbone in BACKBONES else backbone
     sidecar = {
         "n": int(len(ids)),
@@ -376,7 +368,21 @@ def save_embeddings(
         "created_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "failed_ids": [int(i) for i in failed_ids],
     }
-    path.with_suffix(".json").write_text(json.dumps(sidecar, indent=1))
+    with tempfile.TemporaryDirectory(prefix=f".{path.name}-", dir=path.parent) as temporary:
+        staged = Path(temporary) / path.name
+        np.savez_compressed(
+            staged,
+            ids=np.asarray(ids, dtype=np.int64),
+            E=np.asarray(E, dtype=np.float32),
+            lat=np.asarray(lat, dtype=float),
+            lon=np.asarray(lon, dtype=float),
+            backbone=backbone,
+            emb_device=emb_device,
+        )
+        metadata = staged.with_suffix(".json")
+        metadata.write_text(json.dumps(sidecar, indent=1))
+        staged.replace(path)
+        metadata.replace(path.with_suffix(".json"))
 
 
 def load_embeddings(path: Path) -> tuple[np.ndarray, np.ndarray]:
