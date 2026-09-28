@@ -319,3 +319,52 @@ def test_daily_fetch_restores_verified_transport(embedding_build, tmp_path):
     assert result.returncode == 0, result.stderr
     load_bundle(restored)
     assert (restored / "pool.parquet").read_bytes() == pool.read_bytes()
+
+
+def test_cached_build_exact_outputs_and_independent_replay(
+    embedding_build, webapp_dir, tmp_path, monkeypatch
+):
+    import pandas as pd
+
+    from what_to_id.arms import Similarity
+    from what_to_id.replay import _rerun
+
+    pool, record, served, candidates, references = embedding_build
+    inputs = dict(embeddings=str(candidates), reference_embeddings=str(references))
+    context = json.loads(record.read_text())
+    cached = tmp_path / "cached"
+    calls = []
+    original = Similarity.order
+
+    def counted(self, pool, *, seed):
+        calls.append(len(pool))
+        return original(self, pool, seed=seed)
+
+    monkeypatch.setattr(Similarity, "order", counted)
+    for index in range(2):
+        _rerun(
+            context,
+            pool,
+            webapp_dir,
+            KEY,
+            cached,
+            tmp_path / f"cached-served-{index}.parquet",
+            {**inputs, "ordering_cache": str(tmp_path / "ordering-cache")},
+        )
+        if index == 0:
+            first_calls = len(calls)
+        assert len(calls) == first_calls
+    original_dir = record.parent
+    for filename in ("manifest.json", "build_record.json"):
+        assert (cached / filename).read_bytes() == (original_dir / filename).read_bytes()
+    for filename in ("batches.parquet", "assign.parquet"):
+        pd.testing.assert_frame_equal(
+            pd.read_parquet(cached / filename), pd.read_parquet(original_dir / filename)
+        )
+    for path in (original_dir / "site").rglob("*.html"):
+        assert (cached / path.relative_to(original_dir)).read_bytes() == path.read_bytes()
+    pd.testing.assert_frame_equal(
+        pd.read_parquet(served), pd.read_parquet(tmp_path / "cached-served-1.parquet")
+    )
+    assert replay(pool, record, served, webapp_dir, key=KEY, **inputs).ok
+    assert len(calls) == 2 * first_calls

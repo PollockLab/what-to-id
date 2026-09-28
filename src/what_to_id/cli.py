@@ -5,8 +5,11 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
+import platform
 import sys
 from datetime import date
+from importlib import metadata
 from pathlib import Path
 
 import pandas as pd
@@ -130,9 +133,37 @@ def build(args: argparse.Namespace) -> Path:
     if args.embedding_bundle:
         validate_coverage(pool, emb, ref)
     input_files = build_inputs(emb, ref, args.surprise_scores, args.sinr_scores)
+    dependency = labelfirst_provenance() if "similarity" in arm_names else None
+    cache_context = ""
+    if args.ordering_cache:
+        cache_context = json.dumps(
+            {
+                "inputs": input_files,
+                "dependency": dependency,
+                "sources": {
+                    path.name: sha256_file(path)
+                    for path in sorted(Path(__file__).parent.glob("*.py"))
+                },
+                "runtime": [sys.version, platform.platform(), platform.machine()],
+                "versions": {name: metadata.version(name) for name in ("numpy", "scipy", "pandas")},
+                "threads": {
+                    name: value
+                    for name, value in os.environ.items()
+                    if name.startswith(("OMP_", "OPENBLAS_", "MKL_", "VECLIB_"))
+                },
+            },
+            sort_keys=True,
+        )
     arms = _make_arms(arm_names, args.batch_size, emb, ref)
     batches_df = build_batches(
-        pool, assign_df, arms, size=args.batch_size, seed=args.seed, max_batches=args.max_batches
+        pool,
+        assign_df,
+        arms,
+        size=args.batch_size,
+        seed=args.seed,
+        max_batches=args.max_batches,
+        cache_dir=Path(args.ordering_cache) if args.ordering_cache else None,
+        cache_context=cache_context,
     )
     del arms  # Release selection caches before loading embeddings for batch signals.
 
@@ -172,7 +203,6 @@ def build(args: argparse.Namespace) -> Path:
             "ids": ids,
             **signals.get(bid, {}),
         }
-    dependency = labelfirst_provenance() if "similarity" in arm_names else None
     m = Manifest(
         freeze=args.freeze,
         d1=args.d1,
@@ -274,6 +304,7 @@ def make_parser() -> argparse.ArgumentParser:
         default=None,
         help="append this build's served records, by list letter, to this parquet",
     )
+    b.add_argument("--ordering-cache", help="private run-local ordering cache; omit for replay")
     b.add_argument("--out", default="out")
     b.set_defaults(func=build)
     return p

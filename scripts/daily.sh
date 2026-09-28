@@ -140,12 +140,14 @@ build() {
   local common=(--pool "$STATE/pool.parquet" --freeze "$TODAY" --d1 "$BLITZ_D1"
     --arms "$ARMS" --design rotation --max-batches "$MAX_BATCHES" --key-env WHAT_TO_ID_KEY
     --webapp-dir "$WTB_DIR" "${EMBEDDING_ARGS[@]}")
-  rm -rf "$OUT/draft" "$OUT/final"
-  $PY -m what_to_id.cli build "${common[@]}" --out "$OUT/draft"
+  rm -rf "$OUT/draft" "$OUT/final" "$OUT/ordering-cache"
+  mkdir -p "$OUT/ordering-cache"
+  chmod 700 "$OUT/ordering-cache"
+  $PY -m what_to_id.cli build "${common[@]}" --out "$OUT/draft" --ordering-cache "$OUT/ordering-cache"
   if [ "${OFFLINE:-}" != 1 ]; then
     $PY -m what_to_id.pool_state refresh --pool "$STATE/pool.parquet" --ids "$OUT/draft/batches.parquet"
   fi
-  $PY -m what_to_id.cli build "${common[@]}" --out "$OUT/final" --served-log "$STATE/served.parquet"
+  $PY -m what_to_id.cli build "${common[@]}" --out "$OUT/final" --ordering-cache "$OUT/ordering-cache" --served-log "$STATE/served.parquet"
 
   # The day's exact inputs, kept so this build can be rerun later.
   cp "$STATE/pool.parquet" "$STATE/days/pool-$TODAY.parquet"
