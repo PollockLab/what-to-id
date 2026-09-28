@@ -254,6 +254,8 @@ class Similarity:
         that were already absorbed by an earlier batch are replaced by the nearest free row.
         """
         n = X.shape[0]
+        # Mixed-dtype matmul otherwise converts the whole matrix on every growth step.
+        X64 = np.asarray(X, dtype=np.float64)
         free = np.ones(n, dtype=bool)
         member_of = np.full(n, -1, dtype=np.int64)
         for c, p in enumerate(picks):
@@ -266,7 +268,7 @@ class Similarity:
             free[p] = False
             centroid = X[p].astype(np.float64).copy()
             while len(members) < self.batch_size and free.any():
-                sims = X @ (centroid / max(np.linalg.norm(centroid), 1e-12))
+                sims = X64 @ (centroid / max(np.linalg.norm(centroid), 1e-12))
                 sims[~free] = -np.inf
                 q = int(sims.argmax())
                 members.append(q)
