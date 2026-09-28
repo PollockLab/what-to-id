@@ -1,3 +1,4 @@
+import hashlib
 import json
 from dataclasses import replace
 
@@ -100,3 +101,42 @@ def test_no_events_reports_omission_and_finite_json(monkeypatch):
     assert result["omitted_zero_id_participants_across_replicates"] == 1
     assert result["family_any_rejection"]["rejections"] == 0
     json.dumps(result, allow_nan=False)
+
+
+def test_shared_record_propensities_and_independent_rng_domains(monkeypatch):
+    q = calibration.record_propensities(1000, seed=5)
+    assert set(q) == {0.1, 0.5}
+    np.testing.assert_array_equal(q, calibration.record_propensities(1000, seed=5))
+    assert not np.array_equal(q, calibration.record_propensities(1000, seed=6))
+    np.testing.assert_array_equal(
+        calibration.response_probability(0.1, q, 1, 0),
+        calibration.response_probability(0.5, q, 1, 0),
+    )
+    # Removing all record heterogeneity must leave the participant RNG stream and key alone.
+    baseline, served = simulate(Scenario(), seed=5)
+    _, shared_served = simulate(Scenario(record_difficulty_strength=1), seed=5)
+    pd.testing.assert_frame_equal(served, shared_served)
+    monkeypatch.setattr(
+        calibration, "record_propensities", lambda pool_size, seed: np.full(pool_size, 0.5)
+    )
+    unchanged, same_served = simulate(Scenario(), seed=5)
+    pd.testing.assert_frame_equal(baseline, unchanged)
+    pd.testing.assert_frame_equal(served, same_served)
+    digest = hashlib.sha256(json.dumps(baseline.to_dict("records"), sort_keys=True).encode())
+    assert digest.hexdigest() == "0796e33a32b2a83d9b87a3bd6b16e744138a97a5aa422527b136c384558f6fab"
+
+
+def test_effect_recovery_uses_enrolled_denominator(monkeypatch):
+    events, served = simulate(Scenario(participants=1), seed=5)
+    events.attrs["attempts_per_arm"] = 20
+    monkeypatch.setattr(calibration, "simulate", lambda sc, seed: (events, served))
+    result = diagnose(Scenario(participants=2, effect=0.2), reps=1)
+    got = result["comparisons"]["similarity"]
+    assert got["expected_injected_difference_per_enrolled_participant"] == 2
+    assert got["mean_difference_per_enrolled_participant"] == got["mean_participant_difference"] / 2
+
+
+@pytest.mark.parametrize("strength", [-1, 1.1, float("nan")])
+def test_bad_record_strength_fails(strength):
+    with pytest.raises(ValueError, match="record_difficulty_strength"):
+        Scenario(record_difficulty_strength=strength)
