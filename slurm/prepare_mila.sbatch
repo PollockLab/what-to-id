@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=what-to-id-prepare
 #SBATCH --time=18:00:00
-#SBATCH --mem=64G
+#SBATCH --mem=32G
 #SBATCH --cpus-per-task=6
 #SBATCH --gres=gpu:rtx8000:1
 #SBATCH --partition=unkillable
@@ -22,7 +22,8 @@ export HF_HUB_OFFLINE=1
 export TOKENIZERS_PARALLELISM=false
 cd "$SLURM_TMPDIR"
 uv venv --python 3.11 .venv
-source .venv/bin/activate
+export VIRTUAL_ENV="$SLURM_TMPDIR/.venv"
+export PATH="$VIRTUAL_ENV/bin:$PATH"
 uv pip install --require-hashes -r "$RUN/requirements.lock"
 uv pip install 'torch==2.8.0' 'torchvision==0.23.0' 'open_clip_torch==3.1.0' 'pillow==11.3.0'
 uv pip freeze > "$RUN/preparation-environment.txt"
@@ -43,7 +44,9 @@ done
 for archive in "$RUN"/photos/reference/*.tar; do
     tar xf "$archive" -C reference
 done
-rsync -a "$RUN/work/" work/ 2>/dev/null || true
+if [[ -d "$RUN/work" ]]; then
+    rsync -a "$RUN/work/" work/
+fi
 # Photos remain on node-local storage; preserve completed vectors and attestations.
 persist() {
     mkdir -p "$RUN/work" "$RUN/reference"

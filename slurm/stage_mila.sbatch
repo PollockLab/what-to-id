@@ -2,7 +2,7 @@
 #SBATCH --job-name=what-to-id-photos
 #SBATCH --time=1-23:00:00
 #SBATCH --mem=16G
-#SBATCH --cpus-per-task=4
+#SBATCH --cpus-per-task=2
 #SBATCH --partition=unkillable-cpu
 # Usage: sbatch --dependency=afterok:PULL_JOB --output=RUN/stage-%j.log \
 #   slurm/stage_mila.sbatch RUN POOL FROZEN_REFERENCE
@@ -15,7 +15,8 @@ export PATH="$HOME/.local/bin:$PATH"
 export PYTHONPATH="$RUN/src"
 cd "$SLURM_TMPDIR"
 uv venv --python 3.11 .venv
-source .venv/bin/activate
+export VIRTUAL_ENV="$SLURM_TMPDIR/.venv"
+export PATH="$VIRTUAL_ENV/bin:$PATH"
 uv pip install --require-hashes -r "$RUN/requirements.lock"
 python - "$RUN" "$POOL" "$REFERENCE" <<'PY'
 import json
