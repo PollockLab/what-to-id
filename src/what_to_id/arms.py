@@ -124,10 +124,13 @@ def load_embeddings(path: Path) -> tuple[np.ndarray, np.ndarray, str]:
         raise ValueError(f"{path}: E shape {E.shape} does not match {ids.shape[0]} ids")
     if E.shape[1] == 0:
         raise ValueError(f"{path}: embeddings must have at least one dimension")
-    if not np.isfinite(E).all():
-        raise ValueError(f"{path}: embeddings must contain only finite values")
-    if not np.allclose(np.linalg.norm(E.astype(np.float64), axis=1), 1.0, atol=1e-5):
-        raise ValueError(f"{path}: embedding rows must have unit norm (zero rows are invalid)")
+    # Keep validation workspace bounded instead of copying an entire group to float64.
+    for start in range(0, len(E), 8192):
+        rows = E[start : start + 8192]
+        if not np.isfinite(rows).all():
+            raise ValueError(f"{path}: embeddings must contain only finite values")
+        if not np.allclose(np.linalg.norm(rows.astype(np.float64), axis=1), 1.0, atol=1e-5):
+            raise ValueError(f"{path}: embedding rows must have unit norm (zero rows are invalid)")
     if len(np.unique(ids)) != len(ids):
         raise ValueError(f"{path}: duplicate ids")
     return ids, E, backbone
@@ -138,6 +141,7 @@ class _EmbeddingStore:
 
     ``paths`` is either one npz path (used for every group) or a mapping group -> npz path with
     an optional ``"*"`` fallback. Groups with no file resolve to empty arrays.
+    Only the active file is retained, so visiting groups does not accumulate their matrices.
     """
 
     def __init__(self, paths: Mapping[str, Path] | Path | str):
@@ -157,6 +161,8 @@ class _EmbeddingStore:
             path = Path(self._paths)
         key = str(path)
         if key not in self._cache:
+            self._cache.clear()
+            self._models.clear()
             ids, E, backbone = load_embeddings(Path(path))
             self._cache[key] = (ids, E)
             self._models[key] = backbone

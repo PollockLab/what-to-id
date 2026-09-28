@@ -134,6 +134,7 @@ def build(args: argparse.Namespace) -> Path:
     batches_df = build_batches(
         pool, assign_df, arms, size=args.batch_size, seed=args.seed, max_batches=args.max_batches
     )
+    del arms  # Release selection caches before loading embeddings for batch signals.
 
     for (arm, group), n in batches_df.groupby(["arm", "group"])["id"].size().items():
         nb = batches_df[(batches_df["arm"] == arm) & (batches_df["group"] == group)][
