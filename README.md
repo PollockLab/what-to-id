@@ -128,7 +128,23 @@ python -m what_to_id.analysis --idents out/outcomes_idents.parquet --served stat
 
 The read-back denominator is the served records only: `assign.parquet` covers the whole pool, but `batches.parquet` (one build) and the served log (every daily build) hold just the records placed in a served batch. Both work as `--assign` and `--served`; the served log needs `--label-map`.
 
-Prepare candidate and Research Grade reference embeddings separately with `python -m what_to_id.embed` (a GPU job, see `slurm/embed_mila.sbatch`). The daily runner consumes prepared files; it does not run the image model. Package caches for the pool's taxon groups:
+Prepare embeddings separately from daily serving. `slurm/stage_mila.sbatch` downloads photos on CPU into resumable group archives; `slurm/prepare_mila.sbatch` then regenerates the frozen 10,000-row Research Grade reference and candidate embeddings on GPU using the verified BioCLIP 2.5 checkpoint. The scripts take explicit input paths and never publish. The daily runner consumes the completed bundle.
+
+For subsequent pool snapshots, reuse only an attested prior preparation. The command retains observations whose ID, taxon group and photo URL match, embeds new or changed rows, drops removed IDs and keeps the supplied reference files unchanged:
+
+```bash
+python -m what_to_id.prepare_embeddings --pool data/pool-next.parquet \
+  --previous-pool data/previous-bundle/pool.parquet \
+  --candidate-cache 'data/previous-bundle/embeddings_{group}.npz' \
+  --previous-preparation data/previous-bundle/preparation.json \
+  --reference-embeddings 'data/frozen-reference/emb_{group}_bioclip25.npz' \
+  --reference-pool data/frozen-reference.parquet --model-snapshot data/frozen-model \
+  --work-dir data/preparation-next --out data/bundle-next
+```
+
+`--model-snapshot` must contain the exact config and safetensors weights for revision `6e3d04e3d6522012c88181085c5ae666e14c45cd`; hashes are checked before encoding. Cache reuse verifies the previous pool, model and vector file hashes. Legacy caches without that record require regeneration. URL identity does not detect image bytes changed at the same URL. A work directory resumes only the same inputs, and packing requires complete candidate coverage. Publish the resulting pool, provenance and embeddings together as a new immutable bundle.
+
+To package already verified caches directly:
 
 ```bash
 python -m what_to_id.artifacts pack --pool data/pool_YYYY-MM-DD.parquet --embeddings 'data/candidates/emb_{group}.npz' --reference-embeddings 'data/reference/emb_{group}.npz' --out data/embedding-bundle

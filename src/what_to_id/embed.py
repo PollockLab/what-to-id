@@ -10,6 +10,7 @@ Everything heavy is imported lazily inside functions so the rest of the package 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import time
@@ -79,7 +80,9 @@ def device_label(device: str) -> str:
 
 
 # ---- backbones --------------------------------------------------------------------------
-def load_backbone(name: str, device: str) -> tuple[Callable, Callable]:
+def load_backbone(
+    name: str, device: str, *, model_snapshot: Path | None = None
+) -> tuple[Callable, Callable]:
     """Return (model_fn, preprocess). model_fn(batch_tensor) -> feature tensor."""
     if name not in BACKBONES:
         raise KeyError(f"unknown backbone {name!r}; choose from {sorted(BACKBONES)}")
@@ -90,7 +93,23 @@ def load_backbone(name: str, device: str) -> tuple[Callable, Callable]:
     if kind == "open_clip":
         import open_clip
 
-        model, _, preprocess = open_clip.create_model_and_transforms(model_id)
+        if model_snapshot is None:
+            model, _, preprocess = open_clip.create_model_and_transforms(model_id)
+        else:
+            # Use the snapshot's architecture, preprocessing and weights together.
+            import tempfile
+
+            config = json.loads((model_snapshot / "open_clip_config.json").read_text())
+            with tempfile.TemporaryDirectory() as tmp:
+                config_path = Path(tmp) / "what-to-id-frozen.json"
+                config_path.write_text(json.dumps(config["model_cfg"]))
+                open_clip.add_model_config(config_path)
+                model, _, preprocess = open_clip.create_model_and_transforms(
+                    config_path.stem,
+                    pretrained=str(model_snapshot / "open_clip_model.safetensors"),
+                    pretrained_hf=False,
+                    **{f"image_{key}": value for key, value in config["preprocess_cfg"].items()},
+                )
         model = model.to(device).eval()
         return model.encode_image, preprocess
 
@@ -157,8 +176,10 @@ def _passthrough_path(path: str) -> str:
 
 
 # ---- staging ----------------------------------------------------------------------------
-def photo_path(cache_dir: Path, obs_id: int) -> Path:
-    return Path(cache_dir) / "photos" / f"{int(obs_id)}.jpg"
+def photo_path(cache_dir: Path, obs_id: int, url: str | None = None) -> Path:
+    """Bind cached bytes to the observation and source URL."""
+    suffix = "_" + hashlib.sha256(str(url).encode()).hexdigest() if url is not None else ""
+    return Path(cache_dir) / "photos" / f"{int(obs_id)}{suffix}.jpg"
 
 
 def _fetch_one(
@@ -202,7 +223,7 @@ def stage_images(
     retries: int = 3,
     log: Callable[[str], None] = print,
 ) -> pd.DataFrame:
-    """Download photos to <cache_dir>/photos/<id>.jpg, skipping files that already exist.
+    """Download photos keyed by observation ID and URL, skipping matching cached files.
 
     Returns a copy of pool_df with a ``local_path`` column. Single failures never raise;
     they are collected as (id, error) tuples in ``result.attrs["failed"]``.
@@ -210,7 +231,9 @@ def stage_images(
     cache_dir = Path(cache_dir)
     (cache_dir / "photos").mkdir(parents=True, exist_ok=True)
     out = pool_df.copy()
-    out["local_path"] = [str(photo_path(cache_dir, i)) for i in out["id"]]
+    out["local_path"] = [
+        str(photo_path(cache_dir, i, u)) for i, u in zip(out["id"], out["photo_url"], strict=True)
+    ]
     jobs = [
         (int(i), u, Path(p))
         for i, u, p in zip(out["id"], out["photo_url"], out["local_path"], strict=True)
@@ -342,6 +365,7 @@ def embed_group(
     device: str | None = None,
     log: Callable[[str], None] = print,
     _loader: Callable[[str, str], tuple[Callable, Callable]] | None = None,
+    model_snapshot: Path | None = None,
 ) -> Path:
     """Stage and embed one group; write ``emb_<group>_<backbone>.npz`` plus a json sidecar.
 
@@ -378,7 +402,11 @@ def embed_group(
         emb_device = device or "fake"
     else:
         device = device or pick_device()
-        model_fn, preprocess = load_backbone(backbone, device)
+        model_fn, preprocess = (
+            load_backbone(backbone, device)
+            if model_snapshot is None
+            else load_backbone(backbone, device, model_snapshot=model_snapshot)
+        )
         batch_fn = _torch_batch_fn(model_fn, device)
         open_image = _open_image
         emb_device = device_label(device)
@@ -387,6 +415,12 @@ def embed_group(
     E_new, kept, failed_rows = _embed_paths(
         list(staged["local_path"]), batch_fn, preprocess, batch, open_image=open_image, log=log
     )
+    for index, _ in failed_rows:
+        Path(staged.iloc[index]["local_path"]).unlink(missing_ok=True)
+    if not kept and old_E is None:
+        raise ValueError(
+            f"{group}: no images embedded; fix failures and retry the same work directory"
+        )
     new_ids = staged["id"].to_numpy(dtype=np.int64)
     failed_ids = sorted(stage_failed | {int(new_ids[i]) for i, _ in failed_rows})
     kept_ids = new_ids[kept]

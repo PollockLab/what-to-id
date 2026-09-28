@@ -73,10 +73,12 @@ def test_stage_images_success_retry_and_permanent_failure(tmp_path, monkeypatch,
 
     out = embed.stage_images(pool, tmp_path, workers=2, retries=3, log=logs.append)
 
-    assert list(out["local_path"]) == [str(tmp_path / "photos" / f"{i}.jpg") for i in (1, 2, 3)]
-    assert (tmp_path / "photos" / "1.jpg").read_bytes() == b"one"
-    assert (tmp_path / "photos" / "2.jpg").read_bytes() == b"two"
-    assert not (tmp_path / "photos" / "3.jpg").exists()
+    assert list(out["local_path"]) == [
+        str(embed.photo_path(tmp_path, i, f"https://example.test/{i}.jpg")) for i in (1, 2, 3)
+    ]
+    assert embed.photo_path(tmp_path, 1, "https://example.test/1.jpg").read_bytes() == b"one"
+    assert embed.photo_path(tmp_path, 2, "https://example.test/2.jpg").read_bytes() == b"two"
+    assert not embed.photo_path(tmp_path, 3, "https://example.test/3.jpg").exists()
     assert not list((tmp_path / "photos").glob("*.part"))
     assert get.calls["https://example.test/2.jpg"] == 2
     assert get.calls["https://example.test/3.jpg"] == 3
@@ -90,7 +92,7 @@ def test_stage_images_success_retry_and_permanent_failure(tmp_path, monkeypatch,
 
 def test_stage_images_skips_existing_and_bad_url(tmp_path, monkeypatch, no_sleep):
     (tmp_path / "photos").mkdir()
-    (tmp_path / "photos" / "7.jpg").write_bytes(b"cached")
+    embed.photo_path(tmp_path, 7, "https://example.test/7.jpg").write_bytes(b"cached")
     pool = _pool([7, 8])
     pool.loc[pool["id"] == 8, "photo_url"] = None
     get = _fake_get({})
@@ -99,7 +101,7 @@ def test_stage_images_skips_existing_and_bad_url(tmp_path, monkeypatch, no_sleep
     out = embed.stage_images(pool, tmp_path, log=lambda _: None)
 
     assert get.calls == {}
-    assert (tmp_path / "photos" / "7.jpg").read_bytes() == b"cached"
+    assert embed.photo_path(tmp_path, 7, "https://example.test/7.jpg").read_bytes() == b"cached"
     assert out.attrs["failed"] == [(8, "no photo_url")]
 
 
@@ -277,3 +279,28 @@ def test_separability_report_wraps_labelfirst(monkeypatch):
     assert seen["shape"] == (4, 4) and seen["labels"] == ["a", "b", None, "a"]
     with pytest.raises(ValueError, match="align"):
         embed.separability_report(E, ["a"])
+
+
+def test_changed_url_fetches_new_bytes_despite_old_photo(tmp_path, monkeypatch):
+    pool = _pool([1])
+    old = embed.photo_path(tmp_path, 1, pool.photo_url.iloc[0])
+    old.parent.mkdir()
+    old.write_bytes(b"old")
+    pool.loc[0, "photo_url"] = "https://example.test/new.jpg"
+    get = _fake_get({pool.photo_url.iloc[0]: [b"new"]})
+    monkeypatch.setattr(embed.requests, "get", get)
+    staged = embed.stage_images(pool, tmp_path)
+    assert Path(staged.local_path.iloc[0]).read_bytes() == b"new"
+    assert old.read_bytes() == b"old"
+    assert get.calls == {pool.photo_url.iloc[0]: 1}
+
+
+def test_all_failed_images_can_retry(tmp_path, monkeypatch, no_sleep):
+    pool = _pool([1])
+    monkeypatch.setattr(embed.requests, "get", _fake_get({pool.photo_url.iloc[0]: [b""] * 3}))
+    with pytest.raises(ValueError, match="no images embedded"):
+        embed.embed_group(pool, cache_dir=tmp_path, _loader=_fake_loader)
+    assert not embed.emb_cache_path(tmp_path, "Aves", "bioclip25").exists()
+    monkeypatch.setattr(embed.requests, "get", _fake_get({pool.photo_url.iloc[0]: [b"good"]}))
+    out = embed.embed_group(pool, cache_dir=tmp_path, _loader=_fake_loader)
+    assert embed.load_embeddings(out)[0].tolist() == [1]
