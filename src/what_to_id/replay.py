@@ -18,7 +18,9 @@ from pathlib import Path
 
 import pandas as pd
 
+from what_to_id.artifacts import build_inputs, resolve_embeddings
 from what_to_id.cli import main as cli_main
+from what_to_id.labelfirst_adapter import labelfirst_provenance
 from what_to_id.manifest import code_commit, grid_hash, key_fingerprint, key_from_env, sha256_file
 from what_to_id.served_log import COLUMNS
 
@@ -69,12 +71,16 @@ def _check_preconditions(
             f"{webapp_dir}: grid hash {grid!r} does not match the record's where_to_blitz_grid "
             f"{record.get('where_to_blitz_grid')!r}"
         )
-    if record.get("embeddings_sha256") or record.get("reference_sha256"):
-        raise ReplayError("record used embedding arms; replay does not support them yet")
 
 
 def _rerun(
-    record: dict, pool_path: Path, webapp_dir: Path, key: bytes | None, out: Path, served_log: Path
+    record: dict,
+    pool_path: Path,
+    webapp_dir: Path,
+    key: bytes | None,
+    out: Path,
+    served_log: Path,
+    inputs: dict[str, str | None],
 ) -> None:
     argv = [
         "build",
@@ -99,6 +105,9 @@ def _rerun(
         "--served-log",
         str(served_log),
     ]
+    for name, spec in inputs.items():
+        if spec is not None:
+            argv += ["--" + name.replace("_", "-"), str(spec)]
     if record.get("max_batches") is not None:
         argv += ["--max-batches", str(record["max_batches"])]
     if record.get("assignment") == "keyed":
@@ -112,6 +121,8 @@ def _rerun(
 
 def _compare(expected: pd.DataFrame, rebuilt: pd.DataFrame) -> pd.DataFrame:
     """Rows on one side only, on every served-log column (NaN matches NaN); empty on a match."""
+    if expected.duplicated(COLUMNS).any() or rebuilt.duplicated(COLUMNS).any():
+        raise ReplayError("served logs contain duplicate rows")
     merged = expected[COLUMNS].merge(rebuilt[COLUMNS], on=COLUMNS, how="outer", indicator=True)
     merged = merged[merged["_merge"] != "both"]
     side = merged.pop("_merge").map({"left_only": "served", "right_only": "rebuilt"}).astype(str)
@@ -124,12 +135,52 @@ def replay(
     served_log_path: Path | str,
     webapp_dir: Path | str,
     key: bytes | None = None,
+    *,
+    embedding_bundle: str | None = None,
+    embeddings: str | None = None,
+    reference_embeddings: str | None = None,
+    surprise_scores: str | None = None,
+    sinr_scores: str | None = None,
 ) -> ReplayResult:
     pool_path = Path(pool_path)
     webapp_dir = Path(webapp_dir)
     record = _load_record(record_path)
 
     _check_preconditions(record, pool_path, webapp_dir, key)
+    inputs = dict(
+        embedding_bundle=embedding_bundle,
+        embeddings=embeddings,
+        reference_embeddings=reference_embeddings,
+        surprise_scores=surprise_scores,
+        sinr_scores=sinr_scores,
+    )
+    groups = sorted(
+        pd.read_parquet(pool_path, columns=["iconic_taxon"])["iconic_taxon"]
+        .dropna()
+        .astype(str)
+        .unique()
+    )
+    try:
+        candidates, references = resolve_embeddings(
+            groups, embeddings, reference_embeddings, embedding_bundle
+        )
+        actual = build_inputs(candidates, references, surprise_scores, sinr_scores)
+    except (OSError, ValueError, SystemExit) as exc:
+        raise ReplayError(f"embedding or score input unavailable: {exc}") from exc
+    expected = record.get("input_files", {})
+    if not expected and (
+        record.get("embeddings_sha256")
+        or record.get("reference_sha256")
+        or set(record["arms"]) & {"similarity", "novelty", "surprise"}
+    ):
+        raise ReplayError("embedding or score build has no complete input_files record; rebuild it")
+    if actual != expected:
+        raise ReplayError("embedding or score inputs do not match the recorded files")
+
+    if "similarity" in record["arms"]:
+        dependency = record.get("labelfirst")
+        if dependency is None or dependency != labelfirst_provenance():
+            raise ReplayError("installed LabelFirst does not match the recorded provenance")
 
     current = code_commit()
     if current != record.get("code_commit"):
@@ -142,7 +193,7 @@ def replay(
     # The rerun logs into a fresh served log of its own, through the same code path as the build.
     with tempfile.TemporaryDirectory() as tmp:
         rerun_log = Path(tmp) / "served.parquet"
-        _rerun(record, pool_path, webapp_dir, key, Path(tmp) / "out", rerun_log)
+        _rerun(record, pool_path, webapp_dir, key, Path(tmp) / "out", rerun_log, inputs)
         rebuilt = pd.read_parquet(rerun_log)
 
     build_date = str(record["freeze"])
@@ -179,6 +230,14 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="NAME",
         help="for a keyed record, the env var NAME holding the hex list key",
     )
+    for name in (
+        "embedding-bundle",
+        "embeddings",
+        "reference-embeddings",
+        "surprise-scores",
+        "sinr-scores",
+    ):
+        p.add_argument("--" + name, help="original build input, verified against its recorded hash")
     p.add_argument("-v", "--verbose", action="store_true")
     return p
 
@@ -192,7 +251,18 @@ def main(argv: list[str] | None = None) -> int:
     )
     key = key_from_env(args.key_env) if args.key_env else None
     try:
-        result = replay(args.pool, args.record, args.served_log, args.webapp_dir, key=key)
+        result = replay(
+            args.pool,
+            args.record,
+            args.served_log,
+            args.webapp_dir,
+            key=key,
+            embedding_bundle=args.embedding_bundle,
+            embeddings=args.embeddings,
+            reference_embeddings=args.reference_embeddings,
+            surprise_scores=args.surprise_scores,
+            sinr_scores=args.sinr_scores,
+        )
     except ReplayError as exc:
         log.error("replay refused: %s", exc)
         return 1

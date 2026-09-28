@@ -234,8 +234,11 @@ def repro_section(m: Manifest, f: dict, doc: Doc) -> str:
         ["where-to-blitz grid hash", f"<code>{m.where_to_blitz_grid or 'not recorded'}</code>"],
         [
             "labelfirst commit",
-            f"<code>{m.labelfirst_commit}</code>, the commit of labelfirst, "
-            "the library that picks start photos, not of this repository",
+            (
+                f"<code>{m.labelfirst_commit}</code>, the library that picks start photos"
+                if m.labelfirst_commit
+                else "not used or source revision not recorded"
+            ),
         ],
         [
             "Code commit",

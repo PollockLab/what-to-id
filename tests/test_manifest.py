@@ -5,7 +5,6 @@ from pathlib import Path
 import pytest
 
 from what_to_id.manifest import (
-    LABELFIRST_COMMIT,
     Manifest,
     blind_labels,
     blind_labels_keyed,
@@ -62,7 +61,8 @@ def test_round_trip(tmp_path):
     write_manifest(m, p)
     back = read_manifest(p)
     assert back == m
-    assert back.labelfirst_commit == LABELFIRST_COMMIT
+    assert back.labelfirst_commit == ""
+    assert back.labelfirst is None
     assert back.where_to_blitz_ref == "where-to-blitz@3bdcc68f8d9d17aa5c6060dcbcd965a597dfadc7"
     assert json.loads(p.read_text())["created_at"].endswith("+00:00")
 

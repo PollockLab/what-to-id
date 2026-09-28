@@ -17,7 +17,6 @@ import numpy as np
 # The where-to-blitz commit whose cluster_results/ca the cell scores are read from. Not the
 # grid-outputs-v1 release: that tag predates the 25 km equal-area lattice the scores use.
 WHERE_TO_BLITZ_REF = "where-to-blitz@3bdcc68f8d9d17aa5c6060dcbcd965a597dfadc7"
-LABELFIRST_COMMIT = "5fed14e1870fb8e6ad390d60a9b12e60eaa549f2"
 BLIND_LABELS = "ABCDEFGH"
 
 REQUIRED_KEYS = {
@@ -113,7 +112,8 @@ class Manifest:
     pool_sha256: str
     pool_rows: int
     where_to_blitz_ref: str = WHERE_TO_BLITZ_REF
-    labelfirst_commit: str = LABELFIRST_COMMIT
+    labelfirst_commit: str = ""
+    labelfirst: dict | None = None
     embeddings_sha256: str | None = None
     reference_sha256: str | None = None
     backbone: str | None = None
@@ -126,6 +126,7 @@ class Manifest:
     key_fingerprint: str | None = None
     where_to_blitz_grid: str | None = None
     code_commit: str | None = None
+    input_files: dict[str, dict] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -213,6 +214,9 @@ PUBLIC_BUILD_RECORD_FIELDS = (
     "embeddings_sha256",
     "reference_sha256",
     "created_at",
+    "input_files",
+    "labelfirst",
+    "backbone",
 )
 
 

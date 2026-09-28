@@ -12,10 +12,11 @@ from pathlib import Path
 import pandas as pd
 
 from what_to_id.arms import Arm, build_arm, load_embeddings
+from what_to_id.artifacts import build_inputs, resolve_embeddings, validate_coverage
 from what_to_id.assign import assign, assign_keyed
 from what_to_id.batches import build_batches, identify_url
 from what_to_id.cells import WEBAPP_DIR, score_records
-from what_to_id.embed import emb_cache_path
+from what_to_id.labelfirst_adapter import labelfirst_provenance
 from what_to_id.manifest import (
     Manifest,
     blind_labels,
@@ -41,38 +42,6 @@ def _iso_date(s: str) -> str:
         return date.fromisoformat(s).isoformat()
     except ValueError as e:
         raise argparse.ArgumentTypeError(f"expected YYYY-MM-DD, got {s!r}") from e
-
-
-def _embedding_paths(spec: str | None, groups: list[str]) -> dict[str, Path]:
-    """Resolve --embeddings (a `{group}` pattern or a directory) to group -> npz path."""
-    if spec is None:
-        return {}
-    out: dict[str, Path] = {}
-    if "{group}" in spec:
-        for g in groups:
-            p = Path(spec.format(group=g))
-            if p.exists():
-                out[g] = p
-    else:
-        d = Path(spec)
-        if d.is_dir():
-            for g in groups:
-                # The embed step writes emb_<group>_<backbone>.npz; emb_<group>.npz also works.
-                hits = sorted(d.glob(emb_cache_path(d, g, "*").name)) or sorted(
-                    d.glob(f"emb_{g}.npz")
-                )
-                if len(hits) > 1:
-                    names = ", ".join(h.name for h in hits)
-                    raise SystemExit(
-                        f"{d}: several embedding files for {g} ({names}); pass a {{group}} pattern"
-                    )
-                if hits:
-                    out[g] = hits[0]
-        elif d.exists():
-            out = {"*": d}
-    if not out:
-        raise FileNotFoundError(f"no embedding npz files found from {spec!r}")
-    return out
 
 
 def _make_arms(
@@ -155,8 +124,12 @@ def build(args: argparse.Namespace) -> Path:
     # would give the letter-to-list map away, so it names lists by letter only.
     shown = labels if key is not None else {a: a for a in arm_names}
     groups = sorted(pool["iconic_taxon"].dropna().astype(str).unique())
-    emb = _embedding_paths(args.embeddings, groups)
-    ref = _embedding_paths(args.reference_embeddings, groups)
+    emb, ref = resolve_embeddings(
+        groups, args.embeddings, args.reference_embeddings, args.embedding_bundle
+    )
+    if args.embedding_bundle:
+        validate_coverage(pool, emb, ref)
+    input_files = build_inputs(emb, ref, args.surprise_scores, args.sinr_scores)
     arms = _make_arms(arm_names, args.batch_size, emb, ref)
     batches_df = build_batches(
         pool, assign_df, arms, size=args.batch_size, seed=args.seed, max_batches=args.max_batches
@@ -198,6 +171,7 @@ def build(args: argparse.Namespace) -> Path:
             "ids": ids,
             **signals.get(bid, {}),
         }
+    dependency = labelfirst_provenance() if "similarity" in arm_names else None
     m = Manifest(
         freeze=args.freeze,
         d1=args.d1,
@@ -218,6 +192,9 @@ def build(args: argparse.Namespace) -> Path:
         key_fingerprint=key_fingerprint(key) if key is not None else None,
         where_to_blitz_grid=grid_hash(args.webapp_dir),
         code_commit=code_commit(),
+        input_files=input_files,
+        labelfirst=dependency,
+        labelfirst_commit=str(dependency.get("commit") or "") if dependency else "",
     )
     out.mkdir(parents=True, exist_ok=True)
     write_manifest(m, out / "manifest.json")
@@ -255,6 +232,9 @@ def make_parser() -> argparse.ArgumentParser:
         help="serve only the first N batches per arm and taxon group",
     )
     b.add_argument("--arms", default="recency,gap_first", help="comma-separated arm names")
+    b.add_argument(
+        "--embedding-bundle", help="verified directory made by what_to_id.artifacts pack"
+    )
     b.add_argument("--embeddings", default=None, help="npz path pattern with {group}, or a dir")
     b.add_argument(
         "--reference-embeddings",

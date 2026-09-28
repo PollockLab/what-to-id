@@ -20,6 +20,8 @@ TODAY=${TODAY:-$(date -u +%F)}
 D1=${D1:-2025-01-01}
 STATE_TAG=${STATE_TAG:-pool-state}
 MAX_BATCHES=${MAX_BATCHES:-20}
+ARMS=${ARMS:-recency,gap_first,similarity,novelty}
+EMBEDDING_BUNDLE=${EMBEDDING_BUNDLE:-data/embedding-bundle}
 PY=${PYTHON:-python}
 export PYTHONPATH="src${PYTHONPATH:+:$PYTHONPATH}"
 
@@ -45,6 +47,27 @@ fetch() {
     die "the release holds earlier builds but no served log; restore served.parquet before building"
   fi
   ls -la "$STATE"
+}
+
+fetch_embeddings() {
+  : "${EMBEDDING_RELEASE:?set EMBEDDING_RELEASE to a versioned embedding bundle release tag}"
+  local source_repo=${EMBEDDING_REPO:-${GITHUB_REPOSITORY:-PollockLab/what-to-id}}
+  [ ! -e "$EMBEDDING_BUNDLE" ] || die "embedding destination exists; use a fresh EMBEDDING_BUNDLE path"
+  mkdir -p "$EMBEDDING_BUNDLE"
+  gh release download "$EMBEDDING_RELEASE" --repo "$source_repo" -D "$EMBEDDING_BUNDLE" \
+    -p embedding_bundle.json -p 'embeddings_*.npz' -p 'reference_embeddings_*.npz'
+  $PY -m what_to_id.artifacts verify "$EMBEDDING_BUNDLE"
+}
+
+embedding_args() {
+  EMBEDDING_ARGS=()
+  case ",$ARMS," in
+    *,similarity,*|*,novelty,*)
+      [ -s "$EMBEDDING_BUNDLE/embedding_bundle.json" ] || die "embedding lists require a prepared EMBEDDING_BUNDLE"
+      $PY -m what_to_id.artifacts verify "$EMBEDDING_BUNDLE"
+      EMBEDDING_ARGS=(--embedding-bundle "$EMBEDDING_BUNDLE")
+      ;;
+  esac
 }
 
 check_wtb() {
@@ -83,7 +106,7 @@ build() {
   [ -n "${WHAT_TO_ID_KEY:-}" ] || die "WHAT_TO_ID_KEY is not set"
   : "${BLITZ_D1:?set BLITZ_D1, the blitz start date (YYYY-MM-DD)}"
   check_wtb
-  $PY -m pytest -q -p no:cacheprovider
+  embedding_args
 
   mkdir -p "$STATE/days"
   if [ "${OFFLINE:-}" = 1 ]; then
@@ -95,8 +118,8 @@ build() {
   fi
 
   local common=(--pool "$STATE/pool.parquet" --freeze "$TODAY" --d1 "$BLITZ_D1"
-    --design rotation --max-batches "$MAX_BATCHES" --key-env WHAT_TO_ID_KEY
-    --webapp-dir "$WTB_DIR")
+    --arms "$ARMS" --design rotation --max-batches "$MAX_BATCHES" --key-env WHAT_TO_ID_KEY
+    --webapp-dir "$WTB_DIR" "${EMBEDDING_ARGS[@]}")
   rm -rf "$OUT/draft" "$OUT/final"
   $PY -m what_to_id.cli build "${common[@]}" --out "$OUT/draft"
   if [ "${OFFLINE:-}" != 1 ]; then
@@ -110,7 +133,7 @@ build() {
   check_leaks
   $PY -m what_to_id.replay --pool "$STATE/days/pool-$TODAY.parquet" \
     --record "$STATE/days/build-$TODAY.json" --served-log "$STATE/served.parquet" \
-    --webapp-dir "$WTB_DIR" --key-env WHAT_TO_ID_KEY
+    --webapp-dir "$WTB_DIR" --key-env WHAT_TO_ID_KEY "${EMBEDDING_ARGS[@]}"
 }
 
 save() {
@@ -135,7 +158,8 @@ save() {
 
 case "${1:-}" in
   fetch) fetch ;;
+  fetch-embeddings) fetch_embeddings ;;
   build) build ;;
   save) save ;;
-  *) die "usage: scripts/daily.sh fetch|build|save" ;;
+  *) die "usage: scripts/daily.sh fetch|fetch-embeddings|build|save" ;;
 esac

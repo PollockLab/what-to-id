@@ -84,3 +84,13 @@ def test_replay_reports_mismatch_when_pool_edited_after_build(tmp_path, webapp_d
         ]
     )
     assert rc == 1
+
+
+def test_compare_refuses_duplicate_multiplicity():
+    from what_to_id.replay import _compare
+    from what_to_id.served_log import COLUMNS
+
+    a = dict.fromkeys(COLUMNS, "a")
+    b = dict.fromkeys(COLUMNS, "b")
+    with pytest.raises(ReplayError, match="duplicate"):
+        _compare(pd.DataFrame([a, a, b]), pd.DataFrame([a, b, b]))
