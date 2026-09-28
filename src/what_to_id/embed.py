@@ -260,6 +260,25 @@ def stage_images(
 
 
 # ---- embedding --------------------------------------------------------------------------
+def validate_staged_images(staged: pd.DataFrame) -> list[tuple[int, str]]:
+    """Decode staged photos before marking a durable archive complete; discard corrupt bytes."""
+    from PIL import Image
+
+    failures = list(staged.attrs.get("failed", []))
+    failed_ids = {obs_id for obs_id, _ in failures}
+    for row in staged.itertuples():
+        if row.id in failed_ids:
+            continue
+        path = Path(row.local_path)
+        try:
+            with Image.open(path) as photo:
+                photo.load()
+        except (OSError, ValueError) as exc:
+            path.unlink(missing_ok=True)
+            failures.append((int(row.id), type(exc).__name__))
+    return failures
+
+
 def _l2_normalise(E: np.ndarray) -> np.ndarray:
     E = np.asarray(E, dtype=np.float32)
     norms = np.linalg.norm(E, axis=1, keepdims=True)

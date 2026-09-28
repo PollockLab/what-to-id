@@ -18,6 +18,7 @@ uv venv --python 3.11 .venv
 export VIRTUAL_ENV="$SLURM_TMPDIR/.venv"
 export PATH="$VIRTUAL_ENV/bin:$PATH"
 uv pip install --require-hashes -r "$RUN/requirements.lock"
+uv pip install 'pillow==11.3.0'
 python - "$RUN" "$POOL" "$REFERENCE" <<'PY'
 import json
 import shutil
@@ -25,7 +26,7 @@ import subprocess
 import sys
 from pathlib import Path
 import pandas as pd
-from what_to_id.embed import stage_images
+from what_to_id.embed import stage_images, validate_staged_images
 from what_to_id.manifest import sha256_file
 run, pool, ref = map(Path, sys.argv[1:])
 for kind, source in (("candidate", pool), ("reference", ref)):
@@ -47,7 +48,7 @@ for kind, source in (("candidate", pool), ("reference", ref)):
         if archive.exists():
             subprocess.run(["tar", "xf", str(archive), "-C", str(cache)], check=True)
         result = stage_images(rows, cache, workers=4)
-        failed = result.attrs.get("failed", [])
+        failed = validate_staged_images(result)
         partial = archive.with_suffix(".partial")
         subprocess.run(["tar", "cf", str(partial), "-C", str(cache), "photos"], check=True)
         partial.replace(archive)

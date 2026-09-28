@@ -124,6 +124,9 @@ def prepare(
         "pool_sha256": sha256_file(pool),
         "reference_pool_sha256": sha256_file(reference_pool) if reference_pool else None,
         "previous_pool_sha256": sha256_file(previous_pool) if previous_pool else None,
+        "previous_preparation_sha256": (
+            sha256_file(previous_preparation) if previous_preparation else None
+        ),
         "backbone": "bioclip25",
         "reference_sha256": {g: sha256_file(p) for g, p in references.items()},
     }

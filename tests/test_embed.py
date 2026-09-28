@@ -304,3 +304,20 @@ def test_all_failed_images_can_retry(tmp_path, monkeypatch, no_sleep):
     monkeypatch.setattr(embed.requests, "get", _fake_get({pool.photo_url.iloc[0]: [b"good"]}))
     out = embed.embed_group(pool, cache_dir=tmp_path, _loader=_fake_loader)
     assert embed.load_embeddings(out)[0].tolist() == [1]
+
+
+def test_corrupt_download_is_removed_before_archiving_then_refetched(tmp_path, monkeypatch):
+    import io
+
+    Image = pytest.importorskip("PIL.Image")
+    jpeg = io.BytesIO()
+    Image.new("RGB", (2, 2), "green").save(jpeg, format="JPEG")
+    pool = _pool([1])
+    get = _fake_get({pool.photo_url.iloc[0]: [b"not a JPEG", jpeg.getvalue()]})
+    monkeypatch.setattr(embed.requests, "get", get)
+    staged = embed.stage_images(pool, tmp_path)
+    assert embed.validate_staged_images(staged) == [(1, "UnidentifiedImageError")]
+    assert not Path(staged.local_path.iloc[0]).exists()
+    staged = embed.stage_images(pool, tmp_path)
+    assert embed.validate_staged_images(staged) == []
+    assert get.calls == {pool.photo_url.iloc[0]: 2}
