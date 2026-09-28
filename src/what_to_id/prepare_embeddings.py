@@ -11,7 +11,10 @@ import hashlib
 import importlib.metadata
 import json
 import shutil
-from pathlib import Path
+import tarfile
+import tempfile
+from contextlib import contextmanager, nullcontext
+from pathlib import Path, PurePosixPath
 
 import numpy as np
 import pandas as pd
@@ -28,6 +31,66 @@ MODEL_HASHES = {
         "ac2e37c2f89ef8e6b889176a9a3f418970ad9db15a218bd29e3321e95c46ae97"
     ),
 }
+
+
+@contextmanager
+def extracted_photos(archive: Path, cache: Path, *, headroom_bytes: int = 16 * 1024**3):
+    """Expose one photo archive locally, checking 16 GiB headroom beyond extracted bytes.
+
+    Only the staging format (photos/ and regular files directly inside it) is accepted.
+    The disk check is a preflight, not a reservation against other local writers.
+    """
+    if headroom_bytes < 0:
+        raise ValueError("photo extraction headroom must be nonnegative")
+    cache.mkdir(parents=True, exist_ok=True)
+    photos = cache / "photos"
+    if photos.exists() and not photos.is_symlink():
+        raise ValueError(f"archive extraction would replace existing photos: {photos}")
+
+    def validate(member: tarfile.TarInfo) -> None:
+        name = PurePosixPath(member.name)
+        if member.isdir() and member.name.rstrip("/") == "photos":
+            return
+        if (
+            not member.isfile()
+            or name.is_absolute()
+            or len(name.parts) != 2
+            or name.parts[0] != "photos"
+            or ".." in name.parts
+        ):
+            raise ValueError(f"unsafe photo archive member: {member.name}")
+
+    required = 0
+    with tarfile.open(archive, "r:") as source:
+        for member in source:
+            validate(member)
+            required += member.size
+            source.members.clear()
+    if shutil.disk_usage(cache).free < required + headroom_bytes:
+        raise ValueError(
+            f"insufficient local disk for {archive.name}: need {required} photo bytes "
+            f"plus {headroom_bytes} bytes headroom"
+        )
+    previous_link = photos.readlink() if photos.is_symlink() else None
+    with tempfile.TemporaryDirectory(prefix="photo-group-", dir=cache) as temporary:
+        root = Path(temporary)
+        (root / "photos").mkdir()
+        with tarfile.open(archive, "r|") as source:
+            for member in source:
+                validate(member)
+                source.members.clear()
+                if member.isdir():
+                    continue
+                with source.extractfile(member) as incoming, (root / member.name).open("wb") as out:
+                    shutil.copyfileobj(incoming, out)
+        photos.unlink(missing_ok=True)
+        try:
+            photos.symlink_to((root / "photos").resolve(), target_is_directory=True)
+            yield
+        finally:
+            photos.unlink(missing_ok=True)
+            if previous_link is not None:
+                photos.symlink_to(previous_link, target_is_directory=True)
 
 
 def _verify_snapshot(path: Path) -> dict[str, str]:
@@ -68,6 +131,7 @@ def prepare(
     device: str | None = None,
     batch: int = 64,
     photo_cache: Path | None = None,
+    photo_archive_dir: Path | None = None,
     checkpoint_dir: Path | None = None,
     reference_pool: Path | None = None,
 ) -> Path:
@@ -77,6 +141,8 @@ def prepare(
     the work cache reusable, but complete coverage is required to pack a bundle.
     URL identity cannot detect changed image bytes served at an unchanged URL.
     """
+    if photo_cache is not None and photo_archive_dir is not None:
+        raise ValueError("pass photo_cache or photo_archive_dir, not both")
     if (previous_pool is None) != (candidate_cache is None):
         raise ValueError("pass previous_pool and candidate_cache together")
     if (candidate_cache is None) != (previous_preparation is None):
@@ -187,14 +253,25 @@ def prepare(
                     emb_device="reused",
                     failed_ids=[],
                 )
-        embed_group(
-            current,
-            backbone="bioclip25",
-            cache_dir=cache,
-            device=device,
-            batch=batch,
-            model_snapshot=model_snapshot,
+        complete = (
+            photo_archive_dir is not None
+            and target.exists()
+            and np.isin(current.id, load_embeddings(target)[0]).all()
         )
+        photos = (
+            extracted_photos(photo_archive_dir / f"{group}.tar", cache)
+            if photo_archive_dir is not None and not complete
+            else nullcontext()
+        )
+        with photos:
+            embed_group(
+                current,
+                backbone="bioclip25",
+                cache_dir=cache,
+                device=device,
+                batch=batch,
+                model_snapshot=model_snapshot,
+            )
         if checkpoint_dir is not None:
             destination = checkpoint_dir / "candidates" / target.name
             destination.parent.mkdir(parents=True, exist_ok=True)
@@ -220,6 +297,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--previous-preparation", type=Path)
     parser.add_argument("--device")
     parser.add_argument("--photo-cache", type=Path)
+    parser.add_argument("--photo-archive-dir", type=Path)
     parser.add_argument("--checkpoint-dir", type=Path)
     parser.add_argument("--batch", type=int, default=64)
     args = parser.parse_args(argv)

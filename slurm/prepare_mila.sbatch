@@ -37,13 +37,7 @@ for kind, source in (("candidate", pool), ("reference", reference)):
     if (run / "photos" / kind / "pool.sha256").read_text().strip() != sha256_file(source):
         raise ValueError(f"{kind} photo archives belong to a different pool")
 PY_CHECK
-mkdir -p staged_candidates reference
-for archive in "$RUN"/photos/candidate/*.tar; do
-    tar xf "$archive" -C staged_candidates
-done
-for archive in "$RUN"/photos/reference/*.tar; do
-    tar xf "$archive" -C reference
-done
+mkdir -p reference
 if [[ -d "$RUN/work" ]]; then
     rsync -a "$RUN/work/" work/
 fi
@@ -57,11 +51,12 @@ trap persist EXIT
 python - "$REFERENCE" "$MODEL" <<'PY'
 import json
 import sys
+from contextlib import nullcontext
 from pathlib import Path
 import pandas as pd
-from what_to_id.embed import embed_group
+from what_to_id.embed import emb_cache_path, embed_group, load_embeddings
 from what_to_id.manifest import sha256_file
-from what_to_id.prepare_embeddings import _verify_snapshot, MODEL_REVISION
+from what_to_id.prepare_embeddings import _verify_snapshot, MODEL_REVISION, extracted_photos
 pool, model = map(Path, sys.argv[1:])
 _verify_snapshot(model)
 from what_to_id.prepare_embeddings import verify_reference_cache
@@ -74,9 +69,14 @@ if prior.exists():
 rows = pd.read_parquet(pool)
 if len(rows) != 10000 or rows.id.duplicated().any():
     raise ValueError("expected the frozen unique 10,000-row reference sample")
-for _, group in rows.groupby("iconic_taxon", sort=True):
-    embed_group(group, cache_dir=Path("reference"), backbone="bioclip25",
-                device="cuda", batch=64, model_snapshot=model)
+for name, group in rows.groupby("iconic_taxon", sort=True):
+    target = emb_cache_path(Path("reference"), name, "bioclip25")
+    complete = target.exists() and set(group.id) <= set(load_embeddings(target)[0])
+    photos = nullcontext() if complete else extracted_photos(
+        Path(os.environ["RUN"]) / "photos/reference" / f"{name}.tar", Path("reference"))
+    with photos:
+        embed_group(group, cache_dir=Path("reference"), backbone="bioclip25",
+                    device="cuda", batch=64, model_snapshot=model)
     Path("reference/provenance.json").write_text(json.dumps({
         "pool_sha256": sha256_file(pool), "model_revision": MODEL_REVISION,
         "model_sha256": _verify_snapshot(model),
@@ -90,5 +90,5 @@ python -m what_to_id.prepare_embeddings --pool "$POOL" \
     --reference-pool "$REFERENCE" \
     --model-snapshot "$MODEL" --work-dir "$SLURM_TMPDIR/work/candidates" \
     --out "$RUN/bundle" --device cuda --batch 64 \
-    --photo-cache "$SLURM_TMPDIR/staged_candidates/photos" --checkpoint-dir "$RUN/work/candidates"
+    --photo-archive-dir "$RUN/photos/candidate" --checkpoint-dir "$RUN/work/candidates"
 python -m what_to_id.artifacts verify "$RUN/bundle"

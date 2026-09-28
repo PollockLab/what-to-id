@@ -201,3 +201,164 @@ def test_reference_cache_refuses_unattested_or_changed_source(tmp_path):
     source.write_bytes(b"changed source")
     with pytest.raises(ValueError, match="source/model attestation"):
         prep.verify_reference_cache(cache, source, tmp_path / "model")
+
+
+def _photo_archive(path, members):
+    import io
+    import tarfile
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tarfile.open(path, "w") as archive:
+        for name, content in members.items():
+            member = tarfile.TarInfo(name)
+            member.size = len(content)
+            archive.addfile(member, io.BytesIO(content))
+
+
+def test_archive_preparation_cleans_each_group_and_resumes_checkpoint(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from what_to_id.embed import photo_path
+
+    rows = pd.DataFrame(
+        {
+            "id": [1, 2],
+            "iconic_taxon": ["Aves", "Mammalia"],
+            "photo_url": ["a", "b"],
+            "lat": [0.0, 0.0],
+            "lon": [0.0, 0.0],
+        }
+    )
+    pool = tmp_path / "pool.parquet"
+    rows.to_parquet(pool)
+    reference = tmp_path / "reference.npz"
+    _cache(reference, [99])
+    archives = tmp_path / "archives"
+    ordinary = tmp_path / "ordinary"
+    ordinary.mkdir()
+    for row in rows.itertuples():
+        name = photo_path(tmp_path, row.id, row.photo_url).name
+        content = str(row.id).encode()
+        _photo_archive(archives / f"{row.iconic_taxon}.tar", {f"photos/{name}": content})
+        (ordinary / name).write_bytes(content)
+    monkeypatch.setattr(prep.shutil, "disk_usage", lambda _: SimpleNamespace(free=100 * 1024**3))
+    interrupted = True
+    archive_mode = True
+
+    def encode(current, *, cache_dir, backbone, **kwargs):
+        target = emb_cache_path(cache_dir, current.iconic_taxon.iloc[0], backbone)
+        if target.exists():
+            assert set(current.id) <= set(load_embeddings(target)[0])
+            if archive_mode:
+                assert not (cache_dir / "photos").exists()
+            return target
+        assert len(list((cache_dir / "photos").iterdir())) == (1 if archive_mode else 2)
+        for row in current.itertuples():
+            assert photo_path(cache_dir, row.id, row.photo_url).read_bytes() == str(row.id).encode()
+        if interrupted and current.id.iloc[0] == 2:
+            raise RuntimeError("interrupted second taxon")
+        _cache(target, current.id)
+        return target
+
+    monkeypatch.setattr(prep, "embed_group", encode)
+    args = dict(pool=pool, reference_embeddings=str(reference), model_snapshot=tmp_path / "model")
+    work = tmp_path / "work"
+    checkpoint = tmp_path / "checkpoint"
+    with pytest.raises(RuntimeError, match="interrupted"):
+        prep.prepare(
+            **args,
+            work_dir=work,
+            out=tmp_path / "bundle",
+            photo_archive_dir=archives,
+            checkpoint_dir=checkpoint,
+        )
+    assert not (work / "candidates/photos").is_symlink()
+    assert not list((work / "candidates").glob("photo-group-*"))
+    assert load_embeddings(checkpoint / "candidates/emb_Aves_bioclip25.npz")[0].tolist() == [1]
+    (archives / "Aves.tar").unlink()  # Completed groups must resume without extracting photos.
+    interrupted = False
+    prep.prepare(**args, work_dir=work, out=tmp_path / "bundle", photo_archive_dir=archives)
+    archive_mode = False
+    prep.prepare(
+        **args,
+        work_dir=tmp_path / "ordinary-work",
+        out=tmp_path / "ordinary-bundle",
+        photo_cache=ordinary,
+    )
+    candidates, _ = load_bundle(tmp_path / "bundle")
+    expected, _ = load_bundle(tmp_path / "ordinary-bundle")
+    for group in candidates:
+        actual_ids, actual_vectors, _ = load_embeddings(candidates[group])
+        expected_ids, expected_vectors, _ = load_embeddings(expected[group])
+        np.testing.assert_array_equal(actual_ids, expected_ids)
+        np.testing.assert_array_equal(actual_vectors, expected_vectors)
+    assert not (work / "candidates/photos").is_symlink()
+    assert not list((work / "candidates").glob("photo-group-*"))
+
+
+def test_archive_disk_preflight_preserves_existing_link(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    archive = tmp_path / "group.tar"
+    _photo_archive(archive, {"photos/a.jpg": b"photo"})
+    cache = tmp_path / "cache"
+    cache.mkdir()
+    (cache / "photos").symlink_to("prior-photos", target_is_directory=True)
+    monkeypatch.setattr(prep.shutil, "disk_usage", lambda _: SimpleNamespace(free=14))
+    with (
+        pytest.raises(ValueError, match="insufficient local disk"),
+        prep.extracted_photos(archive, cache, headroom_bytes=10),
+    ):
+        pytest.fail("insufficient space must not reach the encoder")
+    assert (cache / "photos").readlink() == Path("prior-photos")
+    assert not list(cache.glob("photo-group-*"))
+    monkeypatch.setattr(prep.shutil, "disk_usage", lambda _: SimpleNamespace(free=15))
+    with (
+        pytest.raises(RuntimeError, match="encoder failed"),
+        prep.extracted_photos(archive, cache, headroom_bytes=10),
+    ):
+        assert (cache / "photos/a.jpg").read_bytes() == b"photo"
+        raise RuntimeError("encoder failed")
+    assert (cache / "photos").readlink() == Path("prior-photos")
+    assert not list(cache.glob("photo-group-*"))
+
+
+@pytest.mark.parametrize("name", ["../escape.jpg", "/photos/a.jpg", "photos/../escape.jpg"])
+def test_archive_rejects_unsafe_paths_before_extraction(tmp_path, name):
+    archive = tmp_path / "group.tar"
+    _photo_archive(archive, {name: b"photo"})
+    with (
+        pytest.raises(ValueError, match="unsafe photo archive member"),
+        prep.extracted_photos(archive, tmp_path / "cache", headroom_bytes=0),
+    ):
+        pytest.fail("unsafe archive reached the encoder")
+    assert not list((tmp_path / "cache").iterdir())
+
+
+def test_archive_rejects_links(tmp_path):
+    import tarfile
+
+    archive = tmp_path / "group.tar"
+    with tarfile.open(archive, "w") as out:
+        member = tarfile.TarInfo("photos/link.jpg")
+        member.type = tarfile.SYMTYPE
+        member.linkname = "../../outside"
+        out.addfile(member)
+    with (
+        pytest.raises(ValueError, match="unsafe photo archive member"),
+        prep.extracted_photos(archive, tmp_path / "cache", headroom_bytes=0),
+    ):
+        pytest.fail("archive link reached the encoder")
+
+
+def test_photo_cache_and_archives_are_mutually_exclusive(tmp_path):
+    with pytest.raises(ValueError, match="not both"):
+        prep.prepare(
+            tmp_path / "unused",
+            reference_embeddings="unused",
+            model_snapshot=tmp_path / "model",
+            work_dir=tmp_path / "work",
+            out=tmp_path / "bundle",
+            photo_cache=tmp_path,
+            photo_archive_dir=tmp_path,
+        )
