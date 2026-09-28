@@ -78,9 +78,9 @@ uv venv && source .venv/bin/activate
 uv pip install -e ".[dev]"      # add ,embed for the image-embedding step, ,similarity for look-alike batches
 ```
 
-The `similarity` extra installs `labelfirst`, a private repository pinned by commit in `pyproject.toml`, so it needs access to that repository. Only the look-alike list's seed picker and the separability report use it; the two-list build and the daily job run without it.
+The `similarity` extra installs `labelfirst`, a private repository pinned by commit in `pyproject.toml`, so it needs access to that repository. Only the look-alike list's seed picker and the separability report use it. The four-list daily build needs this extra; an explicit `recency,gap_first` build still runs without it. CI needs the `LABELFIRST_READ_TOKEN` secret with read access to the pinned repository to test the integration.
 
-The daily job and CI install exact, hash-pinned versions from `requirements.lock` (`pip install --require-hashes -r requirements.lock`, then run with `PYTHONPATH=src`). After changing the dependencies in `pyproject.toml`, regenerate it with `uv pip compile pyproject.toml --extra dev --universal --python-version 3.11 --generate-hashes -o requirements.lock`.
+The base CI job installs exact, hash-pinned versions from `requirements.lock` (`pip install --require-hashes -r requirements.lock`, then run with `PYTHONPATH=src`). After changing the dependencies in `pyproject.toml`, regenerate it with `uv pip compile pyproject.toml --extra dev --universal --python-version 3.11 --generate-hashes -o requirements.lock`.
 
 ## Use
 
@@ -103,13 +103,16 @@ what-to-id build --pool data/pool_YYYY-MM-DD.parquet --freeze YYYY-MM-DD --d1 YY
 # keep the day's pool and build record, check for leaks and replay the build. WTB_DIR is a where-to-blitz
 # checkout at the commit in what_to_id.manifest.WHERE_TO_BLITZ_REF. OFFLINE=1 rehearses on a saved pool.
 export WTB_DIR=../where-to-blitz/cluster_results/ca BLITZ_D1=<blitz-start>
-scripts/daily.sh fetch && scripts/daily.sh build     # scripts/daily.sh save uploads the state
+export EMBEDDING_RELEASE=<versioned-bundle-tag>
+scripts/daily.sh fetch
+scripts/daily.sh fetch-embeddings
+scripts/daily.sh build     # scripts/daily.sh save uploads the state
 
 # Rerun any past day from its snapshot; exits 1 unless it serves exactly what the served log says
-python -m what_to_id.replay --pool state/days/pool-YYYY-MM-DD.parquet --record state/days/build-YYYY-MM-DD.json --served-log state/served.parquet --webapp-dir "$WTB_DIR" --key-env WHAT_TO_ID_KEY
+python -m what_to_id.replay --pool state/days/pool-YYYY-MM-DD.parquet --record state/days/build-YYYY-MM-DD.json --served-log state/served.parquet --webapp-dir "$WTB_DIR" --key-env WHAT_TO_ID_KEY --embedding-bundle data/embedding-bundle
 
 # After the blitz, open the key: letter -> list map for the read-back and the analysis
-python -c "import json; from what_to_id.manifest import blind_labels_keyed as b, key_from_env as k; print(json.dumps({v: a for a, v in b(['recency', 'gap_first'], k()).items()}))" > labels.json
+python -c "import json; from what_to_id.manifest import blind_labels_keyed as b, key_from_env as k; print(json.dumps({v: a for a, v in b(['recency', 'gap_first', 'similarity', 'novelty'], k()).items()}))" > labels.json
 
 # Read back outcomes after the blitz: within a week for the per-identifier comparison, again at 30 days
 python -m what_to_id.readback --pool state/pool.parquet --assign state/served.parquet --label-map labels.json --out out/outcomes.parquet
@@ -125,11 +128,23 @@ python -m what_to_id.analysis --idents out/outcomes_idents.parquet --served stat
 
 The read-back denominator is the served records only: `assign.parquet` covers the whole pool, but `batches.parquet` (one build) and the served log (every daily build) hold just the records placed in a served batch. Both work as `--assign` and `--served`; the served log needs `--label-map`.
 
-The similarity and novelty arms need image embeddings: embed the records assigned to them with `python -m what_to_id.embed` (a GPU job, see `slurm/embed_mila.sbatch`), then pass `--embeddings` and `--reference-embeddings` to `build`. The `gap_first` arm reads where-to-blitz's `cluster_results/ca`; point `--webapp-dir` or the `WHERE_TO_BLITZ_CA` environment variable at a checkout of it.
+Prepare candidate and Research Grade reference embeddings separately with `python -m what_to_id.embed` (a GPU job, see `slurm/embed_mila.sbatch`). The daily runner consumes prepared files; it does not run the image model. Package caches for the pool's taxon groups:
+
+```bash
+python -m what_to_id.artifacts pack --pool data/pool_YYYY-MM-DD.parquet --embeddings 'data/candidates/emb_{group}.npz' --reference-embeddings 'data/reference/emb_{group}.npz' --out data/embedding-bundle
+python -m what_to_id.artifacts verify data/embedding-bundle
+what-to-id build --pool data/pool_YYYY-MM-DD.parquet --freeze YYYY-MM-DD --d1 YYYY-MM-DD --seed 0 --key-env WHAT_TO_ID_KEY --arms recency,gap_first,similarity,novelty --design rotation --embedding-bundle data/embedding-bundle --out out/build
+```
+
+Publish `embedding_bundle.json` and the accompanying NPZ files together as assets of a versioned release, then configure `EMBEDDING_RELEASE` and, if hosted elsewhere, `EMBEDDING_REPO`. `EMBEDDING_BUNDLE` defaults to `data/embedding-bundle`; downloading requires a fresh destination. The operator must provide release access where needed. Production rollout still requires embedding preparation, release upload, secret configuration and deployment.
+
+A build records each candidate/reference file's content hash, dimensions, row count and backbone by taxon group. Replay accepts the original bundle or matching `--embeddings` and `--reference-embeddings` inputs; it refuses changed files. Builds using score files also require the original `--surprise-scores` or `--sinr-scores`. Older image-list build records without complete per-file fingerprints must be rebuilt before this replay path can verify them. Missing individual candidate embeddings retain the arm's recency fallback, so adding new records can require refreshed caches to keep image-based ordering useful.
+
+The `gap_first` arm reads where-to-blitz's `cluster_results/ca`; point `--webapp-dir` or the `WHERE_TO_BLITZ_CA` environment variable at a checkout of it.
 
 ## Publish
 
-The live page is served at https://pollocklab.github.io/what-to-id/. The daily workflow (`.github/workflows/daily.yml`) rebuilds and deploys it every morning once the repository variable `DAILY_ENABLED` is `true`, and on demand from the Actions tab. It reads the key from the `WHAT_TO_ID_KEY` secret and the blitz start from the `BLITZ_D1` variable, and runs `scripts/daily.sh`. It refuses to deploy a page that names a list, reruns the day's build from its snapshot and stops unless that matches the served log exactly, and deploys before it saves the state, so the served log never lists a page that did not go live. The `pool-state` release keeps the pool, the served log (letters only), and each day's pool snapshot and public build record. Set the repository variable `CODE_REF` to a tag to run the same code for the whole blitz; each build record names the commit that ran. Actions are pinned by commit SHA. GitHub turns a schedule off after 60 days without a push to the repository, so push at least once in that window while it runs.
+The live page is served at https://pollocklab.github.io/what-to-id/. The daily workflow (`.github/workflows/daily.yml`) rebuilds and deploys it every morning once the repository variable `DAILY_ENABLED` is `true`, and on demand from the Actions tab. It reads the key from the `WHAT_TO_ID_KEY` secret and the blitz start from the `BLITZ_D1` variable, and runs `scripts/daily.sh`. The script defaults to four lists with rotation and requires a prepared embedding bundle. Configure its versioned release and LabelFirst repository access before enabling this workflow. It refuses to deploy a page that names a list, reruns the day's build from its snapshot and stops unless that matches the served log exactly, and deploys before it saves the state, so the served log never lists a page that did not go live. The `pool-state` release keeps the pool, the served log (letters only), and each day's pool snapshot and public build record. Set the repository variable `CODE_REF` to a tag to run the same code for the whole blitz; each build record names the commit that ran. Actions are pinned by commit SHA. GitHub turns a schedule off after 60 days without a push to the repository, so push at least once in that window while it runs.
 
 A one-off build is published instead by copying `out/build/site/*.html` over `site/`, which the Pages workflow deploys on a push to main (while `DAILY_ENABLED` is `true`, only when run by hand from the Actions tab, so a push never overwrites the daily page); a rotation build writes only `index.html`, so delete the old `arm_*.html` pages when switching. Both workflows refuse any file that is not HTML and any page that names an arm. Keep the key, and a real build's manifest and seed, out of the repo: with the public code and the same pool, any of them recovers which list is which.
 

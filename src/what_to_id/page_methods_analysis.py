@@ -261,8 +261,9 @@ def repro_section(m: Manifest, f: dict, doc: Doc) -> str:
         "What identifies this build. None of it is secret.", ["Field", "Value"], rows, wrap=True
     )
     replay = (
-        " The rerun cannot yet check builds with image-model lists, so this build cannot be "
-        "checked this way."
+        " Image-based builds also require the original candidate and reference embeddings, "
+        "matched by their recorded file hashes. Older records without these fingerprints "
+        "need a new build before this check can verify them."
         if image
         else ""
     )

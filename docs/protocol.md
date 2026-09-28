@@ -78,7 +78,7 @@ The ID-rate factors, the lifts, the effort model (lognormal, median 100 records,
 
 ## Reproducibility
 
-Each daily build comes from a pull of the iNaturalist API at a recorded time, the private list key, and a pinned where-to-blitz commit whose grid is recorded by its hash in every build. Every day's served batches and record ids are logged by list letter, so exposure is fully known and the read-back is a join, not a reconstruction. The key maps letters to lists after the read-back.
+Each daily build comes from a pull of the iNaturalist API at a recorded time, the private list key, and a pinned where-to-blitz commit whose grid is recorded by its hash in every build. Every day's served batches and record ids are logged by list letter, so exposure is fully known and the read-back is a join, not a reconstruction. The key maps letters to lists after the read-back. Four-list builds also record candidate and reference embedding fingerprints by taxon group. Replay requires matching files and checks the rebuilt served records against the saved log. The image model runs separately; daily builds consume a prepared, versioned embedding bundle.
 
 ## Open with the BC team
 
@@ -88,4 +88,4 @@ Each daily build comes from a pull of the iNaturalist API at a recorded time, th
 
 ## Open before the blitz
 
-- The daily job (`scripts/daily.sh`) passes no list names and no image embeddings to the build, so it builds the build command's default of two lists, newest first and data-poor places first, not the four above. Building look-alikes together and unfamiliar photos first every day needs the image model and its embeddings on the machine that runs the daily job. Where that runs is an infrastructure decision, still open.
+- Prepare candidate and Research Grade reference embeddings, publish a verified bundle as versioned release assets, and configure its release and repository access. The daily script defaults to the four lists and rotation; it refuses to proceed without the required bundle. Configure the private LabelFirst dependency access, list key and blitz dates, then rehearse build and replay before enabling deployment. Preparation, publishing and deployment remain operational steps before launch.

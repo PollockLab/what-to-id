@@ -195,9 +195,9 @@ def records_section(m: Manifest, f: dict, doc: Doc) -> str:
         f"<p>This page is one build, of records added up to {m.freeze}, and it does not change "
         "by itself. In the blitz, a daily job adds new records, drops served records that no "
         "longer need an ID, and builds again each day "
-        f"({a('README.md#how-it-works', 'the README')}). As written, the daily job builds only "
-        "two lists, newest first and data-poor places first, because it does not name the "
-        "lists to build.</p>"
+        f"({a('README.md#how-it-works', 'the README')}). The daily script defaults to all four "
+        "lists with rotation. The image-based lists require embeddings prepared separately; "
+        "the daily build checks the supplied files before using them.</p>"
         f"{frame}"
         + fold("what the pull asks for, and what the build record keeps", detail)
         + codes("inat", "pool_state", "daily")
