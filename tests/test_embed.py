@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from threading import Event
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -103,6 +105,59 @@ def test_stage_images_skips_existing_and_bad_url(tmp_path, monkeypatch, no_sleep
     assert get.calls == {}
     assert embed.photo_path(tmp_path, 7, "https://example.test/7.jpg").read_bytes() == b"cached"
     assert out.attrs["failed"] == [(8, "no photo_url")]
+
+
+@pytest.mark.parametrize("workers", [0, 1, 3])
+def test_stage_images_bounds_queued_downloads_and_preserves_failure_order(
+    tmp_path, monkeypatch, workers
+):
+    release = Event()
+    executor = embed.ThreadPoolExecutor
+    limit = 2 * max(1, workers)
+    outstanding = 0
+    peak = 0
+
+    class TrackedExecutor(executor):
+        def submit(self, *args, **kwargs):
+            nonlocal outstanding, peak
+            outstanding += 1
+            peak = max(peak, outstanding)
+            if outstanding > limit:
+                release.set()
+                pytest.fail("downloads queued beyond the bounded window")
+            future = super().submit(*args, **kwargs)
+
+            def result():
+                nonlocal outstanding
+                release.set()
+                value = future.result(timeout=5)
+                outstanding -= 1
+                return value
+
+            return SimpleNamespace(result=result)
+
+    def fetch(obs_id, *args, **kwargs):
+        assert release.wait(timeout=5)
+        return obs_id, "failed"
+
+    monkeypatch.setattr(embed, "ThreadPoolExecutor", TrackedExecutor)
+    monkeypatch.setattr(embed, "_fetch_one", fetch)
+    ids = list(range(17, 0, -1))
+    out = embed.stage_images(_pool(ids), tmp_path, workers=workers, log=lambda _: None)
+
+    assert peak == limit
+    assert outstanding == 0
+    assert out.attrs["failed"] == [(i, "failed") for i in ids]
+
+
+def test_stage_images_empty_pool(tmp_path, monkeypatch):
+    def fetch(*args, **kwargs):
+        pytest.fail("empty input must not download photos")
+
+    monkeypatch.setattr(embed, "_fetch_one", fetch)
+    out = embed.stage_images(_pool([]), tmp_path, log=lambda _: None)
+    assert out.empty
+    assert out.attrs["failed"] == []
 
 
 # ---- embedding core ---------------------------------------------------------------------

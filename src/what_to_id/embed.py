@@ -14,6 +14,7 @@ import hashlib
 import importlib.util
 import json
 import time
+from collections import deque
 from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
@@ -234,25 +235,36 @@ def stage_images(
     out["local_path"] = [
         str(photo_path(cache_dir, i, u)) for i, u in zip(out["id"], out["photo_url"], strict=True)
     ]
-    jobs = [
+    jobs = (
         (int(i), u, Path(p))
         for i, u, p in zip(out["id"], out["photo_url"], out["local_path"], strict=True)
-    ]
+    )
     t0 = time.time()
     failed: list[tuple[int, str]] = []
-    with ThreadPoolExecutor(max_workers=max(1, workers)) as ex:
-        futures = [
-            ex.submit(_fetch_one, i, u, p, timeout=timeout, retries=retries, sleep=time.sleep)
-            for i, u, p in jobs
-        ]
-        for k, fut in enumerate(futures, 1):
-            obs_id, err = fut.result()
+    workers = max(1, workers)
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        futures = deque()
+
+        def submit_next() -> None:
+            job = next(jobs, None)
+            if job is not None:
+                futures.append(
+                    ex.submit(_fetch_one, *job, timeout=timeout, retries=retries, sleep=time.sleep)
+                )
+
+        for _ in range(2 * workers):
+            submit_next()
+        k = 0
+        while futures:
+            obs_id, err = futures.popleft().result()
+            k += 1
             if err is not None:
                 failed.append((obs_id, err))
             if k % 200 == 0:
-                log(f"  [stage] {k}/{len(jobs)} ({len(failed)} failed)")
+                log(f"  [stage] {k}/{len(out)} ({len(failed)} failed)")
+            submit_next()
     log(
-        f"[stage] {len(jobs) - len(failed)}/{len(jobs)} photos in {cache_dir / 'photos'} "
+        f"[stage] {len(out) - len(failed)}/{len(out)} photos in {cache_dir / 'photos'} "
         f"({len(failed)} failed, {time.time() - t0:.0f}s)"
     )
     out.attrs["failed"] = failed
