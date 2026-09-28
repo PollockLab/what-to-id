@@ -258,3 +258,18 @@ def test_bundle_detects_changed_prepared_pool(embedding_build, tmp_path):
         stream.write(b"modified")
     with pytest.raises(ValueError, match="prepared pool"):
         load_bundle(bundle)
+
+
+def test_bundle_preserves_preparation_provenance(embedding_build, tmp_path):
+    from what_to_id.artifacts import load_bundle, pack_bundle
+
+    pool, _, _, candidates, references = embedding_build
+    provenance = tmp_path / "preparation.json"
+    provenance.write_text(json.dumps({"model_revision": "frozen"}))
+    bundle = pack_bundle(
+        pool, str(candidates), str(references), tmp_path / "bundle", preparation=provenance
+    )
+    assert (bundle / "preparation.json").read_bytes() == provenance.read_bytes()
+    (bundle / "preparation.json").write_text("{}")
+    with pytest.raises(ValueError, match="preparation.json"):
+        load_bundle(bundle)

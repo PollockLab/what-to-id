@@ -74,17 +74,9 @@ def load_bundle(root: str | Path) -> tuple[dict[str, Path], dict[str, Path]]:
     manifest = json.loads((root / "embedding_bundle.json").read_text())
     if manifest.get("schema_version") != 1:
         raise ValueError("unsupported embedding bundle schema_version")
-    pool_info = manifest.get("pool")
-    if not isinstance(pool_info, dict):
-        raise ValueError("embedding bundle needs a recorded prepared pool")
-    path = root / "pool.parquet"
-    if (
-        pool_info.get("file") != "pool.parquet"
-        or path.is_symlink()
-        or not path.is_file()
-        or sha256_file(path) != pool_info.get("sha256")
-    ):
-        raise ValueError("prepared pool does not match the embedding bundle record")
+    _verify_recorded_file(root, manifest.get("pool"), "pool.parquet")
+    if "preparation" in manifest:
+        _verify_recorded_file(root, manifest["preparation"], "preparation.json")
     expected = manifest.get("files", {})
     if set(expected) != {"embeddings", "reference_embeddings"}:
         raise ValueError("bundle needs candidate and reference embeddings")
@@ -116,6 +108,18 @@ def load_bundle(root: str | Path) -> tuple[dict[str, Path], dict[str, Path]]:
     if "*" in candidates and "*" in references:
         _check_pair(candidates["*"], references["*"], "*")
     return result[0], result[1]
+
+
+def _verify_recorded_file(root: Path, info: dict | None, filename: str) -> None:
+    path = root / filename
+    if (
+        not isinstance(info, dict)
+        or info.get("file") != filename
+        or path.is_symlink()
+        or not path.is_file()
+        or sha256_file(path) != info.get("sha256")
+    ):
+        raise ValueError(f"prepared {filename} does not match the embedding bundle record")
 
 
 def _check_pair(candidate: dict | None, reference: dict | None, group: str) -> None:
@@ -162,7 +166,14 @@ def validate_coverage(pool, candidates: dict[str, Path], references: dict[str, P
             raise ValueError(f"embedding bundle has no reference rows for {group}")
 
 
-def pack_bundle(pool: str | Path, embeddings: str, reference: str, out: str | Path) -> Path:
+def pack_bundle(
+    pool: str | Path,
+    embeddings: str,
+    reference: str,
+    out: str | Path,
+    *,
+    preparation: str | Path | None = None,
+) -> Path:
     """Copy complete prepared caches into a portable, fingerprinted release asset set."""
     import json
     import re
@@ -209,6 +220,12 @@ def pack_bundle(pool: str | Path, embeddings: str, reference: str, out: str | Pa
             "files": files,
             "pool": {"file": "pool.parquet", "sha256": sha256_file(stage / "pool.parquet")},
         }
+        if preparation is not None:
+            shutil.copyfile(preparation, stage / "preparation.json")
+            manifest["preparation"] = {
+                "file": "preparation.json",
+                "sha256": sha256_file(stage / "preparation.json"),
+            }
         (stage / "embedding_bundle.json").write_text(
             json.dumps(manifest, indent=2, sort_keys=True) + "\n"
         )
@@ -225,12 +242,19 @@ def main(argv: list[str] | None = None) -> int:
     pack = sub.add_parser("pack", help="package precomputed caches for a versioned release")
     for flag in ("pool", "embeddings", "reference-embeddings", "out"):
         pack.add_argument("--" + flag, required=True)
+    pack.add_argument("--preparation", help="preparation provenance JSON to preserve in the bundle")
     verify = sub.add_parser("verify", help="verify all files in a downloaded bundle")
     verify.add_argument("bundle")
     args = parser.parse_args(argv)
     try:
         if args.command == "pack":
-            pack_bundle(args.pool, args.embeddings, args.reference_embeddings, args.out)
+            pack_bundle(
+                args.pool,
+                args.embeddings,
+                args.reference_embeddings,
+                args.out,
+                preparation=args.preparation,
+            )
         else:
             load_bundle(args.bundle)
     except (OSError, ValueError, KeyError) as exc:

@@ -67,7 +67,7 @@ fetch_embeddings() {
   [ ! -e "$EMBEDDING_BUNDLE" ] || die "embedding destination exists; use a fresh EMBEDDING_BUNDLE path"
   mkdir -p "$EMBEDDING_BUNDLE"
   gh release download "$EMBEDDING_RELEASE" --repo "$source_repo" -D "$EMBEDDING_BUNDLE" \
-    -p embedding_bundle.json -p pool.parquet -p 'embeddings_*.npz' -p 'reference_embeddings_*.npz'
+    -p '*.json' -p pool.parquet -p 'embeddings_*.npz' -p 'reference_embeddings_*.npz'
   $PY -m what_to_id.artifacts verify "$EMBEDDING_BUNDLE"
 }
 
