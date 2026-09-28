@@ -30,17 +30,29 @@ die() {
   exit 1
 }
 
+state_release_exists() {
+  local response
+  if response=$(gh api --include --silent "repos/$1/releases/tags/$STATE_TAG" 2>&1); then
+    return 0
+  fi
+  if grep -Eq '^HTTP/[0-9.]+ 404([[:space:]]|$)' <<<"$response"; then
+    return 1
+  fi
+  die "cannot read $1 release $STATE_TAG; refusing to assume this is the first build"
+}
+
 fetch() {
+  local state_repo=${STATE_REPO:-${GITHUB_REPOSITORY:-PollockLab/what-to-id}}
   mkdir -p "$STATE"
-  if ! gh release view "$STATE_TAG" >/dev/null 2>&1; then
+  if ! state_release_exists "$state_repo"; then
     echo "no $STATE_TAG release yet: the first build pulls the whole pool"
     return
   fi
   local assets
-  assets=$(gh release view "$STATE_TAG" --json assets --jq '.assets[].name')
+  assets=$(gh release view "$STATE_TAG" --repo "$state_repo" --json assets --jq '.assets[].name')
   for f in pool.parquet served.parquet; do
     if grep -qx "$f" <<<"$assets"; then
-      gh release download "$STATE_TAG" -D "$STATE" -p "$f" --clobber
+      gh release download "$STATE_TAG" --repo "$state_repo" -D "$STATE" -p "$f" --clobber
     fi
   done
   if grep -q '^build-.*\.json$' <<<"$assets" && [ ! -s "$STATE/served.parquet" ]; then
@@ -143,17 +155,20 @@ build() {
 }
 
 save() {
+  local state_repo=${STATE_REPO:-${GITHUB_REPOSITORY:-PollockLab/what-to-id}}
   local files=("$STATE/pool.parquet" "$STATE/served.parquet"
     "$STATE/days/pool-$TODAY.parquet" "$STATE/days/build-$TODAY.json")
   for f in "${files[@]}"; do
     [ -s "$f" ] || die "missing $f; run build first"
   done
-  gh release view "$STATE_TAG" >/dev/null 2>&1 || gh release create "$STATE_TAG" \
-    --prerelease --latest=false --title "Daily pool state" \
-    --notes "Pool, served log (list letters only), and each day's pool and build record, kept between daily builds."
+  if ! state_release_exists "$state_repo"; then
+    gh release create "$STATE_TAG" --repo "$state_repo" \
+      --prerelease --latest=false --title "Daily pool state" \
+      --notes "Pool, served log (list letters only), and each day's pool and build record, kept between daily builds."
+  fi
   local attempt
   for attempt in 1 2 3; do
-    if gh release upload "$STATE_TAG" "${files[@]}" --clobber; then
+    if gh release upload "$STATE_TAG" "${files[@]}" --repo "$state_repo" --clobber; then
       return
     fi
     echo "upload failed (attempt $attempt), retrying"
