@@ -78,7 +78,7 @@ uv venv && source .venv/bin/activate
 uv pip install -e ".[dev]"      # add ,embed for the image-embedding step, ,similarity for look-alike batches
 ```
 
-The `similarity` extra installs `labelfirst`, a private repository pinned by commit in `pyproject.toml`, so it needs access to that repository. Only the look-alike list's seed picker and the separability report use it. The four-list daily build needs this extra; an explicit `recency,gap_first` build still runs without it. CI needs the `LABELFIRST_READ_TOKEN` secret with read access to the pinned repository to test the integration.
+The `similarity` extra installs `labelfirst`, a private repository pinned by commit in `pyproject.toml`, so it needs access to that repository. Only the look-alike list's seed picker and the separability report use it. The four-list daily build needs this extra; an explicit `recency,gap_first` build still runs without it. CI uses the `LABELFIRST_DEPLOY_KEY` secret, the private half of a dedicated read-only deploy key on `traitlab/labelfirst`, to check out the pinned library and test the integration.
 
 The base CI job installs exact, hash-pinned versions from `requirements.lock` (`pip install --require-hashes -r requirements.lock`, then run with `PYTHONPATH=src`). After changing the dependencies in `pyproject.toml`, regenerate it with `uv pip compile pyproject.toml --extra dev --universal --python-version 3.11 --generate-hashes -o requirements.lock`.
 

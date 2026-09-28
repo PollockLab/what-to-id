@@ -67,10 +67,10 @@ jobs:
       - name: Resolve LabelFirst revision and require daily inputs
         id: labelfirst
         env:
-          LABELFIRST_READ_TOKEN: ${{ secrets.LABELFIRST_READ_TOKEN }}
+          LABELFIRST_DEPLOY_KEY: ${{ secrets.LABELFIRST_DEPLOY_KEY }}
         run: |
-          if [ -z "$LABELFIRST_READ_TOKEN" ]; then
-            echo '::error::LABELFIRST_READ_TOKEN needs read-only Contents access to traitlab/labelfirst.'
+          if [ -z "$LABELFIRST_DEPLOY_KEY" ]; then
+            echo '::error::LABELFIRST_DEPLOY_KEY must be the private half of a read-only traitlab/labelfirst deploy key.'
             exit 1
           fi
           if [ -z "$EMBEDDING_RELEASE" ]; then
@@ -89,7 +89,7 @@ jobs:
           repository: traitlab/labelfirst
           ref: ${{ steps.labelfirst.outputs.revision }}
           path: .integration/labelfirst
-          token: ${{ secrets.LABELFIRST_READ_TOKEN }}
+          ssh-key: ${{ secrets.LABELFIRST_DEPLOY_KEY }}
           persist-credentials: false
       # The small optional lock adds only packages absent from the base lock. Installing
       # together prevents optional dependencies from silently replacing tested base pins.

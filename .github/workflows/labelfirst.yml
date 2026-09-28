@@ -1,8 +1,8 @@
 name: labelfirst consumer integration
 
 # Base CI intentionally has no private dependencies. Run this workflow after changing
-# the LabelFirst pin or adapter. LABELFIRST_READ_TOKEN needs read-only Contents access
-# to traitlab/labelfirst; it is used only by checkout and never persisted in git config.
+# the LabelFirst pin or adapter. LABELFIRST_DEPLOY_KEY is a dedicated read-only deploy
+# key for traitlab/labelfirst, used only by checkout and not persisted in git config.
 on:
   workflow_dispatch:
 
@@ -20,10 +20,10 @@ jobs:
       - name: Resolve configured revision and require private repository access
         id: dependency
         env:
-          LABELFIRST_READ_TOKEN: ${{ secrets.LABELFIRST_READ_TOKEN }}
+          LABELFIRST_DEPLOY_KEY: ${{ secrets.LABELFIRST_DEPLOY_KEY }}
         run: |
-          if [ -z "$LABELFIRST_READ_TOKEN" ]; then
-            echo 'Configure LABELFIRST_READ_TOKEN with read-only Contents access to traitlab/labelfirst.'
+          if [ -z "$LABELFIRST_DEPLOY_KEY" ]; then
+            echo 'Configure LABELFIRST_DEPLOY_KEY with a read-only deploy key for traitlab/labelfirst.'
             exit 1
           fi
           python - <<'PY' >> "$GITHUB_OUTPUT"
@@ -38,7 +38,7 @@ jobs:
           repository: traitlab/labelfirst
           ref: ${{ steps.dependency.outputs.revision }}
           path: .integration/labelfirst
-          token: ${{ secrets.LABELFIRST_READ_TOKEN }}
+          ssh-key: ${{ secrets.LABELFIRST_DEPLOY_KEY }}
           persist-credentials: false
       - run: pip install --require-hashes -r requirements.lock -r requirements-similarity.lock
       - run: pip install --no-deps -e .integration/labelfirst
