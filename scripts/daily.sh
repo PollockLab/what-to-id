@@ -70,6 +70,7 @@ fetch_embeddings() {
   mkdir -p "$downloads"
   gh release download "$EMBEDDING_RELEASE" --repo "$source_repo" -D "$downloads" -p '*'
   $PY -m what_to_id.bundle_transport restore --directory "$downloads" --out "$EMBEDDING_BUNDLE"
+  rm -rf "$downloads" # Verified parts can be fetched again; keep runner disk for the build.
 }
 
 embedding_args() {
