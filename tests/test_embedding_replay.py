@@ -273,3 +273,49 @@ def test_bundle_preserves_preparation_provenance(embedding_build, tmp_path):
     (bundle / "preparation.json").write_text("{}")
     with pytest.raises(ValueError, match="preparation.json"):
         load_bundle(bundle)
+
+
+def test_daily_fetch_restores_verified_transport(embedding_build, tmp_path):
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    from what_to_id.artifacts import load_bundle, pack_bundle
+    from what_to_id.bundle_transport import stage_release
+
+    pool, _, _, candidates, references = embedding_build
+    bundle = pack_bundle(pool, str(candidates), str(references), tmp_path / "bundle")
+    assets = tmp_path / "assets"
+    stage_release(bundle, assets)
+    binaries = tmp_path / "bin"
+    binaries.mkdir()
+    gh = binaries / "gh"
+    gh.write_text(
+        f"#!{sys.executable}\n"
+        "import os, shutil, sys\nfrom pathlib import Path\n"
+        "assert sys.argv[1:3] == ['release', 'download']\n"
+        "destination = Path(sys.argv[sys.argv.index('-D') + 1])\n"
+        "for source in Path(os.environ['TEST_ASSET_SOURCE']).iterdir():\n"
+        "    shutil.copyfile(source, destination / source.name)\n"
+    )
+    gh.chmod(0o755)
+    restored = tmp_path / "restored"
+    env = {
+        **os.environ,
+        "PATH": str(binaries) + os.pathsep + os.environ["PATH"],
+        "PYTHON": sys.executable,
+        "EMBEDDING_RELEASE": "test-release",
+        "EMBEDDING_BUNDLE": str(restored),
+        "TEST_ASSET_SOURCE": str(assets),
+    }
+    result = subprocess.run(
+        ["bash", "scripts/daily.sh", "fetch-embeddings"],
+        cwd=Path(__file__).resolve().parents[1],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    load_bundle(restored)
+    assert (restored / "pool.parquet").read_bytes() == pool.read_bytes()

@@ -65,10 +65,11 @@ fetch_embeddings() {
   : "${EMBEDDING_RELEASE:?set EMBEDDING_RELEASE to a versioned embedding bundle release tag}"
   local source_repo=${EMBEDDING_REPO:-${GITHUB_REPOSITORY:-PollockLab/what-to-id}}
   [ ! -e "$EMBEDDING_BUNDLE" ] || die "embedding destination exists; use a fresh EMBEDDING_BUNDLE path"
-  mkdir -p "$EMBEDDING_BUNDLE"
-  gh release download "$EMBEDDING_RELEASE" --repo "$source_repo" -D "$EMBEDDING_BUNDLE" \
-    -p '*.json' -p pool.parquet -p 'embeddings_*.npz' -p 'reference_embeddings_*.npz'
-  $PY -m what_to_id.artifacts verify "$EMBEDDING_BUNDLE"
+  local downloads="${EMBEDDING_BUNDLE}.download"
+  [ ! -e "$downloads" ] || die "embedding download destination exists; use a fresh path"
+  mkdir -p "$downloads"
+  gh release download "$EMBEDDING_RELEASE" --repo "$source_repo" -D "$downloads" -p '*'
+  $PY -m what_to_id.bundle_transport restore --directory "$downloads" --out "$EMBEDDING_BUNDLE"
 }
 
 embedding_args() {
