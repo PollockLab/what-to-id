@@ -100,3 +100,17 @@ def test_existing_history_without_served_log_fails(daily):
     assert result.returncode != 0
     assert "earlier builds but no served log" in result.stderr
     assert calls[1][calls[1].index("--repo") + 1] == "PollockLab/what-to-id"
+
+
+def test_bundle_eligibility_is_fetched_and_saved(daily):
+    invoke, state = daily
+    eligibility = state / "bundle-eligibility.json"
+    eligibility.write_text('{"closed_ids": [8, 10]}')
+    result, calls = invoke("save", "200")
+    assert result.returncode == 0, result.stderr
+    upload = next(call for call in calls if call[:2] == ["release", "upload"])
+    assert str(eligibility) in upload
+    result, calls = invoke("fetch", "200", assets="bundle-eligibility.json")
+    assert result.returncode == 0, result.stderr
+    downloads = [call for call in calls if call[:2] == ["release", "download"]]
+    assert any(call[call.index("-p") + 1] == eligibility.name for call in downloads)

@@ -130,3 +130,102 @@ def test_cmd_refresh_drops_closed_ids(tmp_path, monkeypatch):
 
     result = pd.read_parquet(pool_path)
     assert sorted(result["id"]) == [1, 3, 4]
+
+
+def test_prepared_snapshot_retains_closures_across_days_and_reconciles_new_bundle(
+    tmp_path, monkeypatch
+):
+    import json
+    import shutil
+
+    from what_to_id.arms import Recency
+    from what_to_id.batches import build_batches
+
+    original = _new_rows(range(1, 11))
+    original["iconic_taxon"] = "Aves"
+    source, pool = tmp_path / "prepared.parquet", tmp_path / "pool.parquet"
+    state, ids = tmp_path / "bundle-eligibility.json", tmp_path / "ids.parquet"
+    original.to_parquet(source, index=False)
+    assignment = original[["id"]].assign(arm="recency")
+
+    def prepare():
+        assert (
+            pool_state.main(
+                [
+                    "prepared",
+                    "--prepared-pool",
+                    str(source),
+                    "--pool",
+                    str(pool),
+                    "--eligibility",
+                    str(state),
+                ]
+            )
+            == 0
+        )
+
+    def selection():
+        return build_batches(
+            pd.read_parquet(pool),
+            assignment,
+            {"recency": Recency()},
+            size=2,
+            seed=0,
+            max_batches=1,
+        )["id"].tolist()
+
+    def refresh(closed):
+        pd.DataFrame({"id": selection()}).to_parquet(ids, index=False)
+        monkeypatch.setattr(pool_state, "still_open", lambda checked: set(checked) - closed)
+        assert (
+            pool_state.main(
+                ["refresh", "--pool", str(pool), "--ids", str(ids), "--eligibility", str(state)]
+            )
+            == 0
+        )
+
+    prepare()
+    assert selection() == [10, 9]
+    refresh({10})
+    assert selection() == [9, 8]
+    # Only the small exclusion state is needed to reconstruct the next day's eligible pool.
+    saved = tmp_path / "release-asset.json"
+    shutil.copyfile(state, saved)
+    pool.unlink()
+    state.unlink()
+    shutil.copyfile(saved, state)
+    prepare()
+    assert selection() == [9, 8]
+    refresh({10, 8})
+    assert selection() == [9, 7]
+    assert json.loads(state.read_text())["closed_ids"] == [8, 10]
+
+    # A newly prepared needs-ID snapshot is authoritative: include new IDs and reopened IDs.
+    updated = pd.concat([original, _new_rows([11])], ignore_index=True)
+    updated.to_parquet(source, index=False)
+    prepare()
+    assert set(pd.read_parquet(pool).id) == set(range(1, 12))
+    assert json.loads(state.read_text())["closed_ids"] == []
+
+
+@pytest.mark.parametrize("bad", ["{}", '{"schema_version":1}', "not-json"])
+def test_corrupt_eligibility_fails_before_replacing_pool(tmp_path, bad):
+    source, pool, state = (
+        tmp_path / name for name in ("source.parquet", "pool.parquet", "state.json")
+    )
+    _new_rows([1, 2]).to_parquet(source, index=False)
+    pool.write_bytes(b"previous pool")
+    state.write_text(bad)
+    with pytest.raises(ValueError):
+        pool_state.main(
+            [
+                "prepared",
+                "--prepared-pool",
+                str(source),
+                "--pool",
+                str(pool),
+                "--eligibility",
+                str(state),
+            ]
+        )
+    assert pool.read_bytes() == b"previous pool"

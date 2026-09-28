@@ -50,7 +50,7 @@ fetch() {
   fi
   local assets
   assets=$(gh release view "$STATE_TAG" --repo "$state_repo" --json assets --jq '.assets[].name')
-  for f in pool.parquet served.parquet; do
+  for f in pool.parquet served.parquet bundle-eligibility.json; do
     if grep -qx "$f" <<<"$assets"; then
       gh release download "$STATE_TAG" --repo "$state_repo" -D "$STATE" -p "$f" --clobber
     fi
@@ -123,12 +123,15 @@ build() {
   embedding_args
 
   mkdir -p "$STATE/days"
+  local eligibility_args=()
   if [ "${#EMBEDDING_ARGS[@]}" -gt 0 ]; then
     [ "${FULL_PULL:-}" != true ] || die "prepare and publish a fresh bundle for a full pool pull"
     [ -s "$EMBEDDING_BUNDLE/pool.parquet" ] || die "bundle has no prepared pool; repack it"
     # Publish a complete snapshot and its embeddings together. Adding observations here
     # would race preparation and make their embeddings unavailable to this build.
-    cp "$EMBEDDING_BUNDLE/pool.parquet" "$STATE/pool.parquet"
+    eligibility_args=(--eligibility "$STATE/bundle-eligibility.json")
+    $PY -m what_to_id.pool_state prepared --pool "$STATE/pool.parquet" \
+      --prepared-pool "$EMBEDDING_BUNDLE/pool.parquet" "${eligibility_args[@]}"
   elif [ "${OFFLINE:-}" = 1 ]; then
     [ -s "$STATE/pool.parquet" ] || die "OFFLINE=1 needs a saved $STATE/pool.parquet"
   elif [ "${FULL_PULL:-}" = true ] || [ ! -s "$STATE/pool.parquet" ]; then
@@ -145,7 +148,7 @@ build() {
   chmod 700 "$OUT/ordering-cache"
   $PY -m what_to_id.cli build "${common[@]}" --out "$OUT/draft" --ordering-cache "$OUT/ordering-cache"
   if [ "${OFFLINE:-}" != 1 ]; then
-    $PY -m what_to_id.pool_state refresh --pool "$STATE/pool.parquet" --ids "$OUT/draft/batches.parquet"
+    $PY -m what_to_id.pool_state refresh --pool "$STATE/pool.parquet" --ids "$OUT/draft/batches.parquet" "${eligibility_args[@]}"
   fi
   $PY -m what_to_id.cli build "${common[@]}" --out "$OUT/final" --ordering-cache "$OUT/ordering-cache" --served-log "$STATE/served.parquet"
 
@@ -162,6 +165,9 @@ save() {
   local state_repo=${STATE_REPO:-${GITHUB_REPOSITORY:-PollockLab/what-to-id}}
   local files=("$STATE/pool.parquet" "$STATE/served.parquet"
     "$STATE/days/pool-$TODAY.parquet" "$STATE/days/build-$TODAY.json")
+  if [ -f "$STATE/bundle-eligibility.json" ]; then
+    files+=("$STATE/bundle-eligibility.json")
+  fi
   for f in "${files[@]}"; do
     [ -s "$f" ] || die "missing $f; run build first"
   done
