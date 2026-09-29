@@ -1,6 +1,6 @@
 name: map
 
-# Refreshes the map of records that need an ID (site/map.html and pool.bin) every morning while
+# Refreshes the map of records that need an ID (site/map.html and its pool*.bin files) every morning while
 # the daily study build is off; once DAILY_ENABLED is "true" that build writes the map itself and
 # this job stands down. It keeps its own pool on the map-state release, apart from the study's
 # pool-state, so it never changes what the study serves.
@@ -77,8 +77,8 @@ jobs:
           mkdir -p _site
           cp site/*.html _site/
           python -m what_to_id.page_map --pool state/pool.parquet --out _site --freeze "$(date -u +%F)"
-          if find _site -type f ! -name '*.html' ! -name pool.bin | grep -q .; then
-            echo "::error::the site must hold only HTML pages and the map's pool.bin"; exit 1
+          if find _site -type f ! -name '*.html' ! -name 'pool*.bin' | grep -q .; then
+            echo "::error::the site must hold only HTML pages and the map's pool*.bin files"; exit 1
           fi
           if grep -ril -E 'recency|gap_first|gap first|similarity|novelty|surprise' _site; then
             echo "::error::a list name leaked into the site"; exit 1

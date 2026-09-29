@@ -1,24 +1,30 @@
-"""A map of the day's pool: every record as a point, filtered by taxon group and observed date.
+"""A map of the pool: every record as a point, filtered by group, taxon, status flags and date.
 
-The page (map.html) loads MapLibre and deck.gl from a CDN and reads the points from pool.bin, a
-column file next to it. The file holds record ids, positions, observed dates and groups, sorted
-by id, and nothing about lists, so the map cannot tell which list a record sits on.
+The page (map.html) loads MapLibre and deck.gl from a CDN and reads the points from gzipped column
+files next to it. The files hold record ids, positions, dates, taxa and flags, sorted by id, and
+nothing about lists, so the map cannot tell which list a record sits on.
 
-pool.bin layout, little-endian, n records, columns back to back:
-    uint32 id[n] | uint16 lon[n] | uint16 lat[n] | uint16 obs[n] | uint16 up[n] | uint8 group[n]
-lon and lat are quantized over the bounding box in the page's META; obs (observed) and up
-(uploaded) count days from META.day0, with NO_DAY for a missing date; group indexes META.groups.
-The page filters on either date: iNaturalist records are often uploaded days or months after
-they were made, so observed is the default and uploaded is one click away.
+Each shard (pool-0.bin, pool-1.bin, ...), gzipped, little-endian, n records, columns back to back:
+    uint32 id | uint16 lon | uint16 lat | uint16 obs | uint16 up | uint16 taxon
+    | uint8 group | uint8 rank | uint8 ids | uint8 flags
+lon and lat are quantized over META.bbox; obs (observed) and up (uploaded) count days from
+META.day0, with NO_DAY for a missing date; taxon indexes the names in pool-taxa.bin (gzipped JSON
+of [latin, common] pairs), group META.groups and rank META.ranks, with 0xFFFF and 0xFF for none.
+ids holds min(IDs, 15) in the low nibble and min(agreements, 15) in the high nibble. flags sets
+FLAG_BITS for the flags META.flags names; a pool pulled before those columns existed has none.
+Shard 0 holds records observed in the last two calendar years (and any without a date), so the
+page draws them first; older records follow in shard 1.
 """
 
 from __future__ import annotations
 
 import argparse
+import gzip
 import hashlib
 import json
 import logging
 from html import escape
+from importlib.resources import files
 from pathlib import Path
 
 import numpy as np
@@ -26,22 +32,31 @@ import pandas as pd
 
 from what_to_id.page import ARM_WORDS, group_name
 
-BIN_NAME = "pool.bin"
 MAP_NAME = "map.html"
+TAXA_NAME = "pool-taxa.bin"
 NO_DAY = 0xFFFF
+NO_TAXON = 0xFFFF
+NO_RANK = 0xFF
 _Q = 0xFFFF
-BYTES_PER_RECORD = 13
+BYTES_PER_RECORD = 18
+IMPRECISE_M = 1000
+FLAG_BITS = {"introduced": 1, "threatened": 2, "obscured": 4, "imprecise": 8}
 _COLS = ("id", "lat", "lon", "observed_on", "created_at", "iconic_taxon")
+_ASSETS = files("what_to_id") / "map_assets"
 
 
-def encode_points(pool: pd.DataFrame) -> tuple[bytes, dict]:
-    """Pack the pool into pool.bin bytes and the META the page needs to read them."""
+def shard_name(k: int) -> str:
+    return f"pool-{k}.bin"
+
+
+def encode_points(pool: pd.DataFrame) -> tuple[dict[str, bytes], dict]:
+    """Pack the pool into the gzipped files the page reads, and the META it needs to read them."""
     missing = [c for c in _COLS if c not in pool]
     if missing:
         raise ValueError(f"pool lacks columns {missing}")
     if pool.empty:
         raise ValueError("pool is empty; nothing to map")
-    df = pool[list(_COLS)].sort_values("id")
+    df = pool.sort_values("id").reset_index(drop=True)
     ids = df["id"].to_numpy(dtype=np.int64)
     if ids.min() < 0 or ids.max() > 0xFFFFFFFF:
         raise ValueError("record ids do not fit in uint32")
@@ -50,73 +65,172 @@ def encode_points(pool: pd.DataFrame) -> tuple[bytes, dict]:
     if not (np.isfinite(lat).all() and np.isfinite(lon).all()):
         raise ValueError("pool has records without coordinates")
     bbox = [float(lon.min()), float(lat.min()), float(lon.max()), float(lat.max())]
-
-    def quant(v: np.ndarray, lo: float, hi: float) -> np.ndarray:
-        span = hi - lo or 1.0
-        return np.rint((v - lo) / span * _Q).astype("<u2")
-
-    obs = _dates(df["observed_on"])
-    up = _dates(df["created_at"])
-    day0 = min(d for d in (obs.min(), up.min()) if pd.notna(d)) if obs.notna().any() else None
-    if day0 is None:
+    obs, up = _dates(df["observed_on"]), _dates(df["created_at"])
+    if obs.isna().all():
         raise ValueError("no record has an observed date")
+    day0 = min(d for d in (obs.min(), up.min()) if pd.notna(d))
     obs_off, up_off = (obs - day0).dt.days, (up - day0).dt.days
     last = int(max(obs_off.max(), up_off.max()))
     if last >= NO_DAY:
         raise ValueError("dates span more than 65,534 days")
+
     groups = sorted(df["iconic_taxon"].fillna("Unknown").astype(str).unique())
     gidx = pd.Categorical(df["iconic_taxon"].fillna("Unknown").astype(str), categories=groups)
-    blob = b"".join(
-        (
-            ids.astype("<u4").tobytes(),
-            quant(lon, bbox[0], bbox[2]).tobytes(),
-            quant(lat, bbox[1], bbox[3]).tobytes(),
-            obs_off.fillna(NO_DAY).to_numpy().astype("<u2").tobytes(),
-            up_off.fillna(NO_DAY).to_numpy().astype("<u2").tobytes(),
-            gidx.codes.astype("u1").tobytes(),
-        )
+    taxa, tidx = _taxa(df)
+    ranks = sorted(df["rank"].dropna().astype(str).unique()) if "rank" in df else []
+    ridx = (
+        pd.Categorical(df["rank"].astype("string"), categories=ranks).codes
+        if "rank" in df
+        else np.full(len(df), -1)
     )
+    known, flags = _flags(df)
+    cols = {
+        "id": ids.astype("<u4"),
+        "lon": _quant(lon, bbox[0], bbox[2]),
+        "lat": _quant(lat, bbox[1], bbox[3]),
+        "obs": obs_off.fillna(NO_DAY).to_numpy().astype("<u2"),
+        "up": up_off.fillna(NO_DAY).to_numpy().astype("<u2"),
+        "taxon": tidx.astype("<u2"),
+        "group": gidx.codes.astype("u1"),
+        "rank": np.where(ridx < 0, NO_RANK, ridx).astype("u1"),
+        "ids": (_nibble(df, "ident_count") | _nibble(df, "agree") << 4).astype("u1"),
+        "flags": flags,
+    }
+    cut = (pd.Timestamp(year=int(obs.max().year) - 1, month=1, day=1) - day0).days
+    recent = (obs_off >= cut).to_numpy() | obs.isna().to_numpy()
+    out: dict[str, bytes] = {}
+    shards = []
+    for part in (recent, ~recent):
+        if part.any():
+            name = shard_name(len(shards))
+            out[name] = _gz(b"".join(v[part].tobytes() for v in cols.values()))
+            shards.append({"file": name, "n": int(part.sum())})
+    out[TAXA_NAME] = _gz(json.dumps(taxa, ensure_ascii=False, separators=(",", ":")).encode())
+    h = hashlib.sha256()
+    for name in sorted(out):
+        h.update(name.encode() + out[name])
     meta = {
         "n": int(len(df)),
         "bbox": bbox,
         "day0": day0.strftime("%Y-%m-%d"),
         "days": last + 1,
+        "hist0": _hist_start(obs_off, day0),
         "groups": groups,
         "names": {g: group_name(g) for g in groups},
-        "sha256": hashlib.sha256(blob).hexdigest(),
+        "ranks": ranks,
+        "flags": known,
+        "shards": shards,
+        "taxa": TAXA_NAME,
+        "sha256": h.hexdigest(),
     }
-    return blob, meta
+    return out, meta
 
 
-def decode_points(blob: bytes, meta: dict) -> pd.DataFrame:
-    """Read pool.bin back, as the page does; for tests and for a QGIS export."""
-    n = int(meta["n"])
-    if len(blob) != BYTES_PER_RECORD * n:
-        raise ValueError(f"pool.bin holds {len(blob)} bytes, expected {BYTES_PER_RECORD * n}")
-    ids = np.frombuffer(blob, "<u4", n, 0)
-    qlon = np.frombuffer(blob, "<u2", n, 4 * n)
-    qlat = np.frombuffer(blob, "<u2", n, 6 * n)
-    obs = np.frombuffer(blob, "<u2", n, 8 * n)
-    up = np.frombuffer(blob, "<u2", n, 10 * n)
-    grp = np.frombuffer(blob, "u1", n, 12 * n)
+def decode_points(blobs: dict[str, bytes], meta: dict) -> pd.DataFrame:
+    """Read the files back, as the page does; for tests and for a QGIS export."""
+    frames = [_decode_shard(gzip.decompress(blobs[s["file"]]), int(s["n"])) for s in meta["shards"]]
+    raw = {k: np.concatenate([f[k] for f in frames]) for k in frames[0]}
     x0, y0, x1, y1 = meta["bbox"]
     day0 = pd.Timestamp(meta["day0"])
+    taxa = json.loads(gzip.decompress(blobs[meta["taxa"]]))
 
     def date(d: np.ndarray) -> pd.Series:
         return pd.Series(day0 + pd.to_timedelta(np.where(d == NO_DAY, 0, d), "D")).where(
             d != NO_DAY
         )
 
-    return pd.DataFrame(
+    def pick(table: list, idx: np.ndarray, none: int) -> list:
+        return [None if i == none else table[i] for i in idx]
+
+    names = pick(taxa, raw["taxon"], NO_TAXON)
+    out = pd.DataFrame(
         {
-            "id": ids.astype(np.int64),
-            "lon": x0 + qlon / _Q * (x1 - x0),
-            "lat": y0 + qlat / _Q * (y1 - y0),
-            "observed_on": date(obs),
-            "uploaded_on": date(up),
-            "iconic_taxon": np.asarray(meta["groups"], dtype=object)[grp],
+            "id": raw["id"].astype(np.int64),
+            "lon": x0 + raw["lon"] / _Q * (x1 - x0),
+            "lat": y0 + raw["lat"] / _Q * (y1 - y0),
+            "observed_on": date(raw["obs"]),
+            "uploaded_on": date(raw["up"]),
+            "iconic_taxon": np.asarray(meta["groups"], dtype=object)[raw["group"]],
+            "taxon_name": [t and t[0] for t in names],
+            "common_name": [t and t[1] for t in names],
+            "rank": pick(meta["ranks"], raw["rank"], NO_RANK),
+            "ident_count": raw["ids"] & 15,
+            "agree": raw["ids"] >> 4,
         }
     )
+    for name in meta["flags"]:
+        out[name] = (raw["flags"] & FLAG_BITS[name]) > 0
+    return out.sort_values("id").reset_index(drop=True)
+
+
+def _decode_shard(blob: bytes, n: int) -> dict[str, np.ndarray]:
+    if len(blob) != BYTES_PER_RECORD * n:
+        raise ValueError(f"shard holds {len(blob)} bytes, expected {BYTES_PER_RECORD * n}")
+    layout = [("id", "<u4"), ("lon", "<u2"), ("lat", "<u2"), ("obs", "<u2"), ("up", "<u2")]
+    layout += [("taxon", "<u2"), ("group", "u1"), ("rank", "u1"), ("ids", "u1"), ("flags", "u1")]
+    out, off = {}, 0
+    for name, dt in layout:
+        out[name] = np.frombuffer(blob, dt, n, off)
+        off += np.dtype(dt).itemsize * n
+    return out
+
+
+def _quant(v: np.ndarray, lo: float, hi: float) -> np.ndarray:
+    span = hi - lo or 1.0
+    return np.rint((v - lo) / span * _Q).astype("<u2")
+
+
+def _taxa(df: pd.DataFrame) -> tuple[list[list[str]], np.ndarray]:
+    """[latin, common] per distinct taxon, and each record's index into that table."""
+    if "taxon_id" not in df or "taxon_name" not in df:
+        return [], np.full(len(df), NO_TAXON)
+    common = df["common_name"] if "common_name" in df else pd.Series("", index=df.index)
+    t = pd.DataFrame({"tid": df["taxon_id"], "latin": df["taxon_name"], "common": common})
+    table = t.dropna(subset=["tid"]).drop_duplicates("tid").sort_values("tid")
+    if len(table) >= NO_TAXON:
+        raise ValueError(f"{len(table)} taxa do not fit in uint16")
+    pos = pd.Series(np.arange(len(table)), index=table["tid"].to_numpy())
+    idx = t["tid"].map(pos).fillna(NO_TAXON).to_numpy()
+    names = [
+        [str(a) if pd.notna(a) else "", str(c) if pd.notna(c) else ""]
+        for a, c in zip(table["latin"], table["common"], strict=True)
+    ]
+    return names, idx
+
+
+def _flags(df: pd.DataFrame) -> tuple[list[str], np.ndarray]:
+    """The flag names this pool can fill, and each record's flag byte."""
+    bits = np.zeros(len(df), dtype="u1")
+    known = []
+    for name in ("introduced", "threatened", "obscured"):
+        if name in df:
+            known.append(name)
+            on = df[name].astype("boolean").fillna(False).to_numpy(dtype=bool)
+            bits |= np.where(on, FLAG_BITS[name], 0).astype("u1")
+    if "pos_acc" in df:
+        known.append("imprecise")
+        acc = pd.to_numeric(df["pos_acc"], errors="coerce").fillna(0).to_numpy()
+        bits |= np.where(acc > IMPRECISE_M, FLAG_BITS["imprecise"], 0).astype("u1")
+    return known, bits
+
+
+def _nibble(df: pd.DataFrame, col: str) -> np.ndarray:
+    if col not in df:
+        return np.zeros(len(df), dtype="u1")
+    return np.clip(pd.to_numeric(df[col], errors="coerce").fillna(0), 0, 15).to_numpy("u1")
+
+
+def _hist_start(obs_off: pd.Series, day0: pd.Timestamp) -> int:
+    """The day the histogram starts: 1 January of the year holding the earliest 0.5% of records.
+
+    Earlier records still count; the page draws them as one bar before the axis.
+    """
+    q = day0 + pd.Timedelta(days=int(obs_off.dropna().quantile(0.005)))
+    return max(0, (pd.Timestamp(year=q.year, month=1, day=1) - day0).days)
+
+
+def _gz(data: bytes) -> bytes:
+    return gzip.compress(data, compresslevel=9, mtime=0)
 
 
 def _dates(col: pd.Series) -> pd.Series:
@@ -126,51 +240,46 @@ def _dates(col: pd.Series) -> pd.Series:
 
 
 def render_map(meta: dict, *, freeze: str | None, back: str = "index.html") -> str:
-    """The map page. META goes inline; the points come from pool.bin at load."""
+    """The map page. META goes inline; the points and names come from the files at load."""
     when = f" on {escape(freeze)}" if freeze else ""
-    title = "Records that need an ID in BC"
-    page_meta = {**meta, "bin": f"{BIN_NAME}?v={meta['sha256'][:12]}"}
-    return (
-        '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
-        '<meta name="viewport" content="width=device-width,initial-scale=1">\n'
-        f"<title>{title}</title>\n"
-        f'<link rel="stylesheet" href="{MAPLIBRE_CSS}">\n'
-        f'<script src="{MAPLIBRE_JS}"></script>\n<script src="{DECK_JS}"></script>\n'
-        f"<style>{MAP_CSS}</style>\n</head>\n<body>\n"
-        '<header><div class="head">'
-        f'<h1>{title}</h1><p class="sub">Each dot is one record that needed an ID and had a photo'
-        f'{when}. Click a dot to open it in iNaturalist. <a href="{escape(back)}">Back</a></p>'
-        "</div>"
-        '<div class="ctl"><div id="groups" role="group" aria-label="Taxon groups"></div>'
-        '<div class="time"><canvas id="hist" height="44" aria-hidden="true"></canvas>'
-        '<div class="range"><input id="t0" type="range" min="0" step="1" aria-label="From">'
-        '<input id="t1" type="range" min="0" step="1" aria-label="To"></div>'
-        '<p class="stat"><span class="seg" role="group" aria-label="Date">'
-        '<button type="button" id="byObs" aria-pressed="true">Observed</button>'
-        '<button type="button" id="byUp" aria-pressed="false">Uploaded</button></span> '
-        '<span id="span"></span> <b id="count">Loading</b></p></div></div>'
-        "</header>\n"
-        '<div id="map" role="application" aria-label="Map of records"></div>\n'
-        '<p class="note">Records whose observer or taxon hides the exact place show at '
-        "iNaturalist's public point, up to about 20 km from where they were made.</p>\n"
-        f"<script>var META={json.dumps(page_meta, sort_keys=True)};{MAP_JS}</script>\n"
-        "</body>\n</html>\n"
-    )
+    v = meta["sha256"][:12]
+    page_meta = {
+        **meta,
+        "shards": [{**s, "file": f"{s['file']}?v={v}"} for s in meta["shards"]],
+        "taxa": f"{meta['taxa']}?v={v}",
+    }
+    fill = {
+        "TITLE": "Records that need an ID in BC",
+        "WHEN": when,
+        "BACK": escape(back),
+        "MAPLIBRE_CSS": MAPLIBRE_CSS,
+        "MAPLIBRE_JS": MAPLIBRE_JS,
+        "DECK_JS": DECK_JS,
+        "CSS": (_ASSETS / "map.css").read_text(),
+        "META": json.dumps(page_meta, sort_keys=True).replace("</", "<\\/"),
+        "BASEMAPS": json.dumps(BASEMAPS, sort_keys=True),
+        "JS": (_ASSETS / "map.js").read_text(),
+    }
+    html = (_ASSETS / "map.html").read_text()
+    for key, value in fill.items():
+        html = html.replace("{{" + key + "}}", value)
+    return html
 
 
 def write_map(out_dir: Path | str, pool: pd.DataFrame, *, freeze: str | None = None) -> list[Path]:
-    """Write map.html and pool.bin into the site folder."""
+    """Write map.html and its data files into the site folder."""
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    blob, meta = encode_points(pool)
+    blobs, meta = encode_points(pool)
     html = render_map(meta, freeze=freeze)
     low = html.lower()
     for w in ARM_WORDS:
         if w in low:
             raise ValueError(f"{MAP_NAME}: arm name {w!r} leaked into the map page")
-    (out / BIN_NAME).write_bytes(blob)
+    for name, blob in blobs.items():
+        (out / name).write_bytes(blob)
     (out / MAP_NAME).write_text(html)
-    return [out / MAP_NAME, out / BIN_NAME]
+    return [out / MAP_NAME, *(out / name for name in blobs)]
 
 
 MAPLIBRE_JS = "https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"
@@ -181,149 +290,9 @@ BASEMAPS = {
     "dark": "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
 }
 
-_LIGHT = (
-    "--bg:#fbfbf9;--ink:#1d1d1b;--muted:#5f5e58;--line:#dcdbd3;--dot:42,120,214;"
-    "--bar:#2a78d6;--chip:#f0efe9;--on:#1d1d1b;--onink:#fff"
-)
-_DARK = (
-    "--bg:#1a1a19;--ink:#fff;--muted:#c3c2b7;--line:#3a3a37;--dot:57,135,229;"
-    "--bar:#3987e5;--chip:#262624;--on:#fff;--onink:#1a1a19"
-)
-MAP_CSS = (
-    f":root{{{_LIGHT}}}"
-    f'@media (prefers-color-scheme:dark){{:root:not([data-theme="light"]){{{_DARK}}}}}'
-    f':root[data-theme="dark"]{{{_DARK}}}'
-    """
-*{box-sizing:border-box}
-html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
-  font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
-body{display:flex;flex-direction:column}
-header{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;
-  gap:8px 24px}
-.head{flex:1 1 320px;min-width:0}
-h1{font-size:18px;margin:0 0 2px}
-.sub,.note,.stat{color:var(--muted);margin:0;font-size:13px}
-.sub a{color:inherit}
-.ctl{flex:2 1 480px;min-width:0;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:flex-start}
-#groups{display:flex;flex-wrap:wrap;gap:4px;flex:1 1 260px}
-#groups button{border:1px solid var(--line);background:var(--chip);color:var(--ink);
-  border-radius:12px;padding:3px 9px;font:inherit;font-size:12px;cursor:pointer;min-height:26px}
-#groups button[aria-pressed="true"]{background:var(--on);color:var(--onink);border-color:var(--on)}
-.time{flex:1 1 260px;min-width:0}
-#hist{width:100%;height:44px;display:block}
-.range{position:relative;height:22px}
-.range input{position:absolute;inset:0;width:100%;margin:0;pointer-events:none;background:none;
-  -webkit-appearance:none;appearance:none}
-.range input::-webkit-slider-runnable-track{height:22px;background:none}
-.range input::-webkit-slider-thumb{pointer-events:auto;-webkit-appearance:none;width:14px;
-  height:18px;border-radius:4px;background:var(--ink);cursor:pointer}
-.range input::-moz-range-thumb{pointer-events:auto;width:14px;height:18px;border-radius:4px;
-  background:var(--ink);border:0;cursor:pointer}
-.seg button{border:1px solid var(--line);background:var(--chip);color:var(--ink);font:inherit;
-  font-size:12px;padding:2px 8px;cursor:pointer}
-.seg button:first-child{border-radius:10px 0 0 10px}
-.seg button:last-child{border-radius:0 10px 10px 0}
-.seg button[aria-pressed="true"]{background:var(--on);color:var(--onink);border-color:var(--on)}
-#map{flex:1;min-height:320px;position:relative}
-.note{padding:6px 16px}
-"""
-)
-
-MAP_JS = (
-    f"var BASEMAPS={json.dumps(BASEMAPS, sort_keys=True)};"
-    r"""
-(function(){
-var dark=matchMedia('(prefers-color-scheme: dark)').matches,
-  css=getComputedStyle(document.documentElement),
-  dot=css.getPropertyValue('--dot').split(',').map(Number),bar=css.getPropertyValue('--bar');
-var DAY=864e5,d0=Date.parse(META.day0+'T00:00:00Z'),NO=65535,n=META.n,P=null;
-function fmt(d){return new Date(d0+d*DAY).toISOString().slice(0,10);}
-var t0=document.getElementById('t0'),t1=document.getElementById('t1');
-t0.max=t1.max=META.days-1;t0.value=0;t1.value=META.days-1;
-var on=META.groups.map(function(){return true;}),box=document.getElementById('groups');
-META.groups.forEach(function(g,i){
-  var b=document.createElement('button');b.type='button';b.textContent=META.names[g]||g;
-  b.setAttribute('aria-pressed','true');
-  b.onclick=function(){on[i]=!on[i];b.setAttribute('aria-pressed',String(on[i]));update();};
-  box.appendChild(b);
-});
-var b=META.bbox,map=new maplibregl.Map({container:'map',
-  style:dark?BASEMAPS.dark:BASEMAPS.light,bounds:[[b[0],b[1]],[b[2],b[3]]],
-  fitBoundsOptions:{padding:20},attributionControl:{compact:true}});
-map.addControl(new maplibregl.NavigationControl({showCompass:false}));
-var overlay=new deck.MapboxOverlay({interleaved:false,layers:[]});map.addControl(overlay);
-fetch(META.bin).then(function(r){
-  if(!r.ok)throw new Error('HTTP '+r.status);return r.arrayBuffer();
-}).then(function(buf){
-  if(buf.byteLength!==13*n)throw new Error('unexpected size');
-  var id=new Uint32Array(buf,0,n),qx=new Uint16Array(buf,4*n,n),qy=new Uint16Array(buf,6*n,n),
-    obs=new Uint16Array(buf,8*n,n),up=new Uint16Array(buf,10*n,n),grp=new Uint8Array(buf,12*n,n),
-    pos=new Float32Array(2*n),fo=new Float32Array(n),fu=new Float32Array(n),
-    fg=new Float32Array(n),sx=(b[2]-b[0])/65535,sy=(b[3]-b[1])/65535;
-  for(var i=0;i<n;i++){
-    pos[2*i]=b[0]+qx[i]*sx;pos[2*i+1]=b[1]+qy[i]*sy;
-    fo[i]=obs[i]===NO?-1:obs[i];fu[i]=up[i]===NO?-1:up[i];fg[i]=grp[i];
-  }
-  P={id:id,obs:obs,up:up,grp:grp,pos:pos,fo:fo,fu:fu,fg:fg};update();
-}).catch(function(e){
-  document.getElementById('count').textContent='Could not load the points ('+e.message+')';
-});
-var hist=document.getElementById('hist');
-function draw(weeks,lo,hi){
-  var w=hist.clientWidth,h=44,r=devicePixelRatio||1,c=hist.getContext('2d');
-  hist.width=w*r;hist.height=h*r;c.scale(r,r);
-  var m=Math.max.apply(null,weeks)||1,bw=w/weeks.length,a=lo/7|0,z=hi/7|0;
-  c.fillStyle=bar;
-  for(var k=0;k<weeks.length;k++){
-    var y=weeks[k]/m*(h-2);c.globalAlpha=(k>=a&&k<=z)?1:.3;
-    c.fillRect(k*bw,h-y,Math.max(bw-1,1),y);
-  }
-}
-function tip(o){
-  if(!P||o.index<0)return null;
-  var i=o.index,g=META.groups[P.grp[i]];
-  function d(v){return v===NO?'unknown':fmt(v);}
-  return {text:(META.names[g]||g)+'\nObserved '+d(P.obs[i])+'\nUploaded '+d(P.up[i])+
-    '\nRecord '+P.id[i]};
-}
-function open(o){
-  if(P&&o.index>=0)window.open('https://www.inaturalist.org/observations/'+P.id[o.index],
-    '_blank','noopener');
-}
-function update(){
-  var lo=Math.min(+t0.value,+t1.value),hi=Math.max(+t0.value,+t1.value);
-  document.getElementById('span').textContent=fmt(lo)+' to '+fmt(hi)+':';
-  if(!P)return;
-  var day=byUp?P.up:P.obs,weeks=new Array(Math.ceil(META.days/7)).fill(0),shown=0,cats=[];
-  for(var i=0;i<n;i++){
-    if(!on[P.grp[i]]||day[i]===NO)continue;
-    weeks[day[i]/7|0]++;if(day[i]>=lo&&day[i]<=hi)shown++;
-  }
-  draw(weeks,lo,hi);
-  document.getElementById('count').textContent=shown.toLocaleString('en-CA')+' records';
-  on.forEach(function(v,i){if(v)cats.push(i);});
-  overlay.setProps({getTooltip:tip,onClick:open,layers:[new deck.ScatterplotLayer({id:'pts',
-    data:{length:n,attributes:{getPosition:{value:P.pos,size:2},
-      getFilterValue:{value:byUp?P.fu:P.fo,size:1},getFilterCategory:{value:P.fg,size:1}}},
-    getFillColor:[dot[0],dot[1],dot[2],110],radiusUnits:'pixels',getRadius:1.5,
-    radiusMinPixels:1,radiusMaxPixels:6,stroked:false,pickable:true,
-    extensions:[new deck.DataFilterExtension({filterSize:1,categorySize:1})],
-    filterRange:[lo,hi],filterCategories:cats.length?cats:[-1]})]});
-}
-var byUp=false,bo=document.getElementById('byObs'),bu=document.getElementById('byUp');
-function by(v){byUp=v;bo.setAttribute('aria-pressed',String(!v));
-  bu.setAttribute('aria-pressed',String(v));update();}
-bo.onclick=function(){by(false);};bu.onclick=function(){by(true);};
-[t0,t1].forEach(function(el){el.addEventListener('input',update);});
-addEventListener('resize',update);
-update();
-})();
-"""
-)
-
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Write map.html and pool.bin from a pool parquet.")
+    ap = argparse.ArgumentParser(description="Write map.html and its data from a pool parquet.")
     ap.add_argument("--pool", required=True, type=Path)
     ap.add_argument("--out", required=True, type=Path, help="site folder")
     ap.add_argument("--freeze", default=None, help="date the pool stands for, YYYY-MM-DD")

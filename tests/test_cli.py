@@ -120,7 +120,12 @@ def test_build_design_rotation_writes_only_index(tmp_path, webapp_dir):
     validate_manifest(d)
     assert d["design"] == "rotation"
     site = out / "site"
-    assert sorted(p.name for p in site.iterdir()) == ["index.html", "map.html", "pool.bin"]
+    assert sorted(p.name for p in site.iterdir()) == [
+        "index.html",
+        "map.html",
+        "pool-0.bin",
+        "pool-taxa.bin",
+    ]
     html = (site / "index.html").read_text().lower()
     assert 'href="map.html"' in html
     for word in ("recency", "gap_first", "novelty", "batch_id"):

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{TITLE}}</title>
+<link rel="stylesheet" href="{{MAPLIBRE_CSS}}">
+<script src="{{MAPLIBRE_JS}}"></script>
+<script src="{{DECK_JS}}"></script>
+<style>{{CSS}}</style>
+</head>
+<body>
+<header>
+<div class="head">
+<h1>{{TITLE}}</h1>
+<p class="sub">Each dot is one record that needed an ID and had a photo{{WHEN}}. Hover a dot for its name, click it for the photo. <a href="{{BACK}}">Back</a></p>
+</div>
+<p class="stat" aria-live="polite"><b id="count">Loading</b> <span id="more"></span></p>
+<button type="button" id="toggle" class="toggle" aria-expanded="false" aria-controls="side">Filters</button>
+</header>
+<section id="side" class="side" aria-label="Filters">
+<label class="field"><span class="lbl">Find a taxon</span>
+<input id="q" type="search" placeholder="Latin or common name, e.g. Amanita, squirrel" autocomplete="off" spellcheck="false"></label>
+<p id="qn" class="muted"></p>
+<div id="flagbox"><p class="lbl">Show only</p><div id="flags" class="chips" role="group" aria-label="Show only"></div></div>
+<p class="lbl">Groups <button type="button" id="gall" class="link">all</button> <button type="button" id="gnone" class="link">none</button></p>
+<div id="groups" class="chips" role="group" aria-label="Taxon groups"></div>
+<p class="lbl">Months of the year <button type="button" id="mclear" class="link">any month</button></p>
+<div id="months" class="chips months" role="group" aria-label="Months of the year"></div>
+<p class="muted">Pick months to compare the same season across years.</p>
+<button type="button" id="reset" class="link">Reset all filters</button>
+</section>
+<main id="map" role="application" aria-label="Map of records"></main>
+<section id="time" class="time" aria-label="Dates">
+<div class="row">
+<span class="seg" role="group" aria-label="Date to filter on">
+<button type="button" id="byObs" aria-pressed="true" title="The date the photo was taken">Observed</button><button type="button" id="byUp" aria-pressed="false" title="The date the record was added to iNaturalist">Uploaded</button>
+</span>
+<span id="presets" class="chips" role="group" aria-label="Periods"></span>
+<span class="dates"><input id="from" type="date" aria-label="From"> to <input id="to" type="date" aria-label="To"></span>
+</div>
+<div class="histwrap"><canvas id="hist" role="img" aria-label="Records per month. Drag to pick a period."></canvas><div id="htip" class="htip" hidden></div></div>
+<p class="hint">Drag across the bars to pick a period, click a bar for one month, double-click for all dates. Bars count records that still need an ID, so older periods look emptier: many of their records have been identified since.</p>
+</section>
+<aside id="card" class="card" hidden></aside>
+<script>var META={{META}};var BASEMAPS={{BASEMAPS}};
+{{JS}}</script>
+</body>
+</html>
