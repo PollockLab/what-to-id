@@ -4,6 +4,7 @@ Each ``<group>.tar`` is bound by its ``<group>.json`` status to a digest of exac
 (id, photo_url) rows that name and fetch its files, so a group survives pool changes elsewhere.
 Candidate photos unfetchable from either host are excluded before assignment, up to
 MAX_UNFETCHABLE_FRACTION of a group; the frozen reference must stage completely.
+Slurm's USR1 warning before the time limit archives the current group's progress without a status.
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ import argparse
 import hashlib
 import json
 import shutil
+import signal
 import subprocess
 from pathlib import Path
 
@@ -23,6 +25,14 @@ from what_to_id.manifest import sha256_file
 KINDS = ("candidate", "reference")
 MAX_UNFETCHABLE_FRACTION = 0.001
 LIMITS = {"candidate": MAX_UNFETCHABLE_FRACTION, "reference": 0.0}
+
+
+class Preempted(Exception):
+    """The job is about to reach its time limit."""
+
+
+def _preempt(signum, frame) -> None:
+    raise Preempted
 
 
 def staged_rows_digest(rows: pd.DataFrame) -> str:
@@ -88,7 +98,12 @@ def stage_group(
     cache.mkdir(parents=True)
     if archive.exists():
         subprocess.run(["tar", "xf", str(archive), "-C", str(cache)], check=True)
-    failed = validate_staged_images(stage_images(rows, cache, workers=workers))
+    try:
+        failed = validate_staged_images(stage_images(rows, cache, workers=workers))
+    except Preempted:
+        # Keep fetched bytes for the rerun; without a status the group stays incomplete.
+        _archive(cache, archive)
+        raise
     _archive(cache, archive)
     status.write_text(
         json.dumps(
@@ -163,7 +178,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     sources = dict(zip(KINDS, (args.pool, args.reference), strict=True))
     if args.command == "stage":
-        stage(args.run, sources, args.cache)
+        signal.signal(signal.SIGUSR1, _preempt)
+        try:
+            stage(args.run, sources, args.cache)
+        except Preempted:
+            parser.exit(1, "photo staging stopped before the time limit; resubmit to resume\n")
     else:
         print(check(args.run, sources))
     return 0

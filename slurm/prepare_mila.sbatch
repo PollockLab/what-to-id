@@ -5,6 +5,7 @@
 #SBATCH --cpus-per-task=6
 #SBATCH --gres=gpu:rtx8000:1
 #SBATCH --partition=unkillable
+#SBATCH --signal=B:USR1@600
 
 # Usage: sbatch --dependency=afterok:STAGE_JOB --output=RUN/prepare-%j.log \
 #   slurm/prepare_mila.sbatch RUN POOL FROZEN_REFERENCE MODEL_SNAPSHOT
@@ -55,7 +56,30 @@ persist() {
     rsync -a --exclude=photos reference/ "$RUN/reference/"
 }
 trap persist EXIT
-python - "$REFERENCE" "$MODEL" <<'PY'
+# Ten minutes before the limit, stop the running step and persist its completed work.
+# A trap runs only once wait returns, so long steps run in the background.
+child=
+on_usr1() {
+    if [[ -n "$child" ]]; then
+        kill -TERM "$child" 2>/dev/null || true
+        wait "$child" || true
+    fi
+    persist
+}
+trap on_usr1 USR1
+run() {
+    "$@" <&0 &
+    child=$!
+    local status=0
+    wait "$child" || status=$?
+    while kill -0 "$child" 2>/dev/null; do
+        status=0
+        wait "$child" || status=$?
+    done
+    child=
+    return "$status"
+}
+run python - "$REFERENCE" "$MODEL" <<'PY'
 import json
 import sys
 from contextlib import nullcontext
@@ -92,7 +116,7 @@ for name, group in rows.groupby("iconic_taxon", sort=True):
     subprocess.run(["rsync", "-a", "--exclude=photos", "reference/",
                     os.environ["RUN"] + "/reference/"], check=True)
 PY
-python -m what_to_id.prepare_embeddings --pool "$ELIGIBLE_POOL" \
+run python -m what_to_id.prepare_embeddings --pool "$ELIGIBLE_POOL" \
     --reference-embeddings "$SLURM_TMPDIR/reference/emb_{group}_bioclip25.npz" \
     --reference-pool "$REFERENCE" \
     --model-snapshot "$MODEL" --work-dir "$SLURM_TMPDIR/work/candidates" \

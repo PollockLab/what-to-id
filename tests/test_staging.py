@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import io
 import json
+import os
+import signal
 import tarfile
 
 import numpy as np
@@ -211,3 +213,45 @@ def test_check_excludes_unfetchable_candidates_from_the_prepared_pool(tmp_path, 
     assert staging.check(run, sources) == pool
     assert not eligible.exists()
     assert json.loads((run / "excluded.json").read_text())["excluded"] == {}
+
+
+@pytest.fixture
+def usr1():
+    previous = signal.getsignal(signal.SIGUSR1)
+    yield
+    signal.signal(signal.SIGUSR1, previous)
+
+
+def test_time_limit_warning_archives_progress_without_completing(
+    tmp_path, fetched, monkeypatch, usr1
+):
+    run = tmp_path / "run"
+    pool, reference = tmp_path / "pool.parquet", tmp_path / "reference.parquet"
+    rows = _pool([1, 2])
+    rows.to_parquet(pool)
+    _pool([5]).to_parquet(reference)
+    real = staging.stage_images
+
+    def warned(group_rows, cache, **kwargs):
+        real(group_rows.iloc[:1], cache, **kwargs)
+        os.kill(os.getpid(), signal.SIGUSR1)
+        return real(group_rows, cache, **kwargs)
+
+    monkeypatch.setattr(staging, "stage_images", warned)
+    with pytest.raises(SystemExit) as stopped:
+        staging.main(["stage", str(run), str(pool), str(reference), "--cache", str(tmp_path / "c")])
+    assert stopped.value.code == 1
+    out = run / "photos/candidate"
+    assert len(_members(out / "Aves.tar")) == 1
+    assert not (out / "Aves.json").exists()
+    assert staging.staged_failures(out, "Aves", rows, 0.0) is None
+    with pytest.raises(ValueError, match="candidate photo archive for Aves"):
+        staging.check(run, {"candidate": pool, "reference": reference})
+    monkeypatch.setattr(staging, "stage_images", real)
+    fetched.calls.clear()
+    assert (
+        staging.main(["stage", str(run), str(pool), str(reference), "--cache", str(tmp_path / "c")])
+        == 0
+    )
+    assert fetched.calls == ["https://example.test/2.jpg", "https://example.test/5.jpg"]
+    assert staging.check(run, {"candidate": pool, "reference": reference}) == pool
