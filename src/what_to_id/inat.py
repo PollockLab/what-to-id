@@ -379,6 +379,46 @@ def still_open(ids: Sequence[int], *, session: requests.Session | None = None) -
     return open_ids
 
 
+def closed_since(
+    since: str | datetime.date | pd.Timestamp,
+    *,
+    d1: str,
+    session: requests.Session | None = None,
+    sleep: float = SLEEP,
+) -> set[int]:
+    """Ids of BC records with a photo, observed from ``d1``, that left needs-ID since ``since``.
+
+    Asks for Research Grade and casual records updated since then, so a daily run costs a
+    few pages instead of re-checking the whole pool. A record deleted from iNaturalist is
+    not returned.
+    """
+    params = {
+        "place_id": BC_PLACE_ID,
+        "quality_grade": "research,casual",
+        "photos": "true",
+        "d1": _check_date("d1", d1),
+        "updated_since": _check_created_d1(since),
+        "only_id": "true",
+        "per_page": PER_PAGE,
+        "order_by": "id",
+        "order": "desc",
+    }
+    session = session or make_session()
+    closed: set[int] = set()
+    id_below = None
+    while True:
+        p = dict(params)
+        if id_below is not None:
+            p["id_below"] = id_below
+        res = _results(session, p)
+        closed.update(int(o["id"]) for o in res)
+        if len(res) < PER_PAGE:
+            return closed
+        id_below = res[-1]["id"]
+        if sleep:
+            time.sleep(sleep)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Pull the BC needs-ID pool to parquet.")
     ap.add_argument("--d1", required=True, help="earliest observed_on, YYYY-MM-DD")

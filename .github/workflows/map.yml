@@ -1,0 +1,93 @@
+name: map
+
+# Refreshes the map of records that need an ID (site/map.html and pool.bin) every morning while
+# the daily study build is off; once DAILY_ENABLED is "true" that build writes the map itself and
+# this job stands down. It keeps its own pool on the map-state release, apart from the study's
+# pool-state, so it never changes what the study serves.
+#
+# Each run pulls records uploaded since the last one (so an observation uploaded long after it
+# was made still arrives) and drops records that left needs-ID since the last run, found by
+# asking for BC records updated since then that are now Research Grade or casual. About 50
+# requests a day. A record deleted from iNaturalist is not dropped until the pool is seeded again.
+#
+# Seed once: upload a pool parquet as pool.parquet to a release tagged map-state, then set the
+# repository variable MAP_DAILY_ENABLED to "true".
+on:
+  schedule:
+    - cron: "47 13 * * *" # 30 minutes after the daily study build's slot
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Shared with pages.yml and daily.yml so two deploys never race.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  D1: "2025-01-01" # earliest observed_on, the same as the study pool
+  STATE_TAG: map-state
+  WHAT_TO_ID_USER_AGENT: what-to-id map refresh (https://github.com/PollockLab/what-to-id)
+
+jobs:
+  refresh:
+    if: >-
+      vars.DAILY_ENABLED != 'true' &&
+      (github.event_name == 'workflow_dispatch' || vars.MAP_DAILY_ENABLED == 'true')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PYTHONPATH: src
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.lock
+      - run: pip install --require-hashes -r requirements.lock
+      - name: Fetch the map pool
+        run: |
+          set -euo pipefail
+          mkdir -p state
+          gh release download "$STATE_TAG" -D state -p pool.parquet -p last_run.txt --clobber || true
+          test -s state/pool.parquet || { echo "::error::no pool.parquet on the $STATE_TAG release; seed it first"; exit 1; }
+      - name: Add new uploads, drop records that got an ID
+        run: |
+          set -euo pipefail
+          # The saved time is two hours early, so a late or retried run misses nothing;
+          # dropping a record twice does nothing.
+          since=$(cat state/last_run.txt 2>/dev/null || date -u -d '26 hours ago' +%FT%TZ)
+          next=$(date -u -d '2 hours ago' +%FT%TZ)
+          python -m what_to_id.pool_state update --pool state/pool.parquet --d1 "$D1"
+          python -m what_to_id.pool_state prune --pool state/pool.parquet --since "$since" --d1 "$D1"
+          echo "$next" > state/last_run.txt
+      - name: Build the site
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+          cp site/*.html _site/
+          python -m what_to_id.page_map --pool state/pool.parquet --out _site --freeze "$(date -u +%F)"
+          if find _site -type f ! -name '*.html' ! -name pool.bin | grep -q .; then
+            echo "::error::the site must hold only HTML pages and the map's pool.bin"; exit 1
+          fi
+          if grep -ril -E 'recency|gap_first|gap first|similarity|novelty|surprise' _site; then
+            echo "::error::a list name leaked into the site"; exit 1
+          fi
+      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+      - name: Save the map pool
+        run: gh release upload "$STATE_TAG" state/pool.parquet state/last_run.txt --clobber

@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from what_to_id.inat import COLUMNS, DTYPES, load_pool, pull_pool, still_open
+from what_to_id.inat import COLUMNS, DTYPES, closed_since, load_pool, pull_pool, still_open
 from what_to_id.manifest import sha256_file
 
 log = logging.getLogger("what_to_id")
@@ -145,6 +145,21 @@ def _cmd_refresh(a: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_prune(a: argparse.Namespace) -> int:
+    pool = load_pool(a.pool)
+    closed = closed_since(a.since, d1=a.d1 or DEFAULT_D1)
+    updated = pool[~pool["id"].isin(closed)].reset_index(drop=True)
+    log.info(
+        "prune: %d left needs-ID since %s, %d dropped, %d kept",
+        len(closed),
+        a.since,
+        len(pool) - len(updated),
+        len(updated),
+    )
+    _atomic_write(updated, a.pool)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Incrementally update the BC needs-ID pool.")
     sub = ap.add_subparsers(dest="command", required=True)
@@ -160,6 +175,12 @@ def main(argv: list[str] | None = None) -> int:
     p_refresh.add_argument("--ids", required=True, type=Path, help="parquet with an id column")
     p_refresh.add_argument("--eligibility", type=Path, help="prepared snapshot exclusion state")
     p_refresh.set_defaults(func=_cmd_refresh)
+
+    p_prune = sub.add_parser("prune", help="drop records that left needs-ID since a time")
+    p_prune.add_argument("--pool", required=True, type=Path)
+    p_prune.add_argument("--since", required=True, help="ISO date or datetime, UTC")
+    p_prune.add_argument("--d1", default=None, help="earliest observed_on, YYYY-MM-DD")
+    p_prune.set_defaults(func=_cmd_prune)
 
     prepared = sub.add_parser("prepared", help="load a prepared snapshot retaining known closures")
     prepared.add_argument("--pool", required=True, type=Path)

@@ -229,3 +229,23 @@ def test_corrupt_eligibility_fails_before_replacing_pool(tmp_path, bad):
             ]
         )
     assert pool.read_bytes() == b"previous pool"
+
+
+def test_cmd_prune_drops_records_that_left_needs_id(tmp_path, monkeypatch):
+    pool = make_pool(4)
+    pool.loc[:, "id"] = [1, 2, 3, 4]
+    pool_path = tmp_path / "pool.parquet"
+    pool.to_parquet(pool_path, index=False)
+    captured = {}
+
+    def fake_closed_since(since, *, d1):
+        captured.update(since=since, d1=d1)
+        return {2, 4, 99}
+
+    monkeypatch.setattr(pool_state, "closed_since", fake_closed_since)
+    rc = pool_state.main(
+        ["prune", "--pool", str(pool_path), "--since", "2026-09-28T00:00:00Z", "--d1", "2025-01-01"]
+    )
+    assert rc == 0
+    assert captured == {"since": "2026-09-28T00:00:00Z", "d1": "2025-01-01"}
+    assert pd.read_parquet(pool_path)["id"].tolist() == [1, 3]

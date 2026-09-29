@@ -416,3 +416,22 @@ def test_pull_amphibia_one_page_live():
     assert not df.empty
     assert df["photo_url"].str.contains("/medium.").all()
     print(f"\nlive rows: {len(df)}")
+
+
+def test_closed_since_pages_by_id_and_asks_for_other_grades():
+    pages = [[{"id": i} for i in range(1000, 800, -1)], [{"id": 5}, {"id": 4}]]
+    sess = FakeSession(pages)
+    got = inat.closed_since("2026-09-28T12:00:00Z", d1="2025-01-01", session=sess, sleep=0)
+    assert got == set(range(801, 1001)) | {4, 5}
+    assert len(sess.calls) == 2
+    first, second = sess.calls
+    assert first["quality_grade"] == "research,casual"
+    assert first["updated_since"].startswith("2026-09-28T12:00:00")
+    assert first["place_id"] == inat.BC_PLACE_ID and first["d1"] == "2025-01-01"
+    assert "id_below" not in first and second["id_below"] == 801
+
+
+def test_closed_since_empty_is_one_request():
+    sess = FakeSession([])
+    assert inat.closed_since("2026-09-28", d1="2025-01-01", session=sess, sleep=0) == set()
+    assert len(sess.calls) == 1
