@@ -46,6 +46,8 @@ h1{font-size:18px;margin:0}
   background:var(--panel);color:var(--ink)}
 .histwrap{position:relative;margin:6px 0 2px}
 #hist{width:100%;height:64px;display:block;cursor:crosshair;touch-action:none}
+#over{width:100%;height:34px;display:block;cursor:pointer;touch-action:none}
+.unit{margin:4px 0 0;font-size:11px;color:var(--muted)}
 .htip{position:absolute;top:-4px;transform:translate(-50%,-100%);background:var(--panel);
   color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:2px 6px;font-size:12px;
   white-space:nowrap;pointer-events:none;box-shadow:var(--shadow)}

@@ -15,13 +15,10 @@ function clamp(d){return Math.max(0,Math.min(LAST,d));}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){
   return '&#'+c.charCodeAt(0)+';';});}
 
-// Calendar lookups by day: month of year, month bin since day0, and each bin's first day.
-var Y0=new Date(D0).getUTCFullYear(),MOY=new Uint8Array(META.days),MB=new Uint16Array(META.days);
-for(var d=0;d<META.days;d++){var t=new Date(D0+d*DAY);MOY[d]=t.getUTCMonth();
-  MB[d]=(t.getUTCFullYear()-Y0)*12+t.getUTCMonth();}
-var NB=MB[LAST]+1,START=new Int32Array(NB+1),H0=MB[META.hist0],EARLY=META.hist0>0?1:0;
-for(d=META.days-1;d>=0;d--)START[MB[d]]=d;
-START[NB]=META.days;
+// Calendar lookups by day: month of year, day of month and weekday (Monday is 0).
+var MOY=new Uint8Array(META.days),DOM=new Uint8Array(META.days),DOW=new Uint8Array(META.days);
+for(var d=0;d<META.days;d++){var t=new Date(D0+d*DAY);MOY[d]=t.getUTCMonth();DOM[d]=t.getUTCDate();
+  DOW[d]=(t.getUTCDay()+6)%7;}
 
 // What the viewer picked. Written to the URL hash so a view can be shared or bookmarked.
 var S={up:false,lo:0,hi:LAST,months:0,groups:META.groups.map(function(){return true;}),
@@ -57,7 +54,8 @@ function writeHash(){clearTimeout(hashTimer);hashTimer=setTimeout(function(){
 var P={n:0,id:new Uint32Array(0),pos:new Float32Array(0),obs:new Uint16Array(0),
   up:new Uint16Array(0),tax:new Uint16Array(0),grp:new Uint8Array(0),rank:new Uint8Array(0),
   ids:new Uint8Array(0),fl:new Uint8Array(0)};
-var TAXA=null,TAXOK=null,KEEP=new Uint8Array(0),FV=new Float32Array(0),SEL=-1,BINS=[];
+var TAXA=null,TAXOK=null,KEEP=new Uint8Array(0),FV=new Float32Array(0),SEL=-1,
+  CUM=new Float64Array(META.days+1);
 function cat(a,b){var c=new a.constructor(a.length+b.length);c.set(a);c.set(b,a.length);return c;}
 function unzip(buf){
   var u=new Uint8Array(buf,0,Math.min(2,buf.byteLength));
@@ -85,14 +83,16 @@ function refilter(){
   var n=P.n,day=S.up?P.up:P.obs,req=0,hide=0,m=S.months,g=S.groups;
   if(S.only.introduced)req|=FLAG.introduced;if(S.only.threatened)req|=FLAG.threatened;
   if(S.only.exact)hide=FLAG.obscured|FLAG.imprecise;
-  KEEP=new Uint8Array(n);FV=new Float32Array(2*n);BINS=new Float64Array(NB);
+  KEEP=new Uint8Array(n);FV=new Float32Array(2*n);var per=new Float64Array(META.days);
   for(var i=0;i<n;i++){
     var d=day[i];FV[2*i]=d===NO?-1:d;
     if(!g[P.grp[i]]||(req&&(P.fl[i]&req)!==req)||(P.fl[i]&hide))continue;
     if(TAXOK&&(P.tax[i]===NOTAX||!TAXOK[P.tax[i]]))continue;
     if(m&&(d===NO||!(m>>MOY[d]&1)))continue;
-    KEEP[i]=1;FV[2*i+1]=1;if(d!==NO)BINS[MB[d]]++;
+    KEEP[i]=1;FV[2*i+1]=1;if(d!==NO)per[d]++;
   }
+  CUM=new Float64Array(META.days+1);
+  for(d=0;d<META.days;d++)CUM[d+1]=CUM[d]+per[d];
   if(SEL>=0&&!KEEP[SEL])closeCard();
   render();
 }
@@ -121,50 +121,86 @@ function layers(){
   overlay.setProps({layers:L,getTooltip:tip,onClick:pick});
 }
 
-// The month histogram: one bar per month from META.hist0, plus one bar for everything earlier.
-var hist=$('hist'),htip=$('htip'),SLOTS=EARLY+NB-H0;
-function slotW(){return hist.clientWidth/SLOTS;}
-function slotAt(x){return Math.max(0,Math.min(SLOTS-1,Math.floor(x/slotW())));}
-function slotRange(s){if(EARLY&&s===0)return [0,START[H0]-1];var b=H0+s-EARLY;
-  return [START[b],Math.min(LAST,START[b+1]-1)];}
-function slotCount(s){if(EARLY&&s===0){var c=0;for(var b=0;b<H0;b++)c+=BINS[b]||0;return c;}
-  return BINS[H0+s-EARLY]||0;}
-function slotOn(s){var r=slotRange(s);if(r[1]<S.lo||r[0]>S.hi)return false;
-  return !S.months||(EARLY&&s===0)||(S.months>>MOY[r[0]]&1)===1;}
-function draw(){
-  var w=hist.clientWidth,h=64,ax=14,r=devicePixelRatio||1,c=hist.getContext('2d');
-  hist.width=w*r;hist.height=h*r;c.setTransform(r,0,0,r,0,0);c.clearRect(0,0,w,h);
-  var sw=w/SLOTS,m=1,s;
-  for(s=0;s<SLOTS;s++)m=Math.max(m,slotCount(s));
+// Two histograms. The overview has one bar per year over every date, on a log scale so that sparse
+// early years still show. The detail shows the period in view, with bars sized to it (days, weeks,
+// months or years) and scaled to its tallest bar. Picking a period in either zooms the detail to it.
+var hist=$('hist'),over=$('over'),htip=$('htip'),VIEW=[0,LAST],HE=[0,LAST+1],HU='year',drag=null;
+var OE=edges('year',0,LAST);
+function count(a,b){return CUM[b+1]-CUM[a];}
+function viewOf(){
+  if(S.lo===0&&S.hi===LAST)return [META.hist0,LAST];
+  var pad=Math.max(0,Math.ceil((31-(S.hi-S.lo+1))/2));
+  return [clamp(S.lo-pad),clamp(S.hi+pad)];
+}
+function unitOf(v){var n=v[1]-v[0]+1;return n<=92?'day':n<=732?'week':n<=25*366?'month':'year';}
+function edges(u,v0,v1){
+  var e=[v0];
+  for(var d=v0+1;d<=v1;d++)if(u==='day'||(u==='week'&&DOW[d]===0)||(DOM[d]===1&&
+    (u==='month'||(u==='year'&&MOY[d]===0))))e.push(d);
+  e.push(v1+1);return e;
+}
+function year(d){return iso(d).slice(0,4);}
+function dlabel(d){return DOM[d]+' '+MON[MOY[d]]+' '+year(d);}
+function binLabel(u,a){return u==='day'?dlabel(a):u==='week'?'Week of '+dlabel(a):
+  u==='month'?MONTH[MOY[a]]+' '+year(a):year(a);}
+function on(a,b){return b>=S.lo&&a<=S.hi&&(!S.months||b-a>40||!!(S.months>>MOY[a]&1)||
+  !!(S.months>>MOY[b]&1));}
+function tickLabel(u,e,k,step){
+  var a=e[k],b=e[k+1]-1;
+  if(u==='year'||u==='month')return DOM[a]===1&&MOY[a]===0&&year(a)%step===0?year(a):null;
+  if(u==='week'){if(DOM[a]!==1&&MOY[a]===MOY[b])return null;var m=DOM[a]===1?a:b;
+    return MON[MOY[m]]+(MOY[m]===0?' '+year(m):'');}
+  return [1,8,15,22].indexOf(DOM[a])>=0?DOM[a]+' '+MON[MOY[a]]:null;
+}
+function bars(cv,e,h,log,u){
+  var w=cv.clientWidth,ax=13,r=devicePixelRatio||1,c=cv.getContext('2d'),n=e.length-1,sw=w/n;
+  cv.width=w*r;cv.height=h*r;c.setTransform(r,0,0,r,0,0);c.clearRect(0,0,w,h);
+  var v=[],m=1,k;
+  for(k=0;k<n;k++){v.push(count(e[k],e[k+1]-1));m=Math.max(m,v[k]);}
   c.fillStyle=tok('--bar');
-  for(s=0;s<SLOTS;s++){
-    var v=slotCount(s),y=v?Math.max(1,v/m*(h-ax-2)):0;c.globalAlpha=slotOn(s)?1:.25;
-    c.fillRect(s*sw,h-ax-y,Math.max(sw-(sw>3?1:0),1),y);
+  for(k=0;k<n;k++){
+    var f=log?Math.log(1+v[k])/Math.log(1+m):v[k]/m,y=v[k]?Math.max(1.5,f*(h-ax-2)):0;
+    c.globalAlpha=on(e[k],e[k+1]-1)?1:.25;c.fillRect(k*sw,h-ax-y,Math.max(sw-(sw>3?1:0),1),y);
   }
   c.globalAlpha=1;c.fillStyle=tok('--muted');c.font='10px system-ui,sans-serif';c.textAlign='left';
-  var step=[1,2,5,10,20].find(function(k){return k*12*sw>=34;})||25;
-  if(EARLY)c.fillText('earlier',0,h-2);
-  for(var b=H0;b<NB;b++)if(b%12===0){var yr=Y0+b/12;if(yr%step)continue;
-    var x=(b-H0+EARLY)*sw;if(EARLY&&x<40)continue;c.fillRect(x,h-ax,1,3);c.fillText(yr,x+2,h-2);}
+  var per=u==='year'?1:u==='month'?12:0,step=1,end=-1e9;
+  if(per)step=[1,2,5,10,20,25,50].find(function(s){return s*per*sw>=32;})||100;
+  for(k=0;k<n;k++){
+    var t=tickLabel(u,e,k,step),x=k*sw;if(!t)continue;
+    var tw=c.measureText(t).width;if(x<end+6||x+tw>w)continue;
+    c.fillRect(x,h-ax,1,3);c.fillText(t,x+2,h-2);end=x+tw+2;
+  }
 }
-var drag=null;
-hist.addEventListener('pointerdown',function(e){hist.setPointerCapture(e.pointerId);
-  drag={x:e.offsetX,moved:false};});
-hist.addEventListener('pointermove',function(e){
-  var s=slotAt(e.offsetX),r=slotRange(s),lab=EARLY&&s===0?'Before '+iso(START[H0]).slice(0,4):
-    MON[MOY[r[0]]]+' '+iso(r[0]).slice(0,4);
-  htip.hidden=false;htip.style.left=Math.min(Math.max(e.offsetX,50),hist.clientWidth-50)+'px';
-  htip.textContent=lab+': '+nf.format(slotCount(s));
-  if(!drag)return;
-  if(Math.abs(e.offsetX-drag.x)>3)drag.moved=true;
-  if(drag.moved){var a=slotAt(Math.min(drag.x,e.offsetX)),z=slotAt(Math.max(drag.x,e.offsetX));
-    S.lo=slotRange(a)[0];S.hi=slotRange(z)[1];render();}
-});
-hist.addEventListener('pointerup',function(e){
-  if(drag&&!drag.moved){var r=slotRange(slotAt(e.offsetX));S.lo=r[0];S.hi=r[1];render();}
-  drag=null;});
-hist.addEventListener('pointerleave',function(){htip.hidden=true;});
-hist.addEventListener('dblclick',function(){S.lo=0;S.hi=LAST;render();});
+function draw(){
+  if(!drag)VIEW=viewOf();
+  HU=unitOf(VIEW);HE=edges(HU,VIEW[0],VIEW[1]);
+  bars(over,OE,34,true,'year');bars(hist,HE,64,false,HU);
+  var cap='One bar per '+HU+', '+dlabel(VIEW[0])+' to '+dlabel(VIEW[1])+'.';
+  $('unit').textContent=cap;hist.setAttribute('aria-label',cap+' Drag to pick a period.');
+}
+function binAt(cv,e,x){var n=e.length-1;return Math.max(0,Math.min(n-1,Math.floor(x/(cv.clientWidth/n))));}
+function brush(cv,get){
+  var st=null;
+  cv.addEventListener('pointerdown',function(ev){cv.setPointerCapture(ev.pointerId);
+    st={x:ev.offsetX,moved:false,e:get().e};if(cv===hist)drag=st;});
+  cv.addEventListener('pointermove',function(ev){
+    var g=get(),e=st?st.e:g.e,k=binAt(cv,e,ev.offsetX);
+    htip.hidden=false;htip.style.top=(cv.offsetTop-4)+'px';
+    htip.style.left=Math.min(Math.max(ev.offsetX,70),cv.clientWidth-70)+'px';
+    htip.textContent=binLabel(g.u,e[k])+': '+nf.format(count(e[k],e[k+1]-1));
+    if(!st)return;
+    if(Math.abs(ev.offsetX-st.x)>3)st.moved=true;
+    if(st.moved){var a=binAt(cv,e,Math.min(st.x,ev.offsetX)),z=binAt(cv,e,Math.max(st.x,ev.offsetX));
+      S.lo=e[a];S.hi=e[z+1]-1;render();}
+  });
+  cv.addEventListener('pointerup',function(ev){
+    if(st&&!st.moved){var k=binAt(cv,st.e,ev.offsetX);S.lo=st.e[k];S.hi=st.e[k+1]-1;}
+    st=null;drag=null;htip.hidden=true;render();});
+  cv.addEventListener('pointerleave',function(){htip.hidden=true;});
+  cv.addEventListener('dblclick',function(){S.lo=0;S.hi=LAST;render();});
+}
+brush(over,function(){return {e:OE,u:'year'};});
+brush(hist,function(){return {e:HE,u:HU};});
 
 // Controls.
 var PRESETS=[

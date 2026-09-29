@@ -39,8 +39,8 @@
 <span id="presets" class="chips" role="group" aria-label="Periods"></span>
 <span class="dates"><input id="from" type="date" aria-label="From"> to <input id="to" type="date" aria-label="To"></span>
 </div>
-<div class="histwrap"><canvas id="hist" role="img" aria-label="Records per month. Drag to pick a period."></canvas><div id="htip" class="htip" hidden></div></div>
-<p class="hint">Drag across the bars to pick a period, click a bar for one month, double-click for all dates. Bars count records that still need an ID, so older periods look emptier: many of their records have been identified since.</p>
+<div class="histwrap"><canvas id="over" role="img" aria-label="Records per year, every year, on a log scale. Click a year to zoom to it."></canvas><p id="unit" class="unit"></p><canvas id="hist" role="img"></canvas><div id="htip" class="htip" hidden></div></div>
+<p class="hint">Top: every year, bar height on a log scale so sparse early years show. Click or drag across years to zoom in. Bottom: the period in view. Drag to pick a period, click a bar to zoom into it, double-click for all dates. Bars count records that still need an ID, so older periods look emptier: many of their records have been identified since.</p>
 </section>
 <aside id="card" class="card" hidden></aside>
 <script>var META={{META}};var BASEMAPS={{BASEMAPS}};
