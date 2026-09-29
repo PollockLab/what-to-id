@@ -130,7 +130,7 @@ The read-back denominator is the served records only: `assign.parquet` covers th
 
 Prepare embeddings separately from daily serving. `slurm/stage_mila.sbatch` downloads photos on CPU into resumable group archives; `slurm/prepare_mila.sbatch` then regenerates the frozen 10,000-row Research Grade reference and candidate embeddings on GPU using the verified BioCLIP 2.5 checkpoint. Each group archive is bound to the IDs and photo URLs of its own rows, so archives copied from a run whose pool differed only in other groups are resumed without re-downloading. Candidate records whose photo cannot be fetched from either iNaturalist host are excluded before assignment and listed in `RUN/excluded.json`, and the bundle's pool omits them; staging stops instead if more than 0.1% of a group fails or any reference photo fails. The scripts take explicit input paths and never publish. The daily runner consumes the completed bundle.
 
-For subsequent pool snapshots, reuse only an attested prior preparation. The command retains observations whose ID, taxon group and photo URL match, embeds new or changed rows, drops removed IDs and keeps the supplied reference files unchanged:
+For subsequent pool snapshots, reuse only an attested prior preparation. The command retains observations whose ID, taxon group and photo URL match, embeds new or changed rows, drops removed IDs and keeps the supplied reference files unchanged. `slurm/prepare_mila.sbatch` passes the same three inputs when `PREVIOUS_POOL`, `CANDIDATE_CACHE` and `PREVIOUS_PREPARATION` are all exported at submission; the earlier bundle is only read:
 
 ```bash
 python -m what_to_id.prepare_embeddings --pool data/pool-next.parquet \

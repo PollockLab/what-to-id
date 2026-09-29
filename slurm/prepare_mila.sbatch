@@ -9,11 +9,24 @@
 # Usage: sbatch --dependency=afterok:STAGE_JOB --output=RUN/prepare-%j.log \
 #   slurm/prepare_mila.sbatch RUN POOL FROZEN_REFERENCE MODEL_SNAPSHOT
 # RUN/src must contain the verified source snapshot. No credentials or publication.
+# To reuse unchanged candidate vectors from an earlier bundle, export all three (read only):
+#   PREVIOUS_POOL=OLD/bundle/pool.parquet CANDIDATE_CACHE='OLD/bundle/embeddings_{group}.npz' \
+#   PREVIOUS_PREPARATION=OLD/bundle/preparation.json sbatch ... slurm/prepare_mila.sbatch ...
+# Choose reuse at the first submission for a RUN: RUN/work resumes only the same inputs.
 set -euo pipefail
 export RUN="${1:?durable run directory}"
 POOL="${2:?complete candidate pool parquet}"
 REFERENCE="${3:?frozen reference parquet}"
 MODEL="${4:?frozen model snapshot directory}"
+REUSE=()
+if [[ -n "${PREVIOUS_POOL:-}${CANDIDATE_CACHE:-}${PREVIOUS_PREPARATION:-}" ]]; then
+    if [[ -z "${PREVIOUS_POOL:-}" || -z "${CANDIDATE_CACHE:-}" || -z "${PREVIOUS_PREPARATION:-}" ]]; then
+        echo "set PREVIOUS_POOL, CANDIDATE_CACHE and PREVIOUS_PREPARATION together" >&2
+        exit 2
+    fi
+    REUSE=(--previous-pool "$PREVIOUS_POOL" --candidate-cache "$CANDIDATE_CACHE"
+           --previous-preparation "$PREVIOUS_PREPARATION")
+fi
 export HF_HOME="$SCRATCH/hf_cache"
 export UV_CACHE_DIR="$SCRATCH/uv_cache"
 export PATH="$HOME/.local/bin:$PATH"
@@ -84,5 +97,6 @@ python -m what_to_id.prepare_embeddings --pool "$ELIGIBLE_POOL" \
     --reference-pool "$REFERENCE" \
     --model-snapshot "$MODEL" --work-dir "$SLURM_TMPDIR/work/candidates" \
     --out "$RUN/bundle" --device cuda --batch 64 \
-    --photo-archive-dir "$RUN/photos/candidate" --checkpoint-dir "$RUN/work/candidates"
+    --photo-archive-dir "$RUN/photos/candidate" --checkpoint-dir "$RUN/work/candidates" \
+    ${REUSE[@]+"${REUSE[@]}"}
 python -m what_to_id.artifacts verify "$RUN/bundle"
