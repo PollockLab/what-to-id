@@ -18,6 +18,7 @@ export HF_HOME="$SCRATCH/hf_cache"
 export UV_CACHE_DIR="$SCRATCH/uv_cache"
 export PATH="$HOME/.local/bin:$PATH"
 export PYTHONPATH="$RUN/src"
+export PYTHONUNBUFFERED=1
 export HF_HUB_OFFLINE=1
 export TOKENIZERS_PARALLELISM=false
 cd "$SLURM_TMPDIR"

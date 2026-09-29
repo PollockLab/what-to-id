@@ -13,6 +13,7 @@ REFERENCE="${3:?frozen reference parquet}"
 export UV_CACHE_DIR="$SCRATCH/uv_cache"
 export PATH="$HOME/.local/bin:$PATH"
 export PYTHONPATH="$RUN/src"
+export PYTHONUNBUFFERED=1
 cd "$SLURM_TMPDIR"
 uv venv --python 3.11 .venv
 export VIRTUAL_ENV="$SLURM_TMPDIR/.venv"
