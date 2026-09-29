@@ -46,7 +46,7 @@ def no_sleep(monkeypatch):
 
 
 def _fake_get(script):
-    """script: url -> list of outcomes consumed in order; outcome is bytes or an Exception."""
+    """script: url -> outcomes consumed in order: bytes, an int status or an Exception."""
     calls = {}
 
     def get(url, timeout=None, headers=None):
@@ -55,6 +55,8 @@ def _fake_get(script):
         outcome = script[url].pop(0)
         if isinstance(outcome, Exception):
             raise outcome
+        if isinstance(outcome, int):
+            return _Resp(status=outcome)
         return _Resp(outcome)
 
     get.calls = calls
@@ -90,6 +92,72 @@ def test_stage_images_success_retry_and_permanent_failure(tmp_path, monkeypatch,
     # backoff 0.5, 1 for id 3 plus 0.5 for id 2; the last attempt never sleeps
     assert sorted(no_sleep) == [0.5, 0.5, 1.0]
     assert any("1 failed" in line for line in logs)
+
+
+STATIC = "https://static.inaturalist.org/photos/9/medium.jpg"
+S3 = "https://inaturalist-open-data.s3.amazonaws.com/photos/9/medium.jpg"
+
+
+def _stage_one(tmp_path, monkeypatch, url, script, retries=3):
+    pool = _pool([9])
+    pool["photo_url"] = url
+    get = _fake_get(script)
+    monkeypatch.setattr(embed.requests, "get", get)
+    out = embed.stage_images(pool, tmp_path, workers=1, retries=retries, log=lambda _: None)
+    return out, get
+
+
+@pytest.mark.parametrize(
+    ("url", "expected"),
+    [
+        (STATIC, S3),
+        (S3, STATIC),
+        (STATIC + "?v=2", S3 + "?v=2"),
+        ("https://example.test/photos/9/medium.jpg", None),
+        ("https://static.inaturalist.org.evil.test/photos/9/medium.jpg", None),
+    ],
+)
+def test_alternate_photo_url(url, expected):
+    assert embed._alternate_photo_url(url) == expected
+
+
+@pytest.mark.parametrize(("url", "other", "status"), [(STATIC, S3, 403), (S3, STATIC, 404)])
+def test_stage_images_moved_inat_photo_uses_other_host(
+    tmp_path, monkeypatch, no_sleep, url, other, status
+):
+    out, get = _stage_one(tmp_path, monkeypatch, url, {url: [status], other: [b"jpg"]})
+
+    assert out.attrs["failed"] == []
+    assert embed.photo_path(tmp_path, 9, url).read_bytes() == b"jpg"
+    assert get.calls == {url: 1, other: 1}
+    assert no_sleep == []
+
+
+def test_stage_images_inat_both_hosts_fail_names_both(tmp_path, monkeypatch, no_sleep):
+    script = {STATIC: [403, 403], S3: [403, 403]}
+    out, get = _stage_one(tmp_path, monkeypatch, STATIC, script, retries=2)
+
+    ((obs_id, err),) = out.attrs["failed"]
+    assert obs_id == 9
+    assert STATIC in err and S3 in err
+    assert not embed.photo_path(tmp_path, 9, STATIC).exists()
+    assert get.calls == {STATIC: 2, S3: 2}
+
+
+def test_stage_images_non_inat_403_makes_no_alternate_request(tmp_path, monkeypatch, no_sleep):
+    url = "https://example.test/photos/9/medium.jpg"
+    out, get = _stage_one(tmp_path, monkeypatch, url, {url: [403, 403, 403]})
+
+    assert [i for i, _ in out.attrs["failed"]] == [9]
+    assert get.calls == {url: 3}
+
+
+def test_stage_images_inat_500_uses_normal_retries(tmp_path, monkeypatch, no_sleep):
+    out, get = _stage_one(tmp_path, monkeypatch, STATIC, {STATIC: [500, b"jpg"]})
+
+    assert out.attrs["failed"] == []
+    assert get.calls == {STATIC: 2}
+    assert no_sleep == [0.5]
 
 
 def test_stage_images_skips_existing_and_bad_url(tmp_path, monkeypatch, no_sleep):

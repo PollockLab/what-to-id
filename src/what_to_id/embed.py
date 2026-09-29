@@ -20,6 +20,7 @@ from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 import numpy as np
 import pandas as pd
@@ -184,6 +185,22 @@ def photo_path(cache_dir: Path, obs_id: int, url: str | None = None) -> Path:
     return Path(cache_dir) / "photos" / f"{int(obs_id)}{suffix}.jpg"
 
 
+_INAT_PHOTO_HOSTS = ("static.inaturalist.org", "inaturalist-open-data.s3.amazonaws.com")
+
+
+def _alternate_photo_url(url: str) -> str | None:
+    """Same photo path on the other iNaturalist host, or None for any other host.
+
+    Openly licensed photos live in the open-data bucket and the rest on static.inaturalist.org,
+    so a licence change moves a photo and leaves the stored URL on the wrong host.
+    """
+    parts = urlsplit(url)
+    if parts.hostname not in _INAT_PHOTO_HOSTS:
+        return None
+    other = _INAT_PHOTO_HOSTS[1 - _INAT_PHOTO_HOSTS.index(parts.hostname)]
+    return urlunsplit(parts._replace(netloc=other))
+
+
 def _fetch_one(
     obs_id: int,
     url: str,
@@ -202,6 +219,16 @@ def _fetch_one(
     for attempt in range(max(1, retries)):
         try:
             r = requests.get(url, timeout=timeout, headers={"User-Agent": USER_AGENT})
+            alt = _alternate_photo_url(url)
+            if r.status_code in (403, 404) and alt is not None:
+                first = r.status_code
+                try:
+                    r = requests.get(alt, timeout=timeout, headers={"User-Agent": USER_AGENT})
+                    r.raise_for_status()
+                except Exception as alt_exc:
+                    raise RuntimeError(
+                        f"{first} for {url}; other host {alt}: {type(alt_exc).__name__}: {alt_exc}"
+                    ) from alt_exc
             r.raise_for_status()
             if not r.content:
                 raise ValueError("empty body")
