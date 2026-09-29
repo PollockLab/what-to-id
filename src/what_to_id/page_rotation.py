@@ -14,6 +14,7 @@ renders the same: a group name, a batch count and one Identify link.
 from __future__ import annotations
 
 import json
+from html import escape
 from pathlib import Path
 
 from what_to_id.manifest import Manifest
@@ -349,7 +350,7 @@ def _runner(batch_size: int) -> str:
     )
 
 
-def render_rotation_index(manifest: Manifest, *, title: str) -> str:
+def render_rotation_index(manifest: Manifest, *, title: str, map_href: str | None = None) -> str:
     """One blind page: pick a group, then cycle "Next batch" through the lists in equal share."""
     data = _rotation_data(manifest)
     groups = sorted({g for by_group in data.values() for g in by_group})
@@ -359,7 +360,9 @@ def render_rotation_index(manifest: Manifest, *, title: str) -> str:
         if manifest.freeze
         else ""
     )
-    sub_html = f'<p class="sub">{sub}</p>\n' if sub else ""
+    if map_href:
+        sub += f' <a href="{escape(map_href)}">See them on a map</a>.'
+    sub_html = f'<p class="sub">{sub.strip()}</p>\n' if sub else ""
     build_msg = (
         '<p class="undo" id="buildMsg" aria-live="polite" hidden>'
         "<span>New batches today. Your count starts again.</span>"
@@ -393,11 +396,13 @@ def render_rotation_index(manifest: Manifest, *, title: str) -> str:
     )
 
 
-def write_rotation_site(out_dir: Path | str, manifest: Manifest) -> list[Path]:
+def write_rotation_site(
+    out_dir: Path | str, manifest: Manifest, *, map_href: str | None = None
+) -> list[Path]:
     """Write a single blind index.html for the rotation design."""
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    html = render_rotation_index(manifest, title="What to ID next in BC")
+    html = render_rotation_index(manifest, title="What to ID next in BC", map_href=map_href)
     low = html.lower()
     for w in ARM_WORDS:
         if w in low:

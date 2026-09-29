@@ -34,6 +34,7 @@ from what_to_id.manifest import (
     write_manifest,
 )
 from what_to_id.page import write_site
+from what_to_id.page_map import MAP_NAME, write_map
 from what_to_id.page_rotation import write_rotation_site
 from what_to_id.served_log import append_served, served_rows
 from what_to_id.signals import batch_signals, signals_by_batch
@@ -247,8 +248,9 @@ def build(args: argparse.Namespace) -> Path:
         fh.write("\n")
     assign_df.to_parquet(out / "assign.parquet", index=False)
     batches_df.to_parquet(out / "batches.parquet", index=False)
+    write_map(out / "site", pool, freeze=args.freeze)
     if args.design == "rotation":
-        write_rotation_site(out / "site", m)
+        write_rotation_site(out / "site", m, map_href=MAP_NAME)
     else:
         write_site(out / "site", m, batches_df, pool=pool)
     if args.served_log:
