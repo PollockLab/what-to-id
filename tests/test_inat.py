@@ -169,6 +169,45 @@ class FlakySession(FakeSession):
         return super().get(url, params=params, timeout=timeout)
 
 
+class TruncatedResponse(FakeResponse):
+    def json(self):
+        raise inat.requests.exceptions.JSONDecodeError("Unterminated string", "{", 1)
+
+
+class TruncatingSession(FakeSession):
+    """Cuts off the body of the first ``bad`` responses, then serves its pages."""
+
+    def __init__(self, pages, bad):
+        super().__init__(pages)
+        self.bad = bad
+
+    def get(self, url, params=None, timeout=None):
+        if self.bad:
+            self.bad -= 1
+            self.calls.append(dict(params))
+            return TruncatedResponse([])
+        return super().get(url, params=params, timeout=timeout)
+
+
+def test_pull_group_retries_truncated_body(monkeypatch):
+    monkeypatch.setattr(inat.time, "sleep", lambda _: None)
+    sess = TruncatingSession([[_obs(3), _obs(2)]], bad=2)
+    df = inat.pull_group(
+        "Aves", d1="2025-01-01", freeze="2026-09-11", session=sess, sleep=0, log=lambda _: None
+    )
+    assert df["id"].tolist() == [3, 2]
+    assert len(sess.calls) == 3
+    assert all("id_below" not in c for c in sess.calls)
+
+
+def test_pull_group_truncated_body_gives_up(monkeypatch):
+    monkeypatch.setattr(inat.time, "sleep", lambda _: None)
+    sess = TruncatingSession([], bad=inat.RETRIES)
+    with pytest.raises(inat.requests.exceptions.JSONDecodeError):
+        inat.pull_group("Aves", d1="2025-01-01", freeze="2026-09-11", session=sess, sleep=0)
+    assert len(sess.calls) == inat.RETRIES
+
+
 def _pool(out, sess, groups=("Aves", "Insecta"), **over):
     kw = {"d1": "2025-01-01", "freeze": "2026-09-11", "out": out, "session": sess, "sleep": 0}
     kw.update(over)

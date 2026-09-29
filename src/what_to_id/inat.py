@@ -173,6 +173,24 @@ def make_session() -> requests.Session:
     return s
 
 
+def _results(session: requests.Session, params: dict) -> list[dict]:
+    """GET one page of results, retrying a body that arrives truncated or unparsable.
+
+    The session's urllib3 retry covers status codes and failed connections, but not a
+    200 response whose body is cut off mid-stream, which surfaces only at ``.json()``.
+    """
+    for attempt in range(RETRIES):
+        try:
+            r = session.get(INAT, params=params, timeout=TIMEOUT)
+            r.raise_for_status()
+            return r.json().get("results", [])
+        except (requests.exceptions.JSONDecodeError, requests.exceptions.ChunkedEncodingError):
+            if attempt == RETRIES - 1:
+                raise
+            time.sleep(2 ** (attempt + 1))
+    raise AssertionError("unreachable")
+
+
 def _frame(rows: list[dict]) -> pd.DataFrame:
     df = pd.DataFrame(rows, columns=list(COLUMNS))
     return df.astype(DTYPES)
@@ -221,9 +239,7 @@ def pull_group(
         p = dict(params)
         if id_below is not None:
             p["id_below"] = id_below
-        r = session.get(INAT, params=p, timeout=TIMEOUT)
-        r.raise_for_status()
-        res = r.json().get("results", [])
+        res = _results(session, p)
         if not res:
             break
         pages += 1
@@ -332,13 +348,7 @@ def fetch_by_ids(
     out: list[dict] = []
     for start in range(0, len(ids), chunk):
         batch = ids[start : start + chunk]
-        r = session.get(
-            INAT,
-            params={"id": ",".join(map(str, batch)), "per_page": chunk},
-            timeout=TIMEOUT,
-        )
-        r.raise_for_status()
-        out.extend(r.json().get("results", []))
+        out.extend(_results(session, {"id": ",".join(map(str, batch)), "per_page": chunk}))
         if sleep and start + chunk < len(ids):
             time.sleep(sleep)
     return out
@@ -356,19 +366,14 @@ def still_open(ids: Sequence[int], *, session: requests.Session | None = None) -
     open_ids: set[int] = set()
     for start in range(0, len(cleaned), PER_PAGE):
         batch = cleaned[start : start + PER_PAGE]
-        r = session.get(
-            INAT,
-            params={
-                "id": ",".join(map(str, batch)),
-                "per_page": PER_PAGE,
-                "quality_grade": "needs_id",
-                "photos": "true",
-                "place_id": BC_PLACE_ID,
-            },
-            timeout=TIMEOUT,
-        )
-        r.raise_for_status()
-        open_ids.update(int(o["id"]) for o in r.json().get("results", []))
+        params = {
+            "id": ",".join(map(str, batch)),
+            "per_page": PER_PAGE,
+            "quality_grade": "needs_id",
+            "photos": "true",
+            "place_id": BC_PLACE_ID,
+        }
+        open_ids.update(int(o["id"]) for o in _results(session, params))
         if start + PER_PAGE < len(cleaned):
             time.sleep(SLEEP)
     return open_ids
