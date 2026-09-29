@@ -100,6 +100,8 @@ def _rerun(
         str(webapp_dir),
         "--design",
         record["design"],
+        "--created-at",
+        record["created_at"],
         "--out",
         str(out),
         "--served-log",

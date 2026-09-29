@@ -8,7 +8,7 @@ import logging
 import os
 import platform
 import sys
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from importlib import metadata
 from pathlib import Path
 
@@ -30,6 +30,7 @@ from what_to_id.manifest import (
     key_fingerprint,
     key_from_env,
     sha256_file,
+    utc_now_iso,
     write_manifest,
 )
 from what_to_id.page import write_site
@@ -45,6 +46,17 @@ def _iso_date(s: str) -> str:
         return date.fromisoformat(s).isoformat()
     except ValueError as e:
         raise argparse.ArgumentTypeError(f"expected YYYY-MM-DD, got {s!r}") from e
+
+
+def _iso_utc(s: str) -> str:
+    """An ISO-8601 UTC timestamp, normalised to whole seconds like `utc_now_iso`."""
+    try:
+        t = datetime.fromisoformat(s)
+    except ValueError as e:
+        raise argparse.ArgumentTypeError(f"expected an ISO-8601 UTC timestamp, got {s!r}") from e
+    if t.utcoffset() != timedelta(0):
+        raise argparse.ArgumentTypeError(f"expected a UTC timestamp (Z or +00:00), got {s!r}")
+    return t.astimezone(UTC).replace(microsecond=0).isoformat()
 
 
 def _make_arms(
@@ -217,6 +229,7 @@ def build(args: argparse.Namespace) -> Path:
         backbone=backbone,
         max_batches=args.max_batches,
         served_rows=int(len(batches_df)),
+        created_at=args.created_at or utc_now_iso(),
         batches=batches,
         design=args.design,
         assignment="keyed" if key is not None else "stratified",
@@ -305,6 +318,13 @@ def make_parser() -> argparse.ArgumentParser:
         help="append this build's served records, by list letter, to this parquet",
     )
     b.add_argument("--ordering-cache", help="private run-local ordering cache; omit for replay")
+    b.add_argument(
+        "--created-at",
+        type=_iso_utc,
+        default=None,
+        help="stamp the manifest with this ISO-8601 UTC time (default: now); replay passes the "
+        "original build's time so the artifacts are byte-identical",
+    )
     b.add_argument("--out", default="out")
     b.set_defaults(func=build)
     return p

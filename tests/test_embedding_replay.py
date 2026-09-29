@@ -368,3 +368,40 @@ def test_cached_build_exact_outputs_and_independent_replay(
     )
     assert replay(pool, record, served, webapp_dir, key=KEY, **inputs).ok
     assert len(calls) == 2 * first_calls
+
+
+def test_replay_reuses_recorded_created_at(embedding_build, webapp_dir, tmp_path, monkeypatch):
+    from datetime import datetime
+
+    from what_to_id.replay import _rerun
+
+    class Later(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2099, 1, 1, 0, 0, 5, tzinfo=tz)
+
+    pool, record, served, candidates, references = embedding_build
+    monkeypatch.setattr("what_to_id.manifest.datetime", Later)
+    rerun = tmp_path / "rerun"
+    inputs = dict(embeddings=str(candidates), reference_embeddings=str(references))
+    _rerun(
+        json.loads(record.read_text()),
+        pool,
+        webapp_dir,
+        KEY,
+        rerun,
+        tmp_path / "rerun-served.parquet",
+        inputs,
+    )
+    original = record.parent
+    for filename in ("manifest.json", "build_record.json"):
+        assert (rerun / filename).read_bytes() == (original / filename).read_bytes()
+    for path in (original / "site").rglob("*.html"):
+        assert (rerun / path.relative_to(original)).read_bytes() == path.read_bytes()
+
+
+def test_build_created_at_must_be_utc_iso(capsys):
+    for bad in ("yesterday", "2026-09-28T12:00:00", "2026-09-28T12:00:00+02:00"):
+        with pytest.raises(SystemExit):
+            build(["build", "--freeze", "2026-09-28", "--d1", "2026-11-01", "--created-at", bad])
+        assert "--created-at" in capsys.readouterr().err
