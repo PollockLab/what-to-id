@@ -29,15 +29,7 @@ uv pip install --require-hashes -r "$RUN/requirements.lock"
 uv pip install 'torch==2.8.0' 'torchvision==0.23.0' 'open_clip_torch==3.1.0' 'pillow==11.3.0'
 uv pip freeze > "$RUN/preparation-environment.txt"
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
-python - "$RUN" "$POOL" "$REFERENCE" <<'PY_CHECK'
-import sys
-from pathlib import Path
-from what_to_id.manifest import sha256_file
-run, pool, reference = map(Path, sys.argv[1:])
-for kind, source in (("candidate", pool), ("reference", reference)):
-    if (run / "photos" / kind / "pool.sha256").read_text().strip() != sha256_file(source):
-        raise ValueError(f"{kind} photo archives belong to a different pool")
-PY_CHECK
+python -m what_to_id.staging check "$RUN" "$POOL" "$REFERENCE"
 mkdir -p reference
 if [[ -d "$RUN/work" ]]; then
     rsync -a "$RUN/work/" work/
