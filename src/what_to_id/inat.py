@@ -77,6 +77,16 @@ DTYPES = {
     "agree": "int64",
     "photo_url": "object",
 }
+# Kept when present and not required: pools pulled before these existed lack them. They feed
+# the map's popup and filters; taxon flags are for BC because the query sets place_id.
+EXTRA_COLUMNS = ("common_name", "introduced", "threatened", "obscured", "pos_acc")
+EXTRA_DTYPES = {
+    "common_name": "object",
+    "introduced": "boolean",
+    "threatened": "boolean",
+    "obscured": "boolean",
+    "pos_acc": "Int64",
+}
 
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
@@ -162,6 +172,11 @@ def flatten(obs: dict) -> dict | None:
         "ident_count": int(obs.get("identifications_count") or 0),
         "agree": int(obs.get("num_identification_agreements") or 0),
         "photo_url": str(photos[0].get("url", "")).replace("/square.", "/medium."),
+        "common_name": taxon.get("preferred_common_name"),
+        "introduced": taxon.get("introduced"),
+        "threatened": taxon.get("threatened"),
+        "obscured": obs.get("obscured"),
+        "pos_acc": obs.get("public_positional_accuracy"),
     }
 
 
@@ -192,8 +207,8 @@ def _results(session: requests.Session, params: dict) -> list[dict]:
 
 
 def _frame(rows: list[dict]) -> pd.DataFrame:
-    df = pd.DataFrame(rows, columns=list(COLUMNS))
-    return df.astype(DTYPES)
+    df = pd.DataFrame(rows, columns=[*COLUMNS, *EXTRA_COLUMNS])
+    return df.astype({**DTYPES, **EXTRA_DTYPES})
 
 
 def _write_atomic(frame: pd.DataFrame, path: Path, meta: dict[str, str] | None = None) -> None:

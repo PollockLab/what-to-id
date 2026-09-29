@@ -15,7 +15,16 @@ from pathlib import Path
 
 import pandas as pd
 
-from what_to_id.inat import COLUMNS, DTYPES, closed_since, load_pool, pull_pool, still_open
+from what_to_id.inat import (
+    COLUMNS,
+    DTYPES,
+    EXTRA_COLUMNS,
+    EXTRA_DTYPES,
+    closed_since,
+    load_pool,
+    pull_pool,
+    still_open,
+)
 from what_to_id.manifest import sha256_file
 
 log = logging.getLogger("what_to_id")
@@ -27,17 +36,19 @@ DEFAULT_D1 = "2000-01-01"
 def merge_new(pool: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
     """Append ``new`` rows into ``pool``, deduping by id with the new row winning.
 
-    Both frames must carry the pool's standard columns; the result has the same columns,
-    dtypes, and is sorted by id.
+    Both frames must carry the pool's standard columns; the result has the same columns plus any
+    optional extra column either frame has, their dtypes, and is sorted by id.
     """
     for name, df in (("pool", pool), ("new", new)):
         missing = [c for c in COLUMNS if c not in df.columns]
         if missing:
             raise ValueError(f"{name} frame missing columns {missing}")
-    combined = pd.concat([pool[list(COLUMNS)], new[list(COLUMNS)]], ignore_index=True)
+    extras = [c for c in EXTRA_COLUMNS if c in pool or c in new]
+    cols = [*COLUMNS, *extras]
+    combined = pd.concat([pool.reindex(columns=cols), new.reindex(columns=cols)], ignore_index=True)
     combined = combined.drop_duplicates("id", keep="last")
     combined = combined.sort_values("id").reset_index(drop=True)
-    return combined.astype(DTYPES)
+    return combined.astype({**DTYPES, **{c: EXTRA_DTYPES[c] for c in extras}})
 
 
 def drop_closed(pool: pd.DataFrame, checked: Iterable[int], open_ids: set[int]) -> pd.DataFrame:

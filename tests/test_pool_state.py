@@ -28,6 +28,17 @@ def test_merge_new_dedupes_new_wins_and_keeps_dtypes():
     assert list(merged.columns) == list(COLUMNS)
 
 
+def test_merge_new_keeps_extras_when_the_old_pool_lacks_them():
+    pool = make_pool(2)
+    pool.loc[:, "id"] = [1, 2]
+    new = _new_rows([3])
+    new["introduced"] = pd.array([True], dtype="boolean")
+    merged = pool_state.merge_new(pool, new)
+    assert list(merged.columns) == [*COLUMNS, "introduced"]
+    assert str(merged["introduced"].dtype) == "boolean"
+    assert merged["introduced"].isna().tolist() == [True, True, False]
+
+
 def test_merge_new_rejects_column_mismatch():
     pool = make_pool(2)
     bad = pool.drop(columns=["photo_url"])

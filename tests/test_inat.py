@@ -49,7 +49,7 @@ class FakeSession:
 def test_flatten_row():
     row = inat.flatten(_obs(7))
     assert row is not None
-    assert list(row) == list(inat.COLUMNS)
+    assert list(row) == [*inat.COLUMNS, *inat.EXTRA_COLUMNS]
     assert row["id"] == 7
     assert row["lon"] == -123.1 and row["lat"] == 49.3
     assert row["photo_url"] == "https://static.inaturalist.org/photos/1/medium.jpg"
@@ -57,6 +57,17 @@ def test_flatten_row():
     assert row["taxon_id"] == 47126
     assert row["user_id"] == 42
     assert row["ident_count"] == 1 and row["agree"] == 0
+
+
+def test_flatten_keeps_map_extras():
+    taxon = {**_obs(0)["taxon"], "preferred_common_name": "Plants", "introduced": True}
+    row = inat.flatten(_obs(8, taxon=taxon, obscured=True, public_positional_accuracy=32342))
+    assert row["common_name"] == "Plants" and row["introduced"] is True
+    assert row["threatened"] is None
+    assert row["obscured"] is True and row["pos_acc"] == 32342
+    df = inat._frame([row])
+    assert str(df["introduced"].dtype) == "boolean" and pd.isna(df["threatened"].iloc[0])
+    assert str(df["pos_acc"].dtype) == "Int64"
 
 
 def test_flatten_missing_geojson_or_photos():
@@ -138,7 +149,7 @@ def test_pull_group_empty():
         "Aves", d1="2025-01-01", freeze="2026-09-11", session=sess, sleep=0, log=lambda _: None
     )
     assert df.empty
-    assert list(df.columns) == list(inat.COLUMNS)
+    assert list(df.columns) == [*inat.COLUMNS, *inat.EXTRA_COLUMNS]
     assert df["id"].dtype == "int64"
     assert str(df["taxon_id"].dtype) == "Int64"
 
@@ -412,7 +423,7 @@ def test_pull_amphibia_one_page_live():
     df = inat.pull_group(
         "Amphibia", d1="2025-01-01", freeze="2026-09-11", cap_pages=1, log=lambda _: None
     )
-    assert list(df.columns) == list(inat.COLUMNS)
+    assert list(df.columns) == [*inat.COLUMNS, *inat.EXTRA_COLUMNS]
     assert not df.empty
     assert df["photo_url"].str.contains("/medium.").all()
     print(f"\nlive rows: {len(df)}")

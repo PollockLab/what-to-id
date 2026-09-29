@@ -26,7 +26,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  D1: "2025-01-01" # earliest observed_on, the same as the study pool
+  D1: "1900-01-01" # all of iNaturalist; the earliest BC needs-ID record is from 1949
   STATE_TAG: map-state
   WHAT_TO_ID_USER_AGENT: what-to-id map refresh (https://github.com/PollockLab/what-to-id)
 
