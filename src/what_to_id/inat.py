@@ -46,6 +46,21 @@ GROUPS = (
     "Plantae",
     "Reptilia",
 )
+# iNat taxon ids of GROUPS. The map pool pulls REST, everything outside them (other animals,
+# kelp, slime moulds, records with no taxon), with without_taxon_id, so no group is left out.
+ICONIC_TAXON_IDS = {
+    "Actinopterygii": 47178,
+    "Amphibia": 20978,
+    "Arachnida": 47119,
+    "Aves": 3,
+    "Fungi": 47170,
+    "Insecta": 47158,
+    "Mammalia": 40151,
+    "Mollusca": 47115,
+    "Plantae": 47126,
+    "Reptilia": 26036,
+}
+REST = "rest"
 
 COLUMNS = (
     "id",
@@ -117,7 +132,7 @@ QUALITY_GRADES = ("needs_id", "research")
 
 
 def pool_params(
-    group: str,
+    group: str | None,
     *,
     d1: str,
     freeze: str,
@@ -136,16 +151,53 @@ def pool_params(
         "place_id": BC_PLACE_ID,
         "quality_grade": quality,
         "photos": "true",
-        "iconic_taxa": group,
         "d1": _check_date("d1", d1),
         "created_d2": _check_date("freeze", freeze),
         "per_page": PER_PAGE,
         "order_by": "id",
         "order": "desc",
     }
+    if group == REST:
+        params["without_taxon_id"] = ",".join(map(str, ICONIC_TAXON_IDS.values()))
+    elif group is not None:
+        params["iconic_taxa"] = group
     if created_d1 is not None:
         params["created_d1"] = _check_created_d1(created_d1)
     return params
+
+
+def total_results(params: dict, *, session: requests.Session | None = None) -> int:
+    """How many records the API holds for ``params``, from one request that returns none."""
+    session = session or make_session()
+    r = session.get(INAT, params={**params, "per_page": 0}, timeout=TIMEOUT)
+    r.raise_for_status()
+    return int(r.json()["total_results"])
+
+
+def coverage(
+    *,
+    d1: str,
+    freeze: str,
+    slack: int = 50,
+    session: requests.Session | None = None,
+    sleep: float = SLEEP,
+) -> dict[str | None, int]:
+    """API totals for each of GROUPS, REST and the whole pool (key None).
+
+    Raises if the parts miss the whole by more than ``slack``, so a record outside every part
+    (a group nobody named, an unexpected iconic taxon) fails loudly instead of going missing.
+    ``slack`` covers records changing grade in the seconds between the requests.
+    """
+    session = session or make_session()
+    totals: dict[str | None, int] = {}
+    for g in (*GROUPS, REST, None):
+        totals[g] = total_results(pool_params(g, d1=d1, freeze=freeze), session=session)
+        if sleep:
+            time.sleep(sleep)
+    parts = sum(v for k, v in totals.items() if k is not None)
+    if abs(parts - totals[None]) > slack:
+        raise ValueError(f"groups and rest hold {parts:,} records but the pool {totals[None]:,}")
+    return totals
 
 
 def flatten(obs: dict) -> dict | None:

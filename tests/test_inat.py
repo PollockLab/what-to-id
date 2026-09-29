@@ -100,6 +100,51 @@ def test_pool_params_quality():
         inat.pool_params("Aves", d1="2025-01-01", freeze="2026-09-11", quality="casual")
 
 
+def test_rest_excludes_every_study_group():
+    assert set(inat.ICONIC_TAXON_IDS) == set(inat.GROUPS)
+    p = inat.pool_params(inat.REST, d1="1900-01-01", freeze="2026-09-29")
+    assert "iconic_taxa" not in p
+    assert p["without_taxon_id"].split(",") == [str(i) for i in inat.ICONIC_TAXON_IDS.values()]
+    whole = inat.pool_params(None, d1="1900-01-01", freeze="2026-09-29")
+    assert "iconic_taxa" not in whole and "without_taxon_id" not in whole
+
+
+class TotalSession:
+    def __init__(self, totals):
+        self.totals = totals
+        self.calls = []
+
+    def get(self, url, params=None, timeout=None):
+        self.calls.append(dict(params))
+        key = params.get("iconic_taxa") or ("rest" if "without_taxon_id" in params else None)
+        total = self.totals[key]
+        return type(
+            "R",
+            (),
+            {"raise_for_status": lambda s: None, "json": lambda s: {"total_results": total}},
+        )()
+
+
+def _totals(whole):
+    return {**{g: 10 for g in inat.GROUPS}, "rest": 5, None: whole}
+
+
+def test_coverage_adds_up():
+    s = TotalSession(_totals(105))
+    got = inat.coverage(d1="1900-01-01", freeze="2026-09-29", session=s, sleep=0)
+    assert got[inat.REST] == 5 and got[None] == 105
+    assert all(c["per_page"] == 0 for c in s.calls) and len(s.calls) == len(inat.GROUPS) + 2
+
+
+def test_coverage_fails_on_a_missing_group():
+    s = TotalSession(_totals(105 + 51))
+    with pytest.raises(ValueError, match="156"):
+        inat.coverage(d1="1900-01-01", freeze="2026-09-29", session=s, sleep=0)
+    assert inat.coverage(
+        d1="1900-01-01", freeze="2026-09-29", slack=51, session=TotalSession(_totals(156)), sleep=0
+    )
+
+
 @pytest.mark.parametrize("bad", ["2025-1-1", "20250101", "", None, 20250101])
 def test_pool_params_rejects_bad_dates(bad):
     with pytest.raises(ValueError):
