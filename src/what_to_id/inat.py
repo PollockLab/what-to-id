@@ -17,6 +17,8 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -28,6 +30,7 @@ SLEEP = 0.5
 TIMEOUT = 60
 RETRIES = 5
 RETRY_STATUS = (429, 500, 502, 503, 504)
+CHECKPOINT_PAGES = 50
 USER_AGENT = os.environ.get(
     "WHAT_TO_ID_USER_AGENT", "what-to-id (+https://github.com/PollockLab/what-to-id)"
 )
@@ -175,6 +178,16 @@ def _frame(rows: list[dict]) -> pd.DataFrame:
     return df.astype(DTYPES)
 
 
+def _write_atomic(frame: pd.DataFrame, path: Path, meta: dict[str, str] | None = None) -> None:
+    """Write ``frame`` to ``path`` via a tmp file, so an interruption never leaves a torn file."""
+    table = pa.Table.from_pandas(frame, preserve_index=False)
+    if meta:
+        table = table.replace_schema_metadata({**(table.schema.metadata or {}), **meta})
+    tmp = path.with_name(path.name + ".tmp")
+    pq.write_table(table, tmp)
+    tmp.replace(path)
+
+
 def pull_group(
     group: str,
     *,
@@ -186,13 +199,24 @@ def pull_group(
     log: Callable[[str], None] = print,
     quality: str = "needs_id",
     created_d1: str | datetime.date | pd.Timestamp | None = None,
+    checkpoint: Path | None = None,
 ) -> pd.DataFrame:
-    """Page through one iconic group with an ``id_below`` cursor."""
+    """Page through one iconic group with an ``id_below`` cursor.
+
+    With ``checkpoint``, the rows so far and the cursor are saved there every
+    ``CHECKPOINT_PAGES`` pages, and an existing checkpoint is resumed instead of restarting.
+    """
     session = session or make_session()
     params = pool_params(group, d1=d1, freeze=freeze, quality=quality, created_d1=created_d1)
     rows: list[dict] = []
     id_below = None
     pages = 0
+    if checkpoint is not None and checkpoint.exists():
+        saved = pq.read_table(checkpoint)
+        meta = saved.schema.metadata
+        id_below, pages = int(meta[b"id_below"]), int(meta[b"pages"])
+        rows = saved.to_pandas().to_dict("records")
+        log(f"{group}: resumed {len(rows)} rows at page {pages} from {checkpoint}")
     while cap_pages is None or pages < cap_pages:
         p = dict(params)
         if id_below is not None:
@@ -209,6 +233,9 @@ def pull_group(
         id_below = res[-1]["id"]
         if len(res) < PER_PAGE:
             break
+        if checkpoint is not None and pages % CHECKPOINT_PAGES == 0:
+            meta = {"id_below": str(id_below), "pages": str(pages)}
+            _write_atomic(_frame(rows), checkpoint, meta)
         if sleep:
             time.sleep(sleep)
     return _frame(rows)
@@ -229,7 +256,8 @@ def pull_pool(
     """Pull every group, dedupe on id, write parquet to ``out`` and return the frame.
 
     Each finished group is checkpointed under ``<out>.parts/``, so a rerun with the same
-    arguments after a failure skips the groups already pulled. The parts are removed once
+    arguments after a failure skips the groups already pulled and resumes an interrupted group
+    from its last saved page cursor (``<group>.partial.parquet``). The parts are removed once
     ``out`` is written. ``created_d1`` restricts the pull to records created since that
     date/datetime, for a cheap incremental update instead of pulling the whole pool.
     """
@@ -254,6 +282,7 @@ def pull_pool(
     frames = []
     for g in groups:
         part = parts / f"{g}.parquet"
+        partial = parts / f"{g}.partial.parquet"
         if part.exists():
             frames.append(pd.read_parquet(part, engine="pyarrow"))
             log(f"{g}: resumed {len(frames[-1])} rows from {part}")
@@ -266,11 +295,11 @@ def pull_pool(
             cap_pages=cap_pages,
             log=log,
             created_d1=created_d1,
+            checkpoint=partial,
             **kw,
         )
-        tmp = part.with_name(part.name + ".tmp")
-        frame.to_parquet(tmp, engine="pyarrow", index=False)
-        tmp.replace(part)
+        _write_atomic(frame, part)
+        partial.unlink(missing_ok=True)
         frames.append(frame)
     df = pd.concat(frames, ignore_index=True) if frames else _frame([])
     df = df.drop_duplicates("id").reset_index(drop=True)

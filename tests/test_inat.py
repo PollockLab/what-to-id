@@ -189,6 +189,75 @@ def test_pull_pool_resumes_after_failure(tmp_path):
     assert not (tmp_path / "pool.parquet.parts").exists()
 
 
+def _full_pages(n, start=1000):
+    """n full pages (PER_PAGE patched small) of descending ids, then a short last page."""
+    per = inat.PER_PAGE
+    ids = list(range(start, start - per * n - 1, -1))
+    return [[_obs(i) for i in ids[k * per : (k + 1) * per]] for k in range(n)] + [[_obs(ids[-1])]]
+
+
+def _small(monkeypatch, per=3, every=2):
+    monkeypatch.setattr(inat, "PER_PAGE", per)
+    monkeypatch.setattr(inat, "CHECKPOINT_PAGES", every)
+
+
+def test_pull_pool_resumes_group_from_cursor(tmp_path, monkeypatch):
+    _small(monkeypatch)
+    pages = _full_pages(5)
+    ref = _pool(tmp_path / "ref.parquet", FakeSession(pages), groups=("Aves",))
+    out = tmp_path / "pool.parquet"
+    with pytest.raises(inat.requests.ConnectionError):
+        _pool(out, FlakySession(pages[:3]), groups=("Aves",))
+    parts = tmp_path / "pool.parquet.parts"
+    assert (parts / "Aves.partial.parquet").exists()
+    assert not (parts / "Aves.parquet").exists()
+    saved_cursor = pages[1][-1]["id"]  # last checkpoint was after page 2
+    sess = FakeSession(pages[2:])
+    df = _pool(out, sess, groups=("Aves",))
+    assert sess.calls[0]["id_below"] == saved_cursor
+    assert len(sess.calls) == 4
+    pd.testing.assert_frame_equal(df, ref)
+    assert not parts.exists()
+
+
+def test_pull_group_partial_removed_after_completion(tmp_path, monkeypatch):
+    _small(monkeypatch)
+    pages = _full_pages(3)
+    out = tmp_path / "pool.parquet"
+    with pytest.raises(inat.requests.ConnectionError):
+        _pool(out, FlakySession(pages[:3]), groups=("Aves", "Insecta"))
+    parts = tmp_path / "pool.parquet.parts"
+    assert (parts / "Aves.partial.parquet").exists()
+    _pool(out, FakeSession(pages[2:] + [[_obs(1)]]), groups=("Aves", "Insecta"))
+    assert not parts.exists()
+    with pytest.raises(inat.requests.ConnectionError):
+        _pool(tmp_path / "b.parquet", FlakySession([[_obs(9)]]), groups=("Aves", "Insecta"))
+    assert not list((tmp_path / "b.parquet.parts").glob("*.partial.parquet"))
+
+
+def test_pull_group_checkpoint_edge_cases(tmp_path):
+    cp = tmp_path / "cp.parquet"
+    kw = {"d1": "2025-01-01", "freeze": "2026-09-11", "sleep": 0, "log": lambda _: None}
+    empty = inat.pull_group("Aves", session=FakeSession([]), checkpoint=cp, **kw)
+    assert empty.empty and not cp.exists()
+    one = inat.pull_group("Aves", session=FakeSession([[_obs(5)]]), checkpoint=cp, **kw)
+    assert list(one["id"]) == [5] and not cp.exists()
+
+
+def test_pull_pool_resume_counts_saved_pages_for_cap(tmp_path, monkeypatch):
+    _small(monkeypatch)
+    pages = _full_pages(6)
+    out = tmp_path / "pool.parquet"
+    ref = _pool(tmp_path / "ref.parquet", FakeSession(pages), groups=("Aves",), cap_pages=4)
+    assert len(ref) == 12
+    with pytest.raises(inat.requests.ConnectionError):
+        _pool(out, FlakySession(pages[:3]), groups=("Aves",), cap_pages=4)
+    sess = FakeSession(pages[2:])
+    df = _pool(out, sess, groups=("Aves",), cap_pages=4)
+    assert len(sess.calls) == 2  # pages 3 and 4 only; the 2 saved pages count toward the cap
+    pd.testing.assert_frame_equal(df, ref)
+
+
 def test_pull_pool_refuses_mismatched_resume(tmp_path):
     out = tmp_path / "pool.parquet"
     with pytest.raises(inat.requests.ConnectionError):
