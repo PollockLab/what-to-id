@@ -29,7 +29,8 @@ uv pip install --require-hashes -r "$RUN/requirements.lock"
 uv pip install 'torch==2.8.0' 'torchvision==0.23.0' 'open_clip_torch==3.1.0' 'pillow==11.3.0'
 uv pip freeze > "$RUN/preparation-environment.txt"
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
-python -m what_to_id.staging check "$RUN" "$POOL" "$REFERENCE"
+# Unfetchable candidates (at most 0.1% per group) are dropped before assignment; see RUN/excluded.json.
+ELIGIBLE_POOL="$(python -m what_to_id.staging check "$RUN" "$POOL" "$REFERENCE")"
 mkdir -p reference
 if [[ -d "$RUN/work" ]]; then
     rsync -a "$RUN/work/" work/
@@ -78,7 +79,7 @@ for name, group in rows.groupby("iconic_taxon", sort=True):
     subprocess.run(["rsync", "-a", "--exclude=photos", "reference/",
                     os.environ["RUN"] + "/reference/"], check=True)
 PY
-python -m what_to_id.prepare_embeddings --pool "$POOL" \
+python -m what_to_id.prepare_embeddings --pool "$ELIGIBLE_POOL" \
     --reference-embeddings "$SLURM_TMPDIR/reference/emb_{group}_bioclip25.npz" \
     --reference-pool "$REFERENCE" \
     --model-snapshot "$MODEL" --work-dir "$SLURM_TMPDIR/work/candidates" \
