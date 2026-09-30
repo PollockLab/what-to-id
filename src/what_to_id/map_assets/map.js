@@ -250,11 +250,18 @@ function chip(box,label,pressed,onclick,title){var b=document.createElement('but
   b.setAttribute('aria-pressed',String(pressed));
   b.onclick=function(){b.setAttribute('aria-pressed',String(onclick()));refilter();};
   $(box).appendChild(b);return b;}
-var GB=META.groups.map(function(g,i){return chip('groups',META.names[g]||g,S.groups[i],
-  function(){return S.groups[i]=!S.groups[i];});});
-function setGroups(v){S.groups=S.groups.map(function(){return v;});
-  GB.forEach(function(b){b.setAttribute('aria-pressed',String(v));});refilter();}
-$('gall').onclick=function(){setGroups(true);};$('gnone').onclick=function(){setGroups(false);};
+// Like the months: with no chip pressed every group shows. A click on the first chip shows that
+// group only, further clicks add or remove groups, and removing the last one shows all again.
+function allGroups(){return S.groups.every(Boolean);}
+function showGroups(){var all=allGroups();
+  GB.forEach(function(b,i){b.setAttribute('aria-pressed',String(!all&&S.groups[i]));});}
+var GB=META.groups.map(function(g,i){return chip('groups',META.names[g]||g,false,function(){
+  if(allGroups())S.groups=S.groups.map(function(v,j){return j===i;});else S.groups[i]=!S.groups[i];
+  if(!S.groups.some(Boolean))S.groups=S.groups.map(function(){return true;});
+  showGroups();return S.groups[i]&&!allGroups();});});
+showGroups();
+function setGroups(){S.groups=S.groups.map(function(){return true;});showGroups();refilter();}
+$('gall').onclick=setGroups;
 var MB_=MON.map(function(m,i){var b=chip('months',m,!!(S.months>>i&1),
   function(){S.months^=1<<i;return !!(S.months>>i&1);});b.setAttribute('aria-label',MONTH[i]);
   return b;});
@@ -279,7 +286,7 @@ function search(){
   TAXOK=ok;TAXID=k&&k<=50?ids:null;$('qn').textContent=k?nf.format(k)+(k===1?' taxon matches':' taxa match'):
     'No taxon matches';
 }
-$('reset').onclick=function(){S.lo=0;S.hi=LAST;S.up=false;clearMonths();setGroups(true);
+$('reset').onclick=function(){S.lo=0;S.hi=LAST;S.up=false;clearMonths();setGroups();
   S.only={};ONLY.forEach(function(b){b.setAttribute('aria-pressed','false');});
   S.q='';$('q').value='';search();refilter();};
 $('toggle').onclick=function(){var o=$('side').classList.toggle('open');
