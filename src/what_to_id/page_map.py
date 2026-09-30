@@ -4,21 +4,24 @@ The page (map.html) loads MapLibre and deck.gl from a CDN and reads the points f
 files next to it. The files hold record ids, positions, dates, taxa and flags, sorted by id, and
 nothing about lists, so the map cannot tell which list a record sits on.
 
-Each shard (pool-0.bin, pool-1.bin, ...), gzipped, little-endian, n records, columns back to back:
-    uint32 id | uint16 lon | uint16 lat | uint16 obs | uint16 up | uint16 taxon
-    | uint8 group | uint8 rank | uint8 ids | uint8 flags
-lon and lat are quantized over META.bbox; obs (observed) and up (uploaded) count days from
-META.day0, with NO_DAY for a missing date; taxon indexes the names in pool-taxa.bin (gzipped JSON
-of [latin, common, id step] triples, sorted by iNaturalist taxon id; the step is the id minus the
-previous row's, and the first row's is the id itself), group META.groups and rank META.ranks, with
-0xFFFF and 0xFF for none.
+Each shard (pool-0.bin, pool-1.bin, ...), gzipped, little-endian, n records sorted by id,
+columns back to back:
+    uint32 id step | uint16 lon | uint16 lat | uint16 obs | uint16 up | uint16 taxon
+    | uint8 group | uint8 ids | uint8 flags
+Each wider column is stored byte by byte: the low byte of every value, then the next byte, and so
+on, which gzip packs tighter. The id step is the id minus the previous record's, and the first
+record's is the id itself. lon and lat are quantized over META.bbox; obs (observed) and up
+(uploaded) count days from META.day0, with NO_DAY for a missing date; taxon indexes pool-taxa.bin
+(gzipped JSON of [latin, common, iNaturalist taxon id, rank] rows, most recorded taxon first; rank
+indexes META.ranks) and group META.groups, with 0xFFFF and 0xFF for none. A taxon's rank is the one
+its first record by id carries.
 ids holds min(IDs, 15) in the low nibble and min(agreements, 15) in the high nibble. flags sets
 FLAG_BITS for the flags META.flags names; a pool pulled before those columns existed has none.
 Dates before DAY_FLOOR (1900-01-01) are stored at that day, so day0 is never earlier, and the
 flags byte then also sets EARLY_OBS (16) or EARLY_UP (32) to say the stored day is a floor, not
 the real date; the page shows "before 1900" for it.
-Shard 0 holds records observed in the last two calendar years (and any without a date), so the
-page draws them first; older records follow in shard 1.
+Shard 0 holds records observed in the last RECENT_DAYS days of the map (and any without a date), so
+the page draws them first; older records follow, newest first, in shards of at most SHARD_MAX.
 
 META.totals, when the build fetched them, holds iNaturalist's count of every BC record with a photo
 that needs an ID or is Research Grade, per group and month, by observed ("obs") and uploaded
@@ -56,7 +59,9 @@ NO_DAY = 0xFFFF
 NO_TAXON = 0xFFFF
 NO_RANK = 0xFF
 _Q = 0xFFFF
-BYTES_PER_RECORD = 18
+BYTES_PER_RECORD = 17
+RECENT_DAYS = 90
+SHARD_MAX = 4_000_000
 IMPRECISE_M = 1000
 DAY_FLOOR = pd.Timestamp("1900-01-01")
 EARLY_OBS = 16
@@ -108,37 +113,35 @@ def encode_points(pool: pd.DataFrame) -> tuple[dict[str, bytes], dict]:
 
     groups = sorted(df["iconic_taxon"].fillna("Unknown").astype(str).unique())
     gidx = pd.Categorical(df["iconic_taxon"].fillna("Unknown").astype(str), categories=groups)
-    taxa, tidx = _taxa(df)
-    ranks = sorted(df["rank"].dropna().astype(str).unique()) if "rank" in df else []
-    ridx = (
-        pd.Categorical(df["rank"].astype("string"), categories=ranks).codes
-        if "rank" in df
-        else np.full(len(df), -1)
-    )
+    taxa, tidx, ranks = _taxa(df)
     known, flags = _flags(df)
     flags = flags | np.where(early_obs, EARLY_OBS, 0).astype("u1")
     flags = flags | np.where(early_up, EARLY_UP, 0).astype("u1")
+    obs_day = obs_off.fillna(NO_DAY).to_numpy().astype("<u2")
     cols = {
         "id": ids.astype("<u4"),
         "lon": _quant(lon, bbox[0], bbox[2]),
         "lat": _quant(lat, bbox[1], bbox[3]),
-        "obs": obs_off.fillna(NO_DAY).to_numpy().astype("<u2"),
+        "obs": obs_day,
         "up": up_off.fillna(NO_DAY).to_numpy().astype("<u2"),
         "taxon": tidx.astype("<u2"),
         "group": gidx.codes.astype("u1"),
-        "rank": np.where(ridx < 0, NO_RANK, ridx).astype("u1"),
         "ids": (_nibble(df, "ident_count") | _nibble(df, "agree") << 4).astype("u1"),
         "flags": flags,
     }
-    cut = (pd.Timestamp(year=int(obs.max().year) - 1, month=1, day=1) - day0).days
-    recent = (obs_off >= cut).to_numpy() | obs.isna().to_numpy()
+    # obs_day is NO_DAY for a missing date, so those records count as recent too
+    recent = obs_day >= max(last - RECENT_DAYS + 1, 0)
+    older = np.flatnonzero(~recent)
+    older = older[np.lexsort((ids[older], -obs_day[older].astype(np.int64)))]
+    parts = [np.flatnonzero(recent), *np.array_split(older, max(1, -(-len(older) // SHARD_MAX)))]
     out: dict[str, bytes] = {}
     shards = []
-    for part in (recent, ~recent):
-        if part.any():
+    for part in parts:
+        if len(part):
+            part = np.sort(part)
             name = shard_name(len(shards))
-            out[name] = _gz(b"".join(v[part].tobytes() for v in cols.values()))
-            shards.append({"file": name, "n": int(part.sum())})
+            out[name] = _gz(b"".join(_planes(_step(k, v[part])) for k, v in cols.items()))
+            shards.append({"file": name, "n": len(part)})
     out[TAXA_NAME] = _gz(json.dumps(taxa, ensure_ascii=False, separators=(",", ":")).encode())
     h = hashlib.sha256()
     for name in sorted(out):
@@ -177,7 +180,6 @@ def decode_points(blobs: dict[str, bytes], meta: dict) -> pd.DataFrame:
         return [None if i == none else table[i] for i in idx]
 
     names = pick(taxa, raw["taxon"], NO_TAXON)
-    tids = np.cumsum([t[2] for t in taxa], dtype=np.int64)
     out = pd.DataFrame(
         {
             "id": raw["id"].astype(np.int64),
@@ -187,12 +189,12 @@ def decode_points(blobs: dict[str, bytes], meta: dict) -> pd.DataFrame:
             "uploaded_on": date(raw["up"]),
             "iconic_taxon": np.asarray(meta["groups"], dtype=object)[raw["group"]],
             "taxon_id": pd.array(
-                [None if t is None else tids[i] for t, i in zip(names, raw["taxon"], strict=True)],
+                [t and t[2] for t in names],
                 dtype="Int64",
             ),
             "taxon_name": [t and t[0] for t in names],
             "common_name": [t and t[1] for t in names],
-            "rank": pick(meta["ranks"], raw["rank"], NO_RANK),
+            "rank": [None if not t or t[3] == NO_RANK else meta["ranks"][t[3]] for t in names],
             "ident_count": raw["ids"] & 15,
             "agree": raw["ids"] >> 4,
         }
@@ -208,12 +210,25 @@ def _decode_shard(blob: bytes, n: int) -> dict[str, np.ndarray]:
     if len(blob) != BYTES_PER_RECORD * n:
         raise ValueError(f"shard holds {len(blob)} bytes, expected {BYTES_PER_RECORD * n}")
     layout = [("id", "<u4"), ("lon", "<u2"), ("lat", "<u2"), ("obs", "<u2"), ("up", "<u2")]
-    layout += [("taxon", "<u2"), ("group", "u1"), ("rank", "u1"), ("ids", "u1"), ("flags", "u1")]
+    layout += [("taxon", "<u2"), ("group", "u1"), ("ids", "u1"), ("flags", "u1")]
     out, off = {}, 0
     for name, dt in layout:
-        out[name] = np.frombuffer(blob, dt, n, off)
-        off += np.dtype(dt).itemsize * n
+        w = np.dtype(dt).itemsize
+        planes = np.frombuffer(blob, "u1", w * n, off).reshape(w, n)
+        out[name] = planes.T.copy().view(dt).ravel()
+        off += w * n
+    out["id"] = np.cumsum(out["id"], dtype=np.int64).astype("<u4")
     return out
+
+
+def _step(name: str, v: np.ndarray) -> np.ndarray:
+    """The id column as steps from the previous id; other columns as they are."""
+    return np.diff(v, prepend=0).astype("<u4") if name == "id" else v
+
+
+def _planes(v: np.ndarray) -> bytes:
+    """A column byte by byte: every value's low byte, then the next byte, and so on."""
+    return v.view("u1").reshape(-1, v.itemsize).T.tobytes()
 
 
 def _quant(v: np.ndarray, lo: float, hi: float) -> np.ndarray:
@@ -221,24 +236,31 @@ def _quant(v: np.ndarray, lo: float, hi: float) -> np.ndarray:
     return np.rint((v - lo) / span * _Q).astype("<u2")
 
 
-def _taxa(df: pd.DataFrame) -> tuple[list[list[str]], np.ndarray]:
-    """[latin, common, id step] per distinct taxon, and each record's index into that table."""
+def _taxa(df: pd.DataFrame) -> tuple[list[list], np.ndarray, list[str]]:
+    """[latin, common, id, rank] per distinct taxon, most records first, each record's index into
+    that table, and the ranks the rows index."""
     if "taxon_id" not in df or "taxon_name" not in df:
-        return [], np.full(len(df), NO_TAXON)
+        return [], np.full(len(df), NO_TAXON), []
     common = df["common_name"] if "common_name" in df else pd.Series("", index=df.index)
-    t = pd.DataFrame({"tid": df["taxon_id"], "latin": df["taxon_name"], "common": common})
-    table = t.dropna(subset=["tid"]).drop_duplicates("tid").sort_values("tid")
+    rank = df["rank"] if "rank" in df else pd.Series(None, index=df.index, dtype=object)
+    t = pd.DataFrame(
+        {"tid": df["taxon_id"], "latin": df["taxon_name"], "common": common, "rank": rank}
+    ).dropna(subset=["tid"])
+    table = t.drop_duplicates("tid").set_index("tid")
+    table["n"] = t["tid"].value_counts()
+    table = table.reset_index().sort_values(["n", "tid"], ascending=[False, True])
     if len(table) >= NO_TAXON:
         raise ValueError(f"{len(table)} taxa do not fit in uint16")
+    ranks = sorted(table["rank"].dropna().astype(str).unique())
+    ridx = pd.Categorical(table["rank"].astype("string"), categories=ranks).codes.astype(int)
+    ridx = np.where(ridx < 0, NO_RANK, ridx)
     pos = pd.Series(np.arange(len(table)), index=table["tid"].to_numpy())
-    idx = t["tid"].map(pos).fillna(NO_TAXON).to_numpy()
-    tids = table["tid"].to_numpy(dtype=np.int64)
-    steps = np.diff(tids, prepend=0).tolist()
+    idx = df["taxon_id"].map(pos).fillna(NO_TAXON).to_numpy()
     names = [
-        [str(a) if pd.notna(a) else "", str(c) if pd.notna(c) else "", int(k)]
-        for a, c, k in zip(table["latin"], table["common"], steps, strict=True)
+        [str(a) if pd.notna(a) else "", str(c) if pd.notna(c) else "", int(k), int(r)]
+        for a, c, k, r in zip(table["latin"], table["common"], table["tid"], ridx, strict=True)
     ]
-    return names, idx
+    return names, idx, ranks
 
 
 def _flags(df: pd.DataFrame) -> tuple[list[str], np.ndarray]:

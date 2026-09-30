@@ -14,8 +14,10 @@ from what_to_id.page_map import (
     IMPRECISE_M,
     MAP_NAME,
     NO_DAY,
+    RECENT_DAYS,
     TAXA_NAME,
     TOTAL_ONLY,
+    _decode_shard,
     align_totals,
     decode_points,
     encode_points,
@@ -43,9 +45,16 @@ def _with_extras(pool):
     return pool
 
 
-def test_encode_round_trips_within_quantization():
+def test_encode_round_trips_within_quantization(monkeypatch):
+    monkeypatch.setattr("what_to_id.page_map.SHARD_MAX", 40)
     pool = _with_extras(make_pool(300, seed=3)).sample(frac=1, random_state=0)
+    pool["rank"] = np.where(pool["taxon_id"] % 2 == 1, "species", "genus")
+    pool["id"] = pool["id"] * 1000 + np.where(pool["id"] % 2 == 1, 0xFFFFFFFF - 10**7, 0)
+    pool["observed_on"] = (
+        pd.Timestamp("2026-08-31") - pd.to_timedelta(np.arange(len(pool)) * 7, "D")
+    ).strftime("%Y-%m-%d")
     blobs, meta = encode_points(pool)
+    assert len(meta["shards"]) > 3
     assert sum(s["n"] for s in meta["shards"]) == meta["n"] == len(pool)
     for s in meta["shards"]:
         assert len(gzip.decompress(blobs[s["file"]])) == BYTES_PER_RECORD * s["n"]
@@ -61,6 +70,7 @@ def test_encode_round_trips_within_quantization():
     assert back["iconic_taxon"].tolist() == want["iconic_taxon"].tolist()
     assert back["taxon_name"].tolist() == want["taxon_name"].tolist()
     assert back["rank"].tolist() == want["rank"].tolist()
+    assert back["taxon_id"].tolist() == want["taxon_id"].tolist()
     assert back["ident_count"].tolist() == np.minimum(want["ident_count"], 15).tolist()
     assert back["agree"].tolist() == want["agree"].tolist()
     assert meta["flags"] == ["introduced", "threatened", "obscured", "imprecise"]
@@ -78,8 +88,8 @@ def test_common_names_follow_the_taxon():
     pool["common_name"] = ["alders", None, "alders", None]
     blobs, meta = encode_points(pool)
     assert json.loads(gzip.decompress(blobs[TAXA_NAME])) == [
-        ["Acer", "", 3],
-        ["Alnus", "alders", 4],
+        ["Alnus", "alders", 7, 0],
+        ["Acer", "", 3, 0],
     ]
     back = decode_points(blobs, meta)
     assert back["common_name"].iloc[:3].tolist() == ["alders", "", "alders"]
@@ -94,16 +104,51 @@ def test_old_pool_without_extras_has_no_flags():
 
 
 def test_recent_records_come_first_and_old_ones_after():
-    pool = make_pool(5)
-    pool["observed_on"] = ["1987-06-01", "2024-12-31", "2025-01-01", None, "2026-09-01"]
+    pool = make_pool(6)
+    last = pd.Timestamp("2026-09-01")
+    edge = (last - pd.Timedelta(days=RECENT_DAYS - 1)).strftime("%Y-%m-%d")
+    out = (last - pd.Timedelta(days=RECENT_DAYS)).strftime("%Y-%m-%d")
+    pool["observed_on"] = ["1987-06-01", out, edge, None, "2026-09-01", "2020-01-01"]
     blobs, meta = encode_points(pool)
     assert [s["file"] for s in meta["shards"]] == [shard_name(0), shard_name(1)]
-    assert [s["n"] for s in meta["shards"]] == [3, 2]
+    assert [s["n"] for s in meta["shards"]] == [3, 3]
     first = decode_points({**blobs}, {**meta, "shards": meta["shards"][:1]})
-    assert first["id"].tolist() == pool["id"].iloc[2:].tolist()
+    assert first["id"].tolist() == pool["id"].iloc[2:5].tolist()
     assert meta["day0"] == "1987-06-01"
-    assert meta["hist0"] == 0
     assert decode_points(blobs, meta)["id"].tolist() == pool["id"].tolist()
+
+
+def test_older_records_follow_newest_first_in_capped_shards(monkeypatch):
+    monkeypatch.setattr("what_to_id.page_map.SHARD_MAX", 2)
+    pool = make_pool(6)
+    pool["observed_on"] = ["2001-01-01", "2005-01-01", "2003-01-01", "2004-01-01", "2002-01-01"] + [
+        "2026-09-01"
+    ]
+    blobs, meta = encode_points(pool)
+    assert [s["n"] for s in meta["shards"]] == [1, 2, 2, 1]
+    got = [decode_points(blobs, {**meta, "shards": [s]})["id"].tolist() for s in meta["shards"]]
+    ids = pool["id"].tolist()
+    assert got == [[ids[5]], [ids[1], ids[3]], [ids[2], ids[4]], [ids[0]]]
+
+
+def test_pool_with_no_recent_records_starts_with_older_ones():
+    pool = make_pool(5)
+    pool["observed_on"] = "2019-05-01"
+    blobs, meta = encode_points(pool)
+    assert meta["shards"] == [{"file": shard_name(0), "n": 5}]
+    assert sorted(blobs) == [shard_name(0), TAXA_NAME]
+    assert decode_points(blobs, meta)["id"].tolist() == pool["id"].tolist()
+
+
+def test_shards_store_columns_byte_by_byte_and_ids_as_steps():
+    pool = make_pool(3)
+    pool["id"] = [5, 300, 70000]
+    blobs, meta = encode_points(pool)
+    raw = gzip.decompress(blobs[shard_name(0)])
+    assert raw[:12] == bytes([5, 39, 68, 0, 1, 16, 0, 0, 1, 0, 0, 0])
+    assert _decode_shard(raw, 3)["id"].tolist() == [5, 300, 70000]
+    empty = _decode_shard(b"", 0)
+    assert all(len(v) == 0 for v in empty.values())
 
 
 def test_histogram_starts_after_rare_old_records():
@@ -125,7 +170,7 @@ def test_late_upload_and_missing_date():
     assert back["observed_on"].isna().tolist() == [False, True, False]
     assert back["uploaded_on"].iloc[0] == pd.Timestamp("2026-09-20")
     n = meta["shards"][0]["n"]
-    obs = np.frombuffer(gzip.decompress(blobs[shard_name(0)]), "<u2", n, 8 * n)
+    obs = _decode_shard(gzip.decompress(blobs[shard_name(0)]), n)["obs"]
     assert NO_DAY in obs.tolist()
     assert meta["days"] == (pd.Timestamp("2026-09-21") - pd.Timestamp("2025-01-01")).days + 1
 
@@ -169,7 +214,7 @@ def test_page_is_blind_and_carries_meta():
     assert page_meta["n"] == 20
     assert page_meta["shards"] == [{"file": f"{shard_name(0)}?v={v}", "n": 20}]
     assert page_meta["taxa"] == f"{TAXA_NAME}?v={v}"
-    assert "18*n" in html and ">2026-09-28</time>" in html
+    assert f"{BYTES_PER_RECORD}*n" in html and ">2026-09-28</time>" in html
 
 
 def test_meta_cannot_close_the_script():
@@ -188,18 +233,30 @@ def test_write_map_and_cli(tmp_path):
         assert (tmp_path / "a" / name).read_bytes() == (tmp_path / "b" / name).read_bytes()
 
 
-def test_taxa_file_carries_ids_as_steps_and_decode_restores_them():
-    pool = make_pool(4)
-    pool["taxon_id"] = pd.array([1700000, 3, 1700000, None], dtype="Int64")
-    pool["taxon_name"] = ["Alnus", "Acer", "Alnus", None]
+def test_taxa_file_numbers_taxa_by_frequency_and_carries_their_rank():
+    pool = make_pool(6)
+    pool["taxon_id"] = pd.array([1700000, 3, 1700000, None, 3, 3], dtype="Int64")
+    pool["taxon_name"] = ["Alnus", "Acer rubrum", "Alnus", None, "Acer rubrum", "Acer rubrum"]
+    pool["rank"] = ["genus", "species", "genus", "kingdom", "species", "species"]
     blobs, meta = encode_points(pool)
+    assert meta["ranks"] == ["genus", "species"]
     assert json.loads(gzip.decompress(blobs[TAXA_NAME])) == [
-        ["Acer", "", 3],
-        ["Alnus", "", 1699997],
+        ["Acer rubrum", "", 3, 1],
+        ["Alnus", "", 1700000, 0],
     ]
     back = decode_points(blobs, meta)
-    assert back["taxon_id"].iloc[:3].tolist() == [1700000, 3, 1700000]
-    assert back["taxon_id"].isna().tolist() == [False, False, False, True]
+    assert back["taxon_id"].tolist()[:3] == [1700000, 3, 1700000]
+    assert back["taxon_id"].isna().tolist() == [False, False, False, True, False, False]
+    assert back["rank"].fillna("-").tolist() == ["genus", "species", "genus", "-"] + ["species"] * 2
+
+
+def test_pool_without_ranks_or_taxa_has_none():
+    blobs, meta = encode_points(make_pool(5).drop(columns="rank"))
+    assert meta["ranks"] == [] and json.loads(gzip.decompress(blobs[TAXA_NAME]))[0][3] == 255
+    assert decode_points(blobs, meta)["rank"].isna().all()
+    blobs, meta = encode_points(make_pool(5).drop(columns=["taxon_id", "rank"]))
+    assert json.loads(gzip.decompress(blobs[TAXA_NAME])) == []
+    assert decode_points(blobs, meta)["taxon_id"].isna().all()
 
 
 def test_page_passes_the_place_and_url_limit_and_has_the_identify_link():

@@ -72,8 +72,8 @@ function writeHash(){clearTimeout(hashTimer);hashTimer=setTimeout(function(){
 
 // Records, concatenated as shards arrive.
 var P={n:0,id:new Uint32Array(0),pos:new Float32Array(0),obs:new Uint16Array(0),
-  up:new Uint16Array(0),tax:new Uint16Array(0),grp:new Uint8Array(0),rank:new Uint8Array(0),
-  ids:new Uint8Array(0),fl:new Uint8Array(0)};
+  up:new Uint16Array(0),tax:new Uint16Array(0),grp:new Uint8Array(0),ids:new Uint8Array(0),
+  fl:new Uint8Array(0)};
 var TAXA=null,TAXOK=null,TAXID=null,GONE={},GONE_NEW=false,KEEP=new Uint8Array(0),SEL=-1,
   CUM=new Float64Array(META.days+1),TOT=META.totals||null,TC=null,NODAY=0,PER=null;
 function cat(a,b){var c=new a.constructor(a.length+b.length);c.set(a);c.set(b,a.length);return c;}
@@ -85,17 +85,21 @@ function unzip(buf){
 }
 function get(url){return fetch(url).then(function(r){
   if(!r.ok)throw new Error('HTTP '+r.status);return r.arrayBuffer();}).then(unzip);}
+// A shard stores each wider column byte by byte (every value's low byte, then the next), and ids
+// as steps from the previous id.
 function addShard(buf,n){
-  if(buf.byteLength!==18*n)throw new Error('unexpected size');
-  var b=META.bbox,sx=(b[2]-b[0])/65535,sy=(b[3]-b[1])/65535,o=0;
-  function col(T,sz){var a=new T(buf.slice(o,o+sz*n));o+=sz*n;return a;}
+  if(buf.byteLength!==17*n)throw new Error('unexpected size');
+  var b=META.bbox,sx=(b[2]-b[0])/65535,sy=(b[3]-b[1])/65535,o=0,u=new Uint8Array(buf);
+  function col(T,w){if(w===1){o+=n;return u.slice(o-n,o);}
+    var a=new T(n),v=new Uint8Array(a.buffer);
+    for(var j=0;j<w;j++,o+=n)for(var k=0;k<n;k++)v[k*w+j]=u[o+k];return a;}
   var id=col(Uint32Array,4),qx=col(Uint16Array,2),qy=col(Uint16Array,2),obs=col(Uint16Array,2),
-    up=col(Uint16Array,2),tax=col(Uint16Array,2),grp=col(Uint8Array,1),rank=col(Uint8Array,1),
-    ids=col(Uint8Array,1),fl=col(Uint8Array,1),pos=new Float32Array(2*n);
-  for(var i=0;i<n;i++){pos[2*i]=b[0]+qx[i]*sx;pos[2*i+1]=b[1]+qy[i]*sy;}
+    up=col(Uint16Array,2),tax=col(Uint16Array,2),grp=col(Uint8Array,1),ids=col(Uint8Array,1),
+    fl=col(Uint8Array,1),pos=new Float32Array(2*n);
+  for(var s=0,i=0;i<n;i++)id[i]=s=(s+id[i])>>>0;
+  for(i=0;i<n;i++){pos[2*i]=b[0]+qx[i]*sx;pos[2*i+1]=b[1]+qy[i]*sy;}
   P={n:P.n+n,id:cat(P.id,id),pos:cat(P.pos,pos),obs:cat(P.obs,obs),up:cat(P.up,up),
-    tax:cat(P.tax,tax),grp:cat(P.grp,grp),rank:cat(P.rank,rank),ids:cat(P.ids,ids),
-    fl:cat(P.fl,fl)};
+    tax:cat(P.tax,tax),grp:cat(P.grp,grp),ids:cat(P.ids,ids),fl:cat(P.fl,fl)};
 }
 
 // The map filters on the GPU. Each record carries its observed and uploaded day (-1 for none) as
@@ -400,7 +404,7 @@ $('toggle').onclick=function(){var o=$('side').classList.toggle('open');
 // Hover and click.
 function names(i){var t=TAXA&&P.tax[i]!==NOTAX?TAXA[P.tax[i]]:null,g=META.groups[P.grp[i]];
   return {common:t&&t[1]||'',latin:t&&t[0]||META.names[g]||g,group:META.names[g]||g,
-    rank:P.rank[i]===255?'':META.ranks[P.rank[i]]};}
+    rank:t&&t[3]!==255?META.ranks[t[3]]:''};}
 function badges(i){var f=P.fl[i],out=[];
   if(f&FLAG.introduced)out.push(['Introduced','']);if(f&FLAG.threatened)out.push(['Threatened','']);
   if(f&FLAG.obscured)out.push(['Location hidden','warn']);
@@ -490,7 +494,6 @@ var HINT=$('hint').textContent,HINT_TOT='Top: records still needing an ID per ye
   'click a bar to zoom into it, double-click for all dates.';
 render();
 var names0=get(META.taxa).then(function(buf){TAXA=JSON.parse(new TextDecoder().decode(buf));
-  for(var i=1,t=TAXA.length?TAXA[0][2]:0;i<TAXA.length;i++)TAXA[i][2]=t+=TAXA[i][2];
   search();});
 // One shard downloads at a time, so on a slow link the recent shard gets all the bandwidth.
 var chain=Promise.resolve(),prev=Promise.resolve();
