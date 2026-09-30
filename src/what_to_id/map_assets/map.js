@@ -54,7 +54,7 @@ function writeHash(){clearTimeout(hashTimer);hashTimer=setTimeout(function(){
 var P={n:0,id:new Uint32Array(0),pos:new Float32Array(0),obs:new Uint16Array(0),
   up:new Uint16Array(0),tax:new Uint16Array(0),grp:new Uint8Array(0),rank:new Uint8Array(0),
   ids:new Uint8Array(0),fl:new Uint8Array(0)};
-var TAXA=null,TAXOK=null,KEEP=new Uint8Array(0),FV=new Float32Array(0),SEL=-1,
+var TAXA=null,TAXOK=null,GONE={},GONE_NEW=false,KEEP=new Uint8Array(0),FV=new Float32Array(0),SEL=-1,
   CUM=new Float64Array(META.days+1);
 function cat(a,b){var c=new a.constructor(a.length+b.length);c.set(a);c.set(b,a.length);return c;}
 function unzip(buf){
@@ -86,7 +86,7 @@ function refilter(){
   KEEP=new Uint8Array(n);FV=new Float32Array(2*n);var per=new Float64Array(META.days);
   for(var i=0;i<n;i++){
     var d=day[i];FV[2*i]=d===NO?-1:d;
-    if(!g[P.grp[i]]||(req&&(P.fl[i]&req)!==req)||(P.fl[i]&hide))continue;
+    if(!g[P.grp[i]]||(req&&(P.fl[i]&req)!==req)||(P.fl[i]&hide)||GONE[P.id[i]])continue;
     if(TAXOK&&(P.tax[i]===NOTAX||!TAXOK[P.tax[i]]))continue;
     if(m&&(d===NO||!(m>>MOY[d]&1)))continue;
     KEEP[i]=1;FV[2*i+1]=1;if(d!==NO)per[d]++;
@@ -281,7 +281,9 @@ function tip(o){
 }
 var ctl=null,card=$('card');
 function pick(o){if(!P.n||o.index<0||o.layer.id!=='pts')return;openCard(o.index);}
-function closeCard(){SEL=-1;card.hidden=true;if(ctl)ctl.abort();layers();writeHash();}
+// A record deleted from iNaturalist leaves the map once its card closes, so the card can say why.
+function closeCard(){SEL=-1;card.hidden=true;if(ctl)ctl.abort();
+  if(GONE_NEW){GONE_NEW=false;refilter();}else{layers();writeHash();}}
 function openCard(i){
   SEL=i;var t=names(i),id=P.id[i],lag=P.obs[i]!==NO&&P.up[i]!==NO?P.up[i]-P.obs[i]:null;
   card.innerHTML='<button type="button" class="x" aria-label="Close">×</button>'+
@@ -298,15 +300,17 @@ function openCard(i){
   layers();writeHash();
   if(ctl)ctl.abort();ctl=new AbortController();
   fetch('https://api.inaturalist.org/v1/observations/'+id,{signal:ctl.signal})
-    .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+    .then(function(r){if(r.status===404)return {results:[]};
+      if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
     .then(function(j){
       var o=j.results&&j.results[0];
-      if(!o){$('ph').textContent='This record is no longer on iNaturalist';$('place').textContent='';
-        return;}
+      if(!o){$('ph').textContent='This record is no longer on iNaturalist, so it leaves the map';
+        $('place').textContent='';GONE[id]=1;GONE_NEW=true;return;}
       var ph=o.photos&&o.photos[0];
       if(ph){var img=new Image();img.alt='Photo of '+(t.common||t.latin);
         img.src=String(ph.url).replace('/square.','/medium.');$('ph').textContent='';
         $('ph').appendChild(img);$('attr').textContent=ph.attribution||'';}
+      else $('ph').textContent='No photo on iNaturalist now';
       $('place').textContent=o.place_guess||'Not given';
       var now=[],ot=o.taxon||{};
       if(o.quality_grade&&o.quality_grade!=='needs_id')now.push('Now '+
