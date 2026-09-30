@@ -10,7 +10,14 @@ from __future__ import annotations
 
 from what_to_id.manifest import Manifest
 from what_to_id.page_doc import Doc, a, codes, fold, see
-from what_to_id.page_order_text import PER_LIST, PER_LIST_ANY, count_role, order_name
+from what_to_id.page_order_text import (
+    PER_LIST,
+    PER_LIST_ANY,
+    count_role,
+    holm_lists,
+    names,
+    order_name,
+)
 from what_to_id.page_svg import fmt
 
 _PROTOCOL = "docs/protocol.md#what-we-measure-decided-before-the-blitz"
@@ -142,6 +149,19 @@ def analysis_section(m: Manifest, f: dict, doc: Doc) -> str:
         f"({see('methods-split', 'Section 3')}) are shuffled among them, as the deal does."
     )
     n_cmp = max(f["k"] - 1, 1)
+    family, exploratory = holm_lists(m.arms)
+    holm_ref = f"Holm's method {doc.cite('holm1979')}"
+    if family:
+        held = (
+            f"Only {names(family)} {'is' if len(family) == 1 else 'are'} confirmatory: tested "
+            "one-sided, for the list coming out ahead of newest first, with "
+            f"{'that p' if len(family) == 1 else f'those {len(family)} p values'} adjusted by "
+            f"{holm_ref}. "
+        )
+    else:
+        held = f"No list in this build is confirmatory, so {holm_ref} adjusts nothing. "
+    if exploratory:
+        held += f"The comparison for {names(exploratory)} is exploratory: two-sided, not adjusted. "
     flips = (
         "<p><b>The assumption.</b> With no effect, each person's difference is symmetric about "
         "zero: +3 is as likely as -3. The sign test needs less, only that a difference is as "
@@ -154,18 +174,21 @@ def analysis_section(m: Manifest, f: dict, doc: Doc) -> str:
         "<p>The record-level test holds each record's IDs fixed, redraws which list each record "
         "would have gone to by the same rule the build used, and works out the same summed "
         "difference. "
-        f"{redraw} p is the share of redrawn splits whose summed "
-        "difference is at least as far from zero as the real one, counting the real split. "
+        f"{redraw} For a confirmatory comparison, one-sided, p is the share of redrawn splits "
+        "whose summed difference (the list minus newest first) is at least as high as the real "
+        "one, counting the real split. For every other comparison, two-sided, it is the share "
+        "at least as far from zero. "
         f"{all_served} By default the analysis command reports this p, with the keyed redraw, "
-        "as each comparison's <code>p</code> and Holm-adjusts the primary ones. Run on one "
+        "as each comparison's <code>p</code> and Holm-adjusts the confirmatory ones. Run on one "
         "count for every list, it reports it as <code>p_record</code>, without adjustment.</p>"
     )
     holm = (
         "<p>Holm's method keeps the chance of any false finding at or below the test level over "
         "those comparisons. The smallest p is multiplied by the number of tests, the next by one "
         "less, and so on, and no adjusted p is smaller than the one before. By default the "
-        "analysis command runs Holm over the primary p values only, one per tested list. Each "
-        "list's other count is reported next to it, marked secondary, without adjustment. Each "
+        "analysis command runs Holm over the confirmatory p values only, one per confirmatory "
+        "list. An exploratory list's pinned count is reported marked exploratory, and each "
+        "list's other count marked secondary, both without adjustment. Each "
         "window gets its own Holm step, and the code does not adjust across windows.</p>"
         "<p>The sum adds up every person's difference, so people who make many IDs count for "
         "more. The sign test gives each person one vote, so the two together show whether a lift "
@@ -181,7 +204,7 @@ def analysis_section(m: Manifest, f: dict, doc: Doc) -> str:
         f"the sign of each difference and adds again, many times {doc.cite('good2005')}. p is "
         "the share of sign patterns whose sum is at least as far from zero as the real sum. With "
         "12 or fewer people left, p is exact, from every sign pattern. With more, p comes from "
-        "10,000 random sign patterns. The draft protocol says the test is two-sided, at 0.05.</p>"
+        "10,000 random sign patterns. This check is two-sided, at 0.05.</p>"
         + fold("the drawn p, and what the test assumes", flips)
         + ""
         '<h4 id="methods-record-test">The primary test, on the records</h4>'
@@ -197,8 +220,7 @@ def analysis_section(m: Manifest, f: dict, doc: Doc) -> str:
         + fold("how the record-level test redraws the split", record)
         + "<p><b>More than one list.</b> Each list other than the control is compared with the "
         f"control on its own primary count ({doc.ref('per-list')}), so this build gives {n_cmp} "
-        f"comparisons, and those {n_cmp} p values are "
-        f"adjusted by Holm's method {doc.cite('holm1979')}. <b>Sign test.</b> An exact binomial "
+        f"comparisons. {held}<b>Sign test.</b> An exact binomial "
         "test on how many people had a positive difference, zeros dropped. It is reported "
         "without adjustment.</p>"
         + fold("Holm's method, and why the sign test sits next to the sum", holm)

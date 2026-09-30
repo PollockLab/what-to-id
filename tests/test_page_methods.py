@@ -272,7 +272,8 @@ def test_record_level_rerandomisation_is_the_primary_test(full):
 def test_table_six_pins_an_outcome_for_every_list(full):
     assert "Open." not in full
     assert "Primary: the weighted count, against newest first" in full
-    assert full.count("Primary: the plain count, against newest first") == 2
+    assert full.count("Primary: the plain count, against newest first, one-sided") == 1
+    assert "Exploratory: the plain count, against newest first, two-sided, not adjusted" in full
     assert "fewer switches between kinds of photo make identifying faster" in full
     assert "predicts more IDs" not in full
     assert "predicted direction on the count is not stated in the draft protocol" in full
@@ -440,10 +441,18 @@ def test_each_list_has_its_pinned_primary_count_on_the_page(full):
     assert "The analysis code stops on unexpected sightings first" in prim
     both = "look-alike photos together and unfamiliar photos first"
     assert f"Primary for data-poor places first. Secondary for {both}" in rows["Weighted count"]
-    assert f"Primary for {both}. Secondary for data-poor places first" in rows["Plain count"]
+    assert (
+        "Primary for look-alike photos together. Exploratory for unfamiliar photos first, not "
+        "adjusted. Secondary for data-poor places first"
+    ) in rows["Plain count"]
     assert page_methods_analysis.PER_LIST_ANY in full
     assert "on its own primary count" in _visible(_sections(full)["methods-analysis"])
-    assert "runs Holm over the primary p values only" in full
+    assert "runs Holm over the confirmatory p values only" in full
+    assert (
+        "Only data-poor places first and look-alike photos together are confirmatory: tested "
+        "one-sided, for the list coming out ahead of newest first, with those 2 p values adjusted"
+    ) in full
+    assert "The comparison for unfamiliar photos first is exploratory: two-sided" in full
     two = method_section(_manifest(), 2)
     assert "the weighted count for data-poor places first" in two and "stops on" not in two
 

@@ -35,7 +35,9 @@ def test_each_tested_list_has_its_pinned_primary_outcome():
     assert confirmatory.primary_outcome("gap_first") == "cell_score"
     res = confirmatory.confirmatory(_idents(), SERVED, control="recency", reps=200, **KW)
     prim = res[res["role"] == "primary"].set_index("arm")["outcome"].to_dict()
-    assert prim == {"gap_first": "weighted", "novelty": "plain", "similarity": "plain"}
+    assert prim == {"gap_first": "weighted", "similarity": "plain"}
+    explo = res[res["role"] == "exploratory"].set_index("arm")["outcome"].to_dict()
+    assert explo == {"novelty": "plain"}
     sec = res[res["role"] == "secondary"].set_index("arm")["outcome"].to_dict()
     assert sec == {"gap_first": "plain", "novelty": "weighted", "similarity": "weighted"}
     weighted = analysis.identifier_counts(_idents(), SERVED, weight="cell_score", **KW)
@@ -46,19 +48,38 @@ def test_each_tested_list_has_its_pinned_primary_outcome():
     assert got.loc["gap_first", "mean_diff"] == pytest.approx(want.loc["gap_first", "mean_diff"])
 
 
-def test_primary_p_is_the_record_level_p_and_holm_runs_over_it():
+def _record_p(arm, weight, alternative):
+    w = None if weight == "none" else weight
+    totals = analysis.record_totals(_idents(), SERVED, weight=w, **KW)
+    return analysis.record_shuffle_p(
+        totals, SERVED, arm=arm, control="recency", reps=200, seed=7, alternative=alternative
+    )
+
+
+def test_primary_p_is_the_one_sided_record_level_p_and_holm_runs_over_h1_and_h2():
     res = confirmatory.confirmatory(_idents(), SERVED, control="recency", reps=200, seed=7, **KW)
+    assert list(res["role"]) == ["primary"] * 2 + ["exploratory"] + ["secondary"] * 3
     prim = res[res["role"] == "primary"].set_index("arm")
-    want = {}
-    for arm, weight in confirmatory.PRIMARY.items():
-        w = None if weight == "none" else weight
-        totals = analysis.record_totals(_idents(), SERVED, weight=w, **KW)
-        want[arm] = analysis.record_shuffle_p(
-            totals, SERVED, arm=arm, control="recency", reps=200, seed=7
-        )
+    assert confirmatory.HOLM_FAMILY == ("gap_first", "similarity")
+    want = {
+        arm: _record_p(arm, confirmatory.PRIMARY[arm], "greater")
+        for arm in ("gap_first", "similarity")
+    }
     assert prim["p"].to_dict() == pytest.approx(want)
     assert prim["p_holm"].to_dict() == pytest.approx(analysis.holm(want))
     assert list(res.columns) == list(confirmatory.COLUMNS)
+
+
+def test_h3_is_exploratory_two_sided_and_unadjusted():
+    res = confirmatory.confirmatory(_idents(), SERVED, control="recency", reps=200, seed=7, **KW)
+    h3 = res[res["role"] == "exploratory"].set_index("arm")
+    assert list(h3.index) == ["novelty"] and h3.loc["novelty", "outcome"] == "plain"
+    assert h3.loc["novelty", "p"] == pytest.approx(_record_p("novelty", "none", "two-sided"))
+    assert np.isnan(h3.loc["novelty", "p_holm"])
+    sec = res[res["role"] == "secondary"].set_index("arm")
+    for arm in confirmatory.PRIMARY:
+        other = "none" if confirmatory.PRIMARY[arm] == "cell_score" else "cell_score"
+        assert sec.loc[arm, "p"] == pytest.approx(_record_p(arm, other, "two-sided"))
 
 
 def test_an_id_on_the_identifiers_own_record_does_not_count():
@@ -94,7 +115,7 @@ def test_a_list_with_nothing_served_stops_the_family():
         confirmatory.confirmatory(_idents(), served, control="recency", reps=10, **KW)
 
 
-def test_holm_runs_over_the_three_primary_p_values_only():
+def test_holm_runs_over_the_h1_and_h2_p_values_only():
     def frame(ps):
         # p_signflip is set to 1 so a Holm over it instead of p would show.
         rows = [
@@ -108,10 +129,12 @@ def test_holm_runs_over_the_three_primary_p_values_only():
     weighted = frame({"gap_first": 0.01, "similarity": 0.0001, "novelty": 0.0002})
     res = confirmatory.family({"none": plain, "cell_score": weighted}).set_index(["role", "arm"])
     prim = res.loc["primary"]
-    assert len(prim) == 3
-    assert prim.loc["gap_first", "p_holm"] == pytest.approx(0.03)
-    assert prim.loc["similarity", "p_holm"] == pytest.approx(0.04)
-    assert prim.loc["novelty", "p_holm"] == pytest.approx(0.04)
+    assert sorted(prim.index) == ["gap_first", "similarity"]
+    # Holm over two: 0.01 * 2 and max(0.02, 0.02 * 1). Over three it would be 0.03 and 0.04.
+    assert prim.loc["gap_first", "p_holm"] == pytest.approx(0.02)
+    assert prim.loc["similarity", "p_holm"] == pytest.approx(0.02)
+    assert res.loc["exploratory"].loc["novelty", "p"] == 0.04
+    assert np.isnan(res.loc["exploratory"].loc["novelty", "p_holm"])
     assert res.loc["secondary", "p_holm"].isna().all()
     assert res.loc["secondary"].loc["similarity", "p"] == 0.0001
     with pytest.raises(ValueError, match="missing weightings"):
@@ -147,10 +170,10 @@ def test_cli_default_is_the_confirmatory_family(tmp_path, capsys):
     assert cols == list(confirmatory.COLUMNS)
     rows = [[c.strip() for c in ln.strip("|").split("|")] for ln in lines if ln.startswith("| ")]
     body = [r for r in rows if r[0] in ARMS]
-    assert [r[:4] for r in body if r[3] == "primary"] == [
+    assert [r[:4] for r in body if r[3] != "secondary"] == [
         ["gap_first", "recency", "weighted", "primary"],
-        ["novelty", "recency", "plain", "primary"],
         ["similarity", "recency", "plain", "primary"],
+        ["novelty", "recency", "plain", "exploratory"],
     ]
-    assert all(r[cols.index("p_holm")] == "nan" for r in body if r[3] == "secondary")
+    assert all(r[cols.index("p_holm")] == "nan" for r in body if r[3] != "primary")
     assert np.isfinite([float(r[cols.index("p")]) for r in body]).all()

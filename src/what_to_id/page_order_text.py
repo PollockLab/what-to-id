@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 
-from what_to_id.confirmatory import PRIMARY
+from what_to_id.confirmatory import HOLM_FAMILY, PRIMARY
 from what_to_id.page_doc import Doc, see
 
 # Plain words for each order. Never the arm names, which ARM_WORDS guards.
@@ -172,23 +172,23 @@ PER_LIST_ANY = (
 PER_LIST = {
     "recency": "Nothing of its own. It is the control that every other list is compared with. "
     "The same read-back shares are computed for it.",
-    "gap_first": "Primary: the weighted count, against newest first. Secondary: the plain count, "
-    "not adjusted. The draft protocol predicts that this list wins on the weighted count and "
-    "likely loses on the plain count.",
-    "similarity": "Primary: the plain count, against newest first. Secondary: the weighted "
-    "count, not adjusted. The draft protocol's hypothesis for this list is that fewer switches "
-    "between kinds of photo make identifying faster. It does not state a direction for the count "
-    "in words. The count is what is tested, not speed.",
-    "novelty": "Primary: the plain count, against newest first. Secondary: the weighted count, "
-    "not adjusted. A species reaching Research Grade in a grid cell with no Research Grade record "
-    "of it before is not in the code. This list's predicted direction on the count is not stated "
-    "in the draft protocol.",
+    "gap_first": "Primary: the weighted count, against newest first, one-sided for this list "
+    "ahead. Secondary: the plain count, not adjusted. The draft protocol predicts that this list "
+    "wins on the weighted count and likely loses on the plain count.",
+    "similarity": "Primary: the plain count, against newest first, one-sided for this list "
+    "ahead. Secondary: the weighted count, not adjusted. The draft protocol's hypothesis for this "
+    "list is that fewer switches between kinds of photo make identifying faster. It does not "
+    "state a direction for the count in words. The count is what is tested, not speed.",
+    "novelty": "Exploratory: the plain count, against newest first, two-sided, not adjusted. "
+    "Secondary: the weighted count, not adjusted. A species reaching Research Grade in a grid "
+    "cell with no Research Grade record of it before is not in the code. This list's predicted "
+    "direction on the count is not stated in the draft protocol.",
 }
 
 _COUNT = {"cell_score": "the weighted count", "none": "the plain count"}
 
 
-def _names(arms: list[str]) -> str:
+def names(arms: list[str]) -> str:
     words = [order_name(arm)[0].lower() + order_name(arm)[1:] for arm in arms]
     return words[0] if len(words) == 1 else ", ".join(words[:-1]) + " and " + words[-1]
 
@@ -199,7 +199,7 @@ def _tested(arms, weight: str) -> list[str]:
 
 def primary_text(arms) -> str:
     """Table 1's primary outcome: each tested list of this build on the count pinned for it."""
-    parts = [f"{_COUNT[w]} for {_names(_tested(arms, w))}" for w in _COUNT if _tested(arms, w)]
+    parts = [f"{_COUNT[w]} for {names(_tested(arms, w))}" for w in _COUNT if _tested(arms, w)]
     text = (
         "Per participant, IDs at species level or below on a tested list minus the same on newest "
         "first, each list on its own count, fixed in the analysis code: " + "; ".join(parts)
@@ -208,16 +208,27 @@ def primary_text(arms) -> str:
     )
     unpinned = [arm for arm in arms if arm != "recency" and arm not in PRIMARY]
     if unpinned:
-        text += f". The analysis code stops on {_names(unpinned)}, with no pinned count"
+        text += f". The analysis code stops on {names(unpinned)}, with no pinned count"
     return text
 
 
+def holm_lists(arms) -> tuple[list[str], list[str]]:
+    """This build's pinned lists in the Holm family (one-sided) and outside it (exploratory)."""
+    pinned = [arm for arm in arms if arm != "recency" and arm in PRIMARY]
+    return [a for a in pinned if a in HOLM_FAMILY], [a for a in pinned if a not in HOLM_FAMILY]
+
+
 def count_role(arms, weight: str) -> str:
-    """Table 5's role for one count: primary for the lists pinned to it, secondary for the rest."""
+    """Table 5's role for one count: primary or exploratory for the lists pinned to it, secondary
+    for the rest."""
     mine = _tested(arms, weight)
+    family, _ = holm_lists(arms)
+    first = [arm for arm in mine if arm in family]
+    other = [arm for arm in mine if arm not in family]
     rest = [arm for arm in arms if arm != "recency" and arm in PRIMARY and arm not in mine]
     role = [
-        f"Primary for {_names(mine)}." if mine else "",
-        f"Secondary for {_names(rest)}, not adjusted." if rest else "",
+        f"Primary for {names(first)}." if first else "",
+        f"Exploratory for {names(other)}, not adjusted." if other else "",
+        f"Secondary for {names(rest)}, not adjusted." if rest else "",
     ]
     return " ".join(r for r in role if r) or "Secondary"
