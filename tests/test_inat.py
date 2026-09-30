@@ -594,3 +594,22 @@ def test_reconcile_splits_a_range_whose_top_pool_id_is_its_bound():
     gone, missing, used, _ = _reconcile([100, 500, 900], api)
     assert gone == set() and missing == set(range(101, 500))
     assert used < 40
+
+
+class CountBehindSession(IdRangeSession):
+    """Reports a count of 200 for the whole range while the listing holds more (records arrived)."""
+
+    def get(self, url, params=None, timeout=None):
+        if params["per_page"] == 0 and params["id_below"] - params["id_above"] > 2**30:
+            self.calls.append(dict(params))
+            return FakeCountResponse(200)
+        return super().get(url, params)
+
+
+def test_reconcile_full_listing_after_a_stale_count_does_not_call_ids_gone():
+    api = list(range(1000, 1210))
+    pool = api[:150]
+    session = CountBehindSession(api)
+    gone, missing, _ = reconcile_ids(pool, d1="1900-01-01", session=session, sleep=0)
+    assert gone == set()
+    assert missing == set(api) - set(pool)

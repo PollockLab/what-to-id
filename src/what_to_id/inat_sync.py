@@ -128,10 +128,13 @@ def reconcile_ids(
             continue
         if api <= PER_PAGE:
             listed = {int(o["id"]) for o in ask(lo, hi, only_id=True)} if api else set()
-            local = set(ids[i:j].tolist())
-            gone |= local - listed
-            missing |= listed - local
-            continue
+            if len(listed) < PER_PAGE:
+                local = set(ids[i:j].tolist())
+                gone |= local - listed
+                missing |= listed - local
+                continue
+            # a full page means records arrived after the count, so the listing may be cut short;
+            # split the range rather than call the unlisted local ids gone
         mid = int(ids[(i + j) // 2]) if j - i >= 2 else (lo + hi) // 2
         if not lo < mid < hi - 1:
             # the median pool id sits on a bound, so that split would give back the same range
