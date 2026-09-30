@@ -243,7 +243,7 @@ white-space:nowrap;vertical-align:top}
 <noscript><p>This page needs JavaScript to deal batches.</p></noscript>
 <main>
 <h1>What to ID next in BC</h1>
-<p class="sub">Records that needed an ID in British Columbia on 2026-09-11. <a id="mapLink" href="map.html" data-base="map.html">See today's records on a map</a>.</p>
+<p class="sub">Records that needed an ID in British Columbia, picked <time id="picked" datetime="2026-09-11" title="2026-09-11">2026-09-11</time>. <a id="mapLink" href="map.html" data-base="map.html">See today's records on a map</a>.</p>
 <p class="undo" id="buildMsg" aria-live="polite" hidden><span>New batches today. Your count starts again.</span><button class="linkbtn" id="buildMsgClose" type="button">Got it</button></p>
 <section id="picker"><p class="resumerow" id="resumeRow" hidden><button class="nextbtn" id="resumeBtn" type="button">Continue</button></p><h2 class="pickhead">Pick a group</h2><p class="hint">Choose a group you know. Open a batch in iNaturalist, ID what you can, then return.</p><div id="groupList"></div></section>
 <section id="runner" hidden><div class="runhead"><h2 class="rungroup" id="runGroup"></h2><p class="crumbs"><button class="linkbtn" id="changeGroup" type="button">Change group</button><button class="linkbtn" id="startOver" type="button" disabled aria-describedby="startOverHint">&#8634; Start over</button><span class="subhint" id="startOverHint">Start over puts this group's batches back.</span></p></div><p class="runcode" id="runnerCode" aria-live="polite">Batch 0</p><div class="bar" aria-hidden="true"><span id="bar"></span></div><button class="nextbtn" id="nextBtn" type="button" aria-keyshortcuts="n">Next batch</button><p class="hint" id="hintBox"><span>Opens up to 120 records in a new iNaturalist tab. ID what you can, then come back.</span><span>Sign in to iNaturalist first. Some records may no longer need an ID, so a batch can show fewer than 120.</span><span>Your place is saved in this browser only.</span><span class="keys">Press <kbd>N</kbd> for the next batch.</span></p><p class="reopenrow"><a id="reopen" href="#" target="_blank" rel="noopener" hidden>Open this batch again</a></p><p class="donebox" id="doneMsg" hidden><span>You opened every batch in this group. To go back to one, use Open again or Start over.</span><button class="pillbtn" id="pickOther" type="button">Pick another group</button></p><p class="undo" id="undoMsg" aria-live="polite" hidden><span id="undoText"></span><button class="linkbtn" id="undoBtn" type="button">Undo</button></p></section>
@@ -360,6 +360,28 @@ function startOver(state, group) {
     } catch (e) {}
   }
   function $(id) { return document.getElementById(id); }
+  var mapLink = $('mapLink'), mapBase = mapLink && mapLink.getAttribute('data-base');
+  function setMap(g) {
+    if (mapLink) mapLink.href = g ? mapBase + '#groups=' + encodeURIComponent(g) : mapBase;
+  }
+  var STALE_DAYS = 2;
+  (function(){
+    var t = $('picked');
+    var m = t && /^(\d{4})-(\d{2})-(\d{2})$/.exec(t.getAttribute('datetime') || '');
+    if (!m) return;
+    var now = new Date();
+    var days = Math.floor((Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+      - Date.UTC(+m[1], m[2] - 1, +m[3])) / 864e5);
+    if (isNaN(days)) return;
+    var before = t.previousSibling, after = t.nextSibling;
+    if (days > STALE_DAYS && before && after) {
+      before.nodeValue = 'These records were picked ';
+      t.textContent = days + ' days ago';
+      after.nodeValue = ', and some may have an ID by now.' + after.nodeValue.slice(1);
+    } else {
+      t.textContent = days <= 0 ? 'today' : days === 1 ? 'yesterday' : days + ' days ago';
+    }
+  })();
   var picker = $('picker'), runner = $('runner'), groupList = $('groupList');
   var runGroup = $('runGroup'), runnerCode = $('runnerCode'), bar = $('bar');
   var nextBtn = $('nextBtn'), reopen = $('reopen'), doneMsg = $('doneMsg'), hintBox = $('hintBox');
@@ -396,12 +418,14 @@ function startOver(state, group) {
       var r = /^(.*) \((.*)\)$/.exec(name(group));
       resumeBtn.textContent = 'Continue with ' + (r ? r[1] : name(group));
     }
+    setMap(null);
     picker.hidden = false;
     runner.hidden = true;
   }
   function renderRunner(focus) {
     picker.hidden = true;
     runner.hidden = false;
+    setMap(group);
     var p = groupProgress(state, DATA, group);
     runGroup.textContent = name(group);
     runnerCode.textContent = p.opened === 0 ? p.total + ' batches to go' :

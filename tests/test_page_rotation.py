@@ -1,5 +1,6 @@
 import json
 import re
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -70,6 +71,23 @@ def test_render_rotation_index_blind_and_minimal():
     assert "<img" not in html
     assert "Next batch" in html
     assert "Batch 0" in html
+
+
+def test_render_rotation_index_picked_date_is_a_time_element():
+    m = replace(_manifest(), freeze="2026-09-11")
+    html = render_rotation_index(m, title="t", map_href="map.html")
+    assert '<time id="picked" datetime="2026-09-11" title="2026-09-11">2026-09-11</time>' in html
+    assert "in British Columbia, picked <time" in html
+    assert "British Columbia on 2026-09-11" not in html
+    assert "See today's records on a map</a>" in html
+    assert "var STALE_DAYS = 2;" in html
+    assert "days > STALE_DAYS" in html
+
+
+def test_render_rotation_index_no_freeze_has_no_date_sentence():
+    html = render_rotation_index(replace(_manifest(), freeze=""), title="t")
+    assert "needed an ID" not in html
+    assert '<time id="picked"' not in html
 
 
 def test_render_rotation_index_explains_the_cycle():
