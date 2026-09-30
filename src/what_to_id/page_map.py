@@ -14,6 +14,9 @@ previous row's, and the first row's is the id itself), group META.groups and ran
 0xFFFF and 0xFF for none.
 ids holds min(IDs, 15) in the low nibble and min(agreements, 15) in the high nibble. flags sets
 FLAG_BITS for the flags META.flags names; a pool pulled before those columns existed has none.
+Dates before DAY_FLOOR (1900-01-01) are stored at that day, so day0 is never earlier, and the
+flags byte then also sets EARLY_OBS (16) or EARLY_UP (32) to say the stored day is a floor, not
+the real date; the page shows "before 1900" for it.
 Shard 0 holds records observed in the last two calendar years (and any without a date), so the
 page draws them first; older records follow in shard 1.
 """
@@ -44,6 +47,9 @@ NO_RANK = 0xFF
 _Q = 0xFFFF
 BYTES_PER_RECORD = 18
 IMPRECISE_M = 1000
+DAY_FLOOR = pd.Timestamp("1900-01-01")
+EARLY_OBS = 16
+EARLY_UP = 32
 FLAG_BITS = {"introduced": 1, "threatened": 2, "obscured": 4, "imprecise": 8}
 _COLS = ("id", "lat", "lon", "observed_on", "created_at", "iconic_taxon")
 _ASSETS = files("what_to_id") / "map_assets"
@@ -72,7 +78,9 @@ def encode_points(pool: pd.DataFrame) -> tuple[dict[str, bytes], dict]:
     obs, up = _dates(df["observed_on"]), _dates(df["created_at"])
     if obs.isna().all():
         raise ValueError("no record has an observed date")
-    day0 = min(d for d in (obs.min(), up.min()) if pd.notna(d))
+    early_obs, early_up = (obs < DAY_FLOOR).to_numpy(), (up < DAY_FLOOR).to_numpy()
+    day0 = max(min(d for d in (obs.min(), up.min()) if pd.notna(d)), DAY_FLOOR)
+    obs, up = obs.clip(lower=DAY_FLOOR), up.clip(lower=DAY_FLOOR)
     obs_off, up_off = (obs - day0).dt.days, (up - day0).dt.days
     last = int(max(obs_off.max(), up_off.max()))
     if last >= NO_DAY:
@@ -88,6 +96,8 @@ def encode_points(pool: pd.DataFrame) -> tuple[dict[str, bytes], dict]:
         else np.full(len(df), -1)
     )
     known, flags = _flags(df)
+    flags = flags | np.where(early_obs, EARLY_OBS, 0).astype("u1")
+    flags = flags | np.where(early_up, EARLY_UP, 0).astype("u1")
     cols = {
         "id": ids.astype("<u4"),
         "lon": _quant(lon, bbox[0], bbox[2]),
@@ -167,6 +177,8 @@ def decode_points(blobs: dict[str, bytes], meta: dict) -> pd.DataFrame:
             "agree": raw["ids"] >> 4,
         }
     )
+    out["observed_before_1900"] = (raw["flags"] & EARLY_OBS) > 0
+    out["uploaded_before_1900"] = (raw["flags"] & EARLY_UP) > 0
     for name in meta["flags"]:
         out[name] = (raw["flags"] & FLAG_BITS[name]) > 0
     return out.sort_values("id").reset_index(drop=True)
@@ -252,7 +264,10 @@ def _dates(col: pd.Series) -> pd.Series:
 
 def render_map(meta: dict, *, freeze: str | None, back: str = "index.html") -> str:
     """The map page. META goes inline; the points and names come from the files at load."""
-    when = f" on {escape(freeze)}" if freeze else ""
+    when = ""
+    if freeze:
+        f = escape(freeze)
+        when = f' on <time id="updated" datetime="{f}" title="{f}">{f}</time>'
     v = meta["sha256"][:12]
     page_meta = {
         **meta,
