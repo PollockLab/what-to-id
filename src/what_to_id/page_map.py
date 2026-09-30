@@ -358,6 +358,7 @@ def render_map(meta: dict, *, freeze: str | None, back: str = "index.html") -> s
         "taxa": f"{meta['taxa']}?v={v}",
         "place_id": BC_PLACE_ID,
         "max_url": MAX_URL_LEN,
+        "imprecise_m": IMPRECISE_M,
     }
     fill = {
         "TITLE": "Records that need an ID in BC",

@@ -146,6 +146,9 @@ function identifyUrl(st,b,meta){
   if(g.length&&g.length<st.all&&g.indexOf('rest')<0)q.set('iconic_taxa',g.join(','));
   if(st.d1)q.set(st.up?'created_d1':'d1',st.d1);if(st.d2)q.set(st.up?'created_d2':'d2',st.d2);
   if(st.months.length)q.set('month',st.months.join(','));
+  // iNaturalist has a search parameter for each status filter, so Identify opens the same records
+  var o=st.only||{};if(o.introduced)q.set('introduced','true');if(o.threatened)q.set('threatened','true');
+  if(o.exact){q.set('obscuration','none');q.set('acc_below_or_unknown',meta.imprecise_m+1);}
   var base='https://www.inaturalist.org/observations/identify?',u=base+q;
   if(st.taxa&&st.taxa.length&&st.taxa.length<=50){q.set('taxon_id',st.taxa.join(','));
     if((base+q).length<meta.max_url)u=base+q;}
@@ -154,10 +157,9 @@ function identifyUrl(st,b,meta){
 function link(){
   var b=map.getBounds(),m=[];for(var i=0;i<12;i++)if(S.months>>i&1)m.push(i+1);
   var a=$('identify');a.href=identifyUrl({groups:META.groups.filter(function(g,i){return S.groups[i];}),
-    all:META.groups.length,up:S.up,d1:S.lo>0?iso(S.lo):'',d2:S.hi<LAST?iso(S.hi):'',months:m,taxa:TAXID},
-    {w:b.getWest(),s:b.getSouth(),e:b.getEast(),n:b.getNorth()},META);
-  a.title='Opens these records in the iNaturalist Identify page'+(Object.keys(S.only).some(function(k){
-    return S.only[k];})?'. Status filters are not carried over.':'.');
+    all:META.groups.length,up:S.up,d1:S.lo>0?iso(S.lo):'',d2:S.hi<LAST?iso(S.hi):'',months:m,taxa:TAXID,
+    only:S.only},{w:b.getWest(),s:b.getSouth(),e:b.getEast(),n:b.getNorth()},META);
+  a.title='Opens these records in the iNaturalist Identify page.';
 }
 function layers(){
   if(!P.n)return;
@@ -170,7 +172,7 @@ function layers(){
     getPosition:function(i){return [P.pos[2*i],P.pos[2*i+1]];},radiusUnits:'pixels',getRadius:8,
     filled:false,stroked:true,lineWidthUnits:'pixels',getLineWidth:2.5,
     getLineColor:dark?[255,255,255]:[29,29,27]}));
-  overlay.setProps({layers:L,getTooltip:tip,onClick:pick});
+  overlay.setProps({layers:L,onHover:tip,onClick:pick});
 }
 
 // Two histograms. The overview has one bar per year over every date, on a log scale so that sparse
@@ -353,14 +355,19 @@ function badges(i){var f=P.fl[i],out=[];
 function idText(i){var n=P.ids[i]&15,a=P.ids[i]>>4;
   return n?(n>=15?'15+':n)+(n===1?' ID':' IDs')+(a?', '+(a>=15?'15+':a)+' agreeing':''):'No IDs yet';}
 function when(v,early){return v===NO?'unknown':early?'before 1900':iso(v);}
+// The hover tip sits below right of the pointer and flips to the other side of it near the map's
+// right or bottom edge, so the map never clips it.
+var ptip=document.createElement('div');ptip.className='ptip';ptip.hidden=true;
 function tip(o){
-  if(!P.n||o.index<0||o.layer&&o.layer.id!=='pts')return null;
+  if(!P.n||o.index<0||!o.layer||o.layer.id!=='pts'){ptip.hidden=true;return;}
   var i=o.index,t=names(i);
-  return {html:'<b>'+esc(t.common||t.latin)+'</b>'+(t.common?'<br><i>'+esc(t.latin)+'</i>':'')+
+  ptip.innerHTML='<b>'+esc(t.common||t.latin)+'</b>'+(t.common?'<br><i>'+esc(t.latin)+'</i>':'')+
     '<br>'+esc(t.group)+' · observed '+when(P.obs[i],P.fl[i]&FLAG.earlyObs)+'<br>'+idText(i)+'<div class="badges">'+
-    badges(i)+'</div>',
-    style:{background:'var(--panel)',color:'var(--ink)',border:'1px solid var(--line)',
-      borderRadius:'8px',fontSize:'12px',padding:'6px 8px',maxWidth:'260px'}};
+    badges(i)+'</div>';
+  ptip.hidden=false;
+  var m=map.getContainer(),w=ptip.offsetWidth,h=ptip.offsetHeight,g=12,
+    x=o.x+g+w>m.clientWidth-4?o.x-g-w:o.x+g,y=o.y+g+h>m.clientHeight-4?o.y-g-h:o.y+g;
+  ptip.style.left=Math.max(4,x)+'px';ptip.style.top=Math.max(4,y)+'px';
 }
 var ctl=null,card=$('card');
 function pick(o){if(!P.n||o.index<0||o.layer.id!=='pts')return;openCard(o.index);}
@@ -413,10 +420,11 @@ var b=META.bbox,opts={container:'map',style:dark?BASEMAPS.dark:BASEMAPS.light,
   attributionControl:{compact:true}};
 if(S.at){opts.center=[S.at[2],S.at[1]];opts.zoom=S.at[0];}
 else{opts.bounds=[[b[0],b[1]],[b[2],b[3]]];opts.fitBoundsOptions={padding:20};}
-var map=new maplibregl.Map(opts);
+var map=new maplibregl.Map(opts);map.getContainer().appendChild(ptip);
 map.addControl(new maplibregl.NavigationControl({showCompass:false}));
 var overlay=new deck.MapboxOverlay({interleaved:false,pickingRadius:8,layers:[]});map.addControl(overlay);
 map.on('moveend',function(){link();writeHash();});
+map.getContainer().addEventListener('pointerleave',function(){ptip.hidden=true;});
 addEventListener('resize',draw);
 var HINT=$('hint').textContent,HINT_TOT='Top: records still needing an ID per year, on a log scale; the line is the '+
   'share of all BC records with photos that still need one. Click or drag across years to zoom in. Bottom: '+
