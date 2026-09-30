@@ -101,9 +101,10 @@ function addShard(buf,n){
 // The map filters on the GPU. Each record carries its observed and uploaded day (-1 for none) as
 // filter values, and four categories: group, observed month, uploaded month (12 for no date) and a
 // status value, bit 1 introduced, 2 threatened, 4 obscured or imprecise, 8 kept by the taxon search
-// and not deleted. Group, month, status and date changes then only change the filter settings;
-// the data is uploaded again only when records arrive or the taxon search or deletions change.
-var ST_INTRO=1,ST_THREAT=2,ST_INEXACT=4,ST_KEEP=8,PD=null,PD_TAX=null,PD_GONE=-1,PD_CAT=0;
+// and not deleted, 16 one record in ten. Group, month, status and date changes then only change the
+// filter settings; the data is uploaded again only when records arrive or the taxon search or
+// deletions change.
+var ST_INTRO=1,ST_THREAT=2,ST_INEXACT=4,ST_KEEP=8,ST_SAMPLE=16,PD=null,PD_TAX=null,PD_GONE=-1,PD_CAT=0;
 function pointData(){
   var n=P.n,gone=Object.keys(GONE).length,i;
   if(PD&&PD.length===n&&PD_TAX===TAXOK&&PD_GONE===gone)return;
@@ -113,7 +114,7 @@ function pointData(){
     days[2*i]=o===NO?-1:o;days[2*i+1]=u===NO?-1:u;
     cat[4*i]=P.grp[i];cat[4*i+1]=o===NO?12:MOY[o];cat[4*i+2]=u===NO?12:MOY[u];
     cat[4*i+3]=(f&FLAG.introduced?ST_INTRO:0)|(f&FLAG.threatened?ST_THREAT:0)|
-      (f&(FLAG.obscured|FLAG.imprecise)?ST_INEXACT:0);}
+      (f&(FLAG.obscured|FLAG.imprecise)?ST_INEXACT:0)|(i%10===0?ST_SAMPLE:0);}
   // only the kept bit follows the taxon search and deletions
   var ok=TAXOK,tax=P.tax,id=P.id,nt=NOTAX;
   for(i=0;i<n;i++){var t=tax[i],drop=(ok!==null&&(t===nt||ok[t]===0))||(gone>0&&GONE[id[i]]===1);
@@ -124,12 +125,12 @@ function pointData(){
     getFilterValue:{value:days,size:2},getFilterCategory:{value:cat,size:4}}};
   PD_TAX=TAXOK;PD_GONE=gone;
 }
-function categories(){
+function categories(thin){
   var groups=[],mon=[],all=[],st=[],req=0,hide=0,i;
   S.groups.forEach(function(v,j){if(v)groups.push(j);});
   for(i=0;i<13;i++){all.push(i);if(S.months?i<12&&S.months>>i&1:true)mon.push(i);}
   if(S.only.introduced)req|=ST_INTRO;if(S.only.threatened)req|=ST_THREAT;if(S.only.exact)hide=ST_INEXACT;
-  for(i=ST_KEEP;i<2*ST_KEEP;i++)if((i&req)===req&&!(i&hide))st.push(i);
+  for(i=0;i<2*ST_SAMPLE;i++)if(i&ST_KEEP&&(i&req)===req&&!(i&hide)&&(!thin||i&ST_SAMPLE))st.push(i);
   return [groups,S.up?all:mon,S.up?mon:all,st];
 }
 // The counts behind the histograms, header and share run on the CPU after the map has redrawn.
@@ -220,7 +221,7 @@ function layers(){
   var L=[new deck.ScatterplotLayer({id:'pts',data:PD,
     getFillColor:[DOT[0],DOT[1],DOT[2],110],radiusUnits:'pixels',getRadius:1.5,radiusMinPixels:1,
     radiusMaxPixels:6,stroked:false,pickable:true,
-    extensions:[EXT],updateTriggers:{getFilterCategory:PD_CAT},filterRange:[S.up?any:r,S.up?r:any],filterCategories:categories()})];
+    extensions:[EXT],updateTriggers:{getFilterCategory:PD_CAT},filterRange:[S.up?any:r,S.up?r:any],filterCategories:categories(THIN)})];
   if(SEL>=0)L.push(new deck.ScatterplotLayer({id:'sel',data:[SEL],
     getPosition:function(i){return [P.pos[2*i],P.pos[2*i+1]];},radiusUnits:'pixels',getRadius:8,
     filled:false,stroked:true,lineWidthUnits:'pixels',getLineWidth:2.5,
@@ -476,7 +477,11 @@ else{opts.bounds=[[b[0],b[1]],[b[2],b[3]]];opts.fitBoundsOptions={padding:20};}
 var map=new maplibregl.Map(opts);map.getContainer().appendChild(ptip);
 map.addControl(new maplibregl.NavigationControl({showCompass:false}));
 var overlay=new deck.MapboxOverlay({interleaved:false,pickingRadius:8,layers:[]});map.addControl(overlay);
-map.on('moveend',function(){link();writeHash();});
+// Zoomed out, blending millions of overlapping dots takes about 250 ms a frame, so while the map
+// moves it draws one record in ten, spread across BC by the id order, and all of them once it stops.
+var THIN=false,THIN_BELOW=8;
+map.on('move',function(){if(!THIN&&map.getZoom()<THIN_BELOW){THIN=true;layers();}});
+map.on('moveend',function(){if(THIN){THIN=false;layers();}link();writeHash();});
 map.getContainer().addEventListener('pointerleave',function(){ptip.hidden=true;});
 addEventListener('resize',draw);
 var HINT=$('hint').textContent,HINT_TOT='Top: records still needing an ID per year, on a log scale; the line is the '+
