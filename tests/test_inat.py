@@ -2,6 +2,7 @@ import pandas as pd
 import pytest
 
 from what_to_id import inat
+from what_to_id.inat_sync import changed_since
 
 
 def _obs(i, **over):
@@ -488,7 +489,7 @@ def test_changed_since_sorts_records_into_pool_and_gone():
         _changed(5, "needs_id", updated="2026-09-30T01:00:00+00:00"),
     ]
     sess = FakeSession([first, second])
-    rows, gone, newest = inat.changed_since(
+    rows, gone, newest = changed_since(
         "2026-09-28T12:00:00Z", d1="1900-01-01", session=sess, sleep=0
     )
     assert sorted(rows["id"]) == [5, *range(801, 1001)]
@@ -504,7 +505,7 @@ def test_changed_since_sorts_records_into_pool_and_gone():
 
 def test_changed_since_nothing_changed_is_one_request():
     sess = FakeSession([])
-    rows, gone, newest = inat.changed_since("2026-09-28", d1="1900-01-01", session=sess, sleep=0)
+    rows, gone, newest = changed_since("2026-09-28", d1="1900-01-01", session=sess, sleep=0)
     assert rows.empty and gone == set() and newest is None
     assert list(rows.columns) == [*inat.COLUMNS, *inat.EXTRA_COLUMNS]
     assert len(sess.calls) == 1

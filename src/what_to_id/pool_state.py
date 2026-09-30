@@ -22,13 +22,13 @@ from what_to_id.inat import (
     DTYPES,
     EXTRA_COLUMNS,
     EXTRA_DTYPES,
-    changed_since,
     load_pool,
     pool_params,
     pull_pool,
     still_open,
     total_results,
 )
+from what_to_id.inat_sync import changed_since
 from what_to_id.manifest import sha256_file
 
 log = logging.getLogger("what_to_id")
