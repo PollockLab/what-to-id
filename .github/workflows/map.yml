@@ -9,9 +9,10 @@ name: map
 # and any group, and brings the pool in line: needs-ID records with a photo are added or
 # replaced, the rest are dropped. So new uploads, records reaching or dropping back from Research
 # Grade, reopened casual records and changed IDs all arrive. The next run starts from the newest
-# update seen, saved in sync.json with the run's counts. Each run also compares the pool's size
-# with iNaturalist's count and warns when they drift apart (records deleted from iNaturalist,
-# moved out of BC or redated are not seen by the daily query); reseed the pool then.
+# update seen, saved in sync.json with the run's counts. The daily query cannot see records
+# deleted from iNaturalist, moved out of BC or redated, so each run also reconciles the pool by
+# id-range counts, dropping what iNaturalist no longer holds, and warns if the pool's size still
+# drifts from iNaturalist's count.
 #
 # Seed once: upload a pool parquet as pool.parquet to a release tagged map-state, set the
 # repository variable MAP_SINCE to the time its pull started (ISO, UTC), then set the repository
@@ -72,6 +73,11 @@ jobs:
           set -euo pipefail
           python -m what_to_id.pool_state sync --pool state/pool.parquet --state state/sync.json \
             --since "$MAP_SINCE" --d1 "$D1"
+      - name: Drop records iNaturalist no longer holds
+        run: |
+          set -euo pipefail
+          python -m what_to_id.pool_state reconcile --pool state/pool.parquet --state state/sync.json \
+            --d1 "$D1"
       - name: Build the site
         run: |
           set -euo pipefail

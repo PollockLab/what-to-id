@@ -4,7 +4,8 @@ Instead of pulling the pool from scratch (thousands of requests, hours), a daily
 pulls only what changed: `update` fetches records created since the pool's newest
 observation, and `refresh` drops observations that already got an ID or lost their photo.
 `sync`, for the map pool, does both from one query of records updated since the last run and
-checks the pool's size against iNaturalist's count.
+checks the pool's size against iNaturalist's count. `reconcile` finds the records a sync cannot
+see (deleted, moved out of BC, redated) by comparing counts over id ranges.
 """
 
 from __future__ import annotations
@@ -22,13 +23,16 @@ from what_to_id.inat import (
     DTYPES,
     EXTRA_COLUMNS,
     EXTRA_DTYPES,
+    _frame,
+    fetch_by_ids,
+    flatten,
     load_pool,
     pool_params,
     pull_pool,
     still_open,
     total_results,
 )
-from what_to_id.inat_sync import changed_since
+from what_to_id.inat_sync import changed_since, reconcile_ids
 from what_to_id.manifest import sha256_file
 
 log = logging.getLogger("what_to_id")
@@ -182,9 +186,7 @@ def _cmd_sync(a: argparse.Namespace) -> int:
     start = start - pd.Timedelta(hours=a.overlap_hours)
     changed, gone, newest = changed_since(start, d1=d1)
     updated = apply_changes(pool, changed, gone)
-    tomorrow = (pd.Timestamp.now(tz="UTC") + pd.Timedelta(days=1)).date().isoformat()
-    api = total_results(pool_params(None, d1=d1, freeze=tomorrow))
-    drift = api - len(updated)
+    counts = _pool_counts(updated, d1, a.max_drift)
     state = {
         "since": newest or since,
         "ran_at": pd.Timestamp.now(tz="UTC").isoformat(),
@@ -192,18 +194,64 @@ def _cmd_sync(a: argparse.Namespace) -> int:
         "added": int((~changed["id"].isin(pool["id"])).sum()),
         "replaced": int(changed["id"].isin(pool["id"]).sum()),
         "dropped": int(pool["id"].isin(gone).sum()),
-        "pool": len(updated),
-        "api_total": api,
-        "drift": drift,
-        "reconcile_due": abs(drift) > a.max_drift,
+        **counts,
     }
     _atomic_write(updated, a.pool)
-    a.state.parent.mkdir(parents=True, exist_ok=True)
-    a.state.write_text(json.dumps(state, indent=1) + "\n")
+    _write_state(a.state, state)
     log.info("sync: %s", state)
-    if state["reconcile_due"]:
+    _warn_drift(counts)
+    return 0
+
+
+def _pool_counts(pool: pd.DataFrame, d1: str, max_drift: int) -> dict:
+    tomorrow = (pd.Timestamp.now(tz="UTC") + pd.Timedelta(days=1)).date().isoformat()
+    api = total_results(pool_params(None, d1=d1, freeze=tomorrow))
+    drift = api - len(pool)
+    return {
+        "pool": len(pool),
+        "api_total": api,
+        "drift": drift,
+        "reconcile_due": abs(drift) > max_drift,
+    }
+
+
+def _write_state(path: Path, state: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(state, indent=1) + "\n")
+
+
+def _warn_drift(counts: dict) -> None:
+    if counts["reconcile_due"]:
         # a workflow command: GitHub Actions shows it as a warning on the run
-        print(f"::warning::map pool is {drift:+,} records off iNaturalist's count; reseed it")
+        drift = counts["drift"]
+        print(f"::warning::map pool is {drift:+,} records off iNaturalist's count")
+
+
+def _cmd_reconcile(a: argparse.Namespace) -> int:
+    saved = json.loads(a.state.read_text()) if a.state.exists() else {}
+    d1 = a.d1 or DEFAULT_D1
+    pool = load_pool(a.pool)
+    gone, missing, requests_used = reconcile_ids(pool["id"], d1=d1, max_requests=a.max_requests)
+    rows = []
+    for obs in fetch_by_ids(sorted(missing)):
+        row = flatten(obs) if obs.get("quality_grade") == "needs_id" else None
+        if row is not None:
+            rows.append(row)
+    added = _frame(rows)
+    updated = apply_changes(pool, added, gone)
+    counts = _pool_counts(updated, d1, a.max_drift)
+    state = {
+        **saved,
+        "reconciled_at": pd.Timestamp.now(tz="UTC").isoformat(),
+        "reconcile_gone": len(gone),
+        "reconcile_added": len(added),
+        "reconcile_requests": requests_used,
+        **counts,
+    }
+    _atomic_write(updated, a.pool)
+    _write_state(a.state, state)
+    log.info("reconcile: %s", state)
+    _warn_drift(counts)
     return 0
 
 
@@ -231,6 +279,14 @@ def main(argv: list[str] | None = None) -> int:
     p_sync.add_argument("--overlap-hours", type=float, default=SYNC_OVERLAP_HOURS)
     p_sync.add_argument("--max-drift", type=int, default=MAX_DRIFT)
     p_sync.set_defaults(func=_cmd_sync)
+
+    p_rec = sub.add_parser("reconcile", help="drop and add records the sync cannot see (map pool)")
+    p_rec.add_argument("--pool", required=True, type=Path)
+    p_rec.add_argument("--state", required=True, type=Path, help="JSON written by sync")
+    p_rec.add_argument("--d1", default=None, help="earliest observed_on, YYYY-MM-DD")
+    p_rec.add_argument("--max-drift", type=int, default=MAX_DRIFT)
+    p_rec.add_argument("--max-requests", type=int, default=2000)
+    p_rec.set_defaults(func=_cmd_reconcile)
 
     prepared = sub.add_parser("prepared", help="load a prepared snapshot retaining known closures")
     prepared.add_argument("--pool", required=True, type=Path)

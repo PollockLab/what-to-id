@@ -2,7 +2,7 @@ import pandas as pd
 import pytest
 
 from what_to_id import inat
-from what_to_id.inat_sync import changed_since
+from what_to_id.inat_sync import changed_since, reconcile_ids
 
 
 def _obs(i, **over):
@@ -509,3 +509,88 @@ def test_changed_since_nothing_changed_is_one_request():
     assert rows.empty and gone == set() and newest is None
     assert list(rows.columns) == [*inat.COLUMNS, *inat.EXTRA_COLUMNS]
     assert len(sess.calls) == 1
+
+
+class IdRangeSession:
+    """Answers counts and only_id pages for the ids in ``api_ids`` that fall in the asked range."""
+
+    def __init__(self, api_ids):
+        self.api_ids = sorted(api_ids)
+        self.calls = []
+
+    def get(self, url, params=None, timeout=None):
+        self.calls.append(dict(params))
+        hit = [i for i in self.api_ids if params["id_above"] < i < params["id_below"]]
+        if params["per_page"] == 0:
+            return FakeCountResponse(len(hit))
+        return FakeResponse([{"id": i} for i in hit[: params["per_page"]]])
+
+
+class FakeCountResponse(FakeResponse):
+    def __init__(self, total):
+        super().__init__([])
+        self.total = total
+
+    def json(self):
+        return {"total_results": self.total, "results": []}
+
+
+def _reconcile(pool_ids, api_ids, **kw):
+    session = IdRangeSession(api_ids)
+    return (*reconcile_ids(pool_ids, d1="1900-01-01", session=session, sleep=0, **kw), session)
+
+
+def test_reconcile_identical_sets_costs_one_request():
+    ids = range(1000, 6000)
+    gone, missing, used, session = _reconcile(ids, ids)
+    assert (gone, missing, used) == (set(), set(), 1)
+    call = session.calls[0]
+    assert call["id_above"] == 0 and call["id_below"] == 2**31 - 1
+    assert call["place_id"] == inat.BC_PLACE_ID
+    assert call["quality_grade"] == "needs_id" and "iconic_taxa" not in call
+
+
+def test_reconcile_finds_a_deleted_id_in_a_large_set_in_log_requests():
+    ids = list(range(1000, 51000))
+    gone, missing, used, session = _reconcile(ids, [i for i in ids if i != 33333])
+    assert (gone, missing) == ({33333}, set())
+    assert used < 40
+    listing = [c for c in session.calls if c["per_page"] != 0]
+    assert len(listing) == 1 and listing[0]["only_id"] == "true"
+
+
+def test_reconcile_finds_a_missing_id_and_ids_moved_out_of_the_pool():
+    pool = [10, 20, 30, 40]
+    gone, missing, _, _ = _reconcile(pool, [10, 25, 26, 30, 40])
+    assert (gone, missing) == ({20}, {25, 26})
+
+
+def test_reconcile_splits_a_range_the_pool_has_almost_no_ids_in():
+    api = list(range(5000, 5600))
+    gone, missing, _, _ = _reconcile([5300], api)
+    assert gone == set() and missing == set(api) - {5300}
+
+
+def test_reconcile_empty_pool_lists_everything():
+    gone, missing, used, _ = _reconcile([], [7, 8, 9])
+    assert (gone, missing, used) == (set(), {7, 8, 9}, 2)
+
+
+def test_reconcile_everything_gone_needs_no_listing():
+    gone, missing, used, _ = _reconcile([7, 8], [])
+    assert (gone, missing, used) == ({7, 8}, set(), 1)
+
+
+def test_reconcile_raises_past_max_requests():
+    ids = list(range(1000, 51000))
+    with pytest.raises(RuntimeError, match="more than 3 requests"):
+        _reconcile(ids, ids[:-1], max_requests=3)
+
+
+def test_reconcile_splits_a_range_whose_top_pool_id_is_its_bound():
+    # the first split leaves (0, 501) holding pool ids 100 and 500 but 401 API ids; splitting at
+    # the median pool id (500) would give back (0, 501) and loop until the request cap
+    api = [*range(100, 501), 900]
+    gone, missing, used, _ = _reconcile([100, 500, 900], api)
+    assert gone == set() and missing == set(range(101, 500))
+    assert used < 40

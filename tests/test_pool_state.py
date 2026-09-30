@@ -313,3 +313,38 @@ def test_cmd_sync_flags_drift(tmp_path, monkeypatch, capsys):
 def test_cmd_sync_needs_a_since(tmp_path, monkeypatch):
     with pytest.raises(SystemExit, match="--since"):
         _sync(tmp_path, monkeypatch)
+
+
+def test_cmd_reconcile_drops_gone_adds_missing_and_keeps_other_keys(tmp_path, monkeypatch):
+    pool = make_pool(4)
+    pool.loc[:, "id"] = [1, 2, 3, 4]
+    pool_path = tmp_path / "pool.parquet"
+    pool.to_parquet(pool_path, index=False)
+    state_path = tmp_path / "sync.json"
+    state_path.write_text(json.dumps({"since": "2026-09-30T01:00:00+00:00", "added": 3}))
+    asked = {}
+
+    def fake_reconcile(ids, *, d1, max_requests):
+        asked.update(ids=sorted(ids), d1=d1, max_requests=max_requests)
+        return {2}, {8, 9}, 17
+
+    def fake_fetch(ids):
+        asked["fetched"] = list(ids)
+        return [{"id": 8, "quality_grade": "needs_id"}, {"id": 9, "quality_grade": "research"}]
+
+    row = _new_rows([8]).iloc[0].to_dict()
+    monkeypatch.setattr(pool_state, "reconcile_ids", fake_reconcile)
+    monkeypatch.setattr(pool_state, "fetch_by_ids", fake_fetch)
+    monkeypatch.setattr(pool_state, "flatten", lambda obs: row if obs["id"] == 8 else None)
+    monkeypatch.setattr(pool_state, "total_results", lambda params: 4)
+    argv = ["reconcile", "--pool", str(pool_path), "--state", str(state_path), "--d1", "1900-01-01"]
+    assert pool_state.main([*argv, "--max-requests", "50"]) == 0
+    assert asked["ids"] == [1, 2, 3, 4] and asked["max_requests"] == 50
+    assert asked["d1"] == "1900-01-01" and asked["fetched"] == [8, 9]
+    assert pd.read_parquet(pool_path)["id"].tolist() == [1, 3, 4, 8]
+    state = json.loads(state_path.read_text())
+    assert state["since"] == "2026-09-30T01:00:00+00:00" and state["added"] == 3
+    assert (state["reconcile_gone"], state["reconcile_added"]) == (1, 1)
+    assert state["reconcile_requests"] == 17 and "reconciled_at" in state
+    assert (state["pool"], state["api_total"], state["drift"]) == (4, 4, 0)
+    assert state["reconcile_due"] is False
