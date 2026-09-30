@@ -338,9 +338,10 @@ addEventListener('resize',draw);
 render();
 var names0=get(META.taxa).then(function(buf){TAXA=JSON.parse(new TextDecoder().decode(buf));
   search();});
-var chain=Promise.resolve();
+// One shard downloads at a time, so on a slow link the recent shard gets all the bandwidth.
+var chain=Promise.resolve(),prev=Promise.resolve();
 META.shards.forEach(function(s,k){
-  var got=get(s.file);
+  var got=prev.then(function(){return get(s.file);});prev=got;
   chain=chain.then(function(){return got;}).then(function(buf){
     addShard(buf,s.n);
     $('more').textContent=k<META.shards.length-1?'Loading older records…':'';
