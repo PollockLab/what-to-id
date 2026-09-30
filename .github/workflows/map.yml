@@ -15,8 +15,8 @@ name: map
 # drifts from iNaturalist's count.
 #
 # The build also fetches iNaturalist's monthly count of every BC record with a photo, needing an ID or
-# Research Grade, per group and date (about 28 requests), so the map can show the share still
-# needing an ID. If that fetch fails the map ships without it.
+# Research Grade, per group and date, and again under each status filter (about 112 requests), so the
+# map can show the share still needing an ID. If that fetch fails the map ships without it.
 #
 # Seed once: upload pool.parquet and sync.json to a release tagged map-state (sync.json holds the
 # since cursor, so the repository variable MAP_SINCE is only needed when there is no sync.json),

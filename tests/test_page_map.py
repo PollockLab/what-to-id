@@ -15,6 +15,7 @@ from what_to_id.page_map import (
     MAP_NAME,
     NO_DAY,
     TAXA_NAME,
+    TOTAL_ONLY,
     align_totals,
     decode_points,
     encode_points,
@@ -252,7 +253,8 @@ class _Hist:
 
     def get(self, url, params, timeout):
         self.calls.append((url, params))
-        months = self.table.get((params["date_field"], params["iconic_taxa"]), {})
+        flag = next((k for k, v in TOTAL_ONLY.items() if v.items() <= params.items()), None)
+        months = self.table.get((params["date_field"], params["iconic_taxa"], flag), {})
 
         class R:
             def raise_for_status(self):
@@ -264,10 +266,16 @@ class _Hist:
         return R()
 
 
-def test_fetch_totals_asks_once_per_group_and_date():
-    s = _Hist({("observed", "Aves"): {"2026-08-01": 7}, ("created", "unknown"): {"2026-09-01": 2}})
+def test_fetch_totals_asks_once_per_group_date_and_status_filter():
+    s = _Hist(
+        {
+            ("observed", "Aves", None): {"2026-08-01": 7},
+            ("created", "unknown", None): {"2026-09-01": 2},
+            ("observed", "Aves", "threatened"): {"2026-08-01": 1},
+        }
+    )
     t = fetch_totals(["Aves", "Unknown"], on="2026-09-30", session=s, sleep=0)
-    assert len(s.calls) == 4
+    assert len(s.calls) == 4 * (1 + len(TOTAL_ONLY))
     assert all(u.endswith("/observations/histogram") for u, _ in s.calls)
     p = s.calls[0][1]
     assert p["quality_grade"] == "needs_id,research" and p["photos"] == "true"
@@ -276,7 +284,17 @@ def test_fetch_totals_asks_once_per_group_and_date():
         "on": "2026-09-30",
         "obs": {"Aves": {"2026-08": 7}, "Unknown": {}},
         "up": {"Aves": {}, "Unknown": {"2026-09": 2}},
+        "only": {
+            "introduced": {"obs": {"Aves": {}, "Unknown": {}}, "up": {"Aves": {}, "Unknown": {}}},
+            "threatened": {
+                "obs": {"Aves": {"2026-08": 1}, "Unknown": {}},
+                "up": {"Aves": {}, "Unknown": {}},
+            },
+            "exact": {"obs": {"Aves": {}, "Unknown": {}}, "up": {"Aves": {}, "Unknown": {}}},
+        },
     }
+    exact = [p for _, p in s.calls if "obscuration" in p]
+    assert exact and exact[0]["obscuration"] == "none" and exact[0]["acc_below_or_unknown"] == 1001
 
 
 def test_align_totals_folds_early_months_and_drops_late_ones():
@@ -290,6 +308,11 @@ def test_align_totals_folds_early_months_and_drops_late_ones():
     assert t["m0"] == "2026-08" and t["on"] == "2026-09-30"
     assert t["obs"] == [[8, 4], [0, 0]]
     assert t["up"] == [[0, 0], [0, 1]]
+    assert t["only"] == {}
+    raw["only"] = {"threatened": {"obs": {"Aves": {"2026-09": 1}}, "up": {}}}
+    assert align_totals(raw, meta)["only"] == {
+        "threatened": {"obs": [[0, 1], [0, 0]], "up": [[0, 0], [0, 0]]}
+    }
 
 
 def test_over_totals_counts_months_the_pool_exceeds():
