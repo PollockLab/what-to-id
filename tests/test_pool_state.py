@@ -348,3 +348,20 @@ def test_cmd_reconcile_drops_gone_adds_missing_and_keeps_other_keys(tmp_path, mo
     assert state["reconcile_requests"] == 17 and "reconciled_at" in state
     assert (state["pool"], state["api_total"], state["drift"]) == (4, 4, 0)
     assert state["reconcile_due"] is False
+
+
+def test_reconcile_failure_leaves_pool_and_state_untouched(tmp_path, monkeypatch):
+    pool_path, state_path = tmp_path / "pool.parquet", tmp_path / "sync.json"
+    make_pool(3).to_parquet(pool_path, index=False)
+    state_path.write_text(json.dumps({"since": "2026-09-01T00:00:00+00:00"}))
+    before = (pool_path.read_bytes(), state_path.read_bytes())
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("reconcile needs more than 1 requests; raise the cap")
+
+    monkeypatch.setattr(pool_state, "reconcile_ids", boom)
+    argv = ["reconcile", "--pool", str(pool_path), "--state", str(state_path)]
+    with pytest.raises(RuntimeError, match="raise the cap"):
+        pool_state.main(argv)
+    assert (pool_path.read_bytes(), state_path.read_bytes()) == before
+    assert not list(tmp_path.glob("*.tmp"))

@@ -14,9 +14,9 @@ name: map
 # id-range counts, dropping what iNaturalist no longer holds, and warns if the pool's size still
 # drifts from iNaturalist's count.
 #
-# Seed once: upload a pool parquet as pool.parquet to a release tagged map-state, set the
-# repository variable MAP_SINCE to the time its pull started (ISO, UTC), then set the repository
-# variable MAP_DAILY_ENABLED to "true".
+# Seed once: upload pool.parquet and sync.json to a release tagged map-state (sync.json holds the
+# since cursor, so the repository variable MAP_SINCE is only needed when there is no sync.json),
+# then set the repository variable MAP_DAILY_ENABLED to "true".
 on:
   schedule:
     - cron: "47 13 * * *" # 30 minutes after the daily study build's slot
@@ -66,18 +66,26 @@ jobs:
           set -euo pipefail
           mkdir -p state
           gh release download "$STATE_TAG" -D state -p pool.parquet --clobber || true
-          gh release download "$STATE_TAG" -D state -p sync.json --clobber || true
           test -s state/pool.parquet || { echo "::error::no pool.parquet on the $STATE_TAG release; seed it first"; exit 1; }
+          # a missing sync.json would restart from MAP_SINCE, so only allow that on the first run
+          if ! gh release download "$STATE_TAG" -D state -p sync.json --clobber && [ -z "${MAP_SINCE:-}" ]; then
+            echo "::error::sync.json did not download and MAP_SINCE is empty; refusing to restart the sync from scratch"; exit 1
+          fi
       - name: Apply every change since the last run
         run: |
           set -euo pipefail
           python -m what_to_id.pool_state sync --pool state/pool.parquet --state state/sync.json \
             --since "$MAP_SINCE" --d1 "$D1"
       - name: Drop records iNaturalist no longer holds
+        id: reconcile
+        continue-on-error: true
         run: |
           set -euo pipefail
           python -m what_to_id.pool_state reconcile --pool state/pool.parquet --state state/sync.json \
             --d1 "$D1"
+      - name: Warn that the reconcile failed
+        if: steps.reconcile.outcome == 'failure'
+        run: echo "::warning::reconcile failed; deploying the synced pool without it"
       - name: Build the site
         run: |
           set -euo pipefail
@@ -97,4 +105,8 @@ jobs:
       - id: deployment
         uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
       - name: Save the map pool
-        run: gh release upload "$STATE_TAG" state/pool.parquet state/sync.json --clobber
+        run: |
+          set -euo pipefail
+          # the pool first, so the cursor never moves past a pool that failed to upload
+          gh release upload "$STATE_TAG" state/pool.parquet --clobber
+          gh release upload "$STATE_TAG" state/sync.json --clobber
