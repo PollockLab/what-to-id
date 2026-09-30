@@ -10,7 +10,9 @@ SERVED = pd.DataFrame({"id": [1, 2, 3, 4], "arm": ["c", "c", "t", "t"]})
 
 
 def _idents(rows):
-    return pd.DataFrame(rows, columns=["id", "user_id", "created_at", "taxon_rank"])
+    """Idents with no known observer, so no ID is on the identifier's own record."""
+    idents = pd.DataFrame(rows, columns=["id", "user_id", "created_at", "taxon_rank"])
+    return idents.assign(observer_id=None)
 
 
 def test_identifier_counts_filters_and_dedupes():
@@ -401,3 +403,16 @@ def test_record_shuffle_p_rejects_bad_arms_and_reps():
         analysis.record_shuffle_p(flat, SERVED, arm="zz", control="c", reps=10)
     with pytest.raises(ValueError, match="reps must be"):
         analysis.record_shuffle_p(flat, SERVED, arm="t", control="c", reps=0)
+
+
+def test_record_shuffle_p_redraws_over_the_design_lists():
+    served = pd.DataFrame({"id": range(40), "arm": ["c", "t"] * 20})
+    totals = pd.Series([1.0 if a == "c" else 1.5 for a in served["arm"]], index=served["id"])
+    kw = {"arm": "t", "control": "c", "reps": 400, "seed": 0}
+    two = analysis.record_shuffle_p(totals, served, **kw)
+    assert analysis.record_shuffle_p(totals, served, arms=["t", "c"], **kw) == two
+    # Four design lists, two served: each record's redraw can land on a list that served nothing.
+    assert analysis.record_shuffle_p(totals, served, arms=["c", "t", "u", "v"], **kw) != two
+    extra = served.assign(arm=["c", "t", "u", "t"] * 10)
+    with pytest.raises(ValueError, match="not in the design"):
+        analysis.record_shuffle_p(totals, extra, arms=["c", "t"], **kw)

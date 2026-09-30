@@ -134,8 +134,10 @@ def simulate(sc: Scenario, *, seed: int) -> tuple[pd.DataFrame, pd.DataFrame]:
                 sc.effect if arm == sc.effect_arm else 0.0,
             )
             for oid in seen[rng.random(len(seen)) < probability]:
-                rows.append((int(oid), user, START, "species"))
-    events = pd.DataFrame(rows, columns=["id", "user_id", "created_at", "taxon_rank"])
+                rows.append((int(oid), user, START, "species", 0))
+    # Synthetic records are observed by user 0, who is never a participant.
+    columns = ["id", "user_id", "created_at", "taxon_rank", "observer_id"]
+    events = pd.DataFrame(rows, columns=columns)
     if sc.duplicate_events:
         events = pd.concat([events, events.assign(created_at="2026-01-01T01:00:00Z")])
     events = events.reset_index(drop=True)

@@ -158,8 +158,10 @@ def test_cli_dry_run(tmp_path, capsys):
 def test_readback_idents_feed_analysis():
     _, idents_df = readback.readback([11], fetch=lambda ids: [OBS])
     served = pd.DataFrame({"id": [11], "arm": ["A"]})
+    assert (idents_df["observer_id"] == 1).all()
     counts = analysis.identifier_counts(idents_df, served, start="2026-09-01", cutoff="2026-10-01")
-    assert counts["A"].to_dict() == {1: 1, 2: 1}
+    # User 1 observed record 11, so their own ID on it does not count.
+    assert counts["A"].to_dict() == {2: 1}
 
 
 def test_readback_from_served_log_union_with_label_map(tiny):

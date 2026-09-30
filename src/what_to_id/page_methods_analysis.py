@@ -151,12 +151,14 @@ def analysis_section(m: Manifest, f: dict, doc: Doc) -> str:
         f"pattern, so p is never 0 {doc.cite('phipson2010')}.</p>"
     )
     record = (
-        "<p>The second test holds each record's IDs fixed, redraws which list each record would "
-        "have gone to by the same rule the build used, and works out the same summed difference. "
+        "<p>The record-level test holds each record's IDs fixed, redraws which list each record "
+        "would have gone to by the same rule the build used, and works out the same summed "
+        "difference. "
         f"{redraw} p is the share of redrawn splits whose summed "
         "difference is at least as far from zero as the real one, counting the real split. "
-        f"{all_served} The analysis command reports this p as <code>p_record</code>, with the "
-        "keyed redraw, next to each comparison's p, and does not Holm-adjust it.</p>"
+        f"{all_served} By default the analysis command reports this p, with the keyed redraw, "
+        "as each comparison's <code>p</code> and Holm-adjusts the primary ones. Run on one "
+        "count for every list, it reports it as <code>p_record</code>, without adjustment.</p>"
     )
     holm = (
         "<p>Holm's method keeps the chance of any false finding at or below the test level over "
@@ -174,24 +176,25 @@ def analysis_section(m: Manifest, f: dict, doc: Doc) -> str:
         "list minus their count on the control. A fast identifier adds IDs to every list, not "
         "only to one. People with no difference drop out. The "
         "statistic is the sum of the differences over the people left. If the list makes no "
-        "difference, each person's difference is symmetric about zero, so the test flips "
+        "difference, each person's difference is symmetric about zero, so the sign-flip test, "
+        "reported next to the primary p as a secondary check, flips "
         f"the sign of each difference and adds again, many times {doc.cite('good2005')}. p is "
         "the share of sign patterns whose sum is at least as far from zero as the real sum. With "
         "12 or fewer people left, p is exact, from every sign pattern. With more, p comes from "
         "10,000 random sign patterns. The draft protocol says the test is two-sided, at 0.05.</p>"
         + fold("the drawn p, and what the test assumes", flips)
         + ""
-        '<h4 id="methods-record-test">A second test, on the records</h4>'
+        '<h4 id="methods-record-test">The primary test, on the records</h4>'
         "<p>The sign-flip test treats the person as the unit, but the design draws the split "
         "record by record. By chance the lists hold a different number of records and a "
         "different mix, which can make every person lean the same way, and flipping signs inside "
         "a person cannot separate that from the order's effect. In the power simulation this "
         "made false findings more common than the test's level "
         f"({see('methods-null-rate', 'Section 8')}). "
-        "A secondary test, fixed before the blitz, redraws the split and works "
-        "out the same summed difference. It does not replace the primary test, which stays each "
-        "list's primary count with the sign-flip p.</p>"
-        + fold("how the second test redraws the split", record)
+        "The primary test, fixed before the blitz, redraws the split and works "
+        "out the same summed difference. It replaces the sign-flip test, which stays on each "
+        "list's primary count as a secondary check.</p>"
+        + fold("how the record-level test redraws the split", record)
         + "<p><b>More than one list.</b> Each list other than the control is compared with the "
         f"control on its own primary count ({doc.ref('per-list')}), so this build gives {n_cmp} "
         f"comparisons, and those {n_cmp} p values are "

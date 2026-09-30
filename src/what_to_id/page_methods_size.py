@@ -73,8 +73,8 @@ def size_section(m: Manifest, f: dict, doc: Doc) -> str:
         f"{mean / level:.1f} times as often, well beyond the simulation error of about "
         f"{se:.3f}. The likely reason is that the split is drawn by record: chance differences "
         "between lists make people lean the same way, which the sign-flip test cannot see. "
-        f"That is why the {see('methods-record-test', 'record-level p')} is reported next to "
-        "each comparison.</p>"
+        f"That is why the {see('methods-record-test', 'record-level p')} is the primary "
+        "test.</p>"
     )
     factors = " and ".join(f"{k:.1f}" for k in WEIGHTED[0])
     lifts = " and ".join(f"{k:.1f}" for k in PLAIN[0])

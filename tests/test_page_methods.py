@@ -260,11 +260,12 @@ def test_the_number_of_lists_is_settled_not_a_preview(full):
     assert "The draft protocol plans 2" not in full
 
 
-def test_record_level_rerandomisation_is_a_secondary_test(full):
-    assert "A second test, on the records" in full
+def test_record_level_rerandomisation_is_the_primary_test(full):
+    assert "The primary test, on the records" in full
     assert "redraws which list each record would have gone to" in full
     assert "In the power simulation this made false findings more common" in full
-    assert "does not replace the primary test" in full
+    assert "It replaces the sign-flip test" in full
+    assert "does not replace the primary test" not in full
     assert "Worked example" not in full
 
 

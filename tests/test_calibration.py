@@ -13,8 +13,9 @@ from what_to_id.confirmatory import confirmatory
 
 
 def _analyse(events, served):
+    users = sorted(events["user_id"].unique())
     return confirmatory(
-        events, served, control="recency", start=START, cutoff=CUTOFF, reps=100, seed=4
+        events, served, control="recency", start=START, cutoff=CUTOFF, users=users, reps=100, seed=4
     )
 
 
@@ -95,7 +96,7 @@ def test_small_pool_attempts_are_equal_and_precede_event_time(monkeypatch):
 
 def test_no_events_reports_omission_and_finite_json(monkeypatch):
     _, served = simulate(Scenario(), seed=5)
-    empty = pd.DataFrame(columns=["id", "user_id", "created_at", "taxon_rank"])
+    empty = pd.DataFrame(columns=["id", "user_id", "created_at", "taxon_rank", "observer_id"])
     monkeypatch.setattr(calibration, "simulate", lambda sc, seed: (empty, served))
     result = diagnose(Scenario(participants=1), reps=1)
     assert result["omitted_zero_id_participants_across_replicates"] == 1
@@ -122,7 +123,9 @@ def test_shared_record_propensities_and_independent_rng_domains(monkeypatch):
     unchanged, same_served = simulate(Scenario(), seed=5)
     pd.testing.assert_frame_equal(baseline, unchanged)
     pd.testing.assert_frame_equal(served, same_served)
-    digest = hashlib.sha256(json.dumps(baseline.to_dict("records"), sort_keys=True).encode())
+    # The pinned digest predates the constant observer column, so it hashes the other columns.
+    pinned = baseline.drop(columns="observer_id").to_dict("records")
+    digest = hashlib.sha256(json.dumps(pinned, sort_keys=True).encode())
     assert digest.hexdigest() == "0796e33a32b2a83d9b87a3bd6b16e744138a97a5aa422527b136c384558f6fab"
 
 

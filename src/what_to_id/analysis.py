@@ -2,23 +2,24 @@
 
 Under ``rotation`` every identifier's batches cycle through all arms in equal share, so an
 identifier's own count of species-level identifications in each arm is comparable across arms
-without knowing which records they opened. The primary test, fixed before the blitz, is a
-paired sign-flip permutation test on per-identifier differences (treatment minus control), one
-per treatment arm, Holm-adjusted across treatment arms; ``sign_test_p`` runs the same paired
-comparison as an exact binomial sign test (positive vs negative differences, zeros dropped) and
-is reported alongside it, unadjusted. ``record_totals`` and ``record_shuffle_p`` add a
-secondary, pre-registered check that re-randomises the unit the design randomises, the record,
-instead of the sign within an identifier, and recomputes the same summed difference; it is not
-a replacement for the primary test. A record an identifier gave several species-level
-identifications counts once, unless ``identifier_counts`` is weighted by ``cell_score``, in
-which case each distinct (user, record) pair contributes that record's cell score (0 when
-missing) instead of 1, so the primary count favours identifications in data-poor cells. Organic
-identifiers who never saw the page are not balanced across arms: each arm serves its own top
-records, and the recency arm serves the newest, which draw the most organic attention on
-iNaturalist. The test is therefore restricted to the blitz participants' user ids (``users``),
-and a placebo run over a pre-blitz period on the same served sets measures how far organic
-attention alone separates the arms. The same test runs on simulated counts
-(``power.identifier_power``) and on the real read-back. Naive timestamps are read as UTC.
+without knowing which records they opened. The primary test, fixed before the blitz, is the
+record-level re-randomisation in ``record_totals`` and ``record_shuffle_p``: it redraws the unit
+the design randomises, the record, and recomputes the summed per-identifier difference
+(treatment minus control). ``confirmatory`` runs it on each tested list's pinned count with Holm
+over those comparisons. ``analyse`` runs the paired sign-flip permutation test on the same
+differences, one per treatment arm, and ``sign_test_p`` the exact binomial sign test (positive
+vs negative differences, zeros dropped); both are secondary and reported next to the primary p.
+An identification the observer made on their own record never counts: ``observer_id`` in the
+idents, written by the read-back, names each record's observer. A record an identifier gave
+several species-level identifications counts once, unless ``identifier_counts`` is weighted by
+``cell_score``, in which case each distinct (user, record) pair contributes that record's cell
+score (0 when missing) instead of 1, so the primary count favours identifications in data-poor
+cells. Organic identifiers who never saw the page are not balanced across arms: each arm serves
+its own top records, and the recency arm serves the newest, which draw the most organic
+attention on iNaturalist. The test is therefore restricted to the blitz participants' user ids
+(``users``), and a placebo run over a pre-blitz period on the same served sets measures how far
+organic attention alone separates the arms. The sign-flip test also runs on simulated counts
+(``power.identifier_power``). Naive timestamps are read as UTC.
 ``exposure`` counts the served records each participant marked reviewed, per arm, from the
 read-back's ``reviewed_by``; it has no timestamps, so it is a compliance check on the equal
 share rotation assumes, not an input to the test. ``served_arms`` normalises either a
@@ -26,20 +27,21 @@ single-build batches frame or a cumulative served log (mapped through a label ->
 one row per served id, and is shared by the analysis and read-back CLIs so a build served under
 several daily labels is read as one arm assignment.
 
-The CLI prints ``p_record`` after ``p_holm`` for every comparison: the record-level check's p
-with the same users, weighting, window, reps and seed. It is secondary and not Holm-adjusted. It
-redraws the split as the keyed build does (``strata`` None), because the served inputs carry no
-stratum. It is valid only when every record in a list is served: when a cap on batches binds,
-which records a list serves depends on the split, and holding each record's identifications
-fixed under a redrawn split no longer matches the design. The CLI cannot check this: a batches
-frame or a served log holds only the served records, not the pool, and not the cap. Check the
-build record (every list and taxon group has fewer batches than ``max_batches``, or no cap)
-before reading ``p_record``.
-
 The CLI's default ``--weight primary`` runs the confirmatory family (``confirmatory``): each
-tested list on its own pinned outcome, Holm over those primary p values only, and each list's
+tested list on its own pinned outcome, with the record-level p as ``p``, Holm over those primary
+p values only, the sign-flip and sign test p as ``p_signflip`` and ``p_sign``, and each list's
 other count as an unadjusted secondary row. ``--weight none`` or ``cell_score`` runs every list
-on one count with Holm over all of them, as ``analyse`` does.
+on one count with Holm over the sign-flip p of all of them, as ``analyse`` does, and prints
+``p_record`` after ``p_holm``: the record-level p with the same users, weighting, window, reps
+and seed, not Holm-adjusted.
+
+Either way the record-level p redraws the split as the keyed build does (``strata`` None),
+because the served inputs carry no stratum. It is valid only when every record in a list is
+served: when a cap on batches binds, which records a list serves depends on the split, and
+holding each record's identifications fixed under a redrawn split no longer matches the design.
+The CLI cannot check this: a batches frame or a served log holds only the served records, not
+the pool, and not the cap. Check the build record (every list and taxon group has fewer batches
+than ``max_batches``, or no cap) before reading it.
 """
 
 from __future__ import annotations
@@ -55,7 +57,7 @@ import pandas as pd
 from scipy.stats import binomtest
 
 SPECIES_RANKS = frozenset({"species", "hybrid", "subspecies", "variety", "form", "infrahybrid"})
-IDENT_NEEDS = ("id", "user_id", "created_at", "taxon_rank")
+IDENT_NEEDS = ("id", "user_id", "created_at", "taxon_rank", "observer_id")
 EXACT_MAX = 12
 WEIGHTS = ("none", "cell_score")
 RESULT_COLUMNS = (
@@ -72,6 +74,11 @@ RECORD_NOTE = (
     "p_record: secondary record-level re-randomisation check, keyed split, not Holm-adjusted. "
     "Valid only if every record in a list is served (no cap on batches binds); the served "
     "files cannot show this, so check the build record."
+)
+PRIMARY_NOTE = (
+    "p: primary record-level re-randomisation test, keyed split, Holm over the primary rows; "
+    "p_signflip and p_sign are secondary. Valid only if every record in a list is served (no "
+    "cap on batches binds); the served files cannot show this, so check the build record."
 )
 
 
@@ -141,6 +148,38 @@ def _by_arm_weighted(pairs: pd.DataFrame, arm_of: pd.Series, score_of: pd.Series
     return out.reindex(columns=arms, fill_value=0.0).astype("float64")
 
 
+def _counted_pairs(
+    idents: pd.DataFrame, ids: pd.Index, *, start, cutoff, users: Sequence[int] | None
+) -> pd.DataFrame:
+    """Distinct (user_id, id) pairs that count: species level, in the window, on a served record.
+
+    An identification the observer made on their own record is dropped. A record with no known
+    observer has no own IDs to drop, so every ID on it is kept.
+    """
+    missing = [c for c in IDENT_NEEDS if c not in idents.columns]
+    if missing:
+        raise ValueError(
+            f"idents missing columns {missing}; read back with taxon_rank and observer_id"
+        )
+    t0, t1 = _utc(start), _utc(cutoff)
+    if t1 <= t0:
+        raise ValueError(f"cutoff {cutoff} is not after start {start}")
+    ts = pd.to_datetime(idents["created_at"], utc=True, errors="coerce")
+    by = pd.to_numeric(idents["user_id"], errors="coerce")
+    own = by.eq(pd.to_numeric(idents["observer_id"], errors="coerce")).fillna(False).astype(bool)
+    keep = (
+        idents["id"].isin(ids)
+        & by.notna()
+        & ~own
+        & ts.ge(t0)
+        & ts.lt(t1)
+        & idents["taxon_rank"].isin(SPECIES_RANKS)
+    )
+    if users is not None:
+        keep &= idents["user_id"].isin({int(u) for u in users})
+    return idents.loc[keep, ["user_id", "id"]].drop_duplicates()
+
+
 def identifier_counts(
     idents: pd.DataFrame,
     served: pd.DataFrame,
@@ -153,29 +192,14 @@ def identifier_counts(
     """Records given a species-level identification, per identifier (rows) and arm (columns).
 
     ``weight="cell_score"`` sums each distinct (user, record) pair's served cell_score (0 when
-    missing) instead of counting 1, so the counts are float; the default counts records.
+    missing) instead of counting 1, so the counts are float; the default counts records. IDs
+    the observer made on their own record are left out.
     """
     if weight is not None and weight not in WEIGHTS:
         raise ValueError(f"weight must be one of {WEIGHTS}, got {weight!r}")
-    missing = [c for c in IDENT_NEEDS if c not in idents.columns]
-    if missing:
-        raise ValueError(f"idents missing columns {missing}; read back with taxon_rank")
     lookup = _served_lookup(served)
     arm_of = lookup["arm"]
-    t0, t1 = _utc(start), _utc(cutoff)
-    if t1 <= t0:
-        raise ValueError(f"cutoff {cutoff} is not after start {start}")
-    ts = pd.to_datetime(idents["created_at"], utc=True, errors="coerce")
-    keep = (
-        idents["id"].isin(arm_of.index)
-        & idents["user_id"].notna()
-        & ts.ge(t0)
-        & ts.lt(t1)
-        & idents["taxon_rank"].isin(SPECIES_RANKS)
-    )
-    if users is not None:
-        keep &= idents["user_id"].isin({int(u) for u in users})
-    pairs = idents.loc[keep, ["user_id", "id"]]
+    pairs = _counted_pairs(idents, arm_of.index, start=start, cutoff=cutoff, users=users)
     if weight == "cell_score":
         return _by_arm_weighted(pairs, arm_of, lookup["cell_score"])
     return _by_arm(pairs, arm_of)
@@ -241,30 +265,15 @@ def record_totals(
     The primary statistic, the sum over identifiers of (count on an arm minus count on the
     control), collapses to a per-record total: distinct (user, record) pairs on the arm's
     records minus those on the control's. This returns that per-record total, indexed by served
-    id and 0 for a served record nobody identified, so the record-level re-randomisation check
-    can recompute the same statistic under a redrawn assignment.
+    id and 0 for a served record nobody identified, so the record-level re-randomisation test
+    can recompute the same statistic under a redrawn assignment. It counts the same pairs as
+    ``identifier_counts``, so IDs the observer made on their own record are left out here too.
     """
     if weight is not None and weight not in WEIGHTS:
         raise ValueError(f"weight must be one of {WEIGHTS}, got {weight!r}")
-    missing = [c for c in IDENT_NEEDS if c not in idents.columns]
-    if missing:
-        raise ValueError(f"idents missing columns {missing}; read back with taxon_rank")
     lookup = _served_lookup(served)
     ids = lookup.index
-    t0, t1 = _utc(start), _utc(cutoff)
-    if t1 <= t0:
-        raise ValueError(f"cutoff {cutoff} is not after start {start}")
-    ts = pd.to_datetime(idents["created_at"], utc=True, errors="coerce")
-    keep = (
-        idents["id"].isin(ids)
-        & idents["user_id"].notna()
-        & ts.ge(t0)
-        & ts.lt(t1)
-        & idents["taxon_rank"].isin(SPECIES_RANKS)
-    )
-    if users is not None:
-        keep &= idents["user_id"].isin({int(u) for u in users})
-    pairs = idents.loc[keep, ["user_id", "id"]].drop_duplicates()
+    pairs = _counted_pairs(idents, ids, start=start, cutoff=cutoff, users=users)
     per_id = pairs.groupby("id").size().astype("float64")
     if weight == "cell_score":
         per_id = per_id * lookup["cell_score"].reindex(per_id.index).fillna(0.0)
@@ -278,26 +287,33 @@ def record_shuffle_p(
     arm: str,
     control: str,
     strata: pd.Series | None = None,
+    arms: Sequence[str] | None = None,
     reps: int = 10000,
     seed: int = 0,
 ) -> float:
     """Two-sided p of the same summed difference under a redrawn record-to-arm assignment.
 
-    The primary test re-randomises signs within identifiers, the unit of analysis. This
-    re-randomises the unit the design actually randomises, the record. With ``strata`` None it
-    draws each record's arm on its own and uniformly, which is what ``assign.assign_keyed``
-    does. With ``strata`` given, one label per served id, it permutes the observed arms inside
-    each stratum, which is what ``assign.assign`` does. It is a secondary check, not the
-    primary test: it asks whether the observed difference is unusual when only the split of
-    records changes, with each record's identifications held fixed.
+    This is the primary test. It re-randomises the unit the design randomises, the record,
+    where the sign-flip test re-randomises signs within identifiers. With ``strata`` None it
+    draws each record's arm on its own and uniformly over ``arms``, which is what
+    ``assign.assign_keyed`` does. ``arms`` is the design's lists; left None it is the lists
+    that were served, which differs from the design only when a list served nothing. With
+    ``strata`` given, one label per served id, it permutes the observed arms inside each
+    stratum, which is what ``assign.assign`` does. It asks whether the observed difference is
+    unusual when only the split of records changes, with each record's identifications held
+    fixed. The observed split counts as one redraw, so p is never 0.
     """
     if reps < 1:
         raise ValueError("reps must be >= 1")
     served = served_arms(served)
-    arms = sorted(served["arm"].unique())
+    seen = sorted(served["arm"].unique())
+    arms = seen if arms is None else sorted(arms)
     missing = [name for name in (arm, control) if name not in arms]
     if missing:
         raise ValueError(f"arms {missing} not in {arms}")
+    extra = [name for name in seen if name not in arms]
+    if extra:
+        raise ValueError(f"served arms {extra} not in the design's lists {arms}")
     w = served["id"].map(totals).fillna(0.0).to_numpy(dtype=np.float64)
     code = served["arm"].map({a: i for i, a in enumerate(arms)}).to_numpy(dtype=np.int64)
     i_arm, i_ctl = arms.index(arm), arms.index(control)
@@ -349,7 +365,9 @@ def analyse(
     """One row per treatment arm against ``control``, with raw and Holm-adjusted p.
 
     ``p`` is the paired sign-flip permutation p, Holm-adjusted into ``p_holm``; ``p_sign`` is
-    the exact binomial sign test on the same differences, reported unadjusted.
+    the exact binomial sign test on the same differences, reported unadjusted. This is the
+    exploratory one-count comparison; the primary test is the record-level one that
+    ``confirmatory`` runs, and there this sign-flip p is a secondary column.
     """
     if control not in counts.columns:
         raise ValueError(f"control arm {control!r} not in {list(counts.columns)}")
@@ -396,7 +414,8 @@ def _label_map(path: Path | None) -> dict[str, str] | None:
 
 def main(argv: Sequence[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
-        description="Pre-registered per-identifier arm comparison.", epilog=RECORD_NOTE
+        description="Pre-registered per-identifier arm comparison.",
+        epilog=f"{PRIMARY_NOTE} {RECORD_NOTE}",
     )
     ap.add_argument("--idents", required=True, type=Path, help="read-back idents parquet")
     ap.add_argument(
@@ -425,6 +444,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap.add_argument("--reps", type=int, default=10000)
     ap.add_argument("--seed", type=int, default=0)
     a = ap.parse_args(argv)
+    if a.weight == "primary" and a.users is None:
+        ap.error("--weight primary counts participants only; give --users")
     idents = pd.read_parquet(a.idents, engine="pyarrow")
     served_raw = pd.concat(
         [pd.read_parquet(p, engine="pyarrow") for p in a.served], ignore_index=True
@@ -437,7 +458,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     windows = [("blitz", a.start, a.cutoff)]
     if a.placebo_start:
         windows.append(("placebo", a.placebo_start, a.start))
-    print(RECORD_NOTE)
+    print(PRIMARY_NOTE if a.weight == "primary" else RECORD_NOTE)
     for label, t0, t1 in windows:
         kw = {"start": t0, "cutoff": t1, "users": users}
         print(f"{label}: [{t0}, {t1})" + ("" if users is not None else ", all identifiers"))
@@ -445,20 +466,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             # Imported here: confirmatory builds on this module.
             from what_to_id.confirmatory import confirmatory
 
+            # The record-level p is already the primary p here, so no p_record column.
             res = confirmatory(idents, served, control=a.control, reps=a.reps, seed=a.seed, **kw)
-            weights = [None if o == "plain" else "cell_score" for o in res["outcome"]]
         else:
             weight = None if a.weight == "none" else a.weight
             counts = identifier_counts(idents, served, weight=weight, **kw)
             res = analyse(counts, control=a.control, reps=a.reps, seed=a.seed)
-            weights = [weight] * len(res)
-        totals = {w: record_totals(idents, served, weight=w, **kw) for w in set(weights)}
-        res["p_record"] = [
-            record_shuffle_p(
-                totals[w], served, arm=arm, control=a.control, reps=a.reps, seed=a.seed
-            )
-            for arm, w in zip(res["arm"], weights, strict=True)
-        ]
+            totals = record_totals(idents, served, weight=weight, **kw)
+            res["p_record"] = [
+                record_shuffle_p(
+                    totals, served, arm=arm, control=a.control, reps=a.reps, seed=a.seed
+                )
+                for arm in res["arm"]
+            ]
         _print(res)
     if a.obs:
         expo = exposure(pd.read_parquet(a.obs, engine="pyarrow"), served, users=users)

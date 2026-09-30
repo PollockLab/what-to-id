@@ -4,6 +4,8 @@
 assignment arms and the pool and tallies per-arm shares. ``--dry-run`` skips the fetch and
 reports the unengaged share per iconic group from the pool alone. Identifications keep their
 timestamps, rank and ``current`` flag, so ``analysis`` can cut them at any date before the fetch.
+Each identification row also carries ``observer_id``, the record's observer, so ``analysis`` can
+leave out IDs an identifier made on their own record.
 ``reviewed_by`` lists every user who marked the record reviewed; it carries no timestamp. The
 ``--assign`` input accepts one or more single-build batches parquets (``id``, ``arm``) or
 cumulative served-log parquets (``id``, ``label``, mapped through ``--label-map``);
@@ -45,7 +47,7 @@ OBS_COLUMNS = (
     "last_ident_at",
     "reviewed_by",
 )
-IDENT_COLUMNS = ("id", "user_id", "created_at", "taxon_id", "taxon_rank", "current")
+IDENT_COLUMNS = ("id", "user_id", "created_at", "taxon_id", "taxon_rank", "current", "observer_id")
 OUTCOME_COLUMNS = (
     "arm",
     "n_served",
@@ -103,11 +105,12 @@ def readback(
             obs_rows.append({"id": i, **{c: None for c in OBS_COLUMNS[1:]}})
             continue
         obs_rows.append({c: s[c] for c in OBS_COLUMNS})
-        ident_rows.extend({"id": i, **f} for f in s["identifications"])
+        ident_rows.extend({"id": i, **f, "observer_id": s["user_id"]} for f in s["identifications"])
     obs_df = pd.DataFrame(obs_rows, columns=list(OBS_COLUMNS))
     for c in ("user_id", "ident_count", "n_identifiers"):
         obs_df[c] = obs_df[c].astype("Int64")
     idents_df = pd.DataFrame(ident_rows, columns=list(IDENT_COLUMNS))
+    idents_df["observer_id"] = idents_df["observer_id"].astype("Int64")
     return obs_df, idents_df
 
 
