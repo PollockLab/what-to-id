@@ -5,13 +5,17 @@ name: map
 # this job stands down. It keeps its own pool on the map-state release, apart from the study's
 # pool-state, so it never changes what the study serves.
 #
-# Each run pulls records uploaded since the last one (so an observation uploaded long after it
-# was made still arrives) and drops records that left needs-ID since the last run, found by
-# asking for BC records updated since then that are now Research Grade or casual. About 50
-# requests a day. A record deleted from iNaturalist is not dropped until the pool is seeded again.
+# Each run asks for every BC record iNaturalist updated since the last run, in any quality grade
+# and any group, and brings the pool in line: needs-ID records with a photo are added or
+# replaced, the rest are dropped. So new uploads, records reaching or dropping back from Research
+# Grade, reopened casual records and changed IDs all arrive. The next run starts from the newest
+# update seen, saved in sync.json with the run's counts. Each run also compares the pool's size
+# with iNaturalist's count and warns when they drift apart (records deleted from iNaturalist,
+# moved out of BC or redated are not seen by the daily query); reseed the pool then.
 #
-# Seed once: upload a pool parquet as pool.parquet to a release tagged map-state, then set the
-# repository variable MAP_DAILY_ENABLED to "true".
+# Seed once: upload a pool parquet as pool.parquet to a release tagged map-state, set the
+# repository variable MAP_SINCE to the time its pull started (ISO, UTC), then set the repository
+# variable MAP_DAILY_ENABLED to "true".
 on:
   schedule:
     - cron: "47 13 * * *" # 30 minutes after the daily study build's slot
@@ -28,6 +32,7 @@ concurrency:
 env:
   D1: "1900-01-01" # all of iNaturalist; the earliest BC needs-ID record is from 1949
   STATE_TAG: map-state
+  MAP_SINCE: ${{ vars.MAP_SINCE }} # read only while sync.json does not exist yet
   WHAT_TO_ID_USER_AGENT: what-to-id map refresh (https://github.com/PollockLab/what-to-id)
 
 jobs:
@@ -59,18 +64,14 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p state
-          gh release download "$STATE_TAG" -D state -p pool.parquet -p last_run.txt --clobber || true
+          gh release download "$STATE_TAG" -D state -p pool.parquet --clobber || true
+          gh release download "$STATE_TAG" -D state -p sync.json --clobber || true
           test -s state/pool.parquet || { echo "::error::no pool.parquet on the $STATE_TAG release; seed it first"; exit 1; }
-      - name: Add new uploads, drop records that got an ID
+      - name: Apply every change since the last run
         run: |
           set -euo pipefail
-          # The saved time is two hours early, so a late or retried run misses nothing;
-          # dropping a record twice does nothing.
-          since=$(cat state/last_run.txt 2>/dev/null || date -u -d '26 hours ago' +%FT%TZ)
-          next=$(date -u -d '2 hours ago' +%FT%TZ)
-          python -m what_to_id.pool_state update --pool state/pool.parquet --d1 "$D1"
-          python -m what_to_id.pool_state prune --pool state/pool.parquet --since "$since" --d1 "$D1"
-          echo "$next" > state/last_run.txt
+          python -m what_to_id.pool_state sync --pool state/pool.parquet --state state/sync.json \
+            --since "$MAP_SINCE" --d1 "$D1"
       - name: Build the site
         run: |
           set -euo pipefail
@@ -90,4 +91,4 @@ jobs:
       - id: deployment
         uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
       - name: Save the map pool
-        run: gh release upload "$STATE_TAG" state/pool.parquet state/last_run.txt --clobber
+        run: gh release upload "$STATE_TAG" state/pool.parquet state/sync.json --clobber

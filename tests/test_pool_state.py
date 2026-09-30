@@ -1,3 +1,5 @@
+import json
+
 import pandas as pd
 import pytest
 
@@ -242,21 +244,72 @@ def test_corrupt_eligibility_fails_before_replacing_pool(tmp_path, bad):
     assert pool.read_bytes() == b"previous pool"
 
 
-def test_cmd_prune_drops_records_that_left_needs_id(tmp_path, monkeypatch):
+def test_apply_changes_drops_gone_and_upserts_changed():
+    pool = make_pool(4)
+    pool.loc[:, "id"] = [1, 2, 3, 4]
+    changed = _new_rows([3, 5])
+    changed.loc[changed["id"] == 3, "taxon_name"] = "Reidentified"
+    updated = pool_state.apply_changes(pool, changed, gone={2, 99})
+    assert updated["id"].tolist() == [1, 3, 4, 5]
+    assert updated.loc[updated["id"] == 3, "taxon_name"].item() == "Reidentified"
+
+
+def _sync(
+    tmp_path, monkeypatch, *, state=None, since=None, api=4, newest="2026-09-30T01:00:00+00:00"
+):
     pool = make_pool(4)
     pool.loc[:, "id"] = [1, 2, 3, 4]
     pool_path = tmp_path / "pool.parquet"
     pool.to_parquet(pool_path, index=False)
-    captured = {}
+    state_path = tmp_path / "state" / "sync.json"
+    if state is not None:
+        state_path.parent.mkdir()
+        state_path.write_text(json.dumps(state))
+    asked = {}
 
-    def fake_closed_since(since, *, d1):
-        captured.update(since=since, d1=d1)
-        return {2, 4, 99}
+    def fake_changed_since(start, *, d1):
+        asked.update(start=start, d1=d1)
+        return _new_rows([4, 7]), {2, 99}, newest
 
-    monkeypatch.setattr(pool_state, "closed_since", fake_closed_since)
-    rc = pool_state.main(
-        ["prune", "--pool", str(pool_path), "--since", "2026-09-28T00:00:00Z", "--d1", "2025-01-01"]
+    def fake_total(params):
+        asked["params"] = params
+        return api
+
+    monkeypatch.setattr(pool_state, "changed_since", fake_changed_since)
+    monkeypatch.setattr(pool_state, "total_results", fake_total)
+    argv = ["sync", "--pool", str(pool_path), "--state", str(state_path), "--d1", "1900-01-01"]
+    if since:
+        argv += ["--since", since]
+    assert pool_state.main(argv) == 0
+    return pd.read_parquet(pool_path), json.loads(state_path.read_text()), asked
+
+
+def test_cmd_sync_first_run_uses_since_and_saves_the_newest_update(tmp_path, monkeypatch):
+    pool, state, asked = _sync(tmp_path, monkeypatch, since="2026-09-29T16:00:00Z")
+    assert pool["id"].tolist() == [1, 3, 4, 7]
+    assert asked["start"] == pd.Timestamp("2026-09-29T14:00:00Z")
+    assert asked["d1"] == "1900-01-01"
+    assert "iconic_taxa" not in asked["params"] and "without_taxon_id" not in asked["params"]
+    assert state["since"] == "2026-09-30T01:00:00+00:00"
+    assert (state["added"], state["replaced"], state["dropped"]) == (1, 1, 1)
+    assert (state["pool"], state["api_total"], state["drift"]) == (4, 4, 0)
+    assert state["reconcile_due"] is False
+
+
+def test_cmd_sync_reads_since_from_state_and_keeps_it_when_nothing_changed(tmp_path, monkeypatch):
+    _, state, asked = _sync(
+        tmp_path, monkeypatch, state={"since": "2026-09-30T01:00:00+00:00"}, newest=None
     )
-    assert rc == 0
-    assert captured == {"since": "2026-09-28T00:00:00Z", "d1": "2025-01-01"}
-    assert pd.read_parquet(pool_path)["id"].tolist() == [1, 3]
+    assert asked["start"] == pd.Timestamp("2026-09-29T23:00:00Z")
+    assert state["since"] == "2026-09-30T01:00:00+00:00"
+
+
+def test_cmd_sync_flags_drift(tmp_path, monkeypatch, capsys):
+    _, state, _ = _sync(tmp_path, monkeypatch, since="2026-09-29", api=4 + 1001)
+    assert state["drift"] == 1001 and state["reconcile_due"] is True
+    assert "::warning::" in capsys.readouterr().out
+
+
+def test_cmd_sync_needs_a_since(tmp_path, monkeypatch):
+    with pytest.raises(SystemExit, match="--since"):
+        _sync(tmp_path, monkeypatch)

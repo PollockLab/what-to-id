@@ -474,20 +474,37 @@ def test_pull_amphibia_one_page_live():
     print(f"\nlive rows: {len(df)}")
 
 
-def test_closed_since_pages_by_id_and_asks_for_other_grades():
-    pages = [[{"id": i} for i in range(1000, 800, -1)], [{"id": 5}, {"id": 4}]]
-    sess = FakeSession(pages)
-    got = inat.closed_since("2026-09-28T12:00:00Z", d1="2025-01-01", session=sess, sleep=0)
-    assert got == set(range(801, 1001)) | {4, 5}
-    assert len(sess.calls) == 2
-    first, second = sess.calls
-    assert first["quality_grade"] == "research,casual"
-    assert first["updated_since"].startswith("2026-09-28T12:00:00")
-    assert first["place_id"] == inat.BC_PLACE_ID and first["d1"] == "2025-01-01"
-    assert "id_below" not in first and second["id_below"] == 801
+def _changed(i, grade, updated="2026-09-29T10:00:00-07:00", **over):
+    return _obs(i, quality_grade=grade, updated_at=updated, **over)
 
 
-def test_closed_since_empty_is_one_request():
+def test_changed_since_sorts_records_into_pool_and_gone():
+    first = [_changed(i, "needs_id") for i in range(1000, 800, -1)]
+    second = [
+        _changed(9, "research"),
+        _changed(8, "casual"),
+        _changed(7, "needs_id", photos=[]),
+        _changed(6, "needs_id", geojson=None),
+        _changed(5, "needs_id", updated="2026-09-30T01:00:00+00:00"),
+    ]
+    sess = FakeSession([first, second])
+    rows, gone, newest = inat.changed_since(
+        "2026-09-28T12:00:00Z", d1="1900-01-01", session=sess, sleep=0
+    )
+    assert sorted(rows["id"]) == [5, *range(801, 1001)]
+    assert gone == {6, 7, 8, 9}
+    assert newest == "2026-09-30T01:00:00+00:00"
+    first_call, second_call = sess.calls
+    assert first_call["quality_grade"] == "needs_id,research,casual"
+    assert "photos" not in first_call and "iconic_taxa" not in first_call
+    assert first_call["updated_since"].startswith("2026-09-28T12:00:00")
+    assert first_call["place_id"] == inat.BC_PLACE_ID and first_call["d1"] == "1900-01-01"
+    assert "id_below" not in first_call and second_call["id_below"] == 801
+
+
+def test_changed_since_nothing_changed_is_one_request():
     sess = FakeSession([])
-    assert inat.closed_since("2026-09-28", d1="2025-01-01", session=sess, sleep=0) == set()
+    rows, gone, newest = inat.changed_since("2026-09-28", d1="1900-01-01", session=sess, sleep=0)
+    assert rows.empty and gone == set() and newest is None
+    assert list(rows.columns) == [*inat.COLUMNS, *inat.EXTRA_COLUMNS]
     assert len(sess.calls) == 1

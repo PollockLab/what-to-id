@@ -3,6 +3,8 @@
 Instead of pulling the pool from scratch (thousands of requests, hours), a daily run
 pulls only what changed: `update` fetches records created since the pool's newest
 observation, and `refresh` drops observations that already got an ID or lost their photo.
+`sync`, for the map pool, does both from one query of records updated since the last run and
+checks the pool's size against iNaturalist's count.
 """
 
 from __future__ import annotations
@@ -20,10 +22,12 @@ from what_to_id.inat import (
     DTYPES,
     EXTRA_COLUMNS,
     EXTRA_DTYPES,
-    closed_since,
+    changed_since,
     load_pool,
+    pool_params,
     pull_pool,
     still_open,
+    total_results,
 )
 from what_to_id.manifest import sha256_file
 
@@ -31,6 +35,8 @@ log = logging.getLogger("what_to_id")
 
 DEFAULT_OVERLAP_HOURS = 24.0
 DEFAULT_D1 = "2000-01-01"
+SYNC_OVERLAP_HOURS = 2.0
+MAX_DRIFT = 1000
 
 
 def merge_new(pool: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
@@ -156,18 +162,48 @@ def _cmd_refresh(a: argparse.Namespace) -> int:
     return 0
 
 
-def _cmd_prune(a: argparse.Namespace) -> int:
+def apply_changes(pool: pd.DataFrame, changed: pd.DataFrame, gone: Iterable[int]) -> pd.DataFrame:
+    """Drop ``gone`` ids from ``pool``, then add or replace the ``changed`` rows by id."""
+    kept = pool[~pool["id"].isin({int(i) for i in gone})]
+    return merge_new(kept, changed)
+
+
+def _cmd_sync(a: argparse.Namespace) -> int:
+    saved = json.loads(a.state.read_text()) if a.state.exists() else {}
+    since = saved.get("since") or a.since
+    if not since:
+        raise SystemExit(f"{a.state} holds no since time; pass --since for the first run")
+    d1 = a.d1 or DEFAULT_D1
     pool = load_pool(a.pool)
-    closed = closed_since(a.since, d1=a.d1 or DEFAULT_D1)
-    updated = pool[~pool["id"].isin(closed)].reset_index(drop=True)
-    log.info(
-        "prune: %d left needs-ID since %s, %d dropped, %d kept",
-        len(closed),
-        a.since,
-        len(pool) - len(updated),
-        len(updated),
-    )
+    start = pd.Timestamp(since)
+    if start.tzinfo is None:
+        start = start.tz_localize("UTC")
+    # iNaturalist's search index lags its edits, so ask again for the last few hours
+    start = start - pd.Timedelta(hours=a.overlap_hours)
+    changed, gone, newest = changed_since(start, d1=d1)
+    updated = apply_changes(pool, changed, gone)
+    tomorrow = (pd.Timestamp.now(tz="UTC") + pd.Timedelta(days=1)).date().isoformat()
+    api = total_results(pool_params(None, d1=d1, freeze=tomorrow))
+    drift = api - len(updated)
+    state = {
+        "since": newest or since,
+        "ran_at": pd.Timestamp.now(tz="UTC").isoformat(),
+        "asked_from": start.isoformat(),
+        "added": int((~changed["id"].isin(pool["id"])).sum()),
+        "replaced": int(changed["id"].isin(pool["id"]).sum()),
+        "dropped": int(pool["id"].isin(gone).sum()),
+        "pool": len(updated),
+        "api_total": api,
+        "drift": drift,
+        "reconcile_due": abs(drift) > a.max_drift,
+    }
     _atomic_write(updated, a.pool)
+    a.state.parent.mkdir(parents=True, exist_ok=True)
+    a.state.write_text(json.dumps(state, indent=1) + "\n")
+    log.info("sync: %s", state)
+    if state["reconcile_due"]:
+        # a workflow command: GitHub Actions shows it as a warning on the run
+        print(f"::warning::map pool is {drift:+,} records off iNaturalist's count; reseed it")
     return 0
 
 
@@ -187,11 +223,14 @@ def main(argv: list[str] | None = None) -> int:
     p_refresh.add_argument("--eligibility", type=Path, help="prepared snapshot exclusion state")
     p_refresh.set_defaults(func=_cmd_refresh)
 
-    p_prune = sub.add_parser("prune", help="drop records that left needs-ID since a time")
-    p_prune.add_argument("--pool", required=True, type=Path)
-    p_prune.add_argument("--since", required=True, help="ISO date or datetime, UTC")
-    p_prune.add_argument("--d1", default=None, help="earliest observed_on, YYYY-MM-DD")
-    p_prune.set_defaults(func=_cmd_prune)
+    p_sync = sub.add_parser("sync", help="apply every change since the last run (map pool)")
+    p_sync.add_argument("--pool", required=True, type=Path)
+    p_sync.add_argument("--state", required=True, type=Path, help="JSON with the next since time")
+    p_sync.add_argument("--since", default=None, help="ISO datetime, UTC, when --state has none")
+    p_sync.add_argument("--d1", default=None, help="earliest observed_on, YYYY-MM-DD")
+    p_sync.add_argument("--overlap-hours", type=float, default=SYNC_OVERLAP_HOURS)
+    p_sync.add_argument("--max-drift", type=int, default=MAX_DRIFT)
+    p_sync.set_defaults(func=_cmd_sync)
 
     prepared = sub.add_parser("prepared", help="load a prepared snapshot retaining known closures")
     prepared.add_argument("--pool", required=True, type=Path)
