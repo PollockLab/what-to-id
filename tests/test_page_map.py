@@ -6,6 +6,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from what_to_id.batches import MAX_URL_LEN
+from what_to_id.inat import BC_PLACE_ID
 from what_to_id.page import ARM_WORDS
 from what_to_id.page_map import (
     BYTES_PER_RECORD,
@@ -70,7 +72,10 @@ def test_common_names_follow_the_taxon():
     pool["taxon_name"] = ["Alnus", "Acer", "Alnus", None]
     pool["common_name"] = ["alders", None, "alders", None]
     blobs, meta = encode_points(pool)
-    assert json.loads(gzip.decompress(blobs[TAXA_NAME])) == [["Acer", ""], ["Alnus", "alders"]]
+    assert json.loads(gzip.decompress(blobs[TAXA_NAME])) == [
+        ["Acer", "", 3],
+        ["Alnus", "alders", 4],
+    ]
     back = decode_points(blobs, meta)
     assert back["common_name"].iloc[:3].tolist() == ["alders", "", "alders"]
     assert back["taxon_name"].iloc[:3].tolist() == ["Alnus", "Acer", "Alnus"]
@@ -176,3 +181,31 @@ def test_write_map_and_cli(tmp_path):
     assert main(["--pool", str(tmp_path / "pool.parquet"), "--out", str(tmp_path / "b")]) == 0
     for name in (shard_name(0), TAXA_NAME, MAP_NAME):
         assert (tmp_path / "a" / name).read_bytes() == (tmp_path / "b" / name).read_bytes()
+
+
+def test_taxa_file_carries_ids_as_steps_and_decode_restores_them():
+    pool = make_pool(4)
+    pool["taxon_id"] = pd.array([1700000, 3, 1700000, None], dtype="Int64")
+    pool["taxon_name"] = ["Alnus", "Acer", "Alnus", None]
+    blobs, meta = encode_points(pool)
+    assert json.loads(gzip.decompress(blobs[TAXA_NAME])) == [
+        ["Acer", "", 3],
+        ["Alnus", "", 1699997],
+    ]
+    back = decode_points(blobs, meta)
+    assert back["taxon_id"].iloc[:3].tolist() == [1700000, 3, 1700000]
+    assert back["taxon_id"].isna().tolist() == [False, False, False, True]
+
+
+def test_page_passes_the_place_and_url_limit_and_has_the_identify_link():
+    _, meta = encode_points(make_pool(20))
+    html = render_map(meta, freeze=None)
+    page_meta = json.loads(re.search(r"var META=(\{.*?\});var BASEMAPS", html).group(1))
+    assert page_meta["place_id"] == BC_PLACE_ID and page_meta["max_url"] == MAX_URL_LEN
+    assert f"place_id={BC_PLACE_ID}" in html
+    assert 'id="identify"' in html and 'rel="noopener"' in html
+    assert "function identifyUrl(" in html
+    assert "https://www.inaturalist.org/observations/identify?" in html
+    for key in ("quality_grade", "iconic_taxa", "created_d1", "taxon_id", "month"):
+        assert key in html
+    assert "place_id=7085" not in re.search(r"<script>var META.*", html, re.S).group(0)

@@ -8,7 +8,8 @@ var DAY=864e5,D0=Date.parse(META.day0+'T00:00:00Z'),NO=65535,NOTAX=65535,LAST=ME
 var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 var MONTH=['January','February','March','April','May','June','July','August','September',
   'October','November','December'];
-var FLAG={introduced:1,threatened:2,obscured:4,imprecise:8},nf=new Intl.NumberFormat('en-CA');
+var FLAG={introduced:1,threatened:2,obscured:4,imprecise:8},ONLYFLAG={introduced:'introduced',
+  threatened:'threatened',exact:'obscured'},nf=new Intl.NumberFormat('en-CA');
 function iso(d){return new Date(D0+d*DAY).toISOString().slice(0,10);}
 function dayOf(s){var t=Date.parse(s+'T00:00:00Z');return isNaN(t)?null:Math.round((t-D0)/DAY);}
 function clamp(d){return Math.max(0,Math.min(LAST,d));}
@@ -22,18 +23,21 @@ for(var d=0;d<META.days;d++){var t=new Date(D0+d*DAY);MOY[d]=t.getUTCMonth();DOM
 
 // What the viewer picked. Written to the URL hash so a view can be shared or bookmarked.
 var S={up:false,lo:0,hi:LAST,months:0,groups:META.groups.map(function(){return true;}),
-  only:{},q:'',rec:null,at:null};
+  only:{},q:'',rec:null,at:null,fly:false};
 (function readHash(){
   var h=new URLSearchParams(location.hash.slice(1));
   S.up=h.get('by')==='uploaded';
   var f=dayOf(h.get('from')||''),t=dayOf(h.get('to')||'');
   if(f!=null)S.lo=clamp(f);if(t!=null)S.hi=clamp(t);
+  if(S.lo>S.hi){var sw=S.lo;S.lo=S.hi;S.hi=sw;}
   (h.get('months')||'').split(',').forEach(function(m){if(+m>=1&&+m<=12)S.months|=1<<(m-1);});
-  if(h.get('groups')!=null){var gs=h.get('groups').split(',');
-    S.groups=META.groups.map(function(g){return gs.indexOf(g)>=0;});}
-  (h.get('only')||'').split(',').forEach(function(k){if(k)S.only[k]=true;});
+  if(h.get('groups')!=null){var gs=h.get('groups').split(','),gm=META.groups.map(function(g){
+    return gs.indexOf(g)>=0;});if(gm.some(Boolean))S.groups=gm;}
+  (h.get('only')||'').split(',').forEach(function(k){
+    if(META.flags.indexOf(ONLYFLAG[k])>=0)S.only[k]=true;});
   S.q=h.get('q')||'';S.rec=+h.get('record')||null;
   var at=(h.get('at')||'').split('/').map(Number);if(at.length===3&&at.every(isFinite))S.at=at;
+  S.fly=!!S.rec&&!S.at;
 })();
 var hashTimer=0;
 function writeHash(){clearTimeout(hashTimer);hashTimer=setTimeout(function(){
@@ -45,7 +49,7 @@ function writeHash(){clearTimeout(hashTimer);hashTimer=setTimeout(function(){
   var only=Object.keys(S.only).filter(function(k){return S.only[k];});
   if(only.length)h.push('only='+only.join(','));
   if(S.q)h.push('q='+encodeURIComponent(S.q));
-  if(P.n&&SEL>=0)h.push('record='+P.id[SEL]);
+  if(P.n&&SEL>=0)h.push('record='+P.id[SEL]);else if(S.rec)h.push('record='+S.rec);
   var c=map.getCenter();h.push('at='+map.getZoom().toFixed(1)+'/'+c.lat.toFixed(3)+'/'+
     c.lng.toFixed(3));
   history.replaceState(null,'','#'+h.join('&'));},250);}
@@ -54,7 +58,7 @@ function writeHash(){clearTimeout(hashTimer);hashTimer=setTimeout(function(){
 var P={n:0,id:new Uint32Array(0),pos:new Float32Array(0),obs:new Uint16Array(0),
   up:new Uint16Array(0),tax:new Uint16Array(0),grp:new Uint8Array(0),rank:new Uint8Array(0),
   ids:new Uint8Array(0),fl:new Uint8Array(0)};
-var TAXA=null,TAXOK=null,GONE={},GONE_NEW=false,KEEP=new Uint8Array(0),FV=new Float32Array(0),SEL=-1,
+var TAXA=null,TAXOK=null,TAXID=null,GONE={},GONE_NEW=false,KEEP=new Uint8Array(0),FV=new Float32Array(0),SEL=-1,
   CUM=new Float64Array(META.days+1);
 function cat(a,b){var c=new a.constructor(a.length+b.length);c.set(a);c.set(b,a.length);return c;}
 function unzip(buf){
@@ -96,16 +100,39 @@ function refilter(){
   if(SEL>=0&&!KEEP[SEL])closeCard();
   render();
 }
+function full(){return S.lo===0&&S.hi===LAST;}
 function render(){
   var day=S.up?P.up:P.obs,shown=0,kept=0;
-  for(var i=0;i<P.n;i++)if(KEEP[i]){kept++;var d=day[i];if(d!==NO&&d>=S.lo&&d<=S.hi)shown++;}
+  for(var i=0;i<P.n;i++)if(KEEP[i]){kept++;var d=day[i];if(d===NO?full():d>=S.lo&&d<=S.hi)shown++;}
   $('count').textContent=P.n?nf.format(shown)+' of '+nf.format(META.n)+' records':'Loading';
   $('from').value=iso(S.lo);$('to').value=iso(S.hi);
   $('byObs').setAttribute('aria-pressed',String(!S.up));
   $('byUp').setAttribute('aria-pressed',String(S.up));
   PRESETS.forEach(function(p){var r=p.range();
     p.el.setAttribute('aria-pressed',String(r[0]===S.lo&&r[1]===S.hi));});
-  draw();layers();writeHash();
+  draw();layers();link();writeHash();
+}
+// The Identify link: the same records on iNaturalist, as far as its filters can say it.
+function identifyUrl(st,b,meta){
+  var q=new URLSearchParams({quality_grade:'needs_id',place_id:meta.place_id}),r=function(v,m){
+    return Math.max(-m,Math.min(m,v)).toFixed(4);};
+  q.set('swlat',r(b.s,90));q.set('swlng',r(b.w,180));q.set('nelat',r(b.n,90));q.set('nelng',r(b.e,180));
+  var g=st.groups;
+  if(g.length&&g.length<st.all&&g.indexOf('rest')<0)q.set('iconic_taxa',g.join(','));
+  if(st.d1)q.set(st.up?'created_d1':'d1',st.d1);if(st.d2)q.set(st.up?'created_d2':'d2',st.d2);
+  if(st.months.length)q.set('month',st.months.join(','));
+  var base='https://www.inaturalist.org/observations/identify?',u=base+q;
+  if(st.taxa&&st.taxa.length&&st.taxa.length<=50){q.set('taxon_id',st.taxa.join(','));
+    if((base+q).length<meta.max_url)u=base+q;}
+  return u;
+}
+function link(){
+  var b=map.getBounds(),m=[];for(var i=0;i<12;i++)if(S.months>>i&1)m.push(i+1);
+  var a=$('identify');a.href=identifyUrl({groups:META.groups.filter(function(g,i){return S.groups[i];}),
+    all:META.groups.length,up:S.up,d1:S.lo>0?iso(S.lo):'',d2:S.hi<LAST?iso(S.hi):'',months:m,taxa:TAXID},
+    {w:b.getWest(),s:b.getSouth(),e:b.getEast(),n:b.getNorth()},META);
+  a.title='Opens these records in the iNaturalist Identify page'+(Object.keys(S.only).some(function(k){
+    return S.only[k];})?'. Status filters are not carried over.':'.');
 }
 function layers(){
   if(!P.n)return;
@@ -113,7 +140,7 @@ function layers(){
     data:{length:P.n,attributes:{getPosition:{value:P.pos,size:2},getFilterValue:{value:FV,size:2}}},
     getFillColor:[DOT[0],DOT[1],DOT[2],110],radiusUnits:'pixels',getRadius:1.5,radiusMinPixels:1,
     radiusMaxPixels:6,stroked:false,pickable:true,
-    extensions:[new deck.DataFilterExtension({filterSize:2})],filterRange:[[S.lo,S.hi],[1,1]]})];
+    extensions:[new deck.DataFilterExtension({filterSize:2})],filterRange:[[full()?-1:S.lo,S.hi],[1,1]]})];
   if(SEL>=0)L.push(new deck.ScatterplotLayer({id:'sel',data:[SEL],
     getPosition:function(i){return [P.pos[2*i],P.pos[2*i+1]];},radiusUnits:'pixels',getRadius:8,
     filled:false,stroked:true,lineWidthUnits:'pixels',getLineWidth:2.5,
@@ -245,11 +272,11 @@ $('q').addEventListener('input',function(){clearTimeout(qt);var v=this.value;
   qt=setTimeout(function(){S.q=v.trim();search();refilter();},200);});
 function search(){
   var q=S.q.toLowerCase();
-  if(q.length<2||!TAXA){TAXOK=null;$('qn').textContent=q.length===1?'Type one more letter':'';return;}
-  var ok=new Uint8Array(TAXA.length),k=0;
+  if(q.length<2||!TAXA){TAXOK=TAXID=null;$('qn').textContent=q.length===1?'Type one more letter':'';return;}
+  var ok=new Uint8Array(TAXA.length),k=0,ids=[];
   for(var i=0;i<TAXA.length;i++)if(TAXA[i][0].toLowerCase().indexOf(q)>=0||
-    TAXA[i][1].toLowerCase().indexOf(q)>=0){ok[i]=1;k++;}
-  TAXOK=ok;$('qn').textContent=k?nf.format(k)+(k===1?' taxon matches':' taxa match'):
+    TAXA[i][1].toLowerCase().indexOf(q)>=0){ok[i]=1;k++;if(k<=50)ids.push(TAXA[i][2]);}
+  TAXOK=ok;TAXID=k&&k<=50?ids:null;$('qn').textContent=k?nf.format(k)+(k===1?' taxon matches':' taxa match'):
     'No taxon matches';
 }
 $('reset').onclick=function(){S.lo=0;S.hi=LAST;S.up=false;clearMonths();setGroups(true);
@@ -333,10 +360,11 @@ else{opts.bounds=[[b[0],b[1]],[b[2],b[3]]];opts.fitBoundsOptions={padding:20};}
 var map=new maplibregl.Map(opts);
 map.addControl(new maplibregl.NavigationControl({showCompass:false}));
 var overlay=new deck.MapboxOverlay({interleaved:false,pickingRadius:8,layers:[]});map.addControl(overlay);
-map.on('moveend',writeHash);
+map.on('moveend',function(){link();writeHash();});
 addEventListener('resize',draw);
 render();
 var names0=get(META.taxa).then(function(buf){TAXA=JSON.parse(new TextDecoder().decode(buf));
+  for(var i=1,t=TAXA.length?TAXA[0][2]:0;i<TAXA.length;i++)TAXA[i][2]=t+=TAXA[i][2];
   search();});
 // One shard downloads at a time, so on a slow link the recent shard gets all the bandwidth.
 var chain=Promise.resolve(),prev=Promise.resolve();
@@ -348,7 +376,9 @@ META.shards.forEach(function(s,k){
     if(k===0)return names0;
   }).then(function(){
     refilter();
-    if(S.rec&&SEL<0){for(var i=0;i<P.n;i++)if(P.id[i]===S.rec){openCard(i);S.rec=null;break;}}
+    if(S.rec&&SEL<0){for(var i=0;i<P.n;i++)if(P.id[i]===S.rec){S.rec=null;openCard(i);
+      if(S.fly){S.fly=false;map.flyTo({center:[P.pos[2*i],P.pos[2*i+1]],zoom:12});}break;}}
+    if(k===META.shards.length-1&&S.rec){S.rec=null;writeHash();}
   });
 });
 chain.catch(function(e){$('count').textContent='Could not load the records ('+e.message+')';});

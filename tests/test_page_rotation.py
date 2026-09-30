@@ -451,3 +451,12 @@ def test_new_build_keeps_cycle_and_resets_batches(tmp_path, node_available):
     )
     assert new_build == {"perm": ["B", "A"], "progress": {}, "build": "day2"}
     assert same_build["progress"] == old["progress"] and same_build["offsets"] == old["offsets"]
+
+
+def test_map_link_carries_the_picked_group():
+    html = render_rotation_index(_manifest(), title="t", map_href="map.html")
+    assert 'id="mapLink" href="map.html" data-base="map.html"' in html
+    assert "mapBase + '#groups=' + encodeURIComponent(g)" in html
+    assert "setMap(group)" in html and "setMap(null)" in html
+    plain = render_rotation_index(_manifest(), title="t")
+    assert 'id="mapLink"' not in plain

@@ -20,6 +20,8 @@ h1{font-size:18px;margin:0}
 .sub a{color:inherit}
 .stat{margin:0;font-size:13px}
 #more{color:var(--muted)}
+.idlink{padding:4px 12px;border-radius:14px;background:var(--on);color:var(--onink);font-size:13px;
+  font-weight:600;text-decoration:none}
 .side{grid-area:side;overflow:auto;padding:12px 16px;border-right:1px solid var(--line);
   display:flex;flex-direction:column;gap:6px}
 .lbl{display:block;font-size:12px;font-weight:600;margin:6px 0 2px}

@@ -9,7 +9,9 @@ Each shard (pool-0.bin, pool-1.bin, ...), gzipped, little-endian, n records, col
     | uint8 group | uint8 rank | uint8 ids | uint8 flags
 lon and lat are quantized over META.bbox; obs (observed) and up (uploaded) count days from
 META.day0, with NO_DAY for a missing date; taxon indexes the names in pool-taxa.bin (gzipped JSON
-of [latin, common] pairs), group META.groups and rank META.ranks, with 0xFFFF and 0xFF for none.
+of [latin, common, id step] triples, sorted by iNaturalist taxon id; the step is the id minus the
+previous row's, and the first row's is the id itself), group META.groups and rank META.ranks, with
+0xFFFF and 0xFF for none.
 ids holds min(IDs, 15) in the low nibble and min(agreements, 15) in the high nibble. flags sets
 FLAG_BITS for the flags META.flags names; a pool pulled before those columns existed has none.
 Shard 0 holds records observed in the last two calendar years (and any without a date), so the
@@ -30,6 +32,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from what_to_id.batches import MAX_URL_LEN
+from what_to_id.inat import BC_PLACE_ID
 from what_to_id.page import ARM_WORDS, group_name
 
 MAP_NAME = "map.html"
@@ -143,6 +147,7 @@ def decode_points(blobs: dict[str, bytes], meta: dict) -> pd.DataFrame:
         return [None if i == none else table[i] for i in idx]
 
     names = pick(taxa, raw["taxon"], NO_TAXON)
+    tids = np.cumsum([t[2] for t in taxa], dtype=np.int64)
     out = pd.DataFrame(
         {
             "id": raw["id"].astype(np.int64),
@@ -151,6 +156,10 @@ def decode_points(blobs: dict[str, bytes], meta: dict) -> pd.DataFrame:
             "observed_on": date(raw["obs"]),
             "uploaded_on": date(raw["up"]),
             "iconic_taxon": np.asarray(meta["groups"], dtype=object)[raw["group"]],
+            "taxon_id": pd.array(
+                [None if t is None else tids[i] for t, i in zip(names, raw["taxon"], strict=True)],
+                dtype="Int64",
+            ),
             "taxon_name": [t and t[0] for t in names],
             "common_name": [t and t[1] for t in names],
             "rank": pick(meta["ranks"], raw["rank"], NO_RANK),
@@ -181,7 +190,7 @@ def _quant(v: np.ndarray, lo: float, hi: float) -> np.ndarray:
 
 
 def _taxa(df: pd.DataFrame) -> tuple[list[list[str]], np.ndarray]:
-    """[latin, common] per distinct taxon, and each record's index into that table."""
+    """[latin, common, id step] per distinct taxon, and each record's index into that table."""
     if "taxon_id" not in df or "taxon_name" not in df:
         return [], np.full(len(df), NO_TAXON)
     common = df["common_name"] if "common_name" in df else pd.Series("", index=df.index)
@@ -191,9 +200,11 @@ def _taxa(df: pd.DataFrame) -> tuple[list[list[str]], np.ndarray]:
         raise ValueError(f"{len(table)} taxa do not fit in uint16")
     pos = pd.Series(np.arange(len(table)), index=table["tid"].to_numpy())
     idx = t["tid"].map(pos).fillna(NO_TAXON).to_numpy()
+    tids = table["tid"].to_numpy(dtype=np.int64)
+    steps = np.diff(tids, prepend=0).tolist()
     names = [
-        [str(a) if pd.notna(a) else "", str(c) if pd.notna(c) else ""]
-        for a, c in zip(table["latin"], table["common"], strict=True)
+        [str(a) if pd.notna(a) else "", str(c) if pd.notna(c) else "", int(k)]
+        for a, c, k in zip(table["latin"], table["common"], steps, strict=True)
     ]
     return names, idx
 
@@ -247,11 +258,14 @@ def render_map(meta: dict, *, freeze: str | None, back: str = "index.html") -> s
         **meta,
         "shards": [{**s, "file": f"{s['file']}?v={v}"} for s in meta["shards"]],
         "taxa": f"{meta['taxa']}?v={v}",
+        "place_id": BC_PLACE_ID,
+        "max_url": MAX_URL_LEN,
     }
     fill = {
         "TITLE": "Records that need an ID in BC",
         "WHEN": when,
         "BACK": escape(back),
+        "PLACE_ID": str(BC_PLACE_ID),
         "MAPLIBRE_CSS": MAPLIBRE_CSS,
         "MAPLIBRE_JS": MAPLIBRE_JS,
         "DECK_JS": DECK_JS,

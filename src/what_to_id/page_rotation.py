@@ -200,6 +200,10 @@ function startOver(state, group) {
     } catch (e) {}
   }
   function $(id) { return document.getElementById(id); }
+  var mapLink = $('mapLink'), mapBase = mapLink && mapLink.getAttribute('data-base');
+  function setMap(g) {
+    if (mapLink) mapLink.href = g ? mapBase + '#groups=' + encodeURIComponent(g) : mapBase;
+  }
   var picker = $('picker'), runner = $('runner'), groupList = $('groupList');
   var runGroup = $('runGroup'), runnerCode = $('runnerCode'), bar = $('bar');
   var nextBtn = $('nextBtn'), reopen = $('reopen'), doneMsg = $('doneMsg'), hintBox = $('hintBox');
@@ -236,12 +240,14 @@ function startOver(state, group) {
       var r = /^(.*) \\((.*)\\)$/.exec(name(group));
       resumeBtn.textContent = 'Continue with ' + (r ? r[1] : name(group));
     }
+    setMap(null);
     picker.hidden = false;
     runner.hidden = true;
   }
   function renderRunner(focus) {
     picker.hidden = true;
     runner.hidden = false;
+    setMap(group);
     var p = groupProgress(state, DATA, group);
     runGroup.textContent = name(group);
     runnerCode.textContent = p.opened === 0 ? p.total + ' batches to go' :
@@ -361,7 +367,10 @@ def render_rotation_index(manifest: Manifest, *, title: str, map_href: str | Non
         else ""
     )
     if map_href:
-        sub += f' <a href="{escape(map_href)}">See them on a map</a>.'
+        sub += (
+            f' <a id="mapLink" href="{escape(map_href)}" data-base="{escape(map_href)}">'
+            "See them on a map</a>."
+        )
     sub_html = f'<p class="sub">{sub.strip()}</p>\n' if sub else ""
     build_msg = (
         '<p class="undo" id="buildMsg" aria-live="polite" hidden>'
