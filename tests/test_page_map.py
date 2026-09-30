@@ -11,6 +11,7 @@ from what_to_id.inat import BC_PLACE_ID
 from what_to_id.page import ARM_WORDS
 from what_to_id.page_map import (
     BYTES_PER_RECORD,
+    IMPRECISE_M,
     MAP_NAME,
     NO_DAY,
     TAXA_NAME,
@@ -205,6 +206,7 @@ def test_page_passes_the_place_and_url_limit_and_has_the_identify_link():
     html = render_map(meta, freeze=None)
     page_meta = json.loads(re.search(r"var META=(\{.*?\});var BASEMAPS", html).group(1))
     assert page_meta["place_id"] == BC_PLACE_ID and page_meta["max_url"] == MAX_URL_LEN
+    assert page_meta["imprecise_m"] == IMPRECISE_M
     assert f"place_id={BC_PLACE_ID}" in html
     assert 'id="identify"' in html and 'rel="noopener"' in html
     assert "function identifyUrl(" in html
