@@ -14,6 +14,10 @@ name: map
 # id-range counts, dropping what iNaturalist no longer holds, and warns if the pool's size still
 # drifts from iNaturalist's count.
 #
+# The build also fetches iNaturalist's monthly count of every BC record with a photo, needing an ID or
+# Research Grade, per group and date (about 28 requests), so the map can show the share still
+# needing an ID. If that fetch fails the map ships without it.
+#
 # Seed once: upload pool.parquet and sync.json to a release tagged map-state (sync.json holds the
 # since cursor, so the repository variable MAP_SINCE is only needed when there is no sync.json),
 # then set the repository variable MAP_DAILY_ENABLED to "true".
@@ -91,7 +95,7 @@ jobs:
           set -euo pipefail
           mkdir -p _site
           cp site/*.html _site/
-          python -m what_to_id.page_map --pool state/pool.parquet --out _site --freeze "$(date -u +%F)"
+          python -m what_to_id.page_map --pool state/pool.parquet --out _site --totals --freeze "$(date -u +%F)"
           if find _site -type f ! -name '*.html' ! -name 'pool*.bin' | grep -q .; then
             echo "::error::the site must hold only HTML pages and the map's pool*.bin files"; exit 1
           fi
