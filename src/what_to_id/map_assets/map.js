@@ -74,8 +74,8 @@ function writeHash(){clearTimeout(hashTimer);hashTimer=setTimeout(function(){
 var P={n:0,id:new Uint32Array(0),pos:new Float32Array(0),obs:new Uint16Array(0),
   up:new Uint16Array(0),tax:new Uint16Array(0),grp:new Uint8Array(0),rank:new Uint8Array(0),
   ids:new Uint8Array(0),fl:new Uint8Array(0)};
-var TAXA=null,TAXOK=null,TAXID=null,GONE={},GONE_NEW=false,KEEP=new Uint8Array(0),FV=new Float32Array(0),SEL=-1,
-  CUM=new Float64Array(META.days+1),TOT=META.totals||null,TC=null;
+var TAXA=null,TAXOK=null,TAXID=null,GONE={},GONE_NEW=false,KEEP=new Uint8Array(0),SEL=-1,
+  CUM=new Float64Array(META.days+1),TOT=META.totals||null,TC=null,NODAY=0,PER=null;
 function cat(a,b){var c=new a.constructor(a.length+b.length);c.set(a);c.set(b,a.length);return c;}
 function unzip(buf){
   var u=new Uint8Array(buf,0,Math.min(2,buf.byteLength));
@@ -98,21 +98,58 @@ function addShard(buf,n){
     fl:cat(P.fl,fl)};
 }
 
-// Filters other than the date range run here; the date range runs on the GPU.
+// The map filters on the GPU. Each record carries its observed and uploaded day (-1 for none) as
+// filter values, and four categories: group, observed month, uploaded month (12 for no date) and a
+// status value, bit 1 introduced, 2 threatened, 4 obscured or imprecise, 8 kept by the taxon search
+// and not deleted. Group, month, status and date changes then only change the filter settings;
+// the data is uploaded again only when records arrive or the taxon search or deletions change.
+var ST_INTRO=1,ST_THREAT=2,ST_INEXACT=4,ST_KEEP=8,PD=null,PD_TAX=null,PD_GONE=-1,PD_CAT=0;
+function pointData(){
+  var n=P.n,gone=Object.keys(GONE).length,i;
+  if(PD&&PD.length===n&&PD_TAX===TAXOK&&PD_GONE===gone)return;
+  var same=PD&&PD.length===n,days=same?PD.days:new Float32Array(2*n),
+    cat=same?PD.attributes.getFilterCategory.value.slice():new Uint8Array(4*n);
+  if(!same)for(i=0;i<n;i++){var o=P.obs[i],u=P.up[i],f=P.fl[i];
+    days[2*i]=o===NO?-1:o;days[2*i+1]=u===NO?-1:u;
+    cat[4*i]=P.grp[i];cat[4*i+1]=o===NO?12:MOY[o];cat[4*i+2]=u===NO?12:MOY[u];
+    cat[4*i+3]=(f&FLAG.introduced?ST_INTRO:0)|(f&FLAG.threatened?ST_THREAT:0)|
+      (f&(FLAG.obscured|FLAG.imprecise)?ST_INEXACT:0);}
+  // only the kept bit follows the taxon search and deletions
+  var ok=TAXOK,tax=P.tax,id=P.id,nt=NOTAX;
+  for(i=0;i<n;i++){var t=tax[i],drop=(ok!==null&&(t===nt||ok[t]===0))||(gone>0&&GONE[id[i]]===1);
+    cat[4*i+3]=cat[4*i+3]&~ST_KEEP|(drop?0:ST_KEEP);}
+  // a new taxon search or deletion swaps only the categories, so deck.gl uploads only those
+  if(same){PD.attributes.getFilterCategory={value:cat,size:4};PD_CAT++;}
+  else PD={length:n,days:days,attributes:{getPosition:{value:P.pos,size:2},
+    getFilterValue:{value:days,size:2},getFilterCategory:{value:cat,size:4}}};
+  PD_TAX=TAXOK;PD_GONE=gone;
+}
+function categories(){
+  var groups=[],mon=[],all=[],st=[],req=0,hide=0,i;
+  S.groups.forEach(function(v,j){if(v)groups.push(j);});
+  for(i=0;i<13;i++){all.push(i);if(S.months?i<12&&S.months>>i&1:true)mon.push(i);}
+  if(S.only.introduced)req|=ST_INTRO;if(S.only.threatened)req|=ST_THREAT;if(S.only.exact)hide=ST_INEXACT;
+  for(i=ST_KEEP;i<2*ST_KEEP;i++)if((i&req)===req&&!(i&hide))st.push(i);
+  return [groups,S.up?all:mon,S.up?mon:all,st];
+}
+// The counts behind the histograms, header and share run on the CPU after the map has redrawn.
+var CT=0;
 function refilter(){
-  var n=P.n,day=S.up?P.up:P.obs,req=0,hide=0,m=S.months,g=S.groups;
-  if(S.only.introduced)req|=FLAG.introduced;if(S.only.threatened)req|=FLAG.threatened;
-  if(S.only.exact)hide=FLAG.obscured|FLAG.imprecise;
-  KEEP=new Uint8Array(n);FV=new Float32Array(2*n);var per=new Float64Array(META.days);
+  pointData();layers();clearTimeout(CT);CT=setTimeout(recount,0);
+}
+function recount(){
+  var n=P.n,day=S.up?P.up:P.obs,c=categories(),gm=0,mm=0,sm=0,nd=0,cat=PD.attributes.getFilterCategory.value,
+    ch=S.up?2:1,g=S.groups,m=S.months;
+  c[0].forEach(function(j){gm|=1<<j;});c[ch].forEach(function(j){mm|=1<<j;});c[3].forEach(function(j){sm|=1<<j;});
+  if(KEEP.length!==n)KEEP=new Uint8Array(n);
+  if(!PER)PER=new Float64Array(META.days);else PER.fill(0);
   for(var i=0;i<n;i++){
-    var d=day[i];FV[2*i]=d===NO?-1:d;
-    if(!g[P.grp[i]]||(req&&(P.fl[i]&req)!==req)||(P.fl[i]&hide)||GONE[P.id[i]])continue;
-    if(TAXOK&&(P.tax[i]===NOTAX||!TAXOK[P.tax[i]]))continue;
-    if(m&&(d===NO||!(m>>MOY[d]&1)))continue;
-    KEEP[i]=1;FV[2*i+1]=1;if(d!==NO)per[d]++;
+    var k=(gm>>cat[4*i]&1)&(mm>>cat[4*i+ch]&1)&(sm>>cat[4*i+3]&1);KEEP[i]=k;
+    if(k){var d=day[i];if(d!==NO)PER[d]++;else nd++;}
   }
+  NODAY=nd;
   CUM=new Float64Array(META.days+1);
-  for(d=0;d<META.days;d++)CUM[d+1]=CUM[d]+per[d];
+  for(var d=0;d<META.days;d++)CUM[d+1]=CUM[d]+PER[d];
   // One status filter reads its own totals; two together have none
   var on=Object.keys(S.only).filter(function(k){return S.only[k];}),
     tt=!TOT||TAXOK||on.length>1?null:on.length?TOT.only&&TOT.only[on[0]]:TOT;
@@ -125,8 +162,8 @@ function refilter(){
 }
 function full(){return S.lo===0&&S.hi===LAST;}
 function render(){
-  var day=S.up?P.up:P.obs,shown=0,kept=0;
-  for(var i=0;i<P.n;i++)if(KEEP[i]){kept++;var d=day[i];if(d===NO?full():d>=S.lo&&d<=S.hi)shown++;}
+  // records without a date show only over all dates, as the GPU filter does
+  var shown=CUM[S.hi+1]-CUM[S.lo]+(full()?NODAY:0);
   $('count').textContent=P.n?nf.format(shown)+' of '+nf.format(META.n)+' records':'Loading';
   var all=P.n&&!$('more').textContent?total(S.lo,S.hi):null;
   $('share').textContent=all?nf.format(Math.min(shown,all))+' of '+nf.format(all)+
@@ -165,13 +202,25 @@ function link(){
     only:S.only},{w:b.getWest(),s:b.getSouth(),e:b.getEast(),n:b.getNorth()},META);
   a.title='Opens these records in the iNaturalist Identify page.';
 }
+// The filter extension is kept between calls, as the point data is in pointData(), so deck.gl
+// uploads nothing when only the filter settings change. deck.gl would also run every category
+// through a lookup in JS and upload the result as 32-bit values; ours are already small numbers,
+// so the lookup is the identity and the bytes go up as they are.
+class Filter extends deck.DataFilterExtension{
+  static componentName='Filter';
+  initializeState(context,extension){super.initializeState(context,extension);
+    var a=this.getAttributeManager().attributes.filterCategoryValues;if(a)a.settings.transform=null;}
+  _getCategoryKey(category){return category;}
+}
+var EXT=null;
 function layers(){
-  if(!P.n)return;
-  var L=[new deck.ScatterplotLayer({id:'pts',
-    data:{length:P.n,attributes:{getPosition:{value:P.pos,size:2},getFilterValue:{value:FV,size:2}}},
+  if(!P.n||!PD)return;
+  EXT=EXT||new Filter({filterSize:2,categorySize:4});
+  var r=[full()?-1:S.lo,S.hi],any=[-1,LAST];
+  var L=[new deck.ScatterplotLayer({id:'pts',data:PD,
     getFillColor:[DOT[0],DOT[1],DOT[2],110],radiusUnits:'pixels',getRadius:1.5,radiusMinPixels:1,
     radiusMaxPixels:6,stroked:false,pickable:true,
-    extensions:[new deck.DataFilterExtension({filterSize:2})],filterRange:[[full()?-1:S.lo,S.hi],[1,1]]})];
+    extensions:[EXT],updateTriggers:{getFilterCategory:PD_CAT},filterRange:[S.up?any:r,S.up?r:any],filterCategories:categories()})];
   if(SEL>=0)L.push(new deck.ScatterplotLayer({id:'sel',data:[SEL],
     getPosition:function(i){return [P.pos[2*i],P.pos[2*i+1]];},radiusUnits:'pixels',getRadius:8,
     filled:false,stroked:true,lineWidthUnits:'pixels',getLineWidth:2.5,
