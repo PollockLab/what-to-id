@@ -30,10 +30,12 @@ var STALE_DAYS=2;
     el.textContent=days<=0?'today':days===1?'yesterday':days+' days ago';}
 })();
 
-// Calendar lookups by day: month of year, day of month and weekday (Monday is 0).
-var MOY=new Uint8Array(META.days),DOM=new Uint8Array(META.days),DOW=new Uint8Array(META.days);
+// Calendar lookups by day: month of year, day of month, weekday (Monday is 0) and month number
+// counted from the first day's month, which indexes META.totals.
+var MOY=new Uint8Array(META.days),DOM=new Uint8Array(META.days),DOW=new Uint8Array(META.days),
+  MI=new Uint16Array(META.days),Y0=new Date(D0).getUTCFullYear(),M0=new Date(D0).getUTCMonth();
 for(var d=0;d<META.days;d++){var t=new Date(D0+d*DAY);MOY[d]=t.getUTCMonth();DOM[d]=t.getUTCDate();
-  DOW[d]=(t.getUTCDay()+6)%7;}
+  DOW[d]=(t.getUTCDay()+6)%7;MI[d]=(t.getUTCFullYear()-Y0)*12+MOY[d]-M0;}
 
 // What the viewer picked. Written to the URL hash so a view can be shared or bookmarked.
 var S={up:false,lo:0,hi:LAST,months:0,groups:META.groups.map(function(){return true;}),
@@ -73,7 +75,7 @@ var P={n:0,id:new Uint32Array(0),pos:new Float32Array(0),obs:new Uint16Array(0),
   up:new Uint16Array(0),tax:new Uint16Array(0),grp:new Uint8Array(0),rank:new Uint8Array(0),
   ids:new Uint8Array(0),fl:new Uint8Array(0)};
 var TAXA=null,TAXOK=null,TAXID=null,GONE={},GONE_NEW=false,KEEP=new Uint8Array(0),FV=new Float32Array(0),SEL=-1,
-  CUM=new Float64Array(META.days+1);
+  CUM=new Float64Array(META.days+1),TOT=META.totals||null,TC=null;
 function cat(a,b){var c=new a.constructor(a.length+b.length);c.set(a);c.set(b,a.length);return c;}
 function unzip(buf){
   var u=new Uint8Array(buf,0,Math.min(2,buf.byteLength));
@@ -111,6 +113,10 @@ function refilter(){
   }
   CUM=new Float64Array(META.days+1);
   for(d=0;d<META.days;d++)CUM[d+1]=CUM[d]+per[d];
+  TC=null;
+  if(TOT&&!TAXOK&&!req&&!hide){var rows=TOT[S.up?'up':'obs'],nm=rows[0].length;TC=new Float64Array(nm+1);
+    for(var k=0;k<nm;k++){var v=0;if(!m||m>>(M0+k)%12&1)for(var j=0;j<rows.length;j++)if(g[j])v+=rows[j][k];
+      TC[k+1]=TC[k]+v;}}
   if(SEL>=0&&!KEEP[SEL])closeCard();
   render();
 }
@@ -119,6 +125,11 @@ function render(){
   var day=S.up?P.up:P.obs,shown=0,kept=0;
   for(var i=0;i<P.n;i++)if(KEEP[i]){kept++;var d=day[i];if(d===NO?full():d>=S.lo&&d<=S.hi)shown++;}
   $('count').textContent=P.n?nf.format(shown)+' of '+nf.format(META.n)+' records':'Loading';
+  var all=P.n&&!$('more').textContent?total(S.lo,S.hi):null;
+  $('share').textContent=all?nf.format(Math.min(shown,all))+' of '+nf.format(all)+
+    ' BC records with photos '+(full()&&!S.months&&allGroups()?'':'matching these filters ')+'still need an ID ('+
+    pct(shown,all)+'). All-record counts from '+TOT.on+'.':'';
+  $('hint').textContent=TC?HINT_TOT:HINT;
   $('from').value=iso(S.lo);$('to').value=iso(S.hi);
   $('byObs').setAttribute('aria-pressed',String(!S.up));
   $('byUp').setAttribute('aria-pressed',String(S.up));
@@ -168,6 +179,13 @@ function layers(){
 var hist=$('hist'),over=$('over'),htip=$('htip'),VIEW=[0,LAST],HE=[0,LAST+1],HU='year',drag=null;
 var OE=edges('year',0,LAST);
 function count(a,b){return CUM[b+1]-CUM[a];}
+// All records, needing an ID or Research Grade, for days a..b under the group and month filters.
+// Null when the totals are off or the days do not span whole months (the last day ends a month).
+function total(a,b){
+  if(!TC||!(a===0||DOM[a]===1)||!(b===LAST||DOM[b+1]===1))return null;
+  return TC[MI[b]+1]-TC[MI[a]];
+}
+function pct(v,t){var f=Math.min(1,v/t)*100;return (f<1&&f>0?'<1':Math.round(f))+'%';}
 function viewOf(){
   if(S.lo===0&&S.hi===LAST)return [META.hist0,LAST];
   var pad=Math.max(0,Math.ceil((31-(S.hi-S.lo+1))/2));
@@ -193,16 +211,30 @@ function tickLabel(u,e,k,step){
     return MON[MOY[m]]+(MOY[m]===0?' '+year(m):'');}
   return [1,8,15,22].indexOf(DOM[a])>=0?DOM[a]+' '+MON[MOY[a]]:null;
 }
+// With totals, the log overview adds a line for the share of each year still needing an ID (0 at
+// the axis, 100% at the top), and the linear detail draws all records as faint bars behind. Years with
+// fewer than SHARE_MIN records in all get no point, so a lone early record cannot draw a spike.
+var SHARE_MIN=30;
 function bars(cv,e,h,log,u){
   var w=cv.clientWidth,ax=13,r=devicePixelRatio||1,c=cv.getContext('2d'),n=e.length-1,sw=w/n;
   cv.width=w*r;cv.height=h*r;c.setTransform(r,0,0,r,0,0);c.clearRect(0,0,w,h);
-  var v=[],m=1,k;
-  for(k=0;k<n;k++){v.push(count(e[k],e[k+1]-1));m=Math.max(m,v[k]);}
+  var v=[],tv=[],m=1,k,H=h-ax-2,bw=Math.max(sw-(sw>3?1:0),1);
+  for(k=0;k<n;k++){v.push(count(e[k],e[k+1]-1));tv.push(total(e[k],e[k+1]-1));
+    m=Math.max(m,v[k],log?0:tv[k]||0);}
+  if(!log){c.fillStyle=tok('--total');
+    for(k=0;k<n;k++)if(tv[k]){var ty=Math.max(1.5,tv[k]/m*H);
+      c.globalAlpha=on(e[k],e[k+1]-1)?1:.25;c.fillRect(k*sw,h-ax-ty,bw,ty);}}
   c.fillStyle=tok('--bar');
   for(k=0;k<n;k++){
-    var f=log?Math.log(1+v[k])/Math.log(1+m):v[k]/m,y=v[k]?Math.max(1.5,f*(h-ax-2)):0;
-    c.globalAlpha=on(e[k],e[k+1]-1)?1:.25;c.fillRect(k*sw,h-ax-y,Math.max(sw-(sw>3?1:0),1),y);
+    var f=log?Math.log(1+v[k])/Math.log(1+m):v[k]/m,y=v[k]?Math.max(1.5,f*H):0;
+    c.globalAlpha=on(e[k],e[k+1]-1)?1:.25;c.fillRect(k*sw,h-ax-y,bw,y);
   }
+  if(log){c.globalAlpha=1;c.strokeStyle=c.fillStyle=tok('--share');c.lineWidth=1.5;c.beginPath();
+    var pen=false;
+    for(k=0;k<n;k++){if(!(tv[k]>=SHARE_MIN)){pen=false;continue;}
+      var x=k*sw+bw/2,sy=h-ax-Math.min(1,v[k]/tv[k])*H;
+      if(pen)c.lineTo(x,sy);else c.moveTo(x,sy);pen=true;}
+    c.stroke();}
   c.globalAlpha=1;c.fillStyle=tok('--muted');c.font='10px system-ui,sans-serif';c.textAlign='left';
   var per=u==='year'?1:u==='month'?12:0,step=1,end=-1e9;
   if(per)step=[1,2,5,10,20,25,50].find(function(s){return s*per*sw>=32;})||100;
@@ -216,7 +248,8 @@ function draw(){
   if(!drag)VIEW=viewOf();
   HU=unitOf(VIEW);HE=edges(HU,VIEW[0],VIEW[1]);
   bars(over,OE,34,true,'year');bars(hist,HE,64,false,HU);
-  var cap='One bar per '+HU+', '+dlabel(VIEW[0])+' to '+dlabel(VIEW[1])+'.';
+  var cap='One bar per '+HU+', '+dlabel(VIEW[0])+' to '+dlabel(VIEW[1])+'.'+
+    (TC&&(HU==='day'||HU==='week')?' Faint all-record bars show only with bars per month or year.':'');
   $('unit').textContent=cap;hist.setAttribute('aria-label',cap+' Drag to pick a period.');
 }
 function binAt(cv,e,x){var n=e.length-1;return Math.max(0,Math.min(n-1,Math.floor(x/(cv.clientWidth/n))));}
@@ -228,7 +261,9 @@ function brush(cv,get){
     var g=get(),e=st?st.e:g.e,k=binAt(cv,e,ev.offsetX);
     htip.hidden=false;htip.style.top=(cv.offsetTop-4)+'px';
     htip.style.left=Math.min(Math.max(ev.offsetX,70),cv.clientWidth-70)+'px';
-    htip.textContent=binLabel(g.u,e[k])+': '+nf.format(count(e[k],e[k+1]-1));
+    var nk=count(e[k],e[k+1]-1),tk=total(e[k],e[k+1]-1);
+    htip.textContent=binLabel(g.u,e[k])+': '+nf.format(nk)+(tk?' of '+nf.format(tk)+' still need an ID ('+
+      pct(nk,tk)+')':'');
     if(!st)return;
     if(Math.abs(ev.offsetX-st.x)>3)st.moved=true;
     if(st.moved){var a=binAt(cv,e,Math.min(st.x,ev.offsetX)),z=binAt(cv,e,Math.max(st.x,ev.offsetX));
@@ -383,6 +418,10 @@ map.addControl(new maplibregl.NavigationControl({showCompass:false}));
 var overlay=new deck.MapboxOverlay({interleaved:false,pickingRadius:8,layers:[]});map.addControl(overlay);
 map.on('moveend',function(){link();writeHash();});
 addEventListener('resize',draw);
+var HINT=$('hint').textContent,HINT_TOT='Top: records still needing an ID per year, on a log scale; the line is the '+
+  'share of all BC records with photos that still need one. Click or drag across years to zoom in. Bottom: '+
+  'the period in view, faint bars all records, solid bars those still needing an ID. Drag to pick a period, '+
+  'click a bar to zoom into it, double-click for all dates.';
 render();
 var names0=get(META.taxa).then(function(buf){TAXA=JSON.parse(new TextDecoder().decode(buf));
   for(var i=1,t=TAXA.length?TAXA[0][2]:0;i<TAXA.length;i++)TAXA[i][2]=t+=TAXA[i][2];

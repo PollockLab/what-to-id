@@ -14,9 +14,12 @@ from what_to_id.page_map import (
     MAP_NAME,
     NO_DAY,
     TAXA_NAME,
+    align_totals,
     decode_points,
     encode_points,
+    fetch_totals,
     main,
+    over_totals,
     render_map,
     shard_name,
     write_map,
@@ -237,3 +240,90 @@ def test_normal_pool_keeps_its_own_day0_and_no_marks():
     assert meta["day0"] > "1900-01-01"
     back = decode_points(blobs, meta)
     assert not back["observed_before_1900"].any()
+
+
+class _Hist:
+    """A stand-in session answering iNaturalist histogram requests from a table."""
+
+    def __init__(self, table):
+        self.table, self.calls = table, []
+
+    def get(self, url, params, timeout):
+        self.calls.append((url, params))
+        months = self.table.get((params["date_field"], params["iconic_taxa"]), {})
+
+        class R:
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return {"results": {"month": months}}
+
+        return R()
+
+
+def test_fetch_totals_asks_once_per_group_and_date():
+    s = _Hist({("observed", "Aves"): {"2026-08-01": 7}, ("created", "unknown"): {"2026-09-01": 2}})
+    t = fetch_totals(["Aves", "Unknown"], on="2026-09-30", session=s, sleep=0)
+    assert len(s.calls) == 4
+    assert all(u.endswith("/observations/histogram") for u, _ in s.calls)
+    p = s.calls[0][1]
+    assert p["quality_grade"] == "needs_id,research" and p["photos"] == "true"
+    assert p["place_id"] == BC_PLACE_ID and p["interval"] == "month"
+    assert t == {
+        "on": "2026-09-30",
+        "obs": {"Aves": {"2026-08": 7}, "Unknown": {}},
+        "up": {"Aves": {}, "Unknown": {"2026-09": 2}},
+    }
+
+
+def test_align_totals_folds_early_months_and_drops_late_ones():
+    meta = {"day0": "2026-08-15", "days": 40, "groups": ["Aves", "Fungi"]}
+    raw = {
+        "on": "2026-09-30",
+        "obs": {"Aves": {"2020-01": 3, "2026-08": 5, "2026-09": 4, "2026-11": 9}},
+        "up": {"Fungi": {"2026-09": 1}},
+    }
+    t = align_totals(raw, meta)
+    assert t["m0"] == "2026-08" and t["on"] == "2026-09-30"
+    assert t["obs"] == [[8, 4], [0, 0]]
+    assert t["up"] == [[0, 0], [0, 1]]
+
+
+def test_over_totals_counts_months_the_pool_exceeds():
+    pool = make_pool(30)
+    _, meta = encode_points(pool)
+    big = {g: {"2026-08": 10**6, "2026-09": 10**6} for g in meta["groups"]}
+    meta["totals"] = align_totals({"on": "x", "obs": big, "up": big}, meta)
+    assert over_totals(pool, meta) == 0
+    meta["totals"] = align_totals({"on": "x", "obs": {}, "up": big}, meta)
+    assert over_totals(pool, meta) > 0
+
+
+def test_page_carries_totals_only_when_given(tmp_path):
+    pool = make_pool(20)
+    write_map(tmp_path / "a", pool)
+    html = (tmp_path / "a" / MAP_NAME).read_text()
+    assert '"totals"' not in re.search(r"var META=(\{.*?\});var BASEMAPS", html).group(1)
+    groups = sorted(pool["iconic_taxon"].unique())
+    raw = {"on": "2026-09-30", "obs": {g: {"2026-08": 50} for g in groups}, "up": {}}
+    write_map(tmp_path / "b", pool, totals=raw)
+    html = (tmp_path / "b" / MAP_NAME).read_text()
+    meta = json.loads(re.search(r"var META=(\{.*?\});var BASEMAPS", html).group(1))
+    assert meta["totals"]["on"] == "2026-09-30" and len(meta["totals"]["obs"]) == len(groups)
+    assert 'id="share"' in html and 'id="hint"' in html
+    assert not [w for w in ARM_WORDS if w in html.lower()]
+
+
+def test_cli_builds_without_totals_when_the_fetch_fails(tmp_path, monkeypatch):
+    import requests
+
+    import what_to_id.page_map as pm
+
+    def boom(*a, **k):
+        raise requests.ConnectionError("down")
+
+    monkeypatch.setattr(pm, "fetch_totals", boom)
+    make_pool(20).to_parquet(tmp_path / "pool.parquet", index=False)
+    assert main(["--pool", str(tmp_path / "pool.parquet"), "--out", str(tmp_path), "--totals"]) == 0
+    assert '"totals"' not in (tmp_path / MAP_NAME).read_text()

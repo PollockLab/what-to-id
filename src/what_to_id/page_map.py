@@ -19,6 +19,12 @@ flags byte then also sets EARLY_OBS (16) or EARLY_UP (32) to say the stored day 
 the real date; the page shows "before 1900" for it.
 Shard 0 holds records observed in the last two calendar years (and any without a date), so the
 page draws them first; older records follow in shard 1.
+
+META.totals, when the build fetched them, holds iNaturalist's count of every BC record with a photo
+that needs an ID or is Research Grade, per group and month, by observed ("obs") and uploaded
+("up") date: one list per META.groups entry, one count per month from META.totals.m0 to the
+month of the last day, with earlier months added into the first. The page sets the pool against
+them to show the share still needing an ID. "on" is the day they were fetched.
 """
 
 from __future__ import annotations
@@ -28,15 +34,18 @@ import gzip
 import hashlib
 import json
 import logging
+import os
+import time
 from html import escape
 from importlib.resources import files
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import requests
 
 from what_to_id.batches import MAX_URL_LEN
-from what_to_id.inat import BC_PLACE_ID
+from what_to_id.inat import BC_PLACE_ID, INAT, SLEEP, TIMEOUT, make_session
 from what_to_id.page import ARM_WORDS, group_name
 
 MAP_NAME = "map.html"
@@ -51,6 +60,8 @@ DAY_FLOOR = pd.Timestamp("1900-01-01")
 EARLY_OBS = 16
 EARLY_UP = 32
 FLAG_BITS = {"introduced": 1, "threatened": 2, "obscured": 4, "imprecise": 8}
+TOTAL_GRADES = "needs_id,research"
+TOTAL_FIELDS = {"obs": "observed", "up": "created"}
 _COLS = ("id", "lat", "lon", "observed_on", "created_at", "iconic_taxon")
 _ASSETS = files("what_to_id") / "map_assets"
 
@@ -262,6 +273,78 @@ def _dates(col: pd.Series) -> pd.Series:
     return d.dt.tz_localize(None).dt.normalize()
 
 
+def fetch_totals(groups: list[str], *, on: str, session=None, sleep: float = SLEEP) -> dict:
+    """Monthly counts of every BC record with a photo that needs an ID or is Research Grade.
+
+    One histogram request per group and date field, each covering every month on record. The
+    pool's "Unknown" group is iNaturalist's ``iconic_taxa=unknown``.
+    """
+    session = session or make_session()
+    out: dict = {"on": on}
+    for key, field in TOTAL_FIELDS.items():
+        out[key] = {}
+        for g in groups:
+            params = {
+                "place_id": BC_PLACE_ID,
+                "quality_grade": TOTAL_GRADES,
+                "photos": "true",
+                "d1": DAY_FLOOR.strftime("%Y-%m-%d"),
+                "iconic_taxa": "unknown" if g == "Unknown" else g,
+                "date_field": field,
+                "interval": "month",
+            }
+            r = session.get(f"{INAT}/histogram", params=params, timeout=TIMEOUT)
+            r.raise_for_status()
+            out[key][g] = {k[:7]: int(v) for k, v in r.json()["results"]["month"].items()}
+            if sleep:
+                time.sleep(sleep)
+    return out
+
+
+def align_totals(raw: dict, meta: dict) -> dict:
+    """The fetched totals as the page reads them: per group, a count per month of the map.
+
+    A group the fetch lacks counts zero; months before the map's first fold into it, and months
+    after its last day are dropped.
+    """
+    day0 = pd.Timestamp(meta["day0"])
+    last = day0 + pd.Timedelta(days=meta["days"] - 1)
+    n = (last.year - day0.year) * 12 + last.month - day0.month + 1
+    out: dict = {"on": raw["on"], "m0": day0.strftime("%Y-%m")}
+    for key in TOTAL_FIELDS:
+        rows = []
+        for g in meta["groups"]:
+            row = [0] * n
+            for ym, v in raw[key].get(g, {}).items():
+                k = (int(ym[:4]) - day0.year) * 12 + int(ym[5:7]) - day0.month
+                if k < n:
+                    row[max(k, 0)] += v
+            rows.append(row)
+        out[key] = rows
+    return out
+
+
+def over_totals(pool: pd.DataFrame, meta: dict) -> int:
+    """How many group-months hold more pool records than their totals.
+
+    The totals are fetched minutes after the pool, so a few records can change grade in between;
+    the page caps the share at 100%, and this count says how often it has to.
+    """
+    t = meta["totals"]
+    m0 = pd.Timestamp(t["m0"] + "-01")
+    over = 0
+    for key, col in (("obs", "observed_on"), ("up", "created_at")):
+        d = _dates(pool[col]).clip(lower=DAY_FLOOR)
+        k = (d.dt.year - m0.year) * 12 + d.dt.month - m0.month
+        g = pool["iconic_taxon"].fillna("Unknown").astype(str)
+        counts = pd.DataFrame({"g": g, "k": k}).dropna().groupby(["g", "k"]).size()
+        for (grp, month), c in counts.items():
+            i, month = meta["groups"].index(grp), int(month)
+            if 0 <= month < len(t[key][i]) and c > t[key][i][month]:
+                over += 1
+    return over
+
+
 def render_map(meta: dict, *, freeze: str | None, back: str = "index.html") -> str:
     """The map page. META goes inline; the points and names come from the files at load."""
     when = ""
@@ -295,11 +378,22 @@ def render_map(meta: dict, *, freeze: str | None, back: str = "index.html") -> s
     return html
 
 
-def write_map(out_dir: Path | str, pool: pd.DataFrame, *, freeze: str | None = None) -> list[Path]:
-    """Write map.html and its data files into the site folder."""
+def write_map(
+    out_dir: Path | str,
+    pool: pd.DataFrame,
+    *,
+    freeze: str | None = None,
+    totals: dict | None = None,
+) -> list[Path]:
+    """Write map.html and its data files into the site folder; ``totals`` from fetch_totals."""
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     blobs, meta = encode_points(pool)
+    if totals is not None:
+        meta["totals"] = align_totals(totals, meta)
+        over = over_totals(pool, meta)
+        if over:
+            _warn(f"{over} group-months hold more records than their totals; the page caps them")
     html = render_map(meta, freeze=freeze)
     low = html.lower()
     for w in ARM_WORDS:
@@ -320,15 +414,35 @@ BASEMAPS = {
 }
 
 
+def _warn(msg: str) -> None:
+    logging.getLogger("what_to_id").warning(msg)
+    if os.environ.get("GITHUB_ACTIONS"):
+        print(f"::warning::{msg}")
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Write map.html and its data from a pool parquet.")
     ap.add_argument("--pool", required=True, type=Path)
     ap.add_argument("--out", required=True, type=Path, help="site folder")
     ap.add_argument("--freeze", default=None, help="date the pool stands for, YYYY-MM-DD")
+    ap.add_argument(
+        "--totals",
+        action="store_true",
+        help="fetch all-record totals from iNaturalist (28 or so requests); on failure the map "
+        "is built without them",
+    )
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     pool = pd.read_parquet(a.pool)
-    for path in write_map(a.out, pool, freeze=a.freeze):
+    totals = None
+    if a.totals:
+        groups = sorted(pool["iconic_taxon"].fillna("Unknown").astype(str).unique())
+        on = a.freeze or pd.Timestamp.now("UTC").strftime("%Y-%m-%d")
+        try:
+            totals = fetch_totals(groups, on=on)
+        except (requests.RequestException, KeyError, ValueError) as e:
+            _warn(f"could not fetch the all-record totals, building the map without them: {e}")
+    for path in write_map(a.out, pool, freeze=a.freeze, totals=totals):
         logging.getLogger("what_to_id").info("wrote %s (%d bytes)", path, path.stat().st_size)
     return 0
 

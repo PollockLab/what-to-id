@@ -15,7 +15,7 @@
 <h1>{{TITLE}}</h1>
 <p class="sub">Each dot is one record that needed an ID and had a photo{{WHEN}}. Hover a dot for its name, click it for the photo. <a href="{{BACK}}">Back</a></p>
 </div>
-<p class="stat" aria-live="polite"><b id="count">Loading</b> <span id="more"></span></p>
+<p class="stat" aria-live="polite"><b id="count">Loading</b> <span id="more"></span><span id="share" class="share"></span></p>
 <a id="identify" class="idlink" target="_blank" rel="noopener" href="https://www.inaturalist.org/observations/identify?quality_grade=needs_id&amp;place_id={{PLACE_ID}}">Identify these</a>
 <button type="button" id="toggle" class="toggle" aria-expanded="false" aria-controls="side">Filters</button>
 </header>
@@ -42,7 +42,7 @@
 <span class="dates"><input id="from" type="date" aria-label="From"> to <input id="to" type="date" aria-label="To"></span>
 </div>
 <div class="histwrap"><canvas id="over" role="img" aria-label="Records per year, every year, on a log scale. Click a year to zoom to it."></canvas><p id="unit" class="unit"></p><canvas id="hist" role="img"></canvas><div id="htip" class="htip" hidden></div></div>
-<p class="hint">Top: every year, bar height on a log scale so sparse early years show. Click or drag across years to zoom in. Bottom: the period in view. Drag to pick a period, click a bar to zoom into it, double-click for all dates. Bars count records that still need an ID, so older periods look emptier: many of their records have been identified since.</p>
+<p id="hint" class="hint">Top: every year, bar height on a log scale so sparse early years show. Click or drag across years to zoom in. Bottom: the period in view. Drag to pick a period, click a bar to zoom into it, double-click for all dates. Bars count records that still need an ID, so older periods look emptier: many of their records have been identified since.</p>
 </section>
 <aside id="card" class="card" hidden></aside>
 <script>var META={{META}};var BASEMAPS={{BASEMAPS}};
