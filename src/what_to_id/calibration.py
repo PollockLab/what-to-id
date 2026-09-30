@@ -26,7 +26,7 @@ import pandas as pd
 from what_to_id.arms import Recency
 from what_to_id.assign import assign_keyed
 from what_to_id.batches import build_batches
-from what_to_id.confirmatory import PRIMARY, confirmatory
+from what_to_id.confirmatory import HOLM_FAMILY, PRIMARY, confirmatory
 
 ARMS = ("recency", *PRIMARY)
 START = "2026-01-01T00:00:00Z"
@@ -168,7 +168,8 @@ def diagnose(sc: Scenario, *, reps: int = 500, seed: int = 0, flips: int = 2000)
             reps=flips,
             seed=draw,
         )
-        primary = result.loc[result["role"].eq("primary")].set_index("arm")
+        # Each list's pinned-count row: primary (H1, H2) or exploratory (H3, p_holm NaN).
+        primary = result.loc[result["role"].ne("secondary")].set_index("arm")
         omitted += sc.participants - int(primary["n_identifiers"].iloc[0])
         any_rejected += int(primary["p_holm"].lt(0.05).any())
         for arm in PRIMARY:
@@ -201,7 +202,7 @@ def diagnose(sc: Scenario, *, reps: int = 500, seed: int = 0, flips: int = 2000)
         "comparisons": {
             arm: {
                 "raw": interval(raw[arm], reps),
-                "holm": interval(adjusted[arm], reps),
+                "holm": interval(adjusted[arm], reps) if arm in HOLM_FAMILY else None,
                 "mean_participant_difference": differences[arm] / reps,
                 "mean_difference_per_enrolled_participant": enrolled_differences[arm] / reps,
                 "expected_injected_difference_per_enrolled_participant": (

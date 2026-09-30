@@ -118,8 +118,9 @@ def design_section(m: Manifest, f: dict, doc: Doc) -> str:
         ["Primary outcome", f"{primary} ({see('methods-outcomes', 'Section 6')})."],
         [
             "Test",
-            "Record-level re-randomisation test, Holm-adjusted when more than one list is "
-            f"compared with the control ({see('methods-analysis', 'Section 7')}).",
+            "Record-level re-randomisation test: one-sided for the confirmatory lists, "
+            "Holm-adjusted over them, and two-sided, not adjusted, for the exploratory one "
+            f"({see('methods-analysis', 'Section 7')}).",
         ],
         [
             "Dates",

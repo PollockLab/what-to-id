@@ -5,10 +5,12 @@ identifier's own count of species-level identifications in each arm is comparabl
 without knowing which records they opened. The primary test, fixed before the blitz, is the
 record-level re-randomisation in ``record_totals`` and ``record_shuffle_p``: it redraws the unit
 the design randomises, the record, and recomputes the summed per-identifier difference
-(treatment minus control). ``confirmatory`` runs it on each tested list's pinned count with Holm
-over those comparisons. ``analyse`` runs the paired sign-flip permutation test on the same
-differences, one per treatment arm, and ``sign_test_p`` the exact binomial sign test (positive
-vs negative differences, zeros dropped); both are secondary and reported next to the primary p.
+(treatment minus control). ``confirmatory`` runs it on each tested list's pinned count:
+one-sided for ``gap_first`` and ``similarity`` with Holm over those two, two-sided and
+unadjusted for the exploratory ``novelty``. ``analyse`` runs the paired sign-flip permutation
+test on the same differences, one per treatment arm, and ``sign_test_p`` the exact binomial
+sign test (positive vs negative differences, zeros dropped); both are two-sided, secondary and
+reported next to the primary p.
 An identification the observer made on their own record never counts: ``observer_id`` in the
 idents, written by the read-back, names each record's observer. A record an identifier gave
 several species-level identifications counts once, unless ``identifier_counts`` is weighted by
@@ -28,8 +30,9 @@ one row per served id, and is shared by the analysis and read-back CLIs so a bui
 several daily labels is read as one arm assignment.
 
 The CLI's default ``--weight primary`` runs the confirmatory family (``confirmatory``): each
-tested list on its own pinned outcome, with the record-level p as ``p``, Holm over those primary
-p values only, the sign-flip and sign test p as ``p_signflip`` and ``p_sign``, and each list's
+tested list on its own pinned outcome, with the record-level p as ``p`` (one-sided for the two
+primary rows, Holm over those two only; two-sided and unadjusted for the exploratory row), the
+sign-flip and sign test p as ``p_signflip`` and ``p_sign``, and each list's
 other count as an unadjusted secondary row. ``--weight none`` or ``cell_score`` runs every list
 on one count with Holm over the sign-flip p of all of them, as ``analyse`` does, and prints
 ``p_record`` after ``p_holm``: the record-level p with the same users, weighting, window, reps
@@ -60,6 +63,7 @@ SPECIES_RANKS = frozenset({"species", "hybrid", "subspecies", "variety", "form",
 IDENT_NEEDS = ("id", "user_id", "created_at", "taxon_rank", "observer_id")
 EXACT_MAX = 12
 WEIGHTS = ("none", "cell_score")
+ALTERNATIVES = ("two-sided", "greater")
 RESULT_COLUMNS = (
     "arm",
     "control",
@@ -76,8 +80,10 @@ RECORD_NOTE = (
     "files cannot show this, so check the build record."
 )
 PRIMARY_NOTE = (
-    "p: primary record-level re-randomisation test, keyed split, Holm over the primary rows; "
-    "p_signflip and p_sign are secondary. Valid only if every record in a list is served (no "
+    "p: record-level re-randomisation test, keyed split. Primary rows (gap_first, similarity): "
+    "one-sided, tested list ahead of the control, Holm over those two. Exploratory row "
+    "(novelty) and secondary rows: two-sided, not Holm-adjusted. p_signflip and p_sign are "
+    "secondary. Valid only if every record in a list is served (no "
     "cap on batches binds); the served files cannot show this, so check the build record."
 )
 
@@ -290,8 +296,9 @@ def record_shuffle_p(
     arms: Sequence[str] | None = None,
     reps: int = 10000,
     seed: int = 0,
+    alternative: str = "two-sided",
 ) -> float:
-    """Two-sided p of the same summed difference under a redrawn record-to-arm assignment.
+    """p of the same summed difference under a redrawn record-to-arm assignment.
 
     This is the primary test. It re-randomises the unit the design randomises, the record,
     where the sign-flip test re-randomises signs within identifiers. With ``strata`` None it
@@ -302,9 +309,17 @@ def record_shuffle_p(
     stratum, which is what ``assign.assign`` does. It asks whether the observed difference is
     unusual when only the split of records changes, with each record's identifications held
     fixed. The observed split counts as one redraw, so p is never 0.
+
+    ``alternative`` "two-sided" (the default) counts redraws whose absolute difference reaches
+    the observed one; "greater" counts redraws whose difference (``arm`` minus ``control``)
+    reaches the observed signed difference, the one-sided test that ``arm`` is ahead. Both use
+    the same redraws and the same tie tolerance.
     """
     if reps < 1:
         raise ValueError("reps must be >= 1")
+    if alternative not in ALTERNATIVES:
+        raise ValueError(f"alternative must be one of {ALTERNATIVES}, got {alternative!r}")
+    two_sided = alternative == "two-sided"
     served = served_arms(served)
     seen = sorted(served["arm"].unique())
     arms = seen if arms is None else sorted(arms)
@@ -317,7 +332,9 @@ def record_shuffle_p(
     w = served["id"].map(totals).fillna(0.0).to_numpy(dtype=np.float64)
     code = served["arm"].map({a: i for i, a in enumerate(arms)}).to_numpy(dtype=np.int64)
     i_arm, i_ctl = arms.index(arm), arms.index(control)
-    obs = abs(float(w[code == i_arm].sum() - w[code == i_ctl].sum()))
+    obs = float(w[code == i_arm].sum() - w[code == i_ctl].sum())
+    if two_sided:
+        obs = abs(obs)
     rng = np.random.default_rng(seed)
     if strata is None:
         blocks = None
@@ -335,7 +352,7 @@ def record_shuffle_p(
             for block in blocks:
                 drawn[block] = rng.permutation(code[block])
         stat = w[drawn == i_arm].sum() - w[drawn == i_ctl].sum()
-        hits += abs(stat) >= obs - 1e-9
+        hits += (abs(stat) if two_sided else stat) >= obs - 1e-9
     return float((1 + hits) / (reps + 1))
 
 
@@ -432,7 +449,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--weight",
         choices=("primary", *WEIGHTS),
         default="primary",
-        help="primary: each list on its pinned outcome, Holm over those; none or cell_score: "
+        help="primary: each list on its pinned outcome, one-sided with Holm over gap_first and "
+        "similarity, novelty exploratory; none or cell_score: "
         "every list on one count (cell_score sums each identifier's served cell_score)",
     )
     ap.add_argument("--control", required=True)

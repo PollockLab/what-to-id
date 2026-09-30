@@ -416,3 +416,41 @@ def test_record_shuffle_p_redraws_over_the_design_lists():
     extra = served.assign(arm=["c", "t", "u", "t"] * 10)
     with pytest.raises(ValueError, match="not in the design"):
         analysis.record_shuffle_p(totals, extra, arms=["c", "t"], **kw)
+
+
+FOUR = pd.DataFrame({"id": range(8), "arm": [a for a in ("c", "t", "u", "v") for _ in range(2)]})
+
+
+def _by_hand(totals, arm, control, reps, seed, one_sided):
+    """(1 + #{redraws with stat >= obs}) / (reps + 1), same redraws as record_shuffle_p."""
+    arms = ["c", "t", "u", "v"]
+    w = FOUR["id"].map(totals).to_numpy()
+    code = FOUR["arm"].map(arms.index).to_numpy()
+    obs = w[code == arms.index(arm)].sum() - w[code == arms.index(control)].sum()
+    rng = np.random.default_rng(seed)
+    hits = 0
+    for _ in range(reps):
+        drawn = rng.integers(len(arms), size=w.size)
+        stat = w[drawn == arms.index(arm)].sum() - w[drawn == arms.index(control)].sum()
+        hits += stat >= obs - 1e-9 if one_sided else abs(stat) >= abs(obs) - 1e-9
+    return (1 + hits) / (reps + 1)
+
+
+def test_one_sided_record_p_is_the_share_of_redraws_at_least_as_high():
+    ahead = pd.Series([0.0, 1.0, 3.0, 4.0, 1.0, 0.0, 2.0, 1.0], index=range(8))
+    kw = {"arm": "t", "control": "c", "reps": 300, "seed": 5}
+    one = analysis.record_shuffle_p(ahead, FOUR, alternative="greater", **kw)
+    two = analysis.record_shuffle_p(ahead, FOUR, **kw)
+    assert one == pytest.approx(_by_hand(ahead, "t", "c", 300, 5, one_sided=True))
+    assert two == pytest.approx(_by_hand(ahead, "t", "c", 300, 5, one_sided=False))
+    assert analysis.record_shuffle_p(ahead, FOUR, alternative="two-sided", **kw) == two
+    # Ahead: every redraw at least as high is at least as far from zero, so one-sided <= two.
+    assert one < two
+    # Behind: the same records with the lists' totals swapped, so almost every redraw is higher.
+    behind = ahead.rename({0: 2, 1: 3, 2: 0, 3: 1}).sort_index()
+    one_behind = analysis.record_shuffle_p(behind, FOUR, alternative="greater", **kw)
+    assert one_behind == pytest.approx(_by_hand(behind, "t", "c", 300, 5, one_sided=True))
+    assert one_behind > 0.9
+    assert analysis.record_shuffle_p(behind, FOUR, **kw) < 0.5
+    with pytest.raises(ValueError, match="alternative must be"):
+        analysis.record_shuffle_p(ahead, FOUR, alternative="less", **kw)
