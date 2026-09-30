@@ -204,6 +204,24 @@ function startOver(state, group) {
   function setMap(g) {
     if (mapLink) mapLink.href = g ? mapBase + '#groups=' + encodeURIComponent(g) : mapBase;
   }
+  var STALE_DAYS = 2;
+  (function(){
+    var t = $('picked');
+    var m = t && /^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(t.getAttribute('datetime') || '');
+    if (!m) return;
+    var now = new Date();
+    var days = Math.floor((Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+      - Date.UTC(+m[1], m[2] - 1, +m[3])) / 864e5);
+    if (isNaN(days)) return;
+    var before = t.previousSibling, after = t.nextSibling;
+    if (days > STALE_DAYS && before && after) {
+      before.nodeValue = 'These records were picked ';
+      t.textContent = days + ' days ago';
+      after.nodeValue = ', and some may have an ID by now.' + after.nodeValue.slice(1);
+    } else {
+      t.textContent = days <= 0 ? 'today' : days === 1 ? 'yesterday' : days + ' days ago';
+    }
+  })();
   var picker = $('picker'), runner = $('runner'), groupList = $('groupList');
   var runGroup = $('runGroup'), runnerCode = $('runnerCode'), bar = $('bar');
   var nextBtn = $('nextBtn'), reopen = $('reopen'), doneMsg = $('doneMsg'), hintBox = $('hintBox');
@@ -362,14 +380,16 @@ def render_rotation_index(manifest: Manifest, *, title: str, map_href: str | Non
     groups = sorted({g for by_group in data.values() for g in by_group})
     group_names = {g: group_name(g) for g in groups}
     sub = (
-        f"Records that needed an ID in British Columbia on {manifest.freeze}."
+        "Records that needed an ID in British Columbia, picked "
+        f'<time id="picked" datetime="{escape(manifest.freeze)}" title="{escape(manifest.freeze)}">'
+        f"{escape(manifest.freeze)}</time>."
         if manifest.freeze
         else ""
     )
     if map_href:
         sub += (
             f' <a id="mapLink" href="{escape(map_href)}" data-base="{escape(map_href)}">'
-            "See them on a map</a>."
+            "See today's records on a map</a>."
         )
     sub_html = f'<p class="sub">{sub.strip()}</p>\n' if sub else ""
     build_msg = (
