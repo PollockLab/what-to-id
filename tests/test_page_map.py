@@ -164,7 +164,7 @@ def test_page_is_blind_and_carries_meta():
     assert page_meta["n"] == 20
     assert page_meta["shards"] == [{"file": f"{shard_name(0)}?v={v}", "n": 20}]
     assert page_meta["taxa"] == f"{TAXA_NAME}?v={v}"
-    assert "18*n" in html and "on 2026-09-28" in html
+    assert "18*n" in html and ">2026-09-28</time>" in html
 
 
 def test_meta_cannot_close_the_script():
@@ -209,3 +209,31 @@ def test_page_passes_the_place_and_url_limit_and_has_the_identify_link():
     for key in ("quality_grade", "iconic_taxa", "created_d1", "taxon_id", "month"):
         assert key in html
     assert "place_id=7085" not in re.search(r"<script>var META.*", html, re.S).group(0)
+
+
+def test_page_carries_the_update_date_for_the_age_check():
+    _, meta = encode_points(make_pool(20))
+    html = render_map(meta, freeze="2026-09-30")
+    assert '<time id="updated" datetime="2026-09-30" title="2026-09-30">2026-09-30</time>' in html
+    assert "STALE_DAYS" in html
+    assert 'id="updated"' not in render_map(meta, freeze=None).split("<script>")[0]
+
+
+def test_records_before_1900_sit_at_the_floor_and_are_marked():
+    pool = make_pool(50)
+    pool.loc[0, "observed_on"] = "1850-06-01"
+    blobs, meta = encode_points(pool)
+    assert meta["day0"] == "1900-01-01"
+    back = decode_points(blobs, meta)
+    assert len(back) == len(pool)
+    old = back[back["id"] == pool.loc[0, "id"]].iloc[0]
+    assert old["observed_on"] == pd.Timestamp("1900-01-01") and old["observed_before_1900"]
+    assert back["observed_before_1900"].sum() == 1
+    assert not back["uploaded_before_1900"].any()
+
+
+def test_normal_pool_keeps_its_own_day0_and_no_marks():
+    blobs, meta = encode_points(make_pool(50))
+    assert meta["day0"] > "1900-01-01"
+    back = decode_points(blobs, meta)
+    assert not back["observed_before_1900"].any()

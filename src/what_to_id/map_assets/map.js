@@ -8,13 +8,27 @@ var DAY=864e5,D0=Date.parse(META.day0+'T00:00:00Z'),NO=65535,NOTAX=65535,LAST=ME
 var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 var MONTH=['January','February','March','April','May','June','July','August','September',
   'October','November','December'];
-var FLAG={introduced:1,threatened:2,obscured:4,imprecise:8},ONLYFLAG={introduced:'introduced',
+var FLAG={introduced:1,threatened:2,obscured:4,imprecise:8,earlyObs:16,earlyUp:32},ONLYFLAG={introduced:'introduced',
   threatened:'threatened',exact:'obscured'},nf=new Intl.NumberFormat('en-CA');
 function iso(d){return new Date(D0+d*DAY).toISOString().slice(0,10);}
 function dayOf(s){var t=Date.parse(s+'T00:00:00Z');return isNaN(t)?null:Math.round((t-D0)/DAY);}
 function clamp(d){return Math.max(0,Math.min(LAST,d));}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){
   return '&#'+c.charCodeAt(0)+';';});}
+
+// The subtitle names the build date; say how old that is, and warn once it is stale.
+var STALE_DAYS=2;
+(function(){
+  var el=$('updated'),t=el?Date.parse(el.getAttribute('datetime')+'T00:00:00Z'):NaN;
+  if(isNaN(t))return;
+  var n=new Date(),days=Math.floor((Date.UTC(n.getUTCFullYear(),n.getUTCMonth(),n.getUTCDate())-t)/DAY),
+    before=el.previousSibling,after=el.nextSibling;
+  if(!before||!after||before.nodeType!==3||after.nodeType!==3)return;
+  if(days>STALE_DAYS){before.nodeValue='Last updated ';
+    el.textContent=days+' days ago';after.nodeValue=after.nodeValue.replace(/^\./,'; some records may have an ID by now.');}
+  else{before.nodeValue=before.nodeValue.replace(/ on $/,', updated ');
+    el.textContent=days<=0?'today':days===1?'yesterday':days+' days ago';}
+})();
 
 // Calendar lookups by day: month of year, day of month and weekday (Monday is 0).
 var MOY=new Uint8Array(META.days),DOM=new Uint8Array(META.days),DOW=new Uint8Array(META.days);
@@ -303,12 +317,12 @@ function badges(i){var f=P.fl[i],out=[];
   return out.map(function(b){return '<span class="badge '+b[1]+'">'+b[0]+'</span>';}).join('');}
 function idText(i){var n=P.ids[i]&15,a=P.ids[i]>>4;
   return n?(n>=15?'15+':n)+(n===1?' ID':' IDs')+(a?', '+(a>=15?'15+':a)+' agreeing':''):'No IDs yet';}
-function when(v){return v===NO?'unknown':iso(v);}
+function when(v,early){return v===NO?'unknown':early?'before 1900':iso(v);}
 function tip(o){
   if(!P.n||o.index<0||o.layer&&o.layer.id!=='pts')return null;
   var i=o.index,t=names(i);
   return {html:'<b>'+esc(t.common||t.latin)+'</b>'+(t.common?'<br><i>'+esc(t.latin)+'</i>':'')+
-    '<br>'+esc(t.group)+' · observed '+when(P.obs[i])+'<br>'+idText(i)+'<div class="badges">'+
+    '<br>'+esc(t.group)+' · observed '+when(P.obs[i],P.fl[i]&FLAG.earlyObs)+'<br>'+idText(i)+'<div class="badges">'+
     badges(i)+'</div>',
     style:{background:'var(--panel)',color:'var(--ink)',border:'1px solid var(--line)',
       borderRadius:'8px',fontSize:'12px',padding:'6px 8px',maxWidth:'260px'}};
@@ -319,13 +333,13 @@ function pick(o){if(!P.n||o.index<0||o.layer.id!=='pts')return;openCard(o.index)
 function closeCard(){SEL=-1;card.hidden=true;if(ctl)ctl.abort();
   if(GONE_NEW){GONE_NEW=false;refilter();}else{layers();writeHash();}}
 function openCard(i){
-  SEL=i;var t=names(i),id=P.id[i],lag=P.obs[i]!==NO&&P.up[i]!==NO?P.up[i]-P.obs[i]:null;
+  SEL=i;var t=names(i),id=P.id[i],lag=P.obs[i]!==NO&&P.up[i]!==NO&&!(P.fl[i]&(FLAG.earlyObs|FLAG.earlyUp))?P.up[i]-P.obs[i]:null;
   card.innerHTML='<button type="button" class="x" aria-label="Close">×</button>'+
     '<div class="ph" id="ph">Loading photo</div><div class="body">'+
     '<h2>'+esc(t.common||t.latin)+'</h2><p class="latin"><i>'+esc(t.latin)+'</i>'+
     (t.rank?' ('+esc(t.rank)+')':'')+'</p><div class="badges">'+badges(i)+'</div><dl>'+
-    '<dt>Group</dt><dd>'+esc(t.group)+'</dd><dt>Observed</dt><dd>'+when(P.obs[i])+'</dd>'+
-    '<dt>Uploaded</dt><dd>'+when(P.up[i])+(lag>0?' ('+nf.format(lag)+(lag===1?' day':' days')+
+    '<dt>Group</dt><dd>'+esc(t.group)+'</dd><dt>Observed</dt><dd>'+when(P.obs[i],P.fl[i]&FLAG.earlyObs)+'</dd>'+
+    '<dt>Uploaded</dt><dd>'+when(P.up[i],P.fl[i]&FLAG.earlyUp)+(lag>0?' ('+nf.format(lag)+(lag===1?' day':' days')+
     ' later)':'')+'</dd><dt>IDs</dt><dd>'+idText(i)+'</dd><dt>Place</dt><dd id="place">…</dd></dl>'+
     '<div id="now"></div><a class="btn" target="_blank" rel="noopener" '+
     'href="https://www.inaturalist.org/observations/'+id+'">Help identify on iNaturalist</a>'+
