@@ -23,8 +23,10 @@ page draws them first; older records follow in shard 1.
 META.totals, when the build fetched them, holds iNaturalist's count of every BC record with a photo
 that needs an ID or is Research Grade, per group and month, by observed ("obs") and uploaded
 ("up") date: one list per META.groups entry, one count per month from META.totals.m0 to the
-month of the last day, with earlier months added into the first. The page sets the pool against
-them to show the share still needing an ID. "on" is the day they were fetched.
+month of the last day, with earlier months added into the first. META.totals.only holds the same
+counts for each status filter ("introduced", "threatened", "exact"), so the share still shows
+under one of them. The page sets the pool against them to show the share still needing an ID.
+"on" is the day they were fetched.
 """
 
 from __future__ import annotations
@@ -62,6 +64,13 @@ EARLY_UP = 32
 FLAG_BITS = {"introduced": 1, "threatened": 2, "obscured": 4, "imprecise": 8}
 TOTAL_GRADES = "needs_id,research"
 TOTAL_FIELDS = {"obs": "observed", "up": "created"}
+# iNaturalist's search parameters for the page's status filters; "exact" drops obscured and
+# imprecise records, as FLAG_BITS does
+TOTAL_ONLY = {
+    "introduced": {"introduced": "true"},
+    "threatened": {"threatened": "true"},
+    "exact": {"obscuration": "none", "acc_below_or_unknown": IMPRECISE_M + 1},
+}
 _COLS = ("id", "lat", "lon", "observed_on", "created_at", "iconic_taxon")
 _ASSETS = files("what_to_id") / "map_assets"
 
@@ -276,51 +285,63 @@ def _dates(col: pd.Series) -> pd.Series:
 def fetch_totals(groups: list[str], *, on: str, session=None, sleep: float = SLEEP) -> dict:
     """Monthly counts of every BC record with a photo that needs an ID or is Research Grade.
 
-    One histogram request per group and date field, each covering every month on record. The
-    pool's "Unknown" group is iNaturalist's ``iconic_taxa=unknown``.
+    One histogram request per group and date field, each covering every month on record, then
+    the same again under each status filter in TOTAL_ONLY. The pool's "Unknown" group is
+    iNaturalist's ``iconic_taxa=unknown``.
     """
     session = session or make_session()
-    out: dict = {"on": on}
-    for key, field in TOTAL_FIELDS.items():
-        out[key] = {}
-        for g in groups:
-            params = {
-                "place_id": BC_PLACE_ID,
-                "quality_grade": TOTAL_GRADES,
-                "photos": "true",
-                "d1": DAY_FLOOR.strftime("%Y-%m-%d"),
-                "iconic_taxa": "unknown" if g == "Unknown" else g,
-                "date_field": field,
-                "interval": "month",
-            }
-            r = session.get(f"{INAT}/histogram", params=params, timeout=TIMEOUT)
-            r.raise_for_status()
-            out[key][g] = {k[:7]: int(v) for k, v in r.json()["results"]["month"].items()}
-            if sleep:
-                time.sleep(sleep)
-    return out
+
+    def fetch(extra: dict) -> dict:
+        out: dict = {}
+        for key, field in TOTAL_FIELDS.items():
+            out[key] = {}
+            for g in groups:
+                params = {
+                    "place_id": BC_PLACE_ID,
+                    "quality_grade": TOTAL_GRADES,
+                    "photos": "true",
+                    "d1": DAY_FLOOR.strftime("%Y-%m-%d"),
+                    "iconic_taxa": "unknown" if g == "Unknown" else g,
+                    "date_field": field,
+                    "interval": "month",
+                    **extra,
+                }
+                r = session.get(f"{INAT}/histogram", params=params, timeout=TIMEOUT)
+                r.raise_for_status()
+                out[key][g] = {k[:7]: int(v) for k, v in r.json()["results"]["month"].items()}
+                if sleep:
+                    time.sleep(sleep)
+        return out
+
+    return {"on": on, **fetch({}), "only": {k: fetch(v) for k, v in TOTAL_ONLY.items()}}
 
 
 def align_totals(raw: dict, meta: dict) -> dict:
     """The fetched totals as the page reads them: per group, a count per month of the map.
 
     A group the fetch lacks counts zero; months before the map's first fold into it, and months
-    after its last day are dropped.
+    after its last day are dropped. A status filter the fetch lacks is left out.
     """
     day0 = pd.Timestamp(meta["day0"])
     last = day0 + pd.Timedelta(days=meta["days"] - 1)
     n = (last.year - day0.year) * 12 + last.month - day0.month + 1
-    out: dict = {"on": raw["on"], "m0": day0.strftime("%Y-%m")}
-    for key in TOTAL_FIELDS:
-        rows = []
+
+    def rows(counts: dict) -> list[list[int]]:
+        out = []
         for g in meta["groups"]:
             row = [0] * n
-            for ym, v in raw[key].get(g, {}).items():
+            for ym, v in counts.get(g, {}).items():
                 k = (int(ym[:4]) - day0.year) * 12 + int(ym[5:7]) - day0.month
                 if k < n:
                     row[max(k, 0)] += v
-            rows.append(row)
-        out[key] = rows
+            out.append(row)
+        return out
+
+    out: dict = {"on": raw["on"], "m0": day0.strftime("%Y-%m")}
+    out.update({key: rows(raw[key]) for key in TOTAL_FIELDS})
+    out["only"] = {
+        f: {key: rows(t[key]) for key in TOTAL_FIELDS} for f, t in raw.get("only", {}).items()
+    }
     return out
 
 
@@ -369,7 +390,7 @@ def render_map(meta: dict, *, freeze: str | None, back: str = "index.html") -> s
         "MAPLIBRE_JS": MAPLIBRE_JS,
         "DECK_JS": DECK_JS,
         "CSS": (_ASSETS / "map.css").read_text(),
-        "META": json.dumps(page_meta, sort_keys=True).replace("</", "<\\/"),
+        "META": json.dumps(page_meta, sort_keys=True, separators=(",", ":")).replace("</", "<\\/"),
         "BASEMAPS": json.dumps(BASEMAPS, sort_keys=True),
         "JS": (_ASSETS / "map.js").read_text(),
     }
@@ -429,7 +450,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--totals",
         action="store_true",
-        help="fetch all-record totals from iNaturalist (28 or so requests); on failure the map "
+        help="fetch all-record totals from iNaturalist (about 112 requests); on failure the map "
         "is built without them",
     )
     a = ap.parse_args(argv)

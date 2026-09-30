@@ -113,8 +113,11 @@ function refilter(){
   }
   CUM=new Float64Array(META.days+1);
   for(d=0;d<META.days;d++)CUM[d+1]=CUM[d]+per[d];
+  // One status filter reads its own totals; two together have none
+  var on=Object.keys(S.only).filter(function(k){return S.only[k];}),
+    tt=!TOT||TAXOK||on.length>1?null:on.length?TOT.only&&TOT.only[on[0]]:TOT;
   TC=null;
-  if(TOT&&!TAXOK&&!req&&!hide){var rows=TOT[S.up?'up':'obs'],nm=rows[0].length;TC=new Float64Array(nm+1);
+  if(tt){var rows=tt[S.up?'up':'obs'],nm=rows[0].length;TC=new Float64Array(nm+1);
     for(var k=0;k<nm;k++){var v=0;if(!m||m>>(M0+k)%12&1)for(var j=0;j<rows.length;j++)if(g[j])v+=rows[j][k];
       TC[k+1]=TC[k]+v;}}
   if(SEL>=0&&!KEEP[SEL])closeCard();
@@ -127,7 +130,8 @@ function render(){
   $('count').textContent=P.n?nf.format(shown)+' of '+nf.format(META.n)+' records':'Loading';
   var all=P.n&&!$('more').textContent?total(S.lo,S.hi):null;
   $('share').textContent=all?nf.format(Math.min(shown,all))+' of '+nf.format(all)+
-    ' BC records with photos '+(full()&&!S.months&&allGroups()?'':'matching these filters ')+'still need an ID ('+
+    ' BC records with photos '+(full()&&!S.months&&allGroups()&&!Object.keys(S.only).some(function(k){return S.only[k];})?
+    '':'matching these filters ')+'still need an ID ('+
     pct(shown,all)+'). All-record counts from '+TOT.on+'.':'';
   $('hint').textContent=TC?HINT_TOT:HINT;
   $('from').value=iso(S.lo);$('to').value=iso(S.hi);
