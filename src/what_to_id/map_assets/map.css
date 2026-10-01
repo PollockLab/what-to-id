@@ -54,7 +54,7 @@ h1{font-size:18px;margin:0}
 .htip{position:absolute;top:-4px;transform:translate(-50%,-100%);background:var(--panel);
   color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:2px 6px;font-size:12px;
   white-space:nowrap;pointer-events:none;box-shadow:var(--shadow)}
-.ptip{position:absolute;z-index:3;max-width:260px;background:var(--panel);color:var(--ink);
+.ptip{position:fixed;z-index:7;max-width:260px;background:var(--panel);color:var(--ink);
   border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);font-size:12px;padding:6px 8px;
   pointer-events:none}
 .ptip[hidden]{display:none}

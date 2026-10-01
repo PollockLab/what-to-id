@@ -413,8 +413,9 @@ function badges(i){var f=P.fl[i],out=[];
 function idText(i){var n=P.ids[i]&15,a=P.ids[i]>>4;
   return n?(n>=15?'15+':n)+(n===1?' ID':' IDs')+(a?', '+(a>=15?'15+':a)+' agreeing':''):'No IDs yet';}
 function when(v,early){return v===NO?'unknown':early?'before 1900':iso(v);}
-// The hover tip sits below right of the pointer and flips to the other side of it near the map's
-// right or bottom edge, so the map never clips it.
+// The hover tip sits below right of the pointer and flips to the other side of it near the window's
+// right or bottom edge. It is fixed to the window above the record card, so neither the map's
+// edges, the time bar nor an open card hide it.
 var ptip=document.createElement('div');ptip.className='ptip';ptip.hidden=true;
 function tip(o){
   if(!P.n||o.index<0||!o.layer||o.layer.id!=='pts'){ptip.hidden=true;return;}
@@ -423,8 +424,9 @@ function tip(o){
     '<br>'+esc(t.group)+' · observed '+when(P.obs[i],P.fl[i]&FLAG.earlyObs)+'<br>'+idText(i)+'<div class="badges">'+
     badges(i)+'</div>';
   ptip.hidden=false;
-  var m=map.getContainer(),w=ptip.offsetWidth,h=ptip.offsetHeight,g=12,
-    x=o.x+g+w>m.clientWidth-4?o.x-g-w:o.x+g,y=o.y+g+h>m.clientHeight-4?o.y-g-h:o.y+g;
+  var r=map.getContainer().getBoundingClientRect(),px=r.left+o.x,py=r.top+o.y,
+    w=ptip.offsetWidth,h=ptip.offsetHeight,g=12,
+    x=px+g+w>innerWidth-4?px-g-w:px+g,y=py+g+h>innerHeight-4?py-g-h:py+g;
   ptip.style.left=Math.max(4,x)+'px';ptip.style.top=Math.max(4,y)+'px';
 }
 var ctl=null,card=$('card');
@@ -493,7 +495,7 @@ var b=META.bbox,opts={container:'map',style:dark?BASEMAPS.dark:BASEMAPS.light,
   attributionControl:{compact:true}};
 if(S.at){opts.center=[S.at[2],S.at[1]];opts.zoom=S.at[0];}
 else{opts.bounds=[[b[0],b[1]],[b[2],b[3]]];opts.fitBoundsOptions={padding:20};}
-var map=new maplibregl.Map(opts);map.getContainer().appendChild(ptip);
+var map=new maplibregl.Map(opts);document.body.appendChild(ptip);
 map.addControl(new maplibregl.NavigationControl({showCompass:false}));
 var overlay=new deck.MapboxOverlay({interleaved:false,pickingRadius:8,layers:[]});map.addControl(overlay);
 // Zoomed out, blending millions of overlapping dots takes about 250 ms a frame, so while the map
