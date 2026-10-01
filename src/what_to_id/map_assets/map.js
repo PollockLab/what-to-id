@@ -430,6 +430,19 @@ function tip(o){
 var ctl=null,card=$('card');
 function pick(o){if(!P.n||o.index<0||o.layer.id!=='pts')return;openCard(o.index);}
 // A record deleted from iNaturalist leaves the map once its card closes, so the card can say why.
+// The card opens beside its point, on the side with room, and follows the point as the map moves.
+// It is fixed to the window, so the time bar and the map's edges never clip it. On a phone it is a
+// bottom sheet instead.
+var NARROW=matchMedia('(max-width:760px)');
+function place(){
+  if(SEL<0||card.hidden)return;var s=card.style;
+  if(NARROW.matches){s.left=s.top=s.right='';return;}
+  var r=map.getContainer().getBoundingClientRect(),p=map.project([P.pos[2*SEL],P.pos[2*SEL+1]]),
+    x=r.left+p.x,y=r.top+p.y,w=card.offsetWidth,h=card.offsetHeight,g=14,m=8,
+    left=x+g+w<=innerWidth-m?x+g:x-g-w>=m?x-g-w:innerWidth-m-w;
+  s.right='auto';s.left=Math.max(m,left)+'px';
+  s.top=Math.max(m,Math.min(y-h/2,innerHeight-m-h))+'px';
+}
 function closeCard(){SEL=-1;card.hidden=true;if(ctl)ctl.abort();
   if(GONE_NEW){GONE_NEW=false;refilter();}else{layers();writeHash();}}
 function openCard(i){
@@ -445,6 +458,7 @@ function openCard(i){
     'href="https://www.inaturalist.org/observations/'+id+'">Help identify on iNaturalist</a>'+
     '<p class="attr" id="attr"></p></div>';
   card.hidden=false;card.querySelector('.x').onclick=closeCard;card.querySelector('.x').focus();
+  place();
   layers();writeHash();
   if(ctl)ctl.abort();ctl=new AbortController();
   fetch('https://api.inaturalist.org/v1/observations/'+id,{signal:ctl.signal})
@@ -456,7 +470,7 @@ function openCard(i){
         $('place').textContent='';GONE[id]=1;GONE_NEW=true;return;}
       var ph=o.photos&&o.photos[0];
       if(ph){var img=new Image();img.alt='Photo of '+(t.common||t.latin);
-        img.src=String(ph.url).replace('/square.','/medium.');$('ph').textContent='';
+        img.onload=place;img.src=String(ph.url).replace('/square.','/medium.');$('ph').textContent='';
         $('ph').appendChild(img);$('attr').textContent=ph.attribution||'';}
       else $('ph').textContent='No photo on iNaturalist now';
       $('place').textContent=o.place_guess||'Not given';
@@ -468,6 +482,7 @@ function openCard(i){
         (ot.preferred_common_name?')':'')+'.');
       if(now.length){var p=document.createElement('p');p.className='now';p.textContent=
         'Since this map was built: '+now.join(' ');$('now').appendChild(p);}
+      place();
     }).catch(function(e){if(e.name==='AbortError')return;
       $('ph').textContent='Could not load the photo';$('place').textContent='Unknown';});
 }
@@ -485,9 +500,10 @@ var overlay=new deck.MapboxOverlay({interleaved:false,pickingRadius:8,layers:[]}
 // moves it draws one record in ten, spread across BC by the id order, and all of them once it stops.
 var THIN=false,THIN_BELOW=8;
 map.on('move',function(){if(!THIN&&map.getZoom()<THIN_BELOW){THIN=true;layers();}});
+map.on('move',place);
 map.on('moveend',function(){if(THIN){THIN=false;layers();}link();writeHash();});
 map.getContainer().addEventListener('pointerleave',function(){ptip.hidden=true;});
-addEventListener('resize',draw);
+addEventListener('resize',function(){draw();place();});
 var HINT=$('hint').textContent,HINT_TOT='Top: records still needing an ID per year, on a log scale; the line is the '+
   'share of all BC records with photos that still need one. Click or drag across years to zoom in. Bottom: '+
   'the period in view, faint bars all records, solid bars those still needing an ID. Drag to pick a period, '+
