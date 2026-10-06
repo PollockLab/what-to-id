@@ -13,9 +13,12 @@ an area by name and by geometry, among places under British Columbia:
   search each, by their own name and each of its other forms ("A / B", "[a.k.a. C]", "(D)").
 - name+geometry: the names agree once the designation words are dropped and the place's
   polygon overlaps the area's (IoU at least MIN_IOU_NAMED).
-- geometry: the place's polygon is near enough the area's (IoU at least MIN_IOU_RENAMED) and its
-  name says it is a park, so a park renamed in BC since the place was made still matches; unless
-  that name is another area's, which means the place's polygon is wrong.
+- geometry: the place's polygon matches the area's both ways (two_way) and its name says it is a
+  park, so a park renamed in BC since the place was made still matches; unless that name is
+  another area's, which means the place's polygon is wrong.
+- A pair scores the mean of its name likeness (name_score, 0 to 1) and its IoU. A name+geometry
+  pair scoring under MIN_SCORE_ONE_WAY must also match both ways: a wrong place is worse than
+  none, since an unmatched park still filters by its own boundary.
 - A place matches at most one area, the one it scores best with. A park in several sites
   (one ORCS, several ORCS_SECONDARY) also gets a row for the whole park, with an empty
   orcs_secondary, matched the same way against the sites' union.
@@ -43,7 +46,8 @@ SLEEP = 1.6
 HARVEST = ("provincial park", "ecological reserve", "protected area", "marine park")
 MIN_NAME = 0.86
 MIN_IOU_NAMED = 0.2
-MIN_IOU_RENAMED = 0.7
+MIN_TWO_WAY = 0.9
+MIN_SCORE_ONE_WAY = 0.85
 KINDS = {
     "PROVINCIAL PARK": "park",
     "RECREATION AREA": "recreation area",
@@ -242,12 +246,21 @@ def score_pairs(areas, places: dict[int, dict]) -> list[tuple]:
             inter = g.intersection(pg).area
             iou = inter / (g.area + pg.area - inter) if inter else 0.0
             ns = name_score(row.name, p["name"])
-            if ns >= MIN_NAME and iou >= MIN_IOU_NAMED and kind_ok(row.desig, p["name"]):
-                out.append((round(0.5 * ns + 0.5 * iou, 3), ai, ids[k], "name+geometry"))
-            elif (iou >= MIN_IOU_RENAMED and kind(p["name"]) and kind_ok(row.desig, p["name"])
+            s = round(0.5 * ns + 0.5 * iou, 3)
+            both = two_way(iou, inter, g.area, pg.area)
+            if (ns >= MIN_NAME and iou >= MIN_IOU_NAMED and kind_ok(row.desig, p["name"])
+                    and (s >= MIN_SCORE_ONE_WAY or both)):  # fmt: skip
+                out.append((s, ai, ids[k], "name+geometry"))
+            elif (both and kind(p["name"]) and kind_ok(row.desig, p["name"])
                   and not names_other(areas, row.orcs, p["name"])):  # fmt: skip
-                out.append((round(0.5 * ns + 0.5 * iou, 3), ai, ids[k], "geometry"))
+                out.append((s, ai, ids[k], "geometry"))
     return out
+
+
+def two_way(iou: float, inter: float, a: float, b: float) -> bool:
+    """Whether two polygons are one area: IoU at least MIN_TWO_WAY, or each covering at least
+    MIN_TWO_WAY of the other. A place covering only part of an area, or much more, is not it."""
+    return iou >= MIN_TWO_WAY or (inter >= MIN_TWO_WAY * a and inter >= MIN_TWO_WAY * b)
 
 
 def names_other(areas, orcs: str, place_name: str) -> bool:

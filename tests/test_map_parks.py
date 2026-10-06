@@ -89,3 +89,13 @@ def test_names_match_across_forms_and_designations():
     assert not m.kind_ok("PROVINCIAL PARK", "Cape Scott Protected Area")
     assert m.kind_ok("RECREATION AREA", "Strathcona-Westmin Provincial Park")
     assert m.kind_ok("ECOLOGICAL RESERVE", "Ten Mile Point")
+
+
+def test_a_place_matches_by_geometry_only_when_it_covers_the_area_both_ways():
+    m = _script()
+    assert m.two_way(0.95, 0.95, 1.0, 1.0)
+    # each covers 90% of the other
+    assert m.two_way(0.82, 0.9, 1.0, 1.0)
+    # one part of the area, or a place much larger than it
+    assert not m.two_way(0.5, 0.5, 1.0, 0.5)
+    assert not m.two_way(0.5, 1.0, 1.0, 2.0)
