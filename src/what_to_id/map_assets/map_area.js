@@ -260,8 +260,8 @@ function MapArea(ctx){
       for(;i<n;i++)m[i]=inside(IDX,pos[2*i],pos[2*i+1]);MASK=m;return m;},
     // The Identify link. What iNaturalist can filter (a park's place_id) goes into the link as is.
     // Otherwise it lists the records by id, in batches of BATCH with a numbered link to each in the
-    // note, and past MAXB batches opens the area's bounding box, cut to the view. The note says which,
-    // with the count Identify will open next to the count inside the area. url(box, params) builds
+    // note. Past MAXB batches the note asks for a narrower selection, and until then the link opens
+    // the area's bounding box, cut to the view, with the count it will open. url(box, params) builds
     // the link; a null box leaves it out.
     link:function(v,url,match){var t=term();LINKS=[];
       if(!t||!ctx.P().n){LINK='';ui();return url(v);}
@@ -283,8 +283,9 @@ function MapArea(ctx){
       var pos=P.pos,m=0;
       for(i=0;i<P.n;i++){var x=pos[2*i],y=pos[2*i+1];
         if(x>=w&&x<=e&&y>=s&&y<=nn&&dated(i)&&match(i))m++;}
-      LINK='Identify is approximate: too many records to list by id, so it opens about '+nf.format(m)+
-        ' records in the box around your shape; '+nf.format(n)+' are inside it.';ui();
+      LINK=nf.format(n)+' records: too many to open exactly (limit '+nf.format(BATCH*MAXB)+'). Make the '+
+        'area smaller or add filters. Identify now opens the box around the shape, about '+nf.format(m)+
+        ' records.';ui();
       return url({w:w,s:s,e:e,n:nn});}
   };
   return api;
