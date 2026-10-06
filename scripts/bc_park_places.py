@@ -19,6 +19,8 @@ an area by name and by geometry, among places under British Columbia:
 - A pair scores the mean of its name likeness (name_score, 0 to 1) and its IoU. A name+geometry
   pair scoring under MIN_SCORE_ONE_WAY must also match both ways: a wrong place is worse than
   none, since an unmatched park still filters by its own boundary.
+- The CSV gives each match's score and overlap: iou, r_bc (the share of the BC area inside the
+  place's polygon) and r_inat (the share of the place's polygon inside the BC area).
 - A place matches at most one area, the one it scores best with. A park in several sites
   (one ORCS, several ORCS_SECONDARY) also gets a row for the whole park, with an empty
   orcs_secondary, matched the same way against the sites' union.
@@ -69,7 +71,7 @@ _KIND_WORDS = (
 )
 FIELDS = (
     "orcs", "layer", "name", "designation", "inat_place_id", "match_method", "score",
-    "orcs_secondary",
+    "orcs_secondary", "iou", "r_bc", "r_inat",
 )  # fmt: skip
 
 
@@ -231,7 +233,8 @@ def load_areas(gpkg: Path):
 
 
 def score_pairs(areas, places: dict[int, dict]) -> list[tuple]:
-    """(score, area index, place id, method) for every pair that passes a rule."""
+    """(score, area index, place id, method, (iou, r_bc, r_inat)) for every pair that passes a
+    rule."""
     from shapely import STRtree, make_valid
     from shapely.geometry import shape
 
@@ -248,12 +251,13 @@ def score_pairs(areas, places: dict[int, dict]) -> list[tuple]:
             ns = name_score(row.name, p["name"])
             s = round(0.5 * ns + 0.5 * iou, 3)
             both = two_way(iou, inter, g.area, pg.area)
+            overlap = (round(iou, 3), round(inter / g.area, 3), round(inter / pg.area, 3))
             if (ns >= MIN_NAME and iou >= MIN_IOU_NAMED and kind_ok(row.desig, p["name"])
                     and (s >= MIN_SCORE_ONE_WAY or both)):  # fmt: skip
-                out.append((s, ai, ids[k], "name+geometry"))
+                out.append((s, ai, ids[k], "name+geometry", overlap))
             elif (both and kind(p["name"]) and kind_ok(row.desig, p["name"])
                   and not names_other(areas, row.orcs, p["name"])):  # fmt: skip
-                out.append((s, ai, ids[k], "geometry"))
+                out.append((s, ai, ids[k], "geometry", overlap))
     return out
 
 
@@ -277,9 +281,9 @@ def assign(pairs: list[tuple]) -> dict[int, tuple]:
     """Best pairs first, each area and each place used once."""
     got: dict[int, tuple] = {}
     used: set[int] = set()
-    for s, ai, pid, how in sorted(pairs, key=lambda t: (-t[0], t[2])):
+    for s, ai, pid, how, overlap in sorted(pairs, key=lambda t: (-t[0], t[2])):
         if ai not in got and pid not in used:
-            got[ai] = (pid, how, s)
+            got[ai] = (pid, how, s, *overlap)
             used.add(pid)
     return got
 
@@ -310,10 +314,10 @@ def write_csv(areas, got: dict[int, tuple], out: Path) -> None:
         w = csv.writer(f)
         w.writerow(FIELDS)
         for ai, row in enumerate(areas.itertuples()):
-            pid, how, s = got.get(ai, ("", "", ""))
+            pid, how, s, iou, r_bc, r_inat = got.get(ai, ("",) * 6)
             w.writerow(
                 [row.orcs, row.layer, row.name, row.desig, pid, how or "none", s,
-                 row.orcs_secondary]
+                 row.orcs_secondary, iou, r_bc, r_inat]
             )  # fmt: skip
 
 
