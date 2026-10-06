@@ -501,7 +501,8 @@ def test_area_identify_batches_open_every_id_once(n, sizes):
         + (_ASSETS / "map_area.js").read_text()
         + f"console.log(JSON.stringify(MapArea.batches({json.dumps(ids)})));"
     )
-    run = subprocess.run(["node", "-e", js], capture_output=True, text=True, check=True)
+    # on stdin: 10,000 ids pass Linux's 128 KiB limit on one command-line argument
+    run = subprocess.run(["node"], input=js, capture_output=True, text=True, check=True)
     out = json.loads(run.stdout)
     assert [b["n"] for b in out] == sizes
     got = []
