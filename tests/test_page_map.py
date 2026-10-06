@@ -1,6 +1,8 @@
 import gzip
 import json
 import re
+import shutil
+import subprocess
 
 import numpy as np
 import pandas as pd
@@ -10,6 +12,7 @@ from what_to_id.batches import MAX_URL_LEN
 from what_to_id.inat import BC_PLACE_ID
 from what_to_id.page import ARM_WORDS
 from what_to_id.page_map import (
+    _ASSETS,
     BYTES_PER_RECORD,
     IMPRECISE_M,
     MAP_NAME,
@@ -409,3 +412,62 @@ def test_cli_builds_without_totals_when_the_fetch_fails(tmp_path, monkeypatch):
     make_pool(20).to_parquet(tmp_path / "pool.parquet", index=False)
     assert main(["--pool", str(tmp_path / "pool.parquet"), "--out", str(tmp_path), "--totals"]) == 0
     assert '"totals"' not in (tmp_path / MAP_NAME).read_text()
+
+
+def test_page_inlines_the_area_filter_before_the_map_script():
+    _, meta = encode_points(make_pool(20))
+    html = render_map(meta, freeze=None)
+    area = (_ASSETS / "map_area.js").read_text()
+    assert area in html and (_ASSETS / "map_area.css").read_text() in html
+    assert html.index("var MapArea=") < html.index("var AREA=MapArea(")
+    assert "AREA.mask(n)" in html and "h.push(AREA.hash())" in html
+    # a park comes back from the hash by its place id, and its place id goes into the Identify link
+    assert "park:S.park,place:META.place_id" in html and "q.set(k,extra[k])" in html
+    # the Identify box count reads the filters without the area
+    assert "META.max_url,match)" in html and "function match(i)" in html
+
+
+_AREA_JS = r"""
+const A = MapArea, out = {};
+const r = [[-123.1234567, 49.2, -123, 49.3, -122.9, 49.2, -123.1234567, 49.2]];
+out.code = A.encode(r);
+out.back = A.decode(out.code);
+const bow = A.index([[0, 0, 2, 2, 2, 0, 0, 2]]), donut = A.index([[0, 0, 10, 0, 10, 10, 0, 10],
+  [3, 3, 7, 3, 7, 7, 3, 7]]);
+out.bow = [[1.5, 1], [0.5, 1], [1, 1.5], [3, 1]].map(p => A.inside(bow, p[0], p[1]));
+out.donut = [[1, 1], [5, 5]].map(p => A.inside(donut, p[0], p[1]));
+const big = [];
+for (let i = 0; i < 5000; i++) { const t = i / 5000 * 2 * Math.PI;
+  big.push(-123 + Math.cos(t) * (1 + 0.01 * Math.sin(50 * t)), 50 + Math.sin(t) * 0.7); }
+const islets = [];
+for (let k = 0; k < 2000; k++) islets.push([-125 + k * 1e-3, 52, -125 + k * 1e-3 + 2e-4, 52,
+  -125 + k * 1e-3, 52.0002]);
+const s = A.simplify([big, ...islets], 1500);
+out.simple = [s.length, s.reduce((a, x) => a + x.length / 2, 0)];
+out.errors = [{type: "FeatureCollection", features: [], crs: {type: "name",
+  properties: {name: "urn:ogc:def:crs:EPSG::3005"}}},
+  {type: "Polygon", coordinates: [[[1200000, 500000], [1, 2], [3, 4]]]},
+  {type: "Point", coordinates: [1, 2]}].map(g => { try { A.fromGeoJSON(g); return null; }
+    catch (e) { return e.message; } });
+out.multi = A.fromGeoJSON({type: "Feature", crs: {type: "name", properties: {name:
+  "urn:ogc:def:crs:OGC:1.3:CRS84"}}, geometry: {type: "MultiPolygon", coordinates: [
+  [[[0, 0], [1, 0], [1, 1], [0, 0]]], [[[5, 5], [6, 5], [6, 6], [5, 5]]]]}}).length;
+try { A.decode("ab!"); } catch (e) { out.bad = e.message; }
+console.log(JSON.stringify(out));
+"""
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="needs node")
+def test_area_filter_codes_tests_and_reads_polygons():
+    js = "var document={};" + (_ASSETS / "map_area.js").read_text() + _AREA_JS
+    run = subprocess.run(["node", "-e", js], capture_output=True, text=True, check=True)
+    out = json.loads(run.stdout)
+    # rounded to 0.0001 degrees, the closing corner dropped, and stable once rounded
+    assert out["back"] == [[-123.1235, 49.2, -123, 49.3, -122.9, 49.2]]
+    # even-odd: the two lobes of a bow tie are inside, a donut's hole is not
+    assert out["bow"] == [1, 1, 0, 0] and out["donut"] == [1, 0]
+    # capped at 1500 corners; islets too small to keep drop out and leave their share to the rest
+    assert out["simple"][0] == 1 and 1400 <= out["simple"][1] <= 1500
+    assert "EPSG:3005" in out["errors"][0] and "not longitude and latitude" in out["errors"][1]
+    assert "no Polygon" in out["errors"][2]
+    assert out["multi"] == 2 and out["bad"] == "bad character"

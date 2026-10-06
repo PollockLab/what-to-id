@@ -52,6 +52,7 @@ var S={up:false,lo:0,hi:LAST,months:0,groups:META.groups.map(function(){return t
   (h.get('only')||'').split(',').forEach(function(k){
     if(META.flags.indexOf(ONLYFLAG[k])>=0)S.only[k]=true;});
   S.picks=TX.read(h.get('taxa'));S.oldq=S.picks.length?'':h.get('q')||'';S.rec=+h.get('record')||null;
+  S.area=h.get('area')||'';S.park=+h.get('park')||0;
   var at=(h.get('at')||'').split('/').map(Number);if(at.length===3&&at.every(isFinite))S.at=at;
   S.fly=!!S.rec&&!S.at;
 })();
@@ -65,6 +66,7 @@ function writeHash(){clearTimeout(hashTimer);hashTimer=setTimeout(function(){
   var only=Object.keys(S.only).filter(function(k){return S.only[k];});
   if(only.length)h.push('only='+only.join(','));
   if(S.picks.length)h.push('taxa='+TX.write(S.picks));
+  if(AREA.on())h.push(AREA.hash());
   if(P.n&&SEL>=0)h.push('record='+P.id[SEL]);else if(S.rec)h.push('record='+S.rec);
   var c=map.getCenter();h.push('at='+map.getZoom().toFixed(1)+'/'+c.lat.toFixed(3)+'/'+
     c.lng.toFixed(3));
@@ -105,15 +107,16 @@ function addShard(buf,n){
 // The map filters on the GPU. Each record carries its observed and uploaded day (-1 for none) as
 // filter values, and four categories: group, observed month, uploaded month (12 for no date) and a
 // status value, bit 1 introduced, 2 threatened, 4 obscured or imprecise, 8 kept by the taxon picks
-// and not deleted, 16 one record in ten. Group, month, status and date changes then only change the
-// filter settings; the data is uploaded again only when records arrive, the picks or deletions
-// change, or the groups change while a taxon is included (the groups and included taxa are one set,
-// so the kept bit then carries the groups too).
-var ST_INTRO=1,ST_THREAT=2,ST_INEXACT=4,ST_KEEP=8,ST_SAMPLE=16,PD=null,PD_KEY=null,PD_GONE=-1,PD_CAT=0;
+// and the area and not deleted, 16 one record in ten. Group, month, status and date changes then
+// only change the filter settings; the data is uploaded again only when records arrive, the picks,
+// the area or deletions change, or the groups change while a taxon is included (the groups and
+// included taxa are one set, so the kept bit then carries the groups too).
+var ST_INTRO=1,ST_THREAT=2,ST_INEXACT=4,ST_KEEP=8,ST_SAMPLE=16,PD=null,PD_KEY=null,PD_GONE=-1,PD_CAT=0,
+  OUT=new Uint8Array(0),RC=null;
 function inc(){return !!TF.inc;}
 function pointData(){
-  var n=P.n,gone=Object.keys(GONE).length,i,key=[TF,inc()&&!allGroups()?S.groups.join():''];
-  if(PD&&PD.length===n&&PD_KEY&&PD_KEY[0]===key[0]&&PD_KEY[1]===key[1]&&PD_GONE===gone)return;
+  var n=P.n,gone=Object.keys(GONE).length,i,key=[TF,inc()&&!allGroups()?S.groups.join():'',AREA.ver()];
+  if(PD&&PD.length===n&&PD_KEY&&PD_KEY.every(function(k,j){return k===key[j];})&&PD_GONE===gone)return;
   var same=PD&&PD.length===n,days=same?PD.days:new Float32Array(2*n),
     cat=same?PD.attributes.getFilterCategory.value.slice():new Uint8Array(4*n);
   if(!same)for(i=0;i<n;i++){var o=P.obs[i],u=P.up[i],f=P.fl[i];
@@ -121,12 +124,14 @@ function pointData(){
     cat[4*i]=P.grp[i];cat[4*i+1]=o===NO?12:MOY[o];cat[4*i+2]=u===NO?12:MOY[u];
     cat[4*i+3]=(f&FLAG.introduced?ST_INTRO:0)|(f&FLAG.threatened?ST_THREAT:0)|
       (f&(FLAG.obscured|FLAG.imprecise)?ST_INEXACT:0)|(i%10===0?ST_SAMPLE:0);}
-  // only the kept bit follows the picks, the groups beside them and deletions
-  var ti=TF.inc,te=TF.exc,gs=key[1]?S.groups:null,tax=P.tax,grp=P.grp,id=P.id,nt=NOTAX;
+  // only the kept bit follows the picks, the groups beside them, the area and deletions
+  // OUT keeps the records out for any reason but the area, for the Identify box count
+  var ti=TF.inc,te=TF.exc,gs=key[1]?S.groups:null,tax=P.tax,grp=P.grp,id=P.id,nt=NOTAX,am=AREA.mask(n);
+  if(OUT.length!==n)OUT=new Uint8Array(n);
   for(i=0;i<n;i++){var t=tax[i],keep=!ti||(t!==nt&&ti[t]===1)||(gs!==null&&gs[grp[i]]);
     if(te&&t!==nt&&te[t]===1||gone>0&&GONE[id[i]]===1)keep=false;
-    cat[4*i+3]=cat[4*i+3]&~ST_KEEP|(keep?ST_KEEP:0);}
-  // a new taxon search or deletion swaps only the categories, so deck.gl uploads only those
+    OUT[i]=keep?0:1;cat[4*i+3]=cat[4*i+3]&~ST_KEEP|(keep&&(am===null||am[i])?ST_KEEP:0);}
+  // a new pick, area or deletion swaps only the categories, so deck.gl uploads only those
   if(same){PD.attributes.getFilterCategory={value:cat,size:4};PD_CAT++;}
   else PD={length:n,days:days,attributes:{getPosition:{value:P.pos,size:2},
     getFilterValue:{value:days,size:2},getFilterCategory:{value:cat,size:4}}};
@@ -149,6 +154,7 @@ function recount(){
   var n=P.n,day=S.up?P.up:P.obs,c=categories(),gm=0,mm=0,sm=0,nd=0,cat=PD.attributes.getFilterCategory.value,
     ch=S.up?2:1,g=S.groups,m=S.months;
   c[0].forEach(function(j){gm|=1<<j;});c[ch].forEach(function(j){mm|=1<<j;});c[3].forEach(function(j){sm|=1<<j;});
+  RC={gm:gm,mm:mm,sm:sm,ch:ch};
   if(KEEP.length!==n)KEEP=new Uint8Array(n);
   if(!PER)PER=new Float64Array(META.days);else PER.fill(0);
   for(var i=0;i<n;i++){
@@ -158,9 +164,9 @@ function recount(){
   NODAY=nd;
   CUM=new Float64Array(META.days+1);
   for(var d=0;d<META.days;d++)CUM[d+1]=CUM[d]+PER[d];
-  // One status filter reads its own totals; two together have none
+  // One status filter reads its own totals; two together, or an area, have none
   var on=Object.keys(S.only).filter(function(k){return S.only[k];}),
-    tt=!TOT||S.picks.length||on.length>1?null:on.length?TOT.only&&TOT.only[on[0]]:TOT;
+    tt=!TOT||S.picks.length||AREA.on()||on.length>1?null:on.length?TOT.only&&TOT.only[on[0]]:TOT;
   TC=null;
   if(tt){var rows=tt[S.up?'up':'obs'],nm=rows[0].length;TC=new Float64Array(nm+1);
     for(var k=0;k<nm;k++){var v=0;if(!m||m>>(M0+k)%12&1)for(var j=0;j<rows.length;j++)if(g[j])v+=rows[j][k];
@@ -186,22 +192,28 @@ function render(){
     p.el.setAttribute('aria-pressed',String(r[0]===S.lo&&r[1]===S.hi));});
   draw();layers();link();writeHash();
 }
+// Whether record i matches the filters with the area left out, as recount() reads them
+function match(i){if(!RC||i>=OUT.length)return 0;var c=PD.attributes.getFilterCategory.value,s=c[4*i+3]&~ST_KEEP|(OUT[i]?0:ST_KEEP);
+  return (RC.gm>>c[4*i]&1)&(RC.mm>>c[4*i+RC.ch]&1)&(RC.sm>>s&1);}
 function link(){
-  var b=map.getBounds(),m=[];for(var i=0;i<12;i++)if(S.months>>i&1)m.push(i+1);
+  var b=map.getBounds(),m=[],u=null;for(var i=0;i<12;i++)if(S.months>>i&1)m.push(i+1);
   // with a taxon included, the groups go in as their taxa, which iNaturalist adds to the picks
   var gs=META.groups.filter(function(g,i){return S.groups[i];}),taxa=TF.ids.slice(),gid=META.group_ids||{};
   if(TF.ids.length&&!allGroups())gs.forEach(function(g){taxa.push(gid[g]||NaN);});
   if(taxa.some(isNaN))taxa=null;
-  var u=TX.identifyUrl({groups:TF.ids.length?[]:gs,
+  var st={groups:TF.ids.length?[]:gs,
     all:META.groups.length,up:S.up,d1:S.lo>0?iso(S.lo):'',d2:S.hi<LAST?iso(S.hi):'',months:m,taxa:taxa,
-    not:TF.not,only:S.only},{w:b.getWest(),s:b.getSouth(),e:b.getEast(),n:b.getNorth()},META);
-  var a=$('identify');a.href=u.url;a.title='Opens these records in the iNaturalist Identify page.';
+    not:TF.not,only:S.only};
+  // with an area on, the link may list the records by id instead, and then u stays null
+  var a=$('identify');a.href=AREA.link({w:b.getWest(),s:b.getSouth(),e:b.getEast(),n:b.getNorth()},
+    function(v,p){u=TX.identifyUrl(st,v,META,p);return u.url;},META.max_url,match);
+  a.title='Opens these records in the iNaturalist Identify page.';
   // say when Identify cannot show the same records, and what it opens instead
-  var why=[];
-  if(TF.ids.length&&!taxa)why.push('Identify cannot add the '+gs.filter(function(g){return !gid[g];})
+  var why=[],lost=u?u.lost:[];
+  if(u&&TF.ids.length&&!taxa)why.push('Identify cannot add the '+gs.filter(function(g){return !gid[g];})
     .map(function(g){return META.names[g]||g;}).join(' and ')+' group to picked taxa, so it opens every taxon');
-  if(u.lost.indexOf('taxa')>=0)why.push('too many taxa for one link, so it opens every taxon');
-  if(u.lost.indexOf('not')>=0)why.push('too many taxa left out for one link, so it keeps them');
+  if(lost.indexOf('taxa')>=0)why.push('too many taxa for one link, so it opens every taxon');
+  if(lost.indexOf('not')>=0)why.push('too many taxa left out for one link, so it keeps them');
   var nt=$('idnote');nt.hidden=!why.length;nt.textContent=why.length?'Identify shows more records than the '+
     'map: '+why.join('; ')+'.':'';
 }
@@ -409,7 +421,7 @@ function oldQuery(){if(!S.oldq)return;
 function search(){TF=TX.filter(TAXA,S.picks);}
 $('reset').onclick=function(){S.lo=0;S.hi=LAST;S.up=false;clearMonths();setGroups();
   S.only={};ONLY.forEach(function(b){b.setAttribute('aria-pressed','false');});
-  S.picks.length=0;$('q').value='';PK.refresh();showClades();search();refilter();};
+  S.picks.length=0;$('q').value='';PK.refresh();showClades();search();AREA.clear();refilter();};
 $('toggle').onclick=function(){var o=$('side').classList.toggle('open');
   this.setAttribute('aria-expanded',String(o));};
 
@@ -430,7 +442,7 @@ function when(v,early){return v===NO?'unknown':early?'before 1900':iso(v);}
 // edges, the time bar nor an open card hide it.
 var ptip=document.createElement('div');ptip.className='ptip';ptip.hidden=true;
 function tip(o){
-  if(!P.n||o.index<0||!o.layer||o.layer.id!=='pts'){ptip.hidden=true;return;}
+  if(!P.n||o.index<0||!o.layer||o.layer.id!=='pts'||AREA.busy()){ptip.hidden=true;return;}
   var i=o.index,t=names(i);
   ptip.innerHTML='<b>'+esc(t.common||t.latin)+'</b>'+(t.common?'<br><i>'+esc(t.latin)+'</i>':'')+
     '<br>'+esc(t.group)+' · observed '+when(P.obs[i],P.fl[i]&FLAG.earlyObs)+'<br>'+idText(i)+'<div class="badges">'+
@@ -442,7 +454,7 @@ function tip(o){
   ptip.style.left=Math.max(4,x)+'px';ptip.style.top=Math.max(4,y)+'px';
 }
 var ctl=null,card=$('card');
-function pick(o){if(!P.n||o.index<0||o.layer.id!=='pts')return;openCard(o.index);}
+function pick(o){if(!P.n||o.index<0||o.layer.id!=='pts'||AREA.busy())return;openCard(o.index);}
 // A record deleted from iNaturalist leaves the map once its card closes, so the card can say why.
 // The card opens beside its point, on the side with room, and follows the point as the map moves.
 // It is fixed to the window, so the time bar and the map's edges never clip it. On a phone it is a
@@ -510,6 +522,8 @@ else{opts.bounds=[[b[0],b[1]],[b[2],b[3]]];opts.fitBoundsOptions={padding:20};}
 var map=new maplibregl.Map(opts);document.body.appendChild(ptip);
 map.addControl(new maplibregl.NavigationControl({showCompass:false}));
 var overlay=new deck.MapboxOverlay({interleaved:false,pickingRadius:8,layers:[]});map.addControl(overlay);
+var AREA=MapArea({map:map,S:S,LAST:LAST,hash:S.area,park:S.park,place:META.place_id,P:function(){return P;},keep:function(){return KEEP;},
+  change:refilter});
 // Zoomed out, blending millions of overlapping dots takes about 250 ms a frame, so while the map
 // moves it draws one record in ten, spread across BC by the id order, and all of them once it stops.
 var THIN=false,THIN_BELOW=8;
