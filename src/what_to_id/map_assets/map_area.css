@@ -22,3 +22,5 @@
 .alist li{padding:5px 6px;border-radius:6px;cursor:pointer}
 .alist li:hover,.alist li:focus{background:var(--chip);outline:none}
 .alist li.anone{cursor:default;color:var(--muted)}
+.alist .akind{margin-left:6px;color:var(--muted);font-size:11px}
+.alist li.ahead{cursor:default;color:var(--muted);padding-top:8px;font-weight:600}

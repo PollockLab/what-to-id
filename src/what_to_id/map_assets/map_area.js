@@ -9,9 +9,12 @@
 // link restores the same area and the same count. Each ring is coded as zigzag varint steps from
 // the previous corner, 5 bits to a base64url character, rings joined by '.'.
 //
-// A park is an area too: its boundary is iNaturalist's own place geometry, fetched when picked, so
-// the map and the Identify link (which filters by place_id) count the same place. The hash then
-// carries only the place id.
+// A park is an area too. The park search reads BC's list of parks, reserves, protected areas and
+// conservancies (page_map.py ships it next to the page), and the hash carries bcpark=<ORCS number>.
+// A park that matches an iNaturalist place takes that place's own boundary, fetched when picked, so
+// the map and the Identify link (which filters by place_id) count the same place; a park without one
+// takes its BC Parks boundary from the list and an Identify link as a drawn area gets. park=<place
+// id> from older links still loads, and iNaturalist's own park names follow the list's in the search.
 var MapArea=(function(){
 'use strict';
 var Q=1e4,MAXV=1500,MAXMB=50,BATCH=200,MAXB=50,BOXQ={per_page:BATCH,reviewed:'false'},API='https://api.inaturalist.org/v1/places/',
@@ -141,10 +144,12 @@ function batches(ids){
 }
 
 // ctx: map, S, LAST, P() and keep() (the current records and kept flags), change() to refilter,
-// hash and park (the area and place id from the URL), place (the region's iNaturalist place id),
-// sel() (the selection as text) and step (the Identify button, an IdStep).
+// hash, park and bcpark (the area, place id and park from the URL), fit (no view in the URL, so fit
+// the map to a park from it), place (the region's iNaturalist place id), parks (the park list's
+// file), get(url) (an ArrayBuffer promise, gunzipped), sel() (the selection as text) and step (the
+// Identify button, an IdStep).
 function MapArea(ctx){
-  var map=ctx.map,RINGS=null,IDX=null,VER=0,MASK=null,NOTE='',LINK='',LINKS=[],BOX=null,PLACE=null,SEQ=0,QT=0,
+  var map=ctx.map,RINGS=null,IDX=null,VER=0,MASK=null,NOTE='',LINK='',LINKS=[],BOX=null,PLACE=null,BC=null,PEND='',SEQ=0,QT=0,
     mode=false,ended=0,pts=[],cursor=null,ready=false,color=getComputedStyle(document.documentElement)
       .getPropertyValue('--share').trim()||'#c2410c',nf=new Intl.NumberFormat('en-CA');
   var box=document.createElement('div');box.className='maplibregl-ctrl area';
@@ -165,7 +170,7 @@ function MapArea(ctx){
     var t=mode?(pts.length<3?'Click or tap the map to add corners.':'Double-click, tap the first corner '+
       'or press Finish to close the area.')+' Esc cancels.':(NOTE+' '+LINK).trim();
     note.textContent=t;note.hidden=!t;abox.hidden=mode||!BOX;
-    if(BOX){abox.href=BOX.url;abox.textContent='Or open the box around the shape in one link, about '+
+    if(BOX){abox.href=BOX.url;abox.textContent='Or open the box around '+(BC?BC.label:'the shape')+' in one link, about '+
       nf.format(BOX.m)+' records';}
   }
   function paint(){
@@ -186,10 +191,11 @@ function MapArea(ctx){
       paint:{'circle-color':'#fff','circle-stroke-color':color,'circle-stroke-width':2,
         'circle-radius':['case',['get','first'],7,4]}});
     ready=true;paint();});
-  // Sets the area, or clears it with null, and refilters; place {id, label} when it is a park.
-  function set(rings,msg,quiet,place){
+  // Sets the area, or clears it with null, and refilters; place {id, label} when it is an
+  // iNaturalist place, bc {key, label} when it is a park from the list.
+  function set(rings,msg,quiet,place,bc){
     RINGS=rings&&rings.length?rings:null;IDX=RINGS&&index(RINGS);VER++;MASK=null;NOTE=msg||'';
-    PLACE=RINGS&&place||null;if(!place){SEQ++;q.value='';}
+    PLACE=RINGS&&place||null;BC=RINGS&&bc||null;PEND='';if(!place&&!bc){SEQ++;q.value='';}
     performance.mark('area');paint();ui();if(!quiet)ctx.change();
   }
   function prepare(rings){
@@ -220,48 +226,98 @@ function MapArea(ctx){
       var b=IDX.bb;map.fitBounds([[b[0],b[1]],[b[2],b[3]]],{padding:40,maxZoom:14});})
       .catch(function(e){NOTE='Could not use '+f.name+': '+(e instanceof SyntaxError?'it is not JSON.':e.message);
         ui();});};
-  // Park search: iNaturalist's place names under the region, then the picked place's boundary.
   // iNaturalist answers a busy moment with an error that carries no CORS header, so try twice more
   function get(u,n){return fetch(u).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();})
     .catch(function(e){if(!n)throw e;return new Promise(function(ok){setTimeout(ok,1500);})
       .then(function(){return get(u,n-1);});});}
-  function park(id,label,fit){var seq=++SEQ;NOTE='Loading '+(label||'the park')+'.';LINK='';LINKS=[];ui();
+  function fit(b){map.fitBounds([[b[0],b[1]],[b[2],b[3]]],{padding:40,maxZoom:14});}
+  // An iNaturalist place's boundary; bc, the park from the list it stands for, if any.
+  function park(id,label,zoom,bc){var seq=++SEQ;NOTE='Loading '+(label||'the park')+'.';LINK='';LINKS=[];ui();
     get(API+id,2).then(function(j){
       var pl=j.results&&j.results[0];if(seq!==SEQ)return;
       if(!pl||!pl.geometry_geojson)throw new Error('no boundary');
       var p=prepare(fromGeoJSON(pl.geometry_geojson)),name=label||pl.name;q.value=name;
-      set(p.rings,p.msg,false,{id:pl.id,label:name});
-      if(fit){var b=IDX.bb;map.fitBounds([[b[0],b[1]],[b[2],b[3]]],{padding:40,maxZoom:14});}})
-      .catch(function(){if(seq===SEQ){NOTE='Could not load that park from iNaturalist.';ui();}});}
-  function pick(li){list.hidden=true;park(+li.dataset.id,li.textContent,true);}
-  q.oninput=function(){clearTimeout(QT);var t=q.value.trim();if(t.length<3){list.hidden=true;return;}
-    QT=setTimeout(function(){get(API+'autocomplete?per_page=30&q='+encodeURIComponent(t),1)
-      .then(function(j){if(q.value.trim()!==t)return;
-        var seen={},rows=(j.results||[]).filter(function(p){return p.admin_level==null&&PARK.test(p.name)&&
-          (p.ancestor_place_ids||[]).indexOf(+ctx.place)>=0;}).slice(0,8);
-        rows.forEach(function(p){seen[p.name]=(seen[p.name]||0)+1;});
-        list.innerHTML='';rows.forEach(function(p){var li=document.createElement('li');li.tabIndex=0;
-          li.dataset.id=p.id;li.textContent=p.name+(seen[p.name]>1?' (place '+p.id+')':'');
-          li.onclick=function(){pick(li);};li.onkeydown=function(e){if(e.key==='Enter')pick(li);};
-          list.appendChild(li);});
-        if(!rows.length){var li=document.createElement('li');li.className='anone';
-          li.textContent='No BC park on iNaturalist matches.';list.appendChild(li);}
-        list.hidden=false;}).catch(function(){});},300);};
-  if(ctx.park)park(ctx.park,'',false);
+      set(p.rings,p.msg,false,{id:pl.id,label:name},bc&&{key:bc.key,label:name});
+      if(zoom)fit(IDX.bb);})
+      .catch(function(){if(seq!==SEQ)return;NOTE='Could not load that park from iNaturalist.';ui();});}
+  // A park from the list by its own boundary.
+  function local(b,zoom,msg){var p=prepare(decode(b.rings));q.value=b.name;
+    set(p.rings,(msg||'')+p.msg,false,null,{key:b.key,label:b.name});if(zoom)fit(b.bb);}
+  function choose(b,zoom){list.hidden=true;
+    if(b.place)park(b.place,b.name,zoom,b);
+    else{SEQ++;local(b,zoom,'iNaturalist has no place for this park, so the map uses its BC Parks boundary. ');}}
+  // The park list, fetched once, when first needed.
+  var PARKS=null,PARKP=null;
+  function fold(s){return s.normalize('NFD').replace(/\p{M}/gu,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();}
+  function parks(){if(!PARKP)PARKP=ctx.get(ctx.parks).then(function(buf){
+      var j=JSON.parse(new TextDecoder().decode(buf));
+      PARKS=j.parks.map(function(r){return {key:r[0],name:r[1],kind:j.kinds[r[2]],place:r[3],bb:r[4],
+        rings:r[5],f:' '+fold(r[1]+' '+r[6])};});return PARKS;})
+      .catch(function(e){PARKP=null;throw e;});
+    return PARKP;}
+  function find(key){var k=String(key).trim(),b=PARKS.filter(function(p){return p.key===k;})[0];
+    if(!b&&/^\d{1,3}$/.test(k))return find(('000'+k).slice(-4));return b;}
+  // Parks whose words start with the words typed, those whose name starts with them first; the whole
+  // list, in order, for an empty box.
+  function hits(t){var f=fold(t);if(!f)return PARKS.slice();var w=f.split(' '),a=[],b=[];
+    PARKS.forEach(function(p){
+      if(w.every(function(x){return p.f.indexOf(' '+x)>=0;}))(p.f.indexOf(' '+f)===0?a:b).push(p);
+      else if(p.f.replace(/ /g,'').indexOf(f.replace(/ /g,''))>=0)b.push(p);});
+    return a.concat(b);}
+  function row(text,kind,go){var li=document.createElement('li');li.tabIndex=0;li.textContent=text;
+    if(kind){var k=document.createElement('span');k.className='akind';k.textContent=kind;li.appendChild(k);}
+    li.onclick=go;li.onkeydown=function(e){if(e.key==='Enter')go();
+      else if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();
+        var n=e.key==='ArrowDown'?li.nextElementSibling:li.previousElementSibling;
+        while(n&&!n.tabIndex)n=e.key==='ArrowDown'?n.nextElementSibling:n.previousElementSibling;
+        (n||q).focus();}};
+    list.appendChild(li);}
+  function msg(text,cls){var li=document.createElement('li');li.className=cls||'anone';li.textContent=text;
+    list.appendChild(li);}
+  function search(){clearTimeout(QT);var t=q.value.trim();
+    parks().then(function(){if(q.value.trim()!==t)return;var rows=hits(t);list.innerHTML='';
+      rows.forEach(function(b){row(b.name,b.kind,function(){choose(b,true);});});
+      if(!rows.length)msg('No BC park matches.');list.hidden=false;
+      // then iNaturalist's other park names under the region, such as regional parks
+      if(t.length>=3)QT=setTimeout(function(){more(t);},300);})
+      .catch(function(){list.innerHTML='';msg('Could not load the list of BC parks.');list.hidden=false;});}
+  function more(t){get(API+'autocomplete?per_page=30&q='+encodeURIComponent(t),1).then(function(j){
+      if(q.value.trim()!==t)return;var known={},seen={};
+      PARKS.forEach(function(p){if(p.place)known[p.place]=1;});
+      var rows=(j.results||[]).filter(function(p){return p.admin_level==null&&PARK.test(p.name)&&!known[p.id]&&
+        (p.ancestor_place_ids||[]).indexOf(+ctx.place)>=0;}).slice(0,8);
+      if(!rows.length)return;
+      var none=list.querySelector('.anone');if(none)none.remove();
+      rows.forEach(function(p){seen[p.name]=(seen[p.name]||0)+1;});
+      msg('More places on iNaturalist','ahead');
+      rows.forEach(function(p){row(p.name+(seen[p.name]>1?' (place '+p.id+')':''),'',function(){
+        list.hidden=true;park(p.id,p.name,true);});});}).catch(function(){});}
+  q.oninput=search;q.onfocus=search;
+  q.onkeydown=function(e){var f=list.querySelector('li[tabindex]');
+    if(e.key==='ArrowDown'&&f){e.preventDefault();f.focus();}
+    else if(e.key==='Enter'&&f)f.click();else if(e.key==='Escape')list.hidden=true;};
+  document.addEventListener('pointerdown',function(e){if(!box.contains(e.target))list.hidden=true;});
+  if(ctx.bcpark){var seq0=++SEQ;PEND='bcpark='+encodeURIComponent(ctx.bcpark);NOTE='Loading the park.';ui();
+    parks().then(function(){if(seq0!==SEQ)return;var b=find(ctx.bcpark);
+      if(b)choose(b,ctx.fit);else{PEND='';NOTE='The list of BC parks has no park '+ctx.bcpark+'.';ui();}})
+      .catch(function(){if(seq0===SEQ){PEND='';NOTE='Could not load the list of BC parks.';ui();}});}
+  else if(ctx.park){PEND='park='+ctx.park;park(ctx.park,'',ctx.fit);}
   else if(ctx.hash){try{set(decode(ctx.hash),'',true);}catch(e){NOTE='The area in this link could not be read.';ui();}}
   else ui();
   // The area as a filter term: what it keeps, and what iNaturalist can say of it.
   function term(){if(!RINGS)return null;
-    return {dim:'area',kind:PLACE?'park':'polygon',id:PLACE?PLACE.id:encode(RINGS),
-      label:PLACE?PLACE.label:'Drawn area',exclude:false,mask:function(){return api.mask(ctx.P().n);},
+    return {dim:'area',kind:PLACE?'park':BC?'bcpark':'polygon',id:PLACE?PLACE.id:BC?BC.key:encode(RINGS),
+      label:PLACE?PLACE.label:BC?BC.label:'Drawn area',exclude:false,mask:function(){return api.mask(ctx.P().n);},
       inat:function(){return PLACE?{params:{place_id:PLACE.id},exact:true}:{params:{},exact:false};}};}
   var api={
     on:function(){return !!RINGS;},
     // true while drawing and briefly after, so the closing tap opens no record's tip
     busy:function(){return mode||performance.now()-ended<500;},
     ver:function(){return VER;},
-    // the hash parameter: area=<rings> or park=<place id>
-    hash:function(){return !RINGS?'':PLACE?'park='+PLACE.id:'area='+encode(RINGS);},
+    // the hash parameter: bcpark=<key>, park=<place id> or area=<rings>; while a park from the
+    // URL loads, the one it names
+    hash:function(){return PEND||(!RINGS?'':BC?'bcpark='+encodeURIComponent(BC.key):
+      PLACE?'park='+PLACE.id:'area='+encode(RINGS));},
     term:term,
     clear:function(){if(mode)stop();SEQ++;list.hidden=true;if(RINGS||NOTE)set(null);},
     // 1 for each record inside the area, null without one; extended as shards arrive.
@@ -291,7 +347,7 @@ function MapArea(ctx){
       if(k>1)BOX=boxlink(v,url,match,dated,true);ui();return LINKS[0].url;}
     var o=boxlink(v,url,match,dated);
     LINK=nf.format(n)+' records: too many to open exactly (limit '+nf.format(BATCH*MAXB)+'). Make the '+
-      'area smaller or add filters. Identify now opens the box around the shape, about '+nf.format(o.m)+
+      'area smaller or add filters. Identify now opens the box around '+(BC?BC.label:'the shape')+', about '+nf.format(o.m)+
       ' records.';ui();
     return o.url;}
   // One Identify link for the area's box, with the batches' page size and review filter. side marks

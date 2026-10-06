@@ -3,8 +3,9 @@
 The page (map.html) loads MapLibre and deck.gl from a CDN and reads the points from gzipped column
 files next to it. The files hold record ids, positions, dates, taxa and flags, sorted by id, and
 nothing about lists, so the map cannot tell which list a record sits on. A viewer can also keep
-only the records inside a polygon they draw or load from GeoJSON (map_area.js); that runs in the
-page and needs nothing from the build.
+only the records inside a polygon they draw or load from GeoJSON, or inside a BC park
+(map_area.js); that runs in the page, and the build only copies the park list (map_parks.py) next
+to it.
 
 Each shard (pool-0.bin, pool-1.bin, ...), gzipped, little-endian, n records sorted by id,
 columns back to back:
@@ -56,6 +57,7 @@ import requests
 
 from what_to_id.batches import MAX_URL_LEN
 from what_to_id.inat import BC_PLACE_ID, INAT, SLEEP, TIMEOUT, make_session
+from what_to_id.map_parks import PARKS_NAME, parks_blob, parks_version
 from what_to_id.map_projects import add_projects
 from what_to_id.page import ARM_WORDS, group_name
 from what_to_id.taxonomy import GROUP_TAXA, NO_RANK, NO_TAXON, PRESETS, load_tree, taxa_table
@@ -392,6 +394,7 @@ def render_map(meta: dict, *, freeze: str | None, back: str = "index.html") -> s
         "place_id": BC_PLACE_ID,
         "max_url": MAX_URL_LEN,
         "imprecise_m": IMPRECISE_M,
+        "parks": f"{PARKS_NAME}?v={parks_version(parks_blob())}",
     }
     fill = {
         "TITLE": "Records that need an ID in BC",
@@ -442,6 +445,7 @@ def write_map(
     for w in ARM_WORDS:
         if w in low:
             raise ValueError(f"{MAP_NAME}: arm name {w!r} leaked into the map page")
+    blobs[PARKS_NAME] = parks_blob()
     for name, blob in blobs.items():
         (out / name).write_bytes(blob)
     (out / MAP_NAME).write_text(html)
