@@ -3,6 +3,7 @@ import json
 import re
 import shutil
 import subprocess
+from urllib.parse import parse_qs, urlparse
 
 import numpy as np
 import pandas as pd
@@ -424,7 +425,7 @@ def test_page_inlines_the_area_filter_before_the_map_script():
     # a park comes back from the hash by its place id, and its place id goes into the Identify link
     assert "park:S.park,place:META.place_id" in html and "q.set(k,extra[k])" in html
     # the Identify box count reads the filters without the area
-    assert "META.max_url,match)" in html and "function match(i)" in html
+    assert "return u.url;},match)" in html and "function match(i)" in html
 
 
 _AREA_JS = r"""
@@ -471,3 +472,41 @@ def test_area_filter_codes_tests_and_reads_polygons():
     assert "EPSG:3005" in out["errors"][0] and "not longitude and latitude" in out["errors"][1]
     assert "no Polygon" in out["errors"][2]
     assert out["multi"] == 2 and out["bad"] == "bad character"
+
+
+_BATCH_PARAMS = {
+    "quality_grade": ["needs_id"],
+    "reviewed": ["false"],
+    "place_id": ["any"],
+    "per_page": ["200"],
+}
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="needs node")
+@pytest.mark.parametrize(
+    "n,sizes", [(0, []), (1, [1]), (200, [200]), (201, [200, 1]), (10000, [200] * 50)]
+)
+def test_area_identify_batches_open_every_id_once(n, sizes):
+    # 10-digit ids, the longest iNaturalist will reach for years, in no order
+    ids = [9_999_999_999 - (i * 7919) % 1_000_003 * 1000 - i for i in range(n)]
+    js = (
+        "var document={};"
+        + (_ASSETS / "map_area.js").read_text()
+        + f"console.log(JSON.stringify(MapArea.batches({json.dumps(ids)})));"
+    )
+    run = subprocess.run(["node", "-e", js], capture_output=True, text=True, check=True)
+    out = json.loads(run.stdout)
+    assert [b["n"] for b in out] == sizes
+    got = []
+    for b in out:
+        u = urlparse(b["url"])
+        assert u.netloc == "www.inaturalist.org" and u.path == "/observations/identify"
+        assert len(b["url"]) < MAX_URL_LEN
+        q = parse_qs(u.query)
+        batch = [int(i) for i in q.pop("id")[0].split(",")]
+        assert q == _BATCH_PARAMS
+        # newest first, as Identify lists them, and the title's range is the batch's own
+        assert batch == sorted(batch, reverse=True) and len(batch) == b["n"]
+        assert (b["lo"], b["hi"]) == (batch[-1], batch[0])
+        got += batch
+    assert len(got) == len(ids) and set(got) == set(ids)

@@ -14,7 +14,7 @@
 // carries only the place id.
 var MapArea=(function(){
 'use strict';
-var Q=1e4,MAXV=1500,MAXMB=50,API='https://api.inaturalist.org/v1/places/',
+var Q=1e4,MAXV=1500,MAXMB=50,BATCH=200,MAXB=50,API='https://api.inaturalist.org/v1/places/',
   PARK=/park|protected area|ecological reserve|conservancy|recreation area/i,B64='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 
 function encode(rings){
@@ -116,11 +116,23 @@ function inside(I,x,y){
     if((ya>y)!==(yb>y)&&x<I.x0[e]+(y-ya)*(I.x1[e]-I.x0[e])/(yb-ya))c^=1;}
   return c;
 }
+// Identify links that open these ids exactly, at most BATCH to a link and newest first, as Identify
+// lists them: per_page shows a whole batch on one page, place_id=any keeps a viewer's default place
+// from hiding any, and reviewed=false leaves out those the viewer has already reviewed. Each batch is
+// {url, n, lo, hi}.
+var IDS='https://www.inaturalist.org/observations/identify?quality_grade=needs_id&reviewed=false'+
+  '&place_id=any&per_page='+BATCH+'&id=';
+function batches(ids){
+  var s=Array.prototype.slice.call(ids).sort(function(a,b){return b-a;}),out=[];
+  for(var i=0;i<s.length;i+=BATCH){var b=s.slice(i,i+BATCH);
+    out.push({url:IDS+b.join(','),n:b.length,lo:b[b.length-1],hi:b[0]});}
+  return out;
+}
 
 // ctx: map, S, LAST, P() and keep() (the current records and kept flags), change() to refilter,
 // hash and park (the area and place id from the URL), place (the region's iNaturalist place id).
 function MapArea(ctx){
-  var map=ctx.map,RINGS=null,IDX=null,VER=0,MASK=null,NOTE='',LINK='',PLACE=null,SEQ=0,QT=0,
+  var map=ctx.map,RINGS=null,IDX=null,VER=0,MASK=null,NOTE='',LINK='',LINKS=[],PLACE=null,SEQ=0,QT=0,
     mode=false,ended=0,pts=[],cursor=null,ready=false,color=getComputedStyle(document.documentElement)
       .getPropertyValue('--share').trim()||'#c2410c',nf=new Intl.NumberFormat('en-CA');
   var box=document.createElement('div');box.className='maplibregl-ctrl area';
@@ -141,6 +153,10 @@ function MapArea(ctx){
     var t=mode?(pts.length<3?'Click or tap the map to add corners.':'Double-click, tap the first corner '+
       'or press Finish to close the area.')+' Esc cancels.':(NOTE+' '+LINK).trim();
     note.textContent=t;note.hidden=!t;
+    // more than one batch: a numbered link to each after the note
+    if(!mode&&LINKS.length>1)LINKS.forEach(function(b,k){var a=document.createElement('a');
+      a.href=b.url;a.target='_blank';a.rel='noopener';a.textContent=k+1;
+      a.title='ids '+b.lo+' to '+b.hi+', '+nf.format(b.n)+(b.n===1?' record':' records');note.append(' ',a);});
   }
   function paint(){
     if(!ready)return;var f=[];
@@ -199,7 +215,7 @@ function MapArea(ctx){
   function get(u,n){return fetch(u).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();})
     .catch(function(e){if(!n)throw e;return new Promise(function(ok){setTimeout(ok,1500);})
       .then(function(){return get(u,n-1);});});}
-  function park(id,label,fit){var seq=++SEQ;NOTE='Loading '+(label||'the park')+'.';LINK='';ui();
+  function park(id,label,fit){var seq=++SEQ;NOTE='Loading '+(label||'the park')+'.';LINK='';LINKS=[];ui();
     get(API+id,2).then(function(j){
       var pl=j.results&&j.results[0];if(seq!==SEQ)return;
       if(!pl||!pl.geometry_geojson)throw new Error('no boundary');
@@ -243,36 +259,37 @@ function MapArea(ctx){
       var pos=ctx.P().pos,m=new Uint8Array(n),i=0;if(MASK){m.set(MASK);i=MASK.length;}
       for(;i<n;i++)m[i]=inside(IDX,pos[2*i],pos[2*i+1]);MASK=m;return m;},
     // The Identify link. What iNaturalist can filter (a park's place_id) goes into the link as is.
-    // Otherwise it lists the records by id when they fit in the URL, and else opens the area's
-    // bounding box, cut to the view. The note says which, with the count Identify will open next to
-    // the count inside the area. url(box, params) builds the link; a null box leaves it out.
-    link:function(v,url,maxUrl,match){var t=term();
+    // Otherwise it lists the records by id, in batches of BATCH with a numbered link to each in the
+    // note, and past MAXB batches opens the area's bounding box, cut to the view. The note says which,
+    // with the count Identify will open next to the count inside the area. url(box, params) builds
+    // the link; a null box leaves it out.
+    link:function(v,url,match){var t=term();LINKS=[];
       if(!t||!ctx.P().n){LINK='';ui();return url(v);}
       var P=ctx.P(),keep=ctx.keep(),S=ctx.S,day=S.up?P.up:P.obs,full=S.lo===0&&S.hi===ctx.LAST,
-        base='https://www.inaturalist.org/observations/identify?quality_grade=needs_id&id=',ids=[],
-        len=base.length,n=0,fits=true,i,d,q=t.inat();
+        ids=[],n=0,i,d,q=t.inat();
       function dated(i){d=day[i];return d===65535?full:d>=S.lo&&d<=S.hi;}
-      for(i=0;i<P.n;i++){if(!keep[i]||!dated(i))continue;
-        n++;if(fits){len+=String(P.id[i]).length+1;if(len>maxUrl)fits=false;else ids.push(P.id[i]);}}
+      for(i=0;i<P.n;i++){if(!keep[i]||!dated(i))continue;if(++n<=BATCH*MAXB)ids.push(P.id[i]);}
       if(q.exact){LINK='Identify is exact: it uses the iNaturalist place for '+t.label+'. '+
         (n===1?'1 record on this map is':nf.format(n)+' records on this map are')+' inside its boundary.';ui();
         return url(null,q.params);}
       if(!n){LINK='No records inside this area match these filters.';ui();return url(v);}
-      if(fits){LINK='Identify is exact: it opens '+(n===1?'this record':'these '+nf.format(n)+' records')+
-        ' by id.';ui();return base+ids.join(',');}
+      if(n<=BATCH*MAXB){LINKS=batches(ids);var k=LINKS.length;
+        LINK='Identify is exact: '+(k===1?'it opens '+(n===1?'this record':'these '+nf.format(n)+' records')+
+          ' by id':nf.format(n)+' records by id in '+k+' links of up to '+BATCH)+
+          (n>1?', less any identified since':'')+(k>1?':':'.');ui();return LINKS[0].url;}
       var b=IDX.bb,w=Math.max(v.w,b[0]),s=Math.max(v.s,b[1]),e=Math.min(v.e,b[2]),nn=Math.min(v.n,b[3]);
       if(!(w<e&&s<nn)){w=b[0];s=b[1];e=b[2];nn=b[3];}
       // the records Identify will open: these filters without the area, inside the box
       var pos=P.pos,m=0;
       for(i=0;i<P.n;i++){var x=pos[2*i],y=pos[2*i+1];
         if(x>=w&&x<=e&&y>=s&&y<=nn&&dated(i)&&match(i))m++;}
-      LINK='Identify is approximate: it opens about '+nf.format(m)+' records in the box around your shape; '+
-        nf.format(n)+' are inside it.';ui();
+      LINK='Identify is approximate: too many records to list by id, so it opens about '+nf.format(m)+
+        ' records in the box around your shape; '+nf.format(n)+' are inside it.';ui();
       return url({w:w,s:s,e:e,n:nn});}
   };
   return api;
 }
 MapArea.encode=encode;MapArea.decode=decode;MapArea.fromGeoJSON=fromGeoJSON;MapArea.simplify=simplify;
-MapArea.index=index;MapArea.inside=inside;
+MapArea.index=index;MapArea.inside=inside;MapArea.batches=batches;
 return MapArea;
 })();
