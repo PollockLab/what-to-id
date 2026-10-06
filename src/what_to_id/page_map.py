@@ -14,7 +14,10 @@ record's is the id itself. lon and lat are quantized over META.bbox; obs (observ
 (uploaded) count days from META.day0, with NO_DAY for a missing date; taxon indexes pool-taxa.bin
 (gzipped JSON of [latin, common, iNaturalist taxon id, rank] rows, most recorded taxon first; rank
 indexes META.ranks) and group META.groups, with 0xFFFF and 0xFF for none. A taxon's rank is the one
-its first record by id carries.
+its first record by id carries. Built with the taxon tree, each row also names its parent's row and
+ancestor rows follow the META.taxa_n record rows (see taxonomy.py); META.presets, the shortcut
+chips, is set only when every record taxon has its whole line of ancestors. META.group_ids holds
+the iNaturalist taxon of each group that has one, for the Identify link.
 ids holds min(IDs, 15) in the low nibble and min(agreements, 15) in the high nibble. flags sets
 FLAG_BITS for the flags META.flags names; a pool pulled before those columns existed has none.
 Dates before DAY_FLOOR (1900-01-01) are stored at that day, so day0 is never earlier, and the
@@ -52,12 +55,11 @@ import requests
 from what_to_id.batches import MAX_URL_LEN
 from what_to_id.inat import BC_PLACE_ID, INAT, SLEEP, TIMEOUT, make_session
 from what_to_id.page import ARM_WORDS, group_name
+from what_to_id.taxonomy import GROUP_TAXA, NO_RANK, NO_TAXON, PRESETS, load_tree, taxa_table
 
 MAP_NAME = "map.html"
 TAXA_NAME = "pool-taxa.bin"
 NO_DAY = 0xFFFF
-NO_TAXON = 0xFFFF
-NO_RANK = 0xFF
 _Q = 0xFFFF
 BYTES_PER_RECORD = 17
 RECENT_DAYS = 90
@@ -84,8 +86,11 @@ def shard_name(k: int) -> str:
     return f"pool-{k}.bin"
 
 
-def encode_points(pool: pd.DataFrame) -> tuple[dict[str, bytes], dict]:
-    """Pack the pool into the gzipped files the page reads, and the META it needs to read them."""
+def encode_points(pool: pd.DataFrame, tree: dict | None = None) -> tuple[dict[str, bytes], dict]:
+    """Pack the pool into the gzipped files the page reads, and the META it needs to read them.
+
+    ``tree`` is the taxon tree from taxonomy.load_tree; without it the taxa rows have no parents.
+    """
     missing = [c for c in _COLS if c not in pool]
     if missing:
         raise ValueError(f"pool lacks columns {missing}")
@@ -113,7 +118,7 @@ def encode_points(pool: pd.DataFrame) -> tuple[dict[str, bytes], dict]:
 
     groups = sorted(df["iconic_taxon"].fillna("Unknown").astype(str).unique())
     gidx = pd.Categorical(df["iconic_taxon"].fillna("Unknown").astype(str), categories=groups)
-    taxa, tidx, ranks = _taxa(df)
+    taxa, tidx, ranks, complete = taxa_table(df, tree)
     known, flags = _flags(df)
     flags = flags | np.where(early_obs, EARLY_OBS, 0).astype("u1")
     flags = flags | np.where(early_up, EARLY_UP, 0).astype("u1")
@@ -154,12 +159,16 @@ def encode_points(pool: pd.DataFrame) -> tuple[dict[str, bytes], dict]:
         "hist0": _hist_start(obs_off, day0),
         "groups": groups,
         "names": {g: group_name(g) for g in groups},
+        "group_ids": {g: GROUP_TAXA[g] for g in groups if g in GROUP_TAXA},
         "ranks": ranks,
         "flags": known,
         "shards": shards,
         "taxa": TAXA_NAME,
+        "taxa_n": int(np.unique(tidx[tidx != NO_TAXON]).size),
         "sha256": h.hexdigest(),
     }
+    if complete:
+        meta["presets"] = PRESETS
     return out, meta
 
 
@@ -234,33 +243,6 @@ def _planes(v: np.ndarray) -> bytes:
 def _quant(v: np.ndarray, lo: float, hi: float) -> np.ndarray:
     span = hi - lo or 1.0
     return np.rint((v - lo) / span * _Q).astype("<u2")
-
-
-def _taxa(df: pd.DataFrame) -> tuple[list[list], np.ndarray, list[str]]:
-    """[latin, common, id, rank] per distinct taxon, most records first, each record's index into
-    that table, and the ranks the rows index."""
-    if "taxon_id" not in df or "taxon_name" not in df:
-        return [], np.full(len(df), NO_TAXON), []
-    common = df["common_name"] if "common_name" in df else pd.Series("", index=df.index)
-    rank = df["rank"] if "rank" in df else pd.Series(None, index=df.index, dtype=object)
-    t = pd.DataFrame(
-        {"tid": df["taxon_id"], "latin": df["taxon_name"], "common": common, "rank": rank}
-    ).dropna(subset=["tid"])
-    table = t.drop_duplicates("tid").set_index("tid")
-    table["n"] = t["tid"].value_counts()
-    table = table.reset_index().sort_values(["n", "tid"], ascending=[False, True])
-    if len(table) >= NO_TAXON:
-        raise ValueError(f"{len(table)} taxa do not fit in uint16")
-    ranks = sorted(table["rank"].dropna().astype(str).unique())
-    ridx = pd.Categorical(table["rank"].astype("string"), categories=ranks).codes.astype(int)
-    ridx = np.where(ridx < 0, NO_RANK, ridx)
-    pos = pd.Series(np.arange(len(table)), index=table["tid"].to_numpy())
-    idx = df["taxon_id"].map(pos).fillna(NO_TAXON).to_numpy()
-    names = [
-        [str(a) if pd.notna(a) else "", str(c) if pd.notna(c) else "", int(k), int(r)]
-        for a, c, k, r in zip(table["latin"], table["common"], table["tid"], ridx, strict=True)
-    ]
-    return names, idx, ranks
 
 
 def _flags(df: pd.DataFrame) -> tuple[list[str], np.ndarray]:
@@ -414,7 +396,7 @@ def render_map(meta: dict, *, freeze: str | None, back: str = "index.html") -> s
         "CSS": (_ASSETS / "map.css").read_text(),
         "META": json.dumps(page_meta, sort_keys=True, separators=(",", ":")).replace("</", "<\\/"),
         "BASEMAPS": json.dumps(BASEMAPS, sort_keys=True),
-        "JS": (_ASSETS / "map.js").read_text(),
+        "JS": (_ASSETS / "map_taxa.js").read_text() + (_ASSETS / "map.js").read_text(),
     }
     html = (_ASSETS / "map.html").read_text()
     for key, value in fill.items():
@@ -428,11 +410,14 @@ def write_map(
     *,
     freeze: str | None = None,
     totals: dict | None = None,
+    tree: dict | None = None,
 ) -> list[Path]:
     """Write map.html and its data files into the site folder; ``totals`` from fetch_totals."""
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    blobs, meta = encode_points(pool)
+    blobs, meta = encode_points(pool, tree)
+    if tree is not None and "presets" not in meta:
+        _warn("the taxon tree lacks some of the pool's taxa; the shortcut chips stay hidden")
     if totals is not None:
         meta["totals"] = align_totals(totals, meta)
         over = over_totals(pool, meta)
@@ -475,9 +460,13 @@ def main(argv: list[str] | None = None) -> int:
         help="fetch all-record totals from iNaturalist (about 112 requests); on failure the map "
         "is built without them",
     )
+    ap.add_argument("--tree", type=Path, help="taxon tree cache from what_to_id.taxonomy")
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     pool = pd.read_parquet(a.pool)
+    tree = load_tree(a.tree) or None
+    if a.tree and tree is None:
+        _warn(f"no taxon tree at {a.tree}; building the map without clade search")
     totals = None
     if a.totals:
         groups = sorted(pool["iconic_taxon"].fillna("Unknown").astype(str).unique())
@@ -486,7 +475,7 @@ def main(argv: list[str] | None = None) -> int:
             totals = fetch_totals(groups, on=on)
         except (requests.RequestException, KeyError, ValueError) as e:
             _warn(f"could not fetch the all-record totals, building the map without them: {e}")
-    for path in write_map(a.out, pool, freeze=a.freeze, totals=totals):
+    for path in write_map(a.out, pool, freeze=a.freeze, totals=totals, tree=tree):
         logging.getLogger("what_to_id").info("wrote %s (%d bytes)", path, path.stat().st_size)
     return 0
 

@@ -17,16 +17,21 @@
 </div>
 <p class="stat" aria-live="polite"><b id="count">Loading</b> <span id="more"></span><span id="share" class="share"></span></p>
 <a id="identify" class="idlink" target="_blank" rel="noopener" href="https://www.inaturalist.org/observations/identify?quality_grade=needs_id&amp;place_id={{PLACE_ID}}">Identify these</a>
+<p id="idnote" class="idnote" role="status" hidden></p>
 <button type="button" id="toggle" class="toggle" aria-expanded="false" aria-controls="side">Filters</button>
 </header>
 <section id="side" class="side" aria-label="Filters">
-<label class="field"><span class="lbl">Find a taxon</span>
-<input id="q" type="search" placeholder="Latin or common name, e.g. Amanita, squirrel" autocomplete="off" spellcheck="false"></label>
-<p id="qn" class="muted"></p>
+<label for="q"><span class="lbl">Taxa <span class="muted">pick several to combine</span></span></label>
+<div class="picker"><div id="picks" class="chips" hidden></div>
+<input id="q" type="search" placeholder="Latin or common name, e.g. Carex" autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="sugg">
+<ul id="sugg" class="sugg" role="listbox" aria-label="Matching taxa" hidden></ul></div>
+<p id="qn" class="muted" aria-live="polite"></p>
+<div id="cladebox" hidden><div id="clades" class="chips" role="group" aria-label="Taxon shortcuts"></div></div>
+<p class="muted">Records under any picked taxon or group show; a taxon keeps everything below it, so Bryophyta keeps all mosses. Click a picked taxon to leave it out instead. A shortcut click picks its taxa, a second leaves them out, a third removes them.</p>
 <div id="flagbox"><p class="lbl">Show only</p><div id="flags" class="chips" role="group" aria-label="Show only"></div></div>
 <p class="lbl">Groups <button type="button" id="gall" class="link">all groups</button></p>
 <div id="groups" class="chips" role="group" aria-label="Taxon groups"></div>
-<p class="muted">Pick one or more groups. Click a group again to remove it.</p>
+<p class="muted">Pick several groups to combine them, with each other and with the taxa above. Click a group again to remove it.</p>
 <p class="lbl">Months of the year <button type="button" id="mclear" class="link">any month</button></p>
 <div id="months" class="chips months" role="group" aria-label="Months of the year"></div>
 <p class="muted">Pick months to compare the same season across years.</p>

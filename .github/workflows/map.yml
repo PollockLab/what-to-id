@@ -18,6 +18,11 @@ name: map
 # Research Grade, per group and date, and again under each status filter (about 112 requests), so the
 # map can show the share still needing an ID. If that fetch fails the map ships without it.
 #
+# The map's clade filters read the taxon tree, kept as taxonomy.json on the same release. Each run
+# asks iNaturalist only for taxa the tree lacks and their ancestors (the first run fills it in a few
+# hundred requests, later runs in a handful). If that fails the map ships with the tree it has, and
+# hides the clade chips while some of the pool's taxa lack their ancestors.
+#
 # Seed once: upload pool.parquet and sync.json to a release tagged map-state (sync.json holds the
 # since cursor, so the repository variable MAP_SINCE is only needed when there is no sync.json),
 # then set the repository variable MAP_DAILY_ENABLED to "true".
@@ -70,6 +75,7 @@ jobs:
           set -euo pipefail
           mkdir -p state
           gh release download "$STATE_TAG" -D state -p pool.parquet --clobber || true
+          gh release download "$STATE_TAG" -D state -p taxonomy.json --clobber || echo "no taxonomy.json yet; this run starts it"
           test -s state/pool.parquet || { echo "::error::no pool.parquet on the $STATE_TAG release; seed it first"; exit 1; }
           # a missing sync.json would restart from MAP_SINCE, so only allow that on the first run
           if ! gh release download "$STATE_TAG" -D state -p sync.json --clobber && [ -z "${MAP_SINCE:-}" ]; then
@@ -90,12 +96,20 @@ jobs:
       - name: Warn that the reconcile failed
         if: steps.reconcile.outcome == 'failure'
         run: echo "::warning::reconcile failed; deploying the synced pool without it"
+      - name: Add new taxa to the taxon tree
+        id: tree
+        continue-on-error: true
+        run: python -m what_to_id.taxonomy --pool state/pool.parquet --tree state/taxonomy.json
+      - name: Warn that the tree update failed
+        if: steps.tree.outcome == 'failure'
+        run: echo "::warning::taxon tree update failed; building with the tree as it was"
       - name: Build the site
         run: |
           set -euo pipefail
           mkdir -p _site
           cp site/*.html _site/
-          python -m what_to_id.page_map --pool state/pool.parquet --out _site --totals --freeze "$(date -u +%F)"
+          python -m what_to_id.page_map --pool state/pool.parquet --out _site --totals --freeze "$(date -u +%F)" \
+            --tree state/taxonomy.json
           if find _site -type f ! -name '*.html' ! -name 'pool*.bin' | grep -q .; then
             echo "::error::the site must hold only HTML pages and the map's pool*.bin files"; exit 1
           fi
@@ -114,3 +128,6 @@ jobs:
           # the pool first, so the cursor never moves past a pool that failed to upload
           gh release upload "$STATE_TAG" state/pool.parquet --clobber
           gh release upload "$STATE_TAG" state/sync.json --clobber
+          if [ -s state/taxonomy.json ]; then
+            gh release upload "$STATE_TAG" state/taxonomy.json --clobber || echo "::warning::could not save taxonomy.json"
+          fi
