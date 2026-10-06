@@ -23,6 +23,11 @@ h1{font-size:18px;margin:0}
 .share{display:block;color:var(--muted);font-size:12px}
 .idlink{padding:4px 12px;border-radius:14px;background:var(--on);color:var(--onink);font-size:13px;
   font-weight:600;text-decoration:none}
+.idstep{display:inline-flex;align-items:center;gap:4px}
+.idarrow{border:1px solid var(--line);background:var(--chip);color:var(--ink);font:inherit;font-size:15px;
+  line-height:1;min-width:28px;min-height:28px;padding:0 6px;border-radius:14px;cursor:pointer}
+.idarrow[hidden]{display:none}
+.idarrow:disabled{opacity:.5;cursor:default}
 .side{grid-area:side;overflow:auto;padding:12px 16px;border-right:1px solid var(--line);
   display:flex;flex-direction:column;gap:6px}
 .lbl{display:block;font-size:12px;font-weight:600;margin:6px 0 2px}

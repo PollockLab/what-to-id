@@ -426,6 +426,10 @@ def test_page_inlines_the_area_filter_before_the_map_script():
     assert "park:S.park,place:META.place_id" in html and "q.set(k,extra[k])" in html
     # the Identify box count reads the filters without the area
     assert "return u.url;},match)" in html and "function match(i)" in html
+    # the Identify button steps through an area's batches, with a ‹ › beside it to step by hand
+    assert html.index("var IdStep=") < html.index("var AREA=MapArea(")
+    assert 'id="idprev" class="idarrow" aria-label="Previous batch" hidden' in html
+    assert 'id="idnext" class="idarrow" aria-label="Next batch" hidden' in html
 
 
 _AREA_JS = r"""
@@ -510,3 +514,87 @@ def test_area_identify_batches_open_every_id_once(n, sizes):
         assert (b["lo"], b["hi"]) == (batch[-1], batch[0])
         got += batch
     assert len(got) == len(ids) and set(got) == set(ids)
+
+
+_STEP_JS = r"""
+function el(text) {
+  const on = {};
+  return {textContent: text, href: "", hidden: false, disabled: false,
+    addEventListener: (t, f) => { on[t] = f; }, click: () => on.click({button: 0})};
+}
+function store(data, broken) {
+  const m = data || new Map(), no = () => { throw new Error("storage is off"); };
+  if (broken) return () => { no(); };
+  return () => ({get length() { return m.size; }, key: i => [...m.keys()][i],
+    getItem: k => m.has(k) ? m.get(k) : null, setItem: (k, v) => m.set(k, String(v)),
+    removeItem: k => m.delete(k)});
+}
+function make(build, st) {
+  const o = {a: el("Identify these"), prev: el("‹"), next: el("›"), build: build, store: st};
+  return Object.assign(IdStep(o), {o: o});
+}
+const list = k => Array.from({length: k}, (_, i) => ({url: "u" + (i + 1)}));
+const tick = () => new Promise(r => setTimeout(r));
+(async () => {
+  const out = {}, data = new Map();
+  let s = make("2026-10-05", store(data));
+  out.one = [s.set("a", list(1), "u1"), s.o.a.textContent, s.o.prev.hidden, s.o.next.hidden];
+  out.first = [s.set("a", list(3), "u1"), s.o.a.textContent, s.o.prev.disabled, s.o.next.disabled,
+    s.o.prev.hidden];
+  s.o.next.click(); s.o.next.click(); s.o.next.click();
+  out.fwd = [s.at(), s.o.a.href, s.o.next.disabled, s.o.prev.disabled];
+  s.o.prev.click();
+  out.back = [s.at(), s.o.a.textContent];
+  s.go(1);
+  // a click opens the batch shown, then moves on once the browser has the href
+  s.o.a.click(); out.opening = s.o.a.href; await tick();
+  out.opened = [s.at(), s.o.a.textContent, s.o.a.href];
+  s.o.a.click(); s.o.a.click(); s.o.a.click(); await tick();
+  out.stop = [s.at(), s.o.next.disabled];
+  out.other = s.set("b", list(4), "u1") && s.at();
+  // back to the first selection, batches 1 to 3 opened: it stays on the last
+  out.again = s.set("a", list(3), "u1") && s.at();
+  // a new page on the same build resumes at the first batch not opened
+  s = make("2026-10-05", store(data));
+  s.set("b", list(4), "u1"); s.o.a.click(); s.go(3); s.o.a.click();
+  s = make("2026-10-05", store(data));
+  out.resume = [s.set("b", list(4), "u1"), s.at()];
+  // more records arriving keep that, until the viewer steps
+  out.grow = s.set("b", list(6), "u1") && s.at();
+  out.keys = [...data.keys()];
+  s = make("2026-10-06", store(data));
+  out.build = s.set("b", list(4), "u1") && s.at();
+  out.pruned = [...data.keys()];
+  // storage that throws: the stepper still steps and remembers in memory
+  s = make("2026-10-06", store(null, true));
+  s.set("c", list(3), "u1"); s.o.a.click(); await tick();
+  out.broken = [s.at(), s.o.a.textContent];
+  s.set("d", list(3), "u1"); out.brokenOther = s.at();
+  s.set("c", list(3), "u1"); out.brokenBack = s.at();
+  console.log(JSON.stringify(out));
+})();
+"""
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="needs node")
+def test_identify_button_steps_through_batches_and_remembers_them():
+    js = (_ASSETS / "map_step.js").read_text() + _STEP_JS
+    run = subprocess.run(["node", "-e", js], capture_output=True, text=True, check=True)
+    out = json.loads(run.stdout)
+    # one link: the button as it was, no arrows
+    assert out["one"] == ["u1", "Identify these", True, True]
+    assert out["first"] == ["u1", "Open in Identify · batch 1 of 3", True, False, False]
+    # › stops at the last batch, ‹ steps back
+    assert out["fwd"] == [[3, 3], "u3", True, False]
+    assert out["back"] == [[2, 3], "Open in Identify · batch 2 of 3"]
+    assert out["opening"] == "u1"
+    assert out["opened"] == [[2, 3], "Open in Identify · batch 2 of 3", "u2"]
+    assert out["stop"] == [[3, 3], True]
+    # a new selection starts at batch 1
+    assert out["other"] == [1, 4] and out["again"] == [3, 3]
+    assert out["resume"] == ["u2", [2, 4]] and out["grow"] == [2, 6]
+    assert out["keys"] == ["idstep:2026-10-05:a", "idstep:2026-10-05:b"]
+    # a new build starts over and drops what the old one remembered
+    assert out["build"] == [1, 4] and out["pruned"] == []
+    assert out["broken"] == [[2, 3], "Open in Identify · batch 2 of 3"]
+    assert out["brokenOther"] == [1, 3] and out["brokenBack"] == [2, 3]
