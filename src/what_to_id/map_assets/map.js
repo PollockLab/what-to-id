@@ -210,7 +210,7 @@ function link(){
     not:TF.not,only:S.only};
   // with an area on, the link may list the records by id instead, and then u stays null
   var a=$('identify');a.href=AREA.link({w:b.getWest(),s:b.getSouth(),e:b.getEast(),n:b.getNorth()},
-    function(v,p){u=TX.identifyUrl(st,v,META,p);return u.url;},match);
+    function(v,p,side){var r=TX.identifyUrl(st,v,META,p);if(!side)u=r;return r.url;},match);
   a.title='Opens these records in the iNaturalist Identify page.';
   // say when Identify cannot show the same records, and what it opens instead
   var why=[],lost=u?u.lost:[];

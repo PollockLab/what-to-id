@@ -425,14 +425,14 @@ def test_page_inlines_the_area_filter_before_the_map_script():
     # a park comes back from the hash by its place id, and its place id goes into the Identify link
     assert "park:S.park,place:META.place_id" in html and "q.set(k,extra[k])" in html
     # the Identify box count reads the filters without the area
-    assert "return u.url;},match)" in html and "function match(i)" in html
+    assert "if(!side)u=r;return r.url;},match)" in html and "function match(i)" in html
     # the Identify button steps through an area's batches, with a ‹ › beside it to step by hand
     assert html.index("var IdStep=") < html.index("var AREA=MapArea(")
     assert 'id="idprev" class="idarrow" aria-label="Previous batch" hidden' in html
     assert 'id="idnext" class="idarrow" aria-label="Next batch" hidden' in html
     # beside several batches, the box around the shape is offered as one link in a new tab
     assert '<a class="abox" target="_blank" rel="noopener" hidden></a>' in html
-    assert "if(k>1)BOX=boxed(v,url,match,dated)" in html
+    assert "if(k>1)BOX=boxlink(v,url,match,dated,true)" in html
 
 
 _AREA_JS = r"""
@@ -553,11 +553,13 @@ const tick = () => new Promise(r => setTimeout(r));
   // a click opens the batch shown, then moves on once the browser has the href
   s.o.a.click(); out.opening = s.o.a.href; await tick();
   out.opened = [s.at(), s.o.a.textContent, s.o.a.href];
-  s.o.a.click(); s.o.a.click(); s.o.a.click(); await tick();
-  out.stop = [s.at(), s.o.next.disabled];
+  s.o.a.click(); s.o.a.click(); await tick();
+  out.stop = [s.at(), s.o.next.disabled, s.o.a.textContent, s.o.a.href];
   out.other = s.set("b", list(4), "u1") && s.at();
-  // back to the first selection, batches 1 to 3 opened: it stays on the last
-  out.again = s.set("a", list(3), "u1") && s.at();
+  // back to the first selection, batches 1 to 3 opened: it says so, and a click starts over
+  out.again = [s.set("a", list(3), "u1"), s.at(), s.o.a.textContent];
+  s.o.a.click(); await tick();
+  out.restart = [s.at(), s.o.a.textContent, data.get("idstep:2026-10-05:a")];
   // a new page on the same build resumes at the first batch not opened
   s = make("2026-10-05", store(data));
   s.set("b", list(4), "u1"); s.o.a.click(); s.go(3); s.o.a.click();
@@ -593,12 +595,49 @@ def test_identify_button_steps_through_batches_and_remembers_them():
     assert out["back"] == [[2, 3], "Open in Identify · batch 2 of 3"]
     assert out["opening"] == "u1"
     assert out["opened"] == [[2, 3], "Open in Identify · batch 2 of 3", "u2"]
-    assert out["stop"] == [[3, 3], True]
+    # with every batch opened the button says so and offers batch 1 again
+    assert out["stop"] == [[3, 3], True, "All 3 batches opened · start over", "u1"]
     # a new selection starts at batch 1
-    assert out["other"] == [1, 4] and out["again"] == [3, 3]
+    assert out["other"] == [1, 4]
+    assert out["again"] == ["u1", [3, 3], "All 3 batches opened · start over"]
+    assert out["restart"] == [[2, 3], "Open in Identify · batch 2 of 3", "1"]
     assert out["resume"] == ["u2", [2, 4]] and out["grow"] == [2, 6]
     assert out["keys"] == ["idstep:2026-10-05:a", "idstep:2026-10-05:b"]
     # a new build starts over and drops what the old one remembered
     assert out["build"] == [1, 4] and out["pruned"] == []
     assert out["broken"] == [[2, 3], "Open in Identify · batch 2 of 3"]
     assert out["brokenOther"] == [1, 3] and out["brokenBack"] == [2, 3]
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="needs node")
+def test_area_box_link_cuts_to_view_counts_and_pages_like_the_batches():
+    # records at x = 0..9 on y = 0; odd ones fail the filters
+    P = {"n": 10, "pos": [c for i in range(10) for c in (i, 0)]}
+    bb = [2, -1, 8, 1]
+    js = (
+        "var document={};"
+        + (_ASSETS / "map_taxa.js").read_text()
+        + (_ASSETS / "map_area.js").read_text()
+        + f"const P={json.dumps(P)},bb={json.dumps(bb)},ok=i=>i%2===0,A=MapArea;"
+        + "const cut=A.boxed({w:0,s:-5,e:5,n:5},bb,P,ok),"
+        + "off=A.boxed({w:20,s:20,e:30,n:30},bb,P,ok);"
+        + "const st={groups:[],all:3,up:false,d1:'',d2:'',months:[],taxa:null,not:[],only:{}};"
+        + "const u=TX.identifyUrl(st,cut.box,{place_id:7085},A.BOXQ);"
+        + "console.log(JSON.stringify({cut:cut,off:off,url:u.url}));"
+    )
+    run = subprocess.run(["node", "-e", js], capture_output=True, text=True, check=True)
+    out = json.loads(run.stdout)
+    # cut to the view, the box holds x = 2, 4 that pass; with no overlap, the whole box: 2, 4, 6, 8
+    assert out["cut"] == {"box": {"w": 2, "s": -1, "e": 5, "n": 1}, "m": 2}
+    assert out["off"] == {"box": {"w": 2, "s": -1, "e": 8, "n": 1}, "m": 4}
+    q = parse_qs(urlparse(out["url"]).query)
+    assert q == {
+        "quality_grade": ["needs_id"],
+        "place_id": ["7085"],
+        "swlat": ["-1.0000"],
+        "swlng": ["2.0000"],
+        "nelat": ["1.0000"],
+        "nelng": ["5.0000"],
+        "per_page": ["200"],
+        "reviewed": ["false"],
+    }

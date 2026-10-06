@@ -2,6 +2,7 @@
 // opens that batch in a new tab and moves on to the next, stopping at the last, and ‹ › step by hand.
 // The batches opened are kept in localStorage per selection and build, so coming back to the same
 // records on the same build starts at the first batch not yet opened, and a new build starts over.
+// Once every batch is open the button says so and starts over at batch 1.
 // Storage that throws only loses that memory across visits. Progress never goes into the URL hash,
 // so a shared link opens at batch 1.
 var IdStep=(function(){
@@ -11,7 +12,7 @@ var PRE='idstep:';
 // (localStorage unless given).
 function IdStep(o){
   var a=o.a,label=a.textContent,store=o.store||function(){return localStorage;},pre=PRE+o.build+':',
-    MEM={},KEY='',LIST=[],K=0,k=1,CUR=0;
+    MEM={},KEY='',LIST=[],K=0,k=1,CUR=0,ALL=false;
   // what older builds remembered no longer names the same batches
   try{var s=store(),old=[];for(var i=0;i<s.length;i++){var n=s.key(i);
     if(n.indexOf(PRE)===0&&n.indexOf(pre)!==0)old.push(n);}
@@ -22,13 +23,17 @@ function IdStep(o){
       MEM[KEY]=d;}
     return MEM[KEY];}
   function first(){var d=done();for(var j=1;j<K;j++)if(!d[j])return j;return K;}
-  function show(){o.prev.hidden=o.next.hidden=K<2;
+  function all(){var d=done();for(var j=1;j<=K;j++)if(!d[j])return false;return true;}
+  function show(){o.prev.hidden=o.next.hidden=K<2;ALL=false;
     if(K<2){a.textContent=label;return;}
-    a.textContent='Open in Identify · batch '+k+' of '+K;a.href=LIST[k-1].url;
-    o.prev.disabled=k<=1;o.next.disabled=k>=K;}
+    ALL=k>=K&&all();
+    a.textContent=ALL?'All '+K+' batches opened · start over':'Open in Identify · batch '+k+' of '+K;
+    a.href=LIST[ALL?0:k-1].url;o.prev.disabled=k<=1;o.next.disabled=k>=K;}
   function go(j){k=CUR=Math.max(1,Math.min(K,j));show();}
   // The browser opens the href once the click handlers return, so the label and href move on after.
-  function open(){if(K<2)return;var d=done();d[k]=1;
+  function open(){if(K<2)return;var d=done();
+    if(ALL){d=MEM[KEY]={};k=1;}
+    d[k]=1;
     try{store().setItem(pre+KEY,Object.keys(d).join(','));}catch(e){}
     k=CUR=Math.min(K,k+1);setTimeout(show,0);}
   a.addEventListener('click',open);
@@ -39,7 +44,7 @@ function IdStep(o){
     // The batches for selection key, or fewer than two for a single link u; returns the href.
     // Until the viewer steps, the batch shown is the first not yet opened, kept as more records load.
     set:function(key,list,u){if(key!==KEY){KEY=key;CUR=0;}LIST=list;K=list.length>1?list.length:0;
-      k=!K?1:CUR?Math.min(CUR,K):first();show();return K?LIST[k-1].url:u;},
+      k=!K?1:CUR?Math.min(CUR,K):first();show();return K?LIST[ALL?0:k-1].url:u;},
     open:open,go:go,
     at:function(){return [k,K];}
   };

@@ -14,7 +14,7 @@
 // carries only the place id.
 var MapArea=(function(){
 'use strict';
-var Q=1e4,MAXV=1500,MAXMB=50,BATCH=200,MAXB=50,API='https://api.inaturalist.org/v1/places/',
+var Q=1e4,MAXV=1500,MAXMB=50,BATCH=200,MAXB=50,BOXQ={per_page:BATCH,reviewed:'false'},API='https://api.inaturalist.org/v1/places/',
   PARK=/park|protected area|ecological reserve|conservancy|recreation area/i,B64='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 
 function encode(rings){
@@ -124,6 +124,15 @@ var IDS='https://www.inaturalist.org/observations/identify?quality_grade=needs_i
 // The order the batches open in: newest first, as Identify lists them. A priority order can take
 // its place here without touching the button.
 function order(ids){return Array.prototype.slice.call(ids).sort(function(a,b){return b-a;});}
+// The area's bounding box bb cut to the view v (the whole box when they do not meet), and how many
+// of the records P that pass ok(i) fall inside it: what one Identify link for the box opens. Not
+// exact, as the box also holds records outside the shape.
+function boxed(v,bb,P,ok){
+  var w=Math.max(v.w,bb[0]),s=Math.max(v.s,bb[1]),e=Math.min(v.e,bb[2]),n=Math.min(v.n,bb[3]),m=0,i;
+  if(!(w<e&&s<n)){w=bb[0];s=bb[1];e=bb[2];n=bb[3];}
+  for(i=0;i<P.n;i++){var x=P.pos[2*i],y=P.pos[2*i+1];if(x>=w&&x<=e&&y>=s&&y<=n&&ok(i))m++;}
+  return {box:{w:w,s:s,e:e,n:n},m:m};
+}
 function batches(ids){
   var s=order(ids),out=[];
   for(var i=0;i<s.length;i+=BATCH){var b=s.slice(i,i+BATCH);
@@ -279,24 +288,21 @@ function MapArea(ctx){
     if(n<=BATCH*MAXB){LINKS=batches(ids);var k=LINKS.length;
       LINK='Exact: '+(k>1?nf.format(n)+' records in '+k+' batches of up to '+BATCH:n===1?'this record by id':
         'these '+nf.format(n)+' records by id')+(n>1?', less any identified since.':'.');
-      if(k>1)BOX=boxed(v,url,match,dated);ui();return LINKS[0].url;}
-    var o=boxed(v,url,match,dated);
+      if(k>1)BOX=boxlink(v,url,match,dated,true);ui();return LINKS[0].url;}
+    var o=boxlink(v,url,match,dated);
     LINK=nf.format(n)+' records: too many to open exactly (limit '+nf.format(BATCH*MAXB)+'). Make the '+
       'area smaller or add filters. Identify now opens the box around the shape, about '+nf.format(o.m)+
       ' records.';ui();
     return o.url;}
-  // The area's bounding box, cut to the view, and how many records Identify opens there: these filters
-  // without the area. One link, not exact; offered beside the batches and used past MAXB.
-  function boxed(v,url,match,dated){
-    var b=IDX.bb,w=Math.max(v.w,b[0]),s=Math.max(v.s,b[1]),e=Math.min(v.e,b[2]),nn=Math.min(v.n,b[3]);
-    if(!(w<e&&s<nn)){w=b[0];s=b[1];e=b[2];nn=b[3];}
-    var P=ctx.P(),pos=P.pos,m=0,i;
-    for(i=0;i<P.n;i++){var x=pos[2*i],y=pos[2*i+1];
-      if(x>=w&&x<=e&&y>=s&&y<=nn&&dated(i)&&match(i))m++;}
-    return {url:url({w:w,s:s,e:e,n:nn}),m:m};}
+  // One Identify link for the area's box, with the batches' page size and review filter. side marks
+  // the link offered beside the batches, so the button's own link is left alone.
+  function boxlink(v,url,match,dated,side){
+    var o=boxed(v,IDX.bb,ctx.P(),function(i){return dated(i)&&match(i);});
+    return {url:url(o.box,BOXQ,side),m:o.m};}
   return api;
 }
 MapArea.encode=encode;MapArea.decode=decode;MapArea.fromGeoJSON=fromGeoJSON;MapArea.simplify=simplify;
 MapArea.index=index;MapArea.inside=inside;MapArea.order=order;MapArea.batches=batches;
+MapArea.boxed=boxed;MapArea.BOXQ=BOXQ;
 return MapArea;
 })();
