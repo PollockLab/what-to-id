@@ -85,6 +85,7 @@ def reconcile_ids(
     session: requests.Session | None = None,
     sleep: float = SLEEP,
     max_requests: int = 2000,
+    extra: dict | None = None,
 ) -> tuple[set[int], set[int], int]:
     """Find pool ids iNaturalist no longer holds and ids it holds that the pool lacks.
 
@@ -95,11 +96,11 @@ def reconcile_ids(
     pool. Costs about one request per differing record times the log of the pool size, instead of
     a walk of every page. A range where one record went missing and another was never added keeps
     equal counts and is not inspected; running daily after the sync keeps that rare. Raises
-    ``RuntimeError`` past ``max_requests``.
+    ``RuntimeError`` past ``max_requests``. ``extra`` narrows the query, e.g. to one project.
     """
     ids = np.unique(np.asarray(list(pool_ids), dtype=np.int64))
     tomorrow = (pd.Timestamp.now(tz="UTC") + pd.Timedelta(days=1)).date().isoformat()
-    params = pool_params(None, d1=d1, freeze=tomorrow)
+    params = {**pool_params(None, d1=d1, freeze=tomorrow), **(extra or {})}
     session = session or make_session()
     used = 0
 

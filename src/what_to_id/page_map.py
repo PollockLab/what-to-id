@@ -56,6 +56,7 @@ import requests
 
 from what_to_id.batches import MAX_URL_LEN
 from what_to_id.inat import BC_PLACE_ID, INAT, SLEEP, TIMEOUT, make_session
+from what_to_id.map_projects import add_projects
 from what_to_id.page import ARM_WORDS, group_name
 from what_to_id.taxonomy import GROUP_TAXA, NO_RANK, NO_TAXON, PRESETS, load_tree, taxa_table
 
@@ -83,9 +84,10 @@ TOTAL_ONLY = {
 _COLS = ("id", "lat", "lon", "observed_on", "created_at", "iconic_taxon")
 _ASSETS = files("what_to_id") / "map_assets"
 # Inlined in this order; map_taxa.js and map_area.js define the taxon and area filters map.js calls,
-# and map_step.js the Identify button that steps through an area's batches.
+# map_step.js the Identify button that steps through an area's batches, and map_projects.js the
+# project filter.
 MAP_CSS = ("map.css", "map_area.css")
-MAP_JS = ("map_taxa.js", "map_step.js", "map_area.js", "map.js")
+MAP_JS = ("map_taxa.js", "map_step.js", "map_area.js", "map_projects.js", "map.js")
 
 
 def shard_name(k: int) -> str:
@@ -421,8 +423,9 @@ def write_map(
     freeze: str | None = None,
     totals: dict | None = None,
     tree: dict | None = None,
+    projects: Path | None = None,
 ) -> list[Path]:
-    """Write map.html and its data files into the site folder; ``totals`` from fetch_totals."""
+    """Write map.html and its data; totals from fetch_totals, projects from map_projects."""
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     blobs, meta = encode_points(pool, tree)
@@ -433,6 +436,7 @@ def write_map(
         over = over_totals(pool, meta)
         if over:
             _warn(f"{over} group-months hold more records than their totals; the page caps them")
+    add_projects(blobs, meta, projects)
     html = render_map(meta, freeze=freeze)
     low = html.lower()
     for w in ARM_WORDS:
@@ -471,6 +475,7 @@ def main(argv: list[str] | None = None) -> int:
         "is built without them",
     )
     ap.add_argument("--tree", type=Path, help="taxon tree cache from what_to_id.taxonomy")
+    ap.add_argument("--projects", type=Path, help="pool-projects.bin, from map_projects")
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     pool = pd.read_parquet(a.pool)
@@ -485,7 +490,9 @@ def main(argv: list[str] | None = None) -> int:
             totals = fetch_totals(groups, on=on)
         except (requests.RequestException, KeyError, ValueError) as e:
             _warn(f"could not fetch the all-record totals, building the map without them: {e}")
-    for path in write_map(a.out, pool, freeze=a.freeze, totals=totals, tree=tree):
+    for path in write_map(
+        a.out, pool, freeze=a.freeze, totals=totals, tree=tree, projects=a.projects
+    ):
         logging.getLogger("what_to_id").info("wrote %s (%d bytes)", path, path.stat().st_size)
     return 0
 
