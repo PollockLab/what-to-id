@@ -2,7 +2,9 @@
 
 The page (map.html) loads MapLibre and deck.gl from a CDN and reads the points from gzipped column
 files next to it. The files hold record ids, positions, dates, taxa and flags, sorted by id, and
-nothing about lists, so the map cannot tell which list a record sits on.
+nothing about lists, so the map cannot tell which list a record sits on. A viewer can also keep
+only the records inside a polygon they draw or load from GeoJSON (map_area.js); that runs in the
+page and needs nothing from the build.
 
 Each shard (pool-0.bin, pool-1.bin, ...), gzipped, little-endian, n records sorted by id,
 columns back to back:
@@ -80,6 +82,9 @@ TOTAL_ONLY = {
 }
 _COLS = ("id", "lat", "lon", "observed_on", "created_at", "iconic_taxon")
 _ASSETS = files("what_to_id") / "map_assets"
+# Inlined in this order; map_taxa.js and map_area.js define the taxon and area filters map.js calls.
+MAP_CSS = ("map.css", "map_area.css")
+MAP_JS = ("map_taxa.js", "map_area.js", "map.js")
 
 
 def shard_name(k: int) -> str:
@@ -393,15 +398,19 @@ def render_map(meta: dict, *, freeze: str | None, back: str = "index.html") -> s
         "MAPLIBRE_CSS": MAPLIBRE_CSS,
         "MAPLIBRE_JS": MAPLIBRE_JS,
         "DECK_JS": DECK_JS,
-        "CSS": (_ASSETS / "map.css").read_text(),
+        "CSS": _assets(MAP_CSS),
         "META": json.dumps(page_meta, sort_keys=True, separators=(",", ":")).replace("</", "<\\/"),
         "BASEMAPS": json.dumps(BASEMAPS, sort_keys=True),
-        "JS": (_ASSETS / "map_taxa.js").read_text() + (_ASSETS / "map.js").read_text(),
+        "JS": _assets(MAP_JS),
     }
     html = (_ASSETS / "map.html").read_text()
     for key, value in fill.items():
         html = html.replace("{{" + key + "}}", value)
     return html
+
+
+def _assets(names: tuple[str, ...]) -> str:
+    return "\n".join((_ASSETS / n).read_text() for n in names)
 
 
 def write_map(
