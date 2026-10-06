@@ -135,7 +135,7 @@ function batches(ids){
 // hash and park (the area and place id from the URL), place (the region's iNaturalist place id),
 // sel() (the selection as text) and step (the Identify button, an IdStep).
 function MapArea(ctx){
-  var map=ctx.map,RINGS=null,IDX=null,VER=0,MASK=null,NOTE='',LINK='',LINKS=[],PLACE=null,SEQ=0,QT=0,
+  var map=ctx.map,RINGS=null,IDX=null,VER=0,MASK=null,NOTE='',LINK='',LINKS=[],BOX=null,PLACE=null,SEQ=0,QT=0,
     mode=false,ended=0,pts=[],cursor=null,ready=false,color=getComputedStyle(document.documentElement)
       .getPropertyValue('--share').trim()||'#c2410c',nf=new Intl.NumberFormat('en-CA');
   var box=document.createElement('div');box.className='maplibregl-ctrl area';
@@ -145,17 +145,19 @@ function MapArea(ctx){
     '<button type="button" data-a="cancel" hidden>Cancel</button><button type="button" data-a="clear" '+
     'hidden>Clear area</button></div><div class="apark"><input type="search" placeholder="Find a BC park" '+
     'aria-label="Find a BC park or protected area" autocomplete="off"><ul class="alist" hidden></ul></div>'+
-    '<p class="anote" aria-live="polite" hidden></p>';
+    '<p class="anote" aria-live="polite" hidden></p><a class="abox" target="_blank" rel="noopener" hidden></a>';
   function el(a){return box.querySelector('[data-a="'+a+'"]');}
   var note=box.querySelector('.anote'),file=box.querySelector('.afile input'),
-    q=box.querySelector('.apark input'),list=box.querySelector('.alist');
+    q=box.querySelector('.apark input'),list=box.querySelector('.alist'),abox=box.querySelector('.abox');
   map.addControl({onAdd:function(){return box;},onRemove:function(){}},'top-left');
   function ui(){
     el('draw').hidden=mode;box.querySelector('.afile').hidden=mode;box.querySelector('.apark').hidden=mode;el('finish').hidden=!mode;
     el('cancel').hidden=!mode;el('clear').hidden=mode||!RINGS;el('finish').disabled=pts.length<3;
     var t=mode?(pts.length<3?'Click or tap the map to add corners.':'Double-click, tap the first corner '+
       'or press Finish to close the area.')+' Esc cancels.':(NOTE+' '+LINK).trim();
-    note.textContent=t;note.hidden=!t;
+    note.textContent=t;note.hidden=!t;abox.hidden=mode||!BOX;
+    if(BOX){abox.href=BOX.url;abox.textContent='Or open the box around the shape in one link, about '+
+      nf.format(BOX.m)+' records';}
   }
   function paint(){
     if(!ready)return;var f=[];
@@ -261,10 +263,10 @@ function MapArea(ctx){
     link:function(v,url,match){var u=link(v,url,match);return ctx.step.set(ctx.sel(),LINKS,u);}
   };
   // What iNaturalist can filter (a park's place_id) goes into the link as is. Otherwise it lists the
-  // records by id, in LINKS, batches of BATCH. Past MAXB batches the note asks for a narrower
-  // selection, and until then the link opens the area's bounding box, cut to the view, with the count
-  // it will open. url(box, params) builds the link; a null box leaves it out.
-  function link(v,url,match){var t=term();LINKS=[];
+  // records by id, in LINKS, batches of BATCH, and offers the bounding box as one link beside them.
+  // Past MAXB batches the note asks for a narrower selection, and until then the link opens the box.
+  // url(box, params) builds the link; a null box leaves it out.
+  function link(v,url,match){var t=term();LINKS=[];BOX=null;
     if(!t||!ctx.P().n){LINK='';ui();return url(v);}
     var P=ctx.P(),keep=ctx.keep(),S=ctx.S,day=S.up?P.up:P.obs,full=S.lo===0&&S.hi===ctx.LAST,
       ids=[],n=0,i,d,q=t.inat();
@@ -276,17 +278,22 @@ function MapArea(ctx){
     if(!n){LINK='No records inside this area match these filters.';ui();return url(v);}
     if(n<=BATCH*MAXB){LINKS=batches(ids);var k=LINKS.length;
       LINK='Exact: '+(k>1?nf.format(n)+' records in '+k+' batches of up to '+BATCH:n===1?'this record by id':
-        'these '+nf.format(n)+' records by id')+(n>1?', less any identified since.':'.');ui();return LINKS[0].url;}
+        'these '+nf.format(n)+' records by id')+(n>1?', less any identified since.':'.');
+      if(k>1)BOX=boxed(v,url,match,dated);ui();return LINKS[0].url;}
+    var o=boxed(v,url,match,dated);
+    LINK=nf.format(n)+' records: too many to open exactly (limit '+nf.format(BATCH*MAXB)+'). Make the '+
+      'area smaller or add filters. Identify now opens the box around the shape, about '+nf.format(o.m)+
+      ' records.';ui();
+    return o.url;}
+  // The area's bounding box, cut to the view, and how many records Identify opens there: these filters
+  // without the area. One link, not exact; offered beside the batches and used past MAXB.
+  function boxed(v,url,match,dated){
     var b=IDX.bb,w=Math.max(v.w,b[0]),s=Math.max(v.s,b[1]),e=Math.min(v.e,b[2]),nn=Math.min(v.n,b[3]);
     if(!(w<e&&s<nn)){w=b[0];s=b[1];e=b[2];nn=b[3];}
-    // the records Identify will open: these filters without the area, inside the box
-    var pos=P.pos,m=0;
+    var P=ctx.P(),pos=P.pos,m=0,i;
     for(i=0;i<P.n;i++){var x=pos[2*i],y=pos[2*i+1];
       if(x>=w&&x<=e&&y>=s&&y<=nn&&dated(i)&&match(i))m++;}
-    LINK=nf.format(n)+' records: too many to open exactly (limit '+nf.format(BATCH*MAXB)+'). Make the '+
-      'area smaller or add filters. Identify now opens the box around the shape, about '+nf.format(m)+
-      ' records.';ui();
-    return url({w:w,s:s,e:e,n:nn});}
+    return {url:url({w:w,s:s,e:e,n:nn}),m:m};}
   return api;
 }
 MapArea.encode=encode;MapArea.decode=decode;MapArea.fromGeoJSON=fromGeoJSON;MapArea.simplify=simplify;

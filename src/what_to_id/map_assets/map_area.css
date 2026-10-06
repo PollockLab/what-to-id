@@ -11,6 +11,8 @@
 .afile:focus-within{outline:2px solid var(--bar)}
 .anote{margin:6px 2px 0;font-size:12px;color:var(--muted)}
 .anote[hidden]{display:none}
+.abox{display:block;margin:4px 2px 0;font-size:12px;color:inherit}
+.abox[hidden]{display:none}
 .apark{position:relative;margin-top:4px}
 .apark[hidden]{display:none}
 .apark input{width:100%;box-sizing:border-box;font:inherit;font-size:12px;padding:4px 8px;min-height:28px;
