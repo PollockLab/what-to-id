@@ -52,7 +52,7 @@ var S={up:false,lo:0,hi:LAST,months:0,groups:META.groups.map(function(){return t
   (h.get('only')||'').split(',').forEach(function(k){
     if(META.flags.indexOf(ONLYFLAG[k])>=0)S.only[k]=true;});
   S.picks=TX.read(h.get('taxa'));S.oldq=S.picks.length?'':h.get('q')||'';S.rec=+h.get('record')||null;
-  S.area=h.get('area')||'';
+  S.area=h.get('area')||'';S.park=+h.get('park')||0;
   var at=(h.get('at')||'').split('/').map(Number);if(at.length===3&&at.every(isFinite))S.at=at;
   S.fly=!!S.rec&&!S.at;
 })();
@@ -66,7 +66,7 @@ function writeHash(){clearTimeout(hashTimer);hashTimer=setTimeout(function(){
   var only=Object.keys(S.only).filter(function(k){return S.only[k];});
   if(only.length)h.push('only='+only.join(','));
   if(S.picks.length)h.push('taxa='+TX.write(S.picks));
-  if(AREA.on())h.push('area='+AREA.hash());
+  if(AREA.on())h.push(AREA.hash());
   if(P.n&&SEL>=0)h.push('record='+P.id[SEL]);else if(S.rec)h.push('record='+S.rec);
   var c=map.getCenter();h.push('at='+map.getZoom().toFixed(1)+'/'+c.lat.toFixed(3)+'/'+
     c.lng.toFixed(3));
@@ -206,7 +206,7 @@ function link(){
     not:TF.not,only:S.only};
   // with an area on, the link may list the records by id instead, and then u stays null
   var a=$('identify');a.href=AREA.link({w:b.getWest(),s:b.getSouth(),e:b.getEast(),n:b.getNorth()},
-    function(v){u=TX.identifyUrl(st,v,META);return u.url;},META.max_url,match);
+    function(v,p){u=TX.identifyUrl(st,v,META,p);return u.url;},META.max_url,match);
   a.title='Opens these records in the iNaturalist Identify page.';
   // say when Identify cannot show the same records, and what it opens instead
   var why=[],lost=u?u.lost:[];
@@ -522,7 +522,7 @@ else{opts.bounds=[[b[0],b[1]],[b[2],b[3]]];opts.fitBoundsOptions={padding:20};}
 var map=new maplibregl.Map(opts);document.body.appendChild(ptip);
 map.addControl(new maplibregl.NavigationControl({showCompass:false}));
 var overlay=new deck.MapboxOverlay({interleaved:false,pickingRadius:8,layers:[]});map.addControl(overlay);
-var AREA=MapArea({map:map,S:S,LAST:LAST,hash:S.area,P:function(){return P;},keep:function(){return KEEP;},
+var AREA=MapArea({map:map,S:S,LAST:LAST,hash:S.area,park:S.park,place:META.place_id,P:function(){return P;},keep:function(){return KEEP;},
   change:refilter});
 // Zoomed out, blending millions of overlapping dots takes about 250 ms a frame, so while the map
 // moves it draws one record in ten, spread across BC by the id order, and all of them once it stops.

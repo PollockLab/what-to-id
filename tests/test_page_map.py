@@ -420,7 +420,9 @@ def test_page_inlines_the_area_filter_before_the_map_script():
     area = (_ASSETS / "map_area.js").read_text()
     assert area in html and (_ASSETS / "map_area.css").read_text() in html
     assert html.index("var MapArea=") < html.index("var AREA=MapArea(")
-    assert "AREA.mask(n)" in html and "'area='+AREA.hash()" in html
+    assert "AREA.mask(n)" in html and "h.push(AREA.hash())" in html
+    # a park comes back from the hash by its place id, and its place id goes into the Identify link
+    assert "park:S.park,place:META.place_id" in html and "q.set(k,extra[k])" in html
     # the Identify box count reads the filters without the area
     assert "META.max_url,match)" in html and "function match(i)" in html
 

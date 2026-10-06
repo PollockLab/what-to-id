@@ -8,9 +8,14 @@
 // a self-intersecting drawing still has an inside. The URL hash carries the same rings, so a shared
 // link restores the same area and the same count. Each ring is coded as zigzag varint steps from
 // the previous corner, 5 bits to a base64url character, rings joined by '.'.
+//
+// A park is an area too: its boundary is iNaturalist's own place geometry, fetched when picked, so
+// the map and the Identify link (which filters by place_id) count the same place. The hash then
+// carries only the place id.
 var MapArea=(function(){
 'use strict';
-var Q=1e4,MAXV=1500,MAXMB=50,B64='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+var Q=1e4,MAXV=1500,MAXMB=50,API='https://api.inaturalist.org/v1/places/',
+  PARK=/park|protected area|ecological reserve|conservancy|recreation area/i,B64='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 
 function encode(rings){
   return rings.map(function(r){var s='',px=0,py=0;
@@ -112,9 +117,10 @@ function inside(I,x,y){
   return c;
 }
 
-// ctx: map, S, LAST, P() and keep() (the current records and kept flags), change() to refilter.
+// ctx: map, S, LAST, P() and keep() (the current records and kept flags), change() to refilter,
+// hash and park (the area and place id from the URL), place (the region's iNaturalist place id).
 function MapArea(ctx){
-  var map=ctx.map,RINGS=null,IDX=null,VER=0,MASK=null,NOTE='',LINK='',
+  var map=ctx.map,RINGS=null,IDX=null,VER=0,MASK=null,NOTE='',LINK='',PLACE=null,SEQ=0,QT=0,
     mode=false,ended=0,pts=[],cursor=null,ready=false,color=getComputedStyle(document.documentElement)
       .getPropertyValue('--share').trim()||'#c2410c',nf=new Intl.NumberFormat('en-CA');
   var box=document.createElement('div');box.className='maplibregl-ctrl area';
@@ -122,12 +128,15 @@ function MapArea(ctx){
     '<label class="afile">Load GeoJSON<input type="file" accept=".geojson,.json,application/geo+json,'+
     'application/json"></label><button type="button" data-a="finish" hidden>Finish</button>'+
     '<button type="button" data-a="cancel" hidden>Cancel</button><button type="button" data-a="clear" '+
-    'hidden>Clear area</button></div><p class="anote" aria-live="polite" hidden></p>';
+    'hidden>Clear area</button></div><div class="apark"><input type="search" placeholder="Find a BC park" '+
+    'aria-label="Find a BC park or protected area" autocomplete="off"><ul class="alist" hidden></ul></div>'+
+    '<p class="anote" aria-live="polite" hidden></p>';
   function el(a){return box.querySelector('[data-a="'+a+'"]');}
-  var note=box.querySelector('.anote'),file=box.querySelector('input');
+  var note=box.querySelector('.anote'),file=box.querySelector('.afile input'),
+    q=box.querySelector('.apark input'),list=box.querySelector('.alist');
   map.addControl({onAdd:function(){return box;},onRemove:function(){}},'top-left');
   function ui(){
-    el('draw').hidden=mode;box.querySelector('.afile').hidden=mode;el('finish').hidden=!mode;
+    el('draw').hidden=mode;box.querySelector('.afile').hidden=mode;box.querySelector('.apark').hidden=mode;el('finish').hidden=!mode;
     el('cancel').hidden=!mode;el('clear').hidden=mode||!RINGS;el('finish').disabled=pts.length<3;
     var t=mode?(pts.length<3?'Click or tap the map to add corners.':'Double-click, tap the first corner '+
       'or press Finish to close the area.')+' Esc cancels.':(NOTE+' '+LINK).trim();
@@ -151,9 +160,10 @@ function MapArea(ctx){
       paint:{'circle-color':'#fff','circle-stroke-color':color,'circle-stroke-width':2,
         'circle-radius':['case',['get','first'],7,4]}});
     ready=true;paint();});
-  // Sets the area, or clears it with null, and refilters.
-  function set(rings,msg,quiet){
+  // Sets the area, or clears it with null, and refilters; place {id, label} when it is a park.
+  function set(rings,msg,quiet,place){
     RINGS=rings&&rings.length?rings:null;IDX=RINGS&&index(RINGS);VER++;MASK=null;NOTE=msg||'';
+    PLACE=RINGS&&place||null;if(!place){SEQ++;q.value='';}
     performance.mark('area');paint();ui();if(!quiet)ctx.change();
   }
   function prepare(rings){
@@ -184,30 +194,69 @@ function MapArea(ctx){
       var b=IDX.bb;map.fitBounds([[b[0],b[1]],[b[2],b[3]]],{padding:40,maxZoom:14});})
       .catch(function(e){NOTE='Could not use '+f.name+': '+(e instanceof SyntaxError?'it is not JSON.':e.message);
         ui();});};
-  if(ctx.hash){try{set(decode(ctx.hash),'',true);}catch(e){NOTE='The area in this link could not be read.';ui();}}
+  // Park search: iNaturalist's place names under the region, then the picked place's boundary.
+  // iNaturalist answers a busy moment with an error that carries no CORS header, so try twice more
+  function get(u,n){return fetch(u).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();})
+    .catch(function(e){if(!n)throw e;return new Promise(function(ok){setTimeout(ok,1500);})
+      .then(function(){return get(u,n-1);});});}
+  function park(id,label,fit){var seq=++SEQ;NOTE='Loading '+(label||'the park')+'.';LINK='';ui();
+    get(API+id,2).then(function(j){
+      var pl=j.results&&j.results[0];if(seq!==SEQ)return;
+      if(!pl||!pl.geometry_geojson)throw new Error('no boundary');
+      var p=prepare(fromGeoJSON(pl.geometry_geojson)),name=label||pl.name;q.value=name;
+      set(p.rings,p.msg,false,{id:pl.id,label:name});
+      if(fit){var b=IDX.bb;map.fitBounds([[b[0],b[1]],[b[2],b[3]]],{padding:40,maxZoom:14});}})
+      .catch(function(){if(seq===SEQ){NOTE='Could not load that park from iNaturalist.';ui();}});}
+  function pick(li){list.hidden=true;park(+li.dataset.id,li.textContent,true);}
+  q.oninput=function(){clearTimeout(QT);var t=q.value.trim();if(t.length<3){list.hidden=true;return;}
+    QT=setTimeout(function(){get(API+'autocomplete?per_page=30&q='+encodeURIComponent(t),1)
+      .then(function(j){if(q.value.trim()!==t)return;
+        var seen={},rows=(j.results||[]).filter(function(p){return p.admin_level==null&&PARK.test(p.name)&&
+          (p.ancestor_place_ids||[]).indexOf(+ctx.place)>=0;}).slice(0,8);
+        rows.forEach(function(p){seen[p.name]=(seen[p.name]||0)+1;});
+        list.innerHTML='';rows.forEach(function(p){var li=document.createElement('li');li.tabIndex=0;
+          li.dataset.id=p.id;li.textContent=p.name+(seen[p.name]>1?' (place '+p.id+')':'');
+          li.onclick=function(){pick(li);};li.onkeydown=function(e){if(e.key==='Enter')pick(li);};
+          list.appendChild(li);});
+        if(!rows.length){var li=document.createElement('li');li.className='anone';
+          li.textContent='No BC park on iNaturalist matches.';list.appendChild(li);}
+        list.hidden=false;}).catch(function(){});},300);};
+  if(ctx.park)park(ctx.park,'',false);
+  else if(ctx.hash){try{set(decode(ctx.hash),'',true);}catch(e){NOTE='The area in this link could not be read.';ui();}}
   else ui();
-  return {
+  // The area as a filter term: what it keeps, and what iNaturalist can say of it.
+  function term(){if(!RINGS)return null;
+    return {dim:'area',kind:PLACE?'park':'polygon',id:PLACE?PLACE.id:encode(RINGS),
+      label:PLACE?PLACE.label:'Drawn area',exclude:false,mask:function(){return api.mask(ctx.P().n);},
+      inat:function(){return PLACE?{params:{place_id:PLACE.id},exact:true}:{params:{},exact:false};}};}
+  var api={
     on:function(){return !!RINGS;},
-    // true while drawing and briefly after, so the tap that closes the shape does not open a record's tip
+    // true while drawing and briefly after, so the closing tap opens no record's tip
     busy:function(){return mode||performance.now()-ended<500;},
     ver:function(){return VER;},
-    hash:function(){return RINGS?encode(RINGS):'';},
-    clear:function(){if(mode)stop();if(RINGS||NOTE)set(null);},
+    // the hash parameter: area=<rings> or park=<place id>
+    hash:function(){return !RINGS?'':PLACE?'park='+PLACE.id:'area='+encode(RINGS);},
+    term:term,
+    clear:function(){if(mode)stop();SEQ++;list.hidden=true;if(RINGS||NOTE)set(null);},
     // 1 for each record inside the area, null without one; extended as shards arrive.
     mask:function(n){if(!RINGS)return null;if(MASK&&MASK.length===n)return MASK;
       var pos=ctx.P().pos,m=new Uint8Array(n),i=0;if(MASK){m.set(MASK);i=MASK.length;}
       for(;i<n;i++)m[i]=inside(IDX,pos[2*i],pos[2*i+1]);MASK=m;return m;},
-    // The Identify link. iNaturalist has no polygon filter, so it lists the records by id when they
-    // fit in the URL, and otherwise opens the area's bounding box, cut to the view. The note says
-    // which, with the count Identify will open next to the count inside the area.
-    link:function(v,url,maxUrl,match){
-      if(!RINGS||!ctx.P().n){LINK='';ui();return url(v);}
+    // The Identify link. What iNaturalist can filter (a park's place_id) goes into the link as is.
+    // Otherwise it lists the records by id when they fit in the URL, and else opens the area's
+    // bounding box, cut to the view. The note says which, with the count Identify will open next to
+    // the count inside the area. url(box, params) builds the link; a null box leaves it out.
+    link:function(v,url,maxUrl,match){var t=term();
+      if(!t||!ctx.P().n){LINK='';ui();return url(v);}
       var P=ctx.P(),keep=ctx.keep(),S=ctx.S,day=S.up?P.up:P.obs,full=S.lo===0&&S.hi===ctx.LAST,
         base='https://www.inaturalist.org/observations/identify?quality_grade=needs_id&id=',ids=[],
-        len=base.length,n=0,fits=true,i,d;
+        len=base.length,n=0,fits=true,i,d,q=t.inat();
       function dated(i){d=day[i];return d===65535?full:d>=S.lo&&d<=S.hi;}
       for(i=0;i<P.n;i++){if(!keep[i]||!dated(i))continue;
         n++;if(fits){len+=String(P.id[i]).length+1;if(len>maxUrl)fits=false;else ids.push(P.id[i]);}}
+      if(q.exact){LINK='Identify is exact: it uses the iNaturalist place for '+t.label+'. '+
+        (n===1?'1 record on this map is':nf.format(n)+' records on this map are')+' inside its boundary.';ui();
+        return url(null,q.params);}
       if(!n){LINK='No records inside this area match these filters.';ui();return url(v);}
       if(fits){LINK='Identify is exact: it opens '+(n===1?'this record':'these '+nf.format(n)+' records')+
         ' by id.';ui();return base+ids.join(',');}
@@ -221,6 +270,7 @@ function MapArea(ctx){
         nf.format(n)+' are inside it.';ui();
       return url({w:w,s:s,e:e,n:nn});}
   };
+  return api;
 }
 MapArea.encode=encode;MapArea.decode=decode;MapArea.fromGeoJSON=fromGeoJSON;MapArea.simplify=simplify;
 MapArea.index=index;MapArea.inside=inside;

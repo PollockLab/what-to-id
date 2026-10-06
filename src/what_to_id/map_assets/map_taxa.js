@@ -163,11 +163,14 @@ function picker(o){
 // The Identify link: the same records on iNaturalist, as far as its filters can say it. iNaturalist
 // counts a taxon's descendants under taxon_id and without_taxon_id, as the map does. lost names what
 // the link had to leave out for MAX_IDS or the URL length: 'taxa' (it then opens every taxon) and
-// 'not' (it then keeps the excluded taxa).
-function identifyUrl(st,b,meta){
+// 'not' (it then keeps the excluded taxa). A null box b leaves the bounding box out; extra params,
+// such as a park's place_id, override the rest.
+function identifyUrl(st,b,meta,extra){
   var q=new URLSearchParams({quality_grade:'needs_id',place_id:meta.place_id}),r=function(v,m){
     return Math.max(-m,Math.min(m,v)).toFixed(4);},lost=[];
-  q.set('swlat',r(b.s,90));q.set('swlng',r(b.w,180));q.set('nelat',r(b.n,90));q.set('nelng',r(b.e,180));
+  if(b){q.set('swlat',r(b.s,90));q.set('swlng',r(b.w,180));q.set('nelat',r(b.n,90));
+    q.set('nelng',r(b.e,180));}
+  for(var k in extra||{})q.set(k,extra[k]);
   var g=st.groups;
   if(g.length&&g.length<st.all&&g.indexOf('rest')<0)q.set('iconic_taxa',g.join(','));
   if(st.d1)q.set(st.up?'created_d1':'d1',st.d1);if(st.d2)q.set(st.up?'created_d2':'d2',st.d2);
