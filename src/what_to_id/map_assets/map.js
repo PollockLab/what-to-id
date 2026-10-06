@@ -39,7 +39,7 @@ for(var d=0;d<META.days;d++){var t=new Date(D0+d*DAY);MOY[d]=t.getUTCMonth();DOM
 
 // What the viewer picked. Written to the URL hash so a view can be shared or bookmarked.
 var S={up:false,lo:0,hi:LAST,months:0,groups:META.groups.map(function(){return true;}),
-  only:{},q:'',rec:null,at:null,fly:false};
+  only:{},picks:[],rec:null,at:null,fly:false};
 (function readHash(){
   var h=new URLSearchParams(location.hash.slice(1));
   S.up=h.get('by')==='uploaded';
@@ -51,7 +51,7 @@ var S={up:false,lo:0,hi:LAST,months:0,groups:META.groups.map(function(){return t
     return gs.indexOf(g)>=0;});if(gm.some(Boolean))S.groups=gm;}
   (h.get('only')||'').split(',').forEach(function(k){
     if(META.flags.indexOf(ONLYFLAG[k])>=0)S.only[k]=true;});
-  S.q=h.get('q')||'';S.rec=+h.get('record')||null;
+  S.picks=TX.read(h.get('taxa'));S.oldq=S.picks.length?'':h.get('q')||'';S.rec=+h.get('record')||null;
   var at=(h.get('at')||'').split('/').map(Number);if(at.length===3&&at.every(isFinite))S.at=at;
   S.fly=!!S.rec&&!S.at;
 })();
@@ -64,7 +64,7 @@ function writeHash(){clearTimeout(hashTimer);hashTimer=setTimeout(function(){
     return S.groups[i];}).map(encodeURIComponent).join(','));
   var only=Object.keys(S.only).filter(function(k){return S.only[k];});
   if(only.length)h.push('only='+only.join(','));
-  if(S.q)h.push('q='+encodeURIComponent(S.q));
+  if(S.picks.length)h.push('taxa='+TX.write(S.picks));
   if(P.n&&SEL>=0)h.push('record='+P.id[SEL]);else if(S.rec)h.push('record='+S.rec);
   var c=map.getCenter();h.push('at='+map.getZoom().toFixed(1)+'/'+c.lat.toFixed(3)+'/'+
     c.lng.toFixed(3));
@@ -74,7 +74,7 @@ function writeHash(){clearTimeout(hashTimer);hashTimer=setTimeout(function(){
 var P={n:0,id:new Uint32Array(0),pos:new Float32Array(0),obs:new Uint16Array(0),
   up:new Uint16Array(0),tax:new Uint16Array(0),grp:new Uint8Array(0),ids:new Uint8Array(0),
   fl:new Uint8Array(0)};
-var TAXA=null,TAXOK=null,TAXID=null,GONE={},GONE_NEW=false,KEEP=new Uint8Array(0),SEL=-1,
+var TAXA=null,TF=TX.filter(null,[]),GONE={},GONE_NEW=false,KEEP=new Uint8Array(0),SEL=-1,
   CUM=new Float64Array(META.days+1),TOT=META.totals||null,TC=null,NODAY=0,PER=null;
 function cat(a,b){var c=new a.constructor(a.length+b.length);c.set(a);c.set(b,a.length);return c;}
 function unzip(buf){
@@ -104,14 +104,16 @@ function addShard(buf,n){
 
 // The map filters on the GPU. Each record carries its observed and uploaded day (-1 for none) as
 // filter values, and four categories: group, observed month, uploaded month (12 for no date) and a
-// status value, bit 1 introduced, 2 threatened, 4 obscured or imprecise, 8 kept by the taxon search
+// status value, bit 1 introduced, 2 threatened, 4 obscured or imprecise, 8 kept by the taxon picks
 // and not deleted, 16 one record in ten. Group, month, status and date changes then only change the
-// filter settings; the data is uploaded again only when records arrive or the taxon search or
-// deletions change.
-var ST_INTRO=1,ST_THREAT=2,ST_INEXACT=4,ST_KEEP=8,ST_SAMPLE=16,PD=null,PD_TAX=null,PD_GONE=-1,PD_CAT=0;
+// filter settings; the data is uploaded again only when records arrive, the picks or deletions
+// change, or the groups change while a taxon is included (the groups and included taxa are one set,
+// so the kept bit then carries the groups too).
+var ST_INTRO=1,ST_THREAT=2,ST_INEXACT=4,ST_KEEP=8,ST_SAMPLE=16,PD=null,PD_KEY=null,PD_GONE=-1,PD_CAT=0;
+function inc(){return !!TF.inc;}
 function pointData(){
-  var n=P.n,gone=Object.keys(GONE).length,i;
-  if(PD&&PD.length===n&&PD_TAX===TAXOK&&PD_GONE===gone)return;
+  var n=P.n,gone=Object.keys(GONE).length,i,key=[TF,inc()&&!allGroups()?S.groups.join():''];
+  if(PD&&PD.length===n&&PD_KEY&&PD_KEY[0]===key[0]&&PD_KEY[1]===key[1]&&PD_GONE===gone)return;
   var same=PD&&PD.length===n,days=same?PD.days:new Float32Array(2*n),
     cat=same?PD.attributes.getFilterCategory.value.slice():new Uint8Array(4*n);
   if(!same)for(i=0;i<n;i++){var o=P.obs[i],u=P.up[i],f=P.fl[i];
@@ -119,19 +121,20 @@ function pointData(){
     cat[4*i]=P.grp[i];cat[4*i+1]=o===NO?12:MOY[o];cat[4*i+2]=u===NO?12:MOY[u];
     cat[4*i+3]=(f&FLAG.introduced?ST_INTRO:0)|(f&FLAG.threatened?ST_THREAT:0)|
       (f&(FLAG.obscured|FLAG.imprecise)?ST_INEXACT:0)|(i%10===0?ST_SAMPLE:0);}
-  // only the kept bit follows the taxon search and deletions
-  var ok=TAXOK,tax=P.tax,id=P.id,nt=NOTAX;
-  for(i=0;i<n;i++){var t=tax[i],drop=(ok!==null&&(t===nt||ok[t]===0))||(gone>0&&GONE[id[i]]===1);
-    cat[4*i+3]=cat[4*i+3]&~ST_KEEP|(drop?0:ST_KEEP);}
+  // only the kept bit follows the picks, the groups beside them and deletions
+  var ti=TF.inc,te=TF.exc,gs=key[1]?S.groups:null,tax=P.tax,grp=P.grp,id=P.id,nt=NOTAX;
+  for(i=0;i<n;i++){var t=tax[i],keep=!ti||(t!==nt&&ti[t]===1)||(gs!==null&&gs[grp[i]]);
+    if(te&&t!==nt&&te[t]===1||gone>0&&GONE[id[i]]===1)keep=false;
+    cat[4*i+3]=cat[4*i+3]&~ST_KEEP|(keep?ST_KEEP:0);}
   // a new taxon search or deletion swaps only the categories, so deck.gl uploads only those
   if(same){PD.attributes.getFilterCategory={value:cat,size:4};PD_CAT++;}
   else PD={length:n,days:days,attributes:{getPosition:{value:P.pos,size:2},
     getFilterValue:{value:days,size:2},getFilterCategory:{value:cat,size:4}}};
-  PD_TAX=TAXOK;PD_GONE=gone;
+  PD_KEY=key;PD_GONE=gone;
 }
 function categories(thin){
   var groups=[],mon=[],all=[],st=[],req=0,hide=0,i;
-  S.groups.forEach(function(v,j){if(v)groups.push(j);});
+  S.groups.forEach(function(v,j){if(v||inc())groups.push(j);});
   for(i=0;i<13;i++){all.push(i);if(S.months?i<12&&S.months>>i&1:true)mon.push(i);}
   if(S.only.introduced)req|=ST_INTRO;if(S.only.threatened)req|=ST_THREAT;if(S.only.exact)hide=ST_INEXACT;
   for(i=0;i<2*ST_SAMPLE;i++)if(i&ST_KEEP&&(i&req)===req&&!(i&hide)&&(!thin||i&ST_SAMPLE))st.push(i);
@@ -157,7 +160,7 @@ function recount(){
   for(var d=0;d<META.days;d++)CUM[d+1]=CUM[d]+PER[d];
   // One status filter reads its own totals; two together have none
   var on=Object.keys(S.only).filter(function(k){return S.only[k];}),
-    tt=!TOT||TAXOK||on.length>1?null:on.length?TOT.only&&TOT.only[on[0]]:TOT;
+    tt=!TOT||S.picks.length||on.length>1?null:on.length?TOT.only&&TOT.only[on[0]]:TOT;
   TC=null;
   if(tt){var rows=tt[S.up?'up':'obs'],nm=rows[0].length;TC=new Float64Array(nm+1);
     for(var k=0;k<nm;k++){var v=0;if(!m||m>>(M0+k)%12&1)for(var j=0;j<rows.length;j++)if(g[j])v+=rows[j][k];
@@ -183,29 +186,24 @@ function render(){
     p.el.setAttribute('aria-pressed',String(r[0]===S.lo&&r[1]===S.hi));});
   draw();layers();link();writeHash();
 }
-// The Identify link: the same records on iNaturalist, as far as its filters can say it.
-function identifyUrl(st,b,meta){
-  var q=new URLSearchParams({quality_grade:'needs_id',place_id:meta.place_id}),r=function(v,m){
-    return Math.max(-m,Math.min(m,v)).toFixed(4);};
-  q.set('swlat',r(b.s,90));q.set('swlng',r(b.w,180));q.set('nelat',r(b.n,90));q.set('nelng',r(b.e,180));
-  var g=st.groups;
-  if(g.length&&g.length<st.all&&g.indexOf('rest')<0)q.set('iconic_taxa',g.join(','));
-  if(st.d1)q.set(st.up?'created_d1':'d1',st.d1);if(st.d2)q.set(st.up?'created_d2':'d2',st.d2);
-  if(st.months.length)q.set('month',st.months.join(','));
-  // iNaturalist has a search parameter for each status filter, so Identify opens the same records
-  var o=st.only||{};if(o.introduced)q.set('introduced','true');if(o.threatened)q.set('threatened','true');
-  if(o.exact){q.set('obscuration','none');q.set('acc_below_or_unknown',meta.imprecise_m+1);}
-  var base='https://www.inaturalist.org/observations/identify?',u=base+q;
-  if(st.taxa&&st.taxa.length&&st.taxa.length<=50){q.set('taxon_id',st.taxa.join(','));
-    if((base+q).length<meta.max_url)u=base+q;}
-  return u;
-}
 function link(){
   var b=map.getBounds(),m=[];for(var i=0;i<12;i++)if(S.months>>i&1)m.push(i+1);
-  var a=$('identify');a.href=identifyUrl({groups:META.groups.filter(function(g,i){return S.groups[i];}),
-    all:META.groups.length,up:S.up,d1:S.lo>0?iso(S.lo):'',d2:S.hi<LAST?iso(S.hi):'',months:m,taxa:TAXID,
-    only:S.only},{w:b.getWest(),s:b.getSouth(),e:b.getEast(),n:b.getNorth()},META);
-  a.title='Opens these records in the iNaturalist Identify page.';
+  // with a taxon included, the groups go in as their taxa, which iNaturalist adds to the picks
+  var gs=META.groups.filter(function(g,i){return S.groups[i];}),taxa=TF.ids.slice(),gid=META.group_ids||{};
+  if(TF.ids.length&&!allGroups())gs.forEach(function(g){taxa.push(gid[g]||NaN);});
+  if(taxa.some(isNaN))taxa=null;
+  var u=TX.identifyUrl({groups:TF.ids.length?[]:gs,
+    all:META.groups.length,up:S.up,d1:S.lo>0?iso(S.lo):'',d2:S.hi<LAST?iso(S.hi):'',months:m,taxa:taxa,
+    not:TF.not,only:S.only},{w:b.getWest(),s:b.getSouth(),e:b.getEast(),n:b.getNorth()},META);
+  var a=$('identify');a.href=u.url;a.title='Opens these records in the iNaturalist Identify page.';
+  // say when Identify cannot show the same records, and what it opens instead
+  var why=[];
+  if(TF.ids.length&&!taxa)why.push('Identify cannot add the '+gs.filter(function(g){return !gid[g];})
+    .map(function(g){return META.names[g]||g;}).join(' and ')+' group to picked taxa, so it opens every taxon');
+  if(u.lost.indexOf('taxa')>=0)why.push('too many taxa for one link, so it opens every taxon');
+  if(u.lost.indexOf('not')>=0)why.push('too many taxa left out for one link, so it keeps them');
+  var nt=$('idnote');nt.hidden=!why.length;nt.textContent=why.length?'Identify shows more records than the '+
+    'map: '+why.join('; ')+'.':'';
 }
 // The filter extension is kept between calls, as the point data is in pointData(), so deck.gl
 // uploads nothing when only the filter settings change. deck.gl would also run every category
@@ -386,21 +384,32 @@ var ONLY=[['introduced','Introduced to BC','introduced','Species not native to B
   .map(function(o){return chip('flags',o[1],!!S.only[o[0]],
     function(){return S.only[o[0]]=!S.only[o[0]];},o[3]);});
 if(!ONLY.length)$('flagbox').hidden=true;
-var qt=0;$('q').value=S.q;
-$('q').addEventListener('input',function(){clearTimeout(qt);var v=this.value;
-  qt=setTimeout(function(){S.q=v.trim();search();refilter();},200);});
-function search(){
-  var q=S.q.toLowerCase();
-  if(q.length<2||!TAXA){TAXOK=TAXID=null;$('qn').textContent=q.length===1?'Type one more letter':'';return;}
-  var ok=new Uint8Array(TAXA.length),k=0,ids=[];
-  for(var i=0;i<TAXA.length;i++)if(TAXA[i][0].toLowerCase().indexOf(q)>=0||
-    TAXA[i][1].toLowerCase().indexOf(q)>=0){ok[i]=1;k++;if(k<=50)ids.push(TAXA[i][2]);}
-  TAXOK=ok;TAXID=k&&k<=50?ids:null;$('qn').textContent=k?nf.format(k)+(k===1?' taxon matches':' taxa match'):
-    'No taxon matches';
-}
+// Picked taxa: chips beside the groups, one set with them. A shortcut picks, then leaves out, a set
+// of taxa, and shows only once the taxa file carries the whole tree.
+var PK=TX.picker({input:$('q'),box:$('picks'),list:$('sugg'),msg:$('qn'),picks:S.picks,ranks:META.ranks,
+  nf:nf,taxa:function(){return TAXA;},counts:function(){return TX.counts(TAXA,P.tax,P.n);},
+  onChange:function(){search();showClades();refilter();}});
+var PRE=META.presets||[],CB=PRE.map(function(c){var b=chip('clades',c[0],false,function(){
+  PK.cycle(c[1]);return PK.state(c[1])!=='';},c[2]);b.setAttribute('aria-label',c[0]);return b;});
+$('cladebox').hidden=!CB.length;
+function showClades(){CB.forEach(function(b,k){var st=PK.state(PRE[k][1]);
+  b.setAttribute('aria-pressed',String(st!==''));b.classList.toggle('not',st==='not');
+  b.textContent=(st==='not'?'not ':'')+PRE[k][0];});}
+showClades();
+// An old link's q, names to keep, becomes picks once the taxa load. It kept those names within the
+// groups; when every name lies inside the groups the picks alone say the same, so the groups clear.
+function oldQuery(){if(!S.oldq)return;
+  var got=TX.resolve(TAXA,S.oldq,TX.counts(TAXA,P.tax,P.n)),gid=META.group_ids||{},
+    gs=META.groups.filter(function(g,i){return S.groups[i]&&gid[g];}).map(function(g){return gid[g];});
+  if(!got.length)$('q').value=S.oldq;S.oldq='';
+  got.forEach(function(p){S.picks.push(p);});
+  if(got.length&&!allGroups()&&got.every(function(p){return p.not||TX.within(TAXA,p.id,gs);}))
+    S.groups=S.groups.map(function(){return true;}),showGroups();
+  PK.refresh();showClades();}
+function search(){TF=TX.filter(TAXA,S.picks);}
 $('reset').onclick=function(){S.lo=0;S.hi=LAST;S.up=false;clearMonths();setGroups();
   S.only={};ONLY.forEach(function(b){b.setAttribute('aria-pressed','false');});
-  S.q='';$('q').value='';search();refilter();};
+  S.picks.length=0;$('q').value='';PK.refresh();showClades();search();refilter();};
 $('toggle').onclick=function(){var o=$('side').classList.toggle('open');
   this.setAttribute('aria-expanded',String(o));};
 
@@ -515,7 +524,7 @@ var HINT=$('hint').textContent,HINT_TOT='Top: records still needing an ID per ye
   'click a bar to zoom into it, double-click for all dates.';
 render();
 var names0=get(META.taxa).then(function(buf){TAXA=JSON.parse(new TextDecoder().decode(buf));
-  search();});
+  oldQuery();search();PK.refresh();showClades();refilter();});
 // One shard downloads at a time, so on a slow link the recent shard gets all the bandwidth.
 var chain=Promise.resolve(),prev=Promise.resolve();
 META.shards.forEach(function(s,k){
