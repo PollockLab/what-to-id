@@ -23,6 +23,13 @@ name: map
 # hundred requests, later runs in a handful). If that fails the map ships with the tree it has, and
 # hides the clade chips while some of the pool's taxa lack their ancestors.
 #
+# It also keeps, in projects.bin on the release, which pool records sit in each project of
+# map_projects.PROJECTS, so the map can combine them. A project is listed in full once, then kept
+# up to date from the day's updates and an id-range count check. If that step fails the map ships
+# with the last lists, and without project filters when there are none. A big project (the BC
+# Biodiversity Program) is over the per-run cap, so seed it once from a local run of
+# `python -m what_to_id.map_projects --max-requests 4000` and upload the file as projects.bin.
+#
 # Seed once: upload pool.parquet and sync.json to a release tagged map-state (sync.json holds the
 # since cursor, so the repository variable MAP_SINCE is only needed when there is no sync.json),
 # then set the repository variable MAP_DAILY_ENABLED to "true".
@@ -81,6 +88,7 @@ jobs:
           if ! gh release download "$STATE_TAG" -D state -p sync.json --clobber && [ -z "${MAP_SINCE:-}" ]; then
             echo "::error::sync.json did not download and MAP_SINCE is empty; refusing to restart the sync from scratch"; exit 1
           fi
+          gh release download "$STATE_TAG" -D state -p projects.bin --clobber || echo "no projects.bin yet; this run starts it"
       - name: Apply every change since the last run
         run: |
           set -euo pipefail
@@ -103,13 +111,24 @@ jobs:
       - name: Warn that the tree update failed
         if: steps.tree.outcome == 'failure'
         run: echo "::warning::taxon tree update failed; building with the tree as it was"
+      - name: Update the project lists
+        id: projects
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          python -m what_to_id.map_projects --pool state/pool.parquet --state state/projects.bin \
+            --d1 "$D1"
+      - name: Warn that the project lists did not update
+        if: steps.projects.outcome == 'failure'
+        run: echo "::warning::project lists did not update; the map uses the last ones, if any"
       - name: Build the site
         run: |
           set -euo pipefail
           mkdir -p _site
           cp site/*.html _site/
           python -m what_to_id.page_map --pool state/pool.parquet --out _site --totals --freeze "$(date -u +%F)" \
-            --tree state/taxonomy.json
+            --tree state/taxonomy.json \
+            --projects state/projects.bin
           if find _site -type f ! -name '*.html' ! -name 'pool*.bin' | grep -q .; then
             echo "::error::the site must hold only HTML pages and the map's pool*.bin files"; exit 1
           fi
@@ -130,4 +149,7 @@ jobs:
           gh release upload "$STATE_TAG" state/sync.json --clobber
           if [ -s state/taxonomy.json ]; then
             gh release upload "$STATE_TAG" state/taxonomy.json --clobber || echo "::warning::could not save taxonomy.json"
+          fi
+          if [ -s state/projects.bin ]; then
+            gh release upload "$STATE_TAG" state/projects.bin --clobber || echo "::warning::could not save projects.bin"
           fi

@@ -67,6 +67,14 @@ h1{font-size:18px;margin:0}
 .link{border:0;background:none;color:var(--muted);font:inherit;font-size:12px;font-weight:400;
   text-decoration:underline;cursor:pointer;padding:0 2px}
 #reset{align-self:flex-start;margin-top:8px}
+.prow{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.padd{font:inherit;font-size:12px;min-height:26px;max-width:100%;padding:2px 6px;border:1px solid var(--line);
+  border-radius:6px;background:var(--panel);color:var(--ink)}
+.pchips{margin-top:4px}
+.pchip{display:inline-flex}
+.chips .pchip button{border-radius:13px 0 0 13px;background:var(--on);color:var(--onink);border-color:var(--on)}
+.chips .pchip button.x{border-radius:0 13px 13px 0;border-left:0;padding:3px 7px}
+.chips .pchip.not button{background:var(--warnbg);color:var(--warn);border-color:var(--warn)}
 #map{grid-area:map;position:relative;min-height:240px}
 .time{grid-area:time;padding:8px 16px 10px;border-top:1px solid var(--line)}
 .row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
