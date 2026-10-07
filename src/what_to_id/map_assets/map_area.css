@@ -24,3 +24,11 @@
 .alist li.anone{cursor:default;color:var(--muted)}
 .alist .akind{margin-left:6px;color:var(--muted);font-size:11px}
 .alist li.ahead{cursor:default;color:var(--muted);padding-top:8px;font-weight:600}
+.achips{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.achips[hidden]{display:none}
+.achip{display:inline-flex;align-items:center;gap:2px;max-width:100%;font-size:12px;padding:2px 2px 2px 9px;
+  border:1px solid var(--line);border-radius:13px;background:var(--chip);color:var(--ink)}
+.achip.aload{opacity:.6}
+.achip button{border:0;background:none;color:inherit;font:inherit;font-size:14px;line-height:1;cursor:pointer;
+  min-width:24px;min-height:24px;border-radius:12px}
+.achip button:hover,.achip button:focus-visible{background:var(--line)}

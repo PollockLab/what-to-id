@@ -50,7 +50,7 @@ var S={up:false,lo:0,hi:LAST,months:0,groups:{},only:{},picks:[],rec:null,at:nul
   S.groups=CH.read(h.get('groups'),META.groups);
   S.only=CH.read(h.get('only'),ONLYKEYS.filter(function(k){return META.flags.indexOf(ONLYFLAG[k])>=0;}),['exact']);
   S.picks=TX.read(h.get('taxa'));S.oldq=S.picks.length?'':h.get('q')||'';S.rec=+h.get('record')||null;
-  S.area=h.get('area')||'';S.park=+h.get('park')||0;
+  S.area=h.get('area')||'';S.park=h.get('park')||'';
   S.bcpark=h.get('bcpark')||'';
   var at=(h.get('at')||'').split('/').map(Number);if(at.length===3&&at.every(isFinite))S.at=at;
   S.fly=!!S.rec&&!S.at;
