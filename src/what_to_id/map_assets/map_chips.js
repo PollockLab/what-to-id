@@ -50,15 +50,17 @@ function chip(box,k,label,get,three,title,changed){var b=document.createElement(
 // filter can leave things out, what flips it between picked and left out. o: S, meta, terms (the
 // taxon terms, see TX.terms), picker (the taxon picker), pj (the project filter), months (month
 // names), only ([key, label] per status chip), two (the status keys that cannot be left out), area,
-// and redraw() after a group, month or status chip changes.
+// and redraw() after a group, month or status chip changes. A shortcut's chip also splits into its
+// taxa, one chip each, by adding its name to S.split.
 function items(o){var out=[],S=o.S,m=o.meta,two=o.two||[];
-  function add(label,not,remove,flip){out.push({label:label,not:not,remove:remove,flip:flip});}
+  function add(label,not,remove,flip,split){out.push({label:label,not:not,remove:remove,flip:flip,split:split});}
   function drop(st,k){return function(){delete st[k];o.redraw();};}
   function turn(st,k){return function(){st[k]=st[k]==='not'?'inc':'not';o.redraw();};}
   o.terms.forEach(function(t){var ids=[].concat(t.id);add(t.label,t.exclude,function(){
     for(var k=S.picks.length-1;k>=0;k--)if(ids.indexOf(S.picks[k].id)>=0)S.picks.splice(k,1);
     o.picker.changed();},function(){S.picks.forEach(function(p){if(ids.indexOf(p.id)>=0)p.not=!t.exclude;});
-    o.picker.changed();});});
+    o.picker.changed();},t.kind==='preset'?{n:ids.length,go:function(){S.split.push(t.label);
+    o.picker.changed();}}:null);});
   out=out.concat(o.pj.items());
   m.groups.forEach(function(g){if(S.groups[g])add(m.names[g]||g,S.groups[g]==='not',drop(S.groups,g),
     turn(S.groups,g));});
@@ -68,10 +70,11 @@ function items(o){var out=[],S=o.S,m=o.meta,two=o.two||[];
   var a=o.area.term();if(a)add(a.label,false,function(){o.area.clear();});
   return out;}
 // The selection bar, the one list of what is picked: one chip per active pick, items [{label, not,
-// tag, remove, flip}], each with × to remove it, and Clear all; a tag (as "Identify only") shows
-// after the label. A chip with flip is a button that flips it between picked and left out. set()
-// redraws only when the items change, and keeps focus in the bar: on the flipped chip, after a
-// removal on the next × (else Clear all), or, once the bar is empty, on fallback.
+// tag, remove, flip, split}], each with × to remove it, and Clear all; a tag (as "Identify only")
+// shows after the label. A chip with flip is a button that flips it between picked and left out; one
+// with split ({n, go}) has a button that lists its n taxa as chips of their own. set() redraws only
+// when the items change, and keeps focus in the bar: on the flipped chip, after a split on the first
+// of its taxa, after a removal on the next × (else Clear all), or, once the bar is empty, on fallback.
 function bar(o){
   var box=o.box,list=box.querySelector('ul'),clear=box.querySelector('button'),sig=null,want=null;
   clear.onclick=function(){want={clear:true};o.clear();};
@@ -87,6 +90,10 @@ function bar(o){
       if(t.flip){sp.type='button';sp.setAttribute('aria-pressed',String(!!t.not));
         sp.title='Click to '+(t.not?'pick':'leave out')+' instead';
         sp.onclick=function(){want={flip:j};t.flip();};}
+      if(t.split){var sb=li.appendChild(el('button','sn',t.split.n+' \u25BE'));sb.type='button';
+        sb.title='Show the '+t.split.n+' taxa one by one, to remove or leave out any of them';
+        sb.setAttribute('aria-label','Split '+text+' into its '+t.split.n+' taxa');
+        sb.onclick=function(){want={flip:j};t.split.go();};}
       x.type='button';x.setAttribute('aria-label','Remove '+text+(t.tag?' ('+t.tag+')':''));
       x.onclick=function(){want={x:j};t.remove();};li.appendChild(x);list.appendChild(li);
       xs.push(x);fs.push(t.flip?sp:x);});

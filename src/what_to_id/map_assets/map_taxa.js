@@ -76,8 +76,8 @@ function resolve(T,s,cnt){var out=[];
 // The taxon selection as terms a shared selection module can take over: each group chip, shortcut
 // and picked taxon is {dim:'taxon', kind:'group'|'preset'|'clade', id, label, exclude, mask(),
 // inat()}, mask() 1 per record the term covers and inat() its Identify parameters. Includes combine
-// with OR and excludes subtract. o: T, picks, groups (the chosen group names, [] for all), meta, and
-// the records' tax, grp and n.
+// with OR and excludes subtract. o: T, picks, groups (the chosen group names, [] for all), meta, the
+// records' tax, grp and n, and split (the shortcut names to list taxon by taxon, optional).
 function terms(o){
   var out=[],m=o.meta,gid=m.group_ids||{},left=o.picks.slice(),ix=o.T&&index(o.T),
     tree=!!(o.T&&o.T.length&&o.T[0].length>4);
@@ -91,7 +91,7 @@ function terms(o){
   function term(kind,ids,label,not){var key=not?'without_taxon_id':'taxon_id',p={};p[key]=ids.join(',');
     out.push({dim:'taxon',kind:kind,id:kind==='preset'?ids.slice():ids[0],label:label,exclude:not,
       mask:function(){return recs(ids);},inat:function(){return {params:p,exact:tree};}});}
-  (m.presets||[]).forEach(function(c){var hit=c[1].map(function(id){
+  (m.presets||[]).forEach(function(c){if((o.split||[]).indexOf(c[0])>=0)return;var hit=c[1].map(function(id){
     return left.filter(function(p){return p.id===id;})[0];});
     if(hit.every(Boolean)&&hit.every(function(p){return p.not===hit[0].not;})){
       left=left.filter(function(p){return hit.indexOf(p)<0;});term('preset',c[1],c[0],hit[0].not);}});
