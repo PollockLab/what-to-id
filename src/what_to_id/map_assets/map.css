@@ -57,6 +57,7 @@ h1{font-size:18px;margin:0}
   background:var(--on);color:var(--onink);font-size:12px;padding-left:9px}
 .schip span{overflow-wrap:anywhere}
 .chips .schip button{border:0;background:none;color:inherit;padding:3px 8px;min-height:26px;min-width:28px}
+.chips .schip button.sn{padding:3px 4px;min-width:0;opacity:.8;font-size:11px}
 .sugg{position:absolute;left:0;right:0;top:100%;z-index:8;margin:2px 0 0;padding:4px 0;list-style:none;
   background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:var(--shadow);
   max-height:50vh;overflow:auto}

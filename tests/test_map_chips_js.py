@@ -166,7 +166,7 @@ var area={term:function(){return areaOn?{label:'Garibaldi Park'}:null;},
   clear:function(){areaOn=false;log.push('area');}};
 var T=[['Bryophyta','Mosses',3,2,-1],['Plantae','Plants',4,2,-1]];
 function items(){return CH.items({S:S,meta:META,
-  terms:TX.terms({T:T,picks:S.picks,groups:[],meta:META,n:0}),
+  terms:TX.terms({T:T,picks:S.picks,groups:[],meta:META,n:0,split:S.split}),
   picker:{changed:function(){log.push('taxa');}},pj:pj,months:['January','February','March'],
   only:[['introduced','Introduced to BC'],['exact','Exact location']],two:['exact'],area:area,
   redraw:function(){log.push('redraw');}});}
@@ -178,7 +178,7 @@ function flips(){return box.querySelectorAll('button').filter(function(b){return
 function texts(){return box.querySelector('ul').children.map(function(li){
   var s=li.children[0],t=s.children;
   return [s.textContent+(t.length?' ['+t[0].textContent+']':''),!!li.cls.not,
-    li.children[1].attrs['aria-label']];});}
+    li.children[li.children.length-1].attrs['aria-label']];});}
 """
 
 
@@ -253,3 +253,27 @@ def test_selection_bar_flips_a_chip_between_picked_and_left_out():
     assert got["only"] == {"introduced": "inc", "exact": "inc"}
     assert got["focus"] is True
     assert got["log"] == ["taxa", "redraw", "redraw"]
+
+
+def test_selection_bar_splits_a_shortcut_into_its_taxa():
+    body = (
+        BAR
+        + "META.presets=[['Mosses and plants',[3,4]]];S.picks=[{id:3,not:false},{id:4,not:false}];"
+        "S.split=[];B.set(items());var before=texts().slice(0,1),"
+        "sn=box.querySelectorAll('button').filter(function(b){return b.cls.sn;});"
+        "var label=sn.map(function(b){return [b.textContent,b.attrs['aria-label']];});"
+        "sn[0].onclick();B.set(items());"
+        "return {before:before,label:label,split:S.split,after:texts().slice(0,2),"
+        "focus:FOCUS===flips()[0],picks:S.picks,log:log};"
+    )
+    got = run(body)
+    assert got["before"] == [["Mosses and plants", False, "Remove Mosses and plants"]]
+    assert got["label"] == [["2 ▾", "Split Mosses and plants into its 2 taxa"]]
+    assert got["split"] == ["Mosses and plants"]
+    assert got["after"] == [
+        ["Bryophyta", False, "Remove Bryophyta"],
+        ["Plantae", False, "Remove Plantae"],
+    ]
+    assert got["focus"] is True
+    assert got["picks"] == [{"id": 3, "not": False}, {"id": 4, "not": False}]
+    assert got["log"] == ["taxa"]

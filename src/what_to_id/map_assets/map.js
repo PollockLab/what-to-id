@@ -39,7 +39,7 @@ for(var d=0;d<META.days;d++){var t=new Date(D0+d*DAY);MOY[d]=t.getUTCMonth();DOM
 
 // What the viewer picked. Written to the URL hash so a view can be shared or bookmarked.
 // Groups and show only hold chip states (see map_chips.js): {Insecta:'inc', Aves:'not'}.
-var S={up:false,lo:0,hi:LAST,months:0,groups:{},only:{},picks:[],rec:null,at:null,fly:false};
+var S={up:false,lo:0,hi:LAST,months:0,groups:{},only:{},picks:[],split:[],rec:null,at:null,fly:false};
 (function readHash(){
   var h=new URLSearchParams(location.hash.slice(1));
   S.up=h.get('by')==='uploaded';
@@ -414,7 +414,7 @@ var PK=TX.picker({input:$('q'),list:$('sugg'),msg:$('qn'),picks:S.picks,ranks:ME
   nf:nf,taxa:function(){return TAXA;},counts:function(){return TX.counts(TAXA,P.tax,P.n);},
   onChange:function(){search();showClades();refilter();}});
 var PRE=META.presets||[],CB=PRE.map(function(c){return chip('clades',c[0],false,function(){
-  PK.cycle(c[1]);return PK.state(c[1])!=='';},c[2]);});
+  S.split=S.split.filter(function(n){return n!==c[0];});PK.cycle(c[1]);return PK.state(c[1])!=='';},c[2]);});
 $('cladebox').hidden=!CB.length;
 function showClades(){CB.forEach(function(b,k){CH.show(b,PRE[k][0],PK.state(PRE[k][1]));});}
 showClades();
@@ -431,11 +431,11 @@ function oldQuery(){if(!S.oldq)return;
 function search(){TF=TX.filter(TAXA,S.picks);}
 // The selection bar lists every chip; its Clear all clears them, and reset also the dates.
 function redraw(){showGroups();showMonths();showOnly();refilter();}
-function clearAll(){S.months=0;S.groups={};S.only={};S.picks.length=0;$('q').value='';showClades();
+function clearAll(){S.months=0;S.groups={};S.only={};S.picks.length=0;S.split=[];$('q').value='';showClades();
   search();AREA.clear();PJ.reset();redraw();}
 $('reset').onclick=function(){S.lo=0;S.hi=LAST;S.up=false;clearAll();};
 var BAR=CH.bar({box:$('selbar'),clear:clearAll,fallback:$('q')});
-function items(){return CH.items({S:S,meta:META,terms:TX.terms({T:TAXA,picks:S.picks,groups:[],meta:META,n:0}),
+function items(){return CH.items({S:S,meta:META,terms:TX.terms({T:TAXA,picks:S.picks,groups:[],meta:META,n:0,split:S.split}),
   picker:PK,pj:PJ,months:MONTH,only:ONLYDEF,two:['exact'],area:AREA,redraw:redraw});}
 // Each folding section's summary counts its active chips, so a folded one still says what it holds.
 function tally(){var n=function(st){var c=0;for(var k in st)if(st[k])c++;return c;},m=0,i,e;
