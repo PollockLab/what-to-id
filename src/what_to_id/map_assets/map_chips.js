@@ -62,8 +62,8 @@ function items(o){var out=[],S=o.S,m=o.meta;
   o.only.forEach(function(d){if(S.only[d[0]])add(d[1],S.only[d[0]]==='not',drop(S.only,d[0]));});
   var a=o.area.term();if(a)add(a.label,false,function(){o.area.clear();});
   return out;}
-// The selection bar: one chip per active pick, items [{label, not, remove}], each with × to remove
-// it, and Clear all. set() redraws only when the items change, and after a removal keeps focus in
+// The selection bar: one chip per active pick, items [{label, not, tag, remove}], each with × to
+// remove it, and Clear all; a tag (as "Identify only") shows after the label. set() redraws only when the items change, and after a removal keeps focus in
 // the bar (the next ×, else Clear all) or, once it is empty, on fallback.
 function bar(o){
   var box=o.box,list=box.querySelector('ul'),clear=box.querySelector('button'),sig=null,want=-1;
@@ -71,11 +71,12 @@ function bar(o){
   function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;
     if(text!=null)e.textContent=text;return e;}
   return {set:function(items){
-    var s=items.map(function(t){return (t.not?'-':'+')+t.label;}).join('\n');
+    var s=items.map(function(t){return (t.not?'-':'+')+t.label+'|'+(t.tag||'');}).join('\n');
     if(s===sig)return;sig=s;list.textContent='';
     items.forEach(function(t,j){var text=(t.not?'not ':'')+t.label,li=el('li','schip'+(t.not?' not':'')),
-        x=el('button','x','×');
-      li.appendChild(el('span',null,text));x.type='button';x.setAttribute('aria-label','Remove '+text);
+        x=el('button','x','×'),sp=li.appendChild(el('span',null,text));
+      if(t.tag)sp.appendChild(el('span','tag',t.tag));
+      x.type='button';x.setAttribute('aria-label','Remove '+text+(t.tag?' ('+t.tag+')':''));
       x.onclick=function(){want=j;t.remove();};li.appendChild(x);list.appendChild(li);});
     box.hidden=!items.length;
     var xs=list.querySelectorAll('button');

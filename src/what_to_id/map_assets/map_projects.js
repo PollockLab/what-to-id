@@ -1,9 +1,10 @@
 // Projects. pool-projects.bin (see map_projects.py) lists the records in each project of
-// META.projects.list; each record gets a bitmask, bit k set when it is in project k. The viewer adds
-// projects from a list; each added chip toggles between "in" and "not in", and with two or more "in"
-// chips a switch says whether a record must be in any of them (OR) or in all (AND). "Not in" chips
-// always exclude. Without the file the box stays hidden and nothing is filtered. The mask is one
-// byte, so at most 8 projects.
+// META.projects.list; each record gets a bitmask, bit k set when it is in project k. Each project is
+// a chip with the one click rule of map_chips.js: pick (in), leave out (not in), clear. Picked
+// projects combine with OR and left-out ones subtract. The viewer can also paste any other
+// iNaturalist project, by number or URL: an "Identify only" chip that goes into the Identify link
+// but not the map filter, as the page has no list of its records. Without the file the box stays
+// hidden and nothing is filtered. The mask is one byte, so at most 8 map projects.
 function projDecode(buf,list){
   var u=new Uint8Array(buf),hn=new DataView(buf).getUint32(0,true),o=4+hn,
     head=JSON.parse(new TextDecoder().decode(u.subarray(4,o))).projects,out=list.map(function(){return null;});
@@ -25,84 +26,89 @@ function projMask(id,lists,mask,a,b){
       for(var i=r,j=lo;i<e&&j<L.length;i++){while(j<L.length&&L[j]<id[i])j++;if(L[j]===id[i])mask[i]|=1<<k;}}
     r=e;}
 }
-function projKeep(m,inc,exc,any){return !(m&exc)&&(!inc||(any?(m&inc)!==0:(m&inc)===inc));}
-// The Identify parameters for a pick: iNaturalist ORs the ids in project_id and excludes those in
-// not_in_project, so OR and NOT are exact. It cannot require several projects, so for AND it gets
-// the smallest required project, a wider set than the map shows, and exact is false; the page then
-// counts that set too and says so beside the Identify link.
-function projParams(sel,any,list){
-  var inc=sel.filter(function(s){return !s.not;}).map(function(s){return list[s.k];}),
-    exc=sel.filter(function(s){return s.not;}).map(function(s){return list[s.k].id;}),q={},exact=true;
-  if(exc.length)q.not_in_project=exc.join(',');
-  if(inc.length>1&&!any){exact=false;inc=[inc.reduce(function(a,b){return b.n<a.n?b:a;})];}
-  if(inc.length)q.project_id=inc.map(function(p){return p.id;}).join(',');
-  return {q:q,exact:exact,widest:exact?null:list.indexOf(inc[0])};
+function projKeep(m,inc,exc){return !(m&exc)&&(!inc||(m&inc)!==0);}
+// A pasted project: its number, or the number or slug in an iNaturalist project URL, as a string;
+// null for anything else. iNaturalist takes a slug wherever it takes a project number
+// (project_id=bc-rarities and project_id=90486 match the same records), so slugs pass as they are.
+var PROJ_SLUG=/^[a-z0-9][a-z0-9_-]{0,99}$/;
+function projId(t){t=String(t||'').toLowerCase();
+  return /^\d+$/.test(t)?(+t>0&&+t<=4294967295?String(+t):null):PROJ_SLUG.test(t)&&t!=='new'?t:null;}
+function projParse(s){s=String(s||'').trim();if(/^\d+$/.test(s))return projId(s);
+  var m=/^(?:https?:\/\/)?(?:[a-z]+\.)?inaturalist\.[a-z]{2,3}(?:\.[a-z]{2})?\/projects\/([^\/?#\s]+)\/?(?:[\/?#]\S*)?$/i.exec(s);
+  return m?projId(m[1]):null;}
+// The selection is a list of {id, k, st}: id a string, k the project's index in list (-1 for a
+// pasted one), st 'inc' or 'not'. In the hash each is its id, a minus for 'not' and a p before a
+// pasted one: projects=86886,p90486,-pbc-rarities. A plain number not in list, as old links carry
+// for projects the map has since dropped, reads as pasted. match=all, from when picked projects
+// could be required together, is ignored.
+function projRead(s,list){var ids=list.map(function(p){return String(p.id);}),out=[];
+  String(s||'').split(',').forEach(function(t){t=t.trim();var not=t.charAt(0)==='-';if(not)t=t.slice(1);
+    var paste=t.charAt(0)==='p',id=projId(paste?t.slice(1):t);if(!id||!paste&&!/^\d+$/.test(id))return;
+    var k=ids.indexOf(id);
+    if(!out.some(function(s){return s.id===id;}))out.push({id:id,k:k,st:not?'not':'inc'});});
+  return out;}
+function projWrite(sel){return sel.map(function(s){return (s.st==='not'?'-':'')+(s.k<0?'p':'')+s.id;}).join(',');}
+// The Identify parameters: iNaturalist ORs the ids in project_id and leaves out those in
+// not_in_project, map projects first. Exact when no pasted project is in.
+function projParams(sel){
+  var o=sel.filter(function(s){return s.k>=0;}).concat(sel.filter(function(s){return s.k<0;})),q={},
+    ids=function(st){return o.filter(function(s){return s.st===st;}).map(function(s){return s.id;});};
+  if(ids('not').length)q.not_in_project=ids('not').join(',');
+  if(ids('inc').length)q.project_id=ids('inc').join(',');
+  return {q:q,exact:!sel.some(function(s){return s.k<0;})};
 }
-// Each chip as a selection term, the shape a shared selection module can take over: mask() is 1 per
-// record in the project, inat() its Identify parameters. Match all (AND) cannot be said on
-// iNaturalist, so then the included terms are not exact.
-function projTerms(sel,any,list,mask){
-  var nInc=sel.filter(function(s){return !s.not;}).length;
-  return sel.map(function(s){var p=list[s.k];return {dim:'project',kind:'project',id:p.id,label:p.title,
-    exclude:s.not,mask:function(){var m=new Uint8Array(mask.length);
-      for(var i=0;i<m.length;i++)m[i]=mask[i]>>s.k&1;return m;},
-    inat:function(){var q={};q[s.not?'not_in_project':'project_id']=String(p.id);
-      return {params:q,exact:s.not||any||nInc<2};}};});
+function projLabel(s,list){return s.k>=0?list[s.k].title:'project '+s.id;}
+// What the note under Identify says about pasted projects, as {more, fewer}. With a map project and
+// a pasted one in, Identify opens records in either, so more than the map shows: more gives the map
+// count (shown) and the most Identify can open (alt, the records that match every other filter).
+// Otherwise any pasted project narrows what Identify opens, which the map count leaves out: fewer.
+// shown is null while the records load.
+function projNote(sel,list,shown,alt){var nf=new Intl.NumberFormat('en-CA'),
+    p=sel.filter(function(s){return s.k<0;}),pin=p.filter(function(s){return s.st==='inc';});
+  if(!p.length)return {more:'',fewer:''};
+  var names=function(a){return a.map(function(s){return (s.st==='not'?'not in ':'in ')+projLabel(s,list);}).join(', ');};
+  if(pin.length&&sel.some(function(s){return s.k>=0&&s.st==='inc';}))
+    return {fewer:'',more:'it also opens records '+names(pin)+' (Identify only), which the map cannot count'+
+      (shown!=null?', so up to '+nf.format(alt)+' rather than the '+nf.format(shown)+' on the map':'')};
+  return {more:'',fewer:'The map count does not include the Identify only project filter ('+names(p)+
+    '), so Identify opens '+(shown!=null?'at most the '+nf.format(shown)+' records shown':'fewer records than the map shows')+'.'};
 }
 function projectFilter(o){
   var meta=o.meta,list=(meta.projects&&meta.projects.list)||[],box=document.getElementById('projbox'),
-    sel=[],any=true,lists=null,mask=new Uint8Array(0),key=0,inc=0,exc=0,shown=null,alt=0,
-    nf=new Intl.NumberFormat('en-CA');
-  (o.hash.get('projects')||'').split(',').forEach(function(t){
-    var not=t.charAt(0)==='-',id=+(not?t.slice(1):t),k=list.map(function(p){return p.id;}).indexOf(id);
-    if(t&&k>=0&&!sel.some(function(s){return s.k===k;}))sel.push({k:k,not:not});});
-  any=o.hash.get('match')!=='all';
+    sel=projRead(o.hash.get('projects'),list),lists=null,mask=new Uint8Array(0),key=0,inc=0,exc=0,shown=null,alt=0;
   function bits(){inc=exc=0;if(!lists)return;
-    sel.forEach(function(s){if(s.not)exc|=1<<s.k;else inc|=1<<s.k;});}
+    sel.forEach(function(s){if(s.k>=0){if(s.st==='not')exc|=1<<s.k;else inc|=1<<s.k;}});}
   function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;
     if(text!=null)e.textContent=text;return e;}
-  var pick,chips,seg,hint;
-  function words(){var i=sel.filter(function(s){return !s.not;}).map(function(s){return list[s.k].title;}),
-      x=sel.filter(function(s){return s.not;}).map(function(s){return list[s.k].title;}),w='';
-    if(i.length)w='Records in '+(i.length>1&&!any?'all of ':'')+i.join(any?' or ':' and ');
-    if(x.length)w+=(w?', but not in ':'Records not in ')+x.join(' or ');
-    return w?w+'.':'Add a project, then click its chip to switch between in and not in.';}
-  // what Identify opens instead when it cannot say the pick, with both counts; '' when exact
-  function inexact(){var p=lists&&projParams(sel,any,list);if(!p||p.exact)return '';
-    return 'it cannot require more than one project, so it opens every record in '+list[p.widest].title+
-      (shown!=null?', '+nf.format(alt)+' rather than the '+nf.format(shown)+' in all of them':'');}
-  function draw(){
-    chips.textContent='';
-    sel.forEach(function(s,j){var p=list[s.k],c=el('span','pchip'+(s.not?' not':'')),
-        t=el('button',null,(s.not?'Not in ':'In ')+p.title),x=el('button','x','×');
-      t.type=x.type='button';t.title='Click to switch between in and not in';
-      t.setAttribute('aria-label',p.title+': '+(s.not?'not in':'in')+'. Click to switch.');
-      x.setAttribute('aria-label','Remove '+p.title);
-      t.onclick=function(){s.not=!s.not;change();};x.onclick=function(){sel.splice(j,1);change();};
-      c.appendChild(t);c.appendChild(x);chips.appendChild(c);});
-    pick.textContent='';pick.appendChild(el('option',null,'Add a project…')).value='';
-    list.forEach(function(p,k){if(!sel.some(function(s){return s.k===k;})){
-      var op=pick.appendChild(el('option',null,p.title));op.value=k;}});
-    pick.hidden=pick.options.length<2;
-    seg.hidden=sel.filter(function(s){return !s.not;}).length<2;
-    seg.children[0].setAttribute('aria-pressed',String(any));seg.children[1].setAttribute('aria-pressed',String(!any));
-    hint.textContent=words();
-  }
-  function change(){bits();key++;draw();o.changed();}
+  function find(id){for(var j=0;j<sel.length;j++)if(sel[j].id===id)return sel[j];return null;}
+  // a click steps the chip's state; cleared, it leaves the selection
+  function step(id,k){var s=find(id),v=CH.next(s&&s.st,true);
+    if(!v)sel.splice(sel.indexOf(s),1);else if(s)s.st=v;else sel.push({id:id,k:k,st:v});change();}
+  var chips,input,msg;
+  function chip(id,k,label){var b=chips.appendChild(el('button')),s=find(id),tag=k<0?' (Identify only)':'';
+    b.type='button';b.title=label+tag+'. Click to pick, again to leave out, again to clear.';
+    CH.show(b,label,s?s.st:'');b.setAttribute('aria-label',b.getAttribute('aria-label')+tag);
+    if(k<0)b.appendChild(el('span','tag','Identify only'));b.onclick=function(){step(id,k);};}
+  function draw(){chips.textContent='';
+    list.forEach(function(p,k){chip(String(p.id),k,p.title);});
+    sel.forEach(function(s){if(s.k<0)chip(s.id,-1,projLabel(s,list));});}
+  function change(){bits();key++;if(chips)draw();o.changed();}
+  function paste(){if(!input.value.trim())return;var id=projParse(input.value),k=list.map(function(p){return String(p.id);}).indexOf(id);
+    if(!id){msg.textContent='Paste a project number, like 90486, or its iNaturalist URL.';return;}
+    input.value='';if(find(id)){msg.textContent='That project is already picked.';return;}
+    msg.textContent=k>=0?list[k].title+' is on the map, so it filters the map too.':
+      'Added for Identify only; it does not change the map.';
+    sel.push({id:id,k:k,st:'inc'});change();}
   function build(){
-    box.appendChild(el('p','lbl','Projects'));
-    var row=box.appendChild(el('div','prow'));
-    pick=row.appendChild(el('select','padd'));pick.setAttribute('aria-label','Add a project');
-    pick.onchange=function(){if(pick.value!==''){sel.push({k:+pick.value,not:false});change();}};
-    seg=row.appendChild(el('span','seg'));seg.setAttribute('role','group');
-    seg.setAttribute('aria-label','Records must be in');
-    [['any','Match any',true],['all','Match all',false]].forEach(function(m){
-      var b=seg.appendChild(el('button',null,m[1]));b.type='button';
-      b.title=m[2]?'In at least one of the "in" projects':'In every "in" project';
-      b.onclick=function(){any=m[2];change();};});
-    chips=box.appendChild(el('div','chips pchips'));chips.setAttribute('role','group');
-    chips.setAttribute('aria-label','Picked projects');
-    hint=box.appendChild(el('p','muted'));
+    box.appendChild(el('p','lbl','Projects')).appendChild(el('span','muted',' click again to leave out'));
+    chips=box.appendChild(el('div','chips'));chips.setAttribute('role','group');chips.setAttribute('aria-label','Projects');
+    var f=box.appendChild(el('form','prow')),lab=f.appendChild(el('label','muted','Add another project for Identify only'));
+    input=f.appendChild(el('input','padd'));input.id=lab.htmlFor='projpaste';input.type='text';
+    input.placeholder='Project number or URL';input.autocomplete='off';input.spellcheck=false;
+    f.appendChild(el('button','padd','Add')).type='submit';
+    f.onsubmit=function(e){e.preventDefault();paste();};
+    input.addEventListener('paste',function(){setTimeout(paste,0);});
+    msg=box.appendChild(el('p','muted'));msg.setAttribute('aria-live','polite');
     draw();box.hidden=false;
   }
   return {
@@ -113,19 +119,19 @@ function projectFilter(o){
       .catch(function(e){if(window.console)console.warn('Project filters are off: '+e.message);});},
     sync:function(P){if(!lists||mask.length===P.n)return;var m=new Uint8Array(P.n),a=Math.min(mask.length,P.n);
       m.set(mask.subarray(0,a));projMask(P.id,lists,m,a,P.n);mask=m;},
-    drop:function(i){return (inc|exc)!==0&&!projKeep(mask[i],inc,exc,any);},
+    drop:function(i){return (inc|exc)!==0&&!projKeep(mask[i],inc,exc);},
     key:function(){return key;},
-    wide:function(){var p=lists&&projParams(sel,any,list);if(!p||p.exact)return null;var b=1<<p.widest;
-      return function(i){return (mask[i]&b)!==0&&!(mask[i]&exc);};},
-    note:function(n,a){shown=n;alt=a;},inexact:inexact,
+    // the records Identify can open with a pasted project in beside a map one: all but the left out
+    wide:function(){return lists&&projNote(sel,list,null,0).more?function(i){return !(mask[i]&exc);}:null;},
+    note:function(n,a){shown=n;alt=a;},
+    inexact:function(){return lists?projNote(sel,list,shown,alt).more:'';},
+    uncounted:function(){return lists?projNote(sel,list,shown,alt).fewer:'';},
     active:function(){return (inc|exc)!==0;},
-    params:function(){return lists?projParams(sel,any,list).q:{};},
-    terms:function(){return lists?projTerms(sel,any,list,mask):[];},any:function(){return any;},
+    params:function(){return lists?projParams(sel).q:{};},
     // the chips for the selection bar (map_chips.js), once the file has loaded
-    items:function(){return lists?sel.map(function(s){return {label:'in '+list[s.k].title,not:s.not,
-      remove:function(){sel.splice(sel.indexOf(s),1);change();}};}):[];},
-    hash:function(){if(!sel.length)return '';
-      return 'projects='+sel.map(function(s){return (s.not?'-':'')+list[s.k].id;}).join(',')+(any?'':'&match=all');},
-    reset:function(){if(!sel.length)return;sel=[];any=true;bits();key++;if(lists)draw();}
+    items:function(){return lists?sel.map(function(s){return {label:'in '+projLabel(s,list),not:s.st==='not',
+      tag:s.k<0?'Identify only':'',remove:function(){sel.splice(sel.indexOf(s),1);change();}};}):[];},
+    hash:function(){return sel.length?'projects='+projWrite(sel):'';},
+    reset:function(){if(!sel.length)return;sel=[];bits();key++;if(chips)draw();}
   };
 }

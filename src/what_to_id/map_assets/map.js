@@ -225,8 +225,8 @@ function link(){
   if(lost.indexOf('taxa')>=0)why.push('too many taxa for one link, so it opens every taxon');
   if(lost.indexOf('not')>=0)why.push('too many taxa left out for one link, so it keeps them');
   if(u&&PJ.inexact())why.push(PJ.inexact());
-  var nt=$('idnote');nt.hidden=!why.length;nt.textContent=why.length?'Identify shows more records than the '+
-    'map: '+why.join('; ')+'.':'';
+  var nt=$('idnote'),pf=u?PJ.uncounted():'';nt.hidden=!why.length&&!pf;nt.textContent=(why.length?'Identify shows '+
+    'more records than the map: '+why.join('; ')+'. ':'')+pf;
 }
 // The filter extension is kept between calls, as the point data is in pointData(), so deck.gl
 // uploads nothing when only the filter settings change. deck.gl would also run every category

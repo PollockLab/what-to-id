@@ -36,11 +36,9 @@ from what_to_id.inat import PER_PAGE, SLEEP, _results, make_session, pool_params
 from what_to_id.inat_sync import reconcile_ids
 
 # iNaturalist project ids, found with /v1/projects?q=: 86886 is the umbrella of the BC Parks iNat
-# Team Big Summer projects (2019 on); 90486 is the collection of species listed S1 to S3 in BC.
-PROJECTS = (
-    {"id": 86886, "title": "BC Biodiversity Program"},
-    {"id": 90486, "title": "BC Rarities"},
-)
+# Team Big Summer projects (2019 on). A project dropped from here leaves the state file on the next
+# run; the page still takes any other project, pasted, for its Identify link only.
+PROJECTS = ({"id": 86886, "title": "BC Biodiversity Program"},)
 PROJECTS_NAME = "pool-projects.bin"
 MAX_REQUESTS = 600
 # updated_since starts this much before the last run, so a slow clock cannot skip an update

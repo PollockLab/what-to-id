@@ -42,10 +42,9 @@ h1{font-size:18px;margin:0}
 .pick.not{border:1px dashed var(--warn)}
 .chips .pick.not .px{border-left:1px solid var(--warn)}
 /* one "not" style for every left-out chip: taxa, shortcuts, projects, groups, show only, the bar */
-.chips button.not,.chips button[aria-pressed="true"].not,.chips .pick.not button,.chips .pchip.not button,
+.chips button.not,.chips button[aria-pressed="true"].not,.chips .pick.not button,
   .schip.not{background:var(--warnbg);color:var(--warn)}
-.chips button.not,.chips button[aria-pressed="true"].not,.chips .pchip.not button,.schip.not{border:1px dashed var(--warn)}
-.chips .pchip.not button.x{border-left:0}
+.chips button.not,.chips button[aria-pressed="true"].not,.schip.not{border:1px dashed var(--warn)}
 .selbar{border:1px solid var(--line);border-radius:8px;padding:4px 8px 8px;background:var(--chip)}
 .selbar .lbl{margin-top:2px}
 .selbar ul{margin:0;padding:0;list-style:none}
@@ -76,13 +75,15 @@ h1{font-size:18px;margin:0}
 .link{border:0;background:none;color:var(--muted);font:inherit;font-size:12px;font-weight:400;
   text-decoration:underline;cursor:pointer;padding:0 2px}
 #reset{align-self:flex-start;margin-top:8px}
-.prow{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.prow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:6px}
 .padd{font:inherit;font-size:12px;min-height:26px;max-width:100%;padding:2px 6px;border:1px solid var(--line);
   border-radius:6px;background:var(--panel);color:var(--ink)}
-.pchips{margin-top:4px}
-.pchip{display:inline-flex}
-.chips .pchip button{border-radius:13px 0 0 13px;background:var(--on);color:var(--onink);border-color:var(--on)}
-.chips .pchip button.x{border-radius:0 13px 13px 0;border-left:0;padding:3px 7px}
+.prow label{flex:1 1 100%}
+.prow input.padd{flex:1 1 140px;min-width:0;font-size:16px}
+button.padd{cursor:pointer;background:var(--chip)}
+/* "Identify only": a pasted project, in the Identify link but not the map filter */
+.tag{display:inline-block;margin-left:5px;padding:0 5px;border:1px solid currentColor;border-radius:8px;
+  font-size:10px;line-height:14px;white-space:nowrap}
 #map{grid-area:map;position:relative;min-height:240px}
 .time{grid-area:time;padding:8px 16px 10px;border-top:1px solid var(--line)}
 .row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
