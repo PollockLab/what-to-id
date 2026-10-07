@@ -57,7 +57,8 @@ var S={up:false,lo:0,hi:LAST,months:0,groups:META.groups.map(function(){return t
   S.fly=!!S.rec&&!S.at;
 })();
 var hashTimer=0;
-function writeHash(){clearTimeout(hashTimer);hashTimer=setTimeout(function(){
+// The selection: the hash without the open record and the view.
+function sel(){
   var h=[];if(S.up)h.push('by=uploaded');
   if(S.lo>0)h.push('from='+iso(S.lo));if(S.hi<LAST)h.push('to='+iso(S.hi));
   if(S.months){var ms=[];for(var m=0;m<12;m++)if(S.months>>m&1)ms.push(m+1);h.push('months='+ms);}
@@ -67,6 +68,9 @@ function writeHash(){clearTimeout(hashTimer);hashTimer=setTimeout(function(){
   if(only.length)h.push('only='+only.join(','));
   if(S.picks.length)h.push('taxa='+TX.write(S.picks));
   if(AREA.on())h.push(AREA.hash());
+  return h;}
+function writeHash(){clearTimeout(hashTimer);hashTimer=setTimeout(function(){
+  var h=sel();
   if(P.n&&SEL>=0)h.push('record='+P.id[SEL]);else if(S.rec)h.push('record='+S.rec);
   var c=map.getCenter();h.push('at='+map.getZoom().toFixed(1)+'/'+c.lat.toFixed(3)+'/'+
     c.lng.toFixed(3));
@@ -206,7 +210,7 @@ function link(){
     not:TF.not,only:S.only};
   // with an area on, the link may list the records by id instead, and then u stays null
   var a=$('identify');a.href=AREA.link({w:b.getWest(),s:b.getSouth(),e:b.getEast(),n:b.getNorth()},
-    function(v,p){u=TX.identifyUrl(st,v,META,p);return u.url;},META.max_url,match);
+    function(v,p,side){var r=TX.identifyUrl(st,v,META,p);if(!side)u=r;return r.url;},match);
   a.title='Opens these records in the iNaturalist Identify page.';
   // say when Identify cannot show the same records, and what it opens instead
   var why=[],lost=u?u.lost:[];
@@ -523,7 +527,8 @@ var map=new maplibregl.Map(opts);document.body.appendChild(ptip);
 map.addControl(new maplibregl.NavigationControl({showCompass:false}));
 var overlay=new deck.MapboxOverlay({interleaved:false,pickingRadius:8,layers:[]});map.addControl(overlay);
 var AREA=MapArea({map:map,S:S,LAST:LAST,hash:S.area,park:S.park,place:META.place_id,P:function(){return P;},keep:function(){return KEEP;},
-  change:refilter});
+  change:refilter,sel:function(){return sel().join('&');},
+  step:IdStep({a:$('identify'),prev:$('idprev'),next:$('idnext'),build:iso(LAST)})});
 // Zoomed out, blending millions of overlapping dots takes about 250 ms a frame, so while the map
 // moves it draws one record in ten, spread across BC by the id order, and all of them once it stops.
 var THIN=false,THIN_BELOW=8;
