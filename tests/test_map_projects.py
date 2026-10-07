@@ -26,7 +26,10 @@ from what_to_id.page_map import MAP_NAME, write_map
 
 from .conftest import make_pool
 
-A, B = PROJECTS[0]["id"], PROJECTS[1]["id"]
+A = PROJECTS[0]["id"]
+# a second project for the updater, as BC Rarities was before the map dropped it
+B = 90486
+TWO = (*PROJECTS, {"id": B, "title": "BC Rarities"})
 NOW = pd.Timestamp("2026-10-06T12:00:00Z")
 ASSETS = files("what_to_id") / "map_assets"
 
@@ -114,7 +117,9 @@ def test_list_ids_pages_up_by_id_above_with_only_ids():
 
 def test_first_run_lists_each_project_with_the_pool_query():
     api = _Api({A: [10, 20, 30], B: [20, 40]})
-    state, stats = update_projects({}, [10, 20], d1="1900-01-01", now=NOW, session=api, sleep=0)
+    state, stats = update_projects(
+        {}, [10, 20], d1="1900-01-01", now=NOW, session=api, sleep=0, projects=TWO
+    )
     assert state[A]["ids"].tolist() == [10, 20, 30] and state[B]["ids"].tolist() == [20, 40]
     assert state[A]["since"] == "2026-10-06T12:00:00Z"
     assert stats[A] == {"requests": 2, "listed": 3, "n": 3}
@@ -126,7 +131,7 @@ def test_first_run_lists_each_project_with_the_pool_query():
 def test_first_run_skips_a_project_too_big_for_the_cap():
     api = _Api({A: range(1, 5 * PER_PAGE), B: [7]})
     state, stats = update_projects(
-        {}, [], d1="1900-01-01", now=NOW, session=api, sleep=0, max_requests=3
+        {}, [], d1="1900-01-01", now=NOW, session=api, sleep=0, max_requests=3, projects=TWO
     )
     assert list(state) == [B] and stats[A] == {"requests": 1}
 
@@ -137,7 +142,9 @@ def test_later_runs_drop_what_left_the_pool_add_updates_and_repair_the_rest():
     # (members added later); 50 left the project while still needing an ID
     api = _Api({A: [10, 20, 60, 70, 80], B: [20]}, updated=[60])
     pool = [10, 20, 50, 60, 70, 80]
-    state, stats = update_projects(old, pool, d1="1900-01-01", now=NOW, session=api, sleep=0)
+    state, stats = update_projects(
+        old, pool, d1="1900-01-01", now=NOW, session=api, sleep=0, projects=TWO
+    )
     assert state[A]["ids"].tolist() == [10, 20, 60, 70, 80]
     assert state[A]["ids"].dtype == np.int64 and state[B]["ids"].dtype == np.int64
     assert stats[A]["left_pool"] == 1 and stats[A]["updated"] == 1
@@ -155,7 +162,9 @@ def test_later_runs_drop_what_left_the_pool_add_updates_and_repair_the_rest():
 def test_a_failed_project_keeps_its_list_and_cursor():
     old = _state(**{f"p{A}": [10, 30], f"p{B}": [20]})
     api = _Api({A: [10], B: [20]}, fail=A)
-    state, _ = update_projects(old, [10, 20], d1="1900-01-01", now=NOW, session=api, sleep=0)
+    state, _ = update_projects(
+        old, [10, 20], d1="1900-01-01", now=NOW, session=api, sleep=0, projects=TWO
+    )
     assert state[A] == {"ids": state[A]["ids"], "since": "2026-10-05T12:00:00Z"}
     assert state[A]["ids"].tolist() == [10] and state[B]["since"] == "2026-10-06T12:00:00Z"
 
@@ -163,7 +172,7 @@ def test_a_failed_project_keeps_its_list_and_cursor():
 def test_updated_since_starts_before_the_last_run():
     old = _state(**{f"p{A}": [1], f"p{B}": [2]})
     api = _Api({A: [1], B: [2]})
-    update_projects(old, [1, 2], d1="1900-01-01", now=NOW, session=api, sleep=0)
+    update_projects(old, [1, 2], d1="1900-01-01", now=NOW, session=api, sleep=0, projects=TWO)
     assert {c["updated_since"] for c in api.calls if "updated_since" in c} == {
         "2026-10-05T11:00:00Z"
     }
@@ -186,6 +195,21 @@ def test_cli_seeds_then_updates_the_state(tmp_path, monkeypatch):
     assert any("updated_since" in c for c in api.calls)
 
 
+def test_cli_drops_a_project_no_longer_in_projects(tmp_path, monkeypatch):
+    import what_to_id.map_projects as mp
+
+    api = _Api({A: [1000, 1001]})
+    monkeypatch.setattr(mp, "make_session", lambda: api)
+    make_pool(10).to_parquet(tmp_path / "pool.parquet", index=False)
+    state = tmp_path / PROJECTS_NAME
+    state.write_bytes(encode_projects(_state(**{f"p{A}": [1000], f"p{B}": [1001, 1002]})))
+    args = ["--pool", str(tmp_path / "pool.parquet"), "--state", str(state), "--d1", "1900-01-01"]
+    assert main(args) == 0
+    got = decode_projects(state.read_bytes())
+    assert list(got) == [A] and got[A]["ids"].tolist() == [1000, 1001]
+    assert all(c["project_id"] == A for c in api.calls)
+
+
 def _page_meta(html):
     return json.loads(re.search(r"var META=(\{.*?\});var BASEMAPS", html).group(1))
 
@@ -202,7 +226,6 @@ def test_map_carries_the_project_file_and_its_meta(tmp_path):
     assert meta["file"].startswith(PROJECTS_NAME + "?v=")
     assert meta["list"] == [
         {"id": A, "title": PROJECTS[0]["title"], "n": 2},
-        {"id": B, "title": PROJECTS[1]["title"], "n": 1},
     ]
     assert "function projectFilter(" in html and 'id="projbox" hidden' in html
 
@@ -252,75 +275,136 @@ def test_page_decodes_the_file_and_marks_records():
 
 
 @needs_node
-def test_identify_link_is_exact_for_or_and_not_and_wider_for_and():
-    lst = [{"id": A, "title": "A", "n": 500}, {"id": B, "title": "B", "n": 60}]
-    picks = {
-        "or": ([{"k": 0, "not": False}, {"k": 1, "not": False}], True),
-        "and": ([{"k": 0, "not": False}, {"k": 1, "not": False}], False),
-        "a_not_b": ([{"k": 0, "not": False}, {"k": 1, "not": True}], True),
-        "not_both": ([{"k": 0, "not": True}, {"k": 1, "not": True}], False),
-    }
-    script = (
-        f"var list={json.dumps(lst)},picks={json.dumps(picks)},out={{}};"
-        "for(var k in picks){var p=projParams(picks[k][0],picks[k][1],list);"
-        "out[k]={exact:p.exact,url:TX.identifyUrl({groups:[],all:3,months:[]},"
-        "{w:-130,s:48,e:-120,n:55},{place_id:7085,max_url:8000,imprecise_m:1000},p.q).url};}"
-        "console.log(JSON.stringify(out));"
-    )
-    got = _node(script)
-
-    def q(k):
-        return dict(re.findall(r"[?&]([^=&]+)=([^&]*)", got[k]["url"].replace("%2C", ",")))
-
-    assert got["or"]["exact"] and q("or")["project_id"] == f"{A},{B}"
-    assert "not_in_project" not in q("or")
-    assert got["a_not_b"]["exact"] and q("a_not_b")["project_id"] == str(A)
-    assert q("a_not_b")["not_in_project"] == str(B)
-    assert got["not_both"]["exact"] and q("not_both")["not_in_project"] == f"{A},{B}"
-    assert "project_id" not in q("not_both")
-    # AND: iNaturalist cannot require both, so the link opens the smaller project
-    assert not got["and"]["exact"] and q("and")["project_id"] == str(B)
-    assert q("and")["place_id"] == "7085" and q("and")["quality_grade"] == "needs_id"
-    assert q("and")["swlat"] == "48.0000"
-
-
-@needs_node
-def test_page_keeps_records_by_the_picked_combination():
+def test_page_keeps_records_in_any_picked_project_less_the_left_out():
     got = _node(
-        "var c={};[[0,0],[1,0],[2,0],[3,0]].forEach(function(r){var m=r[0];"
-        "c[m]=[projKeep(m,3,0,true),projKeep(m,3,0,false),projKeep(m,1,2,true),projKeep(m,0,3,true)];});"
+        "var c={};[0,1,2,3].forEach(function(m){"
+        "c[m]=[projKeep(m,3,0),projKeep(m,1,2),projKeep(m,0,3)];});"
         "console.log(JSON.stringify(c));"
     )
-    # columns: A or B, A and B, A not B, neither
+    # columns: A or B, A not B, neither
     assert got == {
-        "0": [False, False, False, True],
-        "1": [True, False, True, False],
-        "2": [True, False, False, False],
-        "3": [True, True, False, False],
+        "0": [False, False, True],
+        "1": [True, True, False],
+        "2": [True, False, False],
+        "3": [True, False, False],
     }
 
 
 @needs_node
-def test_chips_read_as_selection_terms():
-    lst = [{"id": A, "title": "A", "n": 500}, {"id": B, "title": "B", "n": 60}]
+@pytest.mark.parametrize(
+    ("text", "want"),
+    [
+        ("90486", "90486"),
+        (" 090486 ", "90486"),
+        ("https://www.inaturalist.org/projects/90486", "90486"),
+        ("www.inaturalist.org/projects/90486/", "90486"),
+        ("https://inaturalist.ca/projects/90486?tab=observations", "90486"),
+        # iNaturalist matches the same records by slug as by number (see projParse)
+        ("https://www.inaturalist.org/projects/bc-rarities", "bc-rarities"),
+        ("https://www.inaturalist.org/projects/BC-Rarities/journal#top", "bc-rarities"),
+        ("bc-rarities", None),
+        ("0", None),
+        ("", None),
+        ("hello world", None),
+        ("https://www.inaturalist.org/observations/90486", None),
+        ("https://example.org/projects/90486", None),
+        ("https://www.inaturalist.org/projects/new", None),
+        ("https://www.inaturalist.org/projects/<script>", None),
+        ("12345678901", None),
+    ],
+)
+def test_paste_reads_a_project_number_or_url(text, want):
+    assert _node(f"console.log(JSON.stringify(projParse({json.dumps(text)})));") == want
+
+
+LIST = [{"id": A, "title": "BC Biodiversity Program", "n": 500}]
+
+
+def _hash(value):
+    return _node(
+        f"var list={json.dumps(LIST)},s=projRead({json.dumps(value)},list);"
+        "console.log(JSON.stringify({sel:s,out:projWrite(s)}));"
+    )
+
+
+@needs_node
+def test_hash_round_trips_map_and_pasted_projects():
+    got = _hash(f"{A},p12345,-pbc-rarities")
+    assert got["sel"] == [
+        {"id": str(A), "k": 0, "st": "inc"},
+        {"id": "12345", "k": -1, "st": "inc"},
+        {"id": "bc-rarities", "k": -1, "st": "not"},
+    ]
+    assert got["out"] == f"{A},p12345,-pbc-rarities"
+    assert _hash(f"-{A}")["out"] == f"-{A}"
+    # a repeat, junk, an unprefixed slug and empty tokens are dropped
+    assert _hash(f"{A},-{A},p,pa b,bc-rarities,,-")["out"] == str(A)
+    assert _hash("")["sel"] == [] and _hash(None)["sel"] == []
+
+
+@needs_node
+def test_old_links_load_a_dropped_project_as_pasted_and_ignore_match_all():
+    # BC Rarities (90486) was a map project; old links name it by number
+    got = _hash("90486")
+    assert got["sel"] == [{"id": "90486", "k": -1, "st": "inc"}] and got["out"] == "p90486"
+    assert _hash(f"{A},-90486")["out"] == f"{A},-p90486"
     got = _node(
-        f"var list={json.dumps(lst)},m=new Uint8Array([0,1,2,3]),out={{}};"
-        "[true,false].forEach(function(any){"
-        "out[any]=projTerms([{k:0,not:false},{k:1,not:false},{k:1,not:true}],any,list,m)"
-        ".map(function(t){return {dim:t.dim,kind:t.kind,id:t.id,label:t.label,ex:t.exclude,"
-        "m:Array.from(t.mask()),inat:t.inat()};});});"
-        "console.log(JSON.stringify(out));"
+        "var document={getElementById:function(){return null;}};"
+        f"var pj=projectFilter({{meta:{{projects:{{list:{json.dumps(LIST)}}}}},"
+        f"hash:new URLSearchParams('projects=90486,{A}&match=all'),changed:function(){{}}}});"
+        "console.log(JSON.stringify(pj.hash()));"
     )
-    a, b, nb = got["true"]
-    assert (a["dim"], a["kind"], a["id"], a["label"], a["ex"]) == (
-        "project",
-        "project",
-        A,
-        "A",
-        False,
+    assert got == f"projects=p90486,{A}"
+
+
+def _params(sel):
+    return _node(f"console.log(JSON.stringify(projParams({json.dumps(sel)})));")
+
+
+@needs_node
+def test_identify_params_for_map_and_pasted_projects():
+    m, p, ps = (
+        {"id": str(A), "k": 0, "st": "inc"},
+        {"id": "90486", "k": -1, "st": "inc"},
+        {"id": "bc-x", "k": -1, "st": "not"},
     )
-    assert a["m"] == [0, 1, 0, 1] and b["m"] == [0, 0, 1, 1]
-    assert a["inat"] == {"params": {"project_id": str(A)}, "exact": True}
-    assert nb["ex"] and nb["inat"] == {"params": {"not_in_project": str(B)}, "exact": True}
-    # match all: the included terms cannot be said exactly on iNaturalist, the excluded one can
-    assert [t["inat"]["exact"] for t in got["false"]] == [False, False, True]
+    assert _params([m]) == {"q": {"project_id": str(A)}, "exact": True}
+    assert _params([{**m, "st": "not"}]) == {"q": {"not_in_project": str(A)}, "exact": True}
+    # map projects first, whatever order they were picked in
+    assert _params([p, m]) == {"q": {"project_id": f"{A},90486"}, "exact": False}
+    assert _params([p]) == {"q": {"project_id": "90486"}, "exact": False}
+    assert _params([m, ps]) == {
+        "q": {"project_id": str(A), "not_in_project": "bc-x"},
+        "exact": False,
+    }
+    assert _params([]) == {"q": {}, "exact": True}
+
+
+def _note(sel, shown, alt):
+    return _node(
+        f"var list={json.dumps(LIST)};"
+        f"console.log(JSON.stringify(projNote({json.dumps(sel)},list,{json.dumps(shown)},{alt})));"
+    )
+
+
+@needs_node
+def test_note_gives_both_counts_or_says_the_map_leaves_the_project_out():
+    m = {"id": str(A), "k": 0, "st": "inc"}
+    p = {"id": "90486", "k": -1, "st": "inc"}
+    assert _note([m], 1234, 0) == {"more": "", "fewer": ""}
+    assert _note([m, p], 1234, 56789) == {
+        "fewer": "",
+        "more": "it also opens records in project 90486 (Identify only), which the map cannot "
+        "count, so up to 56,789 rather than the 1,234 on the map",
+    }
+    assert _note([m, p], None, 0)["more"].endswith("which the map cannot count")
+    assert _note([p], 56789, 0) == {
+        "more": "",
+        "fewer": "The map count does not include the Identify only project filter (in project "
+        "90486), so Identify opens at most the 56,789 records shown.",
+    }
+    left = _note([m, {**p, "st": "not"}], 1234, 0)
+    assert left["more"] == "" and "(not in project 90486)" in left["fewer"]
+    assert _note([{**m, "st": "not"}, p], None, 0)["fewer"].endswith(
+        "opens fewer records than the map shows."
+    )

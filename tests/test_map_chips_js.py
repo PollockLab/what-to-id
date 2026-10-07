@@ -160,7 +160,7 @@ def test_identify_status_filters_pick_or_leave_out():
 BAR = r"""
 var S={picks:[{id:3,not:false},{id:4,not:true}],groups:{Insecta:'not',Aves:'inc'},months:5,
   only:{introduced:'not',exact:'inc'}},log=[],areaOn=true;
-var pj={items:function(){return [{label:'in BC Rarities',not:true,
+var pj={items:function(){return [{label:'in project 90486',not:true,tag:'Identify only',
   remove:function(){log.push('pj');}}];}};
 var area={term:function(){return areaOn?{label:'Garibaldi Park'}:null;},
   clear:function(){areaOn=false;log.push('area');}};
@@ -175,7 +175,9 @@ box.appendChild(new El('ul'));
 var q=new El('input'),cleared=0,B=CH.bar({box:box,clear:function(){cleared++;},fallback:q});
 function xs(){return box.querySelectorAll('button').slice(1);}
 function texts(){return box.querySelector('ul').children.map(function(li){
-  return [li.children[0].textContent,!!li.cls.not,li.children[1].attrs['aria-label']];});}
+  var s=li.children[0],t=s.children;
+  return [s.textContent+(t.length?' ['+t[0].textContent+']':''),!!li.cls.not,
+    li.children[1].attrs['aria-label']];});}
 """
 
 
@@ -195,7 +197,11 @@ def test_selection_bar_lists_every_chip_and_removes_each():
     assert got["first"] == [
         ["Bryophyta", False, "Remove Bryophyta"],
         ["not Plantae", True, "Remove not Plantae"],
-        ["not in BC Rarities", True, "Remove not in BC Rarities"],
+        [
+            "not in project 90486 [Identify only]",
+            True,
+            "Remove not in project 90486 (Identify only)",
+        ],
         ["Birds", False, "Remove Birds"],
         ["not Insects", True, "Remove not Insects"],
         ["January", False, "Remove January"],
