@@ -120,6 +120,9 @@ function projectFilter(o){
     active:function(){return (inc|exc)!==0;},
     params:function(){return lists?projParams(sel,any,list).q:{};},
     terms:function(){return lists?projTerms(sel,any,list,mask):[];},any:function(){return any;},
+    // the chips for the selection bar (map_chips.js), once the file has loaded
+    items:function(){return lists?sel.map(function(s){return {label:'in '+list[s.k].title,not:s.not,
+      remove:function(){sel.splice(sel.indexOf(s),1);change();}};}):[];},
     hash:function(){if(!sel.length)return '';
       return 'projects='+sel.map(function(s){return (s.not?'-':'')+list[s.k].id;}).join(',')+(any?'':'&match=all');},
     reset:function(){if(!sel.length)return;sel=[];any=true;bits();key++;if(lists)draw();}

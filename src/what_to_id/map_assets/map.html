@@ -21,6 +21,7 @@
 <button type="button" id="toggle" class="toggle" aria-expanded="false" aria-controls="side">Filters</button>
 </header>
 <section id="side" class="side" aria-label="Filters">
+<div id="selbar" class="selbar" role="region" aria-label="Your selection" hidden><p class="lbl">Your selection <button type="button" class="link">Clear all</button></p><ul class="chips"></ul></div>
 <label for="q"><span class="lbl">Taxa <span class="muted">pick several to combine</span></span></label>
 <div class="picker"><div id="picks" class="chips" hidden></div>
 <input id="q" type="search" placeholder="Latin or common name, e.g. Carex" autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="sugg">
@@ -28,11 +29,11 @@
 <p id="qn" class="muted" aria-live="polite"></p>
 <div id="cladebox" hidden><div id="clades" class="chips" role="group" aria-label="Taxon shortcuts"></div></div>
 <p class="muted">Records under any picked taxon or group show; a taxon keeps everything below it, so Bryophyta keeps all mosses. Click a picked taxon to leave it out instead. A shortcut click picks its taxa, a second leaves them out, a third removes them.</p>
-<div id="flagbox"><p class="lbl">Show only</p><div id="flags" class="chips" role="group" aria-label="Show only"></div></div>
+<div id="flagbox"><p class="lbl">Show only <span class="muted">click again to leave out</span></p><div id="flags" class="chips" role="group" aria-label="Show only"></div></div>
 <div id="projbox" hidden></div>
 <p class="lbl">Groups <button type="button" id="gall" class="link">all groups</button></p>
 <div id="groups" class="chips" role="group" aria-label="Taxon groups"></div>
-<p class="muted">Pick several groups to combine them, with each other and with the taxa above. Click a group again to remove it.</p>
+<p class="muted">Pick several groups to combine them, with each other and with the taxa above. Click a group again to leave it out, a third time to clear it.</p>
 <p class="lbl">Months of the year <button type="button" id="mclear" class="link">any month</button></p>
 <div id="months" class="chips months" role="group" aria-label="Months of the year"></div>
 <p class="muted">Pick months to compare the same season across years.</p>

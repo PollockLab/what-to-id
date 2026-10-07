@@ -39,11 +39,20 @@ h1{font-size:18px;margin:0}
 .pick{display:inline-flex;border:1px solid var(--on);border-radius:13px;overflow:hidden}
 .chips .pick button{border:0;border-radius:0;background:var(--on);color:var(--onink);min-height:28px}
 .chips .pick .px{padding:3px 8px;border-left:1px solid var(--onink)}
-.pick.not{border-style:dashed}
-.chips .pick.not button{background:var(--chip);color:var(--ink)}
-.chips .pick.not .pn{text-decoration:line-through}
-.chips .pick.not .px{border-left-color:var(--line)}
-.chips button.not{border-style:dashed;text-decoration:line-through}
+.pick.not{border:1px dashed var(--warn)}
+.chips .pick.not .px{border-left:1px solid var(--warn)}
+/* one "not" style for every left-out chip: taxa, shortcuts, projects, groups, show only, the bar */
+.chips button.not,.chips button[aria-pressed="true"].not,.chips .pick.not button,.chips .pchip.not button,
+  .schip.not{background:var(--warnbg);color:var(--warn)}
+.chips button.not,.chips button[aria-pressed="true"].not,.chips .pchip.not button,.schip.not{border:1px dashed var(--warn)}
+.chips .pchip.not button.x{border-left:0}
+.selbar{border:1px solid var(--line);border-radius:8px;padding:4px 8px 8px;background:var(--chip)}
+.selbar .lbl{margin-top:2px}
+.selbar ul{margin:0;padding:0;list-style:none}
+.schip{display:inline-flex;align-items:center;max-width:100%;border:1px solid var(--on);border-radius:13px;
+  background:var(--on);color:var(--onink);font-size:12px;padding-left:9px}
+.schip span{overflow-wrap:anywhere}
+.chips .schip button{border:0;background:none;color:inherit;padding:3px 8px;min-height:26px;min-width:28px}
 .sugg{position:absolute;left:0;right:0;top:100%;z-index:8;margin:2px 0 0;padding:4px 0;list-style:none;
   background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:var(--shadow);
   max-height:50vh;overflow:auto}
@@ -74,7 +83,6 @@ h1{font-size:18px;margin:0}
 .pchip{display:inline-flex}
 .chips .pchip button{border-radius:13px 0 0 13px;background:var(--on);color:var(--onink);border-color:var(--on)}
 .chips .pchip button.x{border-radius:0 13px 13px 0;border-left:0;padding:3px 7px}
-.chips .pchip.not button{background:var(--warnbg);color:var(--warn);border-color:var(--warn)}
 #map{grid-area:map;position:relative;min-height:240px}
 .time{grid-area:time;padding:8px 16px 10px;border-top:1px solid var(--line)}
 .row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}

@@ -9,7 +9,7 @@ var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'
 var MONTH=['January','February','March','April','May','June','July','August','September',
   'October','November','December'];
 var FLAG={introduced:1,threatened:2,obscured:4,imprecise:8,earlyObs:16,earlyUp:32},ONLYFLAG={introduced:'introduced',
-  threatened:'threatened',exact:'obscured'},nf=new Intl.NumberFormat('en-CA');
+  threatened:'threatened',exact:'obscured'},ONLYKEYS=Object.keys(ONLYFLAG),nf=new Intl.NumberFormat('en-CA');
 function iso(d){return new Date(D0+d*DAY).toISOString().slice(0,10);}
 function dayOf(s){var t=Date.parse(s+'T00:00:00Z');return isNaN(t)?null:Math.round((t-D0)/DAY);}
 function clamp(d){return Math.max(0,Math.min(LAST,d));}
@@ -38,8 +38,8 @@ for(var d=0;d<META.days;d++){var t=new Date(D0+d*DAY);MOY[d]=t.getUTCMonth();DOM
   DOW[d]=(t.getUTCDay()+6)%7;MI[d]=(t.getUTCFullYear()-Y0)*12+MOY[d]-M0;}
 
 // What the viewer picked. Written to the URL hash so a view can be shared or bookmarked.
-var S={up:false,lo:0,hi:LAST,months:0,groups:META.groups.map(function(){return true;}),
-  only:{},picks:[],rec:null,at:null,fly:false};
+// Groups and show only hold chip states (see map_chips.js): {Insecta:'inc', Aves:'not'}.
+var S={up:false,lo:0,hi:LAST,months:0,groups:{},only:{},picks:[],rec:null,at:null,fly:false};
 (function readHash(){
   var h=new URLSearchParams(location.hash.slice(1));
   S.up=h.get('by')==='uploaded';
@@ -47,10 +47,8 @@ var S={up:false,lo:0,hi:LAST,months:0,groups:META.groups.map(function(){return t
   if(f!=null)S.lo=clamp(f);if(t!=null)S.hi=clamp(t);
   if(S.lo>S.hi){var sw=S.lo;S.lo=S.hi;S.hi=sw;}
   (h.get('months')||'').split(',').forEach(function(m){if(+m>=1&&+m<=12)S.months|=1<<(m-1);});
-  if(h.get('groups')!=null){var gs=h.get('groups').split(','),gm=META.groups.map(function(g){
-    return gs.indexOf(g)>=0;});if(gm.some(Boolean))S.groups=gm;}
-  (h.get('only')||'').split(',').forEach(function(k){
-    if(META.flags.indexOf(ONLYFLAG[k])>=0)S.only[k]=true;});
+  S.groups=CH.read(h.get('groups'),META.groups);
+  S.only=CH.read(h.get('only'),ONLYKEYS.filter(function(k){return META.flags.indexOf(ONLYFLAG[k])>=0;}),['exact']);
   S.picks=TX.read(h.get('taxa'));S.oldq=S.picks.length?'':h.get('q')||'';S.rec=+h.get('record')||null;
   S.area=h.get('area')||'';S.park=+h.get('park')||0;
   var at=(h.get('at')||'').split('/').map(Number);if(at.length===3&&at.every(isFinite))S.at=at;
@@ -63,10 +61,8 @@ function sel(){
   var h=[];if(S.up)h.push('by=uploaded');
   if(S.lo>0)h.push('from='+iso(S.lo));if(S.hi<LAST)h.push('to='+iso(S.hi));
   if(S.months){var ms=[];for(var m=0;m<12;m++)if(S.months>>m&1)ms.push(m+1);h.push('months='+ms);}
-  if(!S.groups.every(Boolean))h.push('groups='+META.groups.filter(function(g,i){
-    return S.groups[i];}).map(encodeURIComponent).join(','));
-  var only=Object.keys(S.only).filter(function(k){return S.only[k];});
-  if(only.length)h.push('only='+only.join(','));
+  if(!allGroups())h.push('groups='+CH.write(S.groups,META.groups));
+  if(CH.any(S.only))h.push('only='+CH.write(S.only,ONLYKEYS));
   if(S.picks.length)h.push('taxa='+TX.write(S.picks));
   if(AREA.on())h.push(AREA.hash());if(PJ.hash())h.push(PJ.hash());
   return h;}
@@ -121,7 +117,7 @@ var ST_INTRO=1,ST_THREAT=2,ST_INEXACT=4,ST_KEEP=8,ST_SAMPLE=16,PD=null,PD_KEY=nu
 function inc(){return !!TF.inc;}
 function pointData(){
   PJ.sync(P);
-  var n=P.n,gone=Object.keys(GONE).length,i,key=[TF,inc()&&!allGroups()?S.groups.join():'',AREA.ver(),PJ.key()];
+  var n=P.n,gone=Object.keys(GONE).length,i,key=[TF,inc()?CH.picked(S.groups,META.groups,'inc').join():'',AREA.ver(),PJ.key()];
   if(PD&&PD.length===n&&PD_KEY&&PD_KEY.every(function(k,j){return k===key[j];})&&PD_GONE===gone)return;
   var same=PD&&PD.length===n,days=same?PD.days:new Float32Array(2*n),
     cat=same?PD.attributes.getFilterCategory.value.slice():new Uint8Array(4*n);
@@ -133,8 +129,8 @@ function pointData(){
   // only the kept bit follows the picks, the groups beside them, the area, projects and deletions
   // OUT keeps the records out for any reason but the area, for the Identify box count; PJW marks
   // the records Identify opens when it cannot say the projects exactly (see map_projects.js)
-  var ti=TF.inc,te=TF.exc,gs=key[1]?S.groups:null,tax=P.tax,grp=P.grp,id=P.id,nt=NOTAX,am=AREA.mask(n),
-    wide=PJ.wide();
+  var ti=TF.inc,te=TF.exc,gs=key[1]?META.groups.map(function(g){return S.groups[g]==='inc';}):null,tax=P.tax,
+    grp=P.grp,id=P.id,nt=NOTAX,am=AREA.mask(n),wide=PJ.wide();
   if(OUT.length!==n)OUT=new Uint8Array(n);PJW=wide?new Uint8Array(n):null;
   for(i=0;i<n;i++){var t=tax[i],keep=!ti||(t!==nt&&ti[t]===1)||(gs!==null&&gs[grp[i]]);
     if(te&&t!==nt&&te[t]===1||gone>0&&GONE[id[i]]===1)keep=false;
@@ -148,9 +144,10 @@ function pointData(){
 }
 function categories(thin){
   var groups=[],mon=[],all=[],st=[],req=0,hide=0,i;
-  S.groups.forEach(function(v,j){if(v||inc())groups.push(j);});
+  CH.groupPass(S.groups,META.groups,inc()).forEach(function(v,j){if(v)groups.push(j);});
   for(i=0;i<13;i++){all.push(i);if(S.months?i<12&&S.months>>i&1:true)mon.push(i);}
-  if(S.only.introduced)req|=ST_INTRO;if(S.only.threatened)req|=ST_THREAT;if(S.only.exact)hide=ST_INEXACT;
+  [['introduced',ST_INTRO],['threatened',ST_THREAT],['exact',ST_INEXACT]].forEach(function(o){var v=S.only[o[0]];
+    if(v==='not'||v&&o[0]==='exact')hide|=o[1];else if(v)req|=o[1];});
   for(i=0;i<2*ST_SAMPLE;i++)if(i&ST_KEEP&&(i&req)===req&&!(i&hide)&&(!thin||i&ST_SAMPLE))st.push(i);
   return [groups,S.up?all:mon,S.up?mon:all,st];
 }
@@ -161,7 +158,7 @@ function refilter(){
 }
 function recount(){
   var n=P.n,day=S.up?P.up:P.obs,c=categories(),gm=0,mm=0,sm=0,nd=0,cat=PD.attributes.getFilterCategory.value,
-    ch=S.up?2:1,g=S.groups,m=S.months;
+    ch=S.up?2:1,g=CH.groupPass(S.groups,META.groups,false),m=S.months;
   c[0].forEach(function(j){gm|=1<<j;});c[ch].forEach(function(j){mm|=1<<j;});c[3].forEach(function(j){sm|=1<<j;});
   RC={gm:gm,mm:mm,sm:sm,ch:ch};
   if(KEEP.length!==n)KEEP=new Uint8Array(n);
@@ -175,9 +172,10 @@ function recount(){
     (day[i]===NO?full():day[i]>=S.lo&&day[i]<=S.hi))ALT++;
   CUM=new Float64Array(META.days+1);
   for(var d=0;d<META.days;d++)CUM[d+1]=CUM[d]+PER[d];
-  // One status filter reads its own totals; two together, or an area, have none
-  var on=Object.keys(S.only).filter(function(k){return S.only[k];}),
-    tt=!TOT||S.picks.length||AREA.on()||PJ.active()||on.length>1?null:on.length?TOT.only&&TOT.only[on[0]]:TOT;
+  // One picked status filter reads its own totals; two together, a left-out one, or an area, have none
+  var on=Object.keys(S.only),
+    tt=!TOT||S.picks.length||AREA.on()||PJ.active()||on.length>1||S.only[on[0]]==='not'?null:
+      on.length?TOT.only&&TOT.only[on[0]]:TOT;
   TC=null;
   if(tt){var rows=tt[S.up?'up':'obs'],nm=rows[0].length;TC=new Float64Array(nm+1);
     for(var k=0;k<nm;k++){var v=0;if(!m||m>>(M0+k)%12&1)for(var j=0;j<rows.length;j++)if(g[j])v+=rows[j][k];
@@ -192,7 +190,7 @@ function render(){
   $('count').textContent=P.n?nf.format(shown)+' of '+nf.format(META.n)+' records':'Loading';
   var all=P.n&&!$('more').textContent?total(S.lo,S.hi):null;
   $('share').textContent=all?nf.format(Math.min(shown,all))+' of '+nf.format(all)+
-    ' BC records with photos '+(full()&&!S.months&&allGroups()&&!Object.keys(S.only).some(function(k){return S.only[k];})?
+    ' BC records with photos '+(full()&&!S.months&&allGroups()&&!CH.any(S.only)?
     '':'matching these filters ')+'still need an ID ('+
     pct(shown,all)+'). All-record counts from '+TOT.on+'.':'';
   $('hint').textContent=TC?HINT_TOT:HINT;
@@ -201,28 +199,28 @@ function render(){
   $('byUp').setAttribute('aria-pressed',String(S.up));
   PRESETS.forEach(function(p){var r=p.range();
     p.el.setAttribute('aria-pressed',String(r[0]===S.lo&&r[1]===S.hi));});
-  PJ.note(P.n?shown:null,ALT);draw();layers();link();writeHash();
+  PJ.note(P.n?shown:null,ALT);BAR.set(items());draw();layers();link();writeHash();
 }
 // Whether record i matches the filters with the area left out, as recount() reads them
 function match(i){if(!RC||i>=OUT.length)return 0;var c=PD.attributes.getFilterCategory.value,s=c[4*i+3]&~ST_KEEP|(OUT[i]?0:ST_KEEP);
   return (RC.gm>>c[4*i]&1)&(RC.mm>>c[4*i+RC.ch]&1)&(RC.sm>>s&1);}
 function link(){
   var b=map.getBounds(),m=[],u=null;for(var i=0;i<12;i++)if(S.months>>i&1)m.push(i+1);
-  // with a taxon included, the groups go in as their taxa, which iNaturalist adds to the picks
-  var gs=META.groups.filter(function(g,i){return S.groups[i];}),taxa=TF.ids.slice(),gid=META.group_ids||{};
-  if(TF.ids.length&&!allGroups())gs.forEach(function(g){taxa.push(gid[g]||NaN);});
-  if(taxa.some(isNaN))taxa=null;
-  var st={groups:TF.ids.length?[]:gs,
+  // with a taxon included, the picked groups go in as their taxa, which iNaturalist adds to the picks;
+  // left-out groups go in as taxa to leave out (see CH.groupLink)
+  var gl=CH.groupLink(S.groups,META.groups,META.group_ids||{},TF.ids.length>0),
+    taxa=gl.inc.length?null:TF.ids.concat(gl.taxa);
+  var st={groups:gl.groups,
     all:META.groups.length,up:S.up,d1:S.lo>0?iso(S.lo):'',d2:S.hi<LAST?iso(S.hi):'',months:m,taxa:taxa,
-    not:TF.not,only:S.only};
+    not:TF.not.concat(gl.not),only:S.only};
   // with an area on, the link may list the records by id instead, and then u stays null
   var a=$('identify');a.href=AREA.link({w:b.getWest(),s:b.getSouth(),e:b.getEast(),n:b.getNorth()},
     function(v,p,side){var r=TX.identifyUrl(st,v,META,Object.assign({},PJ.params(),p));if(!side)u=r;return r.url;},match);
   a.title='Opens these records in the iNaturalist Identify page.';
   // say when Identify cannot show the same records, and what it opens instead
-  var why=[],lost=u?u.lost:[];
-  if(u&&TF.ids.length&&!taxa)why.push('Identify cannot add the '+gs.filter(function(g){return !gid[g];})
-    .map(function(g){return META.names[g]||g;}).join(' and ')+' group to picked taxa, so it opens every taxon');
+  var why=[],lost=u?u.lost:[];function gn(gs){return gs.map(gname).join(' and ');}
+  if(u&&gl.inc.length)why.push('Identify cannot add the '+gn(gl.inc)+' group to picked taxa, so it opens every taxon');
+  if(u&&gl.out.length)why.push('Identify cannot leave out the '+gn(gl.out)+' group beside picked taxa, so it keeps it');
   if(lost.indexOf('taxa')>=0)why.push('too many taxa for one link, so it opens every taxon');
   if(lost.indexOf('not')>=0)why.push('too many taxa left out for one link, so it keeps them');
   if(u&&PJ.inexact())why.push(PJ.inexact());
@@ -384,56 +382,58 @@ function chip(box,label,pressed,onclick,title){var b=document.createElement('but
   b.setAttribute('aria-pressed',String(pressed));
   b.onclick=function(){b.setAttribute('aria-pressed',String(onclick()));refilter();};
   $(box).appendChild(b);return b;}
-// Like the months: with no chip pressed every group shows. A click on the first chip shows that
-// group only, further clicks add or remove groups, and removing the last one shows all again.
-function allGroups(){return S.groups.every(Boolean);}
-function showGroups(){var all=allGroups();
-  GB.forEach(function(b,i){b.setAttribute('aria-pressed',String(!all&&S.groups[i]));});}
-var GB=META.groups.map(function(g,i){return chip('groups',META.names[g]||g,false,function(){
-  if(allGroups())S.groups=S.groups.map(function(v,j){return j===i;});else S.groups[i]=!S.groups[i];
-  if(!S.groups.some(Boolean))S.groups=S.groups.map(function(){return true;});
-  showGroups();return S.groups[i]&&!allGroups();});});
-showGroups();
-function setGroups(){S.groups=S.groups.map(function(){return true;});showGroups();refilter();}
-$('gall').onclick=setGroups;
+// Like the months: with no group picked every group shows. A click picks a group, the next leaves it
+// out, the third clears it (see map_chips.js).
+function allGroups(){return !CH.any(S.groups);}
+function gname(g){return META.names[g]||g;}
+function showGroups(){GB.forEach(function(b,i){var g=META.groups[i];CH.show(b,gname(g),S.groups[g]||'');});}
+var GB=META.groups.map(function(g){return CH.chip($('groups'),g,gname(g),function(){return S.groups;},true,
+  gname(g),refilter);});
+$('gall').onclick=function(){S.groups={};showGroups();refilter();};
 var MB_=MON.map(function(m,i){var b=chip('months',m,!!(S.months>>i&1),
   function(){S.months^=1<<i;return !!(S.months>>i&1);});b.setAttribute('aria-label',MONTH[i]);
   return b;});
-function clearMonths(){S.months=0;MB_.forEach(function(b){b.setAttribute('aria-pressed','false');});}
-$('mclear').onclick=function(){clearMonths();refilter();};
-var ONLY=[['introduced','Introduced to BC','introduced','Species not native to BC'],
+function showMonths(){MB_.forEach(function(b,i){b.setAttribute('aria-pressed',String(!!(S.months>>i&1)));});}
+$('mclear').onclick=function(){S.months=0;showMonths();refilter();};
+// Introduced and threatened can be left out too. Exact location stays two-state: its opposite, hidden
+// or over 1 km uncertain, is an OR iNaturalist's Identify filters cannot say.
+var ONLYDEF=[['introduced','Introduced to BC','introduced','Species not native to BC'],
   ['threatened','Threatened','threatened','Species with a threatened status'],
   ['exact','Exact location','obscured','Hide records whose place is hidden or over 1 km uncertain']]
-  .filter(function(o){return META.flags.indexOf(o[2])>=0;})
-  .map(function(o){return chip('flags',o[1],!!S.only[o[0]],
-    function(){return S.only[o[0]]=!S.only[o[0]];},o[3]);});
+  .filter(function(o){return META.flags.indexOf(o[2])>=0;}),
+  ONLY=ONLYDEF.map(function(o){return CH.chip($('flags'),o[0],o[1],function(){return S.only;},o[0]!=='exact',
+    o[3],refilter);});
+function showOnly(){ONLY.forEach(function(b,j){CH.show(b,ONLYDEF[j][1],S.only[ONLYDEF[j][0]]||'');});}
 if(!ONLY.length)$('flagbox').hidden=true;
 // Picked taxa: chips beside the groups, one set with them. A shortcut picks, then leaves out, a set
 // of taxa, and shows only once the taxa file carries the whole tree.
 var PK=TX.picker({input:$('q'),box:$('picks'),list:$('sugg'),msg:$('qn'),picks:S.picks,ranks:META.ranks,
   nf:nf,taxa:function(){return TAXA;},counts:function(){return TX.counts(TAXA,P.tax,P.n);},
   onChange:function(){search();showClades();refilter();}});
-var PRE=META.presets||[],CB=PRE.map(function(c){var b=chip('clades',c[0],false,function(){
-  PK.cycle(c[1]);return PK.state(c[1])!=='';},c[2]);b.setAttribute('aria-label',c[0]);return b;});
+var PRE=META.presets||[],CB=PRE.map(function(c){return chip('clades',c[0],false,function(){
+  PK.cycle(c[1]);return PK.state(c[1])!=='';},c[2]);});
 $('cladebox').hidden=!CB.length;
-function showClades(){CB.forEach(function(b,k){var st=PK.state(PRE[k][1]);
-  b.setAttribute('aria-pressed',String(st!==''));b.classList.toggle('not',st==='not');
-  b.textContent=(st==='not'?'not ':'')+PRE[k][0];});}
+function showClades(){CB.forEach(function(b,k){CH.show(b,PRE[k][0],PK.state(PRE[k][1]));});}
 showClades();
 // An old link's q, names to keep, becomes picks once the taxa load. It kept those names within the
 // groups; when every name lies inside the groups the picks alone say the same, so the groups clear.
 function oldQuery(){if(!S.oldq)return;
   var got=TX.resolve(TAXA,S.oldq,TX.counts(TAXA,P.tax,P.n)),gid=META.group_ids||{},
-    gs=META.groups.filter(function(g,i){return S.groups[i]&&gid[g];}).map(function(g){return gid[g];});
+    gs=CH.picked(S.groups,META.groups,'inc').filter(function(g){return gid[g];}).map(function(g){return gid[g];});
   if(!got.length)$('q').value=S.oldq;S.oldq='';
   got.forEach(function(p){S.picks.push(p);});
   if(got.length&&!allGroups()&&got.every(function(p){return p.not||TX.within(TAXA,p.id,gs);}))
-    S.groups=S.groups.map(function(){return true;}),showGroups();
+    S.groups={},showGroups();
   PK.refresh();showClades();}
 function search(){TF=TX.filter(TAXA,S.picks);}
-$('reset').onclick=function(){S.lo=0;S.hi=LAST;S.up=false;clearMonths();setGroups();
-  S.only={};ONLY.forEach(function(b){b.setAttribute('aria-pressed','false');});
-  S.picks.length=0;$('q').value='';PK.refresh();showClades();search();AREA.clear();PJ.reset();refilter();};
+// The selection bar lists every chip; its Clear all clears them, and reset also the dates.
+function redraw(){showGroups();showMonths();showOnly();refilter();}
+function clearAll(){S.months=0;S.groups={};S.only={};S.picks.length=0;$('q').value='';PK.refresh();showClades();
+  search();AREA.clear();PJ.reset();redraw();}
+$('reset').onclick=function(){S.lo=0;S.hi=LAST;S.up=false;clearAll();};
+var BAR=CH.bar({box:$('selbar'),clear:clearAll,fallback:$('q')});
+function items(){return CH.items({S:S,meta:META,terms:TX.terms({T:TAXA,picks:S.picks,groups:[],meta:META,n:0}),
+  picker:PK,pj:PJ,months:MONTH,only:ONLYDEF,area:AREA,redraw:redraw});}
 $('toggle').onclick=function(){var o=$('side').classList.toggle('open');
   this.setAttribute('aria-expanded',String(o));};
 
