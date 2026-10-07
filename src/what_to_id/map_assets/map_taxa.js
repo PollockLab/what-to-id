@@ -100,27 +100,14 @@ function terms(o){
 // Whether taxon id lies at or below any of ids.
 function within(T,id,ids){var ix=index(T),r=ix.row.get(id);
   for(;r!=null&&r>=0;r=ix.par[r])if(ids.indexOf(T[r][2])>=0)return true;return false;}
-// The chips and suggestion list. o: input, box (chips), list (suggestions), msg (a note under the
-// box), picks (kept in place), taxa() and counts() for the current table, ranks, nf, and onChange
-// after every change.
+// The search box and its suggestion list; the picks show as chips in the selection bar (map_chips.js).
+// o: input, list (suggestions), msg (a note under the input), picks (kept in place), taxa() and
+// counts() for the current table, ranks, nf, and onChange after every change.
 function picker(o){
   var act=-1,rows=[];
-  function name(id){var ix=o.taxa()&&index(o.taxa()),r=ix?ix.row.get(id):null;
-    return r==null?{latin:'Taxon '+id,common:'',rank:''}:{latin:ix.T[r][0],common:ix.T[r][1],
-      rank:ix.T[r][3]!==255?o.ranks[ix.T[r][3]]||'':''};}
   function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;
     if(text!=null)e.textContent=text;return e;}
-  function chips(){o.box.textContent='';
-    o.picks.forEach(function(p,k){var t=name(p.id),s=el('span','pick'+(p.not?' not':'')),
-      b=el('button','pn',(p.not?'not ':'')+t.latin),x=el('button','px','×');
-      b.type=x.type='button';b.setAttribute('aria-pressed',String(p.not));
-      b.title=(t.common?t.common+', ':'')+(t.rank||'taxon')+'. Click to '+(p.not?'include':'exclude')+' it.';
-      x.setAttribute('aria-label','Remove '+t.latin);
-      b.onclick=function(){p.not=!p.not;changed();};
-      x.onclick=function(){o.picks.splice(k,1);changed();o.input.focus();};
-      s.appendChild(b);s.appendChild(x);o.box.appendChild(s);});
-    o.box.hidden=!o.picks.length;}
-  function changed(){chips();o.onChange();}
+  function changed(){o.onChange();}
   function show(){
     var T=o.taxa();rows=suggest(T,o.input.value,T&&o.counts(),o.picks);act=rows.length?0:-1;
     o.list.textContent='';
@@ -150,11 +137,10 @@ function picker(o){
     else if(e.key==='Enter'){if(act>=0){pick(act);e.preventDefault();}}
     else if(e.key==='Escape')hide();
     else if(e.key==='Backspace'&&!o.input.value&&o.picks.length){o.picks.pop();changed();}});
-  chips();
   // A shortcut's state: 'inc' when all its taxa are picked, 'not' when all are left out, else ''.
   function state(ids){var st=null;ids.forEach(function(id){var p=o.picks.filter(function(q){
     return q.id===id;})[0],v=p?(p.not?'not':'inc'):'';st=st===null||st===v?v:'';});return st||'';}
-  return {refresh:chips,changed:changed,state:state,
+  return {changed:changed,state:state,
     // a click on a shortcut picks its taxa, the next leaves them out, the third removes them
     cycle:function(ids){var next={'':'inc',inc:'not',not:''}[state(ids)];
       for(var k=o.picks.length-1;k>=0;k--)if(ids.indexOf(o.picks[k].id)>=0)o.picks.splice(k,1);
