@@ -121,6 +121,7 @@ def test_build_design_rotation_writes_only_index(tmp_path, webapp_dir):
     assert d["design"] == "rotation"
     site = out / "site"
     assert sorted(p.name for p in site.iterdir()) == [
+        "bc-parks.bin",
         "index.html",
         "map.html",
         "pool-0.bin",

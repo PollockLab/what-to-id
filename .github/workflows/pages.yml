@@ -47,9 +47,9 @@ jobs:
         run: |
           set -euo pipefail
           test -s site/index.html
-          if find site -type f ! -name '*.html' ! -name 'pool*.bin' | grep -q .; then
-            echo "site/ must hold only HTML pages and the map's pool*.bin files"
-            find site -type f ! -name '*.html' ! -name 'pool*.bin'; exit 1
+          if find site -type f ! -name '*.html' ! -name 'pool*.bin' ! -name bc-parks.bin | grep -q .; then
+            echo "site/ must hold only HTML pages, the map's pool*.bin files and its bc-parks.bin"
+            find site -type f ! -name '*.html' ! -name 'pool*.bin' ! -name bc-parks.bin; exit 1
           fi
           if grep -ril -E 'recency|gap_first|gap first|similarity|novelty|surprise' site; then
             echo "an arm name leaked into site/"; exit 1

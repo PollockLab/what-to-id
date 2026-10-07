@@ -18,6 +18,7 @@ from what_to_id.page_map import (
     IMPRECISE_M,
     MAP_NAME,
     NO_DAY,
+    PARKS_NAME,
     RECENT_DAYS,
     TAXA_NAME,
     TOTAL_ONLY,
@@ -230,10 +231,11 @@ def test_meta_cannot_close_the_script():
 def test_write_map_and_cli(tmp_path):
     pool = make_pool(40)
     paths = write_map(tmp_path / "a", pool)
-    assert sorted(p.name for p in paths) == sorted([MAP_NAME, shard_name(0), TAXA_NAME])
+    names = [MAP_NAME, shard_name(0), TAXA_NAME, PARKS_NAME]
+    assert sorted(p.name for p in paths) == sorted(names)
     pool.to_parquet(tmp_path / "pool.parquet", index=False)
     assert main(["--pool", str(tmp_path / "pool.parquet"), "--out", str(tmp_path / "b")]) == 0
-    for name in (shard_name(0), TAXA_NAME, MAP_NAME):
+    for name in names:
         assert (tmp_path / "a" / name).read_bytes() == (tmp_path / "b" / name).read_bytes()
 
 
@@ -422,8 +424,10 @@ def test_page_inlines_the_area_filter_before_the_map_script():
     assert area in html and (_ASSETS / "map_area.css").read_text() in html
     assert html.index("var MapArea=") < html.index("var AREA=MapArea(")
     assert "AREA.mask(n)" in html and "h.push(AREA.hash())" in html
-    # a park comes back from the hash by its place id, and its place id goes into the Identify link
-    assert "park:S.park,place:META.place_id" in html and "q.set(k,extra[k])" in html
+    # a park comes back from the hash by its place id or BC Parks number, and its place id goes
+    # into the Identify link
+    assert "park:S.park,bcpark:S.bcpark," in html and "q.set(k,extra[k])" in html
+    assert "parks:META.parks,get:get" in html
     # the Identify box count reads the filters without the area
     assert "if(!side)u=r;return r.url;},match)" in html and "function match(i)" in html
     # the Identify button steps through an area's batches, with a ‹ › beside it to step by hand

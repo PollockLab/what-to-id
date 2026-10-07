@@ -50,7 +50,8 @@ var S={up:false,lo:0,hi:LAST,months:0,groups:{},only:{},picks:[],rec:null,at:nul
   S.groups=CH.read(h.get('groups'),META.groups);
   S.only=CH.read(h.get('only'),ONLYKEYS.filter(function(k){return META.flags.indexOf(ONLYFLAG[k])>=0;}),['exact']);
   S.picks=TX.read(h.get('taxa'));S.oldq=S.picks.length?'':h.get('q')||'';S.rec=+h.get('record')||null;
-  S.area=h.get('area')||'';S.park=+h.get('park')||0;
+  S.area=h.get('area')||'';S.park=h.get('park')||'';
+  S.bcpark=h.get('bcpark')||'';
   var at=(h.get('at')||'').split('/').map(Number);if(at.length===3&&at.every(isFinite))S.at=at;
   S.fly=!!S.rec&&!S.at;
 })();
@@ -64,7 +65,7 @@ function sel(){
   if(!allGroups())h.push('groups='+CH.write(S.groups,META.groups));
   if(CH.any(S.only))h.push('only='+CH.write(S.only,ONLYKEYS));
   if(S.picks.length)h.push('taxa='+TX.write(S.picks));
-  if(AREA.on())h.push(AREA.hash());if(PJ.hash())h.push(PJ.hash());
+  if(AREA.hash())h.push(AREA.hash());if(PJ.hash())h.push(PJ.hash());
   return h;}
 function writeHash(){clearTimeout(hashTimer);hashTimer=setTimeout(function(){
   var h=sel();
@@ -534,7 +535,8 @@ else{opts.bounds=[[b[0],b[1]],[b[2],b[3]]];opts.fitBoundsOptions={padding:20};}
 var map=new maplibregl.Map(opts);document.body.appendChild(ptip);
 map.addControl(new maplibregl.NavigationControl({showCompass:false}));
 var overlay=new deck.MapboxOverlay({interleaved:false,pickingRadius:8,layers:[]});map.addControl(overlay);
-var AREA=MapArea({map:map,S:S,LAST:LAST,hash:S.area,park:S.park,place:META.place_id,P:function(){return P;},keep:function(){return KEEP;},
+var AREA=MapArea({map:map,S:S,LAST:LAST,hash:S.area,park:S.park,bcpark:S.bcpark,fit:!S.at,
+  place:META.place_id,parks:META.parks,get:get,P:function(){return P;},keep:function(){return KEEP;},
   change:refilter,sel:function(){return sel().join('&');},
   step:IdStep({a:$('identify'),prev:$('idprev'),next:$('idnext'),build:iso(LAST)})});
 // Zoomed out, blending millions of overlapping dots takes about 250 ms a frame, so while the map
