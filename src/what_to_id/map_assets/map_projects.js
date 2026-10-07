@@ -100,7 +100,8 @@ function projectFilter(o){
       var b=seg.appendChild(el('button',null,m[1]));b.type='button';
       b.title=m[2]?'In at least one of the "in" projects':'In every "in" project';
       b.onclick=function(){any=m[2];change();};});
-    chips=box.appendChild(el('div','chips pchips'));chips.setAttribute('aria-label','Picked projects');
+    chips=box.appendChild(el('div','chips pchips'));chips.setAttribute('role','group');
+    chips.setAttribute('aria-label','Picked projects');
     hint=box.appendChild(el('p','muted'));
     draw();box.hidden=false;
   }
