@@ -200,7 +200,7 @@ function render(){
   $('byUp').setAttribute('aria-pressed',String(S.up));
   PRESETS.forEach(function(p){var r=p.range();
     p.el.setAttribute('aria-pressed',String(r[0]===S.lo&&r[1]===S.hi));});
-  PJ.note(P.n?shown:null,ALT);BAR.set(items());draw();layers();link();writeHash();
+  PJ.note(P.n?shown:null,ALT);BAR.set(items());tally();draw();layers();link();writeHash();
 }
 // Whether record i matches the filters with the area left out, as recount() reads them
 function match(i){if(!RC||i>=OUT.length)return 0;var c=PD.attributes.getFilterCategory.value,s=c[4*i+3]&~ST_KEEP|(OUT[i]?0:ST_KEEP);
@@ -387,8 +387,10 @@ function chip(box,label,pressed,onclick,title){var b=document.createElement('but
 // out, the third clears it (see map_chips.js).
 function allGroups(){return !CH.any(S.groups);}
 function gname(g){return META.names[g]||g;}
-function showGroups(){GB.forEach(function(b,i){var g=META.groups[i];CH.show(b,gname(g),S.groups[g]||'');});}
-var GB=META.groups.map(function(g){return CH.chip($('groups'),g,gname(g),function(){return S.groups;},true,
+// a group chip shows the plain name only, "Fish" for "Fish (Actinopterygii)"; its title has both
+function gshort(g){return gname(g).replace(/ \([^)]*\)$/,'');}
+function showGroups(){GB.forEach(function(b,i){var g=META.groups[i];CH.show(b,gshort(g),S.groups[g]||'');});}
+var GB=META.groups.map(function(g){return CH.chip($('groups'),g,gshort(g),function(){return S.groups;},true,
   gname(g),refilter);});
 $('gall').onclick=function(){S.groups={};showGroups();refilter();};
 var MB_=MON.map(function(m,i){var b=chip('months',m,!!(S.months>>i&1),
@@ -406,9 +408,9 @@ var ONLYDEF=[['introduced','Introduced to BC','introduced','Species not native t
     o[3],refilter);});
 function showOnly(){ONLY.forEach(function(b,j){CH.show(b,ONLYDEF[j][1],S.only[ONLYDEF[j][0]]||'');});}
 if(!ONLY.length)$('flagbox').hidden=true;
-// Picked taxa: chips beside the groups, one set with them. A shortcut picks, then leaves out, a set
+// Picked taxa: chips in the selection bar, one set with the groups. A shortcut picks, then leaves out, a set
 // of taxa, and shows only once the taxa file carries the whole tree.
-var PK=TX.picker({input:$('q'),box:$('picks'),list:$('sugg'),msg:$('qn'),picks:S.picks,ranks:META.ranks,
+var PK=TX.picker({input:$('q'),list:$('sugg'),msg:$('qn'),picks:S.picks,ranks:META.ranks,
   nf:nf,taxa:function(){return TAXA;},counts:function(){return TX.counts(TAXA,P.tax,P.n);},
   onChange:function(){search();showClades();refilter();}});
 var PRE=META.presets||[],CB=PRE.map(function(c){return chip('clades',c[0],false,function(){
@@ -425,16 +427,30 @@ function oldQuery(){if(!S.oldq)return;
   got.forEach(function(p){S.picks.push(p);});
   if(got.length&&!allGroups()&&got.every(function(p){return p.not||TX.within(TAXA,p.id,gs);}))
     S.groups={},showGroups();
-  PK.refresh();showClades();}
+  showClades();}
 function search(){TF=TX.filter(TAXA,S.picks);}
 // The selection bar lists every chip; its Clear all clears them, and reset also the dates.
 function redraw(){showGroups();showMonths();showOnly();refilter();}
-function clearAll(){S.months=0;S.groups={};S.only={};S.picks.length=0;$('q').value='';PK.refresh();showClades();
+function clearAll(){S.months=0;S.groups={};S.only={};S.picks.length=0;$('q').value='';showClades();
   search();AREA.clear();PJ.reset();redraw();}
 $('reset').onclick=function(){S.lo=0;S.hi=LAST;S.up=false;clearAll();};
 var BAR=CH.bar({box:$('selbar'),clear:clearAll,fallback:$('q')});
 function items(){return CH.items({S:S,meta:META,terms:TX.terms({T:TAXA,picks:S.picks,groups:[],meta:META,n:0}),
-  picker:PK,pj:PJ,months:MONTH,only:ONLYDEF,area:AREA,redraw:redraw});}
+  picker:PK,pj:PJ,months:MONTH,only:ONLYDEF,two:['exact'],area:AREA,redraw:redraw});}
+// Each folding section's summary counts its active chips, so a folded one still says what it holds.
+function tally(){var n=function(st){var c=0;for(var k in st)if(st[k])c++;return c;},m=0,i,e;
+  for(i=0;i<12;i++)m+=S.months>>i&1;
+  [['ntaxa',S.picks.length],['nonly',n(S.only)],['nproj',PJ.items().length],['ngroups',n(S.groups)],
+    ['nmonths',m]].forEach(function(d){e=$(d[0]);if(e)e.textContent=d[1]?String(d[1]):'';});}
+// Taxa and Show only start open, Groups, Projects and Months folded; a section opens as the viewer
+// last left it, and one a link filters on opens regardless (projects only know theirs once loaded).
+var FOLD='wtid-map-fold';
+(function(){var saved={};try{saved=JSON.parse(localStorage.getItem(FOLD))||{};}catch(e){}
+  var on={grpsec:CH.any(S.groups),monsec:!!S.months,flagbox:CH.any(S.only),projbox:/(^|[#&])projects=/.test(location.hash)};
+  [].forEach.call(document.querySelectorAll('details.sec'),function(d){
+    if(on[d.id])d.open=true;else if(d.id in saved)d.open=saved[d.id];
+    d.addEventListener('toggle',function(){saved[d.id]=d.open;
+      try{localStorage.setItem(FOLD,JSON.stringify(saved));}catch(e){}});});})();
 $('toggle').onclick=function(){var o=$('side').classList.toggle('open');
   this.setAttribute('aria-expanded',String(o));};
 
@@ -554,7 +570,7 @@ var HINT=$('hint').textContent,HINT_TOT='Top: records still needing an ID per ye
 render();
 PJ.load(get);
 var names0=get(META.taxa).then(function(buf){TAXA=JSON.parse(new TextDecoder().decode(buf));
-  oldQuery();search();PK.refresh();showClades();refilter();});
+  oldQuery();search();showClades();refilter();});
 // One shard downloads at a time, so on a slow link the recent shard gets all the bandwidth.
 var chain=Promise.resolve(),prev=Promise.resolve();
 META.shards.forEach(function(s,k){

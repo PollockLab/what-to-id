@@ -161,19 +161,20 @@ BAR = r"""
 var S={picks:[{id:3,not:false},{id:4,not:true}],groups:{Insecta:'not',Aves:'inc'},months:5,
   only:{introduced:'not',exact:'inc'}},log=[],areaOn=true;
 var pj={items:function(){return [{label:'in project 90486',not:true,tag:'Identify only',
-  remove:function(){log.push('pj');}}];}};
+  remove:function(){log.push('pj');},flip:function(){log.push('pjflip');}}];}};
 var area={term:function(){return areaOn?{label:'Garibaldi Park'}:null;},
   clear:function(){areaOn=false;log.push('area');}};
 var T=[['Bryophyta','Mosses',3,2,-1],['Plantae','Plants',4,2,-1]];
 function items(){return CH.items({S:S,meta:META,
   terms:TX.terms({T:T,picks:S.picks,groups:[],meta:META,n:0}),
   picker:{changed:function(){log.push('taxa');}},pj:pj,months:['January','February','March'],
-  only:[['introduced','Introduced to BC'],['exact','Exact location']],area:area,
+  only:[['introduced','Introduced to BC'],['exact','Exact location']],two:['exact'],area:area,
   redraw:function(){log.push('redraw');}});}
 var box=new El('div');box.appendChild(new El('p')).appendChild(new El('button'));
 box.appendChild(new El('ul'));
 var q=new El('input'),cleared=0,B=CH.bar({box:box,clear:function(){cleared++;},fallback:q});
-function xs(){return box.querySelectorAll('button').slice(1);}
+function xs(){return box.querySelectorAll('button').filter(function(b){return b.cls.x;});}
+function flips(){return box.querySelectorAll('button').filter(function(b){return b.cls.sl;});}
 function texts(){return box.querySelector('ul').children.map(function(li){
   var s=li.children[0],t=s.children;
   return [s.textContent+(t.length?' ['+t[0].textContent+']':''),!!li.cls.not,
@@ -224,3 +225,31 @@ def test_selection_bar_clear_all_and_empty():
         "return {cleared:cleared,hidden:box.hidden,n:texts().length,focus:FOCUS===q};"
     )
     assert run(body) == {"cleared": 1, "hidden": True, "n": 0, "focus": True}
+
+
+def test_selection_bar_flips_a_chip_between_picked_and_left_out():
+    body = (
+        BAR + "B.set(items());"
+        # a flip button per chip whose filter can leave out: taxa, project, groups, introduced
+        "var labels=flips().map(function(b){return [b.textContent,b.attrs['aria-pressed']];});"
+        "flips()[0].onclick();B.set(items());var f0=flips()[0];"
+        "flips()[4].onclick();B.set(items());"
+        "flips()[5].onclick();B.set(items());"
+        "return {labels:labels,picks:S.picks,groups:S.groups,only:S.only,"
+        "focus:FOCUS===flips()[5],first:[f0.textContent,f0.attrs['aria-pressed']],log:log};"
+    )
+    got = run(body)
+    assert got["labels"] == [
+        ["Bryophyta", "false"],
+        ["not Plantae", "true"],
+        ["not in project 90486", "true"],
+        ["Birds", "false"],
+        ["not Insects", "true"],
+        ["not Introduced to BC", "true"],
+    ]
+    assert got["first"] == ["not Bryophyta", "true"]
+    assert got["picks"] == [{"id": 3, "not": True}, {"id": 4, "not": True}]
+    assert got["groups"] == {"Insecta": "inc", "Aves": "inc"}
+    assert got["only"] == {"introduced": "inc", "exact": "inc"}
+    assert got["focus"] is True
+    assert got["log"] == ["taxa", "redraw", "redraw"]

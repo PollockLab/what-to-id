@@ -100,7 +100,7 @@ function projectFilter(o){
       'Added for Identify only; it does not change the map.';
     sel.push({id:id,k:k,st:'inc'});change();}
   function build(){
-    box.appendChild(el('p','lbl','Projects')).appendChild(el('span','muted',' click again to leave out'));
+    box.appendChild(el('summary',null,'Projects ')).appendChild(el('span','n')).id='nproj';
     chips=box.appendChild(el('div','chips'));chips.setAttribute('role','group');chips.setAttribute('aria-label','Projects');
     var f=box.appendChild(el('form','prow')),lab=f.appendChild(el('label','muted','Add another project for Identify only'));
     input=f.appendChild(el('input','padd'));input.id=lab.htmlFor='projpaste';input.type='text';
@@ -130,7 +130,8 @@ function projectFilter(o){
     params:function(){return lists?projParams(sel).q:{};},
     // the chips for the selection bar (map_chips.js), once the file has loaded
     items:function(){return lists?sel.map(function(s){return {label:'in '+projLabel(s,list),not:s.st==='not',
-      tag:s.k<0?'Identify only':'',remove:function(){sel.splice(sel.indexOf(s),1);change();}};}):[];},
+      tag:s.k<0?'Identify only':'',remove:function(){sel.splice(sel.indexOf(s),1);change();},
+      flip:function(){s.st=s.st==='not'?'inc':'not';change();}};}):[];},
     hash:function(){return sel.length?'projects='+projWrite(sel):'';},
     reset:function(){if(!sel.length)return;sel=[];bits();key++;if(chips)draw();}
   };

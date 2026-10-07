@@ -35,17 +35,22 @@ h1{font-size:18px;margin:0}
 .picker{position:relative}
 .picker input{width:100%;font:inherit;font-size:16px;padding:6px 8px;border:1px solid var(--line);
   border-radius:6px;background:var(--panel);color:var(--ink)}
-#picks{margin-bottom:4px}
-.pick{display:inline-flex;border:1px solid var(--on);border-radius:13px;overflow:hidden}
-.chips .pick button{border:0;border-radius:0;background:var(--on);color:var(--onink);min-height:28px}
-.chips .pick .px{padding:3px 8px;border-left:1px solid var(--onink)}
-.pick.not{border:1px dashed var(--warn)}
-.chips .pick.not .px{border-left:1px solid var(--warn)}
-/* one "not" style for every left-out chip: taxa, shortcuts, projects, groups, show only, the bar */
-.chips button.not,.chips button[aria-pressed="true"].not,.chips .pick.not button,
+/* one "not" style for every left-out chip: shortcuts, projects, groups, show only, the bar */
+.chips button.not,.chips button[aria-pressed="true"].not,
   .schip.not{background:var(--warnbg);color:var(--warn)}
 .chips button.not,.chips button[aria-pressed="true"].not,.schip.not{border:1px dashed var(--warn)}
-.selbar{border:1px solid var(--line);border-radius:8px;padding:4px 8px 8px;background:var(--chip)}
+.selbar{border:1px solid var(--line);border-radius:8px;padding:4px 8px 8px;background:var(--chip);
+  position:sticky;top:-12px;z-index:3;max-height:40vh;overflow:auto;flex-shrink:0}
+/* folding filter sections; the summary counts what is active inside */
+.sec{border-top:1px solid var(--line);padding:2px 0 4px}
+.sec>summary{cursor:pointer;font-size:12px;font-weight:600;padding:6px 0 4px;list-style-position:inside}
+.sec>summary .n:not(:empty){display:inline-block;margin-left:4px;min-width:18px;padding:0 5px;border-radius:9px;
+  background:var(--on);color:var(--onink);font-size:11px;line-height:16px;text-align:center}
+.sec>*+*{margin-top:4px}
+.sec[hidden]{display:none}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.chips .schip button.sl,.chips .schip button.sl[aria-pressed="true"]{border:0;background:none;color:inherit;
+  padding:3px 2px 3px 0;min-width:0;text-align:left;overflow-wrap:anywhere}
 .selbar .lbl{margin-top:2px}
 .selbar ul{margin:0;padding:0;list-style:none}
 .schip{display:inline-flex;align-items:center;max-width:100%;border:1px solid var(--on);border-radius:13px;

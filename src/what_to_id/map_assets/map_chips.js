@@ -46,43 +46,55 @@ function chip(box,k,label,get,three,title,changed){var b=document.createElement(
   b.onclick=function(){var st=get(),v=next(st[k],three);if(v)st[k]=v;else delete st[k];
     show(b,label,v);changed();};
   show(b,label,get()[k]||'');box.appendChild(b);return b;}
-// The selection bar's chips, in the order of the filters, each with what removes it. o: S, meta,
-// terms (the taxon terms, see TX.terms), picker (the taxon picker), pj (the project filter), months
-// (month names), only ([key, label] per status chip), area, and redraw() after a group, month or
-// status chip goes.
-function items(o){var out=[],S=o.S,m=o.meta;
-  function add(label,not,remove){out.push({label:label,not:not,remove:remove});}
+// The selection bar's chips, in the order of the filters, each with what removes it and, when its
+// filter can leave things out, what flips it between picked and left out. o: S, meta, terms (the
+// taxon terms, see TX.terms), picker (the taxon picker), pj (the project filter), months (month
+// names), only ([key, label] per status chip), two (the status keys that cannot be left out), area,
+// and redraw() after a group, month or status chip changes.
+function items(o){var out=[],S=o.S,m=o.meta,two=o.two||[];
+  function add(label,not,remove,flip){out.push({label:label,not:not,remove:remove,flip:flip});}
   function drop(st,k){return function(){delete st[k];o.redraw();};}
+  function turn(st,k){return function(){st[k]=st[k]==='not'?'inc':'not';o.redraw();};}
   o.terms.forEach(function(t){var ids=[].concat(t.id);add(t.label,t.exclude,function(){
     for(var k=S.picks.length-1;k>=0;k--)if(ids.indexOf(S.picks[k].id)>=0)S.picks.splice(k,1);
+    o.picker.changed();},function(){S.picks.forEach(function(p){if(ids.indexOf(p.id)>=0)p.not=!t.exclude;});
     o.picker.changed();});});
   out=out.concat(o.pj.items());
-  m.groups.forEach(function(g){if(S.groups[g])add(m.names[g]||g,S.groups[g]==='not',drop(S.groups,g));});
+  m.groups.forEach(function(g){if(S.groups[g])add(m.names[g]||g,S.groups[g]==='not',drop(S.groups,g),
+    turn(S.groups,g));});
   o.months.forEach(function(n,i){if(S.months>>i&1)add(n,false,function(){S.months&=~(1<<i);o.redraw();});});
-  o.only.forEach(function(d){if(S.only[d[0]])add(d[1],S.only[d[0]]==='not',drop(S.only,d[0]));});
+  o.only.forEach(function(d){if(S.only[d[0]])add(d[1],S.only[d[0]]==='not',drop(S.only,d[0]),
+    two.indexOf(d[0])<0?turn(S.only,d[0]):null);});
   var a=o.area.term();if(a)add(a.label,false,function(){o.area.clear();});
   return out;}
-// The selection bar: one chip per active pick, items [{label, not, tag, remove}], each with × to
-// remove it, and Clear all; a tag (as "Identify only") shows after the label. set() redraws only when the items change, and after a removal keeps focus in
-// the bar (the next ×, else Clear all) or, once it is empty, on fallback.
+// The selection bar, the one list of what is picked: one chip per active pick, items [{label, not,
+// tag, remove, flip}], each with × to remove it, and Clear all; a tag (as "Identify only") shows
+// after the label. A chip with flip is a button that flips it between picked and left out. set()
+// redraws only when the items change, and keeps focus in the bar: on the flipped chip, after a
+// removal on the next × (else Clear all), or, once the bar is empty, on fallback.
 function bar(o){
-  var box=o.box,list=box.querySelector('ul'),clear=box.querySelector('button'),sig=null,want=-1;
-  clear.onclick=function(){want=-2;o.clear();};
+  var box=o.box,list=box.querySelector('ul'),clear=box.querySelector('button'),sig=null,want=null;
+  clear.onclick=function(){want={clear:true};o.clear();};
   function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;
     if(text!=null)e.textContent=text;return e;}
   return {set:function(items){
     var s=items.map(function(t){return (t.not?'-':'+')+t.label+'|'+(t.tag||'');}).join('\n');
     if(s===sig)return;sig=s;list.textContent='';
+    var xs=[],fs=[];
     items.forEach(function(t,j){var text=(t.not?'not ':'')+t.label,li=el('li','schip'+(t.not?' not':'')),
-        x=el('button','x','×'),sp=li.appendChild(el('span',null,text));
+        x=el('button','x','×'),sp=li.appendChild(el(t.flip?'button':'span',t.flip?'sl':null,text));
       if(t.tag)sp.appendChild(el('span','tag',t.tag));
+      if(t.flip){sp.type='button';sp.setAttribute('aria-pressed',String(!!t.not));
+        sp.title='Click to '+(t.not?'pick':'leave out')+' instead';
+        sp.onclick=function(){want={flip:j};t.flip();};}
       x.type='button';x.setAttribute('aria-label','Remove '+text+(t.tag?' ('+t.tag+')':''));
-      x.onclick=function(){want=j;t.remove();};li.appendChild(x);list.appendChild(li);});
+      x.onclick=function(){want={x:j};t.remove();};li.appendChild(x);list.appendChild(li);
+      xs.push(x);fs.push(t.flip?sp:x);});
     box.hidden=!items.length;
-    var xs=list.querySelectorAll('button');
-    if(want>=0)(xs.length?xs[Math.min(want,xs.length-1)]:o.fallback).focus();
-    else if(want===-2&&!items.length)o.fallback.focus();
-    want=-1;}};}
+    if(want&&want.flip!=null&&fs[want.flip])fs[want.flip].focus();
+    else if(want&&want.x!=null)(xs.length?xs[Math.min(want.x,xs.length-1)]:o.fallback).focus();
+    else if(want&&want.clear&&!items.length)o.fallback.focus();
+    want=null;}};}
 return {next:next,read:read,write:write,picked:picked,any:any,groupPass:groupPass,groupLink:groupLink,
   show:show,chip:chip,items:items,bar:bar};
 })();
