@@ -175,8 +175,9 @@ function identifyUrl(st,b,meta,extra){
   if(g.length&&g.length<st.all&&g.indexOf('rest')<0)q.set('iconic_taxa',g.join(','));
   if(st.d1)q.set(st.up?'created_d1':'d1',st.d1);if(st.d2)q.set(st.up?'created_d2':'d2',st.d2);
   if(st.months.length)q.set('month',st.months.join(','));
-  // iNaturalist has a search parameter for each status filter, so Identify opens the same records
-  var o=st.only||{};if(o.introduced)q.set('introduced','true');if(o.threatened)q.set('threatened','true');
+  // iNaturalist has a search parameter for each status filter, so Identify opens the same records; a
+  // left-out status ('not') is its false
+  var o=st.only||{};['introduced','threatened'].forEach(function(k){if(o[k])q.set(k,String(o[k]!=='not'));});
   if(o.exact){q.set('obscuration','none');q.set('acc_below_or_unknown',meta.imprecise_m+1);}
   var base='https://www.inaturalist.org/observations/identify?',u=base+q;
   function add(key,ids,what){if(!ids||!ids.length)return;
