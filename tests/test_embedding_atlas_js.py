@@ -315,3 +315,34 @@ def test_marker_projection_handles_wrapped_world_copy():
     assert evaluate("scope.nearestLongitude(-123,237)") == 237
     assert evaluate("scope.nearestLongitude(179,-181)") == -181
     assert evaluate("scope.nearestLongitude(-123,-124)") == -123
+
+
+def test_marker_hits_expose_all_overlap_ids_and_deduplicate_world_copies():
+    candidates = [dict(index=i, id=100 + i, x=5, y=5) for i in range(98)]
+    candidates += [dict(index=0, id=100, x=5, y=5), dict(index=98, id=198, x=30, y=30)]
+    assert evaluate(f"scope.markerHits({json.dumps(candidates)}, {{x:5,y:5}})") == list(range(98))
+    candidates.reverse()
+    assert evaluate(f"scope.markerHits({json.dumps(candidates)}, {{x:5,y:5}})") == list(range(98))
+
+
+def test_marker_hits_preserve_nearest_order_boundary_and_empty_states():
+    assert evaluate("scope.markerHits([], {x:0,y:0})") == []
+    assert evaluate("scope.markerHits([{index:1,id:1,x:NaN,y:0}], {x:0,y:0})") == []
+    assert evaluate("scope.markerHits([{index:1,id:1,x:0,y:0}], {x:NaN,y:0})") == []
+    assert evaluate("""scope.markerHits([
+        {index:2,id:2,x:12,y:0},{index:3,id:3,x:0,y:0},
+        {index:2,id:2,x:1,y:0},{index:4,id:4,x:12.01,y:0}],{x:0,y:0})""") == [3, 2]
+
+
+def test_projection_description_distinguishes_method_and_optional_local_fidelity():
+    text = evaluate("""scope.projectionSummary({projection:'t-SNE',variance_retained:.12,
+      projection_quality:{k:12,mean_neighbor_recall:.4},
+      records:[{projection_match_count:4}]},0)""")
+    assert "t-SNE layout" in text and "PCA" not in text
+    assert "12 nearest points on this layout contain 4" in text
+    assert "12 full-space matches" in text
+    text = evaluate(
+        "scope.projectionSummary({projection:'PCA',variance_retained:.12,records:[{}]},0)"
+    )
+    assert "PCA retains 12.0%" in text
+    assert "nearest points" not in text

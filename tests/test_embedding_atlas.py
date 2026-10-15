@@ -339,7 +339,8 @@ def test_map_first_default_keeps_advanced_controls_and_projection_optional():
         assert "advanced" in layout.elements[control][1]
     for control in ["group", "search", "fit", "record"]:
         assert "advanced" not in layout.elements[control][1]
-    assert html.index('id="details"') < html.index('id="projection-pane"')
+    assert html.index('id="projection-pane"') < html.index('id="details"')
+    assert layout.elements["photo-comparison"][0]["aria-labelledby"] == "comparison-title"
     assert "Canada · Wildlife &amp; plants" in html
     assert "https://wietzesuijker.github.io/bci-dashboard/crownfirst-atlas.html" not in html
     assert 'aria-label="Countries"' not in html

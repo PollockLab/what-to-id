@@ -104,20 +104,37 @@ const AtlasScope = (() => {
       rgb.every(channel => Number.isInteger(channel) && channel >= 0 && channel <= 255)
       ? `rgb(${rgb.join(',')})` : '#808080';
   }
-  function nearestMarker(candidates, point, radius = 12) {
-    let best = null, bestDistance = radius * radius;
+  function projectionSummary(payload, index) {
+    const method = typeof payload.projection === 'string' ? payload.projection : '2D';
+    let summary = `${method} layout. Distances are approximate; compare the ranked photos.`;
+    if (method.toUpperCase() === 'PCA' && Number.isFinite(payload.variance_retained)) {
+      summary = `PCA retains ${(100 * payload.variance_retained).toFixed(1)}% of variation. Compare the ranked photos.`;
+    }
+    const record = payload.records[index], quality = payload.projection_quality;
+    if (quality && record && Number.isInteger(quality.k) && quality.k > 0 &&
+        Number.isInteger(record.projection_match_count) && record.projection_match_count >= 0 &&
+        record.projection_match_count <= quality.k) {
+      summary += ` The ${quality.k} nearest points on this layout contain ${record.projection_match_count} of this photo’s ${quality.k} full-space matches.`;
+    }
+    return summary;
+  }
+  function markerHits(candidates, point, radius = 12) {
+    const hits = new Map();
     for (const candidate of candidates) {
-      if (![candidate.x, candidate.y].every(Number.isFinite)) continue;
+      if (![candidate.x, candidate.y, point.x, point.y].every(Number.isFinite)) continue;
       const distance = (candidate.x - point.x) ** 2 + (candidate.y - point.y) ** 2;
       if (distance > radius * radius) continue;
-      if (best === null || distance < bestDistance ||
-          (distance === bestDistance && (candidate.id < best.id ||
-           (candidate.id === best.id && candidate.index < best.index)))) {
-        best = candidate;
-        bestDistance = distance;
+      const previous = hits.get(candidate.id);
+      if (!previous || distance < previous.distance ||
+          (distance === previous.distance && candidate.index < previous.index)) {
+        hits.set(candidate.id, {...candidate, distance});
       }
     }
-    return best === null ? null : best.index;
+    return [...hits.values()].sort((a, b) =>
+      a.distance - b.distance || a.id - b.id || a.index - b.index).map(hit => hit.index);
+  }
+  function nearestMarker(candidates, point, radius = 12) {
+    return markerHits(candidates, point, radius)[0] ?? null;
   }
   function nearestLongitude(longitude, reference) {
     return longitude + 360 * Math.round((reference - longitude) / 360);
@@ -128,6 +145,6 @@ const AtlasScope = (() => {
       current: token => token === generation};
   }
   return {inBounds, matches, brushIndices, toggleIndex, modelHref, resolveSelection, mapHref,
-    compareNeighborhoods, requestGate, representationColor, hasRepresentationColors, nearestMarker, nearestLongitude};
+    compareNeighborhoods, requestGate, representationColor, hasRepresentationColors, projectionSummary, markerHits, nearestMarker, nearestLongitude};
 })();
 if (typeof module !== 'undefined') module.exports = AtlasScope;
