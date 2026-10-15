@@ -6,7 +6,7 @@ name: pages
 on:
   push:
     branches: [main]
-    paths: ["site/**", ".github/workflows/pages.yml"]
+    paths: ["site/**", "demo/**", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
 permissions:
@@ -54,6 +54,9 @@ jobs:
           if grep -ril -E 'recency|gap_first|gap first|similarity|novelty|surprise' site; then
             echo "an arm name leaked into site/"; exit 1
           fi
+      # Keep the separately published frozen demo alongside the checked study/map pages.
+      - name: Include the frozen embedding demo
+        run: cp -R demo/. site/
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
       - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:
