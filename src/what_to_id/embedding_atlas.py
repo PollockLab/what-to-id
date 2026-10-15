@@ -1,7 +1,7 @@
 """Build a geographic atlas of a frozen image-embedding sample.
 
 No training or fabricated coverage: only observations matched by ID to validated caches.
-Exact cosine neighbors use the full vectors; PCA is a separate, lossy display.
+Exact cosine neighbors use the full vectors; projections are separate, lossy displays.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ import pandas as pd
 from scipy.sparse.linalg import svds
 
 from what_to_id.arms import load_embeddings
-from what_to_id.atlas_projection import projection_fidelity
+from what_to_id.atlas_projection import display_projection, projection_fidelity
 from what_to_id.page_links import page_url
 
 
@@ -76,6 +76,7 @@ def group_payload(
     *,
     reference_path: Path | None = None,
     reference_pool: pd.DataFrame | None = None,
+    projection: str = "pca",
 ) -> dict:
     ids, vectors, backbone = load_embeddings(path)
     if len(np.unique(ids)) != len(ids):
@@ -93,14 +94,17 @@ def group_payload(
     coords = rows[["lon", "lat"]].to_numpy(dtype=float)
     if not np.isfinite(coords).all() or (np.abs(coords) > [180, 90]).any():
         raise ValueError(f"{group}: invalid coordinates")
-    xy, variance, rgb, color_metadata = representation_projection(vectors)
+    pca_xy, variance, rgb, color_metadata = representation_projection(vectors)
+    xy, projection_metadata = display_projection(vectors, pca_xy, method=projection)
     cosine = np.clip(vectors @ vectors.T, -1, 1)
     np.fill_diagonal(cosine, -np.inf)
     n = min(12, len(ids) - 1)
     neighbors = np.argsort(-cosine, axis=1, kind="stable")[:, :n]
     # Diagnose the rounded coordinates a person sees, rather than hidden fit precision.
-    display_xy = np.round(xy, 6)
+    display_xy = np.round(np.asarray(xy, dtype=np.float64), 6)
     projection_quality, projection_matches = projection_fidelity(display_xy, neighbors)
+    pca_display_xy = np.round(pca_xy, 6)
+    pca_quality, pca_matches = projection_fidelity(pca_display_xy, neighbors)
     reference = None
     reference_matches = None
     reference_scores = None
@@ -163,6 +167,10 @@ def group_payload(
                 "neighbors": [[int(j), round(float(cosine[i, j]), 5)] for j in neighbors[i]],
             }
         )
+    if projection == "tsne":
+        for i, record in enumerate(records):
+            record["pca_xy"] = [float(value) for value in pca_display_xy[i]]
+            record["pca_projection_match_count"] = int(pca_matches[i])
     if reference is not None:
         for i, record in enumerate(records):
             ref_id = int(reference_ids[reference_matches[i]])
@@ -183,8 +191,10 @@ def group_payload(
         "backbone": backbone,
         "dimensions": int(vectors.shape[1]),
         "cache_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
-        "projection": "PCA",
+        "projection": projection_metadata["method"],
+        "projection_metadata": projection_metadata,
         "projection_quality": projection_quality,
+        "pca_projection_quality": pca_quality,
         "representation_colors": color_metadata,
         "variance_retained": variance,
         "records": records,
@@ -227,7 +237,10 @@ def build(
     model_view_specs: list[str] | None = None,
     current_label: str | None = None,
     map_view: str = "https://pollocklab.github.io/what-to-id/map.html",
+    projection: str = "pca",
 ) -> None:
+    if projection not in {"pca", "tsne"}:
+        raise ValueError("projection method must be pca or tsne")
     snapshot_date = date.fromisoformat(snapshot_date).isoformat()
     views = model_views(model_view_specs or [])
     map_view = page_url(map_view)
@@ -274,6 +287,7 @@ def build(
                 group,
                 reference_path=reference_path,
                 reference_pool=reference_pool,
+                projection=projection,
             )
         )
     if not payloads:
@@ -313,6 +327,9 @@ def main() -> None:
     parser.add_argument("--embeddings", required=True, help="Cache pattern containing {group}")
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument(
+        "--projection", choices=["pca", "tsne"], default="pca", help="Offline display layout"
+    )
+    parser.add_argument(
         "--snapshot-date", required=True, help="Frozen source snapshot date, YYYY-MM-DD"
     )
     parser.add_argument(
@@ -347,6 +364,7 @@ def main() -> None:
         model_view_specs=args.model_view,
         current_label=args.current_label,
         map_view=args.map_view,
+        projection=args.projection,
     )
 
 

@@ -21,6 +21,8 @@ dependencies = [
 what-to-id = "what_to_id.cli:main"
 
 [project.optional-dependencies]
+# Optional offline atlas layout build; browsers only consume precomputed coordinates.
+atlas = ["scikit-learn==1.9.1"]
 # Only the similarity arm's seed picker and separability report require this private pin.
 similarity = [
     "labelfirst @ git+https://github.com/traitlab/labelfirst.git@791662c0f0d04698f988640aa58ece1f5cb6be59",
@@ -44,4 +46,4 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers -m 'not network and not labelfirst'"
-markers = ["network: hits the live iNaturalist API", "labelfirst: requires the pinned optional LabelFirst integration"]
+markers = ["atlas: requires the optional pinned atlas build dependencies", "network: hits the live iNaturalist API", "labelfirst: requires the pinned optional LabelFirst integration"]
