@@ -6,7 +6,7 @@ name: pages
 on:
   push:
     branches: [main]
-    paths: ["site/**", "demo/**", ".github/workflows/pages.yml"]
+    paths: ["site/**", "demo/**", "src/what_to_id/demo_publication.py", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
 permissions:
@@ -17,10 +17,35 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # While the daily map is on, deploying site/ alone would take the map down until the next
-  # morning, so hand the deploy to map.yml, which copies site/*.html next to a fresh map.
+  route:
+    runs-on: ubuntu-24.04
+    outputs:
+      refresh: ${{ steps.route.outputs.refresh }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - id: route
+        name: Route full-site changes separately from demo updates
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          refresh=true
+          if [ "$EVENT" = push ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            if ! git diff --name-only "$BEFORE" "$AFTER" -- site/ .github/workflows/ | grep -q .; then
+              refresh=false
+            fi
+          fi
+          echo "refresh=$refresh" >> "$GITHUB_OUTPUT"
+  # Changes to the study/map source retain the existing full-map refresh path.
   handoff:
-    if: vars.MAP_DAILY_ENABLED == 'true' && vars.DAILY_ENABLED != 'true'
+    needs: route
+    if: >-
+      vars.MAP_DAILY_ENABLED == 'true' && vars.DAILY_ENABLED != 'true' &&
+      needs.route.outputs.refresh == 'true'
     runs-on: ubuntu-24.04
     permissions:
       actions: write
@@ -28,6 +53,37 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       - run: gh workflow run map.yml --repo "$GITHUB_REPOSITORY" --ref main
+  # Keep the deployed map/study bytes, replacing only explicitly owned demo files.
+  # The shared pages concurrency group serializes this with full map/study builds.
+  overlay:
+    needs: route
+    if: >-
+      github.event_name == 'push' && needs.route.outputs.refresh == 'false' &&
+      (vars.MAP_DAILY_ENABLED == 'true' || vars.DAILY_ENABLED == 'true')
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      deployments: read
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PYTHONPATH: src
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Preserve the current full site and overlay the frozen demo
+        run: python3 -m what_to_id.demo_publication --repository "$GITHUB_REPOSITORY" --out full_site
+      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+        with:
+          path: full_site
+          retention-days: 7
+      - id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
   deploy:
     # Once the daily build is on, a push to site/ would overwrite its page until the next
     # morning, so only a manual run deploys site/.
