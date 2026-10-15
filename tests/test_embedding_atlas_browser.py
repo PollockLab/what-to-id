@@ -280,3 +280,65 @@ def test_failed_group_load_has_explicit_error_and_can_recover(open_atlas):
     page.wait_for_function("document.getElementById('error').hidden")
     assert page.locator('[data-focal-id="100"]').count() == 1
     assert errors == []
+
+
+@pytest.mark.parametrize("side", ["focal", "candidate"])
+def test_mobile_photo_inspection_uses_full_width_and_returns_to_same_comparison(open_atlas, side):
+    page, errors = open_atlas(390)
+
+    def photo_route(route):
+        landscape = "/photos/100/" in route.request.url
+        width, height = (600, 384) if landscape else (400, 600)
+        route.fulfill(
+            body=f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" '
+            f'height="{height}"><rect width="{width}" height="{height}" '
+            'fill="#78a777"/></svg>',
+            content_type="image/svg+xml",
+        )
+
+    page.route("**/photos/**", photo_route)
+    page.reload()
+    page.locator('[data-focal-id="100"]').wait_for()
+    trigger = page.locator(".neighbors button").first
+    trigger.click()
+    page.get_by_role("button", name="Next match", exact=True).click()
+    candidate_href = page.locator("#candidate-figure a").get_attribute("href")
+    match_status = page.locator("#comparison-status").inner_text()
+    focal_hash = page.evaluate("location.hash")
+    figure = page.locator(f"#{side}-figure")
+    photo_button = figure.get_by_role("button", name="Inspect", exact=False)
+    image = figure.locator("img")
+    image.evaluate("image => image.decode()")
+    before_width = image.bounding_box()["width"]
+    frozen_src = image.get_attribute("src")
+    photo_button.click()
+    assert page.get_by_role("dialog", name="Inspect", exact=False).is_visible()
+    after = image.bounding_box()
+    assert after["width"] >= 320 and after["width"] >= 1.9 * before_width
+    natural_width, natural_height = image.evaluate(
+        "image => [image.naturalWidth,image.naturalHeight]"
+    )
+    assert after["width"] / after["height"] == pytest.approx(
+        natural_width / natural_height, rel=0.01
+    )
+    assert after["height"] <= 900 * 0.62 + 1
+    assert image.get_attribute("src") == frozen_src
+    assert figure.get_by_role("link", name="Complete observation on iNaturalist").is_visible()
+    assert page.evaluate("location.hash") == focal_hash
+    assert page.locator("#candidate-figure a").get_attribute("href") == candidate_href
+    assert page.locator("#comparison-status").inner_text() == match_status
+    page.keyboard.press("ArrowRight")
+    assert page.locator("#candidate-figure a").get_attribute("href") == candidate_href
+    page.keyboard.press("Escape")
+    assert page.get_by_role("dialog", name="Compare photos", exact=True).is_visible()
+    assert photo_button.evaluate("button => document.activeElement === button")
+    assert page.locator("#comparison-status").inner_text() == match_status
+    assert page.locator("#candidate-figure a").get_attribute("href") == candidate_href
+    photo_button.click()
+    page.get_by_role("button", name="Back to comparison", exact=True).click()
+    assert photo_button.evaluate("button => document.activeElement === button")
+    page.keyboard.press("Escape")
+    assert page.locator("#photo-comparison").is_hidden()
+    assert trigger.evaluate("button => document.activeElement === button")
+    assert page.evaluate("location.hash") == focal_hash
+    assert errors == []
