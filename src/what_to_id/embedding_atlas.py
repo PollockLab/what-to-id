@@ -19,6 +19,7 @@ import pandas as pd
 from scipy.sparse.linalg import svds
 
 from what_to_id.arms import load_embeddings
+from what_to_id.atlas_projection import projection_fidelity
 from what_to_id.page_links import page_url
 
 
@@ -97,6 +98,9 @@ def group_payload(
     np.fill_diagonal(cosine, -np.inf)
     n = min(12, len(ids) - 1)
     neighbors = np.argsort(-cosine, axis=1, kind="stable")[:, :n]
+    # Diagnose the rounded coordinates a person sees, rather than hidden fit precision.
+    display_xy = np.round(xy, 6)
+    projection_quality, projection_matches = projection_fidelity(display_xy, neighbors)
     reference = None
     reference_matches = None
     reference_scores = None
@@ -153,7 +157,8 @@ def group_payload(
                 "name": str(row.taxon_name) if pd.notna(row.taxon_name) else "Unidentified",
                 "photo": str(row.photo_url) if pd.notna(row.photo_url) else "",
                 "date": str(row.observed_on) if pd.notna(row.observed_on) else "Unknown date",
-                "xy": [round(float(v), 6) for v in xy[i]],
+                "xy": [float(v) for v in display_xy[i]],
+                "projection_match_count": int(projection_matches[i]),
                 "rgb": [int(v) for v in rgb[i]],
                 "neighbors": [[int(j), round(float(cosine[i, j]), 5)] for j in neighbors[i]],
             }
@@ -179,6 +184,7 @@ def group_payload(
         "dimensions": int(vectors.shape[1]),
         "cache_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
         "projection": "PCA",
+        "projection_quality": projection_quality,
         "representation_colors": color_metadata,
         "variance_retained": variance,
         "records": records,
