@@ -63,16 +63,20 @@ class AtlasTaxonomy:
         if not isinstance(raw, dict) or not isinstance(raw.get("taxa"), dict):
             raise ValueError("taxonomy cache requires a taxa object")
         tree = {}
+        labels = {}
         for key, row in raw["taxa"].items():
             if not key.isascii() or not key.isdecimal() or str(int(key)) != key:
                 raise ValueError(f"invalid taxonomy ID: {key!r}")
             taxon_id = _taxon_id(int(key), context="taxonomy ID")
             if not isinstance(row, list) or len(row) != 4:
                 raise ValueError(f"taxon {taxon_id}: expected [parent, latin, common, rank]")
+            if not all(isinstance(label, str) for label in row[1:]):
+                raise ValueError(f"taxon {taxon_id}: recorded names and rank must be strings")
             parent = row[0]
             if parent is not None:
                 parent = _taxon_id(parent, context=f"taxon {taxon_id} parent")
             tree[taxon_id] = parent
+            labels[taxon_id] = row[1:]
         # Iterative traversal also catches cycles outside the candidate cohort and
         # handles arbitrarily deep valid paths without Python recursion limits.
         finished = set()
@@ -86,6 +90,7 @@ class AtlasTaxonomy:
                 cursor = tree[cursor]
             finished.update(path_ids)
         self._parents = tree
+        self._labels = labels
         self._lineages: dict[int, tuple[tuple[int, ...], bool]] = {}
         self.source_url = source_url
         self.cache_sha256 = hashlib.sha256(contents).hexdigest()
@@ -153,4 +158,13 @@ class AtlasTaxonomy:
             "completeness": "every parent link reaches an explicit root in this cache",
             "membership": "known root matches; absent root is negative only with complete ancestry",
             "presets": presets,
+            # Compact rows: [canonical ID, recorded scientific name, common name, rank].
+            # Missing cache labels stay explicit, even when a recorded parent link
+            # establishes positive membership in that ID.
+            "taxa": [
+                [taxon_id, *self._labels.get(taxon_id, ["", "", ""])]
+                for taxon_id in sorted(
+                    {taxon_id for record in records for taxon_id in record["ancestor_taxon_ids"]}
+                )
+            ],
         }

@@ -181,3 +181,38 @@ def test_missing_brush_id_blocks_even_when_unfiltered_result_ids_still_match():
     assert result["ok"] is False
     assert result["missingBrush"] == 1
     assert result["missing"] == result["unexpected"] == 0
+
+
+def test_catalog_root_context_preserves_literal_geo_brush_and_result_verification():
+    payload = payload_value()
+    payload["taxonomy"] = dict(
+        cache_sha256=TAXONOMY_SHA,
+        presets=[],
+        taxa=[[50, "Crataegus", "Hawthorns", "genus"], [51, "Crataegus", "", "subgenus"]],
+    )
+    for record in payload["records"]:
+        record.update(
+            taxon_id=record["id"], ancestor_taxon_ids=[record["id"], 50], taxonomy_complete=True
+        )
+    value = context_value(
+        taxonomySha=TAXONOMY_SHA,
+        taxonRoots=[50],
+        q="plant",
+        geoBounds=[-130, 45, -110, 60],
+        resultIds=[13],
+    )
+    actual = restore(value, payload)
+    assert actual["taxonId"] == 50 and actual["presetIndex"] == -1
+    assert actual["brushedIndices"] == [2, 0] and actual["ok"] is True
+    assert restore(value | dict(resultIds=[11]), payload)["ok"] is False
+    for updates in [
+        dict(taxonRoots=[51]),
+        dict(taxonRoots=[50, 51]),
+        dict(taxonExclude=True),
+        dict(taxonomySha=SHA),
+    ]:
+        # ID51 has a label but no represented ancestry, so is not available.
+        assert evaluate(
+            f"(()=>{{try{{context.restore({json.dumps(value | updates)}, {json.dumps(payload)},"
+            f"{{pool_sha256:{json.dumps(SHA)}}},scope);return false;}}catch{{return true;}}}})()"
+        )
