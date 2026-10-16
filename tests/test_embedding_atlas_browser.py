@@ -293,6 +293,55 @@ def test_explicit_missing_observation_link_keeps_the_requested_id(open_atlas):
     assert errors == []
 
 
+def test_back_restores_missing_request_notice_and_cross_model_intent(open_atlas):
+    page, errors = open_atlas(fragment="#group=Aves&id=99999")
+    initial_url = page.url
+    page.locator("#record").select_option("7")
+    assert page.locator("#missing-selection").is_hidden()
+    page.go_back()
+    page.wait_for_function("location.hash.includes('requested=99999')")
+    assert page.url == initial_url
+    assert page.locator("#missing-selection").is_visible()
+    page.locator("#advanced summary").first.click()
+    assert (
+        page.get_by_role("link", name="Other", exact=True)
+        .get_attribute("href")
+        .endswith("#group=Aves&id=99999")
+    )
+    assert errors == []
+
+
+def test_promoting_a_match_outside_search_preserves_specialist_scope(open_atlas):
+    page, errors = open_atlas()
+    search = page.get_by_role("searchbox")
+    search.fill("107")
+    search.press("Enter")
+    page.locator('[data-focal-id="107"]').wait_for()
+    trigger = page.locator(".neighbors button").first
+    candidate = trigger.get_attribute("data-observation-id")
+    trigger.click()
+    page.get_by_role("button", name="Use as focal photo", exact=True).click()
+    assert page.locator(f'[data-focal-id="{candidate}"]').count() == 1
+    assert search.input_value() == "107"
+    assert "1 match" in page.locator("#search-status").inner_text()
+    assert "outside these results" in page.locator("#record option").first.inner_text()
+    assert errors == []
+
+
+def test_back_closes_comparison_before_restoring_the_previous_focal(open_atlas):
+    page, errors = open_atlas()
+    page.locator("#record").select_option("7")
+    page.locator(".neighbors button").first.click()
+    assert "Observation 107" in page.locator("#focal-figure").inner_text()
+    page.go_back()
+    page.locator('[data-focal-id="100"]').wait_for()
+    assert page.locator("#photo-comparison").is_hidden()
+    assert page.locator("#location-chooser").is_hidden()
+    page.locator(".neighbors button").first.click()
+    assert "Observation 100" in page.locator("#focal-figure").inner_text()
+    assert errors == []
+
+
 def test_failed_group_load_has_explicit_error_and_can_recover(open_atlas):
     page, errors = open_atlas()
     page.route("**/embeddings-data/Plantae.json", lambda route: route.fulfill(status=503))
