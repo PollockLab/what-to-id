@@ -4,6 +4,7 @@ The map adapter isolates tile/WebGL availability, while clicks execute the produ
 map handler. These tests do not establish live basemap rendering or human usability.
 """
 
+import os
 from urllib.parse import urlparse
 
 import numpy as np
@@ -38,11 +39,17 @@ window.maplibregl={Map:TestMap,LngLatBounds:Bounds,NavigationControl:class {}};
 
 @pytest.fixture(scope="module")
 def browser():
-    api = pytest.importorskip("playwright.sync_api")
+    required = os.environ.get("WHAT_TO_ID_REQUIRE_BROWSER") == "1"
+    if required:
+        from playwright import sync_api as api
+    else:
+        api = pytest.importorskip("playwright.sync_api")
     with api.sync_playwright() as pw:
         try:
             instance = pw.chromium.launch()
         except Exception as error:
+            if required:
+                pytest.fail(f"Required Chromium unavailable: {error}")
             pytest.skip(f"Chromium unavailable: {error}")
         yield instance
         instance.close()
