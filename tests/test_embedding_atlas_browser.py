@@ -226,6 +226,27 @@ def test_filtered_empty_search_recovers_without_changing_focal_or_rankings(open_
     assert errors == []
 
 
+def test_focal_change_refreshes_each_visualization_once(open_atlas):
+    page, errors = open_atlas()
+    page.get_by_role("searchbox").fill("Recorded")
+    page.evaluate(
+        """() => {
+          const source = testMap.sources.observations, setData = source.setData;
+          window.selectionRefreshes = {map: 0, plot: 0};
+          source.setData = data => {selectionRefreshes.map++; setData(data);};
+          new MutationObserver(changes => {
+            selectionRefreshes.plot += changes.filter(change => change.addedNodes.length).length;
+          }).observe(document.getElementById('plot'), {childList: true});
+        }"""
+    )
+    page.locator("#record").select_option("1")
+    assert page.locator('[data-focal-id="101"]').count() == 1
+    assert page.get_by_role("searchbox").input_value() == "Recorded"
+    assert page.locator("#record option").count() == 19
+    assert page.evaluate("selectionRefreshes") == {"map": 1, "plot": 1}
+    assert errors == []
+
+
 def test_unfamiliar_first_preserves_specialist_search_and_empty_scope(open_atlas):
     page, errors = open_atlas()
     page.get_by_role("searchbox").fill("107")
