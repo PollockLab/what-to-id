@@ -1,5 +1,11 @@
 /* Public-coordinate filtering, shared by the atlas and its Node regression tests. */
 const AtlasScope = (() => {
+  function inspectionPhotoUrl(url) {
+    if (typeof url !== 'string') return null;
+    const match = /^(https:\/\/(?:inaturalist-open-data\.s3\.amazonaws\.com|static\.inaturalist\.org)\/photos\/([1-9]\d*)\/)medium\.jpg$/.exec(url);
+    if (!match || match[0] !== url || !Number.isSafeInteger(Number(match[2]))) return null;
+    return `${match[1]}large.jpg`;
+  }
   function inBounds(record, bounds) {
     if (!bounds || bounds.length !== 4 || !bounds.every(Number.isFinite)) return false;
     const [west, south, east, north] = bounds;
@@ -194,7 +200,7 @@ const AtlasScope = (() => {
     return {begin: () => ++generation, cancel: () => {generation++;},
       current: token => token === generation};
   }
-  return {inBounds, matches, taxonMembership, taxonPresets, taxonCounts, taxonScopeCounts,
+  return {inspectionPhotoUrl, inBounds, matches, taxonMembership, taxonPresets, taxonCounts, taxonScopeCounts,
     brushIndices, toggleIndex, modelHref, resolveSelection, mapHref,
     compareNeighborhoods, requestGate, representationColor, hasRepresentationColors, hasPcaAlternative, projectionCoordinates, projectionSummary, markerHits, nearestMarker, nearestLongitude};
 })();

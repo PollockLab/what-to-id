@@ -569,3 +569,39 @@ def test_scope_availability_counts_actual_records_without_losing_canonical_prese
     ]
     assert evaluate(f"scope.taxonPresets({json.dumps(payload)})") == presets
     assert evaluate("scope.taxonScopeCounts({records:[{}]})") == []
+
+
+@pytest.mark.parametrize(
+    "host", ["inaturalist-open-data.s3.amazonaws.com", "static.inaturalist.org"]
+)
+def test_inspection_variant_keeps_the_same_photo_and_supported_host(host):
+    url = f"https://{host}/photos/732685322/medium.jpg"
+    assert evaluate(f"scope.inspectionPhotoUrl({json.dumps(url)})") == url.replace(
+        "/medium.jpg", "/large.jpg"
+    )
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        None,
+        "",
+        "http://static.inaturalist.org/photos/100/medium.jpg",
+        "https://example.org/photos/100/medium.jpg",
+        "https://static.inaturalist.org.example.org/photos/100/medium.jpg",
+        "https://user@static.inaturalist.org/photos/100/medium.jpg",
+        "https://static.inaturalist.org:443/photos/100/medium.jpg",
+        "https://static.inaturalist.org/photos/100/medium.gif",
+        "https://static.inaturalist.org/photos/100/medium.jpg?size=large",
+        "https://static.inaturalist.org/photos/100/medium.jpg#fragment",
+        "https://static.inaturalist.org/photos/100/medium.jpg\n",
+        "https://static.inaturalist.org/photos/100/../200/medium.jpg",
+        "https://static.inaturalist.org/photos/100/%6dedium.jpg",
+        "https://static.inaturalist.org/photos/0100/medium.jpg",
+        "https://static.inaturalist.org/photos/0/medium.jpg",
+        "https://static.inaturalist.org/photos/9007199254740992/medium.jpg",
+        "https://static.inaturalist.org/photos/100/large.jpg",
+    ],
+)
+def test_inspection_variant_rejects_unsupported_or_ambiguous_sources(url):
+    assert evaluate(f"scope.inspectionPhotoUrl({json.dumps(url)})") is None

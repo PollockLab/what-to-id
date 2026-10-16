@@ -2174,3 +2174,233 @@ def test_missing_target_taxonomy_fails_closed_for_restored_zero_scope(open_conte
     assert set(_scope_result_ids(page)) == set(range(100, 108))
     assert page.locator("#taxon-scope-control").is_hidden()
     assert errors == []
+
+
+def _large_photo_svg():
+    return (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="960">'
+        '<rect width="1200" height="960" fill="#78a777"/></svg>'
+    )
+
+
+def _defer_large_photos(page):
+    pending = []
+    page.route("**/photos/**/large.jpg", lambda route: pending.append(route))
+    return pending
+
+
+def _inspect_focal(page):
+    page.get_by_role("button", name="Enlarge focal photo", exact=False).click()
+    page.get_by_role("button", name="Inspect focal photo", exact=False).click()
+    page.locator("#inspection-status").filter(has_text="Loading larger photo").wait_for()
+
+
+@pytest.mark.parametrize("width", [390, 1440])
+def test_inspection_decodes_large_photo_before_swap_and_reuses_explicit_request(open_atlas, width):
+    page, errors = open_atlas(width)
+    pending = _defer_large_photos(page)
+    page.locator("#record").select_option("7")
+    page.locator("#record").select_option("0")
+    assert pending == []  # Normal browsing and its neighboring photos stay at medium size.
+    initial_hash = page.evaluate("location.hash")
+    _inspect_focal(page)
+    image = page.locator("#focal-figure img")
+    medium = image.get_attribute("src")
+    assert medium.endswith("/photos/100/medium.jpg")
+    image.evaluate("image=>image.decode()")
+    assert image.evaluate("image=>image.naturalWidth") == 300
+    assert len(pending) == 1
+    assert page.get_by_role("button", name="Back to comparison", exact=True).evaluate(
+        "button=>document.activeElement===button"
+    )
+    pending[0].fulfill(body=_large_photo_svg(), content_type="image/svg+xml")
+    page.wait_for_function(
+        "document.getElementById('inspection-status').textContent==='Larger photo loaded.'"
+    )
+    assert image.get_attribute("src") == medium.replace("/medium.jpg", "/large.jpg")
+    image.evaluate("image=>image.decode()")
+    assert image.evaluate("image=>[image.naturalWidth,image.naturalHeight]") == [1200, 960]
+    assert len(pending) == 1
+    assert page.evaluate("location.hash") == initial_hash
+    page.keyboard.press("Escape")
+    assert page.get_by_role("button", name="Inspect focal photo", exact=False).evaluate(
+        "button=>document.activeElement===button"
+    )
+    page.get_by_role("button", name="Inspect focal photo", exact=False).click()
+    assert page.locator("#inspection-status").inner_text() == "Larger photo loaded."
+    assert len(pending) == 1
+    assert errors == []
+
+
+@pytest.mark.parametrize("failure", ["network", "decode"])
+def test_inspection_failure_keeps_medium_and_link_without_repeated_requests(open_atlas, failure):
+    page, errors = open_atlas()
+    pending = _defer_large_photos(page)
+    _inspect_focal(page)
+    image = page.locator("#focal-figure img")
+    medium = image.get_attribute("src")
+    link = page.locator("#focal-figure a").get_attribute("href")
+    assert len(pending) == 1
+    if failure == "network":
+        pending[0].abort()
+    else:
+        pending[0].fulfill(body="Invalid image bytes", content_type="image/jpeg")
+    page.locator("#inspection-status").filter(has_text="Larger photo unavailable").wait_for()
+    assert image.get_attribute("src") == medium
+    image.evaluate("image=>image.decode()")
+    assert page.locator("#focal-figure a").get_attribute("href") == link
+    for _ in range(2):
+        page.get_by_role("button", name="Back to comparison", exact=True).click()
+        page.get_by_role("button", name="Inspect focal photo", exact=False).click()
+        page.locator("#inspection-status").filter(has_text="Larger photo unavailable").wait_for()
+        assert image.get_attribute("src") == medium
+    assert len(pending) == 1
+    assert errors == []
+
+
+def test_unsupported_inspection_source_keeps_current_photo_without_request(open_atlas, atlas_site):
+    import json
+
+    page, errors = open_atlas()
+    payload = json.loads((atlas_site / "embeddings-data/Aves.json").read_text())
+    payload["records"][0]["photo"] = "https://static.inaturalist.org/photos/100/medium.gif"
+    page.route(
+        "**/embeddings-data/Aves.json",
+        lambda route: route.fulfill(body=json.dumps(payload), content_type="application/json"),
+    )
+    page.reload()
+    page.locator('[data-focal-id="100"]').wait_for()
+    pending = _defer_large_photos(page)
+    page.get_by_role("button", name="Enlarge focal photo", exact=False).click()
+    page.get_by_role("button", name="Inspect focal photo", exact=False).click()
+    assert "unavailable for this source" in page.locator("#inspection-status").inner_text()
+    assert page.locator("#focal-figure img").get_attribute("src").endswith("/medium.gif")
+    assert page.locator("#focal-figure a").is_visible()
+    assert pending == []
+    assert errors == []
+
+
+@pytest.mark.parametrize("change", ["exit", "focal", "history", "loading"])
+def test_late_inspection_success_cannot_change_observation_after_context_change(open_atlas, change):
+    page, errors = open_atlas()
+    if change == "history":
+        page.locator("#record").select_option("7")
+    pending = _defer_large_photos(page)
+    _inspect_focal(page)
+    old_photo = page.locator("#focal-figure img")
+    medium = old_photo.get_attribute("src")
+    assert len(pending) == 1
+    if change == "exit":
+        page.get_by_role("button", name="Back to comparison", exact=True).click()
+    elif change == "focal":
+        # An external selection change must invalidate the old dialog's pending image too.
+        page.evaluate("choose(7)")
+        page.locator('[data-focal-id="107"]').wait_for()
+    elif change == "history":
+        page.go_back()
+        page.locator('[data-focal-id="100"]').wait_for()
+    else:
+        page.evaluate("loadGroup()")
+        page.wait_for_function("sampleState==='ready'")
+    pending[0].fulfill(body=_large_photo_svg(), content_type="image/svg+xml")
+    page.wait_for_function("inspectionPhotos.values().next().value.then(()=>true)")
+    assert old_photo.get_attribute("src") == medium
+    assert page.locator("#inspection-status").text_content() == ""
+    assert page.locator(".hero-photo").get_attribute("src").endswith("/medium.jpg")
+    assert errors == []
+
+
+def test_candidate_inspection_keeps_focal_rankings_and_reuses_loaded_photo_after_reopening(
+    open_atlas,
+):
+    page, errors = open_atlas()
+    pending = _defer_large_photos(page)
+    focal = page.locator('[data-focal-id="100"]')
+    rankings = page.locator(".neighbors button").evaluate_all(
+        "buttons=>buttons.map(button=>button.dataset.observationId)"
+    )
+    page.locator(".neighbors button").first.click()
+    candidate = page.locator("#candidate-figure")
+    link = candidate.locator("a").get_attribute("href")
+    candidate.get_by_role("button", name="Inspect visual match", exact=False).click()
+    page.locator("#inspection-status").filter(has_text="Loading larger photo").wait_for()
+    assert len(pending) == 1
+    pending[0].fulfill(body=_large_photo_svg(), content_type="image/svg+xml")
+    page.locator("#inspection-status").filter(has_text="Larger photo loaded.").wait_for()
+    assert candidate.locator("img").get_attribute("src").endswith("/large.jpg")
+    assert page.locator("#focal-figure img").get_attribute("src").endswith("/medium.jpg")
+    assert candidate.locator("a").get_attribute("href") == link
+    page.get_by_role("button", name="Close", exact=True).first.click()
+    page.locator(".neighbors button").first.click()
+    candidate.get_by_role("button", name="Inspect visual match", exact=False).click()
+    page.locator("#inspection-status").filter(has_text="Larger photo loaded.").wait_for()
+    assert candidate.locator("img").get_attribute("src").endswith("/large.jpg")
+    assert len(pending) == 1
+    assert focal.count() == 1
+    assert (
+        page.locator(".neighbors button").evaluate_all(
+            "buttons=>buttons.map(button=>button.dataset.observationId)"
+        )
+        == rankings
+    )
+    assert errors == []
+
+
+def test_pending_inspection_is_discarded_when_navigating_to_another_encoder(
+    open_context_atlas, context_site
+):
+    import json
+
+    page, errors, _ = open_context_atlas()
+
+    def with_photos(route):
+        path = urlparse(route.request.url).path
+        payload = json.loads((context_site / path.lstrip("/")).read_text())
+        for record in payload["records"]:
+            record["photo"] = f"https://static.inaturalist.org/photos/{record['id']}/medium.jpg"
+        route.fulfill(body=json.dumps(payload), content_type="application/json")
+
+    page.route("**/embeddings-data/*.json", with_photos)
+    page.route(
+        "**/photos/**",
+        lambda route: route.fulfill(
+            body='<svg xmlns="http://www.w3.org/2000/svg" width="300" height="240"/>',
+            content_type="image/svg+xml",
+        ),
+    )
+    page.reload()
+    page.locator('[data-focal-id="100"]').wait_for()
+    pending = _defer_large_photos(page)
+    _inspect_focal(page)
+    assert len(pending) == 1
+    # A different document cannot inherit the previous inspection's cache or callback.
+    target = page.locator("#model-links a").filter(has_text="DINO")
+    href = target.get_attribute("href")
+    page.goto(href)
+    page.wait_for_function("sampleState==='ready'")
+    pending[0].fulfill(body=_large_photo_svg(), content_type="image/svg+xml")
+    assert page.locator('[data-focal-id="100"]').count() == 1
+    assert page.locator(".hero-photo").get_attribute("src").endswith("/medium.jpg")
+    assert page.locator("#photo-comparison").is_hidden()
+    assert page.evaluate("inspectionPhotos.size") == 0
+    assert page.locator("#inspection-status").text_content() == ""
+    assert errors == []
+
+
+def test_inspection_deadline_keeps_medium_even_if_photo_arrives_later(open_atlas):
+    page, errors = open_atlas()
+    page.clock.install()
+    pending = _defer_large_photos(page)
+    _inspect_focal(page)
+    image = page.locator("#focal-figure img")
+    medium = image.get_attribute("src")
+    assert len(pending) == 1
+    page.clock.fast_forward(15001)
+    page.locator("#inspection-status").filter(has_text="Larger photo unavailable").wait_for()
+    pending[0].fulfill(body=_large_photo_svg(), content_type="image/svg+xml")
+    page.get_by_role("button", name="Back to comparison", exact=True).click()
+    page.get_by_role("button", name="Inspect focal photo", exact=False).click()
+    page.locator("#inspection-status").filter(has_text="Larger photo unavailable").wait_for()
+    assert len(pending) == 1
+    assert image.get_attribute("src") == medium
+    assert errors == []

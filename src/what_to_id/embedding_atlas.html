@@ -42,7 +42,7 @@ function setSampleState(state){
   workspace.inert=state!=='ready'||data?.group!==groupSelect.value;$('model-nav').inert=workspace.inert;workspace.setAttribute('aria-busy',String(state==='loading'));
   sampleLoading.hidden=state!=='loading';
   if(state==='loading')sampleLoading.textContent=`Loading ${names[groupSelect.value]||groupSelect.value} sample…`;
-  if(state!=='ready'){cancelBrush();$('plot-preview').hidden=true;}
+  if(state!=='ready'){cancelPhotoInspection();cancelBrush();$('plot-preview').hidden=true;}
 }
 let retainedGeoBounds=null,retainedFromLabel='',transferState=null,restoringContext=false,choosingSelection=false;
 function currentScopeBounds(){return retainedGeoBounds||currentBounds();}
@@ -192,6 +192,36 @@ document.querySelectorAll('[data-fit-sample]').forEach(button=>button.onclick=()
 function element(tag,text,cls){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e}
 function photo(url,cls){const img=element('img',undefined,cls);if(/^https:\/\/(?:inaturalist-open-data\.s3\.amazonaws\.com|static\.inaturalist\.org)\/photos\//.test(url))img.src=url;img.alt='Observation photo';img.loading='lazy';img.onerror=()=>{img.removeAttribute('src');img.alt='Photo unavailable'};return img}
 let comparisonIndices=[],candidateIndex=null,comparisonTrigger=null,locationTrigger=null,inspectionTrigger=null,comparisonScroll=0;
+const inspectionGate=AtlasScope.requestGate(),inspectionPhotos=new Map();
+const inspectionStatus=element('p');inspectionStatus.id='inspection-status';inspectionStatus.setAttribute('role','status');inspectionStatus.setAttribute('aria-live','polite');$('inspection-controls').append(inspectionStatus);
+function cancelPhotoInspection(){inspectionGate.cancel();inspectionStatus.textContent='';}
+function inspectionPhoto(url){
+  if(!inspectionPhotos.has(url)){
+    if(inspectionPhotos.size>=8)inspectionPhotos.delete(inspectionPhotos.keys().next().value);
+    const image=new Image();image.src=url;
+    const loaded=image.decode().then(()=>{if(!image.naturalWidth||!image.naturalHeight)throw Error('Photo unavailable');return image;});
+    let timeout;const deadline=new Promise((resolve,reject)=>{timeout=setTimeout(()=>reject(Error('Photo unavailable')),15000);});
+    inspectionPhotos.set(url,Promise.race([loaded,deadline]).finally(()=>clearTimeout(timeout)));
+  }
+  return inspectionPhotos.get(url);
+}
+async function loadInspectionPhoto(trigger){
+  const image=trigger.querySelector('img');
+  if(image?.dataset.inspectionLoaded==='true'){inspectionStatus.textContent='Larger photo loaded.';return;}
+  const url=AtlasScope.inspectionPhotoUrl(image?.getAttribute('src'));
+  if(!url){inspectionStatus.textContent='A larger photo is unavailable for this source. Current photo retained.';return;}
+  const token=inspectionGate.begin(),snapshot=data,focalId=data.records[selected].id,dialog=$('photo-comparison');
+  const current=()=>inspectionGate.current(token)&&sampleUsable()&&data===snapshot&&data.records[selected].id===focalId&&dialog.open&&inspectionTrigger===trigger&&image.isConnected;
+  inspectionStatus.textContent='Loading larger photo. Current photo remains available.';
+  try{
+    const larger=await inspectionPhoto(url);if(!current())return;
+    if(larger.naturalWidth<=image.naturalWidth&&larger.naturalHeight<=image.naturalHeight){inspectionStatus.textContent='No additional photo detail is available. Current photo retained.';return;}
+    const medium=image.getAttribute('src'),onerror=image.onerror;
+    image.onerror=()=>{image.onerror=onerror;delete image.dataset.inspectionLoaded;image.src=medium;if(current())inspectionStatus.textContent='Larger photo unavailable. Current photo retained.';};
+    image.src=url;image.dataset.inspectionLoaded='true';inspectionStatus.textContent='Larger photo loaded.';
+  }catch{if(current())inspectionStatus.textContent='Larger photo unavailable. Current photo retained; open the complete observation for more detail.';}
+}
+window.addEventListener('pagehide',cancelPhotoInspection);
 function observationLink(record,text='Complete observation on iNaturalist'){
   const link=element('a',text);link.href=`https://www.inaturalist.org/observations/${record.id}`;link.target='_blank';link.rel='noopener noreferrer';return link;
 }
@@ -207,8 +237,10 @@ function inspectComparisonPhoto(side,trigger){
   inspectionTrigger=trigger;comparisonScroll=dialog.scrollTop;dialog.dataset.inspect=side;
   $('comparison-title').textContent=side==='focal'?'Inspect focal photo':'Inspect visual match';
   $('inspection-controls').hidden=false;dialog.scrollTop=0;$('back-comparison').focus({preventScroll:true});
+  loadInspectionPhoto(trigger);
 }
 function exitPhotoInspection(restoreFocus=true){
+  cancelPhotoInspection();
   const dialog=$('photo-comparison'),trigger=inspectionTrigger;inspectionTrigger=null;dialog.dataset.inspect='none';
   $('inspection-controls').hidden=true;$('comparison-title').textContent=dialog.dataset.single==='true'?'Focal photo':'Compare photos';
   if(restoreFocus){dialog.scrollTop=comparisonScroll;if(trigger?.isConnected)trigger.focus({preventScroll:true});}
@@ -216,6 +248,7 @@ function exitPhotoInspection(restoreFocus=true){
 $('back-comparison').onclick=()=>exitPhotoInspection();
 $('photo-comparison').addEventListener('cancel',event=>{if(inspectionTrigger){event.preventDefault();exitPhotoInspection();}});
 function renderPhotoComparison(){
+  cancelPhotoInspection();
   const single=candidateIndex===selected,position=comparisonIndices.indexOf(candidateIndex);
   $('photo-comparison').dataset.single=String(single);$('comparison-title').textContent=single?'Focal photo':'Compare photos';
   comparisonFigure($('focal-figure'),selected,'Focal observation');
@@ -247,7 +280,7 @@ $('close-location').onclick=()=>$('location-chooser').close();
 $('location-chooser').addEventListener('close',()=>{if(locationTrigger?.isConnected)locationTrigger.focus({preventScroll:true});});
 function restoreRequestedSelection(requested){const resolution=AtlasScope.resolveSelection(data.records,requested);selected=resolution.index;missingRequestedId=resolution.missingRequestedId;const missingNotice=$('missing-selection');missingNotice.hidden=missingRequestedId===null;if(missingRequestedId!==null){missingNotice.replaceChildren(document.createTextNode(`Requested observation ${missingRequestedId} is unavailable in this model and life-group sample. Showing observation ${data.records[selected].id} instead. `));const requestedLink=element('a','View the requested observation on iNaturalist');requestedLink.href=`https://www.inaturalist.org/observations/${missingRequestedId}`;requestedLink.target='_blank';requestedLink.rel='noopener noreferrer';missingNotice.append(requestedLink);}}
 function choose(index,preserveMissing=false,historyMode='push',loadedSample=null){
-  if(!data||data.group!==groupSelect.value||(!sampleUsable()&&!(sampleState==='loading'&&loadedSample===data))||!data.records[Number(index)])return;choosingSelection=true;cancelComparison();
+  if(!data||data.group!==groupSelect.value||(!sampleUsable()&&!(sampleState==='loading'&&loadedSample===data))||!data.records[Number(index)])return;choosingSelection=true;cancelPhotoInspection();cancelComparison();
   if(!preserveMissing){missingRequestedId=null;$('missing-selection').hidden=true;}
   selected=Number(index);if(![...recordSelect.options].some(o=>o.value===String(selected)))searchRecords();recordSelect.value=String(selected);
   const r=data.records[selected],hash=selectionHash(r.id,missingRequestedId);
