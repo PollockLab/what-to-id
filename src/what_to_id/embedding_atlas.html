@@ -61,7 +61,7 @@ function restoreContext(state=new URLSearchParams(location.hash.slice(1))){
   restoringContext=true;retainedGeoBounds=null;retainedFromLabel='';transferState=null;
   $('search').value='';$('taxon-scope').value='';$('only-view').checked=false;resetBrush();
   if(state.has('ctx')){const raw=state.get('ctx');try{const context=AtlasContext.decode(raw),restored=AtlasContext.restore(context,data,META,AtlasScope);
-    $('search').value=context.q;$('taxon-scope').value=restored.presetIndex<0?'':String(restored.presetIndex);
+    $('search').value=context.q;if(restored.presetIndex>=0)ensureTaxonOption(restored.presetIndex);$('taxon-scope').value=restored.presetIndex<0?'':String(restored.presetIndex);
     brushed=new Set(restored.brushedIndices);brushActive=context.brushIds.length>0||context.onlyBrushed;brushRect=null;$('only-brushed').checked=context.onlyBrushed;
     retainedGeoBounds=context.geoBounds;retainedFromLabel=context.fromLabel;$('only-view').checked=context.geoBounds!==null;
     transferState={raw,context,blocked:!restored.ok,...restored};
@@ -117,25 +117,38 @@ function resizeGeographicMap(){
 if(map&&typeof ResizeObserver!=='undefined')new ResizeObserver(resizeGeographicMap).observe($('map'));
 $('reset-filters').addEventListener('click',()=>{$('map-resize-note').hidden=true;});
 
-let taxonPresets=[];
+let taxonPresets=[],taxonScopeCounts=[];
 function activeTaxonScope(){return $('taxon-scope').value===''?null:taxonPresets[Number($('taxon-scope').value)]||null;}
 function taxonPresetLabel(preset){return preset.approximate?`${preset.label==='Lichens'?'Lichen-forming groups':preset.label} (approximate)`:preset.label;}
 function updateTaxonomyProvenance(){
   const host=$('taxonomy-provenance'),taxonomy=data?.taxonomy;host.hidden=!taxonomy;if(!taxonomy)return;
   host.replaceChildren(document.createTextNode(`Recorded taxonomy ancestry cache SHA-256: ${taxonomy.cache_sha256||'not supplied'}. `));
   try{const url=new URL(taxonomy.source_url);if(url.protocol==='https:'&&!url.username&&!url.password){const link=element('a','Taxonomy source');link.href=url.href;link.target='_blank';link.rel='noopener noreferrer';host.append(link);}}catch{}
+  if(taxonScopeCounts.length)host.append(document.createTextNode(' Frozen life-group ancestry counts: '+taxonScopeCounts.map(({preset,verified,excluded,unknown})=>`${taxonPresetLabel(preset)}: ${verified.toLocaleString()} known matches, ${excluded.toLocaleString()} known nonmatches, ${unknown.toLocaleString()} unknown`).join('; ')+'. Zero known matches do not establish ecological absence.'));
+}
+function ensureTaxonOption(index){
+  const entry=taxonScopeCounts[index],picker=$('taxon-scope');if(!entry)return false;
+  if(![...picker.options].some(option=>option.value===String(index))){
+    const option=element('option',`${taxonPresetLabel(entry.preset)} · ${entry.verified.toLocaleString()} ancestry matches`);option.value=String(index);
+    const next=[...picker.options].find(option=>option.value!==''&&Number(option.value)>index);picker.insertBefore(option,next||null);
+  }
+  picker.disabled=false;$('taxon-scope-control').hidden=false;return true;
+}
+function updateTaxonOptions(){
+  const picker=$('taxon-scope'),active=picker.value;
+  [...picker.options].forEach(option=>{if(option.value!==''&&option.value!==active&&taxonScopeCounts[Number(option.value)]?.verified===0)option.remove();});
+  const available=picker.options.length>1;picker.disabled=!available;$('taxon-scope-control').hidden=!available;
+  if(!available&&($('taxon-scope-control').contains(document.activeElement)||$('taxon-scope-status').contains(document.activeElement)))$('search').focus({preventScroll:true});
 }
 function resetTaxonScopes(){
-  updateTaxonomyProvenance();
-  taxonPresets=AtlasScope.taxonPresets(data);const picker=$('taxon-scope');
+  taxonScopeCounts=AtlasScope.taxonScopeCounts(data);taxonPresets=taxonScopeCounts.map(entry=>entry.preset);const picker=$('taxon-scope');
   const all=element('option','All sampled observations');all.value='';picker.replaceChildren(all);
-  taxonPresets.forEach((preset,index)=>{const count=AtlasScope.taxonCounts(data.records,preset.taxon_ids,preset.exclude===true).verified;
-    const option=element('option',`${taxonPresetLabel(preset)} · ${count.toLocaleString()} ancestry matches`);option.value=String(index);picker.append(option);});
-  picker.value='';picker.disabled=!taxonPresets.length;$('taxon-scope-control').hidden=!taxonPresets.length;$('taxon-scope-status').hidden=true;
+  taxonScopeCounts.forEach(({index,verified})=>{if(verified>0)ensureTaxonOption(index);});
+  picker.value='';updateTaxonOptions();$('taxon-scope-status').hidden=true;updateTaxonomyProvenance();
 }
 function scopedMatches({withoutTaxon=false}={}){return AtlasScope.matches(data.records,{term:$('search').value,bounds:currentScopeBounds(),onlyInView:$('only-view').checked,order:$('order').value,hasReference:Boolean(data.reference),onlyBrushed:$('only-brushed').checked,brushedIndices:[...brushed],taxonRoots:withoutTaxon?null:activeTaxonScope()?.taxon_ids||null,taxonExclude:!withoutTaxon&&activeTaxonScope()?.exclude===true});}
 function updateTaxonStatus(matches){
-  const preset=activeTaxonScope();$('taxon-scope-status').hidden=!preset;if(!preset)return;
+  updateTaxonOptions();const preset=activeTaxonScope();$('taxon-scope-status').hidden=!preset;if(!preset)return;
   const counts=AtlasScope.taxonCounts(data.records,preset.taxon_ids,preset.exclude===true);
   const context=AtlasScope.taxonCounts(scopedMatches({withoutTaxon:true}).map(({r})=>r),preset.taxon_ids,preset.exclude===true);
   let message=`${taxonPresetLabel(preset)}: ${counts.verified.toLocaleString()} matching recorded taxonomy in this life-group sample; ${matches.length.toLocaleString()} match current filters. `;

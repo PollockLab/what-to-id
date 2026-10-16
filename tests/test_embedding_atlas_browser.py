@@ -679,7 +679,26 @@ def taxonomy_site(tmp_path_factory):
         (202, 98, "Unplaced fungus", -123),
     ]
     rows = []
-    for group, observations in [("Plantae", plants), ("Fungi", fungi)]:
+    for group, observations in [
+        ("Plantae", plants),
+        ("Fungi", fungi),
+        (
+            "Aves",
+            [
+                (300, 20, "Bird", -123),
+                (301, 99, "Unplaced bird", -123),
+                (302, 21, "Another bird", -123),
+            ],
+        ),
+        (
+            "Actinopterygii",
+            [
+                (400, 20, "Fish", -123),
+                (401, 99, "Unplaced fish", -123),
+                (402, 21, "Another fish", -123),
+            ],
+        ),
+    ]:
         vectors = (
             np.random.default_rng(len(observations))
             .normal(size=(len(observations), 8))
@@ -785,7 +804,11 @@ def test_verified_taxon_scope_excludes_name_lookalikes_and_retains_focal_and_ran
     scope = page.get_by_role("combobox", name="Taxon scope", exact=True)
     assert scope.input_value() == ""
     assert "Bryophytes · 5 ancestry matches" in scope.inner_text()
-    assert "Lichen-forming groups (approximate) · 0 ancestry matches" in scope.inner_text()
+    assert "Lichen-forming groups" not in scope.inner_text()
+    assert (
+        "Lichen-forming groups (approximate): 0 known matches"
+        in page.locator("#taxonomy-provenance").text_content()
+    )
     before = page.locator(".neighbors button").evaluate_all(
         "buttons=>buttons.map(b=>b.dataset.observationId)"
     )
@@ -852,7 +875,8 @@ def test_taxon_scope_intersects_search_brush_and_map_and_reset_recovers(open_tax
 
 def test_empty_taxon_scope_recovers_and_group_changes_clear_stale_scope(open_taxonomy_atlas):
     page, errors = open_taxonomy_atlas
-    page.get_by_role("combobox", name="Taxon scope", exact=True).select_option("1")
+    _restore_zero_taxon_scope(page, 1)
+    assert page.locator("#taxon-scope").input_value() == "1"
     assert page.locator("#record").is_disabled()
     assert "0 results" in page.locator("#search-status").inner_text()
     assert (
@@ -1029,6 +1053,16 @@ def test_identify_fungal_partition_contains_exactly_742_known_outside_ids(
     page.locator("#group").select_option("Fungi")
     page.locator('[data-focal-id="10000"]').wait_for()
     scope = page.get_by_role("combobox", name="Taxon scope", exact=True)
+    assert scope.locator("option").all_text_contents() == [
+        "All sampled observations",
+        "Lichen-forming groups (approximate) · 255 ancestry matches",
+        "Outside listed lichen-forming groups (approximate) · 742 ancestry matches",
+    ]
+    assert scope.locator("option").evaluate_all("options=>options.map(option=>option.value)") == [
+        "",
+        "1",
+        "2",
+    ]
     scope.select_option("1")
     page.get_by_role("button", name="Identify these results (255)", exact=True).click()
     included = set(identify_batch_ids(page))
@@ -2021,4 +2055,122 @@ def test_back_during_pending_load_restores_latest_group_and_ignores_old_response
     assert page.locator("#error").is_hidden()
     assert not page.locator(".workspace").evaluate("workspace=>workspace.inert")
     _assert_identify_ids(page, list(range(100, 118)))
+    assert errors == []
+
+
+def _restore_zero_taxon_scope(page, index):
+    from urllib.parse import quote
+
+    state = page.evaluate(
+        """index=>({group:data.group,id:data.records[selected].id,context:AtlasContext.encode({
+          v:1,group:data.group,poolSha:META.pool_sha256,taxonomySha:data.taxonomy.cache_sha256,
+          q:'',taxonRoots:taxonPresets[index].taxon_ids,taxonExclude:taxonPresets[index].exclude===true,
+          brushIds:[],onlyBrushed:false,geoBounds:null,resultIds:[],fromLabel:'Saved scope'})})""",
+        index,
+    )
+    page.goto(
+        page.url.split("#")[0]
+        + f"#group={state['group']}&id={state['id']}&ctx="
+        + quote(state["context"])
+    )
+    page.wait_for_function("!document.getElementById('group').disabled")
+    return state
+
+
+@pytest.mark.parametrize(
+    ("group", "ids"), [("Aves", [300, 301, 302]), ("Actinopterygii", [400, 401, 402])]
+)
+def test_zero_positive_groups_hide_choices_but_restore_zero_scope_without_widening(
+    open_taxonomy_atlas, group, ids
+):
+    page, errors = open_taxonomy_atlas
+    page.locator("#group").select_option(group)
+    page.locator(f'[data-focal-id="{ids[0]}"]').wait_for()
+    assert page.locator("#taxon-scope-control").is_hidden()
+    assert page.locator("#taxon-scope").is_disabled()
+    assert page.locator("#taxon-scope option").count() == 1
+    assert len(page.evaluate("taxonPresets")) == 2
+    provenance = page.locator("#taxonomy-provenance").text_content()
+    assert "Bryophytes: 0 known matches, 2 known nonmatches, 1 unknown" in provenance
+    assert "Zero known matches do not establish ecological absence" in provenance
+
+    _restore_zero_taxon_scope(page, 0)
+    assert page.locator("#taxon-scope-control").is_visible()
+    assert page.locator("#taxon-scope").input_value() == "0"
+    assert "0 ancestry matches" in page.locator("#taxon-scope").inner_text()
+    assert "1 observation has unknown ancestry" in page.locator("#taxon-critical").inner_text()
+    assert _scope_result_ids(page) == []
+    assert page.locator("#identify-results").is_disabled()
+    page.get_by_role("searchbox").fill("Unplaced")
+    page.get_by_role("searchbox").fill("")
+    assert page.locator("#taxon-scope").input_value() == "0"
+    assert page.locator("#identify-results").is_disabled()
+    page.get_by_role("button", name="Clear taxon scope", exact=True).click()
+    assert _scope_result_ids(page) == ids
+    assert page.locator("#taxon-scope-control").is_hidden()
+    assert page.locator("#taxon-scope option").count() == 1
+    assert page.get_by_role("searchbox").evaluate("element=>document.activeElement===element")
+    assert page.locator(f'[data-focal-id="{ids[0]}"]').count() == 1
+    assert errors == []
+
+
+def test_restored_zero_scope_transfers_by_roots_across_reordered_presets_and_history(
+    open_context_atlas,
+):
+    page, errors, _ = open_context_atlas()
+    assert page.locator("#taxon-scope option").evaluate_all("options=>options.map(o=>o.value)") == [
+        "",
+        "0",
+    ]
+    _restore_zero_taxon_scope(page, 1)
+    assert page.locator("#taxon-scope").input_value() == "1"
+    assert _scope_result_ids(page) == []
+    assert page.locator("#identify-results").is_disabled()
+    _go_other_encoder(page, "DINO")
+    assert page.locator("#taxon-scope").input_value() == "0"
+    assert page.locator("#taxon-scope option").evaluate_all("options=>options.map(o=>o.value)") == [
+        "",
+        "0",
+        "1",
+    ]
+    assert _scope_result_ids(page) == []
+    assert page.locator("#identify-results").is_disabled()
+    assert "2 observations have unknown ancestry" in page.locator("#taxon-critical").inner_text()
+    page.go_back()
+    page.wait_for_function("!document.getElementById('group').disabled")
+    assert page.locator("#taxon-scope").input_value() == "1"
+    assert _scope_result_ids(page) == []
+    page.go_forward()
+    page.wait_for_function("!document.getElementById('group').disabled")
+    assert page.locator("#taxon-scope").input_value() == "0"
+    assert _scope_result_ids(page) == []
+    page.get_by_role("button", name="Clear taxon scope", exact=True).click()
+    assert set(_scope_result_ids(page)) == set(range(100, 108))
+    assert page.locator("#taxon-scope option").evaluate_all("options=>options.map(o=>o.value)") == [
+        "",
+        "1",
+    ]
+    assert page.locator("#taxon-scope-control").is_visible()
+    assert page.locator("#identify-results").is_enabled()
+    assert page.locator('[data-focal-id="100"]').count() == 1
+    assert errors == []
+
+
+def test_missing_target_taxonomy_fails_closed_for_restored_zero_scope(open_context_atlas):
+    def without_taxonomy(payload):
+        payload.pop("taxonomy")
+        return payload
+
+    page, errors, _ = open_context_atlas(target_mutator=without_taxonomy)
+    _restore_zero_taxon_scope(page, 1)
+    _go_other_encoder(page, "DINO")
+    assert page.locator("#taxon-scope-control").is_hidden()
+    assert page.locator("#taxon-scope").is_disabled()
+    assert page.locator("#identify-results").is_disabled()
+    assert "Identify is blocked" in page.locator("#transfer-summary").inner_text()
+    assert page.locator("#clear-transfer").is_visible()
+    page.locator("#clear-transfer").click()
+    assert page.locator("#identify-results").is_enabled()
+    assert set(_scope_result_ids(page)) == set(range(100, 108))
+    assert page.locator("#taxon-scope-control").is_hidden()
     assert errors == []
