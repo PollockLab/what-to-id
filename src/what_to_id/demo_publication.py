@@ -19,7 +19,9 @@ import tarfile
 import tempfile
 import zipfile
 from datetime import UTC, datetime
+from functools import cache
 from pathlib import Path, PurePosixPath
+from urllib.parse import urlsplit, urlunsplit
 
 
 class PublicationError(ValueError):
@@ -30,11 +32,59 @@ def _time(value: str) -> datetime:
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
+def _safe_api_error(stderr: bytes | str | None) -> str:
+    message = (
+        stderr.decode("utf-8", errors="replace") if isinstance(stderr, bytes) else stderr or ""
+    )
+    for name in ("GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN"):
+        if value := os.environ.get(name):
+            message = message.replace(value, "[redacted]")
+    message = re.sub(
+        r"\b(?:gh[pousr]_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+)\b", "[redacted]", message
+    )
+    message = re.sub(r"(?im)^(\s*(?:[<>]\s*)?authorization\s*:).*", r"\1 [redacted]", message)
+
+    def redact_url(match: re.Match) -> str:
+        try:
+            url = urlsplit(match.group())
+            return urlunsplit(
+                (
+                    url.scheme,
+                    url.netloc.rsplit("@", 1)[-1],
+                    url.path,
+                    "[redacted]" if url.query else "",
+                    "",
+                )
+            )
+        except ValueError:
+            return "[redacted URL]"
+
+    message = re.sub(r"https?://[^\s<>\"']+", redact_url, message)
+    return message.strip()[:2000] or "gh returned no HTTP diagnostics"
+
+
+@cache
+def _raw_output_flags() -> tuple[str, ...]:
+    # Newer gh refuses ANSI-bearing logs even when stdout is captured. Opt in
+    # only for these internal byte downloads, never for terminal output. Older
+    # local CLI versions predate both the guard and the flag.
+    result = subprocess.run(["gh", "api", "--help"], check=True, capture_output=True)
+    return ("--allow-escape-sequences",) if b"--allow-escape-sequences" in result.stdout else ()
+
+
 def _api(endpoint: str, *, pages: bool = False, raw: bool = False):
     args = ["gh", "api", endpoint]
     if pages:
         args += ["--paginate", "--slurp"]
-    result = subprocess.run(args, check=True, capture_output=True)
+    try:
+        if raw:
+            args.extend(_raw_output_flags())
+        result = subprocess.run(args, check=True, capture_output=True)
+    except subprocess.CalledProcessError as exc:
+        raise PublicationError(
+            f"GitHub API request failed for {endpoint} (exit {exc.returncode}): "
+            f"{_safe_api_error(exc.stderr)}"
+        ) from None
     if raw:
         return result.stdout
     data = json.loads(result.stdout)
