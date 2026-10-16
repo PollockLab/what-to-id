@@ -650,7 +650,8 @@ def test_identify_handoff_is_disabled_after_failed_group_load_then_recovers(open
     page.get_by_role("alert").wait_for()
     assert action.is_disabled()
     page.locator("#group").select_option("Aves")
-    page.wait_for_function("document.getElementById('error').hidden")
+    page.wait_for_function("!document.getElementById('group').disabled")
+    assert page.locator("#error").is_hidden()
     assert action.is_enabled()
     assert errors == []
 
@@ -1854,4 +1855,170 @@ def test_plot_unique_hover_reuses_preview_photo_while_pointer_stays_on_same_cand
     page.locator("#plot-preview img").evaluate("image=>window.previousPlotPhoto=image")
     page.mouse.move(*_plot_client_point(page, 104, dx=1, dy=1))
     assert page.locator("#plot-preview img").evaluate("image=>image===window.previousPlotPhoto")
+    assert errors == []
+
+
+def _hold_group_request(page, atlas_site, group="Plantae"):
+    import json
+
+    held = []
+    pattern = f"**/embeddings-data/{group}.json"
+    page.route(pattern, lambda route: held.append(route))
+    with page.expect_request(pattern):
+        page.locator("#group").select_option(group)
+    page.wait_for_function("document.getElementById('group').disabled")
+    assert len(held) == 1
+    payload = json.loads((atlas_site / f"embeddings-data/{group}.json").read_text())
+    return held[0], payload
+
+
+@pytest.mark.parametrize("source", ["plot", "map"])
+def test_pending_group_load_blocks_old_chooser_and_preserves_focal_and_history(
+    open_point_atlas, atlas_site, source
+):
+    page, errors = open_point_atlas
+    route, payload = _hold_group_request(page, atlas_site)
+    before = page.evaluate("location.hash")
+    if source == "plot":
+        page.locator("#plot").scroll_into_view_if_needed()
+        page.mouse.click(*_plot_client_point(page, 101))
+    else:
+        page.evaluate("testMap.clickIds([1,2])")
+    assert page.locator("#location-chooser").is_hidden()
+    assert page.locator('[data-focal-id="100"]').count() == 1
+    assert page.evaluate("location.hash") == before
+    assert page.locator(".workspace").evaluate("workspace=>workspace.inert")
+    assert page.locator(".workspace").get_attribute("aria-busy") == "true"
+    assert page.locator("#sample-loading").is_visible()
+    route.fulfill(json=payload)
+    page.locator('[data-focal-id="200"]').wait_for()
+    assert not page.locator(".workspace").evaluate("workspace=>workspace.inert")
+    assert page.locator(".workspace").get_attribute("aria-busy") == "false"
+    assert page.locator("#sample-loading").is_hidden()
+    assert errors == []
+
+
+def test_old_chooser_callback_never_retargets_after_reordered_dataset_replacement(
+    open_point_atlas, atlas_site
+):
+    page, errors = open_point_atlas
+    page.locator("#plot").scroll_into_view_if_needed()
+    page.mouse.click(*_plot_client_point(page, 101))
+    page.locator('#location-photos button[data-observation-id="101"]').evaluate(
+        "button=>window.oldChooserButton=button"
+    )
+    page.get_by_role("button", name="Close", exact=True).last.click()
+    route, payload = _hold_group_request(page, atlas_site)
+    before = page.evaluate("location.hash")
+    page.evaluate("oldChooserButton.click()")
+    assert page.evaluate("location.hash") == before
+    assert page.locator('[data-focal-id="100"]').count() == 1
+    old_ids = [record["id"] for record in payload["records"]]
+    payload["records"].reverse()
+    new_indices = {record["id"]: i for i, record in enumerate(payload["records"])}
+    for record in payload["records"]:
+        record["neighbors"] = [
+            [new_indices[old_ids[index]], score] for index, score in record["neighbors"]
+        ]
+    route.fulfill(json=payload)
+    page.wait_for_function("sampleUsable() && data.group==='Plantae'")
+    page.locator('[data-focal-id="203"]').wait_for()
+    after = page.evaluate("location.hash")
+    assert page.locator("#location-chooser").is_hidden()
+    assert page.locator("#location-photos button").count() == 0
+    assert not page.evaluate("oldChooserButton.isConnected")
+    page.evaluate("oldChooserButton.click()")
+    assert page.evaluate("location.hash") == after
+    assert page.locator('[data-focal-id="203"]').count() == 1
+    _assert_identify_ids(page, [200, 201, 202, 203])
+    assert errors == []
+
+
+def test_pending_and_failed_load_block_old_single_points_arrows_brush_and_identify_then_retry(
+    open_point_atlas, atlas_site
+):
+    page, errors = open_point_atlas
+    page.get_by_role("button", name="Add selected photo", exact=True).click()
+    before_brush = page.evaluate("[...brushed]")
+    route, _ = _hold_group_request(page, atlas_site)
+    before = page.evaluate("location.hash")
+    page.locator("#plot").scroll_into_view_if_needed()
+    page.mouse.click(*_plot_client_point(page, 104))
+    page.evaluate("testMap.clickIds([4])")
+    page.locator("#plot").dispatch_event("keydown", {"key": "ArrowRight"})
+    page.evaluate("document.getElementById('toggle-brush').click()")
+    page.evaluate("document.getElementById('identify-results').click()")
+    assert page.locator('[data-focal-id="100"]').count() == 1
+    assert page.evaluate("location.hash") == before
+    assert page.evaluate("[...brushed]") == before_brush
+    assert page.locator("#identify-dialog").is_hidden()
+    assert page.locator("#identify-results").is_disabled()
+    assert page.locator("#model-nav").evaluate("nav=>nav.inert")
+    assert page.evaluate("serializedContext()") is None
+    route.fulfill(status=503, body="Unavailable")
+    page.locator("#error").wait_for()
+    assert page.locator("#group").is_enabled()
+    assert page.locator(".workspace").evaluate("workspace=>workspace.inert")
+    assert page.locator(".workspace").get_attribute("aria-busy") == "false"
+    assert page.evaluate("serializedContext()") is None
+    page.evaluate("testMap.clickIds([4]);choose(4);document.getElementById('toggle-brush').click()")
+    assert page.evaluate("location.hash") == before
+    assert page.evaluate("[...brushed]") == before_brush
+    assert page.locator("#identify-results").is_disabled()
+    page.locator("#group").select_option("Aves")
+    page.wait_for_function("sampleUsable() && data.group==='Aves'")
+    assert page.locator("#error").is_hidden()
+    assert not page.locator(".workspace").evaluate("workspace=>workspace.inert")
+    assert page.evaluate("[...brushed]") == []
+    _assert_identify_ids(page, list(range(100, 118)))
+    assert errors == []
+
+
+def test_failed_same_group_reload_does_not_reactivate_old_matching_group_data(open_atlas):
+    page, errors = open_atlas()
+    before = page.evaluate("location.hash")
+    page.route("**/embeddings-data/Aves.json", lambda route: route.fulfill(status=503))
+    page.evaluate("void loadGroup()")
+    page.locator("#error").wait_for()
+    page.wait_for_function("!document.getElementById('group').disabled")
+    assert page.evaluate("data.group===document.getElementById('group').value")
+    assert page.locator(".workspace").evaluate("workspace=>workspace.inert")
+    assert page.locator("#identify-results").is_disabled()
+    page.evaluate("choose(1);openLocationChooser([0,1]);openPhotoComparison(1)")
+    assert page.locator("#location-chooser").is_hidden()
+    assert page.locator("#photo-comparison").is_hidden()
+    assert page.evaluate("location.hash") == before
+    page.locator("#group").select_option("Plantae")
+    page.wait_for_function("sampleUsable() && data.group==='Plantae'")
+    page.locator('[data-focal-id="200"]').wait_for()
+    assert page.locator("#identify-results").is_enabled()
+    assert errors == []
+
+
+@pytest.mark.parametrize("old_result", ["success", "failure"])
+def test_back_during_pending_load_restores_latest_group_and_ignores_old_response(
+    open_point_atlas, atlas_site, old_result
+):
+    page, errors = open_point_atlas
+    page.evaluate(
+        "window.groupLoadPromises=[];const originalGroupLoader=loadGroup;"
+        "loadGroup=(...args)=>{const promise=originalGroupLoader(...args);"
+        "groupLoadPromises.push(promise);return promise;};void 0;"
+    )
+    page.locator("#record").select_option("1")
+    page.locator('[data-focal-id="101"]').wait_for()
+    route, payload = _hold_group_request(page, atlas_site)
+    page.go_back()
+    page.wait_for_function("sampleUsable() && data.group==='Aves'")
+    page.locator('[data-focal-id="100"]').wait_for()
+    if old_result == "success":
+        route.fulfill(json=payload)
+    else:
+        route.fulfill(status=503, body="Old request failed")
+    page.evaluate("Promise.all(groupLoadPromises)")
+    assert page.locator("#group").input_value() == "Aves"
+    assert page.locator('[data-focal-id="100"]').count() == 1
+    assert page.locator("#error").is_hidden()
+    assert not page.locator(".workspace").evaluate("workspace=>workspace.inert")
+    _assert_identify_ids(page, list(range(100, 118)))
     assert errors == []
