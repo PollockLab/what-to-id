@@ -1288,21 +1288,34 @@ def test_active_encoder_is_visible_with_disclosures_closed_before_and_after_tran
     assert errors == []
 
 
-def test_unlabeled_build_uses_cache_backbone_in_visible_captions(open_atlas, atlas_site, tmp_path):
+@pytest.mark.parametrize("backbone", ["test-encoder", ""])
+def test_unlabeled_build_uses_cache_backbone_in_visible_captions(
+    open_atlas, atlas_site, tmp_path, backbone
+):
+    for source in atlas_site.parent.glob("*.npz"):
+        with np.load(source, allow_pickle=False) as cache:
+            np.savez(tmp_path / source.name, ids=cache["ids"], E=cache["E"], backbone=backbone)
+    output = tmp_path / "site"
     build(
         atlas_site.parent / "pool.parquet",
-        str(atlas_site.parent / "{group}.npz"),
-        tmp_path,
+        str(tmp_path / "{group}.npz"),
+        output,
         snapshot_date="2026-09-11",
     )
     page, errors = open_atlas()
     page.route(
         "https://atlas.test/embeddings.html",
-        lambda route: route.fulfill(path=str(tmp_path / "embeddings.html")),
+        lambda route: route.fulfill(path=str(output / "embeddings.html")),
+    )
+    page.route(
+        "https://atlas.test/embeddings-data/*.json",
+        lambda route: route.fulfill(
+            path=str(output / urlparse(route.request.url).path.lstrip("/"))
+        ),
     )
     page.reload()
     page.locator('[data-focal-id="100"]').wait_for()
-    _assert_visible_encoder_captions(page, "test-encoder")
+    _assert_visible_encoder_captions(page, backbone or "Unknown encoder")
     assert errors == []
 
 
