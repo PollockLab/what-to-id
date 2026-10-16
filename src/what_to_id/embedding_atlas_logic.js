@@ -12,16 +12,43 @@ const AtlasScope = (() => {
     return delta <= width + 1e-9;
   }
   function matches(records, {term = '', bounds = null, onlyInView = false,
-                             order = 'sample', hasReference = false, onlyBrushed = false, brushedIndices = []} = {}) {
+                             order = 'sample', hasReference = false, onlyBrushed = false,
+                             brushedIndices = [], taxonRoots = null} = {}) {
     const query = term.trim().toLocaleLowerCase();
     const brush = new Set(brushedIndices);
     const result = records.map((r, i) => ({r, i})).filter(({r, i}) =>
       (!onlyBrushed || brush.has(i)) &&
       (!onlyInView || inBounds(r, bounds)) &&
+      (taxonRoots === null || taxonMembership(r, taxonRoots) === true) &&
       `${r.name} ${r.id}`.toLocaleLowerCase().includes(query));
     if (order === 'reference' && hasReference) {
       result.sort((a, b) => b.r.reference_distance - a.r.reference_distance || a.r.id - b.r.id);
     }
+    return result;
+  }
+  function taxonMembership(record, roots) {
+    const validId = id => Number.isSafeInteger(id) && id > 0;
+    if (!Array.isArray(roots) || !roots.length || !roots.every(validId) ||
+        !validId(record?.taxon_id) || typeof record.taxonomy_complete !== 'boolean' ||
+        !Array.isArray(record.ancestor_taxon_ids) || !record.ancestor_taxon_ids.every(validId) ||
+        !record.ancestor_taxon_ids.includes(record.taxon_id) ||
+        new Set(record.ancestor_taxon_ids).size !== record.ancestor_taxon_ids.length) return null;
+    if (roots.some(root => record.ancestor_taxon_ids.includes(root))) return true;
+    return record.taxonomy_complete ? false : null;
+  }
+  function taxonPresets(payload) {
+    if (!Array.isArray(payload?.taxonomy?.presets)) return [];
+    return payload.taxonomy.presets.filter(preset => typeof preset?.label === 'string' &&
+      preset.label.length > 0 && typeof preset.approximate === 'boolean' &&
+      Array.isArray(preset.taxon_ids) && preset.taxon_ids.length > 0 &&
+      preset.taxon_ids.every(id => Number.isSafeInteger(id) && id > 0));
+  }
+  function taxonCounts(records, roots) {
+    const result = {verified: 0, excluded: 0, unknown: 0};
+    records.forEach(record => {
+      const state = taxonMembership(record, roots);
+      result[state === true ? 'verified' : state === false ? 'excluded' : 'unknown']++;
+    });
     return result;
   }
   function brushIndices(points, rectangle) {
@@ -160,7 +187,8 @@ const AtlasScope = (() => {
     return {begin: () => ++generation, cancel: () => {generation++;},
       current: token => token === generation};
   }
-  return {inBounds, matches, brushIndices, toggleIndex, modelHref, resolveSelection, mapHref,
+  return {inBounds, matches, taxonMembership, taxonPresets, taxonCounts,
+    brushIndices, toggleIndex, modelHref, resolveSelection, mapHref,
     compareNeighborhoods, requestGate, representationColor, hasRepresentationColors, hasPcaAlternative, projectionCoordinates, projectionSummary, markerHits, nearestMarker, nearestLongitude};
 })();
 if (typeof module !== 'undefined') module.exports = AtlasScope;

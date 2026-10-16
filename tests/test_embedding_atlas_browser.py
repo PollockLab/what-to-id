@@ -630,3 +630,244 @@ def test_identify_handoff_is_disabled_after_failed_group_load_then_recovers(open
     page.wait_for_function("document.getElementById('error').hidden")
     assert action.is_enabled()
     assert errors == []
+
+
+@pytest.fixture(scope="module")
+def taxonomy_site(tmp_path_factory):
+    import json
+
+    directory = tmp_path_factory.mktemp("atlas-taxonomy-browser")
+    # A misleading recorded name is unrelated; ordinary species names descend
+    # through the fixture tree. The hornwort branch deliberately ends above a known preset root.
+    plants = [
+        (100, 20, "Mosses", -123),
+        (101, 11, "Atrichum undulatum", -123),
+        (102, 12, "Pellia epiphylla", -123),
+        (103, 13, "Different recorded label", -123),
+        (104, 99, "Mosses", -123),
+        (105, 21, "Another unrelated plant", -123),
+        (106, 14, "Out-of-map moss", -100),
+        (107, 15, "Extra moss", -123),
+    ]
+    fungi = [
+        (200, 31, "A lichen species", -123),
+        (201, 32, "Another fungus", -123),
+        (202, 98, "Unplaced fungus", -123),
+    ]
+    rows = []
+    for group, observations in [("Plantae", plants), ("Fungi", fungi)]:
+        vectors = (
+            np.random.default_rng(len(observations))
+            .normal(size=(len(observations), 8))
+            .astype("f4")
+        )
+        vectors /= np.linalg.norm(vectors, axis=1, keepdims=True)
+        np.savez(
+            directory / f"{group}.npz",
+            ids=np.array([r[0] for r in observations]),
+            E=vectors,
+            backbone="fixture",
+        )
+        for ident, taxon_id, name, longitude in observations:
+            rows.append(
+                dict(
+                    id=ident,
+                    taxon_id=taxon_id,
+                    iconic_taxon=group,
+                    lon=longitude,
+                    lat=49,
+                    taxon_name=name,
+                    photo_url="",
+                    observed_on="2026-09-11",
+                )
+            )
+    pool = directory / "pool.parquet"
+    pd.DataFrame(rows).to_parquet(pool)
+    parents = {
+        1: None,
+        20: 1,
+        21: 1,
+        11: 311249,
+        12: 64615,
+        13: 56327,
+        14: 311249,
+        15: 311249,
+        311249: 1,
+        64615: 1,
+        56327: 999,
+        31: 54743,
+        32: 1,
+        54743: 1,
+    }
+    taxonomy = directory / "taxonomy.json"
+    taxonomy.write_text(
+        json.dumps(
+            {
+                "taxa": {
+                    str(k): [parent, "Cached taxon", "", "taxon"] for k, parent in parents.items()
+                }
+            }
+        )
+    )
+    output = directory / "site"
+    build(
+        pool,
+        str(directory / "{group}.npz"),
+        output,
+        snapshot_date="2026-09-11",
+        taxonomy_path=taxonomy,
+    )
+    return output
+
+
+@pytest.fixture
+def open_taxonomy_atlas(browser, taxonomy_site):
+    page = browser.new_page(viewport={"width": 1440, "height": 900})
+    errors = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+
+    def route(request):
+        path = urlparse(request.request.url).path
+        if "maplibre-gl.js" in path:
+            request.fulfill(body=MAP_ADAPTER, content_type="text/javascript")
+        elif "maplibre-gl.css" in path:
+            request.fulfill(body="", content_type="text/css")
+        else:
+            file = taxonomy_site / path.lstrip("/")
+            if file.is_file():
+                request.fulfill(path=str(file))
+            else:
+                request.fulfill(status=404, body="Not found")
+
+    page.route("**/*", route)
+    page.goto("https://taxonomy-atlas.test/embeddings.html#group=Plantae&id=100")
+    page.locator('[data-focal-id="100"]').wait_for()
+    page.wait_for_function("window.testMap && testMap.sources.observations")
+    assert errors == []
+    yield page, errors
+    page.close()
+
+
+def _scope_result_ids(page):
+    return page.locator("#record option").evaluate_all(
+        "options=>options.filter(o=>o.value!=='').map(o=>Number(o.textContent.split(' · ').pop()))"
+    )
+
+
+def test_verified_taxon_scope_excludes_name_lookalikes_and_retains_focal_and_rankings(
+    open_taxonomy_atlas,
+):
+    page, errors = open_taxonomy_atlas
+    scope = page.get_by_role("combobox", name="Taxon scope", exact=True)
+    assert scope.input_value() == ""
+    assert "Bryophytes · 5 verified" in scope.inner_text()
+    assert "Lichen-forming groups (approximate) · 0 verified" in scope.inner_text()
+    before = page.locator(".neighbors button").evaluate_all(
+        "buttons=>buttons.map(b=>b.dataset.observationId)"
+    )
+    scope.select_option("0")
+    assert _scope_result_ids(page) == [101, 102, 103, 106, 107]
+    assert page.locator('[data-focal-id="100"]').count() == 1
+    message = page.locator("#taxon-scope-message").inner_text()
+    assert "1 observation has unknown scope membership from incomplete ancestry" in message
+    assert "focal photo stays selected outside" in message
+    assert "full life-group sample" in message
+    assert (
+        page.locator(".neighbors button").evaluate_all(
+            "buttons=>buttons.map(b=>b.dataset.observationId)"
+        )
+        == before
+    )
+    page.get_by_role("searchbox").fill("Mosses")
+    assert page.locator("#record").is_disabled()
+    page.get_by_role("searchbox").fill("Atrichum")
+    assert _scope_result_ids(page) == [101]
+    page.get_by_role("searchbox").fill("")
+    page.get_by_role("button", name="Photo space", exact=True).click()
+    assert (
+        page.locator('#plot circle[data-observation-id="105"]').get_attribute("opacity") == "0.12"
+    )
+    assert (
+        page.locator('#plot circle[data-observation-id="104"]').get_attribute("opacity") == "0.12"
+    )
+    assert page.locator('#plot circle[data-observation-id="100"]').get_attribute("opacity") == "1"
+    opacities = page.evaluate(
+        "Object.fromEntries(testMap.sources.observations.data.features.map(f=>[data.records[f.properties.index].id,f.properties.opacity]))"
+    )
+    assert opacities["105"] == 0.12 and opacities["104"] == 0.12 and opacities["100"] == 1
+    assert "Dimmed: outside the verified taxon scope" in page.locator("#legend").inner_text()
+    assert errors == []
+
+
+def test_taxon_scope_intersects_search_brush_and_map_and_reset_recovers(open_taxonomy_atlas):
+    page, errors = open_taxonomy_atlas
+    page.get_by_role("button", name="Photo space", exact=True).click()
+    for index in [2, 6]:
+        page.locator("#record").select_option(str(index))
+        page.get_by_role("button", name="Add selected photo", exact=True).click()
+    page.locator("#record").select_option("0")
+    page.get_by_role("combobox", name="Taxon scope", exact=True).select_option("0")
+    page.locator("#only-brushed").check()
+    assert _scope_result_ids(page) == [102, 106]
+    page.locator("#advanced summary").first.click()
+    page.locator("#only-view").check()
+    assert _scope_result_ids(page) == [102]
+    page.get_by_role("searchbox").fill("Pellia")
+    assert _scope_result_ids(page) == [102]
+    assert page.locator('[data-focal-id="100"]').count() == 1
+    page.get_by_role("button", name="Clear taxon scope", exact=True).click()
+    assert page.get_by_role("combobox", name="Taxon scope", exact=True).input_value() == ""
+    assert page.locator("#only-brushed").is_checked() and page.locator("#only-view").is_checked()
+    assert page.get_by_role("searchbox").input_value() == "Pellia"
+    assert _scope_result_ids(page) == [102]
+    page.get_by_role("button", name="Clear search and filters", exact=True).click()
+    assert _scope_result_ids(page) == list(range(100, 108))
+    assert page.locator('[data-focal-id="100"]').count() == 1
+    assert errors == []
+
+
+def test_empty_taxon_scope_recovers_and_group_changes_clear_stale_scope(open_taxonomy_atlas):
+    page, errors = open_taxonomy_atlas
+    page.get_by_role("combobox", name="Taxon scope", exact=True).select_option("1")
+    assert page.locator("#record").is_disabled()
+    assert "0 matches" in page.locator("#search-status").inner_text()
+    assert (
+        "2 observations have unknown scope membership from incomplete ancestry"
+        in page.locator("#taxon-scope-message").inner_text()
+    )
+    page.get_by_role("button", name="Clear taxon scope", exact=True).click()
+    assert _scope_result_ids(page) == list(range(100, 108))
+    assert page.locator('[data-focal-id="100"]').count() == 1
+    page.get_by_role("combobox", name="Taxon scope", exact=True).select_option("0")
+    page.locator("#group").select_option("Fungi")
+    page.locator('[data-focal-id="200"]').wait_for()
+    assert page.get_by_role("combobox", name="Taxon scope", exact=True).input_value() == ""
+    assert _scope_result_ids(page) == [200, 201, 202]
+    page.get_by_role("combobox", name="Taxon scope", exact=True).select_option("1")
+    assert _scope_result_ids(page) == [200]
+    assert "approximate" in page.locator("#taxon-scope-message").inner_text()
+    assert errors == []
+
+
+def test_build_without_taxonomy_has_no_expert_scope_controls_or_inference(open_atlas):
+    page, errors = open_atlas()
+    assert page.locator("#taxon-scope-control").is_hidden()
+    assert page.locator("#taxon-scope-status").is_hidden()
+    assert page.locator("#taxon-scope").is_disabled()
+    assert _scope_result_ids(page) == list(range(100, 118))
+    assert errors == []
+
+
+def test_mobile_taxon_scope_is_accessible_and_clear_action_retains_focal(open_taxonomy_atlas):
+    page, errors = open_taxonomy_atlas
+    page.set_viewport_size({"width": 390, "height": 900})
+    scope = page.get_by_role("combobox", name="Taxon scope", exact=True)
+    scope.select_option("0")
+    assert scope.is_visible()
+    assert page.get_by_role("button", name="Clear taxon scope", exact=True).is_visible()
+    assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+    page.get_by_role("button", name="Clear taxon scope", exact=True).click()
+    assert scope.input_value() == ""
+    assert scope.evaluate("element=>document.activeElement===element")
+    assert page.locator('[data-focal-id="100"]').count() == 1
+    assert errors == []
