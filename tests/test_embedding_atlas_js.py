@@ -389,3 +389,156 @@ def test_layout_summary_switches_method_and_matching_diagnostic_without_changing
     fallback = evaluate(f"scope.projectionSummary({json.dumps(payload)},0)")
     assert "PCA fallback for this sample" in fallback
     assert "Local t-SNE layout" not in fallback
+
+
+def test_taxonomy_scopes_distinguish_verified_partial_unknown_and_name_lookalikes():
+    records = [
+        dict(
+            id=1,
+            name="Atrichum undulatum",
+            taxon_id=11,
+            ancestor_taxon_ids=[11, 311249, 1],
+            taxonomy_complete=True,
+        ),
+        dict(id=2, name="Mosses", taxon_id=20, ancestor_taxon_ids=[20, 1], taxonomy_complete=True),
+        dict(
+            id=3,
+            name="Different recorded name",
+            taxon_id=12,
+            ancestor_taxon_ids=[12, 311249, 999],
+            taxonomy_complete=False,
+        ),
+        dict(id=4, name="Mosses", taxon_id=99, ancestor_taxon_ids=[99], taxonomy_complete=False),
+        dict(id=5, name="Plants", taxon_id=1, ancestor_taxon_ids=[1], taxonomy_complete=True),
+    ]
+    encoded = json.dumps(records)
+    assert evaluate(f"{encoded}.map(r=>scope.taxonMembership(r,[311249]))") == [
+        True,
+        False,
+        True,
+        None,
+        False,
+    ]
+    assert evaluate(f"scope.taxonCounts({encoded},[311249])") == dict(
+        verified=2, excluded=2, unknown=1
+    )
+    selected = evaluate(f"scope.matches({encoded},{{taxonRoots:[311249]}})")
+    assert [r["r"]["id"] for r in selected] == [1, 3]
+    assert [r["i"] for r in selected] == [0, 2]
+    assert evaluate(f"scope.matches({encoded},{{taxonRoots:[311249],term:'Mosses'}})") == []
+    assert evaluate(f"scope.matches({encoded},{{term:'Mosses'}}).map(x=>x.r.id)") == [2, 4]
+    assert evaluate(
+        f"scope.matches({encoded},{{taxonRoots:[311249],term:'Atrichum'}}).map(x=>x.r.id)"
+    ) == [1]
+
+
+def test_taxonomy_scope_intersects_search_map_brush_and_existing_order():
+    records = [
+        dict(
+            id=i,
+            name="Species",
+            lon=lon,
+            lat=49,
+            reference_distance=distance,
+            taxon_id=i,
+            ancestor_taxon_ids=[i, 311249, 1],
+            taxonomy_complete=True,
+        )
+        for i, lon, distance in [(11, -123, 0.2), (12, -123, 0.9), (13, -100, 1), (14, -123, 2)]
+    ]
+    options = dict(
+        taxonRoots=[311249],
+        term="Species",
+        bounds=[-124, 48, -122, 50],
+        onlyInView=True,
+        onlyBrushed=True,
+        brushedIndices=[0, 1, 2],
+        order="reference",
+        hasReference=True,
+    )
+    selected = evaluate(f"scope.matches({json.dumps(records)},{json.dumps(options)})")
+    assert [r["r"]["id"] for r in selected] == [12, 11]
+    options["taxonRoots"] = [56327]
+    assert evaluate(f"scope.matches({json.dumps(records)},{json.dumps(options)})") == []
+    options["taxonRoots"] = None
+    assert len(evaluate(f"scope.matches({json.dumps(records)},{json.dumps(options)})")) == 2
+
+
+@pytest.mark.parametrize(
+    "record",
+    [
+        {},
+        dict(taxon_id=None, ancestor_taxon_ids=[], taxonomy_complete=False),
+        dict(taxon_id=1, ancestor_taxon_ids=[1, "311249"], taxonomy_complete=True),
+        dict(taxon_id=1, ancestor_taxon_ids=[311249], taxonomy_complete=True),
+        dict(taxon_id=1, ancestor_taxon_ids=[1, 311249, 1], taxonomy_complete=True),
+        dict(taxon_id=1, ancestor_taxon_ids=[1, 311249], taxonomy_complete="true"),
+    ],
+)
+def test_corrupt_or_missing_ancestry_is_unknown_not_a_verified_scope(record):
+    assert evaluate(f"scope.taxonMembership({json.dumps(record)},[311249])") is None
+
+
+def test_taxon_presets_require_explicit_build_metadata_and_valid_root_ids():
+    assert evaluate("scope.taxonPresets({records:[{name:'Mosses'}]})") == []
+    valid = dict(label="Bryophytes", taxon_ids=[311249], approximate=False)
+    invalid = [
+        dict(label="Guessed", taxon_ids=["311249"], approximate=False),
+        dict(label="Empty", taxon_ids=[], approximate=False),
+    ]
+    assert evaluate(
+        f"scope.taxonPresets({json.dumps(dict(taxonomy=dict(presets=[valid, *invalid])))})"
+    ) == [valid]
+
+
+def test_negative_taxon_scope_keeps_unknown_unknown_and_excludes_partial_known_membership():
+    records = [
+        dict(
+            id=1,
+            name="Recorded fungus",
+            taxon_id=11,
+            ancestor_taxon_ids=[11, 54743, 1],
+            taxonomy_complete=True,
+        ),
+        dict(
+            id=2,
+            name="Partial positive",
+            taxon_id=12,
+            ancestor_taxon_ids=[12, 118252, 999],
+            taxonomy_complete=False,
+        ),
+        dict(
+            id=3,
+            name="Known outside",
+            taxon_id=13,
+            ancestor_taxon_ids=[13, 1],
+            taxonomy_complete=True,
+        ),
+        dict(id=4, name="Unknown", taxon_id=99, ancestor_taxon_ids=[99], taxonomy_complete=False),
+    ]
+    encoded = json.dumps(records)
+    roots = [54743, 118252]
+    assert evaluate(f"{encoded}.map(r=>scope.taxonMembership(r,{roots},true))") == [
+        False,
+        False,
+        True,
+        None,
+    ]
+    assert evaluate(f"scope.taxonCounts({encoded},{roots},true)") == dict(
+        verified=1, excluded=2, unknown=1
+    )
+    assert evaluate(
+        f"scope.matches({encoded},{{taxonRoots:{roots},taxonExclude:true}}).map(x=>x.r.id)"
+    ) == [3]
+    assert evaluate(
+        f"scope.matches({encoded},{{taxonRoots:{roots},taxonExclude:false}}).map(x=>x.r.id)"
+    ) == [1, 2]
+    assert evaluate(f"scope.taxonMembership({encoded}[2],{roots},'true')") is None
+
+
+def test_preset_exclusion_is_explicit_boolean_and_legacy_inclusion_still_works():
+    included = dict(label="Lichens", taxon_ids=[54743], approximate=True)
+    outside = dict(label="Outside listed groups", taxon_ids=[54743], approximate=True, exclude=True)
+    invalid = dict(label="Invalid", taxon_ids=[54743], approximate=True, exclude="true")
+    payload = json.dumps(dict(taxonomy=dict(presets=[included, outside, invalid])))
+    assert evaluate(f"scope.taxonPresets({payload})") == [included, outside]

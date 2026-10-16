@@ -24,7 +24,9 @@ def _script():
 def test_encode_rings_codes_as_the_page_does():
     rings = [[-123.12345, 49.2, -123, 49.30005, -122.9, 49.2], [0, 0, 0.0001, 0, 0, -0.0001]]
     js = (
-        "var document={};" + (_ASSETS / "map_area.js").read_text()
+        "var document={};"
+        + (_ASSETS / "identify_links.js").read_text()
+        + (_ASSETS / "map_area.js").read_text()
         + f"console.log(JSON.stringify([MapArea.encode({json.dumps(rings)}),"
         + f"MapArea.decode({json.dumps(encode_rings(rings))})]));"
     )  # fmt: skip

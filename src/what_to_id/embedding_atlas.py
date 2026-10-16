@@ -20,6 +20,7 @@ from scipy.sparse.linalg import svds
 
 from what_to_id.arms import load_embeddings
 from what_to_id.atlas_projection import display_projection, projection_fidelity
+from what_to_id.atlas_taxonomy import AtlasTaxonomy
 from what_to_id.page_links import page_url
 
 
@@ -77,6 +78,7 @@ def group_payload(
     reference_path: Path | None = None,
     reference_pool: pd.DataFrame | None = None,
     projection: str = "pca",
+    taxonomy: AtlasTaxonomy | None = None,
 ) -> dict:
     ids, vectors, backbone = load_embeddings(path)
     if len(np.unique(ids)) != len(ids):
@@ -91,6 +93,8 @@ def group_payload(
     if len(ids) < 3:
         raise ValueError(f"{group}: at least three matched embeddings are required")
     rows = rows.loc[ids]
+    if taxonomy is not None and "taxon_id" not in rows:
+        raise ValueError("taxonomy export requires taxon_id in the source pool")
     coords = rows[["lon", "lat"]].to_numpy(dtype=float)
     if not np.isfinite(coords).all() or (np.abs(coords) > [180, 90]).any():
         raise ValueError(f"{group}: invalid coordinates")
@@ -179,7 +183,10 @@ def group_payload(
             record["closest_reference_id"] = ref_id
             record["included_in_reference"] = bool(np.isin(record["id"], reference_ids))
             record["closest_reference_name"] = reference_names.get(ref_id)
-    return {
+    if taxonomy is not None:
+        for record, taxon_id in zip(records, rows.taxon_id, strict=True):
+            record.update(taxonomy.lineage(taxon_id if pd.notna(taxon_id) else None))
+    payload = {
         "reference": reference,
         "group": group,
         "pool_group_count": pool_count,
@@ -199,6 +206,9 @@ def group_payload(
         "variance_retained": variance,
         "records": records,
     }
+    if taxonomy is not None:
+        payload["taxonomy"] = taxonomy.metadata(records, group=group)
+    return payload
 
 
 def model_views(specifications: list[str]) -> list[dict[str, str]]:
@@ -238,9 +248,18 @@ def build(
     current_label: str | None = None,
     map_view: str = "https://pollocklab.github.io/what-to-id/map.html",
     projection: str = "pca",
+    taxonomy_path: Path | None = None,
+    taxonomy_source: str | None = None,
 ) -> None:
     if projection not in {"pca", "tsne"}:
         raise ValueError("projection method must be pca or tsne")
+    if taxonomy_source is not None and taxonomy_path is None:
+        raise ValueError("taxonomy source requires a taxonomy cache")
+    taxonomy = (
+        AtlasTaxonomy(taxonomy_path, source_url=taxonomy_source)
+        if taxonomy_path is not None
+        else None
+    )
     snapshot_date = date.fromisoformat(snapshot_date).isoformat()
     views = model_views(model_view_specs or [])
     map_view = page_url(map_view)
@@ -252,6 +271,8 @@ def build(
         raise ValueError(f"pool is missing columns: {sorted(required - set(pool))}")
     if pool.id.duplicated().any():
         raise ValueError("pool IDs must be unique")
+    if taxonomy is not None and "taxon_id" not in pool:
+        raise ValueError("taxonomy export requires taxon_id in the source pool")
     reference_pool = None
     if reference_pool_path is not None:
         if reference_embedding_pattern is None:
@@ -288,6 +309,7 @@ def build(
                 reference_path=reference_path,
                 reference_pool=reference_pool,
                 projection=projection,
+                taxonomy=taxonomy,
             )
         )
     if not payloads:
@@ -314,8 +336,12 @@ def build(
         target.write_text(json.dumps(payload, separators=(",", ":")))
     template = Path(__file__).with_name("embedding_atlas.html").read_text()
     html = template.replace("__ATLAS_META__", json.dumps(metadata).replace("<", "\\u003c"))
+    identify_links = (Path(__file__).with_name("map_assets") / "identify_links.js").read_text()
+    html = html.replace("__IDENTIFY_LINKS__", identify_links)
     logic = Path(__file__).with_name("embedding_atlas_logic.js").read_text()
     html = html.replace("__ATLAS_LOGIC__", logic)
+    context = Path(__file__).with_name("embedding_atlas_context.js").read_text()
+    html = html.replace("__ATLAS_CONTEXT__", context)
     (out / "embeddings.html").write_text(html)
     home = Path(__file__).with_name("embedding_atlas_home.html").read_text()
     (out / "index.html").write_text(home)
@@ -326,6 +352,8 @@ def main() -> None:
     parser.add_argument("--pool", type=Path, required=True)
     parser.add_argument("--embeddings", required=True, help="Cache pattern containing {group}")
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--taxonomy", type=Path, help="Optional offline taxonomy JSON cache")
+    parser.add_argument("--taxonomy-source", help="Public HTTPS source URL for the taxonomy cache")
     parser.add_argument(
         "--projection", choices=["pca", "tsne"], default="pca", help="Offline display layout"
     )
@@ -365,6 +393,8 @@ def main() -> None:
         current_label=args.current_label,
         map_view=args.map_view,
         projection=args.projection,
+        taxonomy_path=args.taxonomy,
+        taxonomy_source=args.taxonomy_source,
     )
 
 

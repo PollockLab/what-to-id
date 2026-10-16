@@ -53,6 +53,8 @@ def test_build_writes_real_data_and_no_private_fields(tmp_path):
     html = (out / "embeddings.html").read_text()
     assert "__ATLAS_META__" not in html
     assert "__ATLAS_LOGIC__" not in html
+    assert "__IDENTIFY_LINKS__" not in html
+    assert html.index("var IdentifyLinks=") < html.index("const AtlasScope")
     assert "const AtlasScope" in html
     assert "new URLSearchParams(location.search)" in html
     assert "No sampled observations" in html
@@ -335,9 +337,9 @@ def test_map_first_default_keeps_advanced_controls_and_projection_optional():
     assert "hidden" in layout.elements["projection-pane"][0]
     assert layout.elements["projection-toggle"][0]["aria-expanded"] == "false"
     assert "open" not in layout.elements["advanced"][0]
-    for control in ["model-nav", "color-mode", "order", "unfamiliar", "only-view"]:
+    for control in ["model-nav", "color-mode", "order", "unfamiliar"]:
         assert "advanced" in layout.elements[control][1]
-    for control in ["group", "search", "fit", "record"]:
+    for control in ["group", "search", "only-view", "fit", "record"]:
         assert "advanced" not in layout.elements[control][1]
     assert html.index('id="projection-pane"') < html.index('id="details"')
     assert layout.elements["photo-comparison"][0]["aria-labelledby"] == "comparison-title"

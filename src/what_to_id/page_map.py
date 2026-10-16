@@ -89,7 +89,15 @@ _ASSETS = files("what_to_id") / "map_assets"
 # map_step.js the Identify button that steps through an area's batches, map_projects.js the
 # project filter, and map_chips.js the click rule for the short-list chips and the selection bar.
 MAP_CSS = ("map.css", "map_area.css")
-MAP_JS = ("map_taxa.js", "map_step.js", "map_area.js", "map_projects.js", "map_chips.js", "map.js")
+MAP_JS = (
+    "identify_links.js",
+    "map_taxa.js",
+    "map_step.js",
+    "map_area.js",
+    "map_projects.js",
+    "map_chips.js",
+    "map.js",
+)
 
 
 def shard_name(k: int) -> str:

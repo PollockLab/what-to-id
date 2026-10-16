@@ -17,7 +17,7 @@
 // id> from older links still loads.
 var MapArea=(function(){
 'use strict';
-var Q=1e4,MAXV=1500,MAXMB=50,BATCH=200,MAXB=50,BOXQ={per_page:BATCH,reviewed:'false'},MAXROWS=200,
+var Q=1e4,MAXV=1500,MAXMB=50,BATCH=IdentifyLinks.BATCH,MAXB=50,BOXQ={per_page:BATCH,reviewed:'false'},MAXROWS=200,
   API='https://api.inaturalist.org/v1/places/',B64='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 
 function encode(rings){
@@ -120,14 +120,8 @@ function inside(I,x,y){
   return c;
 }
 
-// Identify links that open these ids exactly, at most BATCH to a link and in order(): per_page shows
-// a whole batch on one page, place_id=any keeps a viewer's default place from hiding any, and
-// reviewed=false leaves out those the viewer has already reviewed. Each batch is {url, n, lo, hi}.
-var IDS='https://www.inaturalist.org/observations/identify?quality_grade=needs_id&reviewed=false'+
-  '&place_id=any&per_page='+BATCH+'&id=';
-// The order the batches open in: newest first, as Identify lists them. A priority order can take
-// its place here without touching the button.
-function order(ids){return Array.prototype.slice.call(ids).sort(function(a,b){return b-a;});}
+// Shared exact-ID links retain the map's existing ordering and batch contract.
+var order=IdentifyLinks.order,batches=IdentifyLinks.batches;
 // The area's bounding box bb cut to the view v (the whole box when they do not meet), and how many
 // of the records P that pass ok(i) fall inside it: what one Identify link for the box opens. Not
 // exact, as the box also holds records outside the shape.
@@ -136,12 +130,6 @@ function boxed(v,bb,P,ok){
   if(!(w<e&&s<n)){w=bb[0];s=bb[1];e=bb[2];n=bb[3];}
   for(i=0;i<P.n;i++){var x=P.pos[2*i],y=P.pos[2*i+1];if(x>=w&&x<=e&&y>=s&&y<=n&&ok(i))m++;}
   return {box:{w:w,s:s,e:e,n:n},m:m};
-}
-function batches(ids){
-  var s=order(ids),out=[];
-  for(var i=0;i<s.length;i+=BATCH){var b=s.slice(i,i+BATCH);
-    out.push({url:IDS+b.join(','),n:b.length,lo:b[b.length-1],hi:b[0]});}
-  return out;
 }
 // The park picker's search. Names fold to lower case without accents or punctuation, and the query
 // drops the designation words, so "Garibaldi Park" and "garibaldi" find the same parks.
