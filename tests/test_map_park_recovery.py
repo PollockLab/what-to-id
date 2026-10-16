@@ -3,17 +3,19 @@
 import json
 import shutil
 import subprocess
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlparse
 
 import pytest
+
+from what_to_id.map_parks import encode_rings
 
 from .test_map_area_recovery import case_script
 
 pytestmark = pytest.mark.skipif(shutil.which("node") is None, reason="needs node")
 
 
-def park_case(park="", bcpark="", replies=None, list_state="empty"):
-    script = case_script("")
+def park_case(park="", bcpark="", replies=None, list_state="empty", area=""):
+    script = case_script(area)
     script = script[: script.index("const before=state();")]
     script = (
         f"const PARK={json.dumps(park)}, BCPARK={json.dumps(bcpark)},"
@@ -44,8 +46,10 @@ function parkList(){if(LIST==='reject')return Promise.reject(Error('fixture list
     )
     script += r"""
 (async()=>{const pending=state();for(let i=0;i<80;i++)await Promise.resolve();
-  const settled=state();AREA.clear();const cleared=state();
-  console.log(JSON.stringify({pending,settled,cleared,requestedPlaces}));})();
+  const settled=state(),areaNote=areaBox.querySelector('.anote').textContent,
+    areaNoteHidden=areaBox.querySelector('.anote').hidden;
+  AREA.clear();const cleared=state();
+  console.log(JSON.stringify({pending,settled,cleared,requestedPlaces,areaNote,areaNoteHidden}));})();
 """
     result = subprocess.run(["node"], input=script, text=True, capture_output=True)
     assert result.returncode == 0, result.stderr
@@ -131,3 +135,29 @@ def test_largest_safe_integer_place_is_not_rejected_or_rounded():
     assert result["requestedPlaces"] == [token]
     assert result["settled"]["invalid"] is False
     assert result["settled"]["hash"] == "park=" + token
+
+
+@pytest.mark.parametrize("park", ["111", "111,222"])
+def test_native_park_link_keeps_place_query_and_discloses_public_point_difference(park):
+    result = park_case(park=park, replies={place: "ready" for place in park.split(",")})
+    state = result["settled"]
+    query = parse_qs(urlparse(state["href"]).query)
+    assert query["place_id"] == [park]
+    assert query["quality_grade"] == ["needs_id"]
+    assert "id" not in query and "swlat" not in query
+    assert state["invalid"] is False and state["mask"] == [1, 0, 0]
+    assert result["areaNoteHidden"] is False
+    note = result["areaNote"]
+    assert "iNaturalist park filter" in note and "public coordinates" in note
+    assert "obscuration" in note and "location uncertainty" in note
+    assert "sets differ" in note and "exact" not in note.lower()
+
+
+def test_drawn_area_keeps_true_exact_id_link_and_wording():
+    result = park_case(area=encode_rings([[0, 0, 1, 0, 1, 1, 0, 1]]))
+    query = parse_qs(urlparse(result["settled"]["href"]).query)
+    assert query["id"] == ["101"]
+    assert result["areaNoteHidden"] is False
+    assert result["areaNote"].startswith("Exact:")
+    assert "this record by id" in result["areaNote"]
+    assert "park filter" not in result["areaNote"]

@@ -288,6 +288,17 @@ def test_page_carries_the_update_date_for_the_age_check():
     assert 'id="updated"' not in render_map(meta, freeze=None).split("<script>")[0]
 
 
+def test_location_filter_label_does_not_promise_known_or_exact_accuracy():
+    _, meta = encode_points(_with_extras(make_pool(20)))
+    html = render_map(meta, freeze=None)
+    assert (
+        "['exact','Accuracy ≤1 km or unknown','obscured',"
+        "'Hide obscured locations and records with reported uncertainty over 1 km. "
+        "Unknown accuracy is retained. Map points use rounded public coordinates']"
+    ) in html
+    assert "Exact location" not in html
+
+
 def test_records_before_1900_sit_at_the_floor_and_are_marked():
     pool = make_pool(50)
     pool.loc[0, "observed_on"] = "1850-06-01"

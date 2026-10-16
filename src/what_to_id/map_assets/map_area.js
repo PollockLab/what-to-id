@@ -11,10 +11,11 @@
 //
 // A park is an area too. The park picker lists BC's parks, reserves, protected areas and
 // conservancies (page_map.py ships the list next to the page), and the hash carries bcpark=<ORCS number>.
-// A park that matches an iNaturalist place takes that place's own boundary, fetched when picked, so
-// the map and the Identify link (which filters by place_id) count the same place; a park without one
-// takes its BC Parks boundary from the list and an Identify link as a drawn area gets. park=<place
-// id> from older links still loads.
+// A park that matches an iNaturalist place takes that place's own boundary, fetched when picked.
+// The map tests public points; Identify uses native place_id membership, which can differ with
+// obscuration and location uncertainty: https://help.inaturalist.org/en/support/solutions/articles/151000169942
+// A park without a place takes its BC Parks boundary from the list and an Identify link as a drawn
+// area gets. park=<place id> from older links still loads.
 var MapArea=(function(){
 'use strict';
 var Q=1e4,MAXV=1500,MAXMB=50,BATCH=IdentifyLinks.BATCH,MAXB=50,BOXQ={per_page:BATCH,reviewed:'false'},MAXROWS=200,
@@ -291,8 +292,8 @@ function MapArea(ctx){
       Math.max(bb[2],b[2]),Math.max(bb[3],b[3])];});return bb;}
   function fit(b){map.fitBounds([[b[0],b[1]],[b[2],b[3]]],{padding:40,maxZoom:14});}
   // Adds a park to the area: b is a park from the list, or {place, name} for another iNaturalist
-  // place. A park that matches a place takes the place's own boundary, fetched now, so the map and
-  // the Identify link (which filters by place_id) count the same place; zoom fits the map to the parks.
+  // place. A park that matches a place takes its boundary, fetched now, for the public-point mask;
+  // Identify uses native place membership as described above. Zoom fits the map to the parks.
   function add(b,zoom){if(drawn())AREAS=[];
     if(AREAS.some(function(a){return b.key?a.key===b.key:!a.key&&a.place===b.place;}))return;
     var a={key:b.key||'',place:b.place||0,label:b.name||'',drawn:false,rings:null,idx:null,
@@ -410,7 +411,7 @@ function MapArea(ctx){
       else p.push(a.rawPlace!==undefined?encodeURIComponent(a.rawPlace):a.place);});
     return [k.length?'bcpark='+k.join(','):'',p.length?'park='+p.join(','):''].filter(Boolean).join('&');}
   // The area as a filter term: what it keeps, and what iNaturalist can say of it. iNaturalist takes
-  // several place ids as OR, so parks that all match a place are exact.
+  // several place ids as OR, so parks that all match a place use its native filter directly.
   function term(){var a=AREAS;if(!a.length)return null;var exact=!unresolved()&&!drawn()&&a.every(function(x){return x.place;});
     return {dim:'area',kind:drawn()?'polygon':'parks',id:hash(),label:drawn()?'Drawn area':names(a),n:a.length,
       exclude:false,mask:function(){return api.mask(ctx.P().n);},
@@ -442,12 +443,11 @@ function MapArea(ctx){
     if(unresolved()){LINK='';ui();return null;}
     if(!t||!ctx.P().n){LINK='';ui();return url(v);}
     var P=ctx.P(),keep=ctx.keep(),S=ctx.S,day=S.up?P.up:P.obs,full=S.lo===0&&S.hi===ctx.LAST,
-      ids=[],n=0,i,d,q=t.inat(),one=t.n===1;
+      ids=[],n=0,i,d,q=t.inat();
     function dated(i){d=day[i];return d===65535?full:d>=S.lo&&d<=S.hi;}
     for(i=0;i<P.n;i++){if(!keep[i]||!dated(i))continue;if(++n<=BATCH*MAXB)ids.push(P.id[i]);}
-    if(q.exact){LINK='Identify is exact: it uses the iNaturalist place'+(one?'':'s')+' for '+t.label+'. '+
-      (n===1?'1 record on this map is':nf.format(n)+' records on this map are')+' inside '+
-      (one?'its boundary.':'them.');ui();
+    if(q.exact){LINK='Identify uses the iNaturalist park filter for '+t.label+'. '+
+      'The map uses public coordinates; obscuration and location uncertainty can make the sets differ.';ui();
       return url(null,q.params);}
     if(!n){LINK='No records inside this area match these filters.';ui();return url(v);}
     if(n<=BATCH*MAXB){LINKS=batches(ids);var k=LINKS.length;
