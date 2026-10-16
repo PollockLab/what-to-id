@@ -147,11 +147,12 @@ function setView(mode,focus=true){
   document.querySelectorAll('.view-controls button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.view===mode)));
   $('projection-toggle').setAttribute('aria-expanded',String(mode!=='map'));
   $('plot-preview').hidden=true;if(mode==='map')cancelBrush();
-  requestAnimationFrame(()=>{resizeGeographicMap();if(data)renderPlot();if(focus){const pane=$(mode==='map'?'geography-pane':'projection-pane');pane.setAttribute('tabindex','-1');pane.focus({preventScroll:true});pane.scrollIntoView({block:'start',behavior:'instant'});}});
+  requestAnimationFrame(()=>{resizeGeographicMap();if(data)updateScope();if(focus){const pane=$(mode==='map'?'geography-pane':'projection-pane');pane.setAttribute('tabindex','-1');pane.focus({preventScroll:true});pane.scrollIntoView({block:'start',behavior:'instant'});}});
 }
 document.querySelectorAll('.view-controls button').forEach(button=>button.onclick=()=>setView(button.dataset.view));
 $('advanced').addEventListener('toggle',()=>{document.body.dataset.advanced=String($('advanced').open);});
-$('fit').onclick=()=>{initialBounds=null;$('context').hidden=true;fit();updateScope()};
+function showMapForFit(){setView('map');resizeGeographicMap();}
+$('fit').onclick=()=>{initialBounds=null;$('context').hidden=true;showMapForFit();fit();updateScope()};
 function element(tag,text,cls){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e}
 function photo(url,cls){const img=element('img',undefined,cls);if(/^https:\/\/(?:inaturalist-open-data\.s3\.amazonaws\.com|static\.inaturalist\.org)\/photos\//.test(url))img.src=url;img.alt='Observation photo';img.loading='lazy';img.onerror=()=>{img.removeAttribute('src');img.alt='Photo unavailable'};return img}
 let comparisonIndices=[],candidateIndex=null,comparisonTrigger=null,locationTrigger=null,inspectionTrigger=null,comparisonScroll=0;
@@ -247,7 +248,7 @@ function plotPosition(event){const svg=$('plot'),p=svg.createSVGPoint();p.x=even
 function cancelBrush(){if(!brushDrag)return;brushRect=brushDrag.previous;const pointer=brushDrag.pointer;brushDrag=null;if($('plot').hasPointerCapture(pointer))$('plot').releasePointerCapture(pointer);drawBrush();}
 $('toggle-brush').onclick=()=>{if(!data)return;filterEdited();cancelBrush();brushed=new Set(AtlasScope.toggleIndex([...brushed],selected));brushRect=null;brushActive=true;updateScope();};
 $('plot-mode').onchange=updateBrushMode;$('clear-brush').onclick=clearBrush;$('only-brushed').onchange=()=>{filterEdited();updateScope();};
-$('fit-brush').onclick=()=>{if(!mapReady||!brushed.size)return;initialBounds=null;$('context').hidden=true;const bounds=new maplibregl.LngLatBounds();brushed.forEach(i=>bounds.extend([data.records[i].lon,data.records[i].lat]));map.fitBounds(bounds,{padding:35,maxZoom:13,duration:0});updateScope();};
+$('fit-brush').onclick=()=>{if(!mapReady||!brushed.size)return;initialBounds=null;$('context').hidden=true;showMapForFit();const bounds=new maplibregl.LngLatBounds();brushed.forEach(i=>bounds.extend([data.records[i].lon,data.records[i].lat]));map.fitBounds(bounds,{padding:35,maxZoom:13,duration:0});updateScope();};
 $('plot').onpointerdown=event=>{if($('plot-mode').value!=='brush'||!data||event.button!==0||!event.isPrimary)return;const at=plotPosition(event);if(!at)return;event.preventDefault();brushDrag={start:at,previous:brushRect,pointer:event.pointerId};brushRect=[...at,...at];$('plot').setPointerCapture(event.pointerId);drawBrush();};
 $('plot').onpointermove=event=>{if(!brushDrag||event.pointerId!==brushDrag.pointer)return;const at=plotPosition(event);if(!at)return;event.preventDefault();brushRect=[...brushDrag.start,...at];drawBrush();};
 $('plot').onpointerup=event=>{if(!brushDrag||event.pointerId!==brushDrag.pointer)return;const at=plotPosition(event);if(at)brushRect=[...brushDrag.start,...at];if(Math.abs(brushRect[2]-brushRect[0])<3||Math.abs(brushRect[3]-brushRect[1])<3){cancelBrush();return;}brushDrag=null;if($('plot').hasPointerCapture(event.pointerId))$('plot').releasePointerCapture(event.pointerId);filterEdited();brushed=new Set(AtlasScope.brushIndices(plotXY,brushRect));brushActive=true;updateBrushControls();updateScope();};

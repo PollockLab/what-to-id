@@ -1403,3 +1403,96 @@ def test_clear_retained_area_preserves_other_criteria_and_recomputes_normally(op
     assert page.locator("#retained-area-status").is_hidden()
     _assert_identify_ids(page, [101, 102, 103, 106, 107])
     assert errors == []
+
+
+@pytest.fixture
+def fit_map_atlas(open_atlas):
+    # A fit updates the camera, but resizing emits no moveend. This exercises the
+    # explicit refresh path rather than relying on the library's incidental events.
+    adapter = MAP_ADAPTER.replace(
+        "getCanvas(){return this.canvas;}getBounds(){return new Bounds();}getZoom(){return 4;}",
+        """getCanvas(){return this.canvas;}getBounds(){
+          const b=this.bounds||[-130,45,-110,60];return {
+          getWest:()=>b[0],getSouth:()=>b[1],getEast:()=>b[2],getNorth:()=>b[3]};}
+        getZoom(){return 4;}
+        panOutside(){this.bounds=[10,10,11,11];this.handlers.moveend?.();}""",
+    ).replace(
+        "fitBounds(){}flyTo(){}resize(){}project(){return {x:100,y:100};}",
+        """fitBounds(){const container=document.getElementById('map');
+          this.lastFit={visible:container.clientWidth>0&&container.clientHeight>0,
+            size:[container.clientWidth,container.clientHeight],resized:this.resizedSize};
+          this.bounds=[-130,45,-110,60];}
+        flyTo(){}resize(){const container=document.getElementById('map');
+          this.resizedSize=[container.clientWidth,container.clientHeight];}
+        project(){return {x:100,y:100};}""",
+    )
+
+    def open_page(width):
+        page, errors = open_atlas(width)
+        page.route("**/maplibre-gl.js", lambda route: route.fulfill(body=adapter))
+        page.reload()
+        page.locator('[data-focal-id="100"]').wait_for()
+        return page, errors
+
+    return open_page
+
+
+@pytest.mark.parametrize("width", [390, 1440])
+@pytest.mark.parametrize("action", ["Show all locations", "Fit brushed photos"])
+def test_explicit_fit_reveals_resizes_and_refreshes_local_geographic_results(
+    fit_map_atlas, width, action
+):
+    page, errors = fit_map_atlas(width)
+    if action == "Fit brushed photos":
+        page.get_by_role("button", name="Photo space", exact=True).click()
+        page.get_by_role("button", name="Add selected photo", exact=True).click()
+        page.locator("#record").select_option("7")
+        page.get_by_role("button", name="Add selected photo", exact=True).click()
+        page.locator("#only-brushed").check()
+        page.get_by_role("button", name="Map", exact=True).click()
+        page.wait_for_function("document.activeElement.id === 'geography-pane'")
+    page.locator("#only-view").check()
+    page.evaluate("testMap.panOutside()")
+    assert page.locator("#record").is_disabled()
+    page.get_by_role("button", name="Photo space", exact=True).click()
+    page.wait_for_function("document.activeElement.id === 'projection-pane'")
+    initial_selection = page.evaluate(
+        "['group','id'].map(k=>new URLSearchParams(location.hash.slice(1)).get(k))"
+    )
+    page.set_viewport_size({"width": width + 100, "height": 900})
+    page.get_by_role("button", name=action, exact=True).click()
+    assert page.locator(".workspace").get_attribute("data-view") == "map"
+    page.wait_for_function("document.activeElement.id === 'geography-pane'")
+    assert page.locator("#record").is_enabled()
+    fit = page.evaluate("testMap.lastFit")
+    assert fit["visible"] and fit["size"] == fit["resized"]
+    expected_ids = [107, 100] if action == "Fit brushed photos" else list(range(117, 99, -1))
+    assert (
+        page.evaluate("['group','id'].map(k=>new URLSearchParams(location.hash.slice(1)).get(k))")
+        == initial_selection
+    )
+    assert page.locator("#only-view").is_checked()
+    if action == "Fit brushed photos":
+        assert page.locator("#only-brushed").is_checked()
+    fitted_hash = page.evaluate("location.hash")
+    page.get_by_role("button", name="Identify these results", exact=False).click()
+    assert identify_batch_ids(page) == expected_ids
+    page.keyboard.press("Escape")
+    assert page.evaluate("location.hash") == fitted_hash
+    assert errors == []
+
+
+def test_revealing_map_refreshes_local_results_without_moveend(fit_map_atlas):
+    page, errors = fit_map_atlas(390)
+    page.locator("#only-view").check()
+    page.evaluate("testMap.panOutside()")
+    assert page.locator("#record").is_disabled()
+    page.get_by_role("button", name="Photo space", exact=True).click()
+    page.wait_for_function("document.activeElement.id === 'projection-pane'")
+    page.evaluate("testMap.fitBounds()")
+    assert page.locator("#record").is_disabled()
+    page.get_by_role("button", name="Map", exact=True).click()
+    page.wait_for_function("document.activeElement.id === 'geography-pane'")
+    assert page.locator("#record").is_enabled()
+    assert page.locator("#record option").filter(has_text="Recorded taxon").count() == 18
+    assert errors == []
