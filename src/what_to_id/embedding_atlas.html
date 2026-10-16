@@ -211,8 +211,10 @@ function stepCandidate(step){const at=comparisonIndices.indexOf(candidateIndex),
 $('previous-candidate').onclick=()=>stepCandidate(-1);$('next-candidate').onclick=()=>stepCandidate(1);
 $('photo-comparison').addEventListener('keydown',event=>{if(inspectionTrigger)return;if(event.key==='ArrowRight'||event.key==='ArrowLeft'){event.preventDefault();stepCandidate(event.key==='ArrowRight'?1:-1);}});
 $('promote-candidate').onclick=()=>{const next=candidateIndex;$('photo-comparison').close();choose(next);$('record').focus({preventScroll:true});};
-function openLocationChooser(indices){
-  locationTrigger=map?.getCanvas()||document.activeElement;$('location-title').textContent=`${indices.length} observations near this point`;
+function openLocationChooser(indices,{source='map'}={}){
+  const plot=source==='plot';locationTrigger=plot?$('plot'):map?.getCanvas()||document.activeElement;
+  $('location-title').textContent=plot?'Photos near this point':`${indices.length} observations near this point`;
+  $('location-note').textContent=plot?`${indices.length} photos within 12 screen pixels. These are positions in the current 2D layout, not a ranked photo-match list. Ordered by distance on this layout, then observation ID for ties. Choose a photo to make it the focal observation.`:'Choose a photo to make it the focal observation.';
   const list=indices.map(index=>{const record=data.records[index],item=element('li'),button=element('button');button.type='button';button.dataset.observationId=record.id;
     const text=element('span',record.name);text.append(element('small',`Observation ${record.id}`));button.append(photo(record.photo),text);button.onclick=()=>{$('location-chooser').close();choose(index);};item.append(button);return item;});
   $('location-photos').replaceChildren(...list);$('location-chooser').showModal();
@@ -237,7 +239,7 @@ const advancedPhoto=element('div');if(data.reference){const referenceInfo=elemen
   const list=element('ol',undefined,'neighbors');r.neighbors.forEach(([i,score])=>{const n=data.records[i],li=element('li'),button=element('button');button.type='button';button.dataset.observationId=n.id;button.setAttribute('aria-label',`Compare ${n.name}, observation ${n.id}`);const text=element('span',n.name);text.append(element('small','Recorded identification'),element('small',n.date),element('small',`Cosine ${score.toFixed(3)}`,'match-score'));button.append(photo(n.photo),text);button.onclick=()=>openPhotoComparison(i,button);li.append(button);list.append(li);});
   related.append(list,advancedPhoto);$('details').replaceChildren(main,related);$('plot-preview').hidden=true;$('status').textContent=`${data.records.length.toLocaleString()} sampled observations · ${names[data.group]||data.group} · Focal: ${r.name}`;updateScope();
 }
-function previewPhoto(index){if(!data)return;const r=data.records[index],host=$('plot-preview');host.replaceChildren(photo(r.photo),element('span',r.name));host.hidden=false;}
+function previewPhoto(index){if(!data)return;const r=data.records[index],host=$('plot-preview'),key=`photo:${r.id}`;if(!host.hidden&&host.dataset.previewKey===key)return;host.dataset.previewKey=key;host.replaceChildren(photo(r.photo),element('span',r.name));host.hidden=false;}
 let displayLayout='primary',layoutData=null;
 function updateLayoutControl(){
   if(data!==layoutData){displayLayout='primary';layoutData=data;}
@@ -251,7 +253,29 @@ $('layout-select').onchange=()=>{
   if(!data)return;cancelBrush();brushRect=null;displayLayout=$('layout-select').value;
   $('plot-preview').hidden=true;renderPlot();updateBrushControls();
 };
-function renderPlot(){updateLayoutControl();const svg=$('plot'),records=data.records,bounds=currentScopeBounds(),coordinates=AtlasScope.projectionCoordinates(data,displayLayout);const xs=coordinates.map(xy=>xy[0]),ys=coordinates.map(xy=>xy[1]);const minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);const scale=Math.min(540/Math.max(maxX-minX,1e-9),440/Math.max(maxY-minY,1e-9)),cx=(minX+maxX)/2,cy=(minY+maxY)/2;plotXY=coordinates.map(xy=>[300+(xy[0]-cx)*scale,250-(xy[1]-cy)*scale]);const near=new Set(records[selected].neighbors.map(x=>x[0]));const ns='http://www.w3.org/2000/svg',fragment=document.createDocumentFragment();records.forEach((r,i)=>{const c=document.createElementNS(ns,'circle');c.dataset.observationId=r.id;c.setAttribute('cx',plotXY[i][0]);c.setAttribute('cy',plotXY[i][1]);c.setAttribute('r',i===selected?'7':near.has(i)?'5':'2.8');c.setAttribute('fill',pointColor(i,near));c.setAttribute('opacity',String(pointOpacity(i,near,bounds)));c.style.cursor='pointer';c.onmouseenter=()=>previewPhoto(i);c.onmouseleave=()=>$('plot-preview').hidden=true;const title=document.createElementNS(ns,'title');title.textContent=`${r.name}, observation ${r.id}`;c.append(title);const stroke=pointStroke(i,near);c.setAttribute('stroke',stroke.color);c.setAttribute('stroke-width',String(stroke.width));c.onclick=()=>{if($('plot-mode').value==='select')choose(i)};fragment.append(c)});const selectedCircle=fragment.childNodes[selected];fragment.append(selectedCircle);svg.replaceChildren(fragment);drawBrush()}
+function renderPlot(){updateLayoutControl();const svg=$('plot'),records=data.records,bounds=currentScopeBounds(),coordinates=AtlasScope.projectionCoordinates(data,displayLayout);const xs=coordinates.map(xy=>xy[0]),ys=coordinates.map(xy=>xy[1]);const minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);const scale=Math.min(540/Math.max(maxX-minX,1e-9),440/Math.max(maxY-minY,1e-9)),cx=(minX+maxX)/2,cy=(minY+maxY)/2;plotXY=coordinates.map(xy=>[300+(xy[0]-cx)*scale,250-(xy[1]-cy)*scale]);const near=new Set(records[selected].neighbors.map(x=>x[0]));const ns='http://www.w3.org/2000/svg',fragment=document.createDocumentFragment();records.forEach((r,i)=>{const c=document.createElementNS(ns,'circle');c.dataset.observationId=r.id;c.setAttribute('cx',plotXY[i][0]);c.setAttribute('cy',plotXY[i][1]);c.setAttribute('r',i===selected?'7':near.has(i)?'5':'2.8');c.setAttribute('fill',pointColor(i,near));c.setAttribute('opacity',String(pointOpacity(i,near,bounds)));c.style.cursor='pointer';const stroke=pointStroke(i,near);c.setAttribute('stroke',stroke.color);c.setAttribute('stroke-width',String(stroke.width));fragment.append(c)});const selectedCircle=fragment.childNodes[selected];fragment.append(selectedCircle);svg.replaceChildren(fragment);drawBrush()}
+// Transform centers into CSS pixels, including SVG letterboxing and the current layout size.
+function plotHits(event){
+  if(!data)return [];const transform=$('plot').getScreenCTM();if(!transform)return [];
+  const candidates=plotXY.map(([x,y],index)=>({index,id:data.records[index].id,
+    x:transform.a*x+transform.c*y+transform.e,y:transform.b*x+transform.d*y+transform.f}));
+  return AtlasScope.markerHits(candidates,{x:event.clientX,y:event.clientY},12);
+}
+function previewPlotHits(event){
+  const hits=plotHits(event),host=$('plot-preview');
+  if(hits.length===1){previewPhoto(hits[0]);return;}
+  if(!hits.length){host.hidden=true;return;}
+  const key=`count:${hits.length}`;if(!host.hidden&&host.dataset.previewKey===key)return;
+  host.dataset.previewKey=key;host.hidden=false;
+  if(hits.length>1)host.replaceChildren(element('strong',`${hits.length} photos near this point`),element('p','Click to choose. Positions in this layout are not a photo-match ranking.'));
+}
+$('plot').onclick=event=>{
+  if($('plot-mode').value!=='select'||event.button!==0)return;
+  const hits=plotHits(event);
+  if(hits.length===1)choose(hits[0]);
+  else if(hits.length>1){$('plot-preview').hidden=true;openLocationChooser(hits,{source:'plot'});}
+};
+$('plot').onpointerleave=()=>$('plot-preview').hidden=true;
 function updateBrushControls(){updateMapCaption();const active=brushActive;$('toggle-brush').disabled=!data;$('toggle-brush').textContent=brushed.has(selected)?'Remove selected photo':'Add selected photo';$('clear-brush').disabled=!active;$('only-brushed').disabled=!active;$('fit-brush').disabled=!mapReady||brushed.size===0;$('brush-status').textContent=active?`${brushed.size} ${brushed.size===1?'photo':'photos'} in the exploratory selection. This exploratory set is not a biological class.${brushed.size?' Teal outlines link these photos to the map.':' Drag another rectangle or Clear selection to recover.'}`:'Drag in Brush photos mode, or use search and Add selected photo to build a set with the keyboard.';}
 function resetBrush(){cancelBrush();brushed=new Set();brushRect=null;brushDrag=null;brushActive=false;$('only-brushed').checked=false;updateBrushControls();}
 function clearBrush(){filterEdited();resetBrush();updateScope();}
@@ -263,7 +287,7 @@ $('toggle-brush').onclick=()=>{if(!data)return;filterEdited();cancelBrush();brus
 $('plot-mode').onchange=updateBrushMode;$('clear-brush').onclick=clearBrush;$('only-brushed').onchange=()=>{filterEdited();updateScope();};
 $('fit-brush').onclick=()=>{if(!mapReady||!brushed.size)return;initialBounds=null;$('context').hidden=true;showMapForFit();const bounds=new maplibregl.LngLatBounds();brushed.forEach(i=>bounds.extend([data.records[i].lon,data.records[i].lat]));map.fitBounds(bounds,{padding:35,maxZoom:13,duration:0});updateScope();};
 $('plot').onpointerdown=event=>{if($('plot-mode').value!=='brush'||!data||event.button!==0||!event.isPrimary)return;const at=plotPosition(event);if(!at)return;event.preventDefault();brushDrag={start:at,previous:brushRect,pointer:event.pointerId};brushRect=[...at,...at];$('plot').setPointerCapture(event.pointerId);drawBrush();};
-$('plot').onpointermove=event=>{if(!brushDrag||event.pointerId!==brushDrag.pointer)return;const at=plotPosition(event);if(!at)return;event.preventDefault();brushRect=[...brushDrag.start,...at];drawBrush();};
+$('plot').onpointermove=event=>{if(!brushDrag){if($('plot-mode').value==='select')previewPlotHits(event);else $('plot-preview').hidden=true;return;}if(event.pointerId!==brushDrag.pointer)return;const at=plotPosition(event);if(!at)return;event.preventDefault();brushRect=[...brushDrag.start,...at];drawBrush();};
 $('plot').onpointerup=event=>{if(!brushDrag||event.pointerId!==brushDrag.pointer)return;const at=plotPosition(event);if(at)brushRect=[...brushDrag.start,...at];if(Math.abs(brushRect[2]-brushRect[0])<3||Math.abs(brushRect[3]-brushRect[1])<3){cancelBrush();return;}brushDrag=null;if($('plot').hasPointerCapture(event.pointerId))$('plot').releasePointerCapture(event.pointerId);filterEdited();brushed=new Set(AtlasScope.brushIndices(plotXY,brushRect));brushActive=true;updateBrushControls();updateScope();};
 $('plot').onpointercancel=cancelBrush;
 $('plot').onfocus=()=>{if(data)previewPhoto(selected);};$('plot').onblur=()=>$('plot-preview').hidden=true;

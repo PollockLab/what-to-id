@@ -1659,3 +1659,199 @@ def test_taxonomy_provenance_uses_only_safe_https_source_links(open_context_atla
     else:
         assert provenance.get_by_role("link").count() == 0
     assert errors == []
+
+
+@pytest.fixture
+def open_point_atlas(open_atlas, atlas_site):
+    import json
+
+    payload = json.loads((atlas_site / "embeddings-data/Aves.json").read_text())
+    coordinates = [
+        [-10, -10],
+        [0, 0],
+        [0, 0],
+        [0.001, 0],
+        [20, 20],
+        [-10, 20],
+        [20, -10],
+        [10, 10],
+        [0, 10],
+        [10, 0],
+        [0, 20],
+        [20, 0],
+        [-10, 0],
+        [0, -10],
+        [-10, 10],
+        [10, -10],
+        [10, 20],
+        [20, 10],
+    ]
+    for record, xy in zip(payload["records"], coordinates, strict=True):
+        record["xy"] = xy
+    page, errors = open_atlas()
+    page.route(
+        "**/embeddings-data/Aves.json",
+        lambda route: route.fulfill(body=json.dumps(payload), content_type="application/json"),
+    )
+    page.reload()
+    page.locator('[data-focal-id="100"]').wait_for()
+    page.get_by_role("button", name="Photo space", exact=True).click()
+    return page, errors
+
+
+def _plot_client_point(page, observation_id, dx=0, dy=0):
+    return page.locator(f'#plot circle[data-observation-id="{observation_id}"]').evaluate(
+        "(circle, offset)=>{const point=new DOMPoint(Number(circle.getAttribute('cx')), "
+        "Number(circle.getAttribute('cy'))).matrixTransform(circle.ownerSVGElement.getScreenCTM());"
+        "return [point.x+offset[0],point.y+offset[1]];}",
+        [dx, dy],
+    )
+
+
+@pytest.mark.parametrize("width", [390, 820, 1440])
+def test_overlapping_plot_points_open_all_candidates_without_promoting_topmost(
+    open_point_atlas, width
+):
+    page, errors = open_point_atlas
+    page.set_viewport_size({"width": width, "height": 900})
+    page.locator("#plot").scroll_into_view_if_needed()
+    point = _plot_client_point(page, 101)
+    page.mouse.move(*point)
+    assert "3 photos near this point" in page.locator("#plot-preview").inner_text()
+    assert "Click to choose" in page.locator("#plot-preview").inner_text()
+    assert page.locator("#plot-preview img").count() == 0
+    page.mouse.click(*point)
+    dialog = page.get_by_role("dialog", name="Photos near this point", exact=True)
+    assert dialog.is_visible()
+    ids = page.locator("#location-photos button").evaluate_all(
+        "buttons=>buttons.map(button=>Number(button.dataset.observationId))"
+    )
+    assert ids == [101, 102, 103]
+    assert page.locator('[data-focal-id="100"]').count() == 1
+    assert "not a ranked photo-match list" in page.locator("#location-note").inner_text()
+    assert page.locator("#location-photos img").evaluate_all(
+        "images=>images.every(image=>image.loading==='lazy')"
+    )
+    page.keyboard.press("Escape")
+    assert dialog.is_hidden()
+    assert page.evaluate("document.activeElement.id") == "plot"
+    assert page.locator('[data-focal-id="100"]').count() == 1
+    page.mouse.click(*point)
+    page.locator('#location-photos button[data-observation-id="101"]').click()
+    page.locator('[data-focal-id="101"]').wait_for()
+    assert dialog.is_hidden()
+    assert errors == []
+
+
+def test_plot_hit_radius_is_twelve_css_pixels_across_resize_and_letterboxing(open_point_atlas):
+    page, errors = open_point_atlas
+    for width, height in [(390, 900), (1440, 900), (820, 600), (390, 700)]:
+        page.set_viewport_size({"width": width, "height": height})
+        page.locator("#record").select_option("0")
+        page.locator("#plot").scroll_into_view_if_needed()
+        # Outside the painted circle, but inside the fixed CSS-pixel target.
+        page.mouse.click(*_plot_client_point(page, 104, dx=11.5))
+        page.locator('[data-focal-id="104"]').wait_for()
+        assert page.locator("#location-chooser").is_hidden()
+        before = page.evaluate("location.hash")
+        page.mouse.move(*_plot_client_point(page, 104, dx=12.5))
+        assert page.locator("#plot-preview").is_hidden()
+        page.mouse.click(*_plot_client_point(page, 104, dx=12.5))
+        assert page.evaluate("location.hash") == before
+        assert page.locator('[data-focal-id="104"]').count() == 1
+    assert errors == []
+
+
+def test_plot_chooser_can_select_each_coincident_or_nearby_id_and_keyboard_stays_direct(
+    open_point_atlas,
+):
+    page, errors = open_point_atlas
+    for observation_id in [103, 102, 101]:
+        page.locator("#plot").scroll_into_view_if_needed()
+        page.mouse.click(*_plot_client_point(page, 101))
+        page.locator(f'#location-photos button[data-observation-id="{observation_id}"]').click()
+        page.locator(f'[data-focal-id="{observation_id}"]').wait_for()
+    page.locator("#plot").focus()
+    page.keyboard.press("ArrowRight")
+    page.locator('[data-focal-id="102"]').wait_for()
+    assert page.locator("#location-chooser").is_hidden()
+    page.keyboard.press("ArrowRight")
+    page.locator('[data-focal-id="103"]').wait_for()
+    assert page.locator("#location-chooser").is_hidden()
+    assert errors == []
+
+
+def test_plot_ambiguity_does_not_intercept_brushing_or_drop_dimmed_candidates(open_point_atlas):
+    page, errors = open_point_atlas
+    page.locator("#plot-mode").select_option("brush")
+    page.locator("#plot").scroll_into_view_if_needed()
+    point = _plot_client_point(page, 101)
+    page.mouse.click(*point)
+    assert page.locator("#location-chooser").is_hidden()
+    assert page.locator('[data-focal-id="100"]').count() == 1
+    page.mouse.move(point[0] - 8, point[1] - 8)
+    page.mouse.down()
+    page.mouse.move(point[0] + 8, point[1] + 8, steps=4)
+    page.mouse.up()
+    assert page.evaluate("[...brushed].map(i=>data.records[i].id).sort()") == [101, 102, 103]
+    assert page.locator("#location-chooser").is_hidden()
+    page.locator("#plot").focus()
+    page.keyboard.press("Escape")
+    assert page.locator("#plot-mode").input_value() == "select"
+    page.get_by_role("button", name="Clear selection", exact=True).click()
+    page.locator("#record").select_option("1")
+    page.get_by_role("button", name="Add selected photo", exact=True).click()
+    page.locator("#only-brushed").check()
+    page.evaluate("testMap.clickIds([0])")
+    page.locator('[data-focal-id="100"]').wait_for()
+    assert (
+        page.locator('#plot circle[data-observation-id="102"]').get_attribute("opacity") == "0.12"
+    )
+    page.mouse.click(*_plot_client_point(page, 101))
+    assert page.locator("#location-photos button").evaluate_all(
+        "buttons=>buttons.map(button=>Number(button.dataset.observationId))"
+    ) == [101, 102, 103]
+    page.locator('#location-photos button[data-observation-id="102"]').click()
+    page.locator('[data-focal-id="102"]').wait_for()
+    assert _scope_result_ids(page) == [101]
+    assert errors == []
+
+
+def test_plot_chooser_does_not_cap_dense_coincident_candidates(open_atlas, atlas_site):
+    import json
+
+    page, errors = open_atlas()
+    payload = json.loads((atlas_site / "embeddings-data/Aves.json").read_text())
+    for record in payload["records"]:
+        record["xy"] = [0, 0]
+    page.route(
+        "**/embeddings-data/Aves.json",
+        lambda route: route.fulfill(body=json.dumps(payload), content_type="application/json"),
+    )
+    page.reload()
+    page.locator('[data-focal-id="100"]').wait_for()
+    page.get_by_role("button", name="Photo space", exact=True).click()
+    page.locator("#plot").scroll_into_view_if_needed()
+    page.mouse.click(*_plot_client_point(page, 100))
+    assert page.locator("#location-photos button").evaluate_all(
+        "buttons=>buttons.map(button=>Number(button.dataset.observationId))"
+    ) == list(range(100, 118))
+    assert page.locator("#location-photos img").evaluate_all(
+        "images=>images.every(image=>image.loading==='lazy')"
+    )
+    page.locator('#location-photos button[data-observation-id="117"]').click()
+    page.locator('[data-focal-id="117"]').wait_for()
+    assert errors == []
+
+
+def test_plot_unique_hover_reuses_preview_photo_while_pointer_stays_on_same_candidate(
+    open_point_atlas,
+):
+    page, errors = open_point_atlas
+    page.locator("#plot").scroll_into_view_if_needed()
+    page.mouse.move(*_plot_client_point(page, 104))
+    assert "Recorded taxon 104" in page.locator("#plot-preview").inner_text()
+    page.locator("#plot-preview img").evaluate("image=>window.previousPlotPhoto=image")
+    page.mouse.move(*_plot_client_point(page, 104, dx=1, dy=1))
+    assert page.locator("#plot-preview img").evaluate("image=>image===window.previousPlotPhoto")
+    assert errors == []
