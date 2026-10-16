@@ -1,5 +1,6 @@
 """Publication contract tests at the gh subprocess and archive boundaries."""
 
+import copy
 import io
 import json
 import os
@@ -11,7 +12,13 @@ from pathlib import Path
 
 import pytest
 
-from what_to_id.demo_publication import PublicationError, deployed_artifact, prepare_site
+from what_to_id.demo_publication import (
+    PublicationError,
+    deployed_artifact,
+    deployed_revision,
+    main,
+    prepare_site,
+)
 
 REPO = "PollockLab/what-to-id"
 SHA = "a" * 40
@@ -153,19 +160,72 @@ def test_overlay_preserves_every_non_demo_byte_and_removes_stale_groups(github, 
     assert github[1][-1][2] == f"{BASE}/actions/artifacts/30/zip"
 
 
-def test_selects_success_status_chronology_not_deployment_or_run_recency(github):
+def test_publish_step_chronology_overrides_status_and_creation_recency(github):
     responses, _ = github
-    responses[f"{BASE}/deployments?environment=github-pages&per_page=100"] = [
-        [{"id": 2, "sha": "wrong", "created_at": "2099-01-01T03:00:00Z"}],
-        responses[f"{BASE}/deployments?environment=github-pages&per_page=100"][0],
-    ]
+    job = add_newer_deployment(responses)
+    # This job was created later and got a much later failure status, but its
+    # successful publish step finished before the currently published job's step.
+    job["steps"][0]["completed_at"] = "2099-01-01T00:30:00Z"
+    assert deployed_artifact(REPO) == 30
+
+
+def add_newer_deployment(responses, *, outcome="failure", deploy_conclusion="success"):
+    new_sha = "b" * 40
+    responses[f"{BASE}/deployments?environment=github-pages&per_page=100"].insert(
+        0, [{"id": 2, "sha": new_sha, "created_at": "2099-01-01T02:00:00Z"}]
+    )
     responses[f"{BASE}/deployments/2/statuses?per_page=100"] = [
         [
-            {"state": "success", "created_at": "2099-01-01T00:00:00Z", "log_url": "wrong"},
-            {"state": "in_progress", "created_at": "2099-01-01T05:00:00Z"},
-            {"state": "failure", "created_at": "2099-01-01T06:00:00Z"},
+            {
+                "state": outcome,
+                "created_at": "2099-01-01T03:00:00Z",
+                "log_url": f"https://github.com/{REPO}/actions/runs/11/job/21",
+            }
         ]
     ]
+    run = copy.deepcopy(responses[f"{BASE}/actions/runs/10"])
+    run.update(id=11, head_sha=new_sha)
+    responses[f"{BASE}/actions/runs/11"] = run
+    job = copy.deepcopy(responses[f"{BASE}/actions/jobs/20"])
+    job.update(id=21, run_id=11, head_sha=new_sha, conclusion=outcome)
+    job["steps"][0].update(
+        started_at="2099-01-01T01:59:00Z",
+        completed_at="2099-01-01T02:00:00Z",
+        conclusion=deploy_conclusion,
+    )
+    job["steps"].append(
+        {
+            "name": "Save the map pool",
+            "status": "completed",
+            "conclusion": "failure",
+            "completed_at": "2099-01-01T03:00:00Z",
+        }
+    )
+    responses[f"{BASE}/actions/jobs/21"] = job
+    responses[f"{BASE}/actions/jobs/21/logs"] = (
+        responses[f"{BASE}/actions/jobs/20/logs"]
+        .replace(SHA.encode(), new_sha.encode())
+        .replace(b'"artifact_id": 30', b'"artifact_id": 31')
+        .replace(b"00:59:", b"01:59:")
+    )
+    artifact = copy.deepcopy(responses[f"{BASE}/actions/artifacts/30"])
+    artifact["id"] = 31
+    artifact["workflow_run"].update(id=11, head_sha=new_sha)
+    responses[f"{BASE}/actions/artifacts/31"] = artifact
+    return job
+
+
+@pytest.mark.parametrize("outcome", ["failure", "error", "inactive", "in_progress", "success"])
+def test_later_published_map_remains_current_when_post_deploy_step_fails(github, outcome):
+    responses, _ = github
+    add_newer_deployment(responses, outcome=outcome)
+    assert deployed_artifact(REPO) == 31
+
+
+@pytest.mark.parametrize("conclusion", ["failure", "cancelled", "skipped"])
+def test_later_failed_deploy_never_replaces_previous_success(github, conclusion):
+    responses, _ = github
+    add_newer_deployment(responses, deploy_conclusion=conclusion)
     assert deployed_artifact(REPO) == 30
 
 
@@ -236,15 +296,36 @@ def test_rejects_ambiguous_or_invalid_deployment_payload(github, change):
         deployed_artifact(REPO)
 
 
-def test_success_tie_and_no_success_fail_closed(github):
-    responses, _ = github
+def test_repeated_statuses_for_same_job_are_deduplicated(github):
+    responses, calls = github
     key = f"{BASE}/deployments/1/statuses?per_page=100"
     responses[key][0].append(dict(responses[key][0][0]))
+    assert deployed_artifact(REPO) == 30
+    assert sum(call[2] == f"{BASE}/actions/jobs/20" for call in calls) == 1
+
+
+def test_tied_publish_steps_and_no_success_fail_closed(github):
+    responses, _ = github
+    job = add_newer_deployment(responses)
+    job["steps"][0]["completed_at"] = TIME
     with pytest.raises(PublicationError, match="Ambiguous"):
         deployed_artifact(REPO)
-    responses[key] = [[{"state": "in_progress"}]]
+    for job_id in (20, 21):
+        responses[f"{BASE}/actions/jobs/{job_id}"]["steps"][0]["conclusion"] = "failure"
     with pytest.raises(PublicationError, match="No successful"):
         deployed_artifact(REPO)
+
+
+def test_revision_cli_verifies_latest_publish_without_downloading_an_archive(
+    github, monkeypatch, capsys
+):
+    responses, calls = github
+    add_newer_deployment(responses)
+    assert deployed_revision(REPO) == "b" * 40
+    monkeypatch.setattr("sys.argv", ["demo_publication", "--repository", REPO, "--revision"])
+    main()
+    assert capsys.readouterr().out == "b" * 40 + "\n"
+    assert not any("/artifacts/" in call[2] for call in calls)
 
 
 @pytest.mark.parametrize(
@@ -385,15 +466,23 @@ def test_workflow_routes_demo_updates_without_a_map_refresh(tmp_path, changed, e
     path.write_text("change")
     git("add", changed)
     git("-c", "user.name=Test", "-c", "user.email=test@example.org", "commit", "-qm", "change")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    python = bin_dir / "python3"
+    python.write_text('#!/bin/sh\nprintf "%s\\n" "$DEPLOYED_SHA"\n')
+    python.chmod(0o755)
     result = tmp_path / "route-output"
     subprocess.run(
         ["bash", "-c", script],
         cwd=tmp_path,
         check=True,
         env={
-            **os.environ,
+            "PATH": f"{bin_dir}:{os.environ['PATH']}",
             "EVENT": event,
             "BEFORE": before,
+            "FULL_SITE_ENABLED": "true",
+            "GITHUB_REPOSITORY": REPO,
+            "DEPLOYED_SHA": before,
             "AFTER": git("rev-parse", "HEAD"),
             "GITHUB_OUTPUT": str(result),
         },
@@ -411,3 +500,88 @@ def test_dangling_output_symlink_is_preserved(github, demo, tmp_path):
     assert output.readlink() == target
     assert not target.exists()
     assert github[1] == []
+
+
+def test_route_does_not_lose_cancelled_pending_source_push(tmp_path):
+    workflow = Path(__file__).parents[1] / ".github/workflows/pages.yml"
+    text = workflow.read_text()
+    route = text.split("          set -euo pipefail\n", 1)[1].split("  # Changes to", 1)[0]
+    script = "set -euo pipefail\n" + "\n".join(line[10:] for line in route.splitlines())
+
+    def git(*args):
+        return subprocess.check_output(["git", *args], cwd=tmp_path, text=True).strip()
+
+    def commit(message):
+        git("-c", "user.name=Test", "-c", "user.email=test@example.org", "commit", "-qm", message)
+        return git("rev-parse", "HEAD")
+
+    git("init", "-q")
+    (tmp_path / "site").mkdir()
+    (tmp_path / "site/index.html").write_text("deployed study")
+    git("add", "site/index.html")
+    deployed = commit("deployed map R")
+    (tmp_path / "site/index.html").write_text("pending study change A")
+    git("add", "site/index.html")
+    pending = commit("source push A, workflow cancelled while pending")
+    (tmp_path / "demo").mkdir()
+    (tmp_path / "demo/embeddings.html").write_text("new demo B")
+    git("add", "demo/embeddings.html")
+    current = commit("demo push B replaces pending A workflow")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    python = bin_dir / "python3"
+    python.write_text('#!/bin/sh\nprintf "%s\\n" "$DEPLOYED_SHA"\n')
+    python.chmod(0o755)
+    result = tmp_path / "route-output"
+    subprocess.run(
+        ["bash", "-c", script],
+        cwd=tmp_path,
+        check=True,
+        env={
+            "PATH": f"{bin_dir}:{os.environ['PATH']}",
+            "EVENT": "push",
+            "BEFORE": pending,
+            "AFTER": current,
+            "DEPLOYED_SHA": deployed,
+            "FULL_SITE_ENABLED": "true",
+            "GITHUB_REPOSITORY": REPO,
+            "GITHUB_OUTPUT": str(result),
+        },
+    )
+    assert result.read_text() == "refresh=true\n"
+
+
+def test_current_overlay_job_waiting_to_deploy_does_not_hide_live_site(github):
+    responses, _ = github
+    job = add_newer_deployment(responses, outcome="in_progress")
+    job["steps"][0].update(status="pending", conclusion=None, completed_at=None)
+    assert deployed_artifact(REPO) == 30
+
+
+@pytest.mark.parametrize("response", ["exit 1", 'printf "%s\\n" unknown-revision'])
+def test_route_unknown_deployed_revision_fails_without_selecting_a_publish(tmp_path, response):
+    workflow = Path(__file__).parents[1] / ".github/workflows/pages.yml"
+    text = workflow.read_text()
+    route = text.split("          set -euo pipefail\n", 1)[1].split("  # Changes to", 1)[0]
+    script = "set -euo pipefail\n" + "\n".join(line[10:] for line in route.splitlines())
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    python = bin_dir / "python3"
+    python.write_text(f"#!/bin/sh\n{response}\n")
+    python.chmod(0o755)
+    output = tmp_path / "route-output"
+    result = subprocess.run(
+        ["bash", "-c", script],
+        cwd=tmp_path,
+        capture_output=True,
+        env={
+            "PATH": f"{bin_dir}:{os.environ['PATH']}",
+            "EVENT": "push",
+            "FULL_SITE_ENABLED": "true",
+            "GITHUB_REPOSITORY": REPO,
+            "AFTER": SHA,
+            "GITHUB_OUTPUT": str(output),
+        },
+    )
+    assert result.returncode != 0
+    assert not output.exists()

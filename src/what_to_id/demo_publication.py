@@ -41,62 +41,75 @@ def _api(endpoint: str, *, pages: bool = False, raw: bool = False):
     return [item for page in data for item in page] if pages else data
 
 
-def deployed_artifact(repository: str, *, now: datetime | None = None) -> int:
-    """Prove artifact identity from deployment status, job, and deploy request logs."""
+def _deployed_request(repository: str) -> tuple[str, int, dict]:
+    """Find the last successful publish step, regardless of its enclosing job outcome."""
     if not re.fullmatch(r"[\w.-]+/[\w.-]+", repository):
         raise PublicationError("Invalid repository name")
     base = f"repos/{repository}"
     deployments = _api(f"{base}/deployments?environment=github-pages&per_page=100", pages=True)
-    successes = []
+    candidates = {}
+    jobs = {}
     for deployment in deployments:
         statuses = _api(f"{base}/deployments/{deployment['id']}/statuses?per_page=100", pages=True)
-        successes.extend(
-            (_time(status["created_at"]), deployment, status)
-            for status in statuses
-            if status["state"] == "success"
-        )
-    if not successes:
-        raise PublicationError("No successful github-pages deployment; full map refresh required")
-    latest = max(item[0] for item in successes)
-    selected = [item for item in successes if item[0] == latest]
+        # Environment success/failure describes the entire job. A later state-save
+        # failure does not undo a successful Pages deployment earlier in that job.
+        for status in statuses:
+            url = status.get("log_url", "")
+            if not url and status["state"] in ("queued", "pending", "waiting"):
+                continue
+            match = re.fullmatch(
+                rf"https://github\.com/{re.escape(repository)}/actions/runs/(\d+)/job/(\d+)",
+                url,
+                flags=re.IGNORECASE,
+            )
+            if not match:
+                raise PublicationError("Deployment has no same-repository run/job log URL")
+            run_id, job_id = map(int, match.groups())
+            if job_id not in jobs:
+                jobs[job_id] = _api(f"{base}/actions/jobs/{job_id}")
+            job = jobs[job_id]
+            if (
+                job["id"] != job_id
+                or job["run_id"] != run_id
+                or job["head_sha"] != deployment["sha"]
+            ):
+                raise PublicationError("Deployment/job/SHA provenance mismatch")
+            deploy_steps = [
+                step
+                for step in job["steps"]
+                if re.match(r"^Run actions/deploy-pages@", step["name"])
+                and step.get("status") == "completed"
+                and step.get("conclusion") == "success"
+            ]
+            if len(deploy_steps) > 1:
+                raise PublicationError("Ambiguous successful actions/deploy-pages steps")
+            if deploy_steps:
+                step = deploy_steps[0]
+                candidates[job_id] = (
+                    _time(step["completed_at"]),
+                    deployment["sha"],
+                    run_id,
+                    job_id,
+                    job,
+                    step,
+                )
+    if not candidates:
+        raise PublicationError("No successful actions/deploy-pages step; full map refresh required")
+    latest = max(candidate[0] for candidate in candidates.values())
+    selected = [candidate for candidate in candidates.values() if candidate[0] == latest]
     if len(selected) != 1:
-        raise PublicationError("Ambiguous latest successful Pages deployment")
-    _, deployment, status = selected[0]
-    match = re.fullmatch(
-        rf"https://github\.com/{re.escape(repository)}/actions/runs/(\d+)/job/(\d+)",
-        status.get("log_url", ""),
-        flags=re.IGNORECASE,
-    )
-    if not match:
-        raise PublicationError("Successful deployment has no same-repository run/job log URL")
-    run_id, job_id = map(int, match.groups())
+        raise PublicationError("Ambiguous latest successful Pages deployment step")
+    _, sha, run_id, job_id, job, step = selected[0]
     run = _api(f"{base}/actions/runs/{run_id}")
-    job = _api(f"{base}/actions/jobs/{job_id}")
-    sha = deployment["sha"]
     if (
         run["id"] != run_id
-        or job["id"] != job_id
-        or job["run_id"] != run_id
         or run["repository"]["full_name"].lower() != repository.lower()
         or run["head_repository"]["id"] != run["repository"]["id"]
         or run["head_sha"] != sha
-        or job["head_sha"] != sha
     ):
         raise PublicationError("Deployment, job, run, repository, or SHA provenance mismatch")
     if job.get("run_attempt") != run.get("run_attempt"):
         raise PublicationError("Run was rerun after the deployed job; refusing ambiguous artifact")
-    deploy_steps = [
-        step
-        for step in job["steps"]
-        if re.match(r"^Run actions/deploy-pages@", step["name"])
-        and step.get("status") == "completed"
-        and step.get("conclusion") == "success"
-    ]
-    if len(deploy_steps) != 1:
-        raise PublicationError("Expected exactly one successful actions/deploy-pages step")
-    # A later bookkeeping step can fail after Pages is already live. The actual deploy
-    # step, rather than the overall workflow conclusion, is the publication evidence.
-    step = deploy_steps[0]
     start, end = _time(step["started_at"]), _time(step["completed_at"])
     logs = _api(f"{base}/actions/jobs/{job_id}/logs", raw=True).decode("utf-8")
     lines = []
@@ -121,6 +134,20 @@ def deployed_artifact(repository: str, *, now: datetime | None = None) -> int:
     artifact_id = payloads[0].get("artifact_id")
     if not isinstance(artifact_id, int) or isinstance(artifact_id, bool):
         raise PublicationError("Invalid deployed artifact ID")
+    return sha, artifact_id, run
+
+
+def deployed_revision(repository: str) -> str:
+    """Return the proven deployed source SHA without downloading site archives."""
+    sha, _, _ = _deployed_request(repository)
+    return sha
+
+
+def deployed_artifact(repository: str, *, now: datetime | None = None) -> int:
+    """Prove artifact identity from the latest successful deploy-pages request."""
+    sha, artifact_id, run = _deployed_request(repository)
+    base = f"repos/{repository}"
+    run_id = run["id"]
     artifact = _api(f"{base}/actions/artifacts/{artifact_id}")
     provenance = artifact.get("workflow_run", {})
     repository_id = run["repository"]["id"]
@@ -264,8 +291,14 @@ def main() -> None:
     parser.add_argument("--repository", required=True)
     parser.add_argument("--demo", type=Path, default=Path("demo"))
     parser.add_argument("--out", type=Path, default=Path("full_site"))
+    parser.add_argument(
+        "--revision", action="store_true", help="Print the deployed source SHA only"
+    )
     args = parser.parse_args()
     try:
+        if args.revision:
+            print(deployed_revision(args.repository))
+            return
         artifact_id = prepare_site(args.repository, args.demo, args.out)
     except (
         PublicationError,
