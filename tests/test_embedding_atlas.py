@@ -337,9 +337,9 @@ def test_map_first_default_keeps_advanced_controls_and_projection_optional():
     assert "hidden" in layout.elements["projection-pane"][0]
     assert layout.elements["projection-toggle"][0]["aria-expanded"] == "false"
     assert "open" not in layout.elements["advanced"][0]
-    for control in ["model-nav", "color-mode", "order", "unfamiliar", "only-view"]:
+    for control in ["model-nav", "color-mode", "order", "unfamiliar"]:
         assert "advanced" in layout.elements[control][1]
-    for control in ["group", "search", "fit", "record"]:
+    for control in ["group", "search", "only-view", "fit", "record"]:
         assert "advanced" not in layout.elements[control][1]
     assert html.index('id="projection-pane"') < html.index('id="details"')
     assert layout.elements["photo-comparison"][0]["aria-labelledby"] == "comparison-title"
