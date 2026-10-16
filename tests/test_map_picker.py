@@ -254,3 +254,68 @@ def test_hash_round_trips_and_old_links_load(browser, frag, chips, hash):
         back = _page(browser, "#" + hash)
         _chips(back, len(chips))
         assert _state(back)["hash"] == hash
+
+
+def test_unreadable_shared_area_requires_explicit_recovery_before_identify(browser):
+    from .test_map_area_recovery import recovery_html
+
+    page = browser.new_page()
+    errors, external = [], []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.route("http://area-recovery/**", lambda route: route.fulfill(body=recovery_html()))
+    page.route("https://**", lambda route: (external.append(route.request.url), route.abort()))
+    raw = "future&groups=Aves#tail%25"
+    from urllib.parse import quote
+
+    page.goto("http://area-recovery/map.html#area=" + quote(raw, safe=""))
+    assert page.locator("#identify").get_attribute("href") is None
+    assert page.locator("#identify").get_attribute("aria-disabled") == "true"
+    assert page.get_by_text("Area unresolved", exact=True).is_visible()
+    assert page.get_by_role("button", name="Clear invalid area", exact=True).is_visible()
+    assert page.evaluate("new URLSearchParams(location.hash.slice(1)).get('area')") == raw
+    page.reload()
+    assert page.locator("#identify").get_attribute("href") is None
+    # A stale href must not bypass the capture guard through ordinary keyboard or mouse activation.
+    pages_before = len(page.context.pages)
+    page.locator("#identify").evaluate(
+        "a=>{a.href='https://www.inaturalist.org/observations/identify';a.tabIndex=0;}"
+    )
+    page.locator("#identify").focus()
+    page.keyboard.press("Enter")
+    box = page.locator("#identify").bounding_box()
+    for button in ["left", "middle"]:
+        page.mouse.click(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2, button=button)
+    assert len(page.context.pages) == pages_before
+    page.evaluate("refilter()")
+    assert page.locator("#identify").get_attribute("href") is None
+    page.get_by_role("button", name="Draw area", exact=True).click()
+    page.get_by_role("button", name="Cancel", exact=True).click()
+    assert page.evaluate("AREA.invalid()") is True
+    page.get_by_role("button", name="Clear invalid area", exact=True).click()
+    assert (
+        page.locator("#identify")
+        .get_attribute("href")
+        .startswith("https://www.inaturalist.org/observations/identify?")
+    )
+    assert page.locator("#identify").get_attribute("aria-disabled") is None
+    assert page.evaluate("AREA.hash()") == ""
+    page.goto("http://area-recovery/map.html?case=replace#area=ab!")
+    page.locator('input[type="file"]').set_input_files(
+        {"name": "broken.geojson", "mimeType": "application/geo+json", "buffer": b"{"}
+    )
+    page.wait_for_function("document.querySelector('.anote').textContent.includes('not JSON')")
+    assert page.evaluate("AREA.invalid()") is True
+    assert page.locator("#identify").get_attribute("href") is None
+    geometry = {"type": "Polygon", "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]]}
+    page.locator('input[type="file"]').set_input_files(
+        {
+            "name": "area.geojson",
+            "mimeType": "application/geo+json",
+            "buffer": json.dumps(geometry).encode(),
+        }
+    )
+    page.wait_for_function("!AREA.invalid() && AREA.on()")
+    assert page.evaluate("Array.from(AREA.mask(3))") == [1, 0, 0]
+    assert page.locator("#identify").get_attribute("href").endswith("&id=101")
+    assert errors == [] and external == []
+    page.close()

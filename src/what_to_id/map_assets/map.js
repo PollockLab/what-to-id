@@ -188,9 +188,10 @@ function full(){return S.lo===0&&S.hi===LAST;}
 function render(){
   // records without a date show only over all dates, as the GPU filter does
   var shown=CUM[S.hi+1]-CUM[S.lo]+(full()?NODAY:0);
-  $('count').textContent=P.n?nf.format(shown)+' of '+nf.format(META.n)+' records':'Loading';
+  $('count').textContent=AREA.invalid()?'Area unresolved · '+nf.format(shown)+' records available to browse':
+    P.n?nf.format(shown)+' of '+nf.format(META.n)+' records':'Loading';
   var all=P.n&&!$('more').textContent?total(S.lo,S.hi):null;
-  $('share').textContent=all?nf.format(Math.min(shown,all))+' of '+nf.format(all)+
+  $('share').textContent=all&&!AREA.invalid()?nf.format(Math.min(shown,all))+' of '+nf.format(all)+
     ' BC records with photos '+(full()&&!S.months&&allGroups()&&!CH.any(S.only)?
     '':'matching these filters ')+'still need an ID ('+
     pct(shown,all)+'). All-record counts from '+TOT.on+'.':'';
@@ -215,8 +216,14 @@ function link(){
     all:META.groups.length,up:S.up,d1:S.lo>0?iso(S.lo):'',d2:S.hi<LAST?iso(S.hi):'',months:m,taxa:taxa,
     not:TF.not.concat(gl.not),only:S.only};
   // with an area on, the link may list the records by id instead, and then u stays null
-  var a=$('identify');a.href=AREA.link({w:b.getWest(),s:b.getSouth(),e:b.getEast(),n:b.getNorth()},
+  var a=$('identify'),href=AREA.link({w:b.getWest(),s:b.getSouth(),e:b.getEast(),n:b.getNorth()},
     function(v,p,side){var r=TX.identifyUrl(st,v,META,Object.assign({},PJ.params(),p));if(!side)u=r;return r.url;},match);
+  if(AREA.invalid()){a.removeAttribute('href');a.setAttribute('aria-disabled','true');
+    a.title='Clear or replace the unreadable shared area before opening Identify.';
+    $('idprev').disabled=$('idnext').disabled=true;
+    $('idnote').hidden=false;$('idnote').textContent='Identify is unavailable: the shared area could not be restored. Clear or replace the invalid area first.';
+    return;}
+  a.removeAttribute('aria-disabled');a.href=href;
   a.title='Opens these records in the iNaturalist Identify page.';
   // say when Identify cannot show the same records, and what it opens instead
   var why=[],lost=u?u.lost:[];function gn(gs){return gs.map(gname).join(' and ');}
@@ -555,6 +562,11 @@ var AREA=MapArea({map:map,S:S,LAST:LAST,hash:S.area,park:S.park,bcpark:S.bcpark,
   place:META.place_id,parks:META.parks,get:get,P:function(){return P;},keep:function(){return KEEP;},
   change:refilter,sel:function(){return sel().join('&');},
   step:IdStep({a:$('identify'),prev:$('idprev'),next:$('idnext'),build:iso(LAST)})});
+// Guard activation before IdStep's handlers, including a stale batch or keyboard activation.
+function stopInvalidIdentify(e){if(AREA.invalid()){e.preventDefault();e.stopImmediatePropagation();}}
+['identify','idprev','idnext'].forEach(function(id){var el=$(id);
+  el.addEventListener('click',stopInvalidIdentify,true);el.addEventListener('auxclick',stopInvalidIdentify,true);
+  el.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' ')stopInvalidIdentify(e);},true);});
 // Zoomed out, blending millions of overlapping dots takes about 250 ms a frame, so while the map
 // moves it draws one record in ten, spread across BC by the id order, and all of them once it stops.
 var THIN=false,THIN_BELOW=8;
