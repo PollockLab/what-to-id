@@ -80,6 +80,8 @@ def atlas_site(tmp_path_factory):
         snapshot_date="2026-09-11",
         model_view_specs=["Test=embeddings.html", "Other=other/embeddings.html"],
         current_label="Test",
+        reference_embedding_pattern=str(directory / "{group}.npz"),
+        reference_pool_path=pool,
     )
     return output
 
@@ -214,6 +216,20 @@ def test_filtered_empty_search_recovers_without_changing_focal_or_rankings(open_
         )
         == initial_ids
     )
+    assert errors == []
+
+
+def test_unfamiliar_first_preserves_specialist_search_and_empty_scope(open_atlas):
+    page, errors = open_atlas()
+    page.get_by_role("searchbox").fill("107")
+    page.locator("#advanced summary").first.click()
+    page.locator("#unfamiliar").click()
+    assert page.get_by_role("searchbox").input_value() == "107"
+    assert page.locator('[data-focal-id="107"]').count() == 1
+    assert "1 match" in page.locator("#search-status").inner_text()
+    page.get_by_role("searchbox").fill("nonexistent-name")
+    assert page.locator("#unfamiliar").is_disabled()
+    assert page.locator('[data-focal-id="107"]').count() == 1
     assert errors == []
 
 
