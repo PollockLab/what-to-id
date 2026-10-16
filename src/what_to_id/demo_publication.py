@@ -48,6 +48,7 @@ def _deployed_request(repository: str) -> tuple[str, int, dict]:
     base = f"repos/{repository}"
     deployments = _api(f"{base}/deployments?environment=github-pages&per_page=100", pages=True)
     candidates = {}
+    unconfirmed = {}
     jobs = {}
     for deployment in deployments:
         statuses = _api(f"{base}/deployments/{deployment['id']}/statuses?per_page=100", pages=True)
@@ -74,13 +75,26 @@ def _deployed_request(repository: str) -> tuple[str, int, dict]:
                 or job["head_sha"] != deployment["sha"]
             ):
                 raise PublicationError("Deployment/job/SHA provenance mismatch")
-            deploy_steps = [
+            publish_steps = [
                 step
                 for step in job["steps"]
                 if re.match(r"^Run actions/deploy-pages@", step["name"])
-                and step.get("status") == "completed"
-                and step.get("conclusion") == "success"
             ]
+            deploy_steps = [
+                step
+                for step in publish_steps
+                if step.get("status") == "completed" and step.get("conclusion") == "success"
+            ]
+            for number, attempted in enumerate(publish_steps):
+                if attempted in deploy_steps or attempted.get("conclusion") == "skipped":
+                    continue
+                if attempted.get("status") in ("queued", "pending") and not attempted.get(
+                    "started_at"
+                ):
+                    continue
+                # The POST may have published before a polling failure/cancellation.
+                # Only a later confirmed publish can supersede that uncertainty.
+                unconfirmed[job_id, number] = attempted.get("completed_at")
             if len(deploy_steps) > 1:
                 raise PublicationError("Ambiguous successful actions/deploy-pages steps")
             if deploy_steps:
@@ -96,6 +110,10 @@ def _deployed_request(repository: str) -> tuple[str, int, dict]:
     if not candidates:
         raise PublicationError("No successful actions/deploy-pages step; full map refresh required")
     latest = max(candidate[0] for candidate in candidates.values())
+    if any(end is None or _time(end) >= latest for end in unconfirmed.values()):
+        raise PublicationError(
+            "Unconfirmed Pages publication after the last known success; full map refresh required"
+        )
     selected = [candidate for candidate in candidates.values() if candidate[0] == latest]
     if len(selected) != 1:
         raise PublicationError("Ambiguous latest successful Pages deployment step")

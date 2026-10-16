@@ -165,7 +165,7 @@ def test_publish_step_chronology_overrides_status_and_creation_recency(github):
     job = add_newer_deployment(responses)
     # This job was created later and got a much later failure status, but its
     # successful publish step finished before the currently published job's step.
-    job["steps"][0]["completed_at"] = "2099-01-01T00:30:00Z"
+    job["steps"][0].update(started_at="2099-01-01T00:29:00Z", completed_at="2099-01-01T00:30:00Z")
     assert deployed_artifact(REPO) == 30
 
 
@@ -222,11 +222,38 @@ def test_later_published_map_remains_current_when_post_deploy_step_fails(github,
     assert deployed_artifact(REPO) == 31
 
 
-@pytest.mark.parametrize("conclusion", ["failure", "cancelled", "skipped"])
-def test_later_failed_deploy_never_replaces_previous_success(github, conclusion):
-    responses, _ = github
+@pytest.mark.parametrize("conclusion", ["failure", "cancelled"])
+def test_started_later_failed_deploy_refuses_stale_base(github, demo, tmp_path, conclusion):
+    responses, calls = github
     add_newer_deployment(responses, deploy_conclusion=conclusion)
+    # Pages can accept artifact31 and publish it before the action fails its next
+    # status poll or is cancelled. Step failure cannot prove artifact30 is live.
+    with pytest.raises(PublicationError, match="Unconfirmed Pages publication"):
+        prepare_site(REPO, demo, tmp_path / "output")
+    assert not (tmp_path / "output").exists()
+    assert not any(call[2].endswith("/zip") for call in calls)
+
+
+def test_skipped_later_deploy_did_not_publish(github):
+    responses, _ = github
+    add_newer_deployment(responses, deploy_conclusion="skipped")
     assert deployed_artifact(REPO) == 30
+
+
+def test_newer_confirmed_success_recovers_from_historical_failed_step(github):
+    responses, _ = github
+    responses[f"{BASE}/actions/jobs/20"]["steps"][0]["conclusion"] = "failure"
+    add_newer_deployment(responses)
+    assert deployed_artifact(REPO) == 31
+
+
+@pytest.mark.parametrize("end", [TIME, "2099-01-01T01:00:01Z", None])
+def test_failed_step_overlapping_last_success_is_ambiguous(github, end):
+    responses, _ = github
+    job = add_newer_deployment(responses, deploy_conclusion="failure")
+    job["steps"][0].update(started_at="2099-01-01T00:58:00Z", completed_at=end)
+    with pytest.raises(PublicationError, match="Unconfirmed Pages publication"):
+        deployed_artifact(REPO)
 
 
 @pytest.mark.parametrize(
@@ -554,7 +581,7 @@ def test_route_does_not_lose_cancelled_pending_source_push(tmp_path):
 def test_current_overlay_job_waiting_to_deploy_does_not_hide_live_site(github):
     responses, _ = github
     job = add_newer_deployment(responses, outcome="in_progress")
-    job["steps"][0].update(status="pending", conclusion=None, completed_at=None)
+    job["steps"][0].update(status="pending", conclusion=None, started_at=None, completed_at=None)
     assert deployed_artifact(REPO) == 30
 
 
@@ -585,3 +612,14 @@ def test_route_unknown_deployed_revision_fails_without_selecting_a_publish(tmp_p
     )
     assert result.returncode != 0
     assert not output.exists()
+
+
+@pytest.mark.parametrize("has_start", [True, False])
+def test_running_deploy_step_cannot_establish_old_site_is_current(github, has_start):
+    responses, _ = github
+    job = add_newer_deployment(responses, outcome="in_progress")
+    job["steps"][0].update(status="in_progress", conclusion=None, completed_at=None)
+    if not has_start:
+        job["steps"][0]["started_at"] = None
+    with pytest.raises(PublicationError, match="Unconfirmed Pages publication"):
+        deployed_artifact(REPO)
