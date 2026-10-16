@@ -346,3 +346,46 @@ def test_projection_description_distinguishes_method_and_optional_local_fidelity
     )
     assert "PCA retains 12.0%" in text
     assert "nearest points" not in text
+
+
+def test_layout_alternate_requires_complete_finite_coordinates_and_non_pca_primary():
+    payload = dict(
+        projection="t-SNE",
+        records=[dict(xy=[1, 2], pca_xy=[3, 4]), dict(xy=[5, 6], pca_xy=[7, 8])],
+    )
+    assert evaluate(f"scope.hasPcaAlternative({json.dumps(payload)})") is True
+    assert evaluate(f"scope.projectionCoordinates({json.dumps(payload)},'pca')") == [[3, 4], [7, 8]]
+    assert evaluate(f"scope.projectionCoordinates({json.dumps(payload)})") == [[1, 2], [5, 6]]
+    payload["records"][1].pop("pca_xy")
+    assert evaluate(f"scope.hasPcaAlternative({json.dumps(payload)})") is False
+    assert evaluate(f"scope.projectionCoordinates({json.dumps(payload)},'pca')") == [[1, 2], [5, 6]]
+    assert (
+        evaluate("scope.hasPcaAlternative({projection:'t-SNE',records:[{pca_xy:[0,NaN]}]})")
+        is False
+    )
+    assert evaluate("scope.hasPcaAlternative({projection:'PCA',records:[{pca_xy:[0,1]}]})") is False
+    assert evaluate("scope.hasPcaAlternative({projection:'t-SNE',records:[]})") is False
+
+
+def test_layout_summary_switches_method_and_matching_diagnostic_without_changing_payload():
+    payload = dict(
+        projection="t-SNE",
+        variance_retained=0.12,
+        projection_quality=dict(k=12, mean_neighbor_recall=0.8),
+        pca_projection_quality=dict(k=12, mean_neighbor_recall=0.2),
+        records=[
+            dict(xy=[0, 1], pca_xy=[2, 3], projection_match_count=10, pca_projection_match_count=3)
+        ],
+    )
+    primary = evaluate(f"scope.projectionSummary({json.dumps(payload)},0)")
+    alternate = evaluate(f"scope.projectionSummary({json.dumps(payload)},0,'pca')")
+    assert "Local t-SNE layout" in primary and "contain 10" in primary
+    assert "PCA retains 12.0%" in alternate and "contain 3" in alternate
+    assert payload["records"][0]["xy"] == [0, 1]
+    payload["projection"] = "PCA"
+    payload["projection_metadata"] = dict(
+        requested_method="t-SNE", fallback_reason="constant vectors"
+    )
+    fallback = evaluate(f"scope.projectionSummary({json.dumps(payload)},0)")
+    assert "PCA fallback for this sample" in fallback
+    assert "Local t-SNE layout" not in fallback

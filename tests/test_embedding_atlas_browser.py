@@ -365,3 +365,113 @@ def test_mobile_photo_inspection_uses_full_width_and_returns_to_same_comparison(
     assert trigger.evaluate("button => document.activeElement === button")
     assert page.evaluate("location.hash") == focal_hash
     assert errors == []
+
+
+@pytest.mark.parametrize("width", [390, 1440])
+def test_layout_switch_preserves_focal_rankings_filters_and_brushed_observation_ids(
+    open_atlas, atlas_site, width
+):
+    import json
+
+    from what_to_id.atlas_projection import projection_fidelity
+
+    page, errors = open_atlas(width)
+    payload = json.loads((atlas_site / "embeddings-data/Aves.json").read_text())
+    records = payload["records"]
+    neighbors = np.array([[index for index, _ in record["neighbors"]] for record in records])
+    focal_neighbors = neighbors[0].tolist()
+    non_neighbors = [index for index in range(1, len(records)) if index not in focal_neighbors]
+    primary_order = focal_neighbors + non_neighbors
+    pca_order = non_neighbors + focal_neighbors
+    for index, record in enumerate(records):
+        record["xy"] = [0, 0] if index == 0 else [primary_order.index(index) + 1, index % 3]
+        record["pca_xy"] = [0, 0] if index == 0 else [index % 3, pca_order.index(index) + 1]
+    payload["projection"] = "t-SNE"
+    payload["projection_metadata"] = {"method": "t-SNE", "requested_method": "t-SNE"}
+    for coordinate_key, quality_key, count_key in [
+        ("xy", "projection_quality", "projection_match_count"),
+        ("pca_xy", "pca_projection_quality", "pca_projection_match_count"),
+    ]:
+        quality, counts = projection_fidelity(
+            np.array([record[coordinate_key] for record in records], dtype=float), neighbors
+        )
+        payload[quality_key] = quality
+        for record, count in zip(records, counts, strict=True):
+            record[count_key] = int(count)
+    assert records[0]["projection_match_count"] != records[0]["pca_projection_match_count"]
+    page.route(
+        "**/embeddings-data/Aves.json",
+        lambda route: route.fulfill(json=payload),
+    )
+    page.reload()
+    page.locator('[data-focal-id="100"]').wait_for()
+    page.get_by_role("button", name="Photo space", exact=True).click()
+    layout = page.get_by_label("Layout", exact=True)
+    assert layout.is_visible() and layout.input_value() == "primary"
+    assert layout.locator("option").all_text_contents() == [
+        "Local neighborhoods (t-SNE)",
+        "Linear overview (PCA)",
+    ]
+    page.get_by_role("searchbox").fill("Recorded taxon")
+    page.get_by_role("button", name="Add selected photo", exact=True).click()
+    page.locator("#only-brushed").check()
+    initial_hash = page.evaluate("location.hash")
+    initial_ids = page.locator(".neighbors button").evaluate_all(
+        "buttons => buttons.map(button => button.dataset.observationId)"
+    )
+    initial_points = page.locator("#plot circle").evaluate_all(
+        "circles => circles.map(circle => [circle.dataset.observationId,"
+        "circle.getAttribute('cx'),circle.getAttribute('cy')])"
+    )
+    assert (
+        f"contain {records[0]['projection_match_count']}"
+        in page.locator("#projection").inner_text()
+    )
+    page.locator("#plot-mode").select_option("brush")
+    box = page.locator("#plot").bounding_box()
+    page.mouse.move(box["x"] + box["width"] / 3, box["y"] + box["height"] / 3)
+    page.mouse.down()
+    page.mouse.move(box["x"] + box["width"] / 3 + 25, box["y"] + box["height"] / 3 + 20)
+    page.locator("#brush-rectangle").wait_for()
+    layout.select_option("pca")
+    page.mouse.up()
+    assert page.locator("#brush-rectangle").count() == 0
+    assert page.locator("#only-brushed").is_checked()
+    matching_options = page.locator("#record option").filter(has_text="Recorded taxon")
+    assert matching_options.count() == 1
+    assert matching_options.inner_text().endswith("100")
+    assert page.evaluate("location.hash") == initial_hash
+    assert (
+        page.locator(".neighbors button").evaluate_all(
+            "buttons => buttons.map(button => button.dataset.observationId)"
+        )
+        == initial_ids
+    )
+    pca_points = page.locator("#plot circle").evaluate_all(
+        "circles => circles.map(circle => [circle.dataset.observationId,"
+        "circle.getAttribute('cx'),circle.getAttribute('cy')])"
+    )
+    assert pca_points != initial_points
+    assert (
+        f"contain {records[0]['pca_projection_match_count']}"
+        in page.locator("#projection").inner_text()
+    )
+    assert "PCA retains" in page.locator("#projection").inner_text()
+    layout.select_option("primary")
+    assert "Local t-SNE layout" in page.locator("#projection").inner_text()
+    assert (
+        page.locator("#plot circle").evaluate_all(
+            "circles => circles.map(circle => [circle.dataset.observationId,"
+            "circle.getAttribute('cx'),circle.getAttribute('cy')])"
+        )
+        == initial_points
+    )
+    assert errors == []
+
+
+def test_pca_only_sample_has_no_layout_choice(open_atlas):
+    page, errors = open_atlas()
+    page.get_by_role("button", name="Photo space", exact=True).click()
+    assert page.locator("#layout-control").is_hidden()
+    assert "PCA retains" in page.locator("#projection").inner_text()
+    assert errors == []

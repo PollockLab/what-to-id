@@ -104,17 +104,33 @@ const AtlasScope = (() => {
       rgb.every(channel => Number.isInteger(channel) && channel >= 0 && channel <= 255)
       ? `rgb(${rgb.join(',')})` : '#808080';
   }
-  function projectionSummary(payload, index) {
-    const method = typeof payload.projection === 'string' ? payload.projection : '2D';
+  function hasPcaAlternative(payload) {
+    return typeof payload.projection === 'string' && payload.projection.toUpperCase() !== 'PCA' &&
+      payload.records.length > 0 && payload.records.every(record =>
+        Array.isArray(record.pca_xy) && record.pca_xy.length === 2 && record.pca_xy.every(Number.isFinite));
+  }
+  function projectionCoordinates(payload, layout = 'primary') {
+    const pca = layout === 'pca' && hasPcaAlternative(payload);
+    return payload.records.map(record => pca ? record.pca_xy : record.xy);
+  }
+  function projectionSummary(payload, index, layout = 'primary') {
+    const pca = layout === 'pca' && hasPcaAlternative(payload);
+    const method = pca ? 'PCA' : typeof payload.projection === 'string' ? payload.projection : '2D';
     let summary = `${method} layout. Distances are approximate; compare the ranked photos.`;
+    if (method === 't-SNE') {
+      summary = 'Local t-SNE layout. Distant points and gaps do not quantify full-space similarity. Compare the ranked photos.';
+    }
     if (method.toUpperCase() === 'PCA' && Number.isFinite(payload.variance_retained)) {
       summary = `PCA retains ${(100 * payload.variance_retained).toFixed(1)}% of variation. Compare the ranked photos.`;
     }
-    const record = payload.records[index], quality = payload.projection_quality;
+    if (!pca && method === 'PCA' && payload.projection_metadata?.requested_method === 't-SNE') {
+      summary = `PCA fallback for this sample. ${summary}`;
+    }
+    const record = payload.records[index], quality = pca ? payload.pca_projection_quality : payload.projection_quality;
+    const count = pca ? record?.pca_projection_match_count : record?.projection_match_count;
     if (quality && record && Number.isInteger(quality.k) && quality.k > 0 &&
-        Number.isInteger(record.projection_match_count) && record.projection_match_count >= 0 &&
-        record.projection_match_count <= quality.k) {
-      summary += ` The ${quality.k} nearest points on this layout contain ${record.projection_match_count} of this photo’s ${quality.k} full-space matches.`;
+        Number.isInteger(count) && count >= 0 && count <= quality.k) {
+      summary += ` The ${quality.k} nearest points on this layout contain ${count} of this photo’s ${quality.k} full-space matches.`;
     }
     return summary;
   }
@@ -145,6 +161,6 @@ const AtlasScope = (() => {
       current: token => token === generation};
   }
   return {inBounds, matches, brushIndices, toggleIndex, modelHref, resolveSelection, mapHref,
-    compareNeighborhoods, requestGate, representationColor, hasRepresentationColors, projectionSummary, markerHits, nearestMarker, nearestLongitude};
+    compareNeighborhoods, requestGate, representationColor, hasRepresentationColors, hasPcaAlternative, projectionCoordinates, projectionSummary, markerHits, nearestMarker, nearestLongitude};
 })();
 if (typeof module !== 'undefined') module.exports = AtlasScope;
