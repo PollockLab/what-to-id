@@ -13,7 +13,7 @@ from what_to_id.page_map import _ASSETS
 pytestmark = pytest.mark.skipif(shutil.which("node") is None, reason="needs node")
 
 
-def run_case(raw, count=3):
+def case_script(raw, count=3):
     source = (_ASSETS / "map.js").read_text()
     binding = source[source.index("function link(){") : source.index("// The filter extension")]
     script = r"""
@@ -66,7 +66,11 @@ const before=state();S.months=1;step.open();step.go(2);const rechecked=state();
 AREA.clear();const cleared=state();
 console.log(JSON.stringify({before,rechecked,cleared}));
 """
-    result = subprocess.run(["node"], input=script, text=True, capture_output=True)
+    return script
+
+
+def run_case(raw, count=3):
+    result = subprocess.run(["node"], input=case_script(raw, count), text=True, capture_output=True)
     assert result.returncode == 0, result.stderr
     return json.loads(result.stdout)
 
@@ -135,9 +139,11 @@ const META={groups:['Plantae'],place_id:7085,max_url:8000};
 const PJ={params:()=>({}),inexact:()=>'',uncounted:()=>''},match=()=>true;
 const iso=()=>'',gname=x=>x;
 var AREA=MapArea({map,S,LAST,hash:new URLSearchParams(location.hash.slice(1)).get('area')||'',
+  park:new URLSearchParams(location.hash.slice(1)).get('park')||'',
+  bcpark:new URLSearchParams(location.hash.slice(1)).get('bcpark')||'',
   P:()=>P,keep:()=>KEEP,change:refilter,sel:()=>AREA.hash(),
   step:IdStep({a:$('identify'),prev:$('idprev'),next:$('idnext'),build:'fixture'}),
-  get:()=>{throw Error('Unexpected network request');}});
+  get:()=>fetch('http://area-recovery/parks').then(response=>response.arrayBuffer())});
 function refilter(){const mask=AREA.mask(P.n);KEEP=P.id.map((_,i)=>mask?mask[i]:1);
   $('count').textContent=AREA.invalid()?'Area unresolved':KEEP.reduce((a,b)=>a+b,0)+' results';
   link();history.replaceState(null,'','#'+AREA.hash());}

@@ -319,3 +319,138 @@ def test_unreadable_shared_area_requires_explicit_recovery_before_identify(brows
     assert page.locator("#identify").get_attribute("href").endswith("&id=101")
     assert errors == [] and external == []
     page.close()
+
+
+def test_pending_and_partial_shared_parks_need_recovery_before_identify(browser):
+    from .test_map_area_recovery import recovery_html
+
+    page = browser.new_page()
+    requests, errors = [], []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.route("http://area-recovery/**", lambda route: route.fulfill(body=recovery_html()))
+    page.route("https://api.inaturalist.org/**", lambda route: requests.append(route))
+    with page.expect_request("**/111"), page.expect_request("**/222"):
+        page.goto("http://area-recovery/map.html#park=111,222", wait_until="domcontentloaded")
+    page.wait_for_function("AREA.invalid()")
+    assert page.locator("#identify").get_attribute("href") is None
+    assert page.get_by_text("Area unresolved", exact=True).is_visible()
+    assert "Loading Park 111 and Park 222" in page.locator(".anote").inner_text()
+    geometry = {"type": "Polygon", "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]]}
+    assert len(requests) == 2
+    for route in requests:
+        place = int(route.request.url.rsplit("/", 1)[-1])
+        record = {"id": place}
+        if place == 111:
+            record["geometry_geojson"] = geometry
+        route.fulfill(json={"results": [record]})
+    page.wait_for_function("AREA.mask(3)!==null")
+    assert page.evaluate("AREA.invalid()") is True
+    assert page.evaluate("new URLSearchParams(location.hash.slice(1)).get('park')") == "111,222"
+    assert page.locator("#identify").get_attribute("href") is None
+    assert "Could not restore Park 222" in page.locator(".anote").inner_text()
+    page.get_by_role("button", name="Remove Park 222", exact=True).click()
+    assert page.evaluate("AREA.invalid()") is False
+    assert "place_id=111" in page.locator("#identify").get_attribute("href")
+    assert page.evaluate("AREA.hash()") == "park=111"
+    assert errors == []
+    page.close()
+
+
+@pytest.mark.parametrize("replace", [False, True])
+def test_cleared_or_replaced_park_ignores_late_boundary_response(browser, replace):
+    from .test_map_area_recovery import recovery_html
+
+    page = browser.new_page()
+    requests = []
+    page.route("http://area-recovery/**", lambda route: route.fulfill(body=recovery_html()))
+    page.route("https://api.inaturalist.org/**", lambda route: requests.append(route))
+    with page.expect_request("**/111"):
+        page.goto("http://area-recovery/map.html#park=111", wait_until="domcontentloaded")
+    assert len(requests) == 1 and page.evaluate("AREA.invalid()") is True
+    geometry = {"type": "Polygon", "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]]}
+    if replace:
+        page.locator('input[type="file"]').set_input_files(
+            {"name": "broken.geojson", "mimeType": "application/geo+json", "buffer": b"{"}
+        )
+        page.wait_for_function("document.querySelector('.anote').textContent.includes('not JSON')")
+        assert page.evaluate("AREA.invalid()") is True
+        assert page.evaluate("AREA.hash()") == "park=111"
+        page.locator('input[type="file"]').set_input_files(
+            {
+                "name": "area.geojson",
+                "mimeType": "application/geo+json",
+                "buffer": json.dumps(geometry).encode(),
+            }
+        )
+        page.wait_for_function("!AREA.invalid() && AREA.on()")
+    else:
+        page.get_by_role("button", name="Remove Park 111", exact=True).click()
+    before = page.evaluate("window.probe()")
+    with page.expect_response("**/111"):
+        requests[0].fulfill(json={"results": [{"id": 111, "geometry_geojson": geometry}]})
+    page.wait_for_load_state("networkidle")
+    assert page.evaluate("window.probe()") == before
+    assert before["invalid"] is False
+    page.close()
+
+
+@pytest.mark.parametrize("list_body", [{"kinds": ["Park"], "parks": []}, {}])
+def test_unavailable_shared_bc_park_keeps_key_and_explicit_clear(browser, list_body):
+    from .test_map_area_recovery import recovery_html
+
+    page = browser.new_page()
+    requests = []
+    page.route("http://area-recovery/**", lambda route: route.fulfill(body=recovery_html()))
+    page.route("http://area-recovery/parks", lambda route: requests.append(route))
+    with page.expect_request("http://area-recovery/parks"):
+        page.goto("http://area-recovery/map.html#bcpark=0096", wait_until="domcontentloaded")
+    assert page.evaluate("AREA.invalid()") is True
+    assert page.locator("#identify").get_attribute("href") is None
+    requests[0].fulfill(json=list_body)
+    page.wait_for_function(
+        "document.querySelector('.anote').textContent.includes('Could not restore')"
+    )
+    assert page.evaluate("AREA.hash()") == "bcpark=0096"
+    assert page.locator("#identify").get_attribute("href") is None
+    assert page.get_by_role("button", name="Remove BC park 0096", exact=True).is_visible()
+    assert "BC park 0096" in page.locator(".anote").inner_text()
+    page.get_by_role("button", name="Clear unresolved areas", exact=True).click()
+    assert page.evaluate("AREA.invalid()") is False
+    assert page.evaluate("AREA.hash()") == ""
+    assert (
+        page.locator("#identify").get_attribute("href").startswith("https://www.inaturalist.org/")
+    )
+    page.close()
+
+
+def test_failed_park_replacement_preserves_prior_unreadable_shared_area(browser):
+    from .test_map_area_recovery import recovery_html
+
+    page = browser.new_page()
+    page.route("http://area-recovery/**", lambda route: route.fulfill(body=recovery_html()))
+    parks = {
+        "kinds": ["Park"],
+        "parks": [["0096", "Test park", 0, 111, [0, 0, 1, 1], "", ""]],
+    }
+    page.route("http://area-recovery/parks", lambda route: route.fulfill(json=parks))
+    page.route(
+        "https://api.inaturalist.org/**", lambda route: route.fulfill(json={"results": [{}]})
+    )
+    page.goto("http://area-recovery/map.html#area=ab!")
+    page.get_by_role("combobox", name="BC parks and protected areas").click()
+    page.get_by_role("option").filter(has_text="Test park").click()
+    page.wait_for_function(
+        "document.querySelector('.anote').textContent.includes('Could not restore')"
+    )
+    assert page.evaluate("AREA.invalid()") is True
+    assert page.evaluate("new URLSearchParams(location.hash.slice(1)).get('area')") == "ab!"
+    assert page.locator("#identify").get_attribute("href") is None
+    page.get_by_role("button", name="Remove Test park", exact=True).click()
+    assert page.evaluate("AREA.invalid()") is True
+    assert page.evaluate("new URLSearchParams(location.hash.slice(1)).get('area')") == "ab!"
+    page.get_by_role("button", name="Clear invalid area", exact=True).click()
+    assert page.evaluate("AREA.invalid()") is False
+    assert (
+        page.locator("#identify").get_attribute("href").startswith("https://www.inaturalist.org/")
+    )
+    page.close()

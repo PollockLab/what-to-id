@@ -219,9 +219,9 @@ function link(){
   var a=$('identify'),href=AREA.link({w:b.getWest(),s:b.getSouth(),e:b.getEast(),n:b.getNorth()},
     function(v,p,side){var r=TX.identifyUrl(st,v,META,Object.assign({},PJ.params(),p));if(!side)u=r;return r.url;},match);
   if(AREA.invalid()){a.removeAttribute('href');a.setAttribute('aria-disabled','true');
-    a.title='Clear or replace the unreadable shared area before opening Identify.';
+    a.title='Wait for the selected areas to load, or explicitly clear or replace unresolved areas.';
     $('idprev').disabled=$('idnext').disabled=true;
-    $('idnote').hidden=false;$('idnote').textContent='Identify is unavailable: the shared area could not be restored. Clear or replace the invalid area first.';
+    $('idnote').hidden=false;$('idnote').textContent='Identify is unavailable until every selected area is restored. Wait for loading, or explicitly clear or replace unresolved areas.';
     return;}
   a.removeAttribute('aria-disabled');a.href=href;
   a.title='Opens these records in the iNaturalist Identify page.';
