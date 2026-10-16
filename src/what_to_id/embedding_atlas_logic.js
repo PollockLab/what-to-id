@@ -65,11 +65,12 @@ const AtlasScope = (() => {
     if (result.has(index)) result.delete(index); else result.add(index);
     return [...result].sort((a, b) => a - b);
   }
-  function modelHref(relative, base, group, id) {
+  function modelHref(relative, base, group, id, context = null) {
     const target = new URL(relative, base);
     const state = new URLSearchParams();
     state.set('group', group);
     if (id !== null && id !== undefined) state.set('id', String(id));
+    if (context !== null) state.set('ctx', context);
     target.hash = state.toString();
     return target.href;
   }

@@ -1090,3 +1090,316 @@ def test_hidden_map_geometry_does_not_change_geographic_scope(open_atlas, width)
     page.get_by_role("button", name="Clear search and filters", exact=True).click()
     assert page.locator("#map-resize-note").is_hidden()
     assert errors == []
+
+
+@pytest.fixture(scope="module")
+def context_site(tmp_path_factory, taxonomy_site):
+    """Two actual generated pages, with independently reordered target records/presets."""
+    import json
+    import re
+    import shutil
+
+    output = tmp_path_factory.mktemp("atlas-context-browser")
+    shutil.copytree(taxonomy_site, output, dirs_exist_ok=True)
+    shutil.copytree(taxonomy_site, output / "other", dirs_exist_ok=True)
+    for path, label, views in [
+        (
+            output / "embeddings.html",
+            "BioCLIP",
+            [
+                dict(label="BioCLIP", url="embeddings.html"),
+                dict(label="DINO", url="other/embeddings.html"),
+            ],
+        ),
+        (
+            output / "other/embeddings.html",
+            "DINO",
+            [
+                dict(label="BioCLIP", url="../embeddings.html"),
+                dict(label="DINO", url="embeddings.html"),
+            ],
+        ),
+    ]:
+        html = path.read_text()
+        match = re.search(r"const META=(.*);", html)
+        metadata = json.loads(match[1])
+        metadata.update(current_label=label, model_views=views)
+        path.write_text(html[: match.start(1)] + json.dumps(metadata) + html[match.end(1) :])
+    for path in (output / "other/embeddings-data").glob("*.json"):
+        payload = json.loads(path.read_text())
+        old_ids = [record["id"] for record in payload["records"]]
+        payload["records"].reverse()
+        new_indices = {record["id"]: i for i, record in enumerate(payload["records"])}
+        for record in payload["records"]:
+            record["neighbors"] = [
+                [new_indices[old_ids[i]], score] for i, score in record["neighbors"]
+            ]
+            record["pca_xy"] = record["xy"][:]
+        payload["projection"] = "t-SNE"
+        payload["backbone"] = "other-fixture"
+        payload["taxonomy"]["presets"].reverse()
+        path.write_text(json.dumps(payload))
+    return output
+
+
+@pytest.fixture
+def open_context_atlas(browser, context_site):
+    import json
+
+    pages = []
+
+    def open_page(fragment="#group=Plantae&id=100", *, target_mutator=None):
+        page = browser.new_page(viewport={"width": 1440, "height": 900})
+        pages.append(page)
+        errors, urls = [], []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+
+        def route(request):
+            url = request.request.url
+            urls.append(url)
+            path = urlparse(url).path
+            if "maplibre-gl.js" in path:
+                request.fulfill(body=MAP_ADAPTER, content_type="text/javascript")
+            elif "maplibre-gl.css" in path:
+                request.fulfill(body="", content_type="text/css")
+            else:
+                file = context_site / path.lstrip("/")
+                if not file.is_file():
+                    request.fulfill(status=404, body="Not found")
+                elif target_mutator and path.startswith("/other/") and path.endswith(".json"):
+                    payload = target_mutator(json.loads(file.read_text()))
+                    request.fulfill(body=json.dumps(payload), content_type="application/json")
+                else:
+                    request.fulfill(path=str(file))
+
+        page.route("**/*", route)
+        page.goto("https://context-atlas.test/embeddings.html" + fragment)
+        page.locator('[data-focal-id="100"]').wait_for()
+        page.wait_for_function("window.testMap && testMap.sources.observations")
+        assert errors == []
+        return page, errors, urls
+
+    yield open_page
+    for page in pages:
+        page.close()
+
+
+def _go_other_encoder(page, label):
+    page.locator("#advanced").evaluate("element=>element.open=true")
+    page.locator("#model-links").get_by_role("link", name=label, exact=True).click()
+    page.wait_for_function("!document.getElementById('group').disabled")
+
+
+def _assert_identify_ids(page, ids):
+    page.get_by_role("button", name=f"Identify these results ({len(ids)})", exact=True).click()
+    assert set(identify_batch_ids(page)) == set(ids)
+    page.get_by_role("button", name="Close", exact=True).last.click()
+
+
+def test_encoder_links_and_back_forward_keep_ancestry_search_and_exact_identify_ids(
+    open_context_atlas,
+):
+    page, errors, urls = open_context_atlas()
+    page.get_by_role("combobox", name="Taxon scope", exact=True).select_option("0")
+    assert set(_scope_result_ids(page)) == {101, 102, 103, 106, 107}
+    _go_other_encoder(page, "DINO")
+    assert set(_scope_result_ids(page)) == {101, 102, 103, 106, 107}
+    assert page.locator("#taxon-scope").input_value() == "1"  # target presets reordered
+    assert (
+        "5 filtered observations retained from BioCLIP"
+        in page.locator("#transfer-message").inner_text()
+    )
+    _assert_identify_ids(page, [101, 102, 103, 106, 107])
+    page.go_back()
+    page.wait_for_function("!document.getElementById('group').disabled")
+    assert set(_scope_result_ids(page)) == {101, 102, 103, 106, 107}
+    page.go_forward()
+    page.wait_for_function("!document.getElementById('group').disabled")
+    assert set(_scope_result_ids(page)) == {101, 102, 103, 106, 107}
+    page.get_by_role("searchbox").fill("Pellia")
+    assert page.locator("#transfer-status").is_hidden()  # deliberate edit discards verification
+    _go_other_encoder(page, "BioCLIP")
+    assert _scope_result_ids(page) == [102]
+    _assert_identify_ids(page, [102])
+    assert all("ctx=" not in url and "#" not in url for url in urls)
+    assert errors == []
+
+
+def test_comparison_alternate_link_carries_literal_id_search(open_context_atlas):
+    page, errors, _ = open_context_atlas()
+    page.get_by_role("searchbox").fill("107")
+    _assert_identify_ids(page, [107])
+    comparison = page.locator(".encoder-comparison")
+    comparison.locator("summary").click()
+    link = comparison.get_by_role("link", name="View this photo in DINO", exact=True)
+    link.wait_for()
+    assert "ctx=" in link.get_attribute("href")
+    link.click()
+    page.wait_for_function("!document.getElementById('group').disabled")
+    assert _scope_result_ids(page) == [107]
+    assert page.locator('[data-focal-id="100"]').count() == 1
+    _assert_identify_ids(page, [107])
+    _go_other_encoder(page, "BioCLIP")
+    assert _scope_result_ids(page) == [107]
+    assert errors == []
+
+
+def test_reordered_brush_ids_and_retained_geography_survive_fit_layout_and_resize(
+    open_context_atlas,
+):
+    page, errors, _ = open_context_atlas()
+    page.get_by_role("button", name="Photo space", exact=True).click()
+    for index in [2, 6]:
+        page.locator("#record").select_option(str(index))
+        page.get_by_role("button", name="Add selected photo", exact=True).click()
+    page.locator("#only-brushed").check()
+    page.locator("#advanced").evaluate("element=>element.open=true")
+    page.locator("#only-view").check()
+    assert _scope_result_ids(page) == [102]
+    _go_other_encoder(page, "DINO")
+    assert _scope_result_ids(page) == [102]
+    assert page.evaluate("[...brushed].map(i=>data.records[i].id).sort()") == [102, 106]
+    assert page.evaluate("brushRect") is None
+    assert page.locator("#retained-area-status").is_visible()
+    assert "retained from BioCLIP" in page.locator("#retained-area-message").inner_text()
+    page.evaluate(
+        "testMap.getBounds=()=>({getWest:()=>-180,getSouth:()=>-90,getEast:()=>180,getNorth:()=>90});testMap.handlers.moveend()"
+    )
+    page.get_by_role("button", name="Show all locations", exact=True).click()
+    page.get_by_role("button", name="Split", exact=True).click()
+    page.set_viewport_size({"width": 390, "height": 900})
+    page.locator("#layout-select").select_option("pca")
+    assert _scope_result_ids(page) == [102]
+    _assert_identify_ids(page, [102])
+    page.get_by_role("button", name="Use current map area", exact=True).click()
+    assert set(_scope_result_ids(page)) == {102, 106}
+    assert page.locator("#retained-area-status").is_hidden()
+    assert page.locator("#transfer-status").is_hidden()
+    _assert_identify_ids(page, [102, 106])
+    assert errors == []
+
+
+def test_negative_ancestry_scope_transfers_roots_and_polarity_not_option_index(open_context_atlas):
+    page, errors, _ = open_context_atlas()
+    page.locator("#group").select_option("Fungi")
+    page.locator('[data-focal-id="200"]').wait_for()
+    page.locator("#taxon-scope").select_option("2")
+    assert _scope_result_ids(page) == [201]
+    _go_other_encoder(page, "DINO")
+    assert page.locator("#taxon-scope").input_value() == "0"
+    assert _scope_result_ids(page) == [201]
+    _assert_identify_ids(page, [201])
+    _go_other_encoder(page, "BioCLIP")
+    assert _scope_result_ids(page) == [201]
+    assert errors == []
+
+
+@pytest.mark.parametrize(
+    "failure", ["pool", "taxonomy", "missing", "malformed", "empty", "mismatch"]
+)
+def test_failed_or_empty_transfer_never_expands_identify_and_has_explicit_recovery(
+    open_context_atlas, failure
+):
+    import json
+    from urllib.parse import quote
+
+    page, errors, _ = open_context_atlas()
+    page.locator("#taxon-scope").select_option("0")
+    page.get_by_role("searchbox").fill("107")
+    context = page.evaluate("JSON.parse(serializedContext())")
+    if failure == "pool":
+        context["poolSha"] = "a" * 64
+    elif failure == "taxonomy":
+        context["taxonomySha"] = "a" * 64
+    elif failure == "missing":
+        context["resultIds"] = [99999]
+    elif failure == "empty":
+        context.update(q="absent literal", resultIds=[])
+    elif failure == "mismatch":
+        context["resultIds"] = []
+    raw = "{" if failure == "malformed" else json.dumps(context)
+    page.goto(
+        "https://context-atlas.test/other/embeddings.html#group=Plantae&id=100&ctx=" + quote(raw)
+    )
+    page.wait_for_function("!document.getElementById('group').disabled")
+    assert page.locator("#identify-results").is_disabled()
+    if failure == "empty":
+        assert _scope_result_ids(page) == []
+        assert "0 filtered observations" in page.locator("#transfer-message").inner_text()
+    else:
+        assert "Identify is blocked" in page.locator("#transfer-message").inner_text()
+        page.get_by_role("searchbox").fill("")
+        assert page.locator("#identify-results").is_disabled()
+    page.get_by_role("button", name="Clear transferred filters", exact=True).click()
+    assert len(_scope_result_ids(page)) == 8
+    assert page.locator("#identify-results").is_enabled()
+    assert page.locator("#transfer-status").is_hidden()
+    assert errors == []
+
+
+def test_same_document_back_restores_criteria_and_focal_while_group_change_clears_context(
+    open_context_atlas,
+):
+    page, errors, _ = open_context_atlas()
+    assert "ctx=" not in page.locator("#model-links a").last.get_attribute("href")
+    page.get_by_role("searchbox").fill("107")
+    before = page.evaluate("history.length")
+    page.evaluate("testMap.clickIds([3])")
+    page.locator('[data-focal-id="103"]').wait_for()
+    assert page.evaluate("history.length") == before + 1
+    assert _scope_result_ids(page) == [107]
+    page.go_back()
+    page.locator('[data-focal-id="100"]').wait_for()
+    assert page.get_by_role("searchbox").input_value() == "107"
+    _assert_identify_ids(page, [107])
+    page.go_forward()
+    page.locator('[data-focal-id="103"]').wait_for()
+    assert _scope_result_ids(page) == [107]
+    page.locator("#group").select_option("Fungi")
+    page.locator('[data-focal-id="200"]').wait_for()
+    assert page.get_by_role("searchbox").input_value() == ""
+    assert "ctx=" not in page.evaluate("location.hash")
+    assert _scope_result_ids(page) == [200, 201, 202]
+    assert errors == []
+
+
+def test_actual_missing_target_record_blocks_identify_and_reports_missing_count(open_context_atlas):
+    def without_107(payload):
+        old_ids = [record["id"] for record in payload["records"]]
+        payload["records"] = [record for record in payload["records"] if record["id"] != 107]
+        new_index = {record["id"]: i for i, record in enumerate(payload["records"])}
+        for record in payload["records"]:
+            record["neighbors"] = [
+                [new_index[old_ids[i]], score]
+                for i, score in record["neighbors"]
+                if old_ids[i] in new_index
+            ]
+        return payload
+
+    page, errors, _ = open_context_atlas(target_mutator=without_107)
+    page.get_by_role("searchbox").fill("107")
+    _go_other_encoder(page, "DINO")
+    assert _scope_result_ids(page) == []
+    assert page.locator("#identify-results").is_disabled()
+    message = page.locator("#transfer-message").inner_text()
+    assert "1 expected results missing" in message
+    assert "1 observation IDs absent from this view" in message
+    assert "Identify is blocked" in message
+    assert errors == []
+
+
+def test_clear_retained_area_preserves_other_criteria_and_recomputes_normally(open_context_atlas):
+    page, errors, _ = open_context_atlas()
+    page.locator("#taxon-scope").select_option("0")
+    page.locator("#advanced").evaluate("element=>element.open=true")
+    page.locator("#only-view").check()
+    assert set(_scope_result_ids(page)) == {101, 102, 103, 107}
+    _go_other_encoder(page, "DINO")
+    assert set(_scope_result_ids(page)) == {101, 102, 103, 107}
+    page.get_by_role("button", name="Clear area filter", exact=True).click()
+    assert not page.locator("#only-view").is_checked()
+    assert set(_scope_result_ids(page)) == {101, 102, 103, 106, 107}
+    assert page.locator("#taxon-scope").input_value() == "1"
+    assert page.locator("#retained-area-status").is_hidden()
+    _assert_identify_ids(page, [101, 102, 103, 106, 107])
+    assert errors == []

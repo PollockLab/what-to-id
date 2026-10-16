@@ -340,6 +340,8 @@ def build(
     html = html.replace("__IDENTIFY_LINKS__", identify_links)
     logic = Path(__file__).with_name("embedding_atlas_logic.js").read_text()
     html = html.replace("__ATLAS_LOGIC__", logic)
+    context = Path(__file__).with_name("embedding_atlas_context.js").read_text()
+    html = html.replace("__ATLAS_CONTEXT__", context)
     (out / "embeddings.html").write_text(html)
     home = Path(__file__).with_name("embedding_atlas_home.html").read_text()
     (out / "index.html").write_text(home)
