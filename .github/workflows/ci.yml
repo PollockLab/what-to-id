@@ -44,3 +44,30 @@ jobs:
         env:
           PYTHONPATH: src
           WHAT_TO_ID_REQUIRE_BROWSER: "1"
+
+  # Temporary diagnostic for the exact production failure. Remove this fixed job
+  # ID before merging, after the workflow token's HTTP outcome is established.
+  pages-api-diagnostic:
+    if: github.event_name == 'pull_request' && github.repository == 'PollockLab/what-to-id'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Read the failed production log endpoint with the workflow token
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PYTHONPATH: src
+        run: |
+          python3 - <<'PYTHON'
+          import sys
+          from what_to_id.demo_publication import PublicationError, _api
+          try:
+              logs = _api("repos/PollockLab/what-to-id/actions/jobs/116657328440/logs", raw=True)
+          except PublicationError as exc:
+              sys.exit(str(exc))
+          if not logs:
+              sys.exit("Job log download returned an empty response")
+          print("Workflow token downloaded the exact production job logs successfully")
+          PYTHON

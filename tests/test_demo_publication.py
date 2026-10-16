@@ -451,7 +451,7 @@ def test_existing_output_and_api_failure_leave_site_unchanged(github, demo, tmp_
         prepare_site(REPO, demo, output)
     assert (output / "map.html").read_bytes() == b"existing live copy"
     github[0][f"{BASE}/actions/artifacts/30/zip"] = subprocess.CalledProcessError(1, "gh")
-    with pytest.raises(subprocess.CalledProcessError):
+    with pytest.raises(PublicationError, match="GitHub API request failed"):
         prepare_site(REPO, demo, tmp_path / "new_output")
     assert not (tmp_path / "new_output").exists()
 
@@ -623,3 +623,44 @@ def test_running_deploy_step_cannot_establish_old_site_is_current(github, has_st
         job["steps"][0]["started_at"] = None
     with pytest.raises(PublicationError, match="Unconfirmed Pages publication"):
         deployed_artifact(REPO)
+
+
+def test_job_log_http_failure_is_actionable_without_credentials(github, monkeypatch, capsys):
+    responses, _ = github
+    monkeypatch.setenv("GH_TOKEN", "workflow-secret-value")
+    endpoint = f"{BASE}/actions/jobs/20/logs"
+    responses[endpoint] = subprocess.CalledProcessError(
+        1,
+        ["gh", "api", endpoint],
+        output=b"private response body",
+        stderr=(
+            b"gh: Resource not accessible by integration (HTTP 403)\n"
+            b"Authorization: Bearer workflow-secret-value\n"
+            b"GET https://logs.example.test/archive?sig=private-signature&token=workflow-secret-value\n"
+            b"token github_pat_unset_secret and ghs_unset_secret\n"
+        ),
+    )
+    monkeypatch.setattr("sys.argv", ["demo_publication", "--repository", REPO, "--revision"])
+    with pytest.raises(SystemExit) as error:
+        main()
+    assert error.value.code == 1
+    message = capsys.readouterr().err
+    assert endpoint in message
+    assert "HTTP 403" in message
+    assert "Resource not accessible by integration" in message
+    assert "logs.example.test/archive" in message
+    assert "workflow-secret-value" not in message
+    assert "private-signature" not in message
+    assert "private response body" not in message
+    assert "github_pat_unset_secret" not in message
+    assert "ghs_unset_secret" not in message
+    assert "The current live site is unchanged" in message
+
+
+def test_empty_api_stderr_still_reports_failing_endpoint(github):
+    responses, _ = github
+    endpoint = f"{BASE}/actions/jobs/20/logs"
+    responses[endpoint] = subprocess.CalledProcessError(1, ["gh", "api", endpoint])
+    with pytest.raises(PublicationError, match="no HTTP diagnostics") as error:
+        deployed_revision(REPO)
+    assert endpoint in str(error.value)
