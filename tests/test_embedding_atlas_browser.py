@@ -760,8 +760,8 @@ def test_verified_taxon_scope_excludes_name_lookalikes_and_retains_focal_and_ran
     page, errors = open_taxonomy_atlas
     scope = page.get_by_role("combobox", name="Taxon scope", exact=True)
     assert scope.input_value() == ""
-    assert "Bryophytes · 5 verified" in scope.inner_text()
-    assert "Lichen-forming groups (approximate) · 0 verified" in scope.inner_text()
+    assert "Bryophytes · 5 ancestry matches" in scope.inner_text()
+    assert "Lichen-forming groups (approximate) · 0 ancestry matches" in scope.inner_text()
     before = page.locator(".neighbors button").evaluate_all(
         "buttons=>buttons.map(b=>b.dataset.observationId)"
     )
@@ -795,7 +795,7 @@ def test_verified_taxon_scope_excludes_name_lookalikes_and_retains_focal_and_ran
         "Object.fromEntries(testMap.sources.observations.data.features.map(f=>[data.records[f.properties.index].id,f.properties.opacity]))"
     )
     assert opacities["105"] == 0.12 and opacities["104"] == 0.12 and opacities["100"] == 1
-    assert "Dimmed: outside the verified taxon scope" in page.locator("#legend").inner_text()
+    assert "Dimmed: outside the selected ancestry scope" in page.locator("#legend").inner_text()
     assert errors == []
 
 
@@ -870,4 +870,31 @@ def test_mobile_taxon_scope_is_accessible_and_clear_action_retains_focal(open_ta
     assert scope.input_value() == ""
     assert scope.evaluate("element=>document.activeElement===element")
     assert page.locator('[data-focal-id="100"]').count() == 1
+    assert errors == []
+
+
+def test_identify_intersects_ancestry_with_search_brush_and_map(open_taxonomy_atlas):
+    page, errors = open_taxonomy_atlas
+    page.get_by_role("combobox", name="Taxon scope", exact=True).select_option("0")
+    page.get_by_role("button", name="Identify these results (5)", exact=True).click()
+    assert set(identify_batch_ids(page)) == {101, 102, 103, 106, 107}
+    assert "taxon scope" in page.locator("#identify-dialog").inner_text()
+    page.locator("#close-identify").click()
+    page.get_by_role("button", name="Photo space", exact=True).click()
+    for index in [2, 6]:
+        page.locator("#record").select_option(str(index))
+        page.get_by_role("button", name="Add selected photo", exact=True).click()
+    page.locator("#only-brushed").check()
+    page.get_by_role("button", name="Identify these results (2)", exact=True).click()
+    assert set(identify_batch_ids(page)) == {102, 106}
+    page.locator("#close-identify").click()
+    page.locator("#advanced summary").first.click()
+    page.locator("#only-view").check()
+    page.get_by_role("searchbox").fill("Pellia")
+    page.get_by_role("button", name="Identify these results (1)", exact=True).click()
+    assert identify_batch_ids(page) == [102]
+    assert page.locator('[data-focal-id="106"]').count() == 1
+    page.locator("#close-identify").click()
+    page.get_by_role("searchbox").fill("Mosses")
+    assert page.locator("#identify-results").is_disabled()
     assert errors == []
