@@ -32,13 +32,16 @@ const AtlasScope = (() => {
     }
     return result;
   }
+  const validTaxonId = id => Number.isSafeInteger(id) && id > 0;
+  function validLineage(record) {
+    return validTaxonId(record?.taxon_id) && typeof record.taxonomy_complete === 'boolean' &&
+      Array.isArray(record.ancestor_taxon_ids) && record.ancestor_taxon_ids.every(validTaxonId) &&
+      record.ancestor_taxon_ids.includes(record.taxon_id) &&
+      new Set(record.ancestor_taxon_ids).size === record.ancestor_taxon_ids.length;
+  }
   function taxonMembership(record, roots, exclude = false) {
-    const validId = id => Number.isSafeInteger(id) && id > 0;
-    if (typeof exclude !== 'boolean' || !Array.isArray(roots) || !roots.length || !roots.every(validId) ||
-        !validId(record?.taxon_id) || typeof record.taxonomy_complete !== 'boolean' ||
-        !Array.isArray(record.ancestor_taxon_ids) || !record.ancestor_taxon_ids.every(validId) ||
-        !record.ancestor_taxon_ids.includes(record.taxon_id) ||
-        new Set(record.ancestor_taxon_ids).size !== record.ancestor_taxon_ids.length) return null;
+    if (typeof exclude !== 'boolean' || !Array.isArray(roots) || !roots.length || !roots.every(validTaxonId) ||
+        !validLineage(record)) return null;
     if (roots.some(root => record.ancestor_taxon_ids.includes(root))) return !exclude;
     return record.taxonomy_complete ? exclude : null;
   }
@@ -62,6 +65,40 @@ const AtlasScope = (() => {
     const records = Array.isArray(payload?.records) ? payload.records : [];
     return taxonPresets(payload).map((preset, index) =>
       ({index, preset, ...taxonCounts(records, preset.taxon_ids, preset.exclude === true)}));
+  }
+  const catalogs = new WeakMap();
+  function taxonCatalog(payload) {
+    if (!payload || typeof payload !== 'object') return [];
+    if (catalogs.has(payload)) return catalogs.get(payload);
+    const rows = payload.taxonomy?.taxa, seen = new Set();
+    if (!Array.isArray(rows) || !rows.every(row => Array.isArray(row) && row.length === 4 &&
+        validTaxonId(row[0]) && row.slice(1).every(value => typeof value === 'string') &&
+        !seen.has(row[0]) && seen.add(row[0]))) {
+      catalogs.set(payload, []);return [];
+    }
+    // One pass over recorded paths. Text queries subsequently search labels only.
+    const positive = new Map(), partialPositive = new Map();let incomplete = 0;
+    const records = Array.isArray(payload.records) ? payload.records : [];
+    records.forEach(record => {
+      if (!validLineage(record)) {incomplete++;return;}
+      if (!record.taxonomy_complete) incomplete++;
+      record.ancestor_taxon_ids.forEach(id => {
+        positive.set(id, (positive.get(id) || 0) + 1);
+        if (!record.taxonomy_complete) partialPositive.set(id, (partialPositive.get(id) || 0) + 1);
+      });
+    });
+    const result = rows.filter(([id]) => positive.has(id)).map(([id, name, common, rank]) => {
+      const verified = positive.get(id), unknown = incomplete - (partialPositive.get(id) || 0);
+      return {id, label: name || `Taxon ID ${id}`, common, rank, taxon_ids: [id],
+        approximate: false, exclude: false, verified, unknown,
+        excluded: records.length - verified - unknown,
+        search: `${name} ${common} ${id}`.toLocaleLowerCase()};
+    }).sort((a, b) => a.label.localeCompare(b.label) || a.id - b.id);
+    catalogs.set(payload, result);return result;
+  }
+  function findTaxa(catalog, query = '', activeId = null) {
+    const term = query.trim().toLocaleLowerCase();
+    return catalog.filter(taxon => taxon.id === activeId || taxon.search.includes(term));
   }
   function brushIndices(points, rectangle) {
     if (!rectangle || rectangle.length !== 4 || !rectangle.every(Number.isFinite)) return [];
@@ -201,6 +238,7 @@ const AtlasScope = (() => {
       current: token => token === generation};
   }
   return {inspectionPhotoUrl, inBounds, matches, taxonMembership, taxonPresets, taxonCounts, taxonScopeCounts,
+    taxonCatalog, findTaxa,
     brushIndices, toggleIndex, modelHref, resolveSelection, mapHref,
     compareNeighborhoods, requestGate, representationColor, hasRepresentationColors, hasPcaAlternative, projectionCoordinates, projectionSummary, markerHits, nearestMarker, nearestLongitude};
 })();

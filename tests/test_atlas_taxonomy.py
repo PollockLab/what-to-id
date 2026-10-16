@@ -292,3 +292,37 @@ def test_fungal_payload_passes_group_context_without_changing_observations(tmp_p
     assert actual["taxonomy"]["presets"][2]["unknown_count"] == 1
     for before, after in zip(baseline["records"], actual["records"], strict=True):
         assert all(after[key] == value for key, value in before.items())
+
+
+def test_catalog_contains_only_represented_ancestors_with_explicit_missing_labels(tmp_path):
+    tree = AtlasTaxonomy(
+        cache(
+            tmp_path,
+            {
+                "1": [None, "Life", "", "stateofmatter"],
+                "2": [1, "Crataegus", "Hawthorns", "genus"],
+                "3": [2, "Crataegus", "", "subgenus"],
+                "4": [99, "Partial", "", "species"],
+                "5": [1, "Not sampled", "", "species"],
+            },
+        )
+    )
+    records = [tree.lineage(3), tree.lineage(4), tree.lineage(None)]
+    original = json.loads(json.dumps(records))
+    assert tree.metadata(records)["taxa"] == [
+        [1, "Life", "", "stateofmatter"],
+        [2, "Crataegus", "Hawthorns", "genus"],
+        [3, "Crataegus", "", "subgenus"],
+        [4, "Partial", "", "species"],
+        [99, "", "", ""],
+    ]
+    assert records == original
+    assert tree.metadata([])["taxa"] == []
+
+
+@pytest.mark.parametrize("index,value", [(1, None), (2, 123), (3, [])])
+def test_catalog_labels_must_be_recorded_strings(tmp_path, index, value):
+    labels = row(None)
+    labels[index] = value
+    with pytest.raises(ValueError, match="recorded names and rank must be strings"):
+        AtlasTaxonomy(cache(tmp_path, {"1": labels}))

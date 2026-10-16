@@ -51,13 +51,18 @@ const AtlasContext = (() => {
     const context = validate(value);
     if (payload.records.length > MAX_IDS || payload.group !== context.group ||
         metadata.pool_sha256 !== context.poolSha) throw Error('The transferred source pool does not match this view.');
-    let presetIndex = -1;
+    let presetIndex = -1, taxonId = null;
     if (context.taxonRoots.length) {
       if (!context.taxonomySha || payload.taxonomy?.cache_sha256 !== context.taxonomySha)
         throw Error('The transferred taxonomy does not match this view.');
       presetIndex = scope.taxonPresets(payload).findIndex(preset =>
         sameIds(context.taxonRoots, preset.taxon_ids) && (preset.exclude === true) === context.taxonExclude);
-      if (presetIndex < 0) throw Error('The transferred ancestry scope is unavailable in this view.');
+      if (presetIndex < 0) {
+        if (!context.taxonExclude && context.taxonRoots.length === 1 &&
+            scope.taxonCatalog(payload).some(taxon => taxon.id === context.taxonRoots[0]))
+          taxonId = context.taxonRoots[0];
+        else throw Error('The transferred ancestry scope is unavailable in this view.');
+      }
     }
     const index = new Map(payload.records.map((record, i) => [record.id, i]));
     if (index.size !== payload.records.length || !payload.records.every(record => validId(record.id)))
@@ -69,7 +74,7 @@ const AtlasContext = (() => {
       bounds: context.geoBounds, onlyInView: context.geoBounds !== null};
     const matchedIds = scope.matches(payload.records, options).map(({r}) => r.id);
     const verification = verify(context.resultIds, payload.records, matchedIds);
-    return {presetIndex, brushedIndices, missingBrush, ...verification,
+    return {presetIndex, ...(taxonId === null ? {} : {taxonId}), brushedIndices, missingBrush, ...verification,
       ok: verification.ok && missingBrush === 0};
   }
   return {MAX_IDS, MAX_TEXT, decode, encode, restore, verify};

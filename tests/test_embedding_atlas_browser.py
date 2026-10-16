@@ -1053,12 +1053,14 @@ def test_identify_fungal_partition_contains_exactly_742_known_outside_ids(
     page.locator("#group").select_option("Fungi")
     page.locator('[data-focal-id="10000"]').wait_for()
     scope = page.get_by_role("combobox", name="Taxon scope", exact=True)
-    assert scope.locator("option").all_text_contents() == [
+    assert scope.locator(":scope > option").all_text_contents() == [
         "All sampled observations",
         "Lichen-forming groups (approximate) · 255 ancestry matches",
         "Outside listed lichen-forming groups (approximate) · 742 ancestry matches",
     ]
-    assert scope.locator("option").evaluate_all("options=>options.map(option=>option.value)") == [
+    assert scope.locator(":scope > option").evaluate_all(
+        "options=>options.map(option=>option.value)"
+    ) == [
         "",
         "1",
         "2",
@@ -2080,15 +2082,15 @@ def _restore_zero_taxon_scope(page, index):
 @pytest.mark.parametrize(
     ("group", "ids"), [("Aves", [300, 301, 302]), ("Actinopterygii", [400, 401, 402])]
 )
-def test_zero_positive_groups_hide_choices_but_restore_zero_scope_without_widening(
+def test_zero_positive_presets_stay_hidden_and_restore_without_widening(
     open_taxonomy_atlas, group, ids
 ):
     page, errors = open_taxonomy_atlas
     page.locator("#group").select_option(group)
     page.locator(f'[data-focal-id="{ids[0]}"]').wait_for()
-    assert page.locator("#taxon-scope-control").is_hidden()
-    assert page.locator("#taxon-scope").is_disabled()
-    assert page.locator("#taxon-scope option").count() == 1
+    assert page.locator("#taxon-scope-control").is_visible()
+    assert page.locator("#taxon-scope").is_enabled()
+    assert page.locator("#taxon-scope > option").count() == 1
     assert len(page.evaluate("taxonPresets")) == 2
     provenance = page.locator("#taxonomy-provenance").text_content()
     assert "Bryophytes: 0 known matches, 2 known nonmatches, 1 unknown" in provenance
@@ -2107,9 +2109,9 @@ def test_zero_positive_groups_hide_choices_but_restore_zero_scope_without_wideni
     assert page.locator("#identify-results").is_disabled()
     page.get_by_role("button", name="Clear taxon scope", exact=True).click()
     assert _scope_result_ids(page) == ids
-    assert page.locator("#taxon-scope-control").is_hidden()
-    assert page.locator("#taxon-scope option").count() == 1
-    assert page.get_by_role("searchbox").evaluate("element=>document.activeElement===element")
+    assert page.locator("#taxon-scope-control").is_visible()
+    assert page.locator("#taxon-scope > option").count() == 1
+    assert page.locator("#taxon-scope").evaluate("element=>document.activeElement===element")
     assert page.locator(f'[data-focal-id="{ids[0]}"]').count() == 1
     assert errors == []
 
@@ -2118,7 +2120,9 @@ def test_restored_zero_scope_transfers_by_roots_across_reordered_presets_and_his
     open_context_atlas,
 ):
     page, errors, _ = open_context_atlas()
-    assert page.locator("#taxon-scope option").evaluate_all("options=>options.map(o=>o.value)") == [
+    assert page.locator("#taxon-scope > option").evaluate_all(
+        "options=>options.map(o=>o.value)"
+    ) == [
         "",
         "0",
     ]
@@ -2128,7 +2132,9 @@ def test_restored_zero_scope_transfers_by_roots_across_reordered_presets_and_his
     assert page.locator("#identify-results").is_disabled()
     _go_other_encoder(page, "DINO")
     assert page.locator("#taxon-scope").input_value() == "0"
-    assert page.locator("#taxon-scope option").evaluate_all("options=>options.map(o=>o.value)") == [
+    assert page.locator("#taxon-scope > option").evaluate_all(
+        "options=>options.map(o=>o.value)"
+    ) == [
         "",
         "0",
         "1",
@@ -2146,7 +2152,9 @@ def test_restored_zero_scope_transfers_by_roots_across_reordered_presets_and_his
     assert _scope_result_ids(page) == []
     page.get_by_role("button", name="Clear taxon scope", exact=True).click()
     assert set(_scope_result_ids(page)) == set(range(100, 108))
-    assert page.locator("#taxon-scope option").evaluate_all("options=>options.map(o=>o.value)") == [
+    assert page.locator("#taxon-scope > option").evaluate_all(
+        "options=>options.map(o=>o.value)"
+    ) == [
         "",
         "1",
     ]
@@ -2403,4 +2411,177 @@ def test_inspection_deadline_keeps_medium_even_if_photo_arrives_later(open_atlas
     page.locator("#inspection-status").filter(has_text="Larger photo unavailable").wait_for()
     assert len(pending) == 1
     assert image.get_attribute("src") == medium
+    assert errors == []
+
+
+def test_catalog_query_is_explicit_and_active_scope_stays_pinned(open_taxonomy_atlas):
+    page, errors = open_taxonomy_atlas
+    before = _scope_result_ids(page)
+    fragment = page.evaluate("location.hash")
+    query = page.get_by_role("textbox", name="Find a taxon", exact=True)
+    query.fill("311249")
+    assert _scope_result_ids(page) == before
+    assert page.evaluate("location.hash") == fragment
+    assert page.locator("#taxon-scope").input_value() == ""
+    assert page.locator("#taxon-scope optgroup option").count() == 1
+    page.locator("#taxon-scope").select_option("taxon:311249")
+    assert _scope_result_ids(page) == [101, 106, 107]
+    assert page.locator('[data-focal-id="100"]').count() == 1
+    query.fill("nothing recorded here")
+    assert page.locator("#taxon-scope").input_value() == "taxon:311249"
+    assert _scope_result_ids(page) == [101, 106, 107]
+    assert "Current scope retained" in page.locator("#taxon-find-status").inner_text()
+    assert page.locator("#taxon-scope optgroup option").count() == 1
+    _assert_identify_ids(page, [101, 106, 107])
+    page.get_by_role("searchbox").fill("Extra")
+    assert _scope_result_ids(page) == [107]
+    query.fill("")
+    assert page.get_by_role("searchbox").input_value() == "Extra"
+    assert _scope_result_ids(page) == [107]
+    page.get_by_role("button", name="Clear filters", exact=True).click()
+    assert _scope_result_ids(page) == before
+    assert query.input_value() == ""
+    query.fill("999")
+    page.locator("#taxon-scope").select_option("taxon:999")
+    assert _scope_result_ids(page) == [103]
+    assert "Taxon ID 999" in page.locator("#taxon-scope").inner_text()
+    assert "1 observation has unknown ancestry" in page.locator("#taxon-critical").inner_text()
+    assert errors == []
+
+
+def test_catalog_context_combines_geo_brush_text_encoder_and_history(open_context_atlas):
+    page, errors, _ = open_context_atlas()
+    page.get_by_role("textbox", name="Find a taxon", exact=True).fill("311249")
+    page.locator("#taxon-scope").select_option("taxon:311249")
+    page.get_by_role("button", name="Photo space", exact=True).click()
+    for index in [1, 6]:
+        page.locator("#record").select_option(str(index))
+        page.get_by_role("button", name="Add selected photo", exact=True).click()
+    page.locator("#only-brushed").check()
+    page.locator("#only-view").check()
+    page.get_by_role("searchbox").fill("Atrichum")
+    assert _scope_result_ids(page) == [101]
+    page.locator("#taxon-query").fill("unselected query must not transfer")
+    _go_other_encoder(page, "DINO")
+    assert page.locator("#taxon-scope").input_value() == "taxon:311249"
+    assert page.locator("#taxon-query").input_value() == ""
+    assert page.get_by_role("searchbox").input_value() == "Atrichum"
+    assert page.evaluate("[...brushed].map(i=>data.records[i].id).sort()") == [101, 106]
+    assert _scope_result_ids(page) == [101]
+    assert page.locator('[data-focal-id="106"]').count() == 1
+    _assert_identify_ids(page, [101])
+    page.go_back()
+    page.wait_for_function("sampleUsable()")
+    assert _scope_result_ids(page) == [101]
+    assert page.locator("#taxon-scope").input_value() == "taxon:311249"
+    page.go_forward()
+    page.wait_for_function("sampleUsable()")
+    assert _scope_result_ids(page) == [101]
+    assert errors == []
+
+
+def test_unavailable_catalog_root_transfer_blocks_native_handoff(open_context_atlas):
+    def invalid_catalog(payload):
+        payload["taxonomy"]["taxa"] = [[311249, None, "", ""]]
+        return payload
+
+    page, errors, _ = open_context_atlas(target_mutator=invalid_catalog)
+    page.locator("#taxon-query").fill("311249")
+    page.locator("#taxon-scope").select_option("taxon:311249")
+    _go_other_encoder(page, "DINO")
+    assert page.locator("#identify-results").is_disabled()
+    assert "Identify is blocked" in page.locator("#transfer-summary").inner_text()
+    page.locator("#clear-transfer").click()
+    assert page.locator("#identify-results").is_enabled()
+    assert errors == []
+
+
+@pytest.mark.parametrize("width", [390, 820, 1440])
+def test_actual_plant_catalog_is_searchable_without_applying_or_recomputing(
+    open_taxonomy_atlas, taxonomy_site, width
+):
+    import json
+    from pathlib import Path
+
+    page, errors = open_taxonomy_atlas
+    demo = Path(__file__).parents[1] / "demo"
+    payload = json.loads((demo / "embeddings-data/Plantae.json").read_text())
+    # Actual ten-group labels/counts also constrain the native controls' widths.
+    metadata = json.JSONDecoder().raw_decode(
+        (demo / "embeddings.html").read_text().split("const META=", 1)[1]
+    )[0]
+    html = (taxonomy_site / "embeddings.html").read_text()
+    start = html.index("const META=") + len("const META=")
+    _, end = json.JSONDecoder().raw_decode(html[start:])
+    html = html[:start] + json.dumps(metadata) + html[start + end :]
+    page.route(
+        "**/embeddings.html", lambda route: route.fulfill(body=html, content_type="text/html")
+    )
+    represented = sorted({taxon for r in payload["records"] for taxon in r["ancestor_taxon_ids"]})
+    labels = {
+        47124: ["Magnoliopsida", "Dicots", "class"],
+        48372: ["Bryopsida", "Joint-toothed Mosses", "class"],
+        51148: ["Crataegus", "Hawthorns", "genus"],
+        1437484: ["Crataegus", "", "subgenus"],
+        1437522: ["Crataegus", "", "section"],
+        1577961: ["Crataegus", "", "subsection"],
+    }
+    payload["taxonomy"]["taxa"] = [[i, *labels.get(i, ["", "", ""])] for i in represented]
+    page.route("**/embeddings-data/Plantae.json", lambda route: route.fulfill(json=payload))
+    page.set_viewport_size({"width": width, "height": 900})
+    page.goto(page.url.split("#")[0] + f"#group=Plantae&id={payload['records'][0]['id']}")
+    page.reload()  # A fragment-only navigation does not fetch the replaced payload.
+    page.wait_for_function("sampleUsable() && data.records.length===1000")
+    assert page.locator("#map").bounding_box()["y"] <= {390: 420, 820: 450, 1440: 380}[width]
+    assert page.locator("#taxon-scope optgroup option").count() == 1254
+    before = page.evaluate("JSON.stringify(data.records.map(r=>[r.id,r.xy,r.rgb,r.neighbors]))")
+    results = _scope_result_ids(page)
+    page.locator("#taxon-query").fill("Dicots")
+    assert _scope_result_ids(page) == results
+    page.locator("#taxon-scope").select_option("taxon:47124")
+    assert len(_scope_result_ids(page)) == 669
+    _assert_identify_ids(
+        page, [r["id"] for r in payload["records"] if 47124 in r["ancestor_taxon_ids"]]
+    )
+    page.get_by_role("searchbox").fill("Magnoliopsida")
+    assert len(_scope_result_ids(page)) == 8
+    page.get_by_role("searchbox").fill("")
+    page.locator("#taxon-query").fill("Bryopsida")
+    assert len(_scope_result_ids(page)) == 669
+    assert page.locator("#taxon-scope").input_value() == "taxon:47124"
+    assert page.locator("#taxon-summary").is_visible()
+    assert (
+        "Magnoliopsida · Dicots · class · ID 47124" in page.locator("#taxon-summary").inner_text()
+    )
+    assert page.locator("#taxon-find-status").is_visible()
+    assert (
+        "Choose a scope to apply. Current scope retained."
+        in page.locator("#taxon-find-status").inner_text()
+    )
+    page.locator("#taxon-scope").select_option("taxon:48372")
+    assert len(_scope_result_ids(page)) == 69
+    page.get_by_role("searchbox").fill("Bryopsida")
+    assert len(_scope_result_ids(page)) == 9
+    page.get_by_role("searchbox").fill("")
+    page.locator("#taxon-query").fill("Crataegus")
+    for ident in [51148, 1437484, 1437522, 1577961]:
+        option = page.locator(f'#taxon-scope option[value="taxon:{ident}"]')
+        assert f"ID {ident}" in option.text_content()
+        assert labels[ident][2] in option.text_content()
+        page.locator("#taxon-scope").select_option(f"taxon:{ident}")
+        expected = [r["id"] for r in payload["records"] if ident in r["ancestor_taxon_ids"]]
+        assert _scope_result_ids(page) == expected
+        _assert_identify_ids(page, expected)
+    # The catalog is cached: ordinary filtering never rereads ancestor paths to
+    # rebuild all 1,254 counts. Repeated input operates on cached labels only.
+    duration = page.evaluate("""()=>{const start=performance.now();
+      for(const query of ['Dicots','47124','no such taxon','Crataegus','']){
+        document.getElementById('taxon-query').value=query;updateTaxonSearch();}
+      return performance.now()-start;}""")
+    assert duration < 1500  # Generous responsiveness guard, not a performance claim.
+    assert (
+        page.evaluate("JSON.stringify(data.records.map(r=>[r.id,r.xy,r.rgb,r.neighbors]))")
+        == before
+    )
+    assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
     assert errors == []

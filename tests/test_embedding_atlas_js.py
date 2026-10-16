@@ -605,3 +605,80 @@ def test_inspection_variant_keeps_the_same_photo_and_supported_host(host):
 )
 def test_inspection_variant_rejects_unsupported_or_ambiguous_sources(url):
     assert evaluate(f"scope.inspectionPhotoUrl({json.dumps(url)})") is None
+
+
+def test_represented_taxon_catalog_search_counts_and_canonical_identity():
+    payload = dict(
+        taxonomy=dict(
+            taxa=[
+                [50, "Crataegus", "Hawthorns", "genus"],
+                [51, "Crataegus", "", "subgenus"],
+                [99, "", "", ""],
+                [88, "Not represented", "", "family"],
+            ]
+        ),
+        records=[
+            dict(id=1, taxon_id=51, ancestor_taxon_ids=[51, 50], taxonomy_complete=True),
+            dict(id=2, taxon_id=50, ancestor_taxon_ids=[50, 99], taxonomy_complete=False),
+            dict(id=3, taxon_id=None, ancestor_taxon_ids=[], taxonomy_complete=False),
+            dict(id=4, taxon_id=1, ancestor_taxon_ids=[1], taxonomy_complete=True),
+        ],
+    )
+    result = evaluate(
+        f"(()=>{{const payload={json.dumps(payload)}, catalog=scope.taxonCatalog(payload);"
+        "const first=catalog.find(t=>t.id===50);"
+        "payload.records.forEach(r=>Object.defineProperty(r,'ancestor_taxon_ids',"
+        "{get(){throw Error('Catalog counts were recalculated')}}));"
+        "return {same:catalog===scope.taxonCatalog(payload),first,"
+        "names:scope.findTaxa(catalog,'crataegus').map(t=>t.id),"
+        "common:scope.findTaxa(catalog,'HAWTHORNS').map(t=>t.id),"
+        "id:scope.findTaxa(catalog,'51').map(t=>t.id),"
+        "pinned:scope.findTaxa(catalog,'absent',50).map(t=>t.id),"
+        "empty:scope.findTaxa(catalog,'absent').length,"
+        "unknown:catalog.find(t=>t.id===99)};})()"
+    )
+    assert result["same"] is True
+    assert result["first"]["verified"] == 2
+    assert result["first"]["unknown"] == 1
+    assert result["first"]["excluded"] == 1
+    assert result["names"] == [50, 51]
+    assert result["common"] == [50]
+    assert result["id"] == [51]
+    assert result["pinned"] == [50] and result["empty"] == 0
+    assert result["unknown"]["label"] == "Taxon ID 99"
+    assert result["unknown"]["verified"] == 1
+    assert result["unknown"]["unknown"] == 1
+
+
+@pytest.mark.parametrize(
+    "rows",
+    [
+        None,
+        {},
+        [[0, "Bad", "", ""]],
+        [[1, None, "", ""]],
+        [[1, "A", "", ""], [1, "B", "", ""]],
+        [[2**53, "Bad", "", ""]],
+    ],
+)
+def test_invalid_taxon_catalog_has_no_selectable_choices(rows):
+    assert evaluate(f"scope.taxonCatalog({json.dumps(dict(taxonomy=dict(taxa=rows)))})") == []
+
+
+def test_actual_frozen_plants_distinguish_literal_search_from_descendant_sets():
+    root = Path(__file__).parents[1]
+    payload = json.loads((root / "demo/embeddings-data/Plantae.json").read_text())
+    fields = ("id", "name", "taxon_id", "ancestor_taxon_ids", "taxonomy_complete")
+    records = [{key: record[key] for key in fields} for record in payload["records"]]
+    # Actual committed sample, not a synthetic distribution of specialist labels.
+    script = (
+        f"const scope=require({json.dumps(str(LOGIC))});const records={json.dumps(records)};"
+        "console.log(JSON.stringify([['Magnoliopsida',47124],['Bryopsida',48372]].map(([term,id])=>"
+        "({literal:scope.matches(records,{term}).length,"
+        "ancestry:scope.matches(records,{taxonRoots:[id]}).length}))));"
+    )
+    result = subprocess.run([NODE, "-"], input=script, text=True, capture_output=True, check=True)
+    assert json.loads(result.stdout) == [
+        dict(literal=8, ancestry=669),
+        dict(literal=9, ancestry=69),
+    ]
