@@ -405,11 +405,11 @@ var MB_=MON.map(function(m,i){var b=chip('months',m,!!(S.months>>i&1),
   return b;});
 function showMonths(){MB_.forEach(function(b,i){b.setAttribute('aria-pressed',String(!!(S.months>>i&1)));});}
 $('mclear').onclick=function(){S.months=0;showMonths();refilter();};
-// Introduced and threatened can be left out too. Exact location stays two-state: its opposite, hidden
+// Introduced and threatened can be left out too. The location filter stays two-state: its opposite, hidden
 // or over 1 km uncertain, is an OR iNaturalist's Identify filters cannot say.
 var ONLYDEF=[['introduced','Introduced to BC','introduced','Species not native to BC'],
   ['threatened','Threatened','threatened','Species with a threatened status'],
-  ['exact','Exact location','obscured','Hide records whose place is hidden or over 1 km uncertain']]
+  ['exact','Accuracy ≤1 km or unknown','obscured','Hide obscured locations and records with reported uncertainty over 1 km. Unknown accuracy is retained. Map points use rounded public coordinates']]
   .filter(function(o){return META.flags.indexOf(o[2])>=0;}),
   ONLY=ONLYDEF.map(function(o){return CH.chip($('flags'),o[0],o[1],function(){return S.only;},o[0]!=='exact',
     o[3],refilter);});
