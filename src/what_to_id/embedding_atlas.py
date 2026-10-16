@@ -207,7 +207,7 @@ def group_payload(
         "records": records,
     }
     if taxonomy is not None:
-        payload["taxonomy"] = taxonomy.metadata(records)
+        payload["taxonomy"] = taxonomy.metadata(records, group=group)
     return payload
 
 

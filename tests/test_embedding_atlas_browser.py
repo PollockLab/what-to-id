@@ -898,3 +898,128 @@ def test_identify_intersects_ancestry_with_search_brush_and_map(open_taxonomy_at
     page.get_by_role("searchbox").fill("Mosses")
     assert page.locator("#identify-results").is_disabled()
     assert errors == []
+
+
+def test_outside_listed_lichen_scope_is_approximate_and_recovers_without_unknown_ids(
+    open_taxonomy_atlas,
+):
+    page, errors = open_taxonomy_atlas
+    page.locator("#group").select_option("Fungi")
+    page.locator('[data-focal-id="200"]').wait_for()
+    scope = page.get_by_role("combobox", name="Taxon scope", exact=True)
+    assert (
+        "Outside listed lichen-forming groups (approximate) · 1 ancestry matches"
+        in scope.inner_text()
+    )
+    before = page.locator(".neighbors button").evaluate_all(
+        "buttons=>buttons.map(b=>b.dataset.observationId)"
+    )
+    scope.select_option("2")
+    assert _scope_result_ids(page) == [201]
+    assert page.evaluate("activeTaxonScope().exclude") is True
+    assert page.locator('[data-focal-id="200"]').count() == 1
+    assert (
+        "1 observation has unknown scope membership"
+        in page.locator("#taxon-scope-message").inner_text()
+    )
+    page.get_by_role("button", name="Identify these results (1)", exact=True).click()
+    assert identify_batch_ids(page) == [201]
+    page.locator("#close-identify").click()
+    page.get_by_role("searchbox").fill("Unplaced")
+    assert page.locator("#record").is_disabled()
+    assert page.locator("#identify-results").is_disabled()
+    page.get_by_role("button", name="Clear search and filters", exact=True).click()
+    assert scope.input_value() == ""
+    assert _scope_result_ids(page) == [200, 201, 202]
+    assert (
+        page.locator(".neighbors button").evaluate_all(
+            "buttons=>buttons.map(b=>b.dataset.observationId)"
+        )
+        == before
+    )
+    scope.select_option("2")
+    page.locator("#group").select_option("Plantae")
+    page.locator('[data-focal-id="100"]').wait_for()
+    assert scope.input_value() == ""
+    assert scope.locator("option[value='2']").count() == 0
+    assert errors == []
+
+
+@pytest.fixture(scope="module")
+def fungal_partition_payload(tmp_path_factory):
+    import json
+
+    from what_to_id.atlas_taxonomy import AtlasTaxonomy
+    from what_to_id.embedding_atlas import group_payload
+
+    directory = tmp_path_factory.mktemp("fungal-scope-partition")
+    ids = np.arange(10000, 11000)
+    vectors = np.random.default_rng(29).normal(size=(1000, 8)).astype("f4")
+    vectors /= np.linalg.norm(vectors, axis=1, keepdims=True)
+    embeddings = directory / "Fungi.npz"
+    np.savez(embeddings, ids=ids, E=vectors, backbone="fixture")
+    # 254 complete positives plus one partial path through another listed root.
+    # Exactly 742 complete negatives and three unknowns are distinct source IDs.
+    taxa = [31] * 254 + [33] + [32] * 742 + [98] * 3
+    pool = pd.DataFrame(
+        dict(
+            id=ids,
+            taxon_id=taxa,
+            iconic_taxon="Fungi",
+            lon=-123,
+            lat=49,
+            taxon_name="Recorded fungus",
+            photo_url="",
+            observed_on="2026-09-11",
+        )
+    )
+    path = directory / "taxonomy.json"
+    path.write_text(
+        json.dumps(
+            {
+                "taxa": {
+                    str(k): [parent, "Cached taxon", "", "taxon"]
+                    for k, parent in {
+                        1: None,
+                        31: 54743,
+                        54743: 1,
+                        32: 1,
+                        33: 118252,
+                        118252: 999,
+                    }.items()
+                }
+            }
+        )
+    )
+    payload = group_payload(pool, embeddings, "Fungi", taxonomy=AtlasTaxonomy(path))
+    return payload
+
+
+def test_identify_fungal_partition_contains_exactly_742_known_outside_ids(
+    open_taxonomy_atlas, fungal_partition_payload
+):
+    page, errors = open_taxonomy_atlas
+    page.route(
+        "**/embeddings-data/Fungi.json", lambda route: route.fulfill(json=fungal_partition_payload)
+    )
+    page.locator("#group").select_option("Fungi")
+    page.locator('[data-focal-id="10000"]').wait_for()
+    scope = page.get_by_role("combobox", name="Taxon scope", exact=True)
+    scope.select_option("1")
+    page.get_by_role("button", name="Identify these results (255)", exact=True).click()
+    included = set(identify_batch_ids(page))
+    assert included == set(range(10000, 10255))
+    page.locator("#close-identify").click()
+    scope.select_option("2")
+    page.get_by_role("button", name="Identify these results (742)", exact=True).click()
+    outside = set(identify_batch_ids(page))
+    assert outside == set(range(10255, 10997))
+    assert included.isdisjoint(outside)
+    assert len(included | outside) == 997
+    assert (included | outside).isdisjoint(range(10997, 11000))
+    assert page.locator('[data-focal-id="10000"]').count() == 1
+    assert (
+        "3 observations have unknown scope membership"
+        in page.locator("#taxon-scope-message").inner_text()
+    )
+    assert errors == []

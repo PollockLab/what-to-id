@@ -242,3 +242,53 @@ def test_cli_offline_taxonomy_flags_reach_the_published_payload(tmp_path, monkey
     payload = json.loads((out / "embeddings-data/Plantae.json").read_text())
     assert payload["taxonomy"]["source_url"] == source
     assert payload["taxonomy"]["presets"][1]["approximate"] is True
+
+
+def test_exclusion_inverts_only_known_membership_and_preserves_unknown(tmp_path):
+    tree = AtlasTaxonomy(cache(tmp_path, {"1": row(None), "2": row(1), "3": row(9)}))
+    # Taxon 3 reaches a known target before its ancestry ends at the missing parent.
+    records = [
+        tree.lineage(2),
+        tree.lineage(3),
+        tree.lineage(1),
+        tree.lineage(99),
+        tree.lineage(None),
+    ]
+    roots = [2, 3]
+    assert [membership(r, roots) for r in records] == [True, True, False, None, None]
+    assert [membership(r, roots, exclude=True) for r in records] == [False, False, True, None, None]
+    with pytest.raises(ValueError, match="exclude must be a boolean"):
+        membership(records[0], roots, exclude="true")
+
+
+def test_fungal_metadata_appends_an_explicit_approximate_exclusion_without_reordering(tmp_path):
+    tree = AtlasTaxonomy(cache(tmp_path, {"1": row(None), "54743": row(1), "118252": row(999)}))
+    records = [tree.lineage(54743), tree.lineage(118252), tree.lineage(1), tree.lineage(98)]
+    original = tree.metadata(records)
+    fungi = tree.metadata(records, group="Fungi")
+    plants = tree.metadata(records, group="Plantae")
+    assert fungi["presets"][:2] == original["presets"] == plants["presets"]
+    included, outside = fungi["presets"][1:]
+    assert included["exclude"] is False and outside["exclude"] is True
+    assert outside["label"] == "Outside listed lichen-forming groups"
+    assert outside["taxon_ids"] == included["taxon_ids"]
+    assert outside["approximate"] is True
+    assert outside["match_count"] == 1
+    assert outside["nonmatch_count"] == 2
+    assert included["match_count"] == 2
+    assert included["nonmatch_count"] == 1
+    assert outside["unknown_count"] == included["unknown_count"] == 1
+
+
+def test_fungal_payload_passes_group_context_without_changing_observations(tmp_path):
+    pool, embeddings = inputs(tmp_path)
+    pool["iconic_taxon"] = "Fungi"
+    pool["taxon_id"] = pd.array([None, 54743, 1], dtype="Int64")
+    tree = AtlasTaxonomy(cache(tmp_path, {"1": row(None), "54743": row(1)}))
+    baseline = group_payload(pool, embeddings, "Fungi")
+    actual = group_payload(pool, embeddings, "Fungi", taxonomy=tree)
+    assert len(actual["taxonomy"]["presets"]) == 3
+    assert actual["taxonomy"]["presets"][2]["match_count"] == 1
+    assert actual["taxonomy"]["presets"][2]["unknown_count"] == 1
+    for before, after in zip(baseline["records"], actual["records"], strict=True):
+        assert all(after[key] == value for key, value in before.items())

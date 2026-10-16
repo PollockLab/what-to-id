@@ -13,40 +13,41 @@ const AtlasScope = (() => {
   }
   function matches(records, {term = '', bounds = null, onlyInView = false,
                              order = 'sample', hasReference = false, onlyBrushed = false,
-                             brushedIndices = [], taxonRoots = null} = {}) {
+                             brushedIndices = [], taxonRoots = null, taxonExclude = false} = {}) {
     const query = term.trim().toLocaleLowerCase();
     const brush = new Set(brushedIndices);
     const result = records.map((r, i) => ({r, i})).filter(({r, i}) =>
       (!onlyBrushed || brush.has(i)) &&
       (!onlyInView || inBounds(r, bounds)) &&
-      (taxonRoots === null || taxonMembership(r, taxonRoots) === true) &&
+      (taxonRoots === null || taxonMembership(r, taxonRoots, taxonExclude) === true) &&
       `${r.name} ${r.id}`.toLocaleLowerCase().includes(query));
     if (order === 'reference' && hasReference) {
       result.sort((a, b) => b.r.reference_distance - a.r.reference_distance || a.r.id - b.r.id);
     }
     return result;
   }
-  function taxonMembership(record, roots) {
+  function taxonMembership(record, roots, exclude = false) {
     const validId = id => Number.isSafeInteger(id) && id > 0;
-    if (!Array.isArray(roots) || !roots.length || !roots.every(validId) ||
+    if (typeof exclude !== 'boolean' || !Array.isArray(roots) || !roots.length || !roots.every(validId) ||
         !validId(record?.taxon_id) || typeof record.taxonomy_complete !== 'boolean' ||
         !Array.isArray(record.ancestor_taxon_ids) || !record.ancestor_taxon_ids.every(validId) ||
         !record.ancestor_taxon_ids.includes(record.taxon_id) ||
         new Set(record.ancestor_taxon_ids).size !== record.ancestor_taxon_ids.length) return null;
-    if (roots.some(root => record.ancestor_taxon_ids.includes(root))) return true;
-    return record.taxonomy_complete ? false : null;
+    if (roots.some(root => record.ancestor_taxon_ids.includes(root))) return !exclude;
+    return record.taxonomy_complete ? exclude : null;
   }
   function taxonPresets(payload) {
     if (!Array.isArray(payload?.taxonomy?.presets)) return [];
     return payload.taxonomy.presets.filter(preset => typeof preset?.label === 'string' &&
       preset.label.length > 0 && typeof preset.approximate === 'boolean' &&
+      (preset.exclude === undefined || typeof preset.exclude === 'boolean') &&
       Array.isArray(preset.taxon_ids) && preset.taxon_ids.length > 0 &&
       preset.taxon_ids.every(id => Number.isSafeInteger(id) && id > 0));
   }
-  function taxonCounts(records, roots) {
+  function taxonCounts(records, roots, exclude = false) {
     const result = {verified: 0, excluded: 0, unknown: 0};
     records.forEach(record => {
-      const state = taxonMembership(record, roots);
+      const state = taxonMembership(record, roots, exclude);
       result[state === true ? 'verified' : state === false ? 'excluded' : 'unknown']++;
     });
     return result;

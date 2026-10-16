@@ -51,26 +51,26 @@ function taxonPresetLabel(preset){return preset.approximate?`${preset.label==='L
 function resetTaxonScopes(){
   taxonPresets=AtlasScope.taxonPresets(data);const picker=$('taxon-scope');
   const all=element('option','All sampled observations');all.value='';picker.replaceChildren(all);
-  taxonPresets.forEach((preset,index)=>{const count=AtlasScope.taxonCounts(data.records,preset.taxon_ids).verified;
+  taxonPresets.forEach((preset,index)=>{const count=AtlasScope.taxonCounts(data.records,preset.taxon_ids,preset.exclude===true).verified;
     const option=element('option',`${taxonPresetLabel(preset)} · ${count.toLocaleString()} ancestry matches`);option.value=String(index);picker.append(option);});
   picker.value='';picker.disabled=!taxonPresets.length;$('taxon-scope-control').hidden=!taxonPresets.length;$('taxon-scope-status').hidden=true;
 }
-function scopedMatches({withoutTaxon=false}={}){return AtlasScope.matches(data.records,{term:$('search').value,bounds:currentBounds(),onlyInView:$('only-view').checked,order:$('order').value,hasReference:Boolean(data.reference),onlyBrushed:$('only-brushed').checked,brushedIndices:[...brushed],taxonRoots:withoutTaxon?null:activeTaxonScope()?.taxon_ids||null});}
+function scopedMatches({withoutTaxon=false}={}){return AtlasScope.matches(data.records,{term:$('search').value,bounds:currentBounds(),onlyInView:$('only-view').checked,order:$('order').value,hasReference:Boolean(data.reference),onlyBrushed:$('only-brushed').checked,brushedIndices:[...brushed],taxonRoots:withoutTaxon?null:activeTaxonScope()?.taxon_ids||null,taxonExclude:!withoutTaxon&&activeTaxonScope()?.exclude===true});}
 function updateTaxonStatus(matches){
   const preset=activeTaxonScope();$('taxon-scope-status').hidden=!preset;if(!preset)return;
-  const counts=AtlasScope.taxonCounts(data.records,preset.taxon_ids);
-  const context=AtlasScope.taxonCounts(scopedMatches({withoutTaxon:true}).map(({r})=>r),preset.taxon_ids);
+  const counts=AtlasScope.taxonCounts(data.records,preset.taxon_ids,preset.exclude===true);
+  const context=AtlasScope.taxonCounts(scopedMatches({withoutTaxon:true}).map(({r})=>r),preset.taxon_ids,preset.exclude===true);
   let message=`${taxonPresetLabel(preset)}: ${counts.verified.toLocaleString()} matching recorded taxonomy in this life-group sample; ${matches.length.toLocaleString()} match current filters. `;
   message+=`${context.unknown.toLocaleString()} ${context.unknown===1?'observation has':'observations have'} unknown scope membership from incomplete ancestry in these filters and ${context.unknown===1?'is':'are'} excluded. `;
   if(preset.approximate)message+=`${preset.description}. `;
-  if(AtlasScope.taxonMembership(data.records[selected],preset.taxon_ids)!==true)message+='The focal photo stays selected outside this ancestry scope. ';
+  if(AtlasScope.taxonMembership(data.records[selected],preset.taxon_ids,preset.exclude===true)!==true)message+='The focal photo stays selected outside this ancestry scope. ';
   message+='Ranked photo matches still use the full life-group sample.';
   $('taxon-scope-message').textContent=message;
 }
 function taxonLegend(){return activeTaxonScope()?' Dimmed: outside the selected ancestry scope; focal photo retained.':'';}
 $('taxon-scope').onchange=updateScope;
 $('clear-taxon-scope').onclick=()=>{$('taxon-scope').value='';updateScope();$('taxon-scope').focus();};
-function pointOpacity(i,near,bounds){if(activeTaxonScope()&&AtlasScope.taxonMembership(data.records[i],activeTaxonScope().taxon_ids)!==true&&i!==selected)return .12;if($('only-brushed').checked&&!brushed.has(i)&&i!==selected)return .12;if($('only-view').checked&&!AtlasScope.inBounds(data.records[i],bounds)&&i!==selected)return .12;return ['reference','representation'].includes($('color-mode').value)||i===selected||near.has(i)?1:.45;}
+function pointOpacity(i,near,bounds){if(activeTaxonScope()&&AtlasScope.taxonMembership(data.records[i],activeTaxonScope().taxon_ids,activeTaxonScope().exclude===true)!==true&&i!==selected)return .12;if($('only-brushed').checked&&!brushed.has(i)&&i!==selected)return .12;if($('only-view').checked&&!AtlasScope.inBounds(data.records[i],bounds)&&i!==selected)return .12;return ['reference','representation'].includes($('color-mode').value)||i===selected||near.has(i)?1:.45;}
 function updateScope(){if(!data)return;updateBrushControls();searchRecords();updatePlotLegend();renderPlot();updateMap();const notice=$('viewport-state'),bounds=currentBounds();notice.hidden=!bounds;if(!bounds){notice.hidden=!$('only-brushed').checked;if($('only-brushed').checked)notice.textContent=`Search is limited to ${brushed.size} brushed photos. Clear selection to recover the full sample.${brushed.has(selected)?'':' Selected photo is outside the brushed set and remains selected for comparison.'}`;return;}const visible=data.records.filter(r=>AtlasScope.inBounds(r,bounds)).length;const outside=!AtlasScope.inBounds(data.records[selected],bounds);notice.hidden=!$('only-view').checked&&!$('only-brushed').checked&&!outside&&!initialBounds;let message=`${visible.toLocaleString()} of ${data.records.length.toLocaleString()} sampled ${names[data.group]||data.group} observations in the current map view.`;if($('only-view').checked)message+=visible?' Search and unfamiliar-first choices are limited to this area.':' No sampled observations here. Choose Fit sample or turn off the map-view filter to explore available records. This limited sample cannot establish ecological absence.';if($('only-brushed').checked&&!brushed.has(selected))message+=' Selected photo is outside the brushed set and remains selected for comparison.';if(outside)message+=' Selected photo is outside this map view and remains selected for comparison. Use Locate photo to see it.';notice.textContent=message;const location=$('selection-location');if(location){location.hidden=!outside;location.textContent='Selected photo is outside the current map view. Its details and full-space matches remain available.';}}
 $('only-view').onchange=updateScope;
 function referenceColor(distance){const t=Math.max(0,Math.min(1,(distance-referenceRange[0])/Math.max(referenceRange[1]-referenceRange[0],1e-9)));const a=[198,219,239],b=[106,27,154];return `rgb(${a.map((v,i)=>Math.round(v+(b[i]-v)*t)).join(',')})`;}

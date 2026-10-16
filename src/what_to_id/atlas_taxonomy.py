@@ -32,11 +32,13 @@ def _unique_object(pairs: list[tuple]) -> dict:
     return result
 
 
-def membership(record: dict, taxon_ids: list[int]) -> bool | None:
+def membership(record: dict, taxon_ids: list[int], *, exclude: bool = False) -> bool | None:
     """Known ancestry is positive; an absent root is negative only for a complete path."""
+    if not isinstance(exclude, bool):
+        raise ValueError("taxon scope exclude must be a boolean")
     if set(record["ancestor_taxon_ids"]).intersection(taxon_ids):
-        return True
-    return False if record["taxonomy_complete"] else None
+        return not exclude
+    return exclude if record["taxonomy_complete"] else None
 
 
 class AtlasTaxonomy:
@@ -112,18 +114,31 @@ class AtlasTaxonomy:
             "taxonomy_complete": complete,
         }
 
-    def metadata(self, records: list[dict]) -> dict:
+    def metadata(self, records: list[dict], *, group: str | None = None) -> dict:
         """Describe the exact cache and observed completeness, never ecological coverage."""
         complete = sum(record["taxonomy_complete"] for record in records)
         presets = []
-        for label, roots, description in PRESETS:
-            states = [membership(record, roots) for record in records]
+        definitions = [(label, roots, description, False) for label, roots, description in PRESETS]
+        if group == "Fungi":
+            roots = next(roots for label, roots, _ in PRESETS if label == "Lichens")
+            definitions.append(
+                (
+                    "Outside listed lichen-forming groups",
+                    roots,
+                    "An approximate exclusion of the listed lichen-forming groups, "
+                    "using complete cached ancestry only",
+                    True,
+                )
+            )
+        for label, roots, description, exclude in definitions:
+            states = [membership(record, roots, exclude=exclude) for record in records]
             presets.append(
                 {
                     "label": label,
                     "taxon_ids": list(roots),
                     "description": description,
-                    "approximate": label == "Lichens",
+                    "approximate": exclude or label == "Lichens",
+                    "exclude": exclude,
                     "match_count": sum(state is True for state in states),
                     "nonmatch_count": sum(state is False for state in states),
                     "unknown_count": sum(state is None for state in states),

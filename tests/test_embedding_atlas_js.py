@@ -489,3 +489,56 @@ def test_taxon_presets_require_explicit_build_metadata_and_valid_root_ids():
     assert evaluate(
         f"scope.taxonPresets({json.dumps(dict(taxonomy=dict(presets=[valid, *invalid])))})"
     ) == [valid]
+
+
+def test_negative_taxon_scope_keeps_unknown_unknown_and_excludes_partial_known_membership():
+    records = [
+        dict(
+            id=1,
+            name="Recorded fungus",
+            taxon_id=11,
+            ancestor_taxon_ids=[11, 54743, 1],
+            taxonomy_complete=True,
+        ),
+        dict(
+            id=2,
+            name="Partial positive",
+            taxon_id=12,
+            ancestor_taxon_ids=[12, 118252, 999],
+            taxonomy_complete=False,
+        ),
+        dict(
+            id=3,
+            name="Known outside",
+            taxon_id=13,
+            ancestor_taxon_ids=[13, 1],
+            taxonomy_complete=True,
+        ),
+        dict(id=4, name="Unknown", taxon_id=99, ancestor_taxon_ids=[99], taxonomy_complete=False),
+    ]
+    encoded = json.dumps(records)
+    roots = [54743, 118252]
+    assert evaluate(f"{encoded}.map(r=>scope.taxonMembership(r,{roots},true))") == [
+        False,
+        False,
+        True,
+        None,
+    ]
+    assert evaluate(f"scope.taxonCounts({encoded},{roots},true)") == dict(
+        verified=1, excluded=2, unknown=1
+    )
+    assert evaluate(
+        f"scope.matches({encoded},{{taxonRoots:{roots},taxonExclude:true}}).map(x=>x.r.id)"
+    ) == [3]
+    assert evaluate(
+        f"scope.matches({encoded},{{taxonRoots:{roots},taxonExclude:false}}).map(x=>x.r.id)"
+    ) == [1, 2]
+    assert evaluate(f"scope.taxonMembership({encoded}[2],{roots},'true')") is None
+
+
+def test_preset_exclusion_is_explicit_boolean_and_legacy_inclusion_still_works():
+    included = dict(label="Lichens", taxon_ids=[54743], approximate=True)
+    outside = dict(label="Outside listed groups", taxon_ids=[54743], approximate=True, exclude=True)
+    invalid = dict(label="Invalid", taxon_ids=[54743], approximate=True, exclude="true")
+    payload = json.dumps(dict(taxonomy=dict(presets=[included, outside, invalid])))
+    assert evaluate(f"scope.taxonPresets({payload})") == [included, outside]
