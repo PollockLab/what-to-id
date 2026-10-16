@@ -19,6 +19,7 @@ import tarfile
 import tempfile
 import zipfile
 from datetime import UTC, datetime
+from functools import cache
 from pathlib import Path, PurePosixPath
 from urllib.parse import urlsplit, urlunsplit
 
@@ -62,11 +63,22 @@ def _safe_api_error(stderr: bytes | str | None) -> str:
     return message.strip()[:2000] or "gh returned no HTTP diagnostics"
 
 
+@cache
+def _raw_output_flags() -> tuple[str, ...]:
+    # Newer gh refuses ANSI-bearing logs even when stdout is captured. Opt in
+    # only for these internal byte downloads, never for terminal output. Older
+    # local CLI versions predate both the guard and the flag.
+    result = subprocess.run(["gh", "api", "--help"], check=True, capture_output=True)
+    return ("--allow-escape-sequences",) if b"--allow-escape-sequences" in result.stdout else ()
+
+
 def _api(endpoint: str, *, pages: bool = False, raw: bool = False):
     args = ["gh", "api", endpoint]
     if pages:
         args += ["--paginate", "--slurp"]
     try:
+        if raw:
+            args.extend(_raw_output_flags())
         result = subprocess.run(args, check=True, capture_output=True)
     except subprocess.CalledProcessError as exc:
         raise PublicationError(

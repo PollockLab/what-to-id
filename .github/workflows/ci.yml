@@ -45,9 +45,8 @@ jobs:
           PYTHONPATH: src
           WHAT_TO_ID_REQUIRE_BROWSER: "1"
 
-  # Temporary diagnostic for the exact production failure. Remove this fixed job
-  # ID before merging, after the workflow token's HTTP outcome is established.
-  pages-api-diagnostic:
+  # Exercise the raw log boundary with the same read-only workflow token as Pages.
+  pages-api:
     if: github.event_name == 'pull_request' && github.repository == 'PollockLab/what-to-id'
     runs-on: ubuntu-24.04
     permissions:
@@ -55,7 +54,7 @@ jobs:
       actions: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Read the failed production log endpoint with the workflow token
+      - name: Capture current map job logs with the workflow token
         env:
           GH_TOKEN: ${{ github.token }}
           PYTHONPATH: src
@@ -64,10 +63,19 @@ jobs:
           import sys
           from what_to_id.demo_publication import PublicationError, _api
           try:
-              logs = _api("repos/PollockLab/what-to-id/actions/jobs/116657328440/logs", raw=True)
+              repository = "repos/PollockLab/what-to-id"
+              runs = _api(f"{repository}/actions/workflows/map.yml/runs?status=success&per_page=1")
+              if not runs["workflow_runs"]:
+                  raise PublicationError("No successful map run available for log transport check")
+              run_id = runs["workflow_runs"][0]["id"]
+              jobs = _api(f"{repository}/actions/runs/{run_id}/jobs?per_page=100")["jobs"]
+              refresh = [job for job in jobs if job["name"] == "refresh" and job["conclusion"] == "success"]
+              if len(refresh) != 1:
+                  raise PublicationError("Expected one successful map refresh job")
+              logs = _api(f"{repository}/actions/jobs/{refresh[0]['id']}/logs", raw=True)
+              if not logs:
+                  raise PublicationError("Map job log download returned an empty response")
           except PublicationError as exc:
               sys.exit(str(exc))
-          if not logs:
-              sys.exit("Job log download returned an empty response")
-          print("Workflow token downloaded the exact production job logs successfully")
+          print(f"Workflow token captured current map job logs (ANSI present: {bytes([27]) in logs})")
           PYTHON

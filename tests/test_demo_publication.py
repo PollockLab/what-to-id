@@ -14,6 +14,7 @@ import pytest
 
 from what_to_id.demo_publication import (
     PublicationError,
+    _raw_output_flags,
     deployed_artifact,
     deployed_revision,
     main,
@@ -46,7 +47,9 @@ def archive(files, *, member=None, zip_name="artifact.tar", zip_mode=None):
 
 @pytest.fixture
 def github(monkeypatch):
+    _raw_output_flags.cache_clear()
     responses = {
+        "__gh_api_help__": b"--allow-escape-sequences",
         f"{BASE}/deployments?environment=github-pages&per_page=100": [
             [{"id": 1, "sha": SHA, "created_at": "2099-01-01T00:00:00Z"}]
         ],
@@ -119,7 +122,7 @@ def github(monkeypatch):
         assert args[:2] == ["gh", "api"]
         assert check and capture_output
         calls.append(args)
-        value = responses[args[2]]
+        value = responses["__gh_api_help__"] if args[2] == "--help" else responses[args[2]]
         if isinstance(value, Exception):
             raise value
         return subprocess.CompletedProcess(
@@ -664,3 +667,27 @@ def test_empty_api_stderr_still_reports_failing_endpoint(github):
     with pytest.raises(PublicationError, match="no HTTP diagnostics") as error:
         deployed_revision(REPO)
     assert endpoint in str(error.value)
+
+
+@pytest.mark.parametrize("modern_cli", [True, False])
+def test_captured_ansi_logs_support_new_and_old_gh_cli(github, modern_cli):
+    responses, calls = github
+    responses["__gh_api_help__"] = b"--allow-escape-sequences" if modern_cli else b"old CLI help"
+    key = f"{BASE}/actions/jobs/20/logs"
+    responses[key] = b"2099-01-01T00:59:00Z \x1b[36;1mRun deploy\x1b[0m\n" + responses[key]
+    assert deployed_revision(REPO) == SHA
+    log_call = next(call for call in calls if call[2] == key)
+    assert ("--allow-escape-sequences" in log_call) == modern_cli
+    assert all("--allow-escape-sequences" not in call for call in calls if call[2] != key)
+    assert sum(call[2] == "--help" for call in calls) == 1
+
+
+def test_raw_download_capability_is_checked_once_and_also_applies_to_archives(
+    github, demo, tmp_path
+):
+    _, calls = github
+    prepare_site(REPO, demo, tmp_path / "output")
+    raw_calls = [call for call in calls if call[2].endswith(("/logs", "/zip"))]
+    assert len(raw_calls) == 2
+    assert all("--allow-escape-sequences" in call for call in raw_calls)
+    assert sum(call[2] == "--help" for call in calls) == 1
