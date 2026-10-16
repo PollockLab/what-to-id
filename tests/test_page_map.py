@@ -421,6 +421,8 @@ def test_page_inlines_the_area_filter_before_the_map_script():
     _, meta = encode_points(make_pool(20))
     html = render_map(meta, freeze=None)
     area = (_ASSETS / "map_area.js").read_text()
+    assert (_ASSETS / "identify_links.js").read_text() in html
+    assert html.index("var IdentifyLinks=") < html.index("var MapArea=")
     assert area in html and (_ASSETS / "map_area.css").read_text() in html
     assert html.index("var MapArea=") < html.index("var AREA=MapArea(")
     assert "AREA.mask(n)" in html and "h.push(AREA.hash())" in html
@@ -471,7 +473,11 @@ console.log(JSON.stringify(out));
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="needs node")
 def test_area_filter_codes_tests_and_reads_polygons():
-    js = "var document={};" + (_ASSETS / "map_area.js").read_text() + _AREA_JS
+    js = (
+        "var document={};"
+        + ((_ASSETS / "identify_links.js").read_text() + (_ASSETS / "map_area.js").read_text())
+        + _AREA_JS
+    )
     run = subprocess.run(["node", "-e", js], capture_output=True, text=True, check=True)
     out = json.loads(run.stdout)
     # rounded to 0.0001 degrees, the closing corner dropped, and stable once rounded
@@ -502,7 +508,7 @@ def test_area_identify_batches_open_every_id_once(n, sizes):
     ids = [9_999_999_999 - (i * 7919) % 1_000_003 * 1000 - i for i in range(n)]
     js = (
         "var document={};"
-        + (_ASSETS / "map_area.js").read_text()
+        + ((_ASSETS / "identify_links.js").read_text() + (_ASSETS / "map_area.js").read_text())
         + f"console.log(JSON.stringify(MapArea.batches({json.dumps(ids)})));"
     )
     # on stdin: 10,000 ids pass Linux's 128 KiB limit on one command-line argument
@@ -621,7 +627,7 @@ def test_area_box_link_cuts_to_view_counts_and_pages_like_the_batches():
     js = (
         "var document={};"
         + (_ASSETS / "map_taxa.js").read_text()
-        + (_ASSETS / "map_area.js").read_text()
+        + ((_ASSETS / "identify_links.js").read_text() + (_ASSETS / "map_area.js").read_text())
         + f"const P={json.dumps(P)},bb={json.dumps(bb)},ok=i=>i%2===0,A=MapArea;"
         + "const cut=A.boxed({w:0,s:-5,e:5,n:5},bb,P,ok),"
         + "off=A.boxed({w:20,s:20,e:30,n:30},bb,P,ok);"

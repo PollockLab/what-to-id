@@ -524,3 +524,109 @@ def test_pca_only_sample_has_no_layout_choice(open_atlas):
     assert page.locator("#layout-control").is_hidden()
     assert "PCA retains" in page.locator("#projection").inner_text()
     assert errors == []
+
+
+def identify_batch_ids(page):
+    from urllib.parse import parse_qs
+
+    result = []
+    for href in page.locator("#identify-batches a").evaluate_all(
+        "links => links.map(link => link.href)"
+    ):
+        url = urlparse(href)
+        assert url.scheme == "https" and url.netloc == "www.inaturalist.org"
+        assert url.path == "/observations/identify"
+        params = parse_qs(url.query)
+        result.extend(int(ident) for ident in params.pop("id")[0].split(","))
+        assert params == {
+            "quality_grade": ["needs_id"],
+            "reviewed": ["false"],
+            "place_id": ["any"],
+            "per_page": ["200"],
+        }
+    return result
+
+
+@pytest.mark.parametrize("width", [390, 1440])
+def test_identify_handoff_uses_exact_search_ids_and_empty_results_recover(open_atlas, width):
+    page, errors = open_atlas(width)
+    requests = []
+    page.on("request", lambda request: requests.append(request.url))
+    action = page.get_by_role("button", name="Identify these results", exact=False)
+    page.get_by_role("searchbox").fill("107")
+    assert action.inner_text() == "Identify these results (1)"
+    initial_hash = page.evaluate("location.hash")
+    initial_tabs = len(page.context.pages)
+    action.click()
+    dialog = page.get_by_role("dialog", name="Identify these results", exact=True)
+    assert dialog.is_visible()
+    assert identify_batch_ids(page) == [107]
+    assert "2026-09-11" in page.locator("#identify-note").inner_text()
+    assert "live count may be smaller" in dialog.inner_text()
+    assert page.evaluate("location.hash") == initial_hash
+    assert page.locator('[data-focal-id="100"]').count() == 1
+    assert len(page.context.pages) == initial_tabs
+    page.keyboard.press("Escape")
+    assert dialog.is_hidden()
+    assert action.evaluate("button => document.activeElement === button")
+    assert page.get_by_role("searchbox").input_value() == "107"
+    page.get_by_role("searchbox").fill("no-such-sampled-observation")
+    assert action.is_disabled() and action.inner_text() == "Identify these results (0)"
+    page.get_by_role("button", name="Clear search and filters", exact=True).click()
+    assert action.is_enabled() and action.inner_text() == "Identify these results (18)"
+    assert not [url for url in requests if "api.inaturalist.org" in url]
+    assert errors == []
+
+
+def test_identify_handoff_intersects_brush_search_and_map_without_changing_state(open_atlas):
+    page, errors = open_atlas(390)
+    page.get_by_role("button", name="Photo space", exact=True).click()
+    page.get_by_role("button", name="Add selected photo", exact=True).click()
+    page.locator("#record").select_option("7")
+    page.get_by_role("button", name="Add selected photo", exact=True).click()
+    page.locator("#only-brushed").check()
+    page.get_by_role("searchbox").fill("Recorded taxon")
+    action = page.get_by_role("button", name="Identify these results", exact=False)
+    assert action.inner_text() == "Identify these results (2)"
+    initial_hash = page.evaluate("location.hash")
+    original_rank_ids = page.locator(".neighbors button").evaluate_all(
+        "buttons => buttons.map(button => button.dataset.observationId)"
+    )
+    action.click()
+    assert identify_batch_ids(page) == [107, 100]
+    assert page.evaluate("location.hash") == initial_hash
+    assert page.locator('[data-focal-id="107"]').count() == 1
+    page.get_by_role("button", name="Close", exact=True).click()
+    assert page.locator("#only-brushed").is_checked()
+    assert page.get_by_role("searchbox").input_value() == "Recorded taxon"
+    assert page.locator("#group").input_value() == "Aves"
+    assert page.locator(".workspace").get_attribute("data-view") == "photo"
+    assert (
+        page.locator(".neighbors button").evaluate_all(
+            "buttons => buttons.map(button => button.dataset.observationId)"
+        )
+        == original_rank_ids
+    )
+    page.locator("#advanced summary").first.click()
+    page.evaluate("""testMap.getBounds=()=>({getWest:()=>10,getSouth:()=>10,
+        getEast:()=>11,getNorth:()=>11})""")
+    page.locator("#only-view").check()
+    assert action.is_disabled() and action.inner_text() == "Identify these results (0)"
+    page.locator("#only-view").uncheck()
+    assert action.is_enabled() and action.inner_text() == "Identify these results (2)"
+    assert page.evaluate("location.hash") == initial_hash
+    assert errors == []
+
+
+def test_identify_handoff_is_disabled_after_failed_group_load_then_recovers(open_atlas):
+    page, errors = open_atlas()
+    action = page.get_by_role("button", name="Identify these results", exact=False)
+    assert action.is_enabled()
+    page.route("**/embeddings-data/Plantae.json", lambda route: route.fulfill(status=503))
+    page.locator("#group").select_option("Plantae")
+    page.get_by_role("alert").wait_for()
+    assert action.is_disabled()
+    page.locator("#group").select_option("Aves")
+    page.wait_for_function("document.getElementById('error').hidden")
+    assert action.is_enabled()
+    assert errors == []

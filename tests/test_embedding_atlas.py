@@ -53,6 +53,8 @@ def test_build_writes_real_data_and_no_private_fields(tmp_path):
     html = (out / "embeddings.html").read_text()
     assert "__ATLAS_META__" not in html
     assert "__ATLAS_LOGIC__" not in html
+    assert "__IDENTIFY_LINKS__" not in html
+    assert html.index("var IdentifyLinks=") < html.index("const AtlasScope")
     assert "const AtlasScope" in html
     assert "new URLSearchParams(location.search)" in html
     assert "No sampled observations" in html
