@@ -608,6 +608,8 @@ def test_identify_handoff_intersects_brush_search_and_map_without_changing_state
         == original_rank_ids
     )
     page.locator("#advanced summary").first.click()
+    page.get_by_role("button", name="Map", exact=True).click()
+    page.wait_for_function("document.activeElement.id === 'geography-pane'")
     page.evaluate("""testMap.getBounds=()=>({getWest:()=>10,getSouth:()=>10,
         getEast:()=>11,getNorth:()=>11})""")
     page.locator("#only-view").check()
@@ -1022,4 +1024,69 @@ def test_identify_fungal_partition_contains_exactly_742_known_outside_ids(
         "3 observations have unknown scope membership"
         in page.locator("#taxon-scope-message").inner_text()
     )
+    assert errors == []
+
+
+@pytest.mark.parametrize("width", [390, 1440])
+def test_hidden_map_geometry_does_not_change_geographic_scope(open_atlas, width):
+    # Simulate MapLibre's fallback geometry and automatic container observer. The
+    # ordinary adapter has constant bounds and cannot detect hidden-resize bugs.
+    adapter = (
+        MAP_ADAPTER.replace(
+            "constructor(){this.handlers={};this.sources={};window.testMap=this;",
+            """constructor(options){this.handlers={};this.sources={};window.testMap=this;
+        this.visibleBounds=[-130,45,-110,60];this.bounds=this.visibleBounds;
+        this.hiddenResizeCalls=0;
+        if(options.trackResize!==false)new ResizeObserver(()=>this.resize()).observe(
+          document.getElementById('map'));""",
+        )
+        .replace(
+            "getCanvas(){return this.canvas;}getBounds(){return new Bounds();}getZoom(){return 4;}",
+            """getCanvas(){return this.canvas;}getBounds(){const b=this.bounds;return {
+          getWest:()=>b[0],getSouth:()=>b[1],getEast:()=>b[2],getNorth:()=>b[3]};}
+        getZoom(){return 4;}
+        panOutside(){this.visibleBounds=[10,10,11,11];this.bounds=this.visibleBounds;
+          this.handlers.moveend?.();}""",
+        )
+        .replace(
+            "fitBounds(){}flyTo(){}resize(){}project(){return {x:100,y:100};}",
+            """fitBounds(){}flyTo(){}resize(){
+          const container=document.getElementById('map');
+          if(!container.clientWidth||!container.clientHeight){
+            this.hiddenResizeCalls++;this.bounds=[10,10,11,11];
+          }else{this.bounds=this.visibleBounds;}
+          this.handlers.moveend?.();
+        }project(){return {x:100,y:100};}""",
+        )
+    )
+    page, errors = open_atlas(width)
+    page.route("**/maplibre-gl.js", lambda route: route.fulfill(body=adapter))
+    page.reload()
+    page.locator('[data-focal-id="100"]').wait_for()
+    page.locator("#advanced summary").first.click()
+    page.locator("#only-view").check()
+    initial_ids = page.locator("#record option").all_text_contents()
+    assert len(initial_ids) == 18
+    page.get_by_role("button", name="Photo space", exact=True).click()
+    page.wait_for_function("document.activeElement.id === 'projection-pane'")
+    assert page.locator("#record option").all_text_contents() == initial_ids
+    assert page.evaluate("testMap.hiddenResizeCalls") == 0
+    page.set_viewport_size({"width": width + 100, "height": 900})
+    page.evaluate("testMap.resize()")  # An unexpected library callback still cannot change scope.
+    assert page.locator("#record option").all_text_contents() == initial_ids
+    page.set_viewport_size({"width": width, "height": 900})
+    page.get_by_role("button", name="Map", exact=True).click()
+    page.wait_for_function("document.activeElement.id === 'geography-pane'")
+    assert page.locator("#record option").all_text_contents() == initial_ids
+    page.get_by_role("button", name="Photo space", exact=True).click()
+    page.wait_for_function("document.activeElement.id === 'projection-pane'")
+    page.set_viewport_size({"width": width + 100, "height": 900})
+    page.get_by_role("button", name="Map", exact=True).click()
+    page.wait_for_function("document.activeElement.id === 'geography-pane'")
+    assert page.locator("#map-resize-note").is_visible()
+    page.evaluate("testMap.panOutside()")
+    assert page.locator("#record").is_disabled()
+    assert "0 matches" in page.locator("#search-status").inner_text()
+    page.get_by_role("button", name="Clear search and filters", exact=True).click()
+    assert page.locator("#map-resize-note").is_hidden()
     assert errors == []
