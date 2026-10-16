@@ -52,6 +52,11 @@ const AtlasScope = (() => {
     });
     return result;
   }
+  function taxonScopeCounts(payload) {
+    const records = Array.isArray(payload?.records) ? payload.records : [];
+    return taxonPresets(payload).map((preset, index) =>
+      ({index, preset, ...taxonCounts(records, preset.taxon_ids, preset.exclude === true)}));
+  }
   function brushIndices(points, rectangle) {
     if (!rectangle || rectangle.length !== 4 || !rectangle.every(Number.isFinite)) return [];
     const [x0, y0, x1, y1] = rectangle;
@@ -189,7 +194,7 @@ const AtlasScope = (() => {
     return {begin: () => ++generation, cancel: () => {generation++;},
       current: token => token === generation};
   }
-  return {inBounds, matches, taxonMembership, taxonPresets, taxonCounts,
+  return {inBounds, matches, taxonMembership, taxonPresets, taxonCounts, taxonScopeCounts,
     brushIndices, toggleIndex, modelHref, resolveSelection, mapHref,
     compareNeighborhoods, requestGate, representationColor, hasRepresentationColors, hasPcaAlternative, projectionCoordinates, projectionSummary, markerHits, nearestMarker, nearestLongitude};
 })();

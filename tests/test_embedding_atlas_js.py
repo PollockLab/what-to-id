@@ -542,3 +542,30 @@ def test_preset_exclusion_is_explicit_boolean_and_legacy_inclusion_still_works()
     invalid = dict(label="Invalid", taxon_ids=[54743], approximate=True, exclude="true")
     payload = json.dumps(dict(taxonomy=dict(presets=[included, outside, invalid])))
     assert evaluate(f"scope.taxonPresets({payload})") == [included, outside]
+
+
+def test_scope_availability_counts_actual_records_without_losing_canonical_presets():
+    presets = [
+        dict(label="No sampled matches", taxon_ids=[2], approximate=False, match_count=1000),
+        dict(label="Matching lineage", taxon_ids=[3], approximate=False, match_count=0),
+        dict(label="Outside lineage", taxon_ids=[3], approximate=True, exclude=True),
+    ]
+    payload = dict(
+        group="Aves",  # Availability follows ancestry, never this iconic label.
+        records=[
+            dict(taxon_id=11, ancestor_taxon_ids=[11, 3, 1], taxonomy_complete=True),
+            dict(taxon_id=12, ancestor_taxon_ids=[12, 1], taxonomy_complete=True),
+            dict(taxon_id=99, ancestor_taxon_ids=[99], taxonomy_complete=False),
+        ],
+        taxonomy=dict(presets=presets),
+    )
+    result = evaluate(f"scope.taxonScopeCounts({json.dumps(payload)})")
+    assert [entry["index"] for entry in result] == [0, 1, 2]
+    assert [entry["preset"] for entry in result] == presets
+    assert [(r["verified"], r["excluded"], r["unknown"]) for r in result] == [
+        (0, 2, 1),
+        (1, 1, 1),
+        (1, 1, 1),
+    ]
+    assert evaluate(f"scope.taxonPresets({json.dumps(payload)})") == presets
+    assert evaluate("scope.taxonScopeCounts({records:[{}]})") == []
