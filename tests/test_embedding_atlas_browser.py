@@ -1254,6 +1254,58 @@ def _assert_identify_ids(page, ids):
     page.get_by_role("button", name="Close", exact=True).last.click()
 
 
+def _assert_visible_encoder_captions(page, label):
+    assert page.locator("#advanced").get_attribute("open") is None
+    assert page.locator(".methods").get_attribute("open") is None
+    for panel in page.locator(".encoder-comparison").all():
+        assert panel.get_attribute("open") is None
+    caption = page.locator("#details > div:last-child > p")
+    assert caption.is_visible()
+    assert caption.inner_text().startswith(f"{label}: Closest matches across all ")
+    assert "filters do not rerank these matches" in caption.inner_text()
+    assert "Photo resemblance is not an identification" in caption.inner_text()
+    page.get_by_role("button", name="Photo space", exact=True).click()
+    assert page.locator("#projection").is_visible()
+    assert page.locator("#projection").inner_text().startswith(f"{label}: ")
+    page.get_by_role("button", name="Map", exact=True).click()
+
+
+@pytest.mark.parametrize("label,path", [("BioCLIP", ""), ("DINO", "other/")])
+def test_active_encoder_is_visible_with_disclosures_closed_before_and_after_transfer(
+    open_context_atlas, label, path
+):
+    page, errors, _ = open_context_atlas()
+    if path:
+        page.goto(f"https://context-atlas.test/{path}embeddings.html#group=Plantae&id=100")
+        page.locator('[data-focal-id="100"]').wait_for()
+    _assert_visible_encoder_captions(page, label)
+    page.get_by_role("searchbox").fill("107")
+    target = "DINO" if label == "BioCLIP" else "BioCLIP"
+    _go_other_encoder(page, target)
+    _assert_visible_encoder_captions(page, target)
+    assert _scope_result_ids(page) == [107]
+    assert f"retained from {label}" in page.locator("#transfer-summary").inner_text()
+    assert errors == []
+
+
+def test_unlabeled_build_uses_cache_backbone_in_visible_captions(open_atlas, atlas_site, tmp_path):
+    build(
+        atlas_site.parent / "pool.parquet",
+        str(atlas_site.parent / "{group}.npz"),
+        tmp_path,
+        snapshot_date="2026-09-11",
+    )
+    page, errors = open_atlas()
+    page.route(
+        "https://atlas.test/embeddings.html",
+        lambda route: route.fulfill(path=str(tmp_path / "embeddings.html")),
+    )
+    page.reload()
+    page.locator('[data-focal-id="100"]').wait_for()
+    _assert_visible_encoder_captions(page, "test-encoder")
+    assert errors == []
+
+
 def test_encoder_links_and_back_forward_keep_ancestry_search_and_exact_identify_ids(
     open_context_atlas,
 ):
