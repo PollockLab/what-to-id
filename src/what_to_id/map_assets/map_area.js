@@ -174,7 +174,7 @@ function listing(parks,t,sel,view){var g=[],n=0,left=MAXROWS;
 // inside any of them is kept. Picking a park replaces a shape, and a shape replaces the parks.
 function MapArea(ctx){
   // AREAS: {key (BC park, '' for none), place (iNaturalist place id, 0 for none), label, drawn,
-  // rings, idx (null until restored) and error. Requested parks remain here on failure.
+  // rings, idx (null until restored), error and rawPlace for an invalid shared place token.
   var map=ctx.map,AREAS=[],VER=0,MASK=null,NOTE='',INVALID='',LINK='',LINKS=[],BOX=null,INITIAL=true,CHIPS='',UID='apark'+(++MapArea.n),
     mode=false,ended=0,pts=[],cursor=null,ready=false,color=getComputedStyle(document.documentElement)
       .getPropertyValue('--share').trim()||'#c2410c',nf=new Intl.NumberFormat('en-CA');
@@ -386,9 +386,12 @@ function MapArea(ctx){
   hdr.lastChild.onclick=function(){set(null);say('No parks selected.');};
   document.addEventListener('pointerdown',function(e){if(!box.contains(e.target))close();});
   function ids(s){return String(s||'').split(',').map(function(x){return x.trim();}).filter(Boolean);}
-  var keys=ids(ctx.bcpark),places=ids(ctx.park).map(Number).filter(function(x){return x>0;});
+  var keys=ids(ctx.bcpark),places=String(ctx.park||'').split(',').filter(function(x){return x.trim();});
   if(keys.length||places.length){
-    places.forEach(function(id){add({place:id},ctx.fit);});
+    places.forEach(function(token){var id=Number(token);
+      if(Number.isSafeInteger(id)&&id>0)add({place:id},ctx.fit);
+      else{AREAS.push({key:'',place:0,rawPlace:token,label:'Park '+token+' (invalid ID)',drawn:false,
+        rings:null,idx:null,error:'A park ID must be a positive safe integer.'});refresh(true);}});
     if(keys.length){var requested=keys.filter(function(k,i){return keys.indexOf(k)===i;}).map(function(k){
       var a={key:k,place:0,label:'BC park '+k,drawn:false,rings:null,idx:null};AREAS.push(a);return a;});
       refresh(true);
@@ -403,7 +406,8 @@ function MapArea(ctx){
   // the park list loads, the parks the URL names
   function hash(){if(INVALID)return 'area='+encodeURIComponent(INVALID);
     if(drawn())return 'area='+encode(AREAS[0].rings);
-    var k=[],p=[];AREAS.forEach(function(a){if(a.key)k.push(encodeURIComponent(a.key));else p.push(a.place);});
+    var k=[],p=[];AREAS.forEach(function(a){if(a.key)k.push(encodeURIComponent(a.key));
+      else p.push(a.rawPlace!==undefined?encodeURIComponent(a.rawPlace):a.place);});
     return [k.length?'bcpark='+k.join(','):'',p.length?'park='+p.join(','):''].filter(Boolean).join('&');}
   // The area as a filter term: what it keeps, and what iNaturalist can say of it. iNaturalist takes
   // several place ids as OR, so parks that all match a place are exact.

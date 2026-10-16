@@ -19,9 +19,10 @@ def park_case(park="", bcpark="", replies=None, list_state="empty"):
         f"const PARK={json.dumps(park)}, BCPARK={json.dumps(bcpark)},"
         f" REPLIES={json.dumps(replies or {})}, LIST={json.dumps(list_state)};\n"
         + r"""
-var areaBox;
+var areaBox,requestedPlaces=[];
 const setTimeout=fn=>{queueMicrotask(fn);return 1;};
 const fetch=url=>{const id=url.split('/').pop(),kind=REPLIES[id]||'pending';
+  requestedPlaces.push(id);
   if(kind==='pending')return new Promise(()=>{});
   if(kind==='reject')return Promise.reject(Error('fixture rejection'));
   const geometry=kind==='missing'?{}:{geometry_geojson:{type:'Polygon',
@@ -44,7 +45,7 @@ function parkList(){if(LIST==='reject')return Promise.reject(Error('fixture list
     script += r"""
 (async()=>{const pending=state();for(let i=0;i<80;i++)await Promise.resolve();
   const settled=state();AREA.clear();const cleared=state();
-  console.log(JSON.stringify({pending,settled,cleared}));})();
+  console.log(JSON.stringify({pending,settled,cleared,requestedPlaces}));})();
 """
     result = subprocess.run(["node"], input=script, text=True, capture_output=True)
     assert result.returncode == 0, result.stderr
@@ -96,3 +97,37 @@ def test_loaded_legacy_place_does_not_hide_an_unknown_bc_park():
     assert state["invalid"] is True and state["href"] is None
     assert parse_qs(state["hash"]) == {"park": ["111"], "bcpark": ["0096"]}
     assert state["mask"] == [1, 0, 0]
+
+
+@pytest.mark.parametrize(
+    "token",
+    ["ab!", " ab! ", "-111", "0", "111.5", "Infinity", "9007199254740993", "bad&taxa=3#%25"],
+)
+@pytest.mark.parametrize("mixed", [False, True])
+def test_invalid_place_tokens_are_preserved_without_requests(token, mixed):
+    raw = "111," + token if mixed else token
+    result = park_case(park=raw, replies={"111": "ready"})
+    state = result["settled"]
+    assert state["invalid"] is True and state["href"] is None
+    assert parse_qs(state["hash"]) == {"park": [raw]}
+    assert result["requestedPlaces"] == (["111"] if mixed else [])
+    assert state["mask"] == ([1, 0, 0] if mixed else None)
+    assert result["cleared"]["invalid"] is False
+    assert result["cleared"]["hash"] == ""
+
+
+@pytest.mark.parametrize("token", ["111", "111.0", "1.11e2", "0x6f", " 111 "])
+def test_safe_integer_place_interpretations_keep_normalization(token):
+    result = park_case(park=token, replies={"111": "ready"})
+    assert result["requestedPlaces"] == ["111"]
+    assert result["settled"]["invalid"] is False
+    assert result["settled"]["hash"] == "park=111"
+    assert "place_id=111" in result["settled"]["href"]
+
+
+def test_largest_safe_integer_place_is_not_rejected_or_rounded():
+    token = "9007199254740991"
+    result = park_case(park=token, replies={token: "ready"})
+    assert result["requestedPlaces"] == [token]
+    assert result["settled"]["invalid"] is False
+    assert result["settled"]["hash"] == "park=" + token

@@ -454,3 +454,68 @@ def test_failed_park_replacement_preserves_prior_unreadable_shared_area(browser)
         page.locator("#identify").get_attribute("href").startswith("https://www.inaturalist.org/")
     )
     page.close()
+
+
+@pytest.mark.parametrize("recovery", ["remove", "clear", "replace"])
+def test_invalid_shared_park_member_survives_reload_until_explicit_recovery(browser, recovery):
+    from urllib.parse import quote
+
+    from .test_map_area_recovery import recovery_html
+
+    page = browser.new_page()
+    requests = []
+    geometry = {"type": "Polygon", "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]]}
+
+    def respond(route):
+        if route.request.url.startswith("http://area-recovery/"):
+            route.fulfill(body=recovery_html())
+            return
+        requests.append(route.request.url)
+        if route.request.url == "https://api.inaturalist.org/v1/places/111":
+            route.fulfill(json={"results": [{"id": 111, "geometry_geojson": geometry}]})
+        else:
+            route.abort()
+
+    page.route("**/*", respond)
+    token = "bad&taxa=3#%25"
+    raw = "111," + token
+    page.goto("http://area-recovery/map.html#park=" + quote(raw, safe=""))
+    page.wait_for_function("AREA.mask(3)!==null")
+    page.reload()
+    page.wait_for_function("AREA.mask(3)!==null")
+    assert page.evaluate("new URLSearchParams(location.hash.slice(1)).get('park')") == raw
+    assert page.evaluate("AREA.invalid()") is True
+    assert page.locator("#identify").get_attribute("href") is None
+    assert "invalid ID" in page.locator(".anote").inner_text()
+    assert len(requests) == 2 and all(url.endswith("/111") for url in requests)
+    pages_before = len(page.context.pages)
+    page.locator("#identify").evaluate(
+        "a=>{a.href='https://www.inaturalist.org/observations/identify';a.tabIndex=0;}"
+    )
+    page.locator("#identify").focus()
+    page.keyboard.press("Enter")
+    assert len(page.context.pages) == pages_before
+    page.evaluate("refilter()")
+    assert page.locator("#identify").get_attribute("href") is None
+    if recovery == "remove":
+        page.get_by_role(
+            "button", name="Remove Park " + token + " (invalid ID)", exact=True
+        ).click()
+        assert page.evaluate("AREA.hash()") == "park=111"
+        assert "place_id=111" in page.locator("#identify").get_attribute("href")
+    elif recovery == "clear":
+        page.get_by_role("button", name="Clear unresolved areas", exact=True).click()
+        assert page.evaluate("AREA.hash()") == ""
+    else:
+        page.locator('input[type="file"]').set_input_files(
+            {
+                "name": "area.geojson",
+                "mimeType": "application/geo+json",
+                "buffer": json.dumps(geometry).encode(),
+            }
+        )
+        page.wait_for_function("!AREA.invalid()")
+        assert page.locator("#identify").get_attribute("href").endswith("&id=101")
+    assert page.evaluate("AREA.invalid()") is False
+    assert len(requests) == 2
+    page.close()
