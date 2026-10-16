@@ -1558,9 +1558,14 @@ def test_revealing_map_refreshes_local_results_without_moveend(fit_map_atlas):
 
 
 @pytest.mark.parametrize("width", [390, 820, 1440])
-def test_first_screen_prioritizes_evidence_and_preserves_disclosed_scope(open_context_atlas, width):
+@pytest.mark.parametrize("font_family", [None, "Arial, sans-serif", "Tahoma, sans-serif"])
+def test_first_screen_prioritizes_evidence_and_preserves_disclosed_scope(
+    open_context_atlas, width, font_family
+):
     page, errors, _ = open_context_atlas()
     page.set_viewport_size({"width": width, "height": 900})
+    if font_family:
+        page.add_style_tag(content=f":root{{font-family:{font_family}!important}}")
     page.evaluate("window.scrollTo(0,0)")
     assert page.locator("#map").bounding_box()["y"] <= {390: 420, 820: 450, 1440: 380}[width]
     assert page.evaluate("document.documentElement.scrollWidth") <= width
@@ -2497,8 +2502,9 @@ def test_unavailable_catalog_root_transfer_blocks_native_handoff(open_context_at
 
 
 @pytest.mark.parametrize("width", [390, 820, 1440])
+@pytest.mark.parametrize("font_family", [None, "Arial, sans-serif", "Tahoma, sans-serif"])
 def test_actual_plant_catalog_is_searchable_without_applying_or_recomputing(
-    open_taxonomy_atlas, taxonomy_site, width
+    open_taxonomy_atlas, taxonomy_site, width, font_family
 ):
     import json
     from pathlib import Path
@@ -2532,7 +2538,18 @@ def test_actual_plant_catalog_is_searchable_without_applying_or_recomputing(
     page.goto(page.url.split("#")[0] + f"#group=Plantae&id={payload['records'][0]['id']}")
     page.reload()  # A fragment-only navigation does not fetch the replaced payload.
     page.wait_for_function("sampleUsable() && data.records.length===1000")
+    if font_family:
+        page.add_style_tag(content=f":root{{font-family:{font_family}!important}}")
     assert page.locator("#map").bounding_box()["y"] <= {390: 420, 820: 450, 1440: 380}[width]
+    # Native intrinsic widths must not create an extra row under font fallbacks.
+    tops = [
+        page.locator(selector).bounding_box()["y"]
+        for selector in ["#group", "#search", "#taxon-query", "#taxon-scope"]
+    ]
+    if width >= 701:
+        assert max(tops) - min(tops) < 1
+    else:
+        assert tops[0] == tops[1] and tops[2] == tops[3]
     assert page.locator("#taxon-scope optgroup option").count() == 1254
     before = page.evaluate("JSON.stringify(data.records.map(r=>[r.id,r.xy,r.rgb,r.neighbors]))")
     results = _scope_result_ids(page)
