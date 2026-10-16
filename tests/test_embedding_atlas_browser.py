@@ -246,6 +246,8 @@ def test_group_change_resets_brush_and_keeps_photo_space_and_representation_cont
     page.locator("#only-brushed").check()
     page.locator("#group").select_option("Plantae")
     page.locator('[data-focal-id="200"]').wait_for()
+    assert page.locator("#missing-selection").is_hidden()
+    assert "requested=" not in page.url
     assert not page.locator("#only-brushed").is_checked()
     assert page.locator("#record option").count() == 4
     assert page.locator("#projection-pane").is_visible()
@@ -256,6 +258,15 @@ def test_group_change_resets_brush_and_keeps_photo_space_and_representation_cont
     assert page.locator("#plot-preview").is_visible()
     page.keyboard.press("ArrowRight")
     assert page.locator("#plot-preview").is_visible()
+    assert errors == []
+
+
+def test_explicit_missing_observation_link_keeps_the_requested_id(open_atlas):
+    page, errors = open_atlas(fragment="#group=Aves&id=99999")
+    assert page.locator("#missing-selection").is_visible()
+    assert "99999" in page.locator("#missing-selection").inner_text()
+    assert "requested=99999" in page.url
+    assert page.locator('[data-focal-id="100"]').count() == 1
     assert errors == []
 
 
