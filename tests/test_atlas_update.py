@@ -264,9 +264,14 @@ def test_apply_compact_drops_ids_that_left_the_pool(index, new_vectors, tmp_path
     assert r["compacted"] and r["dropped"] == 30
     m = ai.read_manifest(index)
     live = pd.read_parquet(pool)["id"].to_numpy()
-    assert [p["name"] for p in m["parts"]] == ["base"] and m["count"] == len(live)
-    assert [e["name"] for e in m["neighbors"]] == ["neighbors"]
-    assert not list(index.glob("delta-*")) and not list(index.glob("neighbors-*"))
+    # new names every compaction, so no published file is rewritten in place
+    assert [p["name"] for p in m["parts"]] == ["base-20260301"] and m["count"] == len(live)
+    assert [e["name"] for e in m["neighbors"]] == ["neighbors-base-20260301"]
+    assert not list(index.glob("delta-*")) and not list(index.glob("base.*"))
+    assert sorted(f.name for f in index.glob("neighbors*")) == [
+        "neighbors-base-20260301.bin",
+        "neighbors-base-20260301.dir.u32",
+    ]
     assert np.isin(ai._existing_ids(index, m), live).all()
     gone, kept = int(old[0]), int(old[40])
     assert lookup_neighbors(index, gone) is None

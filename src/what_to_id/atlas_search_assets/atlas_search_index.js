@@ -92,14 +92,18 @@ Index.prototype.bytes=async function(name,start,end){
   var self=this,headers={};
   if(start!==undefined)headers.Range='bytes='+start+'-'+(end-1);
   var res=await this.fetch(join(this.base,name),{headers:headers});
-  if(!res.ok)throw new Error('Could not load '+name+' ('+res.status+')');
+  if(!res.ok){
+    var err=new Error('Could not load '+name+' ('+res.status+')');
+    err.stale=res.status===404;  // replaced by a newer index; reload the manifest
+    throw err;
+  }
   var buf=await res.arrayBuffer();
   if(start!==undefined&&res.status===200)buf=buf.slice(start,end);
   self.stats.requests++;self.stats.bytes+=buf.byteLength;
   return buf;
 };
 Index.prototype.init=async function(){
-  var res=await this.fetch(join(this.base,'manifest.json'));
+  var res=await this.fetch(join(this.base,'manifest.json'),{cache:'no-cache'});
   if(!res.ok)throw new Error('Could not load the search index ('+res.status+')');
   var text=await res.text();
   this.stats.requests++;this.stats.bytes+=text.length;

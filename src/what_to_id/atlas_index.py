@@ -217,11 +217,13 @@ def append(index_dir: str | Path, part_name: str, E_new, ids_new) -> dict:
     return manifest
 
 
-def compact(index_dir: str | Path, keep_ids=None) -> dict:
-    """Merge all parts into one `base` grouped by list, optionally keeping only ``keep_ids``.
+def compact(index_dir: str | Path, keep_ids=None, name: str = "base") -> dict:
+    """Merge all parts into one part ``name`` grouped by list, optionally keeping only ``keep_ids``.
 
     Files are written to temp names and renamed, the manifest last, so a reader never sees a
-    manifest that references files that were not yet written. Old delta files are removed after.
+    manifest that references files that were not yet written. Old part files are removed after.
+    A published index passes a new ``name`` each time, so files a reader already holds a
+    manifest for are never rewritten in place.
     """
     manifest = read_manifest(index_dir)
     nlist, m = manifest["nlist"], manifest["m"]
@@ -236,9 +238,9 @@ def compact(index_dir: str | Path, keep_ids=None) -> dict:
         keep = np.isin(ids, np.asarray(keep_ids))
         lists, ids, codes = lists[keep], ids[keep], codes[keep]
     offsets, ids, codes = group_by_list(lists, ids, codes, nlist)
-    old = [p["name"] for p in manifest["parts"] if p["name"] != "base"]
-    write_part(index_dir, "base", offsets, ids, codes)
-    manifest["parts"] = [{"name": "base", "count": len(ids), "built_at": _now()}]
+    old = [p["name"] for p in manifest["parts"] if p["name"] != name]
+    write_part(index_dir, name, offsets, ids, codes)
+    manifest["parts"] = [{"name": name, "count": len(ids), "built_at": _now()}]
     manifest["count"] = len(ids)
     write_manifest(index_dir, manifest)
     for name in old:

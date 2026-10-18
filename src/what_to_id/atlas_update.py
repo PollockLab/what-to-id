@@ -286,8 +286,11 @@ def apply(
             raise ValueError(
                 f"compaction would drop {dropped} of {total} ids; is the pool truncated?"
             )
-        atlas_index.compact(index, keep_ids=live)
-        merge_neighbors(index, keep_ids=live)
+        # versioned names: a browser holding last week's manifest gets a 404 and reloads it,
+        # never this week's bytes under last week's offsets
+        base = "base-" + part.removeprefix("delta-")
+        atlas_index.compact(index, keep_ids=live, name=base)
+        merge_neighbors(index, keep_ids=live, name=f"neighbors-{base}")
         result.update(compacted=True, dropped=dropped)
     result["count"] = read_manifest(index)["count"]
     return result

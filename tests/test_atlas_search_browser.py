@@ -43,6 +43,9 @@ class RangeHandler(http.server.SimpleHTTPRequestHandler):
         self.wfile.write(part)
 
 
+SITE_ROOT = {}  # served base url -> directory, for tests that change files under a live page
+
+
 @pytest.fixture(scope="module")
 def browser():
     required = os.environ.get("WHAT_TO_ID_REQUIRE_BROWSER") == "1"
@@ -70,7 +73,9 @@ def site(tmp_path_factory):
     handler = functools.partial(RangeHandler, directory=str(root))
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    yield f"http://127.0.0.1:{server.server_port}", ref
+    base = f"http://127.0.0.1:{server.server_port}"
+    SITE_ROOT[base] = root
+    yield base, ref
     server.shutdown()
 
 
@@ -189,6 +194,34 @@ def test_more_like_this_and_id_deep_link(open_page, site):
     deep.wait_for_selector(".card")
     assert card_ids(deep) == source["neighbors"][0]
     assert deep.errors == [] and page.errors == []
+
+
+def test_stale_manifest_reloads_after_files_are_renamed(open_page, site):
+    # the weekly compaction renames what it replaces; an open page must reload, not break
+    base, ref = site
+    atlas = SITE_ROOT[base] / "atlas"
+    first, second = [r for r in ref["lookups"] if r["neighbors"] is not None][:2]
+    page = open_page(f"#id={first['id']}", fake_encoder=False)
+    page.wait_for_selector(".card")
+    manifest_path = atlas / "manifest.json"
+    saved = manifest_path.read_text()
+    manifest = json.loads(saved)
+    old = manifest["neighbors"][0]["name"]
+    try:
+        for suffix in (".bin", ".dir.u32"):
+            (atlas / f"{old}{suffix}").rename(atlas / f"{old}-v2{suffix}")
+        manifest["neighbors"][0]["name"] = f"{old}-v2"
+        manifest_path.write_text(json.dumps(manifest))
+        page.evaluate(f"location.hash = '#id={second['id']}'")
+        page.wait_for_function(
+            f"document.querySelector('.card a.photo[href$=\"/{second['neighbors'][0][0]}\"]')"
+        )
+        assert card_ids(page) == second["neighbors"][0]
+    finally:
+        for suffix in (".bin", ".dir.u32"):
+            if (atlas / f"{old}-v2{suffix}").exists():
+                (atlas / f"{old}-v2{suffix}").rename(atlas / f"{old}{suffix}")
+        manifest_path.write_text(saved)
 
 
 def test_pasted_url_absent_id_and_taxon_filter(open_page, site):

@@ -48,7 +48,16 @@ async function encoderFor(state,confirmed){
   return S.encoder;
 }
 
+// The daily update renames files it replaces, so a 404 means the manifest is stale: reload it once.
 async function hitsFor(state,confirmed){
+  try{return await hitsFrom(state,confirmed);}
+  catch(e){
+    if(!e.stale)throw e;
+    S.index=null;
+    return hitsFrom(state,confirmed);
+  }
+}
+async function hitsFrom(state,confirmed){
   var idx=await getIndex();
   if(state.kind==='id'){
     var nb=await idx.neighbors(state.id);
