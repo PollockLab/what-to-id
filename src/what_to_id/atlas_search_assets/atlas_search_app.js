@@ -4,7 +4,7 @@
 var CFG=ATLAS_SEARCH_CONFIG,Meta=AtlasSearchMeta,Enc=AtlasEncoder;
 var K=200,NPROBE=32;
 var qs=new URLSearchParams(location.search);
-var DATA=new URL(qs.get('data')||CFG.dataUrl,location.href).href.replace(/\/*$/,'/');
+var DATA=new URL(CFG.dataUrl,location.href).href.replace(/\/*$/,'/');
 var S={index:null,encoder:null,cache:new Map(),hits:[],state:null,run:0,include:[],exclude:[]};
 var EXAMPLES=['a bird eating a frog','a spider with prey','mushrooms growing on a log'];
 
