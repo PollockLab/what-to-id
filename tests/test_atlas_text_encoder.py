@@ -90,6 +90,65 @@ def test_js_tokenizer_rejects_incomplete_merges():
     assert "incomplete" in result.stdout
 
 
+def test_quantize_embedding_rewrites_gather_to_int8_rows(tmp_path):
+    np = pytest.importorskip("numpy")
+    onnx = pytest.importorskip("onnx")
+    ort = pytest.importorskip("onnxruntime", reason="onnxruntime is not installed")
+    from onnx import TensorProto, helper, numpy_helper
+
+    from what_to_id.atlas_text_encoder import EMBEDDING_NAME, quantize_embedding
+
+    rng = np.random.default_rng(0)
+    table = rng.normal(size=(16, 8)).astype(np.float32)
+    table[3] = 0.0  # an all-zero row must not divide by zero
+    table[5] *= 100.0  # per-row scales: a large row must not coarsen the others
+    graph = helper.make_graph(
+        [helper.make_node("Gather", [EMBEDDING_NAME, "tokens"], ["embedding"], "g")],
+        "g",
+        [helper.make_tensor_value_info("tokens", TensorProto.INT64, ["b", 4])],
+        [helper.make_tensor_value_info("embedding", TensorProto.FLOAT, ["b", 4, 8])],
+        [numpy_helper.from_array(table, name=EMBEDDING_NAME)],
+    )
+    path = tmp_path / "m.onnx"
+    model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", 17)])
+    model.ir_version = 9  # older than any onnxruntime this repo supports
+    onnx.save(model, str(path))
+    quantize_embedding(path)
+
+    model = onnx.load(str(path))
+    assert {i.name: i.data_type for i in model.graph.initializer}[f"{EMBEDDING_NAME}_int8"] == (
+        TensorProto.INT8
+    )
+    ids = np.array([[0, 3, 5, 15], [1, 2, 4, 5]], dtype=np.int64)
+    got = ort.InferenceSession(str(path), providers=["CPUExecutionProvider"]).run(
+        None, {"tokens": ids}
+    )[0]
+    want = table[ids]
+    assert got.shape == want.shape
+    assert np.all(got[0, 1] == 0)
+    row_max = np.abs(want).max(axis=-1, keepdims=True)
+    assert np.all(np.abs(got - want) <= row_max / 127.0 / 2 + 1e-6)
+
+
+def test_quantize_embedding_rejects_missing_table(tmp_path):
+    onnx = pytest.importorskip("onnx")
+    pytest.importorskip("onnxruntime", reason="onnxruntime is not installed")
+    from onnx import TensorProto, helper
+
+    from what_to_id.atlas_text_encoder import quantize_embedding
+
+    graph = helper.make_graph(
+        [helper.make_node("Identity", ["x"], ["y"])],
+        "g",
+        [helper.make_tensor_value_info("x", TensorProto.FLOAT, [1])],
+        [helper.make_tensor_value_info("y", TensorProto.FLOAT, [1])],
+    )
+    path = tmp_path / "m.onnx"
+    onnx.save(helper.make_model(graph), str(path))
+    with pytest.raises(SystemExit, match="not found"):
+        quantize_embedding(path)
+
+
 EXPORT_DIR = os.environ.get("WHAT_TO_ID_TEXT_ENCODER_DIR")
 SNAPSHOT_DIR = os.environ.get(
     "WHAT_TO_ID_BIOCLIP_SNAPSHOT", str(Path.home() / ".cache/what-to-id/bioclip-2.5")

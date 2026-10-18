@@ -45,6 +45,8 @@ OPSET = 17
 MIN_COSINE = 0.99
 # Merges open_clip keeps after its header line: 49152 - 256 - 2 + 1 lines, minus the header.
 N_MERGES = 49152 - 256 - 2 + 1 - 1
+EMBEDDING_NAME = "clip.token_embedding.weight"
+EMBEDDING_QUANT = "int8, symmetric per-row scale (Gather, Cast, Mul)"
 QUANT_MODES = ("int8", "int8-perchannel", "uint8")
 
 # Scene and taxon phrases plus tokenizer edge cases (empty, accents, truncation, case, punctuation).
@@ -167,7 +169,7 @@ def export_fp32(tower, path: Path) -> None:
 
 
 def quantize(src: Path, dst: Path, mode: str) -> dict:
-    """Dynamic weight quantization of the MatMul layers; the token embedding stays fp32."""
+    """Dynamic weight quantization of the MatMul layers, then the token embedding to int8 rows."""
     from onnxruntime.quantization import QuantType, quantize_dynamic
 
     if mode not in QUANT_MODES:
@@ -181,13 +183,68 @@ def quantize(src: Path, dst: Path, mode: str) -> dict:
         weight_type=weight_type,
         per_channel=per_channel,
     )
+    quantize_embedding(dst)
     return {
         "method": "onnxruntime.quantization.quantize_dynamic",
         "mode": mode,
         "weight_type": weight_type.name,
         "per_channel": per_channel,
         "op_types": ["MatMul"],
+        "token_embedding": EMBEDDING_QUANT,
     }
+
+
+def quantize_embedding(path: Path, name: str = EMBEDDING_NAME) -> None:
+    """Rewrite ``path`` in place with the token embedding table as int8 plus a scale per row.
+
+    quantize_dynamic skips Gather, leaving the [vocab, width] table (~200 MB) in fp32. The table
+    initializer becomes int8 plus a [vocab, 1] fp32 scale, and the Gather becomes
+    ``Cast(Gather(int8, ids)) * Gather(scale, ids)``, which uses only ops onnxruntime-web has.
+    """
+    import numpy as np
+    import onnx
+    from onnx import TensorProto, helper, numpy_helper
+
+    model = onnx.load(str(path))
+    graph = model.graph
+    table = next((i for i in graph.initializer if i.name == name), None)
+    if table is None:
+        raise SystemExit(f"initializer {name!r} not found in {path}")
+    users = [n for n in graph.node if name in n.input]
+    if len(users) != 1 or users[0].op_type != "Gather" or users[0].input[0] != name:
+        raise SystemExit(f"{name!r} must feed exactly one Gather as its data input")
+    gather = users[0]
+    weights = numpy_helper.to_array(table).astype(np.float32)
+    scale = np.abs(weights).max(axis=1, keepdims=True) / 127.0
+    scale[scale == 0] = 1.0
+    quant = np.clip(np.rint(weights / scale), -127, 127).astype(np.int8)
+    graph.initializer.remove(table)
+    graph.initializer.extend(
+        [
+            numpy_helper.from_array(quant, name=f"{name}_int8"),
+            numpy_helper.from_array(scale.astype(np.float32), name=f"{name}_scale"),
+        ]
+    )
+    out = gather.output[0]
+    axis = next((a.i for a in gather.attribute if a.name == "axis"), 0)
+    stem = gather.name or "token_embedding"
+    nodes = [
+        helper.make_node(
+            "Gather", [f"{name}_int8", gather.input[1]], [f"{stem}_q"], f"{stem}_q", axis=axis
+        ),
+        helper.make_node(
+            "Cast", [f"{stem}_q"], [f"{stem}_f"], f"{stem}_cast", to=TensorProto.FLOAT
+        ),
+        helper.make_node(
+            "Gather", [f"{name}_scale", gather.input[1]], [f"{stem}_s"], f"{stem}_s", axis=axis
+        ),
+        helper.make_node("Mul", [f"{stem}_f", f"{stem}_s"], [out], f"{stem}_mul"),
+    ]
+    index = list(graph.node).index(gather)
+    graph.node.remove(gather)
+    for offset, node in enumerate(nodes):
+        graph.node.insert(index + offset, node)
+    onnx.save(model, str(path))
 
 
 def write_merges(path: Path) -> None:
