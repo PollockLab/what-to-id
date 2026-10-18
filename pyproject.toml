@@ -24,6 +24,8 @@ what-to-id = "what_to_id.cli:main"
 # Optional offline atlas layout build; browsers only consume precomputed coordinates.
 atlas = ["scikit-learn==1.9.1"]
 browser = ["playwright==1.64.0"]
+# Static IVF-PQ atlas index training (build only; search, append and compact are numpy).
+index = ["faiss-cpu==1.15.1"]
 # Only the similarity arm's seed picker and separability report require this private pin.
 similarity = [
     "labelfirst @ git+https://github.com/traitlab/labelfirst.git@791662c0f0d04698f988640aa58ece1f5cb6be59",
