@@ -11,8 +11,10 @@
 #   r2     Cloudflare R2 bucket ATLAS_R2_BUCKET at ATLAS_R2_ENDPOINT (needs R2_ACCESS_KEY_ID and
 #          R2_SECRET_ACCESS_KEY; the aws CLI)
 #   local  the directory ATLAS_LOCAL_DIR, for tests and rehearsals
-# After the manifest, push removes remote files that DIR no longer has (parts that a compaction
-# folded away), so only push a directory that came from a full pull.
+# After the manifest, push removes remote index files that DIR no longer has (parts that a
+# compaction folded away), so only push a directory that came from a full pull. The browser text
+# model under model/ is never pulled or pruned; a push uploads it only when DIR has it (the seed).
+# ATLAS_SQUASH=true (hf only) then squashes the repo history, so replaced parts stop using storage.
 # ATLAS_SYNC_LOG, if set, gets one line per transferred file in transfer order.
 set -euo pipefail
 
@@ -46,6 +48,7 @@ pull_local() {
   local f
   for f in "$ATLAS_LOCAL_DIR"/*; do
     case "$(basename "$f")" in
+      model) continue ;;
       manifest.json | *.ids.u32) ;;
       *) [ -z "$only" ] || continue ;;
     esac
@@ -61,30 +64,39 @@ push_local() {
   for f in "$dir"/*; do
     case "$(basename "$f")" in
       manifest.json | *.tmp) ;;
-      *) cp "$f" "$ATLAS_LOCAL_DIR/" && log "push $(basename "$f")" ;;
+      *) cp -R "$f" "$ATLAS_LOCAL_DIR/" && log "push $(basename "$f")" ;;
     esac
   done
   cp "$dir/manifest.json" "$ATLAS_LOCAL_DIR/" && log "push manifest.json"
   for f in "$ATLAS_LOCAL_DIR"/*; do
-    [ -e "$dir/$(basename "$f")" ] || rm -f "$f"
+    [ "$(basename "$f")" = model ] || [ -e "$dir/$(basename "$f")" ] || rm -f "$f"
   done
 }
 
 pull_hf() {
   [ -n "${ATLAS_HF_REPO:-}" ] || die "ATLAS_HF_REPO is not set"
   local include=()
-  [ -z "$only" ] || include=(--include manifest.json "*.ids.u32")
-  hf_cli download "$ATLAS_HF_REPO" --repo-type dataset --local-dir "$dir" ${include[@]+"${include[@]}"}
+  [ -z "$only" ] || include=(--include manifest.json --include "*.ids.u32")
+  hf_cli download "$ATLAS_HF_REPO" --repo-type dataset --local-dir "$dir" --exclude "model/*" \
+    ${include[@]+"${include[@]}"}
 }
+
+# Index file names; prune deletes only these, never the dataset card, .gitattributes or model/.
+# The hf CLI takes one glob per flag: --delete a --delete b.
+HF_PRUNE=(--delete "*.offsets.u32" --delete "*.ids.u32" --delete "*.codes.u8" --delete "*.dir.u32"
+  --delete "neighbors*.bin")
 
 push_hf() {
   [ -n "${ATLAS_HF_REPO:-}" ] || die "ATLAS_HF_REPO is not set"
-  hf_cli upload "$ATLAS_HF_REPO" "$dir" . --repo-type dataset --exclude manifest.json "*.tmp" ".cache/*" \
-    --commit-message "atlas parts"
+  hf_cli upload "$ATLAS_HF_REPO" "$dir" . --repo-type dataset --exclude manifest.json --exclude "*.tmp" \
+    --exclude ".cache/*" --commit-message "atlas parts"
   hf_cli upload "$ATLAS_HF_REPO" "$dir/manifest.json" manifest.json --repo-type dataset \
     --commit-message "atlas manifest"
-  hf_cli upload "$ATLAS_HF_REPO" "$dir" . --repo-type dataset --exclude "*.tmp" ".cache/*" --delete "*" \
-    --commit-message "atlas prune"
+  hf_cli upload "$ATLAS_HF_REPO" "$dir" . --repo-type dataset --exclude "*.tmp" --exclude ".cache/*" \
+    --exclude "model/*" "${HF_PRUNE[@]}" --commit-message "atlas prune"
+  if [ "${ATLAS_SQUASH:-}" = true ]; then
+    python -c 'import os, huggingface_hub as h; h.HfApi().super_squash_history(os.environ["ATLAS_HF_REPO"], repo_type="dataset", commit_message="atlas index")'
+  fi
 }
 
 r2_env() {
@@ -98,7 +110,8 @@ pull_r2() {
   r2_env
   local filter=()
   [ -z "$only" ] || filter=(--exclude "*" --include manifest.json --include "*.ids.u32")
-  aws s3 sync "s3://$ATLAS_R2_BUCKET/" "$dir" --endpoint-url "$ATLAS_R2_ENDPOINT" --only-show-errors ${filter[@]+"${filter[@]}"}
+  aws s3 sync "s3://$ATLAS_R2_BUCKET/" "$dir" --endpoint-url "$ATLAS_R2_ENDPOINT" --only-show-errors \
+    --exclude "model/*" ${filter[@]+"${filter[@]}"}
 }
 
 push_r2() {
@@ -108,7 +121,7 @@ push_r2() {
   aws s3 cp "$dir/manifest.json" "s3://$ATLAS_R2_BUCKET/manifest.json" --endpoint-url "$ATLAS_R2_ENDPOINT" \
     --only-show-errors --cache-control "no-cache"
   aws s3 sync "$dir" "s3://$ATLAS_R2_BUCKET/" --endpoint-url "$ATLAS_R2_ENDPOINT" --only-show-errors \
-    --exclude "*.tmp" --delete
+    --exclude "*.tmp" --exclude "model/*" --delete
 }
 
 case "$cmd:$host" in

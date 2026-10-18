@@ -375,6 +375,47 @@ def cmd_verify(args) -> int:
     return 0 if meta["parity"]["passed"] else 1
 
 
+def attach(export_dir: Path, index_dir: Path) -> dict:
+    """Copy a passing export into ``index_dir/model/`` and name it in the index manifest.
+
+    File names carry the first 12 hex digits of their sha256, so a new export never reuses a URL
+    that browsers have cached. The daily update leaves ``model/`` alone (atlas_sync.sh).
+    """
+    import shutil
+
+    from .atlas_index_io import read_manifest, write_manifest
+
+    meta = _meta(export_dir)
+    if not meta.get("parity", {}).get("passed"):
+        raise SystemExit(f"{export_dir} has no passing parity check; run export or verify first")
+    names = {}
+    for name in (ONNX_FILE, MERGES_FILE):
+        want = meta["files"][name]["sha256"]
+        if sha256(export_dir / name) != want:
+            raise SystemExit(f"{export_dir / name} does not match the sha256 in {META_FILE}")
+        stem, dot, ext = name.partition(".")
+        names[name] = f"model/{stem}-{want[:12]}{dot}{ext}"
+    manifest = read_manifest(index_dir)
+    if manifest["dims"] != meta["embed_dim"]:
+        dims = manifest["dims"]
+        raise SystemExit(f"encoder gives {meta['embed_dim']} dims, the index has {dims}")
+    (index_dir / "model").mkdir(exist_ok=True)
+    for name, dest in names.items():
+        shutil.copyfile(export_dir / name, index_dir / dest)
+    manifest["text_encoder"] = {
+        "onnx": names[ONNX_FILE],
+        "vocab": names[MERGES_FILE],
+        "input_name": meta["input"]["name"],
+        "output_name": meta["output"]["name"],
+        "bytes": meta["files"][ONNX_FILE]["bytes"],
+        "model": meta["model"],
+        "revision": meta["revision"],
+        "sha256": meta["files"][ONNX_FILE]["sha256"],
+    }
+    write_manifest(index_dir, manifest)
+    return manifest["text_encoder"]
+
+
 def report(meta: dict) -> None:
     p = meta["parity"]
     for row in p["queries"]:
@@ -411,7 +452,13 @@ def main(argv: list[str] | None = None) -> int:
         if name == "export":
             p.add_argument("--quant", choices=QUANT_MODES, default="int8")
             p.add_argument("--keep-fp32", action="store_true", help="keep the unquantized ONNX")
+    p = sub.add_parser("attach", help="add a passing export to an index for browser text search")
+    p.add_argument("--out", type=Path, required=True, help="export directory")
+    p.add_argument("--index", type=Path, required=True, help="index directory")
     args = parser.parse_args(argv)
+    if args.command == "attach":
+        print(json.dumps(attach(args.out, args.index), indent=2))
+        return 0
     if args.command == "fetch":
         fetch(args.snapshot)
         return 0

@@ -405,8 +405,13 @@ def test_sync_script_local_mode_orders_manifest_last_and_prunes(index, tmp_path)
     assert (work / "base.codes.u8").exists()
 
     (host / "stale.bin").write_bytes(b"x")  # e.g. a delta part a compaction folded away
+    (host / "model").mkdir()
+    (host / "model" / "text_encoder-abc.onnx").write_bytes(b"m")  # seeded once, never synced
     run("push", str(work))
     assert not (host / "stale.bin").exists()  # files the pushed index no longer has are pruned
+    assert (host / "model" / "text_encoder-abc.onnx").exists()
+    run("pull", str(tmp_path / "again"))
+    assert not (tmp_path / "again" / "model").exists()
 
     (work / "delta-20260101.codes.u8").unlink()
     broken = run("push", str(work), check=False)
@@ -414,6 +419,56 @@ def test_sync_script_local_mode_orders_manifest_last_and_prunes(index, tmp_path)
     assert run("pull", str(tmp_path / "x"), check=False).returncode == 0
     env.pop("ATLAS_HOST")
     assert run("pull", str(tmp_path / "y"), check=False).returncode != 0
+
+
+# Stand-in for the hf CLI: each glob flag takes one value, so a stray value is an extra positional,
+# which the real CLI rejects ("Got unexpected extra argument").
+FAKE_HF = """#!/usr/bin/env python3
+import json, os, sys
+args, pos, flags = sys.argv[1:], [], []
+i = 1
+while i < len(args):
+    if args[i].startswith("--"):
+        flags.append([args[i], args[i + 1]]); i += 2
+    else:
+        pos.append(args[i]); i += 1
+want = {"upload": 3, "download": 1}[args[0]]
+if len(pos) != want:
+    sys.exit(f"Got unexpected extra argument ({pos[want:]})")
+with open(os.environ["HF_LOG"], "a") as log:
+    log.write(json.dumps({"cmd": args[0], "pos": pos, "flags": flags}) + "\\n")
+if args[0] == "download":
+    local = dict(flags)["--local-dir"]
+    os.makedirs(local, exist_ok=True)
+    open(os.path.join(local, "manifest.json"), "w").write("{}")
+"""
+
+
+@pytest.mark.skipif(shutil.which("jq") is None, reason="atlas_sync.sh needs jq")
+def test_sync_script_hf_mode_passes_one_glob_per_flag_and_prunes_only_index_files(index, tmp_path):
+    bin_dir, log = tmp_path / "bin", tmp_path / "hf.log"
+    bin_dir.mkdir()
+    (bin_dir / "hf").write_text(FAKE_HF)
+    (bin_dir / "hf").chmod(0o755)
+    env = {"PATH": f"{bin_dir}:/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin", "ATLAS_HOST": "hf",
+           "ATLAS_HF_REPO": "someone/atlas", "HF_LOG": str(log)}  # fmt: skip
+
+    def run(*args):
+        done = subprocess.run(["bash", str(SYNC), *args], env=env, capture_output=True, text=True)
+        assert done.returncode == 0, done.stderr
+        return [json.loads(line) for line in log.read_text().splitlines()]
+
+    calls = run("push", str(index))
+    assert [c["cmd"] for c in calls] == ["upload"] * 3
+    assert calls[1]["pos"][1:] == [str(index / "manifest.json"), "manifest.json"]
+    deletes = [v for f, v in calls[2]["flags"] if f == "--delete"]
+    assert deletes and "*" not in deletes and all("*" in d for d in deletes)
+    assert ["--exclude", "model/*"] in calls[2]["flags"]
+    log.unlink()
+    calls = run("pull", str(tmp_path / "ids"), "ids")
+    includes = [v for f, v in calls[0]["flags"] if f == "--include"]
+    assert includes == ["manifest.json", "*.ids.u32"]
+    assert ["--exclude", "model/*"] in calls[0]["flags"]
 
 
 def test_workflow_is_gated_pinned_and_off_the_pages_group():
@@ -428,6 +483,8 @@ def test_workflow_is_gated_pinned_and_off_the_pages_group():
         assert "vars.ATLAS_ENABLED == 'true'" in job["if"], name
     assert "inputs.dry_run" in wf["jobs"]["plan"]["if"]
     assert wf["jobs"]["encode"]["timeout-minutes"] <= 180
+    for name in ("plan", "apply"):  # atlas_sync.sh needs the hf CLI, which requirements.lock lacks
+        assert any("huggingface_hub==" in step.get("run", "") for step in wf["jobs"][name]["steps"])
     uses = re.findall(r"uses: (\S+)@(\S+)", text)
     assert uses and all(re.fullmatch(r"[0-9a-f]{40}", ref) for _, ref in uses)
     for action in ("checkout", "setup-python", "upload-artifact"):

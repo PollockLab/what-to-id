@@ -23,6 +23,8 @@ name: atlas
 #   hf   variable ATLAS_HF_REPO (a Hugging Face dataset repo), secret HF_TOKEN
 #   r2   variables ATLAS_R2_BUCKET and ATLAS_R2_ENDPOINT, secrets R2_ACCESS_KEY_ID and
 #        R2_SECRET_ACCESS_KEY
+# The browser text model lives under model/ on the host (python -m what_to_id.atlas_text_encoder
+# attach, before the seed push); updates neither download nor prune it.
 # Optional variables: ATLAS_WORKERS (4), ATLAS_MAX_NEW (12000 photos per run).
 # The pool comes from the map-state release that map.yml keeps.
 on:
@@ -78,6 +80,8 @@ jobs:
           cache: pip
           cache-dependency-path: requirements.lock
       - run: pip install --require-hashes -r requirements.lock
+      - if: vars.ATLAS_HOST == 'hf'
+        run: pip install huggingface_hub==1.10.1 # the hf CLI, for atlas_sync.sh
       - name: Fetch the map pool and the index ids
         run: |
           set -euo pipefail
@@ -178,6 +182,8 @@ jobs:
           cache: pip
           cache-dependency-path: requirements.lock
       - run: pip install --require-hashes -r requirements.lock
+      - if: vars.ATLAS_HOST == 'hf'
+        run: pip install huggingface_hub==1.10.1 # the hf CLI, for atlas_sync.sh
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           pattern: vec-*
@@ -206,6 +212,8 @@ jobs:
           COMPACT: ${{ needs.plan.outputs.compact }}
       - name: Upload the index
         run: scripts/atlas_sync.sh push index
+        env:
+          ATLAS_SQUASH: ${{ needs.plan.outputs.compact }} # weekly: drop the history of replaced parts
       - name: Keep the raw vectors for the next Fir rebuild
         run: |
           set -euo pipefail

@@ -175,3 +175,62 @@ def test_exported_onnx_matches_torch_and_manifest():
     result = enc.parity(out / enc.ONNX_FILE, enc.text_tower(model), tokenizer)
     assert result["min_cosine"] >= enc.MIN_COSINE, result["queries"]
     assert result["retrieval_top1_agreement"] >= 0.75
+
+
+def fake_export(directory, passed=True):
+    from what_to_id import atlas_text_encoder as enc
+
+    directory.mkdir()
+    (directory / enc.ONNX_FILE).write_bytes(b"onnx bytes")
+    (directory / enc.MERGES_FILE).write_text("#version\na b\n")
+    meta = {
+        "model": enc.REPO_ID,
+        "revision": enc.REVISION,
+        "embed_dim": 1024,
+        "input": {"name": "tokens"},
+        "output": {"name": "embedding"},
+        "files": {
+            n: {"sha256": enc.sha256(directory / n), "bytes": (directory / n).stat().st_size}
+            for n in (enc.ONNX_FILE, enc.MERGES_FILE)
+        },
+        "parity": {"passed": passed},
+    }
+    (directory / enc.META_FILE).write_text(json.dumps(meta))
+    return meta
+
+
+def test_attach_names_hashed_files_in_the_manifest(tmp_path):
+    from what_to_id import atlas_text_encoder as enc
+
+    meta = fake_export(tmp_path / "export")
+    index = tmp_path / "index"
+    index.mkdir()
+    (index / "manifest.json").write_text(json.dumps({"version": 1, "dims": 1024, "parts": []}))
+    spec = enc.attach(tmp_path / "export", index)
+    sha = meta["files"][enc.ONNX_FILE]["sha256"]
+    assert spec["onnx"] == f"model/text_encoder-{sha[:12]}.onnx"
+    assert spec["vocab"].startswith("model/bpe_merges-") and spec["vocab"].endswith(".txt")
+    assert spec["bytes"] == len(b"onnx bytes") and spec["input_name"] == "tokens"
+    assert (index / spec["onnx"]).read_bytes() == b"onnx bytes"
+    manifest = json.loads((index / "manifest.json").read_text())
+    assert manifest["text_encoder"] == spec and manifest["parts"] == []
+
+
+def test_attach_refuses_failed_parity_tampered_files_and_wrong_dims(tmp_path):
+    from what_to_id import atlas_text_encoder as enc
+
+    index = tmp_path / "index"
+    index.mkdir()
+    (index / "manifest.json").write_text(json.dumps({"version": 1, "dims": 1024}))
+    fake_export(tmp_path / "failed", passed=False)
+    with pytest.raises(SystemExit, match="parity"):
+        enc.attach(tmp_path / "failed", index)
+    fake_export(tmp_path / "tampered")
+    (tmp_path / "tampered" / enc.ONNX_FILE).write_bytes(b"other")
+    with pytest.raises(SystemExit, match="sha256"):
+        enc.attach(tmp_path / "tampered", index)
+    fake_export(tmp_path / "ok")
+    (index / "manifest.json").write_text(json.dumps({"version": 1, "dims": 512}))
+    with pytest.raises(SystemExit, match="dims"):
+        enc.attach(tmp_path / "ok", index)
+    assert not (index / "model").exists()
