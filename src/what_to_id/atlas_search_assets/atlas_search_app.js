@@ -20,6 +20,8 @@ function getIndex(){
   if(!S.index)S.index=AtlasSearchIndex.open(DATA,{whole:WHOLE});
   return S.index;
 }
+// CLIP text towers match captions best, so a bare query gets the caption template the search test used.
+function caption(text){return /^(an? )?(photo|picture|image)\b/i.test(text)?text:'a photo of '+text;}
 function obsUrl(id){return 'https://www.inaturalist.org/observations/'+id;}
 function taxonId(t){return t.id;}
 function same(a,b){return a&&b&&a.kind===b.kind&&(a.kind==='id'?a.id===b.id:a.text===b.text);}
@@ -67,7 +69,7 @@ async function hitsFrom(state,confirmed){
   var enc=await encoderFor(state,confirmed);
   if(!enc)return {gated:true};
   status('Searching...');
-  var q=await enc.encode(state.text);
+  var q=await enc.encode(caption(state.text));
   return {hits:await idx.search(q,{k:K,nprobe:+qs.get('nprobe')||NPROBE})};
 }
 

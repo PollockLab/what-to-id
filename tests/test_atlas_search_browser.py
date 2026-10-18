@@ -134,8 +134,8 @@ def open_page(browser, site):
         page.on("requestfailed", lambda r: page.errors.append(f"failed {r.url}"))
         if fake_encoder:
             page.add_init_script(
-                f"window.AtlasEncoderOverride = {{encode: async () => Float32Array.from("
-                f"{json.dumps(ref['queries'][0])})}};"
+                f"window.encoded = []; window.AtlasEncoderOverride = {{encode: async t => "
+                f"(window.encoded.push(t), Float32Array.from({json.dumps(ref['queries'][0])}))}};"
             )
         page.stub = stub_inat(page, ref)
         page.goto(f"{base}/search.html{hash_}")
@@ -238,6 +238,8 @@ def test_pasted_url_absent_id_and_taxon_filter(open_page, site):
     # exclude Fungi from a text search: the one Fungi hit is reported as filtered
     text = open_page("#q=a+bird", fake_encoder=True)
     text.wait_for_selector(".card")
+    # a bare query is wrapped in the caption template the model was tested with
+    assert text.evaluate("window.encoded") == ["a photo of a bird"]
     text.locator("#filter summary").click()
     text.fill("#tq", "Fung")
     text.get_by_role("button", name="Leave out Fungi (Fungi)").click()
