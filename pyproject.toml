@@ -39,6 +39,15 @@ text-encoder = [
     "onnxscript==0.7.2",
     "huggingface_hub>=0.24",
 ]
+# CPU photo encoder for the daily atlas update (.github/workflows/atlas.yml installs these pins, with
+# torch from the CPU wheel index). The index, neighbours and apply steps need only numpy.
+update = [
+    "torch==2.6.0",
+    "torchvision==0.21.0",
+    "open_clip_torch==3.3.0",
+    "pillow==11.3.0",
+    "huggingface_hub>=0.24",
+]
 embed = ["torch>=2.1", "torchvision>=0.16", "open_clip_torch>=2.24", "pillow>=10.0"]
 dev = ["pytest>=7.4", "ruff>=0.4"]
 

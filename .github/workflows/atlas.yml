@@ -1,0 +1,217 @@
+name: atlas
+
+# Keeps the static photo-search index (the IVF-PQ atlas read by atlas_search.html) current, on free
+# runners and without a server. After each successful map refresh it compares the map pool with the
+# index, embeds the observations the index lacks with BioCLIP 2.5 on CPU, appends them as a delta
+# part with a neighbour delta, and uploads the result to the host. On Sundays it also compacts:
+# deltas are folded into the base and observations that left Needs ID are dropped.
+#
+# One CPU runner embeds a photo in about 2.7 s, so ATLAS_WORKERS (default 4) runners of 3 hours each
+# take roughly 11k photos a day against 4-9k arrivals. Each worker saves after every chunk and
+# stops before its deadline; whatever is not embedded is planned again the next day. Neighbours of
+# new observations are approximate: the raw vectors of the base are not on the runner, so they merge
+# exact cosines among the day's new photos with an IVF-PQ search of the index (see
+# atlas_update.delta_neighbors). A Fir rebuild makes them exact again. The day's raw vectors (float16)
+# go to the atlas-state release for that rebuild.
+#
+# Nothing runs until the repository variable ATLAS_ENABLED is "true". A manual run with dry_run only
+# reports what would be encoded and works without it.
+#
+# Seed once: build the index on Fir (python -m what_to_id.atlas_index build / neighbors), push it
+# with `ATLAS_HOST=... scripts/atlas_sync.sh push DIR`, then set the variables and secrets below.
+# The host is chosen by ATLAS_HOST:
+#   hf   variable ATLAS_HF_REPO (a Hugging Face dataset repo), secret HF_TOKEN
+#   r2   variables ATLAS_R2_BUCKET and ATLAS_R2_ENDPOINT, secrets R2_ACCESS_KEY_ID and
+#        R2_SECRET_ACCESS_KEY
+# Optional variables: ATLAS_WORKERS (4), ATLAS_MAX_NEW (12000 photos per run).
+# The pool comes from the map-state release that map.yml keeps.
+on:
+  workflow_run:
+    workflows: [map]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Report what would be encoded, without encoding or uploading
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# Not the pages group: a slow index update never holds up a map deploy.
+concurrency:
+  group: atlas
+  cancel-in-progress: false
+
+env:
+  STATE_TAG: map-state
+  RAW_TAG: atlas-state
+  ATLAS_HOST: ${{ vars.ATLAS_HOST }}
+  ATLAS_HF_REPO: ${{ vars.ATLAS_HF_REPO }}
+  ATLAS_R2_BUCKET: ${{ vars.ATLAS_R2_BUCKET }}
+  ATLAS_R2_ENDPOINT: ${{ vars.ATLAS_R2_ENDPOINT }}
+  HF_TOKEN: ${{ secrets.HF_TOKEN }}
+  R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+  R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+  GH_TOKEN: ${{ github.token }}
+  PYTHONPATH: src
+  WHAT_TO_ID_USER_AGENT: what-to-id atlas update (https://github.com/PollockLab/what-to-id)
+
+jobs:
+  plan:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && (inputs.dry_run || vars.ATLAS_ENABLED == 'true')) ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
+       vars.ATLAS_ENABLED == 'true')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      new: ${{ steps.plan.outputs.new }}
+      shards: ${{ steps.plan.outputs.shards }}
+      compact: ${{ steps.plan.outputs.compact }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.lock
+      - run: pip install --require-hashes -r requirements.lock
+      - name: Fetch the map pool and the index ids
+        run: |
+          set -euo pipefail
+          mkdir -p state index
+          gh release download "$STATE_TAG" -D state -p pool.parquet --clobber
+          test -s state/pool.parquet || { echo "::error::no pool.parquet on the $STATE_TAG release"; exit 1; }
+          scripts/atlas_sync.sh pull index ids
+      - name: Plan
+        id: plan
+        run: |
+          set -euo pipefail
+          python -m what_to_id.atlas_update plan --pool state/pool.parquet --index index \
+            --out todo.json --max-new "${ATLAS_MAX_NEW:-12000}" | tee plan.json
+          new=$(jq .planned plan.json)
+          {
+            echo "new=$new"
+            echo "shards=$(jq -nc --argjson n "${ATLAS_WORKERS:-4}" '[range(0; $n)]')"
+            if [ "$(date -u +%u)" = 7 ]; then echo "compact=true"; else echo "compact=false"; fi
+          } >>"$GITHUB_OUTPUT"
+          {
+            echo "### Atlas plan"
+            echo '```json'
+            cat plan.json
+            echo '```'
+          } >>"$GITHUB_STEP_SUMMARY"
+        env:
+          ATLAS_MAX_NEW: ${{ vars.ATLAS_MAX_NEW }}
+          ATLAS_WORKERS: ${{ vars.ATLAS_WORKERS }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: todo
+          path: todo.json
+          retention-days: 3
+
+  encode:
+    needs: plan
+    if: >-
+      vars.ATLAS_ENABLED == 'true' && !(github.event_name == 'workflow_dispatch' && inputs.dry_run) &&
+      needs.plan.outputs.new != '0'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.plan.outputs.shards) }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.lock
+      # torch and open_clip are not in requirements.lock: pinned here, the same as the `update` extra
+      # in pyproject.toml, with torch from the CPU wheel index (the default wheels pull CUDA).
+      - run: |
+          pip install --require-hashes -r requirements.lock
+          pip install torch==2.6.0 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install open_clip_torch==3.3.0 pillow==11.3.0 "huggingface_hub>=0.24"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: todo
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: atlas-work/model-cache
+          key: bioclip-2.5-6e3d04e3d6522012c88181085c5ae666e14c45cd
+      - name: Embed this worker's slice
+        env:
+          SHARDS: ${{ vars.ATLAS_WORKERS || '4' }}
+        run: |
+          set -euo pipefail
+          # the 3 hour job limit includes setup; 160 minutes leaves room for one chunk and the upload
+          python -m what_to_id.atlas_update encode --todo todo.json --shard "${{ matrix.shard }}" \
+            --shards "$SHARDS" --out "vec-${{ matrix.shard }}.npz" --deadline-minutes 160 \
+            --work atlas-work
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: vec-${{ matrix.shard }}
+          path: vec-${{ matrix.shard }}.npz
+          if-no-files-found: ignore
+          retention-days: 3
+
+  apply:
+    needs: [plan, encode]
+    if: >-
+      always() && needs.plan.result == 'success' && needs.encode.result != 'cancelled' &&
+      vars.ATLAS_ENABLED == 'true' && !(github.event_name == 'workflow_dispatch' && inputs.dry_run) &&
+      (needs.plan.outputs.new != '0' || needs.plan.outputs.compact == 'true')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    permissions:
+      contents: write # the raw vectors go to the atlas-state release
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.lock
+      - run: pip install --require-hashes -r requirements.lock
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: vec-*
+          path: vectors
+          merge-multiple: true
+      - name: Fetch the pool and the index
+        run: |
+          set -euo pipefail
+          mkdir -p state index
+          gh release download "$STATE_TAG" -D state -p pool.parquet --clobber
+          scripts/atlas_sync.sh pull index
+      - name: Append the new photos
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          part="delta-$(date -u +%Y%m%d)"
+          if jq -e --arg p "$part" '.parts | map(.name) | index($p)' index/manifest.json >/dev/null; then
+            part="$part-$(date -u +%H%M)" # a second run on the same day
+          fi
+          compact=()
+          if [ "$COMPACT" = true ]; then compact=(--compact); fi
+          mkdir -p raw
+          python -m what_to_id.atlas_update apply --index index --pool state/pool.parquet --part "$part" \
+            --vectors vectors/vec-*.npz --raw-out "raw/raw-$part.npz" ${compact[@]+"${compact[@]}"}
+        env:
+          COMPACT: ${{ needs.plan.outputs.compact }}
+      - name: Upload the index
+        run: scripts/atlas_sync.sh push index
+      - name: Keep the raw vectors for the next Fir rebuild
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(raw/raw-*.npz)
+          [ ${#files[@]} -gt 0 ] || exit 0
+          gh release view "$RAW_TAG" >/dev/null 2>&1 ||
+            gh release create "$RAW_TAG" --title "$RAW_TAG" --notes "Raw float16 vectors of the daily atlas deltas, for rebuilds."
+          gh release upload "$RAW_TAG" "${files[@]}" --clobber

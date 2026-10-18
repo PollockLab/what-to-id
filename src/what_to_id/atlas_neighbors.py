@@ -137,11 +137,22 @@ def neighbors(
     vals, idx, fixed = _all_topk_torch(E, k, "cuda") if use_cuda else _all_topk_numpy(E, k)
     warn_normalized(fixed, "neighbors")
 
+    return write_neighbor_records(out_dir, name, ids, ids[idx], vals, block)
+
+
+def write_neighbor_records(out_dir, name: str, ids, nb_ids, cos, block: int = 1024) -> dict:
+    """Write ``(n, k)`` neighbour ids and cosines for ``ids`` as ``<name>.bin`` and register them.
+
+    Records are sorted by id; an existing manifest entry of the same name is replaced.
+    """
+    ids, nb_ids, cos = np.asarray(ids), np.asarray(nb_ids), np.asarray(cos)
+    k = nb_ids.shape[1]
+    manifest = read_manifest(out_dir)
     order = np.argsort(ids)
     rec = np.empty(len(ids), dtype=record_dtype(k))
     rec["id"] = ids[order]
-    rec["nb"] = ids[idx[order]]
-    rec["cos"] = vals[order].astype("<f2")
+    rec["nb"] = nb_ids[order]
+    rec["cos"] = cos[order].astype("<f2")
     base = Path(out_dir)
     write_array(base / f"{name}.bin", rec.view(np.uint8), "u1")
     write_array(base / f"{name}.dir.u32", rec["id"][::block], "<u4")
@@ -153,13 +164,65 @@ def neighbors(
     return entry
 
 
-def lookup_neighbors(index_dir: str | Path, obs_id: int, name: str = "neighbors"):
-    """Return ``(neighbor_ids int64, cosines float32)`` for ``obs_id``, or None if absent."""
+def merge_neighbors(index_dir: str | Path, keep_ids=None, name: str = "neighbors") -> dict | None:
+    """Fold every neighbour set into one ``name`` set, newest record per id, optionally pruned.
+
+    Records of ids outside ``keep_ids`` are dropped; neighbour ids inside surviving records are
+    left as they are (a front end filters them live). Returns the new entry, or None when the
+    manifest has no neighbour sets.
+    """
     manifest = read_manifest(index_dir)
-    entry = next((e for e in manifest.get("neighbors", []) if e["name"] == name), None)
-    if entry is None:
-        raise KeyError(f"no neighbour set {name!r} in manifest")
+    entries = manifest.get("neighbors", [])
+    if not entries:
+        return None
+    ks = {e.get("k", 12) for e in entries}
+    if len(ks) != 1:
+        raise ValueError(f"neighbour sets disagree on k: {sorted(ks)}")
     base = Path(index_dir)
+    dtype = record_dtype(ks.pop())
+    parts = [np.fromfile(base / f"{e['name']}.bin", dtype=dtype, count=e["count"]) for e in entries]
+    rec = np.concatenate(parts)
+    del parts
+    # later sets win: stable sort by id, keep the last record of each id
+    rec = rec[np.argsort(rec["id"], kind="stable")]
+    last = np.append(rec["id"][1:] != rec["id"][:-1], True)
+    rec = rec[last]
+    if keep_ids is not None:
+        rec = rec[np.isin(rec["id"], np.asarray(keep_ids))]
+    entry = write_neighbor_records(
+        index_dir, name, rec["id"], rec["nb"], rec["cos"], entries[0]["block"]
+    )
+    manifest = read_manifest(index_dir)
+    manifest["neighbors"] = [entry]
+    write_manifest(index_dir, manifest)
+    for e in entries:
+        if e["name"] != name:
+            (base / f"{e['name']}.bin").unlink(missing_ok=True)
+            (base / f"{e['name']}.dir.u32").unlink(missing_ok=True)
+    return entry
+
+
+def lookup_neighbors(index_dir: str | Path, obs_id: int, name: str | None = None):
+    """Return ``(neighbor_ids int64, cosines float32)`` for ``obs_id``, or None if absent.
+
+    With no ``name`` every neighbour set is tried, newest first, so a daily delta set overrides
+    the base set for ids it holds. A named set that is not in the manifest raises KeyError.
+    """
+    manifest = read_manifest(index_dir)
+    entries = manifest.get("neighbors", [])
+    if name is not None:
+        entries = [e for e in entries if e["name"] == name]
+    if not entries:
+        raise KeyError(f"no neighbour set {name!r} in manifest" if name else "no neighbour sets")
+    for entry in reversed(entries):
+        found = _lookup_in(Path(index_dir), entry, obs_id)
+        if found is not None:
+            return found
+    return None
+
+
+def _lookup_in(base: Path, entry: dict, obs_id: int):
+    name = entry["name"]
     dtype = record_dtype(entry.get("k", 12))
     n_blocks = -(-entry["count"] // entry["block"])
     directory = load_array(base / f"{name}.dir.u32", "<u4", (n_blocks,))
