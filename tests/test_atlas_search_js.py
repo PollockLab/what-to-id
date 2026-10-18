@@ -127,6 +127,86 @@ def test_range_reads_fetch_only_probed_lists(fixture):
             assert row["data"] < data_total
 
 
+# A host that redirects each file to a signed CDN URL, like Hugging Face, and can expire the URLs.
+REDIRECTING = """
+const hub = {resolves: {}, cdn: 0, expired: false};
+function hubFetch(url, opts) {
+  const res = (body, status, extra) => Object.assign({ok: status < 300, status,
+    arrayBuffer: async () => body.buffer.slice(body.byteOffset, body.byteOffset + body.length),
+    text: async () => body.toString()}, extra);
+  const file = (name) => fs.readFileSync(path.join(DIR, name));
+  const r = opts && opts.headers && opts.headers.Range;
+  const part = (buf) => {
+    if (!r) return buf;
+    const [a, b] = r.replace('bytes=', '').split('-').map(Number);
+    return buf.subarray(a, b + 1);
+  };
+  if (url.startsWith('http://cdn.test/')) {
+    hub.cdn++;
+    if (hub.expired && url.endsWith('sig=1')) return Promise.resolve(res(Buffer.alloc(0), 403));
+    return Promise.resolve(res(part(file(url.slice(16).split('?')[0])), r ? 206 : 200));
+  }
+  const name = url.replace('http://hub.test/resolve/main/', '');
+  hub.resolves[name] = (hub.resolves[name] || 0) + 1;
+  return Promise.resolve(res(part(file(name)), r ? 206 : 200,
+    {redirected: true, url: 'http://cdn.test/' + name + '?sig=' + hub.resolves[name]}));
+}
+"""
+
+
+def test_redirect_target_is_reused_and_re_resolved_when_expired(fixture):
+    # each resolve counts against the host's rate limit, CDN reads do not
+    directory, ref = fixture
+    s = ref["searches"][0]  # nprobe 1: each query reads new lists, so later ranges reuse the URL
+    script = (
+        REDIRECTING
+        + f"""(async () => {{
+      const q = {json.dumps(ref["queries"])}, k = {ref["k"]}, nprobe = {s["nprobe"]};
+      const idx = await IDX.open('http://hub.test/resolve/main/', {{fetch: hubFetch}});
+      const ids = [];
+      const run = async (v) =>
+        ids.push((await idx.search(Float32Array.from(v), {{k, nprobe}})).map(h => h.id));
+      for (const v of q.slice(0, 4)) await run(v);
+      const before = Object.assign({{}}, hub.resolves), cdn = hub.cdn;
+      hub.expired = true;
+      idx.lists = {{}};  // force fresh range reads after expiry
+      for (const v of q.slice(4)) await run(v);
+      out({{ids, before, after: hub.resolves, cdn}});
+    }})()"""
+    )
+    got = node(script, directory)
+    for hits, expected in zip(got["ids"], s["ids"], strict=True):
+        assert hits == [i for i in expected if i != -1]
+    data = [n for n in got["before"] if ".ids." in n or ".codes." in n]
+    assert data and all(got["before"][n] == 1 for n in data), got["before"]
+    assert got["cdn"] > 0, "later ranges must go to the CDN URL"
+    # after expiry each data file is resolved exactly once more, not once per range
+    assert all(got["after"][n] == 2 for n in data), got["after"]
+
+
+def test_small_parts_load_whole_once(fixture):
+    directory, ref = fixture
+    s = ref["searches"][-1]
+    script = f"""(async () => {{
+      const q = {json.dumps(ref["queries"])}, k = {ref["k"]}, nprobe = {s["nprobe"]};
+      const idx = await IDX.open('http://data.test/atlas/', {{fetch: fakeFetch, whole: 1 << 30}});
+      const ids = [];
+      for (const v of q)
+        ids.push((await idx.search(Float32Array.from(v), {{k, nprobe}})).map(h => h.id));
+      const data = requests.filter(r => r.name.includes('.ids.') || r.name.includes('.codes.'));
+      out({{ids, data}});
+    }})()"""
+    got = node(script, directory)
+    mf = json.loads((directory / "manifest.json").read_text())
+    for hits, expected in zip(got["ids"], s["ids"], strict=True):
+        assert hits == [i for i in expected if i != -1]
+    names = [r["name"] for r in got["data"]]
+    assert sorted(names) == sorted(
+        f"{p['name']}.{e}" for p in mf["parts"] if p["count"] for e in ("ids.u32", "codes.u8")
+    )
+    assert all("start" not in r for r in got["data"])
+
+
 def test_neighbors_match_python_reference(fixture):
     directory, ref = fixture
     script = f"""(async () => {{

@@ -2,7 +2,7 @@
 (function(){
 'use strict';
 var CFG=ATLAS_SEARCH_CONFIG,Meta=AtlasSearchMeta,Enc=AtlasEncoder;
-var K=200,NPROBE=32;
+var K=200,NPROBE=32,WHOLE=4<<20;  // parts up to 4 MB load whole: one request, not 32 ranges
 var qs=new URLSearchParams(location.search);
 var DATA=new URL(CFG.dataUrl,location.href).href.replace(/\/*$/,'/');
 var S={index:null,encoder:null,cache:new Map(),hits:[],state:null,run:0,include:[],exclude:[]};
@@ -17,7 +17,7 @@ function el(tag,attrs,kids){
 }
 function status(text){$('status').textContent=text;}
 function getIndex(){
-  if(!S.index)S.index=AtlasSearchIndex.open(DATA);
+  if(!S.index)S.index=AtlasSearchIndex.open(DATA,{whole:WHOLE});
   return S.index;
 }
 function obsUrl(id){return 'https://www.inaturalist.org/observations/'+id;}
