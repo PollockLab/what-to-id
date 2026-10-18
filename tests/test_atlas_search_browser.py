@@ -246,7 +246,7 @@ def test_pasted_url_absent_id_and_taxon_filter(open_page, site):
     assert page.errors == [] and text.errors == []
 
 
-def test_text_search_without_encoder_asks_before_downloading(open_page, site):
+def test_text_search_without_encoder_asks_before_downloading(open_page):
     page = open_page("#q=a+bird", fake_encoder=False)
     page.wait_for_function("document.getElementById('status').textContent.includes('went wrong')")
     assert page.locator(".card").count() == 0

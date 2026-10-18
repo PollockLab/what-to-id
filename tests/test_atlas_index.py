@@ -192,7 +192,7 @@ def test_neighbors_normalizes_and_checks_size(index, data):
         ai.neighbors(E[:50, :32], ids[:50], index, device="numpy")
 
 
-def test_build_errors(tmp_path, data, caplog):
+def test_build_errors(tmp_path, data):
     E, ids = data
     with pytest.raises(ValueError, match="dims .* not divisible"):
         ai.build(E, ids, tmp_path / "a", m=10)

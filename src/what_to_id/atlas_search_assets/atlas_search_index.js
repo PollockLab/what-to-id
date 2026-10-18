@@ -84,14 +84,13 @@ function join(base,name){return base.replace(/\/*$/,'/')+name;}
 
 function Index(base,opts){
   this.base=base;this.fetch=opts.fetch;this.gap=opts.gap||0;this.whole=opts.whole||0;
-  this.stats={requests:0,bytes:0};
   this.offsets={};this.lists={};this.dir={};this.urls={};this.files={};
 }
 // Fetch bytes [start,end) of a file; a server that ignores Range (200) is sliced.
 // A redirect target (Hugging Face sends large files to a signed CDN URL) is reused for later ranges,
 // so only the first read of a file counts against the host's rate limit; an expired one is re-resolved.
 Index.prototype.bytes=async function(name,start,end){
-  var self=this,headers={},url=join(this.base,name),cached=this.urls[name];
+  var headers={},url=join(this.base,name),cached=this.urls[name];
   if(start!==undefined)headers.Range='bytes='+start+'-'+(end-1);
   var res=await this.fetch(cached||url,{headers:headers});
   if(!res.ok&&cached){
@@ -106,7 +105,6 @@ Index.prototype.bytes=async function(name,start,end){
   if(!cached&&res.redirected&&res.url)this.urls[name]=res.url;
   var buf=await res.arrayBuffer();
   if(start!==undefined&&res.status===200)buf=buf.slice(start,end);
-  self.stats.requests++;self.stats.bytes+=buf.byteLength;
   return buf;
 };
 // Whole-file read, cached; used for parts small enough that one request beats many ranges.
@@ -117,9 +115,7 @@ Index.prototype.file=function(name){
 Index.prototype.init=async function(){
   var res=await this.fetch(join(this.base,'manifest.json'),{cache:'no-cache'});
   if(!res.ok)throw new Error('Could not load the search index ('+res.status+')');
-  var text=await res.text();
-  this.stats.requests++;this.stats.bytes+=text.length;
-  var m=this.manifest=JSON.parse(text);
+  var m=this.manifest=JSON.parse(await res.text());
   if(m.version!==1)throw new Error('Unsupported index version '+m.version);
   return this;
 };
@@ -151,7 +147,7 @@ Index.prototype.partOffsets=function(part){
 Index.prototype.loadLists=async function(part,lists){
   var m=this.manifest.m,off=await this.partOffsets(part),self=this,cache=this.lists;
   var need=lists.filter(function(l){return !cache[part.name+':'+l]&&off[l+1]>off[l];});
-  if(!need.length)return off;
+  if(!need.length)return;
   var idR=need.map(function(l){return [off[l]*4,off[l+1]*4];});
   var cdR=need.map(function(l){return [off[l]*m,off[l+1]*m];});
   var small=part.count*(4+m)<=this.whole;  // daily delta parts: fetch each file once, whole
@@ -170,7 +166,6 @@ Index.prototype.loadLists=async function(part,lists){
       codes:new Uint8Array(slice(cdC,got.slice(idC.length),off[l]*m,off[l+1]*m))
     };
   });
-  return off;
 };
 // Top-k {id,score} for a unit query: nprobe lists per part, ADC, merged across parts.
 Index.prototype.search=async function(q,opts){
@@ -208,7 +203,7 @@ Index.prototype.neighbors=async function(obsId,name){
   return null;
 };
 Index.prototype.neighborsIn=async function(set,obsId){
-  var k=set.k||12,rec=4+6*k,self=this;
+  var k=set.k||12,rec=4+6*k;
   if(!this.dir[set.name])this.dir[set.name]=this.bytes(set.name+'.dir.u32').then(function(b){
     return new Uint32Array(b);
   });
@@ -216,7 +211,7 @@ Index.prototype.neighborsIn=async function(set,obsId){
   while(lo<=hi){var mid=(lo+hi)>>1;if(dir[mid]<=obsId){b=mid;lo=mid+1;}else hi=mid-1;}
   if(b<0)return null;
   var first=b*set.block,last=Math.min(first+set.block,set.count);
-  var buf=await self.bytes(set.name+'.bin',first*rec,last*rec),dv=new DataView(buf);
+  var buf=await this.bytes(set.name+'.bin',first*rec,last*rec),dv=new DataView(buf);
   var n=last-first;lo=0;hi=n-1;
   while(lo<=hi){
     var mi=(lo+hi)>>1,id=dv.getUint32(mi*rec,true);
@@ -232,7 +227,6 @@ Index.prototype.neighborsIn=async function(set,obsId){
   }
   return null;
 };
-Index.prototype.resetStats=function(){this.stats={requests:0,bytes:0};};
 
 // open(baseUrl, {fetch, gap, whole}) -> Promise<Index>; fetch defaults to the global one, parts of at most
 // `whole` id+code bytes are read in full.

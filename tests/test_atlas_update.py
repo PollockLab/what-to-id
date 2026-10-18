@@ -288,7 +288,7 @@ def test_apply_compact_refuses_a_truncated_pool(index, new_vectors, tmp_path):
         au.apply(index, encode_all(new_vectors, tmp_path), pool, "delta-20260301", compact=True)
 
 
-def test_merge_neighbors_newer_record_wins(index, tmp_path):
+def test_merge_neighbors_newer_record_wins(index):
     ids = np.array([1, 2, 3])
     write_neighbor_records(index, "a", ids, np.full((3, 12), 9), np.full((3, 12), 0.5), 2)
     write_neighbor_records(index, "b", ids[:1], np.full((1, 12), 8), np.full((1, 12), 0.7), 2)
