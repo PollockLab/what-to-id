@@ -9,6 +9,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from what_to_id.atlas_neighbors import lookup_neighbors, write_neighbor_records
+
 from .atlas_index_fixture import write_fixture
 
 ASSETS = Path(__file__).parents[1] / "src/what_to_id/atlas_search_assets"
@@ -149,6 +151,33 @@ def test_neighbors_match_python_reference(fixture):
         assert g["bytes"] <= 256 * size + 4 * 16, "one block (plus the directory once)"
 
 
+def test_neighbors_newest_set_wins(fixture, tmp_path):
+    # a daily delta set overrides the base set for ids it holds, as lookup_neighbors does
+    directory = tmp_path / "atlas"
+    shutil.copytree(fixture[0], directory)
+    base_id = fixture[1]["lookups"][0]["id"]
+    new_id = 2**32 - 5
+    write_neighbor_records(
+        directory, "delta", [base_id, new_id], np.full((2, 12), 7), np.full((2, 12), 0.5), 2
+    )
+    ids = [base_id, new_id, fixture[1]["lookups"][1]["id"]]
+    got = node(
+        f"""(async () => {{
+      const idx = await IDX.open('http://data.test/atlas/', {{fetch: fakeFetch}});
+      const res = [];
+      for (const id of {json.dumps(ids)}) res.push(await idx.neighbors(id));
+      out(res);
+    }})()""",
+        directory,
+    )
+    for g, obs in zip(got, ids, strict=True):
+        found = lookup_neighbors(directory, obs)
+        assert (g is None) == (found is None)
+        if found is not None:
+            assert [n["id"] for n in g] == found[0].tolist()
+    assert got[0][0]["id"] == 7 and got[1][0]["id"] == 7
+
+
 def test_pure_functions():
     got = node("""(() => {
       const bits = [0, 1, 0x3ff, 0x400, 0x3c00, 0x7bff, 0x7c00, 0xfc00, 0x7e00,
@@ -260,7 +289,8 @@ def test_text_encoder_load_finds_page_globals():
       const ort = {Tensor: class { constructor(t, d, s) { this.data = d; } },
         InferenceSession: {create: async () => ({run: async () => ({embedding: {data: [0, 2]}})})}};
       const fetch = async () => new Response('merges');
-      const enc = await ENC.load({text_encoder: {onnx: 'm.onnx', vocab: 'v.txt'}}, 'http://x/', {ort, fetch});
+      const manifest = {text_encoder: {onnx: 'm.onnx', vocab: 'v.txt'}};
+      const enc = await ENC.load(manifest, 'http://x/', {ort, fetch});
       out(Array.from(await enc.encode('moss')));
     })()""")
     assert got == [0, 1]

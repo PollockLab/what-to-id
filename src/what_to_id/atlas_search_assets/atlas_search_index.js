@@ -175,14 +175,23 @@ Index.prototype.search=async function(q,opts){
   });
   return top.result();
 };
-Index.prototype.neighborSet=function(name){
-  var set=(this.manifest.neighbors||[]).filter(function(e){return !name||e.name===name;})[0];
-  if(!set)throw new Error('This index has no precomputed neighbours.');
-  return set;
+Index.prototype.neighborSets=function(name){
+  var sets=(this.manifest.neighbors||[]).filter(function(e){return !name||e.name===name;});
+  if(!sets.length)throw new Error('This index has no precomputed neighbours.');
+  return sets;
 };
 // Precomputed neighbours as [{id,score}], or null when the observation is not in the index.
+// Without a name every set is tried newest first, so a daily delta set overrides the base set.
 Index.prototype.neighbors=async function(obsId,name){
-  var set=this.neighborSet(name),k=set.k||12,rec=4+6*k,self=this;
+  var sets=this.neighborSets(name);
+  for(var i=sets.length-1;i>=0;i--){
+    var found=await this.neighborsIn(sets[i],obsId);
+    if(found)return found;
+  }
+  return null;
+};
+Index.prototype.neighborsIn=async function(set,obsId){
+  var k=set.k||12,rec=4+6*k,self=this;
   if(!this.dir[set.name])this.dir[set.name]=this.bytes(set.name+'.dir.u32').then(function(b){
     return new Uint32Array(b);
   });
