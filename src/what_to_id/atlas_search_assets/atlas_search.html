@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Photo search</title>
+<style>
+:root{--bg:#fbfbf9;--panel:#fff;--ink:#1d1d1b;--muted:#5f5e58;--line:#dcdbd3;--chip:#f0efe9;--on:#1d1d1b;--onink:#fff;
+  --warn:#8a4b00;--warnbg:#fdf0dc;--bar:#2a78d6}
+@media (prefers-color-scheme:dark){:root{--bg:#1a1a19;--panel:#222220;--ink:#fff;--muted:#c3c2b7;--line:#3a3a37;
+  --chip:#2c2c2a;--on:#fff;--onink:#1a1a19;--warn:#ffc27a;--warnbg:#3a2a14;--bar:#3987e5}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+body{min-height:100vh}
+header,main{max-width:1100px;margin:0 auto;padding:10px 16px}
+header{border-bottom:1px solid var(--line)}
+h1{font-size:18px;margin:0}
+h2{font-size:15px;margin:0}
+.sub,.hint,.muted{color:var(--muted);margin:0;font-size:12px}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--bar);outline-offset:2px}
+form.search{display:flex;gap:8px;margin:12px 0 4px}
+.search input{flex:1 1 auto;min-width:0;font:inherit;font-size:16px;padding:8px 10px;border:1px solid var(--line);
+  border-radius:6px;background:var(--panel);color:var(--ink)}
+button,.btn{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--chip);color:var(--ink);
+  padding:6px 12px;border-radius:14px;cursor:pointer;text-decoration:none;display:inline-block}
+button.primary,.btn.primary{background:var(--on);color:var(--onink);border-color:var(--on);font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.examples{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.note{margin:8px 0;padding:8px 10px;border-radius:8px;background:var(--warnbg);color:var(--warn);font-size:13px}
+.note[hidden]{display:none}
+.filter{border:1px solid var(--line);border-radius:8px;padding:4px 10px 8px;margin:8px 0;background:var(--panel)}
+.filter summary{cursor:pointer;font-size:12px;font-weight:600;padding:4px 0}
+.filter .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px}
+.filter input{font:inherit;font-size:16px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;
+  background:var(--bg);color:var(--ink);min-width:0;flex:1 1 160px}
+.sugg{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.chips{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;border:1px solid var(--on);border-radius:13px;background:var(--on);
+  color:var(--onink);font-size:12px;padding-left:9px}
+.chip.not{background:var(--warnbg);color:var(--warn);border:1px dashed var(--warn)}
+.chip button{border:0;background:none;color:inherit;padding:3px 8px;border-radius:0}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:10px 0}
+.bar h2{flex:1 1 220px}
+.bar .actions{display:flex;flex-wrap:wrap;gap:6px}
+.grid{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+.card{border:1px solid var(--line);border-radius:8px;background:var(--panel);overflow:hidden;display:flex;flex-direction:column}
+.card .photo{display:block;aspect-ratio:1;background:var(--chip)}
+.card img{width:100%;height:100%;object-fit:cover;display:block}
+.card .body{padding:6px 8px 8px;display:flex;flex-direction:column;gap:2px;font-size:12px;flex:1}
+.card .name{font-weight:600;font-size:13px;overflow-wrap:anywhere}
+.card .common{color:var(--muted)}
+.card .links{display:flex;flex-wrap:wrap;gap:4px;margin-top:auto;padding-top:6px}
+.card .links button,.card .links a{font-size:12px;padding:3px 9px}
+progress{width:100%;height:10px}
+@media (max-width:480px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}header,main{padding:8px 12px}}
+</style>
+</head>
+<body>
+<header>
+<h1>Photo search</h1>
+<p class="sub">Search the photos of British Columbia observations that still need an ID, then open the hits in iNaturalist Identify. Similarity shows how closely a photo resembles your words or your photo, not how sure anyone is of its identification. Names are the current iNaturalist identifications.</p>
+<form class="search" id="form" role="search">
+<label for="q" class="vh">Describe a photo, or paste an iNaturalist observation link or number</label>
+<input id="q" type="search" autocomplete="off" spellcheck="false" placeholder="a bird eating a frog, or an observation link">
+<button type="submit" class="primary">Search</button>
+</form>
+<div class="examples" id="examples" role="group" aria-label="Example searches"></div>
+</header>
+<main id="main">
+<div id="gate" class="note" role="alert" hidden>
+<p style="margin:0 0 6px" id="gatetext"></p>
+<button type="button" id="gobtn" class="primary">Download and search</button>
+</div>
+<progress id="progress" max="1" value="0" aria-label="Downloading search model" hidden></progress>
+<p id="status" class="muted" role="status" aria-live="polite"></p>
+<details class="filter" id="filter">
+<summary>Filter by taxon (optional)</summary>
+<div class="row">
+<label for="tq" class="vh">Find a taxon to keep or leave out</label>
+<input id="tq" type="search" autocomplete="off" spellcheck="false" placeholder="Taxon, e.g. Fungi">
+</div>
+<ul class="sugg" id="sugg" aria-label="Matching taxa"></ul>
+<ul class="chips" id="chips" aria-label="Taxon filters"></ul>
+<p class="hint">Keeps results inside the picked taxa and drops results inside the left-out ones. Applies to the best matches only.</p>
+</details>
+<section aria-labelledby="rh" id="results" hidden>
+<div class="bar">
+<h2 id="rh" tabindex="-1">Results</h2>
+<div class="actions" id="actions"></div>
+</div>
+<p id="dropped" class="hint" role="status"></p>
+<ul class="grid" id="grid"></ul>
+</section>
+</main>
+<script>var ATLAS_SEARCH_CONFIG=__ATLAS_SEARCH_CONFIG__;</script>
+<script>__IDENTIFY_LINKS__</script>
+<script>__CLIP_TOKENIZER__</script>
+<script>__ATLAS_SEARCH_INDEX__</script>
+<script>__ATLAS_SEARCH_META__</script>
+<script>__ATLAS_SEARCH_ENCODER__</script>
+<script>__ATLAS_SEARCH_APP__</script>
+</body>
+</html>
