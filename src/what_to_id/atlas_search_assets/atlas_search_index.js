@@ -228,6 +228,41 @@ Index.prototype.neighborsIn=async function(set,obsId){
   return null;
 };
 
+// Lookup key for a taxon name: case-insensitive, whitespace collapsed, a leading "a photo of " dropped.
+function normName(text){return String(text).toLowerCase().trim().replace(/\s+/g,' ').replace(/^a photo of /,'');}
+async function gunzipText(buf){
+  var s=new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return new Response(s).text();
+}
+// name -> row for scientific names, then for common names that are unambiguous (-1 marks a shared one).
+function nameRows(tsv){
+  var sci=new Map(),com=new Map(),lines=tsv.split('\n');
+  if(lines[lines.length-1]==='')lines.pop();
+  lines.forEach(function(line,row){
+    var p=line.split('\t'),k=normName(p[0]);
+    if(k&&!sci.has(k))sci.set(k,row);
+    var c=normName(p[1]||'');
+    if(c)com.set(c,com.has(c)&&com.get(c)!==row?-1:row);
+  });
+  com.forEach(function(row,k){if(!sci.has(k)&&row>=0)sci.set(k,row);});
+  return sci;
+}
+// Unit Float32Array for a query that names a taxon in the precomputed table, else null.
+Index.prototype.taxonVector=async function(text){
+  var t=this.manifest.taxa;
+  if(!t)return null;
+  if(!this._taxa)this._taxa=this.bytes(t.names).then(gunzipText).then(nameRows);
+  var self=this;this._taxa.catch(function(){self._taxa=null;});
+  var row=(await this._taxa).get(normName(text));
+  if(row===undefined)return null;
+  var size=t.dims*2,buf=await this.bytes(t.vectors,row*size,(row+1)*size);
+  var q=decodeF16(new Uint16Array(buf)),n=0;
+  for(var i=0;i<q.length;i++)n+=q[i]*q[i];
+  n=Math.sqrt(n);
+  for(i=0;i<q.length;i++)q[i]/=n;
+  return q;
+};
+
 // open(baseUrl, {fetch, gap, whole}) -> Promise<Index>; fetch defaults to the global one, parts of at most
 // `whole` id+code bytes are read in full.
 function open(base,opts){
@@ -237,5 +272,5 @@ function open(base,opts){
   return new Index(base,{fetch:f,gap:opts.gap,whole:opts.whole}).init();
 }
 return {open:open,f16ToF32:f16ToF32,decodeF16:decodeF16,buildLut:buildLut,coarseScores:coarseScores,
-  topIndices:topIndices,adc:adc,topk:topk,Topk:Topk,coalesce:coalesce};
+  normName:normName,nameRows:nameRows,topIndices:topIndices,adc:adc,topk:topk,Topk:Topk,coalesce:coalesce};
 });

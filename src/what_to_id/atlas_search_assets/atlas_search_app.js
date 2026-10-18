@@ -66,10 +66,13 @@ async function hitsFrom(state,confirmed){
     if(!nb)return {error:'Observation '+state.id+' is not in the index. It may be new, or no longer need an ID.'};
     return {hits:nb};
   }
-  var enc=await encoderFor(state,confirmed);
-  if(!enc)return {gated:true};
-  status('Searching...');
-  var q=await enc.encode(caption(state.text));
+  var q=await idx.taxonVector(state.text);  // a taxon name has a precomputed vector: no model, no download
+  if(!q){
+    var enc=await encoderFor(state,confirmed);
+    if(!enc)return {gated:true};
+    status('Searching...');
+    q=await enc.encode(caption(state.text));
+  }
   return {hits:await idx.search(q,{k:K,nprobe:+qs.get('nprobe')||NPROBE})};
 }
 

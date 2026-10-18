@@ -11,6 +11,7 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 
+from what_to_id import atlas_taxa
 from what_to_id.atlas_search_page import build
 
 from .atlas_index_fixture import write_fixture
@@ -43,6 +44,27 @@ class RangeHandler(http.server.SimpleHTTPRequestHandler):
         self.wfile.write(part)
 
 
+TAXA = [("Quercus garryana", "Garry oak"), ("Lobaria pulmonaria", "Lungwort"), ("Acer", "Maple")]
+
+
+def write_taxa(atlas, ref):
+    """Taxa whose vectors are fixture queries 1..3, so a taxon search has known hits."""
+    import numpy as np
+    import pandas as pd
+
+    pool = atlas.parent / "pool.parquet"
+    pd.DataFrame(
+        {"taxon_name": [t for t, _ in TAXA] * 2, "common_name": [c for _, c in TAXA] * 2}
+    ).to_parquet(pool)
+    rows = dict(zip(sorted(t.lower() for t, _ in TAXA), range(1, 4), strict=True))
+    queries = np.array(ref["queries"], dtype=np.float32)
+
+    def embed(prompts):
+        return queries[[rows[p.removeprefix("a photo of ").lower()] for p in prompts]]
+
+    atlas_taxa.build(pool, atlas, embed)
+
+
 SITE_ROOT = {}  # served base url -> directory, for tests that change files under a live page
 
 
@@ -69,6 +91,7 @@ def site(tmp_path_factory):
     pytest.importorskip("faiss")
     root = tmp_path_factory.mktemp("atlas-search-site")
     ref = write_fixture(root / "atlas")
+    write_taxa(root / "atlas", ref)
     build(root, data_url="atlas/")
     handler = functools.partial(RangeHandler, directory=str(root))
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
@@ -264,4 +287,25 @@ def test_layout_has_no_horizontal_scroll_at_375px(open_page):
         "getComputedStyle(document.getElementById('grid')).gridTemplateColumns.split(' ').length"
     )
     assert columns == 2
+    assert page.errors == []
+
+
+@pytest.mark.parametrize(
+    "query", ["Lobaria+pulmonaria", "LUNGWORT", "a+photo+of+lobaria++pulmonaria"]
+)
+def test_taxon_query_uses_precomputed_vector_not_the_encoder(open_page, site, query):
+    _, ref = site
+    page = open_page(f"#q={query}")
+    page.wait_for_selector(".card")
+    # sorted names: Acer=1, Lobaria pulmonaria=2, Quercus garryana=3 -> reference query 2
+    want = ref["searches"][-1]["ids"][2]
+    assert card_ids(page)[:5] == want[:5]
+    assert page.evaluate("window.encoded") == []
+    assert page.errors == []
+
+
+def test_unknown_query_still_uses_the_encoder_when_taxa_exist(open_page):
+    page = open_page("#q=a+bird")
+    page.wait_for_selector(".card")
+    assert page.evaluate("window.encoded") == ["a photo of a bird"]
     assert page.errors == []

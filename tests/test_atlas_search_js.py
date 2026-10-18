@@ -347,7 +347,7 @@ def test_text_encoder_wraps_tokens_and_normalizes():
       }};
       const enc = ENC.make(ort, session, tokenizer, {input_name: 'tok', output_name: 'emb'});
       let err = null;
-      try { await ENC.load({}, 'http://x/', {}); } catch (e) { err = e.message; }
+      try { await ENC.load({}, 'http://data.test/atlas/', {}); } catch (e) { err = e.message; }
       const v = Array.from(await enc.encode('hi'));
       out({v, seen, mb: ENC.megabytes({bytes: 508673577}), err});
     })()""")
@@ -370,7 +370,47 @@ def test_text_encoder_load_finds_page_globals():
         InferenceSession: {create: async () => ({run: async () => ({embedding: {data: [0, 2]}})})}};
       const fetch = async () => new Response('merges');
       const manifest = {text_encoder: {onnx: 'm.onnx', vocab: 'v.txt'}};
-      const enc = await ENC.load(manifest, 'http://x/', {ort, fetch});
+      const enc = await ENC.load(manifest, 'http://data.test/atlas/', {ort, fetch});
       out(Array.from(await enc.encode('moss')));
     })()""")
     assert got == [0, 1]
+
+
+def test_taxon_names_match_exactly_and_ambiguous_common_names_are_skipped():
+    got = node(r"""(() => {
+      const rows = IDX.nameRows(['Acer\tMaple', 'Acer rubrum\tRed maple', 'Quercus alba\tOak',
+        'Quercus rubra\tOak', 'Poa\t', ''].join('\n'));
+      const look = (t) => rows.has(IDX.normName(t)) ? rows.get(IDX.normName(t)) : null;
+      out(['acer', '  ACER ', 'A photo of  Acer   rubrum', 'maple', 'oak', 'quercus alba', 'poa',
+        'a bird', ''].map(look));
+    })()""")
+    assert got == [0, 0, 1, 0, None, 2, 4, None, None]
+
+
+def test_taxon_vector_reads_one_row_and_unit_normalises(tmp_path):
+    dims = 4
+    rows = np.array([[3, 0, 0, 4], [1, 1, 1, 1]], dtype="<f2")
+    import gzip
+
+    (tmp_path / "n.tsv.gz").write_bytes(gzip.compress(b"Acer\tMaple\nPoa\t\n"))
+    rows.tofile(tmp_path / "v.f16")
+    manifest = {
+        "version": 1,
+        "taxa": {"names": "n.tsv.gz", "vectors": "v.f16", "count": 2, "dims": dims},
+    }
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest))
+    got = node(
+        """(async () => {
+      const idx = await IDX.open('http://data.test/atlas/', {fetch: fakeFetch});
+      const q = await idx.taxonVector('poa'), a = await idx.taxonVector('Maple');
+      out({q: Array.from(q), a: Array.from(a), none: await idx.taxonVector('zzz'),
+        reqs: requests.filter(r => r.name === 'v.f16')});
+    })()""",
+        tmp_path,
+    )
+    assert got["q"] == [0.5] * 4 and got["a"] == pytest.approx([0.6, 0, 0, 0.8])
+    assert got["none"] is None
+    assert got["reqs"] == [
+        {"name": "v.f16", "bytes": 8, "start": 8},
+        {"name": "v.f16", "bytes": 8, "start": 0},
+    ]
