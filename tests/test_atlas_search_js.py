@@ -251,3 +251,16 @@ def test_text_encoder_wraps_tokens_and_normalizes():
         "text": "hi",
     }
     assert got["mb"] == 485 and "no text search model" in got["err"]
+
+
+def test_text_encoder_load_finds_page_globals():
+    # the real page passes no tokenizer, so load must read ClipTokenizer from the page's globals
+    got = node("""(async () => {
+      globalThis.ClipTokenizer = {create: (v) => ({tokenize: () => [49406, 49407], vocab: v})};
+      const ort = {Tensor: class { constructor(t, d, s) { this.data = d; } },
+        InferenceSession: {create: async () => ({run: async () => ({embedding: {data: [0, 2]}})})}};
+      const fetch = async () => new Response('merges');
+      const enc = await ENC.load({text_encoder: {onnx: 'm.onnx', vocab: 'v.txt'}}, 'http://x/', {ort, fetch});
+      out(Array.from(await enc.encode('moss')));
+    })()""")
+    assert got == [0, 1]

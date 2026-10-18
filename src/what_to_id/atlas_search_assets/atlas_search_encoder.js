@@ -3,9 +3,9 @@
 //   encoder.encode(text) -> Float32Array(1024) | Promise<Float32Array(1024)>, unit length
 // Manifest: text_encoder:{onnx, vocab, input_name, output_name, bytes}, paths relative to the data URL.
 (function(root,factory){
-  var api=factory();
+  var api=factory(root);
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.AtlasEncoder=api;
-})(typeof globalThis!=='undefined'?globalThis:this,function(){
+})(typeof globalThis!=='undefined'?globalThis:this,function(root){
 'use strict';
 var ORT='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/';
 var CACHE='what-to-id-atlas-model-v1';
