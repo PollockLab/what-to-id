@@ -50,7 +50,7 @@ function make(o){
     else li.appendChild(el('span','tw'));
     lab.type='button';lab.setAttribute('data-k','l'+x);lab.setAttribute('aria-pressed',String(!!st));
     lab.textContent=(st==='not'?'not ':'')+name;
-    lab.title=[t[0],t[3]!==255?o.ranks[t[3]]:''].filter(Boolean).join(' · ')+
+    lab.title=[t[1],t[0],t[3]!==255?o.ranks[t[3]]:''].filter(Boolean).join(' · ')+
       '. Click to pick, again to leave out, again to clear.';
     lab.onclick=function(){o.cycle(t[2]);};li.appendChild(lab);
     li.appendChild(el('span','tc',o.nf.format(cnt[g][x])));
