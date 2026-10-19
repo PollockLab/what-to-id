@@ -8,9 +8,9 @@ var CFG=EMBEDDINGS_CONFIG,Meta=AtlasSearchMeta,L=EmbeddingsLayout;
 var WHOLE=4<<20,THIN_ABOVE=200000,nf=new Intl.NumberFormat('en-CA');
 var DATA=new URL(CFG.dataUrl,location.href).href.replace(/\/*$/,'/');
 var MAP=new URL(CFG.mapUrl,location.href).href;
-// One colour per life group, in the order of the map's groups.
-var PAL=[[42,120,214],[214,78,56],[46,160,90],[230,160,30],[140,90,200],[20,170,180],[200,80,160],[120,120,40],
-  [90,90,90],[230,110,30],[60,60,190],[160,60,60]];
+// One colour per life group, in the order of the map's groups: 16 distinct hues, each at least 2:1 against
+// both the light and the dark page. The map draws no per-group colour, so this is the only palette.
+var PAL=[[0,114,178],[213,94,0],[0,158,115],[190,160,0],[204,121,167],[86,180,233],[230,70,70],[120,60,170],[110,110,110],[160,60,40],[150,130,200],[40,120,60],[140,200,50],[70,90,220],[255,140,100],[0,190,190]];
 var S={idx:null,P:null,META:null,TAXA:null,groups:{},sel:-1,nbr:[],thin:false,cache:new Map(),run:0,deck:null,vs:null,PD:null};
 
 function $(id){return document.getElementById(id);}

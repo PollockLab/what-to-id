@@ -2,10 +2,11 @@
 
 import json
 import re
+from pathlib import Path
 
 import pytest
 
-from what_to_id import page_map
+from what_to_id import embeddings_page, page_map
 from what_to_id.embeddings_page import DECK_JS, build
 
 
@@ -31,3 +32,12 @@ def test_empty_data_url_is_rejected(tmp_path):
 
 def test_deck_pin_matches_the_map():
     assert DECK_JS == page_map.DECK_JS
+
+
+def test_group_palette_has_no_repeats_at_fifteen_groups():
+    src = (
+        Path(embeddings_page.__file__).parent / "embeddings_assets" / "embeddings_app.js"
+    ).read_text()
+    pal = re.search(r"var PAL=(\[\[.*?\]\]);", src).group(1)
+    colours = [tuple(c) for c in json.loads(pal)]
+    assert len(set(colours)) == len(colours) >= 15
