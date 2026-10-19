@@ -110,7 +110,8 @@ def github(monkeypatch):
                 "./pool.bin": b"\x00\xffmap",
                 "./metadata/state.json": b'{"map":"frozen"}',
                 "./.nojekyll": b"",
-                "./embeddings.html": b"old demo",
+                "./embeddings.html": b"<html>full photo space</html>",
+                "./embeddings-sample.html": b"old demo",
                 "./embeddings-data/Old.json": b"old group",
                 "./dinov3/embeddings-data/Old.json": b"old dino group",
             }
@@ -138,7 +139,7 @@ def demo(tmp_path):
     root = tmp_path / "demo"
     for prefix in (root, root / "dinov3"):
         prefix.mkdir(parents=True, exist_ok=True)
-        (prefix / "embeddings.html").write_text("<!doctype html><html>new demo</html>")
+        (prefix / "embeddings-sample.html").write_text("<!doctype html><html>new demo</html>")
         (prefix / "embeddings-data").mkdir()
         (prefix / "embeddings-data/Plantae.json").write_text(
             '{"group":"Plantae","records":[{"id":1}]}'
@@ -155,6 +156,7 @@ def test_overlay_preserves_every_non_demo_byte_and_removes_stale_groups(github, 
     assert actual == {
         "index.html": b"<html>study</html>",
         "map.html": b"<html>map</html>",
+        "embeddings.html": b"<html>full photo space</html>",
         "pool.bin": b"\x00\xffmap",
         "metadata/state.json": b'{"map":"frozen"}',
         ".nojekyll": b"",
@@ -430,11 +432,11 @@ def test_bad_demo_does_not_contact_github_or_modify_existing_files(github, demo,
             }[kind]
         )
     elif kind == "missing_page":
-        (demo / "dinov3/embeddings.html").unlink()
+        (demo / "dinov3/embeddings-sample.html").unlink()
     elif kind == "bad_html":
-        (demo / "embeddings.html").write_text("broken")
+        (demo / "embeddings-sample.html").write_text("broken")
     elif kind == "symlink":
-        (demo / "link").symlink_to(demo / "embeddings.html")
+        (demo / "link").symlink_to(demo / "embeddings-sample.html")
     else:
         (demo / "extra").mkdir()
     sentinel = tmp_path / "sentinel"
@@ -462,11 +464,11 @@ def test_existing_output_and_api_failure_leave_site_unchanged(github, demo, tmp_
 @pytest.mark.parametrize(
     "changed,event,expected",
     [
-        ("demo/embeddings.html", "push", "false"),
+        ("demo/embeddings-sample.html", "push", "false"),
         ("src/what_to_id/demo_publication.py", "push", "false"),
         ("site/index.html", "push", "true"),
         (".github/workflows/pages.yml", "push", "true"),
-        ("demo/embeddings.html", "workflow_dispatch", "true"),
+        ("demo/embeddings-sample.html", "workflow_dispatch", "true"),
     ],
 )
 def test_workflow_routes_demo_updates_without_a_map_refresh(tmp_path, changed, event, expected):
@@ -554,8 +556,8 @@ def test_route_does_not_lose_cancelled_pending_source_push(tmp_path):
     git("add", "site/index.html")
     pending = commit("source push A, workflow cancelled while pending")
     (tmp_path / "demo").mkdir()
-    (tmp_path / "demo/embeddings.html").write_text("new demo B")
-    git("add", "demo/embeddings.html")
+    (tmp_path / "demo/embeddings-sample.html").write_text("new demo B")
+    git("add", "demo/embeddings-sample.html")
     current = commit("demo push B replaces pending A workflow")
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Add the serverless photo-search page (search.html) to a Pages site directory.
+# Add the serverless photo-search page (search.html) and the photo-space page (embeddings.html) to a Pages site directory.
 #
 #   scripts/atlas_page.sh DIR
 #
@@ -10,10 +10,12 @@ set -euo pipefail
 
 dir="${1:?usage: atlas_page.sh DIR}"
 if [ -z "${ATLAS_HF_REPO:-}" ]; then
-  echo "atlas_page: ATLAS_HF_REPO is not set, skipping search.html"
+  echo "atlas_page: ATLAS_HF_REPO is not set, skipping search.html and embeddings.html"
   exit 0
 fi
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PYTHONPATH="$root/src${PYTHONPATH:+:$PYTHONPATH}" python3 -m what_to_id.atlas_search_page \
-  --out "$dir" --data-url "https://huggingface.co/datasets/${ATLAS_HF_REPO}/resolve/main/"
-echo "atlas_page: wrote $dir/search.html"
+data="https://huggingface.co/datasets/${ATLAS_HF_REPO}/resolve/main/"
+for page in atlas_search_page embeddings_page; do
+  PYTHONPATH="$root/src${PYTHONPATH:+:$PYTHONPATH}" python3 -m "what_to_id.$page" --out "$dir" --data-url "$data"
+done
+echo "atlas_page: wrote $dir/search.html and $dir/embeddings.html"

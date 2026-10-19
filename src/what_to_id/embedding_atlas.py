@@ -23,6 +23,9 @@ from what_to_id.atlas_projection import display_projection, projection_fidelity
 from what_to_id.atlas_taxonomy import AtlasTaxonomy
 from what_to_id.page_links import page_url
 
+# embeddings.html is the full-pool photo space (embeddings_page.py); this frozen sample is beside it
+PAGE_NAME = "embeddings-sample.html"
+
 
 def representation_projection(vectors: np.ndarray) -> tuple:
     """Return display-only PCA coordinates and clipped RGB, never full embeddings."""
@@ -342,7 +345,7 @@ def build(
     html = html.replace("__ATLAS_LOGIC__", logic)
     context = Path(__file__).with_name("embedding_atlas_context.js").read_text()
     html = html.replace("__ATLAS_CONTEXT__", context)
-    (out / "embeddings.html").write_text(html)
+    (out / PAGE_NAME).write_text(html)
     home = Path(__file__).with_name("embedding_atlas_home.html").read_text()
     (out / "index.html").write_text(home)
 

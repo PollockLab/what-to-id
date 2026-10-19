@@ -1,0 +1,229 @@
+// Photo space: every observation that needs an ID, drawn at its layout position (see embeddings_layout.js).
+// Points are the join of the atlas repo's layout parts with the map's pool shards, so names and groups come
+// from the map data and observations that left Needs ID drop out on their own.
+(function(){
+'use strict';
+var CFG=EMBEDDINGS_CONFIG,Meta=AtlasSearchMeta,L=EmbeddingsLayout;
+var WHOLE=4<<20,THIN_ABOVE=200000,nf=new Intl.NumberFormat('en-CA');
+var DATA=new URL(CFG.dataUrl,location.href).href.replace(/\/*$/,'/');
+var MAP=new URL(CFG.mapUrl,location.href).href;
+// One colour per life group, in the order of the map's groups.
+var PAL=[[42,120,214],[214,78,56],[46,160,90],[230,160,30],[140,90,200],[20,170,180],[200,80,160],[120,120,40],
+  [90,90,90],[230,110,30],[60,60,190],[160,60,60]];
+var S={idx:null,P:null,META:null,TAXA:null,vis:{},sel:-1,nbr:[],thin:false,cache:new Map(),run:0,deck:null,vs:null,PD:null};
+
+function $(id){return document.getElementById(id);}
+function el(tag,attrs,kids){
+  var e=document.createElement(tag);
+  Object.keys(attrs||{}).forEach(function(k){if(attrs[k]!==null&&attrs[k]!==undefined)e.setAttribute(k,attrs[k]);});
+  (kids||[]).forEach(function(c){e.appendChild(typeof c==='string'?document.createTextNode(c):c);});
+  return e;
+}
+function status(t){$('status').textContent=t;}
+function color(g){return PAL[g%PAL.length];}
+function gname(g){var m=S.META;return m.names&&m.names[m.groups[g]]||m.groups[g];}
+function names(i){
+  var P=S.P,t=S.TAXA&&P.tax[i]!==65535?S.TAXA[P.tax[i]]:null;
+  return {common:t&&t[1]||'',latin:t&&t[0]||'',group:gname(P.grp[i])};
+}
+function okFetch(url,init){return fetch(url,init).then(function(r){
+  if(!r.ok)throw new Error('Could not load '+String(url).split('/').pop().split('?')[0]+' ('+r.status+')');return r;});}
+function openIndex(){return AtlasSearchIndex.open(DATA,{whole:WHOLE});}
+
+// Counter: records the group chips leave in view, out of those the layout places.
+function shown(){
+  var P=S.P,n=0;
+  for(var i=0;i<P.n;i++)if(S.vis[P.grp[i]])n++;
+  return n;
+}
+function update(){
+  var s=shown(),P=S.P,total=S.META.n;
+  $('count').textContent=nf.format(s)+' shown of '+nf.format(P.n);
+  $('more').textContent=P.n<total?'('+nf.format(total-P.n)+' of the map’s '+nf.format(total)+
+    ' records are not placed yet)':'';
+  [].forEach.call($('groups').querySelectorAll('button'),function(b){
+    b.setAttribute('aria-pressed',String(!!S.vis[+b.getAttribute('data-g')]));});
+  layers();
+}
+function chips(){
+  var P=S.P,count=new Array(S.META.groups.length).fill(0);
+  for(var i=0;i<P.n;i++)count[P.grp[i]]++;
+  var box=$('groups');box.textContent='';
+  S.META.groups.forEach(function(g,j){
+    if(!count[j])return;
+    S.vis[j]=true;
+    var dot=el('i',{});dot.style.background='rgb('+color(j).join(',')+')';
+    var b=el('button',{type:'button','data-g':j,'aria-pressed':'true'},[dot,gname(j)+' '+nf.format(count[j])]);
+    b.addEventListener('click',function(){S.vis[j]=!S.vis[j];update();});
+    box.appendChild(b);
+  });
+}
+$('gall').addEventListener('click',function(){Object.keys(S.vis).forEach(function(k){S.vis[k]=true;});update();});
+
+// The filter extension as map.js uses it: categories are already small numbers, so deck.gl uploads them as they are
+// instead of running three million values through a lookup.
+class Filter extends deck.DataFilterExtension{
+  static componentName='Filter';
+  initializeState(context,extension){super.initializeState(context,extension);
+    var a=this.getAttributeManager().attributes.filterCategoryValues;if(a)a.settings.transform=null;}
+  _getCategoryKey(category){return category;}
+}
+var EXT=null;
+function pointData(){
+  var P=S.P,cat=new Uint8Array(2*P.n),col=new Uint8Array(4*P.n);
+  for(var i=0;i<P.n;i++){
+    var c=color(P.grp[i]);
+    cat[2*i]=P.grp[i];cat[2*i+1]=i%10===0?1:0;
+    col[4*i]=c[0];col[4*i+1]=c[1];col[4*i+2]=c[2];col[4*i+3]=150;
+  }
+  return {length:P.n,attributes:{getPosition:{value:P.pos,size:2},getFilterCategory:{value:cat,size:2},
+    getFillColor:{value:col,size:4,normalized:true}}};
+}
+function layers(){
+  var P=S.P;
+  if(!P||!S.deck)return;
+  EXT=EXT||new Filter({filterSize:1,categorySize:2});
+  S.PD=S.PD||pointData();
+  var groups=Object.keys(S.vis).filter(function(k){return S.vis[k];}).map(Number);
+  var thin=S.thin&&P.n>THIN_ABOVE;
+  var lyr=[new deck.ScatterplotLayer({id:'pts',data:S.PD,radiusUnits:'pixels',getRadius:1.5,radiusMinPixels:1,radiusMaxPixels:3,
+    stroked:false,pickable:true,extensions:[EXT],filterCategories:[groups,thin?[1]:[0,1]]})];
+  function ring(id,rows,px,rgb,w){
+    return new deck.ScatterplotLayer({id:id,data:rows,getPosition:function(i){return [P.pos[2*i],P.pos[2*i+1]];},
+      radiusUnits:'pixels',getRadius:px,filled:false,stroked:true,lineWidthUnits:'pixels',getLineWidth:w,getLineColor:rgb});
+  }
+  if(S.nbr.length)lyr.push(ring('nbr',S.nbr,6,[230,110,30],2));
+  if(S.sel>=0)lyr.push(ring('sel',[S.sel],9,[29,29,27],2.5));
+  S.deck.setProps({layers:lyr});
+}
+
+// Hover and click.
+var ptip=el('div',{'class':'ptip',hidden:''});document.body.appendChild(ptip);
+function tip(o){
+  if(!S.P||o.index<0||!o.layer||o.layer.id!=='pts'){ptip.hidden=true;return;}
+  var t=names(o.index);
+  ptip.textContent=t.common||t.latin?(t.common||t.latin)+' · '+t.group:t.group;
+  ptip.hidden=false;
+  var g=12,x=o.x+$('plot').getBoundingClientRect().left,y=o.y+$('plot').getBoundingClientRect().top;
+  ptip.style.left=Math.max(4,x+g+ptip.offsetWidth>innerWidth-4?x-g-ptip.offsetWidth:x+g)+'px';
+  ptip.style.top=Math.max(4,y+g+ptip.offsetHeight>innerHeight-4?y-g-ptip.offsetHeight:y+g)+'px';
+}
+function pick(o){if(S.P&&o.index>=0&&o.layer&&o.layer.id==='pts')select(o.index,false);}
+
+function closeCard(){
+  S.sel=-1;S.nbr=[];S.run++;$('card').hidden=true;
+  history.replaceState(null,'',location.pathname+location.search);layers();
+}
+addEventListener('keydown',function(e){if(e.key==='Escape'&&!$('card').hidden)closeCard();});
+async function neighborsOf(id){
+  try{return await S.idx.neighbors(id);}
+  catch(e){  // the daily update renamed files: reload the manifest once
+    if(!e.stale)throw e;
+    S.idx=await openIndex();return S.idx.neighbors(id);
+  }
+}
+function select(i,fly){
+  var P=S.P,id=P.id[i],run=++S.run,t=names(i),card=$('card');
+  S.sel=i;S.nbr=[];
+  if(fly){
+    var z=Math.max(S.vs.zoom,S.zoom0+3);
+    S.vs=Object.assign({},S.vs,{target:[P.pos[2*i],P.pos[2*i+1],0],zoom:z});S.deck.setProps({viewState:S.vs});
+  }
+  history.replaceState(null,'','#id='+id);
+  var x=el('button',{type:'button','class':'x','aria-label':'Close'},['×']);x.addEventListener('click',closeCard);
+  var ph=el('div',{'class':'ph'},['Loading photo']),sub=el('p',{'class':'muted'},[t.group]),place=el('p',{'class':'muted'},['']);
+  var nb=el('ul',{'class':'nbrs','aria-label':'Closest matches'}),nbNote=el('p',{'class':'muted'},['Finding closest matches…']);
+  var link=function(href,text,cls){return el('a',{'class':'btn '+(cls||''),href:href,target:'_blank',rel:'noopener'},[text]);};
+  var actions=el('div',{'class':'actions'},[
+    link('https://www.inaturalist.org/observations/'+id,'Help identify on iNaturalist','primary'),
+    link(CFG.searchUrl+'#id='+id,'More like this'),link(CFG.mapUrl+'#record='+id,'Show on map')]);
+  var title=el('h2',{},[t.common||t.latin||t.group]);
+  card.textContent='';
+  [x,ph,el('div',{'class':'body'},[title,sub,place,actions,el('p',{'class':'muted'},['Closest matches, from the full image space']),nbNote,nb])]
+    .forEach(function(c){card.appendChild(c);});
+  card.hidden=false;x.focus();
+  layers();
+  (async function(){
+    var hits;
+    try{hits=await neighborsOf(id);}catch(e){if(run===S.run)nbNote.textContent='Could not load matches: '+e.message;return;}
+    if(run!==S.run)return;
+    if(!hits){nbNote.textContent='Its closest matches are not computed yet; the index may predate this observation.';}
+    else{
+      S.nbr=hits.map(function(h){return L.find(P,h.id);}).filter(function(r){return r>=0;});
+      layers();
+    }
+    var ids=[id].concat((hits||[]).map(function(h){return h.id;}));
+    try{await Meta.fetchObservations(ids,function(u){return fetch(u);},S.cache);}
+    catch(e){if(run===S.run){ph.textContent='Could not load the photo';nbNote.textContent=e.message;}return;}
+    if(run!==S.run)return;
+    var o=S.cache.get(id);
+    if(!o){ph.textContent='This record is no longer on iNaturalist';}
+    else{
+      var p=o.photos&&o.photos[0],ot=o.taxon||{};
+      if(p){ph.textContent='';ph.appendChild(el('img',{src:String(p.url).replace('/square.','/medium.'),alt:'Photo of '+(t.common||t.latin||t.group)}));}
+      else ph.textContent='No photo on iNaturalist now';
+      if(ot.name)title.textContent=ot.preferred_common_name||ot.name;
+      place.textContent=(o.observed_on||'Date unknown')+' · '+(o.place_guess||'Place unknown');
+      if(o.quality_grade&&o.quality_grade!=='needs_id')sub.textContent=t.group+' · now '+o.quality_grade+', so it no longer needs an ID';
+    }
+    if(!hits)return;
+    var res=Meta.build(hits,S.cache),left=[];
+    if(res.notNeedsId)left.push(res.notNeedsId+' no longer need an ID');
+    if(res.missing)left.push(res.missing+' no longer on iNaturalist');
+    nbNote.textContent=left.length?'Left out: '+left.join(', ')+'.':'';
+    res.cards.forEach(function(c){
+      var label=(c.common||c.name||'Unidentified'),row=L.find(P,c.id);
+      var img=c.photo?el('img',{src:c.photo,alt:label,loading:'lazy'}):label;
+      var b=el('button',{type:'button','aria-label':'Jump to '+label+(row<0?' (not in the plot)':''),'data-id':c.id},[img]);
+      b.addEventListener('click',function(){if(row>=0)select(row,true);else window.open('https://www.inaturalist.org/observations/'+c.id,'_blank','noopener');});
+      nb.appendChild(el('li',{},[b]));
+    });
+  })();
+}
+
+async function load(){
+  status('Reading the index…');
+  S.idx=await openIndex();
+  var lay=S.idx.manifest.layout;
+  if(!lay||!lay.parts||!lay.parts.length)throw new Error('This index has no photo-space layout yet.');
+  var f=L.fidelity(lay.fidelity);
+  $('fid').textContent=f?'Measured on the layout: on average '+Math.round(f.value*100)+'% of a photo’s '+f.k+
+    ' true closest matches are among its '+f.k+' nearest points here.':'';
+  status('Reading the map data…');
+  var meta=L.parseMapMeta(await (await okFetch(MAP)).text());
+  S.META=meta;
+  var get=function(u){return okFetch(u).then(function(r){return r.arrayBuffer();}).then(L.gunzip);};
+  var taxa=get(new URL(meta.taxa,MAP)).then(function(b){return JSON.parse(new TextDecoder().decode(b));});
+  var parts=lay.parts.map(function(p){return S.idx.file(p.name+'.bin').then(L.gunzip).then(function(b){return L.decodePart(b,p.count);});});
+  var shards=meta.shards.map(function(s){return get(new URL(s.file,MAP)).then(function(b){return L.decodeShard(b,s.n);});});
+  status('Downloading the layout and the map data…');
+  var got=await Promise.all([Promise.all(parts),Promise.all(shards),taxa]);
+  S.TAXA=got[2];
+  S.P=L.join(got[1],got[0],lay.bbox,meta.bbox);
+  status('');
+  chips();
+  start(lay.bbox);
+  update();
+  var want=+new URLSearchParams(location.hash.slice(1)).get('id');
+  var row=want?L.find(S.P,want):-1;
+  if(row>=0)select(row,true);
+}
+function start(bbox){
+  var box=$('plot'),w=Math.max(box.clientWidth,1),h=Math.max(box.clientHeight,1),sx=bbox[2]-bbox[0]||1,sy=bbox[3]-bbox[1]||1;
+  S.zoom0=Math.log2(Math.min(w/sx,h/sy)*0.95);
+  S.vs={target:[(bbox[0]+bbox[2])/2,(bbox[1]+bbox[3])/2,0],zoom:S.zoom0,minZoom:S.zoom0-1,maxZoom:S.zoom0+16};
+  S.deck=new deck.Deck({parent:box,views:new deck.OrthographicView({id:'photo-space',flipY:false}),controller:true,
+    viewState:S.vs,pickingRadius:4,
+    onViewStateChange:function(e){S.vs=e.viewState;S.deck.setProps({viewState:S.vs});},
+    // while the view moves it draws one record in ten, and all of them once it stops
+    onInteractionStateChange:function(st){
+      var t=!!(st.isDragging||st.isZooming||st.isPanning);
+      if(t!==S.thin){S.thin=t;layers();}
+    },
+    onHover:tip,onClick:pick,layers:[]});
+  box.addEventListener('pointerleave',function(){ptip.hidden=true;});
+}
+load().catch(function(e){
+  $('count').textContent='Could not load the photo space';status(e.message);
+});
+})();

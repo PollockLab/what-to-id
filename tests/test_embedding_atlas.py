@@ -50,7 +50,7 @@ def test_build_writes_real_data_and_no_private_fields(tmp_path):
     pool.to_parquet(path)
     out = tmp_path / "site"
     build(path, str(tmp_path / "{group}.npz"), out, snapshot_date="2026-09-11")
-    html = (out / "embeddings.html").read_text()
+    html = (out / "embeddings-sample.html").read_text()
     assert "__ATLAS_META__" not in html
     assert "__ATLAS_LOGIC__" not in html
     assert "__IDENTIFY_LINKS__" not in html
@@ -239,15 +239,15 @@ def test_model_navigation_metadata_is_optional_and_escaped(tmp_path):
         out,
         snapshot_date="2026-09-11",
         region_name="British Columbia <test>",
-        model_view_specs=[f"{label}=embeddings.html", "Other=dinov3/embeddings.html"],
+        model_view_specs=[f"{label}=embeddings-sample.html", "Other=dinov3/embeddings-sample.html"],
         current_label=label,
     )
-    html = (out / "embeddings.html").read_text()
+    html = (out / "embeddings-sample.html").read_text()
     assert label not in html
     assert "British Columbia <test>" not in html
     assert "British Columbia \\u003ctest>" in html
     assert '"current_label": "Model \\u003c/script>' in html
-    assert "dinov3/embeddings.html" in html
+    assert "dinov3/embeddings-sample.html" in html
     assert json.loads((out / "embeddings-data/Aves.json").read_text())["reference"] is None
 
 
@@ -258,7 +258,7 @@ def test_current_model_label_must_match_configured_navigation(tmp_path):
             "",
             tmp_path,
             snapshot_date="2026-09-11",
-            model_view_specs=["A=embeddings.html"],
+            model_view_specs=["A=embeddings-sample.html"],
             current_label="B",
         )
 

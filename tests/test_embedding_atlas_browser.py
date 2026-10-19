@@ -85,7 +85,7 @@ def atlas_site(tmp_path_factory):
         str(directory / "{group}.npz"),
         output,
         snapshot_date="2026-09-11",
-        model_view_specs=["Test=embeddings.html", "Other=other/embeddings.html"],
+        model_view_specs=["Test=embeddings-sample.html", "Other=other/embeddings-sample.html"],
         current_label="Test",
         reference_embedding_pattern=str(directory / "{group}.npz"),
         reference_pool_path=pool,
@@ -125,7 +125,7 @@ def open_atlas(browser, atlas_site):
                     request.fulfill(status=404, body="Not found")
 
         page.route("**/*", route)
-        page.goto("https://atlas.test/embeddings.html" + fragment)
+        page.goto("https://atlas.test/embeddings-sample.html" + fragment)
         page.locator('[data-focal-id="100"]').wait_for()
         page.wait_for_function("window.testMap && testMap.sources.observations")
         assert errors == []
@@ -271,7 +271,7 @@ def test_deep_link_and_cross_encoder_links_keep_focal_id_and_brush_filters_work(
     assert (
         page.get_by_role("link", name="Other", exact=True)
         .get_attribute("href")
-        .endswith("other/embeddings.html#group=Aves&id=107")
+        .endswith("other/embeddings-sample.html#group=Aves&id=107")
     )
     page.get_by_role("button", name="Photo space", exact=True).click()
     page.get_by_role("button", name="Add selected photo", exact=True).click()
@@ -783,7 +783,7 @@ def open_taxonomy_atlas(browser, taxonomy_site):
                 request.fulfill(status=404, body="Not found")
 
     page.route("**/*", route)
-    page.goto("https://taxonomy-atlas.test/embeddings.html#group=Plantae&id=100")
+    page.goto("https://taxonomy-atlas.test/embeddings-sample.html#group=Plantae&id=100")
     page.locator('[data-focal-id="100"]').wait_for()
     page.wait_for_function("window.testMap && testMap.sources.observations")
     assert errors == []
@@ -1162,19 +1162,19 @@ def context_site(tmp_path_factory, taxonomy_site):
     shutil.copytree(taxonomy_site, output / "other", dirs_exist_ok=True)
     for path, label, views in [
         (
-            output / "embeddings.html",
+            output / "embeddings-sample.html",
             "BioCLIP",
             [
-                dict(label="BioCLIP", url="embeddings.html"),
-                dict(label="DINO", url="other/embeddings.html"),
+                dict(label="BioCLIP", url="embeddings-sample.html"),
+                dict(label="DINO", url="other/embeddings-sample.html"),
             ],
         ),
         (
-            output / "other/embeddings.html",
+            output / "other/embeddings-sample.html",
             "DINO",
             [
-                dict(label="BioCLIP", url="../embeddings.html"),
-                dict(label="DINO", url="embeddings.html"),
+                dict(label="BioCLIP", url="../embeddings-sample.html"),
+                dict(label="DINO", url="embeddings-sample.html"),
             ],
         ),
     ]:
@@ -1231,7 +1231,7 @@ def open_context_atlas(browser, context_site):
                     request.fulfill(path=str(file))
 
         page.route("**/*", route)
-        page.goto("https://context-atlas.test/embeddings.html" + fragment)
+        page.goto("https://context-atlas.test/embeddings-sample.html" + fragment)
         page.locator('[data-focal-id="100"]').wait_for()
         page.wait_for_function("window.testMap && testMap.sources.observations")
         assert errors == []
@@ -1276,7 +1276,7 @@ def test_active_encoder_is_visible_with_disclosures_closed_before_and_after_tran
 ):
     page, errors, _ = open_context_atlas()
     if path:
-        page.goto(f"https://context-atlas.test/{path}embeddings.html#group=Plantae&id=100")
+        page.goto(f"https://context-atlas.test/{path}embeddings-sample.html#group=Plantae&id=100")
         page.locator('[data-focal-id="100"]').wait_for()
     _assert_visible_encoder_captions(page, label)
     page.get_by_role("searchbox").fill("107")
@@ -1304,8 +1304,8 @@ def test_unlabeled_build_uses_cache_backbone_in_visible_captions(
     )
     page, errors = open_atlas()
     page.route(
-        "https://atlas.test/embeddings.html",
-        lambda route: route.fulfill(path=str(output / "embeddings.html")),
+        "https://atlas.test/embeddings-sample.html",
+        lambda route: route.fulfill(path=str(output / "embeddings-sample.html")),
     )
     page.route(
         "https://atlas.test/embeddings-data/*.json",
@@ -1442,7 +1442,8 @@ def test_failed_or_empty_transfer_never_expands_identify_and_has_explicit_recove
         context["resultIds"] = []
     raw = "{" if failure == "malformed" else json.dumps(context)
     page.goto(
-        "https://context-atlas.test/other/embeddings.html#group=Plantae&id=100&ctx=" + quote(raw)
+        "https://context-atlas.test/other/embeddings-sample.html#group=Plantae&id=100&ctx="
+        + quote(raw)
     )
     page.wait_for_function("!document.getElementById('group').disabled")
     assert page.locator("#identify-results").is_disabled()
@@ -1725,7 +1726,7 @@ def test_blocked_transfer_recovery_and_retained_area_actions_stay_visible(
     context = page.evaluate("JSON.parse(serializedContext())")
     context["poolSha"] = "a" * 64
     page.goto(
-        "https://context-atlas.test/embeddings.html#group=Plantae&id=100&ctx="
+        "https://context-atlas.test/embeddings-sample.html#group=Plantae&id=100&ctx="
         + quote(json.dumps(context))
     )
     page.wait_for_function("!document.getElementById('group').disabled")
@@ -2579,14 +2580,15 @@ def test_actual_plant_catalog_is_searchable_without_applying_or_recomputing(
     payload = json.loads((demo / "embeddings-data/Plantae.json").read_text())
     # Actual ten-group labels/counts also constrain the native controls' widths.
     metadata = json.JSONDecoder().raw_decode(
-        (demo / "embeddings.html").read_text().split("const META=", 1)[1]
+        (demo / "embeddings-sample.html").read_text().split("const META=", 1)[1]
     )[0]
-    html = (taxonomy_site / "embeddings.html").read_text()
+    html = (taxonomy_site / "embeddings-sample.html").read_text()
     start = html.index("const META=") + len("const META=")
     _, end = json.JSONDecoder().raw_decode(html[start:])
     html = html[:start] + json.dumps(metadata) + html[start + end :]
     page.route(
-        "**/embeddings.html", lambda route: route.fulfill(body=html, content_type="text/html")
+        "**/embeddings-sample.html",
+        lambda route: route.fulfill(body=html, content_type="text/html"),
     )
     represented = sorted({taxon for r in payload["records"] for taxon in r["ancestor_taxon_ids"]})
     labels = {
