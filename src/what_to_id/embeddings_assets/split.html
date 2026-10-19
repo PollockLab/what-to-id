@@ -67,7 +67,7 @@ function setView(v){
     var show=v==='side'||v===n,f=frames[n];
     if(show&&!f)mk(n);
     else if(f&&!show&&innerWidth<800){f.remove();delete frames[n];}  // a phone holds one view at a time
-    else if(f){var was=f.hidden;f.hidden=!show;if(show&&was){sendSel(n,last);post(n,{type:'wtid-record',id:rec});}}});
+    else if(f){var was=f.hidden;f.hidden=!show;if(show&&was){sendSel(n,last);post(n,{type:'wtid-record',id:rec});if(mat)post(n,mat);}}});
   box.classList.toggle('side',v==='side');
   post('space',{type:'wtid-layout',peer:v==='side'});
   [].forEach.call(document.querySelectorAll('[data-v]'),function(b){b.setAttribute('aria-pressed',b.dataset.v===v);});
@@ -106,12 +106,13 @@ addEventListener('message',function(e){
   last=e.data.sel;var o=n==='map'?'space':'map';if(visible(o))sendSel(o,last);
   history.replaceState(null,'',location.search+(last?'#'+last:''));
 });
-// A picked record is mirrored by id in the other frame, and in one that shows up later.
-var rec=null;
+// A picked record and its closest matches are mirrored by id in the other frame, and in one that shows up later.
+var rec=null,mat=null;
 addEventListener('message',function(e){
-  var n=Object.keys(frames).filter(function(k){return frames[k].contentWindow===e.source;})[0];
-  if(!n||e.origin!==location.origin||!e.data||e.data.type!=='wtid-record'||e.data.id===rec)return;
-  rec=e.data.id;var o=n==='map'?'space':'map';if(visible(o))post(o,{type:'wtid-record',id:rec});
+  var n=Object.keys(frames).filter(function(k){return frames[k].contentWindow===e.source;})[0],d=e.data;
+  if(!n||e.origin!==location.origin||!d||(d.type!=='wtid-record'&&d.type!=='wtid-matches'))return;
+  if(d.type==='wtid-record'){if(d.id===rec)return;rec=d.id;mat=null;}else mat=d;
+  var o=n==='map'?'space':'map';if(visible(o))post(o,d);
 });
 // Back and forward: the new selection goes to both.
 addEventListener('hashchange',function(){var s=MapFilter.tokens(location.hash);

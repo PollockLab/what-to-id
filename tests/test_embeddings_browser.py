@@ -446,11 +446,20 @@ def test_split_page_mirrors_a_picked_record_in_the_other_frame(browser, site):
     )
     pick = [f for f in page.frames if "embed=1" in f.url]
     assert len(pick) == 2
+    pick[1].evaluate(
+        "window.got = []; addEventListener('message', e =>"
+        " e.data.type === 'wtid-matches' && got.push(e.data))"
+    )
     pick[0].evaluate("__deck.props.onClick({index: 7, layer: {id: 'pts'}})")
     sel = "__deck.props.layers.find(x => x.id === 'sel').props.data[0]"
     for f in pick:
         f.wait_for_function("__deck.props.layers.some(x => x.id === 'sel')")
         assert f.evaluate(sel) == 7
+    pick[0].wait_for_selector(".nbrs li .score")
+    assert pick[0].locator(".nbrs li .score").first.inner_text().endswith("%")
+    pick[1].wait_for_function("got.length === 1")  # the matches reached the other frame
+    hits = pick[1].evaluate("got[0].hits")
+    assert len(hits) == 12 and all(0 <= h["score"] <= 1 for h in hits)
     pick[1].evaluate("document.querySelector('#card .x').click()")
     for f in pick:
         f.wait_for_function("!__deck.props.layers.some(x => x.id === 'sel')")

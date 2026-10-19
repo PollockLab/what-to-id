@@ -303,6 +303,8 @@ function select(i,fly){
     else{
       S.nbr=hits.map(function(h){return L.find(S.P,h.id);}).filter(function(r){return r>=0;});
       layers();
+      if(parent!==window)parent.postMessage({type:'wtid-matches',id:id,
+        hits:hits.map(function(h){return {id:h.id,score:h.score};})},location.origin);
     }
     var ids=[id].concat((hits||[]).map(function(h){return h.id;}));
     try{await Meta.fetchObservations(ids,function(u){return fetch(u);},S.cache);}
@@ -319,7 +321,8 @@ function select(i,fly){
       if(o.quality_grade&&o.quality_grade!=='needs_id')sub.textContent=t.group+' · now '+o.quality_grade+', so it no longer needs an ID';
     }
     if(!hits)return;
-    var res=Meta.build(hits,S.cache),left=[];
+    var res=Meta.build(hits,S.cache),left=[],score={};
+    hits.forEach(function(h){score[h.id]=h.score;});
     if(res.notNeedsId)left.push(res.notNeedsId+' no longer need an ID');
     if(res.missing)left.push(res.missing+' no longer on iNaturalist');
     nbNote.textContent=left.length?'Left out: '+left.join(', ')+'.':'';
@@ -328,7 +331,9 @@ function select(i,fly){
       var img=c.photo?el('img',{src:c.photo,alt:label,loading:'lazy'}):label;
       var b=el('button',{type:'button','aria-label':'Jump to '+label+(row<0?' (not in the plot)':''),'data-id':c.id},[img]);
       b.addEventListener('click',function(){row=L.find(S.P,c.id);if(row>=0)select(row,true);else window.open('https://www.inaturalist.org/observations/'+c.id,'_blank','noopener');});
-      nb.appendChild(el('li',{},[b]));
+      var sc=el('span',{'class':'score'},[Math.round(score[c.id]*100)+'%']);
+      sc.title='cosine similarity '+score[c.id].toFixed(2);
+      nb.appendChild(el('li',{},[b,sc]));
     });
   })();
 }

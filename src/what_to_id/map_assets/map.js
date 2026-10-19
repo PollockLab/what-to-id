@@ -63,7 +63,7 @@ function writeHash(){SYNC.send();clearTimeout(hashTimer);hashTimer=setTimeout(fu
 var P={n:0,id:new Uint32Array(0),pos:new Float32Array(0),obs:new Uint16Array(0),
   up:new Uint16Array(0),tax:new Uint16Array(0),grp:new Uint8Array(0),ids:new Uint8Array(0),
   fl:new Uint8Array(0)};
-var TAXA=null,TF=TX.filter(null,[]),GONE={},GONE_NEW=false,KEEP=new Uint8Array(0),SEL=-1,
+var TAXA=null,TF=TX.filter(null,[]),GONE={},GONE_NEW=false,KEEP=new Uint8Array(0),SEL=-1,NBR=[],
   CUM=new Float64Array(META.days+1),TOT=META.totals||null,TC=null,NODAY=0,PER=null,ALT=0;
 function cat(a,b){var c=new a.constructor(a.length+b.length);c.set(a);c.set(b,a.length);return c;}
 function unzip(buf){
@@ -226,6 +226,9 @@ function layers(){
     getFillColor:[DOT[0],DOT[1],DOT[2],110],radiusUnits:'pixels',getRadius:1.5,radiusMinPixels:1,
     radiusMaxPixels:6,stroked:false,pickable:true,
     extensions:[EXT],updateTriggers:{getFilterCategory:PD_CAT},filterRange:[S.up?any:r,S.up?r:any],filterCategories:categories(THIN)})];
+  if(NBR.length)L.push(new deck.ScatterplotLayer({id:'nbr',data:NBR,
+    getPosition:function(i){return [P.pos[2*i],P.pos[2*i+1]];},radiusUnits:'pixels',getRadius:6,
+    filled:false,stroked:true,lineWidthUnits:'pixels',getLineWidth:2,getLineColor:[230,110,30]}));
   if(SEL>=0)L.push(new deck.ScatterplotLayer({id:'sel',data:[SEL],
     getPosition:function(i){return [P.pos[2*i],P.pos[2*i+1]];},radiusUnits:'pixels',getRadius:8,
     filled:false,stroked:true,lineWidthUnits:'pixels',getLineWidth:2.5,
@@ -474,25 +477,33 @@ function place(){
   s.right='auto';s.left=Math.max(m,left)+'px';
   s.top=Math.max(m,Math.min(y-h/2,innerHeight-m-h))+'px';
 }
-function closeCard(){SEL=-1;card.hidden=true;if(ctl)ctl.abort();
+function closeCard(){SEL=-1;NBR=[];card.hidden=true;if(ctl)ctl.abort();
   if(GONE_NEW){GONE_NEW=false;refilter();}else{layers();writeHash();}
   tell(null);}
 // The split view mirrors the picked record in the photo space by id. A record picked there is ringed
 // here without a card, and the map pans to it only when it is off screen.
 function tell(id){if(parent!==window)parent.postMessage({type:'wtid-record',id:id},location.origin);}
 function mark(i){
-  SEL=i;card.hidden=true;if(ctl)ctl.abort();layers();
+  SEL=i;NBR=[];card.hidden=true;if(ctl)ctl.abort();layers();
   var c=[P.pos[2*i],P.pos[2*i+1]];if(!map.getBounds().contains(c))map.easeTo({center:c});
 }
+// The photo space sends the closest matches of the picked record; those that are on the map get a ring.
+addEventListener('message',function(e){
+  if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-matches'||SEL<0||
+    e.data.id!==P.id[SEL])return;
+  var at={};e.data.hits.forEach(function(h){at[h.id]=1;});
+  NBR=[];for(var i=0;i<P.n;i++)if(at[P.id[i]])NBR.push(i);
+  layers();
+});
 addEventListener('message',function(e){
   if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-record')return;
   var id=e.data.id;
-  if(id==null){S.rec=S.mark=null;if(SEL>=0){SEL=-1;card.hidden=true;if(ctl)ctl.abort();layers();}return;}
+  if(id==null){S.rec=S.mark=null;if(SEL>=0){SEL=-1;NBR=[];card.hidden=true;if(ctl)ctl.abort();layers();}return;}
   for(var i=0;i<P.n;i++)if(P.id[i]===id){if(i!==SEL)mark(i);return;}
   S.rec=id;S.fly=false;S.mark=true;  // the shards that hold it have not loaded yet
 });
 function openCard(i){
-  SEL=i;tell(P.id[i]);var t=names(i),id=P.id[i],lag=P.obs[i]!==NO&&P.up[i]!==NO&&!(P.fl[i]&(FLAG.earlyObs|FLAG.earlyUp))?P.up[i]-P.obs[i]:null;
+  SEL=i;NBR=[];tell(P.id[i]);var t=names(i),id=P.id[i],lag=P.obs[i]!==NO&&P.up[i]!==NO&&!(P.fl[i]&(FLAG.earlyObs|FLAG.earlyUp))?P.up[i]-P.obs[i]:null;
   card.innerHTML='<button type="button" class="x" aria-label="Close">×</button>'+
     '<div class="ph" id="ph">Loading photo</div><div class="body">'+
     '<h2>'+esc(t.common||t.latin)+'</h2><p class="latin"><i>'+esc(t.latin)+'</i>'+
