@@ -458,6 +458,26 @@ def test_split_page_mirrors_a_picked_record_in_the_other_frame(browser, site):
     page.close()
 
 
+def test_split_divider_resizes_by_keys_and_double_click_and_remembers(browser, site):
+    base, *_ = site
+    page = browser.new_page(viewport={"width": 1280, "height": 900})
+    page.goto(f"{base}/split.html")
+    width = "document.getElementById('map').getBoundingClientRect().width"
+    page.wait_for_selector("#map")
+    half = page.evaluate(width)
+    sep = page.locator("#sep")
+    sep.focus()
+    for _ in range(5):
+        page.keyboard.press("ArrowRight")
+    assert page.evaluate(width) == pytest.approx(half + 0.1 * 1280, abs=3)
+    page.reload()
+    page.wait_for_selector("#map")
+    assert page.evaluate(width) > half + 100  # remembered
+    sep.dblclick()
+    assert page.evaluate(width) == pytest.approx(half, abs=3)
+    page.close()
+
+
 def test_click_opens_card_with_neighbours_and_jump(open_page, site):
     _, _, in_pool, _ = site
     page = open_page(drop=None)

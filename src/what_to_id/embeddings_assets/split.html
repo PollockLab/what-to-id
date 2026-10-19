@@ -27,14 +27,17 @@ body{display:flex;flex-direction:column}
 #main-content{flex:1 1 0;min-height:0;display:flex}
 #main-content iframe{flex:1 1 0;min-width:0;height:100%;border:0;background:var(--bg)}
 #main-content iframe[hidden]{display:none}
-#main-content iframe+iframe{border-left:1px solid var(--line)}
-@media (max-width:800px){.xbar{flex:1 1 100%;margin:0 0 6px;justify-content:space-between}
+#main-content.side #map{flex:0 0 var(--split,50%)}
+#sep{flex:0 0 7px;cursor:col-resize;background:var(--line);touch-action:none;outline-offset:-2px}
+#sep:hover,#sep:focus-visible,#sep.on{background:var(--on)}
+#main-content:not(.side) #sep{display:none}
+@media (max-width:800px){#sep{display:none}.xbar{flex:1 1 100%;margin:0 0 6px;justify-content:space-between}
 .seg [data-v="side"]{display:none}}
 </style>
 </head>
 <body>
 __SITE_NAV__
-<div id="main-content" tabindex="-1"></div>
+<div id="main-content" tabindex="-1"><div id="sep" role="separator" aria-orientation="vertical" aria-label="Resize the map and photo space" aria-valuemin="20" aria-valuemax="80" tabindex="0"></div></div>
 <script>
 __MAP_FILTER__
 (function(){
@@ -65,6 +68,7 @@ function setView(v){
     if(show&&!f)mk(n);
     else if(f&&!show&&innerWidth<800){f.remove();delete frames[n];}  // a phone holds one view at a time
     else if(f){var was=f.hidden;f.hidden=!show;if(show&&was){sendSel(n,last);post(n,{type:'wtid-record',id:rec});}}});
+  box.classList.toggle('side',v==='side');
   post('space',{type:'wtid-layout',peer:v==='side'});
   [].forEach.call(document.querySelectorAll('[data-v]'),function(b){b.setAttribute('aria-pressed',b.dataset.v===v);});
   count();}
@@ -81,6 +85,19 @@ document.getElementById('xbar').addEventListener('click',function(e){
 var i=document.getElementById('i'),note=document.getElementById('note');
 i.addEventListener('click',function(){note.hidden=!note.hidden;i.setAttribute('aria-expanded',!note.hidden);});
 addEventListener('keydown',function(e){if(e.key==='Escape'&&!note.hidden)i.click();});
+// The divider: drag it, or use the arrow keys; a double click goes back to 50/50. The share is remembered.
+var sep=document.getElementById('sep'),pct=+localStorage.getItem('wtid-split')||50;
+function share(p){pct=Math.max(20,Math.min(80,p));box.style.setProperty('--split',pct+'%');
+  sep.setAttribute('aria-valuenow',Math.round(pct));localStorage.setItem('wtid-split',pct);}
+share(pct);
+sep.addEventListener('pointerdown',function(e){sep.setPointerCapture(e.pointerId);sep.classList.add('on');});
+sep.addEventListener('pointermove',function(e){
+  if(sep.classList.contains('on')){var r=box.getBoundingClientRect();share((e.clientX-r.left)/r.width*100);}});
+sep.addEventListener('pointerup',function(){sep.classList.remove('on');});
+sep.addEventListener('dblclick',function(){share(50);});
+sep.addEventListener('keydown',function(e){
+  var d={ArrowLeft:-2,ArrowRight:2}[e.key];if(d){share(pct+d);e.preventDefault();}
+  else if(e.key==='Home'||e.key==='Enter'){share(50);e.preventDefault();}});
 // A frame reports its selection; the other one applies it in place. The frames never reload.
 addEventListener('message',function(e){
   var n=Object.keys(frames).filter(function(k){return frames[k].contentWindow===e.source;})[0];
