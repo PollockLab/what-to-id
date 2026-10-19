@@ -1,4 +1,4 @@
-"""Deterministic atlas-index fixture: a tiny IVF-PQ index plus reference queries for parity tests.
+"""Deterministic atlas-index fixture: a tiny IVF-OPQ-PQ index plus reference queries for parity.
 
 Run as `PYTHONPATH=src python tests/atlas_index_fixture.py OUT_DIR` (needs faiss) to write an index
 (`base` plus one delta part, neighbours) and `reference.json` with queries and the expected
@@ -47,6 +47,7 @@ def write_fixture(out_dir: str | Path) -> dict:
         nlist=FIXTURE_NLIST,
         m=FIXTURE_M,
         train_size=FIXTURE_ROWS,
+        opq_iter=4,
         model={"id": "fixture", "revision": "0", "sha256": "0" * 64},
     )
     atlas_index.append(out, "delta-20260101", E[FIXTURE_ROWS:], ids[FIXTURE_ROWS:])

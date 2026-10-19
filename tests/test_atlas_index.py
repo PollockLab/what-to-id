@@ -1,4 +1,4 @@
-"""Tests for the static IVF-PQ atlas index on synthetic clustered unit vectors."""
+"""Tests for the static IVF-OPQ-PQ atlas index on synthetic clustered unit vectors."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ import pytest
 
 from what_to_id import atlas_index as ai
 from what_to_id.atlas_index_io import load_core
+from what_to_id.atlas_refine import row_bytes
 
 from .atlas_index_fixture import clustered_unit, write_fixture
 
@@ -33,7 +34,7 @@ def data():
 def built(tmp_path_factory, data):
     E, ids = data
     out = tmp_path_factory.mktemp("idx")
-    ai.build(E, ids, out, nlist=NLIST, m=M, train_size=N, model={"id": "t"})
+    ai.build(E, ids, out, nlist=NLIST, m=M, train_size=N, opq_iter=4, model={"id": "t"})
     return out
 
 
@@ -50,12 +51,17 @@ def index(tmp_path, built):
 def test_layout_sizes_and_dtypes(built, data):
     _, ids = data
     man = json.loads((built / "manifest.json").read_text())
-    assert (man["version"], man["dims"], man["nlist"], man["m"]) == (1, D, NLIST, M)
+    assert (man["version"], man["dims"], man["nlist"], man["m"]) == (2, D, NLIST, M)
     assert (man["nbits"], man["metric"], man["by_residual"], man["count"]) == (8, "ip", True, N)
+    assert man["refine"] == {"bits": 3, "params": "refine.f32"}
+    assert man["defaults"] == {"nprobe": 64, "shortlist": 500}
     assert man["model"] == {"id": "t"}
     assert man["parts"][0]["name"] == "base" and man["parts"][0]["count"] == N
     assert (built / "centroids.f16").stat().st_size == NLIST * D * 2
+    assert (built / "opq.f16").stat().st_size == D * D * 2
     assert (built / "pq.f32").stat().st_size == M * 256 * (D // M) * 4
+    assert (built / "refine.f32").stat().st_size == 2 * D * 4
+    assert (built / "base.refine.u8").stat().st_size == N * D * 3 // 8
     assert (built / "base.offsets.u32").stat().st_size == (NLIST + 1) * 4
     assert (built / "base.ids.u32").stat().st_size == N * 4
     assert (built / "base.codes.u8").stat().st_size == N * M
@@ -67,7 +73,7 @@ def test_layout_sizes_and_dtypes(built, data):
 
 def test_rows_sit_in_their_nearest_list(built, data):
     E, ids = data
-    c, _ = load_core(built, json.loads((built / "manifest.json").read_text()))
+    c = load_core(built, json.loads((built / "manifest.json").read_text())).centroids
     offsets = np.fromfile(built / "base.offsets.u32", dtype="<u4").astype(int)
     stored = np.fromfile(built / "base.ids.u32", dtype="<u4")
     by_id = dict(zip(ids.tolist(), range(N), strict=True))
@@ -77,22 +83,48 @@ def test_rows_sit_in_their_nearest_list(built, data):
             assert np.all((E[rows] @ c.T).argmax(1) == lst)
 
 
-def test_adc_scores_match_faiss(built, data):
+def test_stage1_scores_match_faiss(built, data):
     E, ids = data
     man = json.loads((built / "manifest.json").read_text())
-    c, pq = load_core(built, man)
+    core = load_core(built, man)
+    # (A x - A c) = A (x - c): faiss on the rotated data and centroids is the same ADC
     quantizer = faiss.IndexFlatIP(D)
-    quantizer.add(c)
+    quantizer.add(np.ascontiguousarray(core.centroids @ core.rot.T))
     ref = faiss.IndexIVFPQ(quantizer, D, NLIST, M, 8, faiss.METRIC_INNER_PRODUCT)
-    faiss.copy_array_to_vector(pq.ravel(), ref.pq.centroids)
+    faiss.copy_array_to_vector(core.pq.ravel(), ref.pq.centroids)
     ref.is_trained = True
-    ref.add_with_ids(E, ids.astype(np.int64))
+    ref.add_with_ids(np.ascontiguousarray(E @ core.rot.T), ids.astype(np.int64))
     ref.nprobe = 8
     Q = E[::500][:10]
-    want_s, want_i = ref.search(Q, 10)
-    got_i, got_s = ai.search(built, Q, 10, 8)
-    np.testing.assert_allclose(got_s, want_s, atol=1e-4)
-    assert (got_i == want_i).mean() > 0.95
+    want_s, want_i = ref.search(np.ascontiguousarray(Q @ core.rot.T), 10)
+    got_i, got_s = ai.search(built, Q, 10, 8, shortlist=0)
+    np.testing.assert_allclose(got_s, want_s, atol=2e-3)
+    assert (got_i == want_i).mean() > 0.9
+
+
+def test_refine_reorders_toward_exact_scores(built, data):
+    E, ids = data
+    Q = E[::250][:20]
+    exact = Q @ E.T
+    by_id = dict(zip(ids.tolist(), range(N), strict=True))
+    errs = {}
+    for shortlist in (0, 500):
+        found, scores = ai.search(built, Q, 10, NLIST, shortlist)
+        rows = np.vectorize(by_id.get)(found)
+        errs[shortlist] = np.abs(scores - np.take_along_axis(exact, rows, 1)).mean()
+        assert np.all(np.diff(scores, axis=1) <= 0)
+    assert errs[500] < errs[0] / 2, errs
+    r0 = ai.recall_at_k(built, E, ids, k=10, nprobe=NLIST, shortlist=0, n_queries=200)
+    r1 = ai.recall_at_k(built, E, ids, k=10, nprobe=NLIST, shortlist=100, n_queries=200)
+    assert r1 >= r0
+
+
+def test_shortlist_smaller_than_k_still_returns_k(built, data):
+    E, _ = data
+    found, _ = ai.search(built, E[:2], 10, NLIST, shortlist=3)
+    assert (found >= 0).all()
+    with pytest.raises(ValueError, match="shortlist >= 0"):
+        ai.search(built, E[:1], 5, 4, shortlist=-1)
 
 
 def test_recall_vs_exact(built, data):
@@ -122,6 +154,7 @@ def test_append_then_search_finds_new(index, data):
     ]
     assert (index / "delta-20260102.ids.u32").stat().st_size == 400
     assert (index / "delta-20260102.codes.u8").stat().st_size == 100 * M
+    assert (index / "delta-20260102.refine.u8").stat().st_size == 100 * row_bytes(D, 3)
     found, _ = ai.search(index, new, 10, NLIST)
     assert np.mean([new_ids[i] in found[i] for i in range(100)]) > 0.9
     with pytest.raises(ValueError, match="already exists"):
@@ -143,6 +176,7 @@ def test_compact_preserves_results_and_drops(index, data):
     man = ai.compact(index)
     assert man["parts"][0]["name"] == "base" and len(man["parts"]) == 1 and man["count"] == N + 100
     assert not list(index.glob("delta-*")) and not list(index.glob("*.tmp"))
+    assert (index / "base.refine.u8").stat().st_size == (N + 100) * row_bytes(D, 3)
     after = ai.search(index, Q, 10, 8)
     np.testing.assert_allclose(after[1], before[1], atol=1e-5)
     assert (after[0] == before[0]).mean() > 0.98
@@ -152,9 +186,11 @@ def test_compact_preserves_results_and_drops(index, data):
     man = ai.compact(index, keep_ids=keep)
     assert man["count"] == N + 100 - 210
     assert (index / "base.ids.u32").stat().st_size == man["count"] * 4
+    assert (index / "base.refine.u8").stat().st_size == man["count"] * row_bytes(D, 3)
     found, _ = ai.search(index, E[:50], 10, NLIST)
     assert not np.isin(found, drop).any()
     assert ai.compact(index, keep_ids=[])["count"] == 0
+    assert (index / "base.refine.u8").stat().st_size == 0
     assert (ai.search(index, E[:2], 3, 4)[0] == -1).all()
 
 
@@ -244,6 +280,7 @@ def test_write_fixture_and_reference(tmp_path):
     out = tmp_path / "fx"
     man = json.loads((out / "manifest.json").read_text())
     assert (man["dims"], man["nlist"], man["m"], man["count"]) == (1024, 16, 64, 2200)
+    assert (out / "base.refine.u8").stat().st_size == 2000 * 384
     assert [p["name"] for p in man["parts"]] == ["base", "delta-20260101"]
     assert man["neighbors"] == [{"name": "neighbors", "count": 2200, "block": 256, "k": 12}]
     assert (out / "neighbors.bin").stat().st_size == 2200 * 76
@@ -275,7 +312,7 @@ def test_cli_roundtrip(tmp_path, data, capsys):
     idx = str(tmp_path / "idx")
     base = ["--index", idx]
     src = ["--E", str(tmp_path / "E.npy"), "--ids", str(tmp_path / "ids.npy")]
-    ai.main(["build", *base, *src, "--nlist", "8", "--m", str(M)])
+    ai.main(["build", *base, *src, "--nlist", "8", "--m", str(M), "--opq-iter", "2"])
     ai.main(["neighbors", *base, *src, "--k", "5", "--device", "numpy"])
     np.save(tmp_path / "Q.npy", E[:2])
     ai.main(["search", *base, "--queries", str(tmp_path / "Q.npy"), "--k", "3", "--nprobe", "8"])
