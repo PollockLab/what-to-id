@@ -106,6 +106,13 @@ def test_switcher_on_the_map_page_carries_the_record_and_the_centre(browser):
     assert _href(pg, "blitz") == BLITZ + "?at=50.500,-120.250"
 
 
+def test_switcher_carries_groups_between_map_and_photo_space(browser):
+    pg = _open(browser, "map.html", "#groups=Insecta,-Aves&record=42")
+    assert _href(pg, "space") == "embeddings.html#id=42&groups=Insecta,-Aves"
+    pg = _open(browser, "embeddings.html", "#groups=-Aves")
+    assert _href(pg, "map") == "map.html#groups=-Aves"
+
+
 def test_photo_search_switcher_points_the_map_at_the_chosen_record(browser):
     pg = _open(browser, "search.html", "#id=7")
     assert _href(pg, "map") == "map.html#record=7"

@@ -160,17 +160,45 @@ def test_points_are_the_join_of_layout_and_pool(open_page):
     assert page.errors == []
 
 
-def test_group_chip_filters_points_and_counter(open_page):
+def test_group_chip_steps_pick_leave_out_clear_and_all_groups_resets(open_page):
     page = open_page()
     ready(page)
-    chip = page.get_by_role("button", name="Aves")
+    each = POOL_N // 3
+    count = page.locator("#count")
+    chip = page.locator("#groups button[data-g='0']")  # Aves
+    chip.click()  # picked: only Aves
+    assert count.inner_text() == f"{each:,} shown of {POOL_N:,}"
+    assert layer(page, "pts")["cats"][0] == [0]
+    assert (
+        chip.get_attribute("aria-pressed") == "true"
+        and page.evaluate("location.hash") == "#groups=Aves"
+    )
+    chip.click()  # left out: the other two
+    assert count.inner_text() == f"{POOL_N - each:,} shown of {POOL_N:,}"
+    assert layer(page, "pts")["cats"][0] == [1, 2]
+    assert "not " in chip.inner_text() and page.evaluate("location.hash") == "#groups=-Aves"
+    chip.click()  # cleared
+    assert (
+        count.inner_text() == f"{POOL_N:,} shown of {POOL_N:,}"
+        and page.evaluate("location.hash") == ""
+    )
     chip.click()
-    assert chip.get_attribute("aria-pressed") == "false"
-    assert page.locator("#count").inner_text() == f"{POOL_N - POOL_N // 3:,} shown of {POOL_N:,}"
-    assert layer(page, "pts")["cats"][0] == [1, 2]  # Aves is group 0; its points leave the filter
     page.get_by_role("button", name="All groups").click()
-    assert page.locator("#count").inner_text() == f"{POOL_N:,} shown of {POOL_N:,}"
+    assert count.inner_text() == f"{POOL_N:,} shown of {POOL_N:,}"
     assert layer(page, "pts")["cats"][0] == [0, 1, 2]
+    assert page.evaluate("location.hash") == ""
+    assert page.errors == []
+
+
+def test_groups_in_the_hash_open_filtered_and_survive_a_selection(open_page):
+    page = open_page("#groups=-Aves")
+    ready(page)
+    assert layer(page, "pts")["cats"][0] == [1, 2]
+    assert page.locator("#count").inner_text() == f"{POOL_N - POOL_N // 3:,} shown of {POOL_N:,}"
+    page.evaluate("__deck.props.onClick({index: 7, layer: {id: 'pts'}})")
+    page.wait_for_function("/^#groups=-Aves&id=\\d+$/.test(location.hash)")
+    page.keyboard.press("Escape")
+    assert page.evaluate("location.hash") == "#groups=-Aves"
     assert page.errors == []
 
 

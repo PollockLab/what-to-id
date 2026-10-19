@@ -21,6 +21,7 @@ DECK_JS = "https://unpkg.com/deck.gl@9.1.14/dist.min.js"
 SCRIPTS = {
     "__ATLAS_SEARCH_INDEX__": HERE / "atlas_search_assets" / "atlas_search_index.js",
     "__ATLAS_SEARCH_META__": HERE / "atlas_search_assets" / "atlas_search_meta.js",
+    "__MAP_CHIPS__": HERE / "map_assets" / "map_chips.js",
     "__EMBEDDINGS_LAYOUT__": ASSETS / "embeddings_layout.js",
     "__EMBEDDINGS_APP__": ASSETS / "embeddings_app.js",
 }

@@ -68,12 +68,12 @@ JS = """
 function ctx(){var h=new URLSearchParams(location.hash.slice(1)),
 at=(h.get('at')||'').split('/').map(Number);
 var ok=at.length===3&&at.every(isFinite);return{rec:+(h.get('record')||h.get('id'))||0,
-lat:ok?at[1]:null,lon:ok?at[2]:null};}
+lat:ok?at[1]:null,lon:ok?at[2]:null,g:h.get('groups')||''};}
 function sync(){var c=ctx();n.querySelectorAll('a[data-view]').forEach(function(a){
 var b=a.dataset.base,v=a.dataset.view,u=b;
 if(a.hasAttribute('aria-current'))return;
-if(v==='map'&&c.rec)u=b+'#record='+c.rec;
-else if(v==='space'&&c.rec)u=b+'#id='+c.rec;
+if(v==='map'||v==='space'){var p=[];if(c.rec)p.push((v==='map'?'record=':'id=')+c.rec);
+if(c.g)p.push('groups='+c.g);if(p.length)u=b+'#'+p.join('&');}
 else if(v==='blitz'&&c.lat!==null)u=b+'?at='+c.lat.toFixed(3)+','+c.lon.toFixed(3);
 a.href=u;});}
 if(!n.hasAttribute('data-fixed'))['mouseover','focusin','touchstart',

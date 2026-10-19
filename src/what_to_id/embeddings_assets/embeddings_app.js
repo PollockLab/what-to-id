@@ -11,7 +11,7 @@ var MAP=new URL(CFG.mapUrl,location.href).href;
 // One colour per life group, in the order of the map's groups.
 var PAL=[[42,120,214],[214,78,56],[46,160,90],[230,160,30],[140,90,200],[20,170,180],[200,80,160],[120,120,40],
   [90,90,90],[230,110,30],[60,60,190],[160,60,60]];
-var S={idx:null,P:null,META:null,TAXA:null,vis:{},sel:-1,nbr:[],thin:false,cache:new Map(),run:0,deck:null,vs:null,PD:null};
+var S={idx:null,P:null,META:null,TAXA:null,groups:{},sel:-1,nbr:[],thin:false,cache:new Map(),run:0,deck:null,vs:null,PD:null};
 
 function $(id){return document.getElementById(id);}
 function el(tag,attrs,kids){
@@ -45,35 +45,47 @@ function applyJoin(P,taxa){
 function openIndex(){return AtlasSearchIndex.open(DATA,{whole:WHOLE});}
 
 // Counter: records the group chips leave in view, out of those the layout places.
+function passing(){return CH.groupPass(S.groups,S.META.groups,false);}
 function shown(){
   var P=S.P,n=0;
   if(!P.grp)return P.n;
-  for(var i=0;i<P.n;i++)if(S.vis[P.grp[i]])n++;
+  var ok=passing();
+  for(var i=0;i<P.n;i++)if(ok[P.grp[i]])n++;
   return n;
+}
+// The hash keeps the group states (as the map writes them) beside the selected id.
+function writeHash(){
+  var h=[];
+  if(CH.any(S.groups))h.push('groups='+CH.write(S.groups,S.META.groups));
+  if(S.sel>=0)h.push('id='+S.P.id[S.sel]);
+  history.replaceState(null,'',h.length?'#'+h.join('&'):location.pathname+location.search);
+}
+// CH.show rewrites the label, so the colour dot goes back in after it.
+function paint(b){
+  var j=+b.getAttribute('data-g'),dot=el('i',{});dot.style.background='rgb('+color(j).join(',')+')';
+  CH.show(b,gname(j)+' '+nf.format(S.count[j]),S.groups[S.META.groups[j]]||'');b.insertBefore(dot,b.firstChild);
 }
 function update(){
   var s=shown(),P=S.P,total=S.META?S.META.n:P.n;
   $('count').textContent=P.grp?nf.format(s)+' shown of '+nf.format(P.n):nf.format(P.n)+' points';
   $('more').textContent=P.grp&&P.n<total?'('+nf.format(total-P.n)+' of the map’s '+nf.format(total)+
     ' records are not placed yet)':'';
-  [].forEach.call($('groups').querySelectorAll('button'),function(b){
-    b.setAttribute('aria-pressed',String(!!S.vis[+b.getAttribute('data-g')]));});
+  [].forEach.call($('groups').querySelectorAll('button'),paint);
   layers();
 }
+function picked(){update();writeHash();}
 function chips(){
-  var P=S.P,count=new Array(S.META.groups.length).fill(0);
+  var P=S.P,count=S.count=new Array(S.META.groups.length).fill(0);
   for(var i=0;i<P.n;i++)count[P.grp[i]]++;
   var box=$('groups');box.textContent='';
+  S.groups=CH.read(new URLSearchParams(location.hash.slice(1)).get('groups'),S.META.groups);
   S.META.groups.forEach(function(g,j){
     if(!count[j])return;
-    S.vis[j]=true;
-    var dot=el('i',{});dot.style.background='rgb('+color(j).join(',')+')';
-    var b=el('button',{type:'button','data-g':j,'aria-pressed':'true'},[dot,gname(j)+' '+nf.format(count[j])]);
-    b.addEventListener('click',function(){S.vis[j]=!S.vis[j];update();});
-    box.appendChild(b);
+    var b=CH.chip(box,g,'',function(){return S.groups;},true,'',picked);
+    b.setAttribute('data-g',j);paint(b);
   });
 }
-$('gall').addEventListener('click',function(){Object.keys(S.vis).forEach(function(k){S.vis[k]=true;});update();});
+$('gall').addEventListener('click',function(){S.groups={};picked();});
 
 // The filter extension as map.js uses it: categories are already small numbers, so deck.gl uploads them as they are
 // instead of running three million values through a lookup.
@@ -99,7 +111,8 @@ function layers(){
   if(!P||!S.deck)return;
   EXT=EXT||new Filter({filterSize:1,categorySize:2});
   S.PD=S.PD||pointData();
-  var groups=P.grp?Object.keys(S.vis).filter(function(k){return S.vis[k];}).map(Number):[0];
+  var groups=[0];
+  if(P.grp){groups=[];passing().forEach(function(v,j){if(v)groups.push(j);});}
   var thin=S.thin&&P.n>THIN_ABOVE;
   var lyr=[new deck.ScatterplotLayer({id:'pts',data:S.PD,radiusUnits:'pixels',getRadius:1.5,radiusMinPixels:1,radiusMaxPixels:3,
     stroked:false,pickable:true,extensions:[EXT],filterCategories:[groups,thin?[1]:[0,1]]})];
@@ -127,7 +140,7 @@ function pick(o){if(S.P&&o.index>=0&&o.layer&&o.layer.id==='pts')select(o.index,
 
 function closeCard(){
   S.sel=-1;S.nbr=[];S.run++;$('card').hidden=true;
-  history.replaceState(null,'',location.pathname+location.search);layers();
+  writeHash();layers();
 }
 addEventListener('keydown',function(e){if(e.key==='Escape'&&!$('card').hidden)closeCard();});
 async function neighborsOf(id){
@@ -144,7 +157,7 @@ function select(i,fly){
     var z=Math.max(S.vs.zoom,S.zoom0+3);
     S.vs=Object.assign({},S.vs,{target:[P.pos[2*i],P.pos[2*i+1],0],zoom:z});S.deck.setProps({viewState:S.vs});
   }
-  history.replaceState(null,'','#id='+id);
+  writeHash();
   var x=el('button',{type:'button','class':'x','aria-label':'Close'},['×']);x.addEventListener('click',closeCard);
   var ph=el('div',{'class':'ph'},['Loading photo']),sub=el('p',{'class':'muted'},[t.group||LOADING]),place=el('p',{'class':'muted'},['']);
   var nb=el('ul',{'class':'nbrs','aria-label':'Closest matches'}),nbNote=el('p',{'class':'muted'},['Finding closest matches…']);
