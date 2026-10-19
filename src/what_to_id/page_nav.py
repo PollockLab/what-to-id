@@ -54,7 +54,9 @@ color:var(--muted);
 .site-nav a[aria-current="page"]{color:var(--ink);font-weight:650;border-bottom-color:var(--on)}
 .site-vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);
 white-space:nowrap}
-@media (max-width:640px){.site-shell{padding:0 8px;gap:0 8px}.site-nav a{padding:0 9px}}
+@media (max-width:640px){.site-shell{padding:0 8px;gap:0 8px}.site-nav a{padding:0 9px}
+.site-nav{--fade:linear-gradient(90deg,transparent,#000 16px,#000 calc(100% - 16px),transparent);
+-webkit-mask-image:var(--fade);mask-image:var(--fade)}}
 @media (max-width:480px){.site-bc{display:none}}
 """.strip()
 
