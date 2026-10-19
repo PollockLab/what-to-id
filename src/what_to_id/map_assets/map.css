@@ -7,6 +7,11 @@ header{grid-area:head;padding:10px 16px;border-bottom:1px solid var(--line);disp
   flex-wrap:wrap;align-items:center;gap:4px 16px}
 .head{flex:1 1 360px;min-width:0}
 .embed .head{display:none}
+.embed header{padding:6px 12px}
+.embed .share{display:inline;margin-left:8px}
+.embed .time{padding:4px 12px 6px}
+.embed .unit,.embed .hint{display:none}
+.embed #over{height:26px}
 h1{font-size:18px;margin:0}
 .sub,.hint,.muted{color:var(--muted);margin:0;font-size:12px}
 .stat{margin:0;font-size:13px}

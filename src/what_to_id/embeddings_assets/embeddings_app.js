@@ -79,6 +79,13 @@ function applySel(str){
   picked();
 }
 SYNC=MapFilter.sync({key:selKey,apply:applySel});
+// In the split view the map holds the filters, so the side panel folds into a count over the plot; the shell
+// says when this view is alone. The "i" button shows the page's warning note over the plot.
+addEventListener('message',function(e){
+  if(e.origin===location.origin&&e.source===parent&&e.data&&e.data.type==='wtid-layout')
+    document.documentElement.classList.toggle('peer',!!e.data.peer);});
+$('info').addEventListener('click',function(){
+  $('info').setAttribute('aria-expanded',document.documentElement.classList.toggle('about'));});
 // CH.show rewrites the label, so the colour dot goes back in after it.
 function paint(b){
   var j=+b.getAttribute('data-g'),dot=el('i',{});dot.style.background='rgb('+color(j).join(',')+')';

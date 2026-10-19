@@ -129,7 +129,7 @@ def open_page(browser, site):
         page.on("console", lambda m: page.errors.append(m.text) if m.type == "error" else None)
         page.on("requestfailed", lambda r: page.errors.append(f"failed {r.url}"))
         page.calls = stub_inat(page, drop)
-        page.goto(f"{base}/embeddings.html{hash_}")
+        page.goto(f"{base}/embeddings.html?standalone=1{hash_}")
         return page
 
     yield opener
@@ -372,7 +372,7 @@ def test_filters_in_the_hash_wait_for_the_join(browser, site):
     page.errors = []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     stub_inat(page, None)
-    page.goto(f"{base}/embeddings.html#months=8&groups=Aves")
+    page.goto(f"{base}/embeddings.html?standalone=1#months=8&groups=Aves")
     page.wait_for_function("window.__deck && __deck.props.layers.length > 0")
     assert layer(page, "pts")["n"] == TOTAL
     # nothing is rewritten before the join
@@ -488,7 +488,7 @@ def test_missing_layout_says_so(browser, site):
 
         page.route("**/atlas/manifest.json", without_layout)
         page.route("https://unpkg.com/**", lambda r: r.fulfill(body=DECK_STUB))
-        page.goto(f"{base}/embeddings.html")
+        page.goto(f"{base}/embeddings.html?standalone=1")
         page.wait_for_function(
             "document.getElementById('status').textContent.includes('no photo-space')"
         )
@@ -509,7 +509,7 @@ def test_points_draw_and_click_before_the_shards_arrive(browser, site):
         page.route(
             "**/pool-*.bin*", lambda r: held.append(r)
         )  # park the shard requests until released
-        page.goto(f"{base}/embeddings.html")
+        page.goto(f"{base}/embeddings.html?standalone=1")
         ready_early = "window.__deck && __deck.props.layers.length > 0"
         page.wait_for_function(ready_early)
         assert layer(page, "pts")["n"] == TOTAL  # the layout alone, nothing joined yet
@@ -536,10 +536,76 @@ def test_failed_shards_leave_the_plot_usable(browser, site):
     try:
         stub_inat(page, None)
         page.route("**/pool-*.bin*", lambda r: r.fulfill(status=500))
-        page.goto(f"{base}/embeddings.html")
+        page.goto(f"{base}/embeddings.html?standalone=1")
         page.wait_for_function(
             "document.getElementById('status').textContent.includes('unavailable')"
         )
         assert layer(page, "pts")["n"] == TOTAL
     finally:
         page.close()
+
+
+def _split(browser, site, w, h, query="", hash_=""):
+    base, *_ = site
+    page = browser.new_page(viewport={"width": w, "height": h})
+    page.errors = []
+    page.on("pageerror", lambda e: page.errors.append(str(e)))
+    stub_inat(page, None)
+    page.goto(f"{base}/split.html{query}{hash_}")
+    return page
+
+
+FRAMES = "[...document.querySelectorAll('iframe')].filter(f => !f.hidden).map(f => f.id)"
+
+
+def test_split_shows_both_views_wide_and_the_map_alone_when_narrower(browser, site):
+    page = _split(browser, site, 1280, 800)
+    assert page.evaluate(FRAMES) == ["map", "space"]
+    assert page.locator("[data-v=side]").get_attribute("aria-pressed") == "true"
+    page.close()
+    page = _split(browser, site, 1100, 800)
+    assert page.evaluate(FRAMES) == ["map"]
+    page.click("[data-v=space]")
+    page.wait_for_function(f"{FRAMES}.join() === 'space'")
+    assert "view=space" in page.evaluate("location.search")
+    page.click("[data-v=side]")
+    page.wait_for_function(f"{FRAMES}.join() === 'map,space'")
+    page.close()
+
+
+def test_split_has_one_header_and_the_note_behind_an_i_button(browser, site):
+    page = _split(browser, site, 1280, 800)
+    page.wait_for_function(f"{FRAMES}.length === 2")
+    assert page.locator(".site-shell:visible").count() == 1
+    for f in ("#map", "#space"):
+        shell = page.frame_locator(f).locator(".site-shell")
+        assert shell.count() == 0 or not shell.is_visible()
+    assert page.locator("#note").is_hidden()
+    page.click("#i")
+    assert page.locator("#note").is_visible() and "share one selection" in page.inner_text("#note")
+    page.keyboard.press("Escape")
+    assert page.locator("#note").is_hidden()
+    assert page.errors == []
+    page.close()
+
+
+def test_a_phone_holds_one_frame_at_a_time(browser, site):
+    page = _split(browser, site, 390, 800, hash_="#months=8")
+    assert page.evaluate("document.querySelectorAll('iframe').length") == 1
+    assert page.locator("[data-v=side]").is_hidden()
+    page.click("[data-v=space]")
+    page.wait_for_function(
+        "document.querySelectorAll('iframe').length === 1 && document.querySelector('#space')"
+    )
+    assert "months=8" in page.evaluate("document.querySelector('#space').src")
+    page.close()
+
+
+def test_old_page_urls_open_the_matching_explore_view_with_the_hash(browser, site):
+    base, *_ = site
+    page = browser.new_page(viewport={"width": 1280, "height": 800})
+    stub_inat(page, None)
+    page.goto(f"{base}/embeddings.html#months=8")
+    page.wait_for_url(f"{base}/split.html?view=space#months=8")
+    assert page.evaluate(FRAMES) == ["space"]
+    page.close()

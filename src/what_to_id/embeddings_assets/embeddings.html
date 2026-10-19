@@ -5,7 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Photo space</title>
 <script src="__DECK_JS__"></script>
-<script>if(/[?&]embed=1/.test(location.search))document.documentElement.classList.add('embed');</script>
+<script>if(/[?&]embed=1/.test(location.search))document.documentElement.classList.add('embed');
+if(/[?&]peer=1/.test(location.search))document.documentElement.classList.add('peer');
+(function(){var q=location.search;if(/[?&](embed|standalone)=1/.test(q)||!/\/embeddings\.html$/.test(location.pathname))return;
+fetch('split.html',{method:'HEAD'}).then(function(r){if(r.ok)location.replace('split.html?view=space'+location.hash);}).catch(function(){});})();</script>
 <style>
 __SITE_CSS__
 __SELECT_CSS__
@@ -13,6 +16,15 @@ __SELECT_CSS__
 html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
 body{display:grid;grid-template-columns:260px minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);grid-template-areas:"nav nav" "head head" "side plot"}
 .embed header{display:none}
+.info{display:none;position:absolute;z-index:7;top:8px;right:8px;width:28px;height:28px;padding:0;border-radius:50%;font:italic 700 14px Georgia,serif}
+.embed .info{display:block}
+.embed.about header{display:block;position:absolute;z-index:6;top:44px;right:8px;width:min(380px,calc(100% - 16px));padding:0;border:0}
+.embed.about header h1,.embed.about header .sub{display:none}
+.embed.about .note{margin:0;background:var(--panel);color:var(--muted);border:1px solid var(--line);box-shadow:var(--shadow)}
+.peer body{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);grid-template-areas:"nav" "head" "plot"}
+.peer .side{grid-area:plot;border-bottom:1px solid var(--line);max-height:none;position:relative;z-index:5;align-self:start;justify-self:start;margin:8px;padding:4px 10px;overflow:visible;border:1px solid var(--line);border-radius:8px;background:var(--panel);pointer-events:none;gap:0}
+.peer .side>:not(.stat):not(#status){display:none}
+.peer #status:empty{display:none}
 .embed .card{top:12px;max-height:calc(100vh - 24px)}
 header{grid-area:head;padding:10px 16px;border-bottom:1px solid var(--line)}
 h1{font-size:18px;margin:0}
@@ -86,6 +98,7 @@ __SITE_NAV__<header>
 <p class="muted"><button type="button" class="link" id="gall">All groups</button> <button type="button" class="link" id="gfit" hidden>Fit to selection</button></p></div>
 </section>
 <main id="plot" role="application" aria-label="Photo space of observations"></main>
+<button type="button" class="info" id="info" aria-expanded="false" aria-controls="honest" aria-label="About this picture">i</button>
 <aside id="card" class="card" hidden aria-label="Selected observation"></aside>
 <script>var EMBEDDINGS_CONFIG=__EMBEDDINGS_CONFIG__;</script>
 <script>__ATLAS_SEARCH_INDEX__</script>

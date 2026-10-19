@@ -9,16 +9,19 @@ from __future__ import annotations
 
 from html import escape
 
-# (file, label). Photo space and Photo search exist only when ATLAS_HF_REPO is set.
+# (file, label). Explore is split.html, the map and the photo space side by side. The pages map.html
+# and embeddings.html keep their URLs and mark Explore as current. Without split.html (a site built
+# without the photo space) the Explore tab falls back to the map. Photo search exists only when
+# ATLAS_HF_REPO is set.
 PAGES = (
     ("index.html", "Overview"),
-    ("map.html", "Map"),
-    ("embeddings.html", "Photo space"),
+    ("split.html", "Explore"),
     ("search.html", "Photo search"),
 )
-OPTIONAL = {"embeddings.html", "search.html"}
+OPTIONAL = {"search.html"}
+EXPLORE = "split.html"
 # Pages outside the switcher get one extra tab while they are the current page.
-EXTRA = {"embeddings-sample.html": "Photo sample", "split.html": "Split view"}
+EXTRA = {"embeddings-sample.html": "Photo sample"}
 BLITZ = "https://pollocklab.github.io/where-to-blitz/"
 
 CSS = """
@@ -74,22 +77,25 @@ lat:ok?at[1]:null,lon:ok?at[2]:null,sel:location.hash.slice(1).split('&').filter
 return /^(by|from|to|months|groups|only|taxa|area|park|bcpark|projects)=/.test(t);})};}
 function sync(){var c=ctx();n.querySelectorAll('a[data-view]').forEach(function(a){
 var b=a.dataset.base,v=a.dataset.view,u=b;
-if(a.hasAttribute('aria-current'))return;
-if(v==='map'||v==='space'){var p=[];if(c.rec)p.push((v==='map'?'record=':'id=')+c.rec);
-p=p.concat(c.sel);if(p.length)u=b+'#'+p.join('&');}
+if(a.hasAttribute('aria-current')&&v!=='explore')return;
+if(v==='explore'){var p=[];if(c.rec)p.push('id='+c.rec);p=p.concat(c.sel);
+if(p.length)u=b+'#'+p.join('&');}
 else if(v==='blitz'&&c.lat!==null)u=b+'?at='+c.lat.toFixed(3)+','+c.lon.toFixed(3);
 a.href=u;});}
 if(!n.hasAttribute('data-fixed'))['mouseover','focusin','touchstart',
 'click'].forEach(function(e){n.addEventListener(e,sync,true);});
 var cur=n.querySelector('[aria-current]');
-if(cur)n.scrollLeft+=cur.getBoundingClientRect().left-n.getBoundingClientRect().left-(n.clientWidth-cur.offsetWidth)/2;
+if(cur)n.scrollLeft+=cur.getBoundingClientRect().left-n.getBoundingClientRect().left-
+(n.clientWidth-cur.offsetWidth)/2;
 if(!n.hasAttribute('data-fixed')){addEventListener('hashchange',sync);sync();}
-if(n.hasAttribute('data-probe'))n.querySelectorAll('a[data-optional]').forEach(function(a){
-fetch(a.dataset.base,{method:'HEAD'}).then(function(r){if(!r.ok)a.remove();}).catch(function(){
-});});})();
+if(n.hasAttribute('data-probe'))n.querySelectorAll('a[data-optional],a[data-fallback]').forEach(function(a){
+fetch(a.dataset.base,{method:'HEAD'}).then(function(r){if(r.ok)return;
+if(a.dataset.fallback){a.dataset.base=a.dataset.fallback;a.dataset.view='';
+a.href=a.dataset.base;}else a.remove();
+}).catch(function(){});});})();
 """.strip()
 
-_VIEW = {"map.html": "map", "embeddings.html": "space"}
+_EXPLORE_OF = ("map.html", "embeddings.html")
 _SKIP = (
     "onclick=\"event.preventDefault();var m=document.getElementById('main-content')"
     "||document.querySelector('main');m.tabIndex=-1;m.focus()\""
@@ -102,22 +108,27 @@ def nav(
     *,
     base: str = "",
     carry: bool = True,
+    extra: str = "",
 ) -> str:
     """Skip link, brand and switcher with `current` marked. `available` lists the built pages.
 
     With `available=None` the page cannot know which optional pages exist, so the script drops
     the ones that answer 404. `base` prefixes the links of a page served from another folder.
     `carry=False` leaves the link targets to a page that sets them itself (the frozen sample).
+    `extra` is html placed at the end of the header row (the split page's view switch and counts).
     """
     links = []
+    here = EXPLORE if current in _EXPLORE_OF else current
     pages = PAGES + (((current, EXTRA[current]),) if current in EXTRA else ())
     for page, label in pages:
-        if available is not None and page not in available and page != current:
+        if available is not None and page not in available and page != here:
             continue
         href = page if page in EXTRA else base + page
-        attrs = ' aria-current="page"' if page == current else ""
-        if page in _VIEW:
-            attrs += f' data-view="{_VIEW[page]}"'
+        attrs = ' aria-current="page"' if page == here else ""
+        if page == EXPLORE and available is not None and page not in available:
+            href = base + "map.html"
+        elif page == EXPLORE:
+            attrs += f' data-view="explore" data-fallback="{escape(base)}map.html"'
         if page in OPTIONAL:
             attrs += " data-optional"
         attrs += f' data-base="{escape(href)}"'
@@ -132,6 +143,6 @@ def nav(
         f'<a class="site-skip" href="#main-content" {_SKIP}>Skip to content</a>\n'
         f'<div class="site-shell"><a class="site-brand" href="{escape(base)}index.html">'
         'What to ID<span class="site-bc"> · BC</span></a>'
-        f'<nav class="site-nav" aria-label="Views"{flags}>{"".join(links)}</nav></div>\n'
+        f'<nav class="site-nav" aria-label="Views"{flags}>{"".join(links)}</nav>{extra}</div>\n'
         f"<script>{JS}</script>\n"
     )
