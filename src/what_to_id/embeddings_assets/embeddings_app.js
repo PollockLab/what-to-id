@@ -78,13 +78,14 @@ function applyKeep(){
     for(var i=0;i<P.n;i++)c[3*i+2]=S.keep[i];
     S.PD.attributes.getFilterCategory={value:c,size:3};S.PDV=(S.PDV||0)+1;}
 }
+var TR=null;
 function update(){
   var s=shown(),P=S.P,total=S.META?S.META.n:P.n;
   $('count').textContent=P.grp?nf.format(s)+' shown of '+nf.format(P.n):nf.format(P.n)+' points';
   $('more').textContent=P.grp&&P.n<total?'('+nf.format(total-P.n)+' of the map’s '+nf.format(total)+
     ' records are not placed yet)':'';
-  [].forEach.call($('groups').querySelectorAll('button'),paint);
-  if(BAR)BAR.set(items());layers();
+  [].forEach.call($('groups').querySelectorAll('button[data-g]'),paint);
+  if(BAR)BAR.set(items());if(TR)TR.render();layers();
 }
 // A pick, a left-out or a removal anywhere: the groups beside included taxa change which points are kept.
 function picked(){
@@ -117,15 +118,21 @@ function chips(){
   Object.assign(S,MF.read(new URLSearchParams(location.hash.slice(1))));
   S.extra=location.hash.slice(1).split('&').filter(function(t){return PASS.indexOf(t.split('=')[0])>=0;});
   TF=TX.filter(S.TAXA,S.picks);
+  TR=S.TAXA&&TT.make({T:S.TAXA,tax:S.P.tax,grp:S.P.grp,n:S.P.n,groups:S.META.groups.length,ranks:S.META.ranks,
+    nf:nf,box:$('tree'),label:gname,pass:function(){return null;},onOpen:function(){TR.render();},
+    state:function(id){return PK.state([id]);},cycle:function(id){PK.cycle([id]);},
+    inside:function(r){return !!TF.inc&&TF.inc[r]===1;}});
   S.META.groups.forEach(function(g,j){
     if(!count[j])return;
     var b=CH.chip(box,g,'',function(){return S.groups;},true,'',picked);
-    b.setAttribute('data-g',j);paint(b);
+    b.setAttribute('data-g',j);paint(b);if(TR)TR.attach(b,j);
   });
   PK=TX.picker({input:$('q'),list:$('sugg'),msg:$('qn'),picks:S.picks,ranks:S.META.ranks,nf:nf,
-    taxa:function(){return S.TAXA;},counts:function(){return TX.counts(S.TAXA,S.P.tax,S.P.n);},onChange:picked});
+    taxa:function(){return S.TAXA;},counts:function(){return TX.counts(S.TAXA,S.P.tax,S.P.n);},onChange:picked,
+    onPick:function(r){if(TR)TR.reveal(r);}});
   BAR=CH.bar({box:$('selbar'),clear:clearAll,fallback:$('q')});
   applyKeep();$('gfit').hidden=!(CH.any(S.groups)||S.picks.length);
+  if(TR)TR.render();
 }
 $('gall').addEventListener('click',function(){S.groups={};picked();});
 

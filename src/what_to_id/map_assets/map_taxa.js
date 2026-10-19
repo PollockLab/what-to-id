@@ -102,7 +102,8 @@ function within(T,id,ids){var ix=index(T),r=ix.row.get(id);
   for(;r!=null&&r>=0;r=ix.par[r])if(ids.indexOf(T[r][2])>=0)return true;return false;}
 // The search box and its suggestion list; the picks show as chips in the selection bar (map_chips.js).
 // o: input, list (suggestions), msg (a note under the input), picks (kept in place), taxa() and
-// counts() for the current table, ranks, nf, and onChange after every change.
+// counts() for the current table, ranks, nf, onChange after every change, and onPick(row) after a pick
+// from the list (optional).
 function picker(o){
   var act=-1,rows=[];
   function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;
@@ -127,7 +128,7 @@ function picker(o){
     else o.input.removeAttribute('aria-activedescendant');}
   function hide(){o.list.hidden=true;rows=[];act=-1;o.input.setAttribute('aria-expanded','false');mark();}
   function pick(k){var r=rows[k];if(r==null)return;o.picks.push({id:o.taxa()[r][2],not:false});
-    o.input.value='';hide();changed();}
+    o.input.value='';hide();changed();if(o.onPick)o.onPick(r);}
   o.input.addEventListener('input',show);
   o.input.addEventListener('focus',show);
   o.input.addEventListener('blur',hide);

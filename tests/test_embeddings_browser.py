@@ -152,7 +152,7 @@ def test_points_are_the_join_of_layout_and_pool(open_page):
     ready(page)
     assert layer(page, "pts")["n"] == POOL_N  # layout holds 2150, the pool 2100: the join is 2100
     assert page.locator("#count").inner_text() == f"{POOL_N:,} shown of {POOL_N:,}"
-    assert page.locator("#groups button").count() == len(GROUPS)
+    assert page.locator("#groups button[data-g]").count() == len(GROUPS)
     text = page.locator("#honest").inner_text()
     assert "Measured on the layout" in text and "50%" in text and "12" in text
     assert "not identification confidence" in text and "lossy" in text
@@ -220,6 +220,12 @@ def test_fit_to_selection_is_offered_and_zooms_only_on_click(open_page):
     assert page.errors == []
 
 
+def shown_in(page, name):
+    return int(
+        page.locator("#tree .tn", has_text=name).first.locator(".tc").inner_text().replace(",", "")
+    )
+
+
 def shown(page):
     return int(page.locator("#count").inner_text().split(" shown")[0].replace(",", ""))
 
@@ -256,6 +262,33 @@ def test_taxon_search_picks_and_combines_with_group_chips_as_on_the_map(open_pag
     page = open_page("#groups=-Aves&taxa=900")
     ready(page)
     assert shown(page) == POOL_N * 3 // 7 - POOL_N // 7
+    assert page.errors == []
+
+
+def test_group_opens_to_its_ranks_and_nodes_take_the_chip_clicks(open_page):
+    page = open_page()
+    ready(page)
+    page.locator("#groups .gt").first.click()
+    assert page.locator("#tree .tl").all_inner_texts() == ["Genus B", "Genus A"]
+    assert shown_in(page, "Genus A") + shown_in(page, "Genus B") == POOL_N // 3
+    assert page.evaluate("location.hash") == ""
+    page.get_by_role("button", name="Open Genus A").click()
+    assert page.locator("#tree .tn").count() == 5 and page.evaluate("location.hash") == ""
+    page.locator("#tree .tl", has_text="Genus A").click()
+    assert page.evaluate("location.hash") == "#taxa=900" and shown(page) == POOL_N * 3 // 7
+    page.locator("#tree .tl", has_text="Genus A").click()
+    assert page.evaluate("location.hash") == "#taxa=-900"
+    page.locator("#tree .tl", has_text="Genus A").click()
+    assert page.evaluate("location.hash") == "" and shown(page) == POOL_N
+    assert page.errors == []
+
+
+def test_picking_from_the_search_box_opens_the_path_to_the_taxon(open_page):
+    page = open_page()
+    ready(page)
+    page.locator("#q").fill("Taxon 4")
+    page.locator("#sugg li").first.click()
+    assert page.locator("#tree .tn[data-r] .tl[aria-pressed=true]").inner_text() == "Taxon 4"
     assert page.errors == []
 
 
@@ -358,7 +391,7 @@ def test_points_draw_and_click_before_the_shards_arrive(browser, site):
             route.continue_()
         page.wait_for_function("document.getElementById('status').textContent === ''")
         assert layer(page, "pts")["n"] == POOL_N
-        assert page.locator("#groups button").count() == len(GROUPS)
+        assert page.locator("#groups button[data-g]").count() == len(GROUPS)
         assert page.locator("#card").is_visible()  # the open card survives the join
         assert page.errors == []
     finally:

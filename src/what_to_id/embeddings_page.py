@@ -24,6 +24,7 @@ SCRIPTS = {
     "__MAP_TAXA__": HERE / "map_assets" / "map_taxa.js",
     "__MAP_CHIPS__": HERE / "map_assets" / "map_chips.js",
     "__MAP_FILTER__": HERE / "map_assets" / "map_filter.js",
+    "__TAXON_TREE__": ASSETS / "taxon_tree.js",
     "__EMBEDDINGS_LAYOUT__": ASSETS / "embeddings_layout.js",
     "__EMBEDDINGS_APP__": ASSETS / "embeddings_app.js",
 }

@@ -42,6 +42,21 @@ button[hidden]{display:none}
 .nbrs{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 .nbrs button{width:100%;padding:0;border-radius:6px;overflow:hidden;aspect-ratio:1;background:var(--chip)}
 .nbrs img{width:100%;height:100%;object-fit:cover;display:block}
+.tree section{margin-top:6px}
+.tree h3{font-size:12px;margin:0 0 2px}
+.tree ul{list-style:none;margin:0;padding:0 0 0 12px}
+.tree [role=tree]{padding:0}
+.tn{display:flex;align-items:center;gap:2px;margin:1px 0}
+.tn .tl{flex:1;min-width:0;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-radius:6px;padding:2px 6px}
+.tn .tl[aria-pressed="true"]{background:var(--on);color:var(--onink);border-color:var(--on)}
+.tn.in .tl{border-style:dashed}
+.tn.not .tl{text-decoration:line-through}
+.tn .tc{color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
+.tw{width:20px;padding:0;border:0;background:none;flex:none;text-align:center}
+.gw{display:inline-flex;align-items:center;white-space:nowrap}
+.gt{width:18px;margin-left:2px}
+.tree [aria-expanded]>ul{flex-basis:100%}
+.tree [aria-expanded]{flex-wrap:wrap}
 @media (max-width:760px){body{grid-template-columns:1fr;grid-template-rows:auto auto auto minmax(0,1fr);grid-template-areas:"nav" "head" "side" "plot"}
   .side{border-right:0;border-bottom:1px solid var(--line);max-height:30vh}
   .card{top:auto;bottom:0;right:0;left:0;width:auto;max-height:60vh;border-radius:10px 10px 0 0}}
@@ -64,6 +79,7 @@ __SITE_NAV__<header>
 <p id="qn" class="muted" aria-live="polite"></p></div>
 <div><p class="muted">Life groups. Click a chip to pick it, again to leave it out, a third time to clear it.</p>
 <div id="groups" class="chips" role="group" aria-label="Life groups"></div>
+<div id="tree" class="tree" aria-label="Ranks under the groups"></div>
 <p class="muted"><button type="button" class="link" id="gall">All groups</button> <button type="button" class="link" id="gfit" hidden>Fit to selection</button></p></div>
 </section>
 <main id="plot" role="application" aria-label="Photo space of observations"></main>
@@ -74,6 +90,7 @@ __SITE_NAV__<header>
 <script>__MAP_TAXA__</script>
 <script>__MAP_CHIPS__</script>
 <script>__MAP_FILTER__</script>
+<script>__TAXON_TREE__</script>
 <script>__EMBEDDINGS_LAYOUT__</script>
 <script>__EMBEDDINGS_APP__</script>
 </body>
