@@ -262,6 +262,24 @@ addEventListener('message',function(e){
   remote=true;try{if(i<0)closeCard();else select(i,true);}finally{remote=false;}
 });
 addEventListener('keydown',function(e){if(e.key==='Escape'&&!$('card').hidden)closeCard();});
+// The card's left edge: drag it, or use the arrow keys; a double click goes back to the default. The width is remembered.
+function cardWidth(w){
+  var c=$('card');if(w==null){c.style.width='';localStorage.removeItem('wtid-card');return;}
+  w=Math.max(240,Math.min(innerWidth*0.7,w));c.style.width=w+'px';localStorage.setItem('wtid-card',w);
+}
+if(+localStorage.getItem('wtid-card'))cardWidth(+localStorage.getItem('wtid-card'));
+function resizer(){
+  var rz=el('button',{type:'button','class':'rz','aria-label':'Resize the card'});
+  // preventDefault: otherwise the photo under the edge starts a native image drag and cancels the pointer
+  rz.addEventListener('pointerdown',function(e){e.preventDefault();rz.setPointerCapture(e.pointerId);rz.classList.add('on');});
+  rz.addEventListener('pointermove',function(e){if(rz.classList.contains('on'))cardWidth($('card').getBoundingClientRect().right-e.clientX);});
+  rz.addEventListener('pointerup',function(){rz.classList.remove('on');});
+  rz.addEventListener('dblclick',function(){cardWidth(null);});
+  rz.addEventListener('keydown',function(e){
+    var d={ArrowLeft:20,ArrowRight:-20}[e.key];if(d){cardWidth($('card').getBoundingClientRect().width+d);e.preventDefault();}
+    else if(e.key==='Home'){cardWidth(null);e.preventDefault();}});
+  return rz;
+}
 async function neighborsOf(id){
   try{return await S.idx.neighbors(id);}
   catch(e){  // the daily update renamed files: reload the manifest once
@@ -286,7 +304,7 @@ function select(i,fly){
     link(CFG.searchUrl+'#id='+id,'More like this'),link(CFG.mapUrl+'#record='+id,'Show on map')]);
   var title=el('h2',{},[t.common||t.latin||t.group||'Observation '+id]);
   card.textContent='';
-  [x,ph,el('div',{'class':'body'},[title,sub,place,actions,el('p',{'class':'muted'},['Closest matches, from the full image space']),nbNote,nb])]
+  [resizer(),x,ph,el('div',{'class':'body'},[title,sub,place,actions,el('p',{'class':'muted'},['Closest matches, from the full image space']),nbNote,nb])]
     .forEach(function(c){card.appendChild(c);});
   card.hidden=false;x.focus();
   // the shards arrived after this card opened: fill in what they know, unless iNaturalist's answer already did

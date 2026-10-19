@@ -489,6 +489,34 @@ def test_split_divider_resizes_by_keys_and_double_click_and_remembers(browser, s
     page.close()
 
 
+def test_card_resizes_from_its_left_edge_and_remembers(open_page):
+    page = open_page(drop=None)
+    ready(page)
+    page.evaluate("__deck.props.onClick({index: 7, layer: {id: 'pts'}})")
+    width = "document.getElementById('card').getBoundingClientRect().width"
+    assert page.evaluate(width) == 300
+    rz = page.locator("#card .rz")
+    rz.focus()
+    for _ in range(5):
+        page.keyboard.press("ArrowLeft")
+    assert page.evaluate(width) == 400
+    box = rz.bounding_box()
+    page.mouse.move(box["x"] + 3, box["y"] + 50)
+    page.mouse.down()
+    page.mouse.move(box["x"] + 100, box["y"] + 50, steps=4)
+    page.mouse.up()
+    assert page.evaluate(width) == pytest.approx(300, abs=3)
+    page.reload()
+    ready(page)
+    page.evaluate("__deck.props.onClick({index: 7, layer: {id: 'pts'}})")
+    assert (
+        page.evaluate(width) == pytest.approx(300, abs=3) and page.evaluate(width) != 300
+    )  # remembered
+    page.locator("#card .rz").dblclick()
+    assert page.evaluate(width) == 300
+    assert page.errors == []
+
+
 def test_click_opens_card_with_neighbours_and_jump(open_page, site):
     _, _, in_pool, _ = site
     page = open_page(drop=None)
