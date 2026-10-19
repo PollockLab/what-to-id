@@ -184,9 +184,8 @@ def test_redirect_target_is_reused_and_re_resolved_when_expired(fixture):
     assert all(got["after"][n] == 2 for n in data), got["after"]
 
 
-
 def test_concurrent_first_reads_resolve_each_file_once(fixture):
-    # nprobe 4 reads separate ranges of each file in parallel on the first search; only one may hit the hub
+    # nprobe 4 reads ranges of each file in parallel on the first search; only one may hit the hub
     directory, ref = fixture
     q = ref["queries"][0]
     script = (
@@ -201,6 +200,7 @@ def test_concurrent_first_reads_resolve_each_file_once(fixture):
     data = [n for n in got["resolves"] if ".ids." in n or ".codes." in n or ".refine." in n]
     assert data and all(got["resolves"][n] == 1 for n in data), got["resolves"]
     assert got["cdn"] > 0
+
 
 def test_small_parts_load_whole_once(fixture):
     directory, ref = fixture

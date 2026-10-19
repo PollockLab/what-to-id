@@ -5,6 +5,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+
 yaml = pytest.importorskip("yaml")
 
 ROOT = Path(__file__).parents[1]
