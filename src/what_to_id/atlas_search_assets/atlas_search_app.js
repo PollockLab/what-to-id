@@ -6,7 +6,7 @@ var K=200,WHOLE=4<<20;  // parts up to 4 MB load whole: one request, not 32 rang
 var qs=new URLSearchParams(location.search);
 var DATA=new URL(CFG.dataUrl,location.href).href.replace(/\/*$/,'/');
 var S={index:null,encoder:null,cache:new Map(),hits:[],state:null,run:0,include:[],exclude:[]};
-var EXAMPLES=['a bird eating a frog','a spider with prey','mushrooms growing on a log'];
+var EXAMPLES=['a nudibranch','a hummingbird feeding at a flower','colourful mushrooms on moss','a jellyfish'];
 
 function $(id){return document.getElementById(id);}
 function el(tag,attrs,kids){
