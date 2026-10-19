@@ -13,7 +13,7 @@ var MAP=new URL(CFG.mapUrl,location.href).href;
 var PAL=[[0,114,178],[213,94,0],[0,158,115],[190,160,0],[204,121,167],[86,180,233],[230,70,70],[120,60,170],[110,110,110],[160,60,40],[150,130,200],[40,120,60],[140,200,50],[70,90,220],[255,140,100],[0,190,190]];
 var S={idx:null,P:null,META:null,TAXA:null,groups:{},picks:[],split:[],extra:[],keep:null,sel:-1,nbr:[],thin:false,cache:new Map(),run:0,deck:null,vs:null,PD:null};
 
-var MF=null,TF=null,PASS=['area','park','bcpark','projects'];
+var MF=null,TF=null,TR=null,PASS=['park','bcpark','projects'],MAPONLY={park:'Park',bcpark:'BC park',projects:'Projects'},AI=null;
 function $(id){return document.getElementById(id);}
 function el(tag,attrs,kids){
   var e=document.createElement(tag);
@@ -59,7 +59,7 @@ function shown(){
 // Filters this page does not apply yet go back untouched, so a link round-trips through it.
 function writeHash(){
   // before the join the selection is only in the hash, so it stays as it is
-  var h=S.P.grp?MF.write(S).concat(S.extra):location.hash.slice(1).split('&').filter(function(t){
+  var h=S.P.grp?MF.write(S).concat(S.area?['area='+S.area]:[],S.extra):location.hash.slice(1).split('&').filter(function(t){
     return t&&t.indexOf('id=')!==0;});
   if(S.sel>=0)h.push('id='+S.P.id[S.sel]);
   history.replaceState(null,'',h.length?'#'+h.join('&'):location.pathname+location.search);
@@ -69,16 +69,43 @@ function paint(b){
   var j=+b.getAttribute('data-g'),dot=el('i',{});dot.style.background='rgb('+color(j).join(',')+')';
   CH.show(b,gname(j)+' '+nf.format(S.count[j]),S.groups[S.META.groups[j]]||'');b.insertBefore(dot,b.firstChild);
 }
-// Which points the taxon picks keep, with the picked groups beside them (see MapFilter.keep).
+// The points the dates, months, show only chips and the area leave in, apart from the taxa and groups; null
+// when none is set. An area that does not read is left to the map and shows as map only.
+function areaIndex(){
+  if(!S.area)return null;
+  if(!AI||AI.key!==S.area){
+    AI={key:S.area,I:null};
+    try{var r=MapArea.decode(S.area);if(r.length)AI.I=MapArea.index(r);}catch(e){}
+  }
+  return AI.I;
+}
+function baseKey(){return [S.lo,S.hi,S.up,S.months,JSON.stringify(S.only),S.area].join('|');}
+function applyBase(){
+  var P=S.P,key=baseKey();
+  if(S.baseKey===key&&S.base&&S.base.length===P.n)return;
+  S.baseKey=key;S.base=new Uint8Array(P.n).fill(1);
+  if(P.grp){
+    MF.rest(S,P.obs,P.up,P.flags,P.n,S.base);
+    var I=areaIndex();
+    if(I)for(var i=0;i<P.n;i++)if(S.base[i]&&!MapArea.inside(I,P.lonlat[2*i],P.lonlat[2*i+1]))S.base[i]=0;
+  }
+  var count=S.count=new Array(S.META?S.META.groups.length:0).fill(0);
+  if(P.grp)for(var j=0;j<P.n;j++)if(S.base[j])count[P.grp[j]]++;
+  if(TR)TR.refresh();
+}
+// Which points the filters keep: the taxon picks with the picked groups beside them (see MapFilter.keep),
+// and the rest of the selection.
 function applyKeep(){
   var P=S.P;
+  applyBase();
   if(!S.keep||S.keep.length!==P.n)S.keep=new Uint8Array(P.n);
-  if(P.grp)MF.keep(TF,MF.groupSet(S,TF),P.tax,P.grp,P.n,S.keep);else S.keep.fill(1);
+  if(P.grp){MF.keep(TF,MF.groupSet(S,TF),P.tax,P.grp,P.n,S.keep);
+    for(var k=0;k<P.n;k++)S.keep[k]&=S.base[k];}
+  else S.keep.fill(1);
   if(S.PD){var c=S.PD.attributes.getFilterCategory.value;
     for(var i=0;i<P.n;i++)c[3*i+2]=S.keep[i];
     S.PD.attributes.getFilterCategory={value:c,size:3};S.PDV=(S.PDV||0)+1;}
 }
-var TR=null;
 function update(){
   var s=shown(),P=S.P,total=S.META?S.META.n:P.n;
   $('count').textContent=P.grp?nf.format(s)+' shown of '+nf.format(P.n):nf.format(P.n)+' points';
@@ -89,15 +116,25 @@ function update(){
 }
 // A pick, a left-out or a removal anywhere: the groups beside included taxa change which points are kept.
 function picked(){
-  TF=TX.filter(S.TAXA,S.picks);applyKeep();update();writeHash();$('gfit').hidden=!(CH.any(S.groups)||S.picks.length);
+  TF=TX.filter(S.TAXA,S.picks);applyKeep();update();writeHash();$('gfit').hidden=!items().length;
 }
 var PK=null,BAR=null;
+// The map's selection bar plus a date chip (the map keeps dates in its inputs) and, marked "map only", the
+// filters this page leaves to the map. The area applies here when it reads.
 function items(){
-  return CH.items({S:S,meta:S.META,terms:TX.terms({T:S.TAXA,picks:S.picks,groups:[],meta:S.META,n:0,split:S.split}),
-    picker:PK,pj:{items:function(){return [];}},months:[],only:[],two:[],area:{term:function(){return null;}},
-    redraw:picked});
+  var L=MF.LAST,out=CH.items({S:S,meta:S.META,terms:TX.terms({T:S.TAXA,picks:S.picks,groups:[],meta:S.META,n:0,split:S.split}),
+    picker:PK,pj:{items:function(){return [];}},months:MF.MONTH,only:MF.ONLYDEF,two:['exact'],
+    area:{term:function(){return S.area?{label:'Drawn area'}:null;},clear:function(){S.area='';picked();}},redraw:picked});
+  if(S.lo>0||S.hi<L)out.push({label:(S.up?'Uploaded ':'Observed ')+(S.lo>0?MF.iso(S.lo):'start')+' to '+(S.hi<L?MF.iso(S.hi):'now'),
+    remove:function(){S.lo=0;S.hi=L;S.up=false;picked();}});
+  if(S.area&&!areaIndex())out.forEach(function(t){if(t.label==='Drawn area')t.tag='map only';});
+  S.extra.forEach(function(t){var k=t.split('=')[0];
+    out.push({label:MAPONLY[k]+': '+decodeURIComponent(t.slice(k.length+1)).replace(/,/g,', '),tag:'map only',
+      remove:function(){S.extra=S.extra.filter(function(x){return x!==t;});picked();}});});
+  return out;
 }
-function clearAll(){S.groups={};S.picks.length=0;S.split=[];$('q').value='';picked();}
+function clearAll(){S.groups={};S.only={};S.months=0;S.lo=0;S.hi=MF.LAST;S.up=false;S.area='';S.extra=[];
+  S.picks.length=0;S.split=[];$('q').value='';picked();}
 // Zooms to the 1st-99th percentile box of the points that pass, so a few stray points do not flatten it.
 function fit(){
   var P=S.P,ok=passing(),xs=[],ys=[],box=$('plot');
@@ -111,15 +148,15 @@ function fit(){
 }
 $('gfit').addEventListener('click',fit);
 function chips(){
-  var P=S.P,count=S.count=new Array(S.META.groups.length).fill(0);
+  var P=S.P,count=new Array(S.META.groups.length).fill(0);
   for(var i=0;i<P.n;i++)count[P.grp[i]]++;
   var box=$('groups');box.textContent='';
   MF=MF||MapFilter(S.META);
   Object.assign(S,MF.read(new URLSearchParams(location.hash.slice(1))));
   S.extra=location.hash.slice(1).split('&').filter(function(t){return PASS.indexOf(t.split('=')[0])>=0;});
-  TF=TX.filter(S.TAXA,S.picks);
+  TF=TX.filter(S.TAXA,S.picks);S.baseKey=null;applyBase();
   TR=S.TAXA&&TT.make({T:S.TAXA,tax:S.P.tax,grp:S.P.grp,n:S.P.n,groups:S.META.groups.length,ranks:S.META.ranks,
-    nf:nf,box:$('tree'),label:gname,pass:function(){return null;},onOpen:function(){TR.render();},
+    nf:nf,box:$('tree'),label:gname,pass:function(){return S.base;},onOpen:function(){TR.render();},
     state:function(id){return PK.state([id]);},cycle:function(id){PK.cycle([id]);},
     inside:function(r){return !!TF.inc&&TF.inc[r]===1;}});
   S.META.groups.forEach(function(g,j){
@@ -131,7 +168,7 @@ function chips(){
     taxa:function(){return S.TAXA;},counts:function(){return TX.counts(S.TAXA,S.P.tax,S.P.n);},onChange:picked,
     onPick:function(r){if(TR)TR.reveal(r);}});
   BAR=CH.bar({box:$('selbar'),clear:clearAll,fallback:$('q')});
-  applyKeep();$('gfit').hidden=!(CH.any(S.groups)||S.picks.length);
+  applyKeep();$('gfit').hidden=!items().length;
   if(TR)TR.render();
 }
 $('gall').addEventListener('click',function(){S.groups={};picked();});

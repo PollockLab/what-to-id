@@ -54,12 +54,17 @@ function record(days,cat,i,grp,o,u,f){
 // The category lists the filter takes: groups, observed month, uploaded month and status values.
 // inc: a taxon is included, so the groups are part of the kept bit (see CH.groupPass); thin: the
 // one record in ten drawn while the view moves.
-function categories(S,inc,thin){
-  var groups=[],mon=[],all=[],st=[],req=0,hide=0,i;
-  CH.groupPass(S.groups,META.groups,inc).forEach(function(v,j){if(v)groups.push(j);});
-  for(i=0;i<13;i++){all.push(i);if(S.months?i<12&&S.months>>i&1:true)mon.push(i);}
+// The status bits the show only chips require and hide.
+function status(S){
+  var req=0,hide=0;
   [['introduced',ST_INTRO],['threatened',ST_THREAT],['exact',ST_INEXACT]].forEach(function(o){var v=S.only[o[0]];
     if(v==='not'||v&&o[0]==='exact')hide|=o[1];else if(v)req|=o[1];});
+  return {req:req,hide:hide};
+}
+function categories(S,inc,thin){
+  var groups=[],mon=[],all=[],st=[],s=status(S),req=s.req,hide=s.hide,i;
+  CH.groupPass(S.groups,META.groups,inc).forEach(function(v,j){if(v)groups.push(j);});
+  for(i=0;i<13;i++){all.push(i);if(S.months?i<12&&S.months>>i&1:true)mon.push(i);}
   for(i=0;i<2*ST_SAMPLE;i++)if(i&ST_KEEP&&(i&req)===req&&!(i&hide)&&(!thin||i&ST_SAMPLE))st.push(i);
   return [groups,S.up?all:mon,S.up?mon:all,st];
 }
@@ -75,7 +80,27 @@ function keep(TF,gs,tax,grp,n,out){
     if(te&&t!==NOTAX&&te[t]===1)k=false;out[i]=k?1:0;}
   return out;
 }
-return {DAY:DAY,D0:D0,NO:NO,NOTAX:NOTAX,LAST:LAST,FLAG:FLAG,ONLYFLAG:ONLYFLAG,ONLYKEYS:ONLYKEYS,ST_INTRO:ST_INTRO,
+// Clears from out each record the dates, months and show only chips leave out, as the map's filter does:
+// the dates and months read the observed day, or the uploaded one with by=uploaded, and a record with no
+// date fails any date or month limit. o, u and f are the records' observed day, uploaded day and flags.
+function rest(S,o,u,f,n,out){
+  var day=S.up?u:o,full=S.lo===0&&S.hi===LAST,m=S.months,s=status(S),req=s.req,hide=s.hide,
+    fi=FLAG.introduced,ft=FLAG.threatened,fe=FLAG.obscured|FLAG.imprecise;
+  for(var i=0;i<n;i++){
+    if(!out[i])continue;
+    var d=day[i],b=(f[i]&fi?ST_INTRO:0)|(f[i]&ft?ST_THREAT:0)|(f[i]&fe?ST_INEXACT:0);
+    if((!full&&(d===NO||d<S.lo||d>S.hi))||(m&&(d===NO||!(m>>MOY[d]&1)))||(b&req)!==req||b&hide)out[i]=0;
+  }
+  return out;
+}
+var MONTH=['January','February','March','April','May','June','July','August','September','October','November',
+  'December'];
+// The show only chips as [key, label, flag, hint], those the data has the flag for.
+var ONLYDEF=[['introduced','Introduced to BC','introduced','Species not native to BC'],
+  ['threatened','Threatened','threatened','Species with a threatened status'],
+  ['exact','Accuracy ≤1 km or unknown','obscured','Hide obscured locations and records with reported uncertainty over 1 km. Unknown accuracy is retained. Map points use rounded public coordinates']]
+  .filter(function(o){return META.flags.indexOf(o[2])>=0;});
+return {rest:rest,MONTH:MONTH,ONLYDEF:ONLYDEF,DAY:DAY,D0:D0,NO:NO,NOTAX:NOTAX,LAST:LAST,FLAG:FLAG,ONLYFLAG:ONLYFLAG,ONLYKEYS:ONLYKEYS,ST_INTRO:ST_INTRO,
   ST_THREAT:ST_THREAT,ST_INEXACT:ST_INEXACT,ST_KEEP:ST_KEEP,ST_SAMPLE:ST_SAMPLE,iso:iso,dayOf:dayOf,clamp:clamp,
   MOY:MOY,DOM:DOM,DOW:DOW,MI:MI,M0:M0,read:read,write:write,record:record,categories:categories,groupSet:groupSet,keep:keep};
 }

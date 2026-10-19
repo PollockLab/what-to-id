@@ -6,8 +6,7 @@ function tok(n){return css.getPropertyValue(n).trim();}
 var dark=matchMedia('(prefers-color-scheme: dark)').matches,DOT=tok('--dot').split(',').map(Number);
 var MF=MapFilter(META),DAY=MF.DAY,D0=MF.D0,NO=MF.NO,NOTAX=MF.NOTAX,LAST=MF.LAST;
 var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-var MONTH=['January','February','March','April','May','June','July','August','September',
-  'October','November','December'];
+var MONTH=MF.MONTH;
 var FLAG=MF.FLAG,ONLYFLAG=MF.ONLYFLAG,ONLYKEYS=MF.ONLYKEYS,nf=new Intl.NumberFormat('en-CA'),
   iso=MF.iso,dayOf=MF.dayOf,clamp=MF.clamp;
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){
@@ -372,10 +371,7 @@ function showMonths(){MB_.forEach(function(b,i){b.setAttribute('aria-pressed',St
 $('mclear').onclick=function(){S.months=0;showMonths();refilter();};
 // Introduced and threatened can be left out too. The location filter stays two-state: its opposite, hidden
 // or over 1 km uncertain, is an OR iNaturalist's Identify filters cannot say.
-var ONLYDEF=[['introduced','Introduced to BC','introduced','Species not native to BC'],
-  ['threatened','Threatened','threatened','Species with a threatened status'],
-  ['exact','Accuracy ≤1 km or unknown','obscured','Hide obscured locations and records with reported uncertainty over 1 km. Unknown accuracy is retained. Map points use rounded public coordinates']]
-  .filter(function(o){return META.flags.indexOf(o[2])>=0;}),
+var ONLYDEF=MF.ONLYDEF,
   ONLY=ONLYDEF.map(function(o){return CH.chip($('flags'),o[0],o[1],function(){return S.only;},o[0]!=='exact',
     o[3],refilter);});
 function showOnly(){ONLY.forEach(function(b,j){CH.show(b,ONLYDEF[j][1],S.only[ONLYDEF[j][0]]||'');});}

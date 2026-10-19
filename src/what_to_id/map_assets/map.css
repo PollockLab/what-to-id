@@ -45,8 +45,6 @@ h1{font-size:18px;margin:0}
 .prow input.padd{flex:1 1 140px;min-width:0;font-size:16px}
 button.padd{cursor:pointer;background:var(--chip)}
 /* "Identify only": a pasted project, in the Identify link but not the map filter */
-.tag{display:inline-block;margin-left:5px;padding:0 5px;border:1px solid currentColor;border-radius:8px;
-  font-size:10px;line-height:14px;white-space:nowrap}
 #map{grid-area:map;position:relative;min-height:240px}
 .time{grid-area:time;padding:8px 16px 10px;border-top:1px solid var(--line)}
 .row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}

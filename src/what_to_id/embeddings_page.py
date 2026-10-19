@@ -23,6 +23,8 @@ SCRIPTS = {
     "__ATLAS_SEARCH_META__": HERE / "atlas_search_assets" / "atlas_search_meta.js",
     "__MAP_TAXA__": HERE / "map_assets" / "map_taxa.js",
     "__MAP_CHIPS__": HERE / "map_assets" / "map_chips.js",
+    "__IDENTIFY_LINKS__": HERE / "map_assets" / "identify_links.js",
+    "__MAP_AREA__": HERE / "map_assets" / "map_area.js",
     "__MAP_FILTER__": HERE / "map_assets" / "map_filter.js",
     "__TAXON_TREE__": ASSETS / "taxon_tree.js",
     "__EMBEDDINGS_LAYOUT__": ASSETS / "embeddings_layout.js",

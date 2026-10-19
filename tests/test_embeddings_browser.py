@@ -300,6 +300,88 @@ def test_filters_the_page_does_not_apply_stay_in_the_hash(open_page):
     assert page.errors == []
 
 
+def bar_labels(page):
+    return page.locator("#selbar li").all_inner_texts()
+
+
+def test_months_and_dates_in_the_hash_filter_the_page_and_show_in_the_bar(open_page):
+    aug = open_page("#months=8")
+    ready(aug)
+    sep = open_page("#months=9")
+    ready(sep)
+    assert shown(aug) > 0 and shown(sep) > 0
+    assert shown(aug) + shown(sep) == POOL_N  # the fixture observes in August and September only
+    assert layer(aug, "pts")["n"] == POOL_N
+    assert any("August" in t for t in bar_labels(aug))
+    late = open_page("#from=2026-09-01")
+    ready(late)
+    assert 0 < shown(late) <= shown(sep)
+    assert any("Observed 2026-09-01 to" in t for t in bar_labels(late)), bar_labels(late)
+    late.locator("#selbar li", has_text="Observed").locator("button.x").click()
+    assert shown(late) == POOL_N
+    assert "from=" not in late.evaluate("location.hash")
+    assert aug.errors == [] and late.errors == []
+
+
+def test_area_in_the_hash_filters_by_position_and_chips_count_what_is_left(open_page):
+    ring = "[[-123.6,48,-123,48,-123,50,-123.6,50]]"
+    h = open_page("").evaluate(f"MapArea.encode({ring})")
+    west = open_page(f"#area={h}")
+    ready(west)
+    assert 0 < shown(west) < POOL_N
+    chips = west.locator("#groups button[data-g]").all_inner_texts()
+    assert sum(int(t.replace(",", "").split()[-1]) for t in chips) == shown(west)
+    assert any("Drawn area" in t and "map only" not in t for t in bar_labels(west))
+    assert west.evaluate("location.hash") == f"#area={h}"
+    west.locator("#selbar li", has_text="Drawn area").locator("button.x").click()
+    assert shown(west) == POOL_N
+    assert west.errors == []
+
+
+def test_filters_left_to_the_map_show_as_map_only_and_stay_in_the_hash(open_page):
+    page = open_page("#park=1,2&bcpark=Foo&projects=bar&groups=Aves")
+    ready(page)
+    labels = bar_labels(page)
+    assert sum("map only" in t for t in labels) == 3
+    assert 0 < shown(page) < POOL_N
+    page.locator("#groups button[data-g='1']").click()
+    assert page.evaluate("location.hash") == "#groups=Aves,Insecta&park=1,2&bcpark=Foo&projects=bar"
+    page.locator("#selbar li", has_text="BC park").locator("button.x").click()
+    assert "bcpark" not in page.evaluate("location.hash")
+    assert "park=1,2" in page.evaluate("location.hash")
+    assert page.errors == []
+
+
+def test_clear_all_resets_every_filter_the_bar_shows(open_page):
+    page = open_page("#months=8&groups=Aves&park=1")
+    ready(page)
+    page.locator("#selbar button", has_text="Clear all").click()
+    assert shown(page) == POOL_N
+    assert page.evaluate("location.hash") == ""
+    assert page.errors == []
+
+
+def test_filters_in_the_hash_wait_for_the_join(browser, site):
+    base, *_ = site
+    page = browser.new_page(viewport={"width": 1280, "height": 900})
+    held = []
+    page.route("**/pool-*.bin*", lambda r: held.append(r))
+    page.errors = []
+    page.on("pageerror", lambda e: page.errors.append(str(e)))
+    stub_inat(page, None)
+    page.goto(f"{base}/embeddings.html#months=8&groups=Aves")
+    page.wait_for_function("window.__deck && __deck.props.layers.length > 0")
+    assert layer(page, "pts")["n"] == TOTAL
+    # nothing is rewritten before the join
+    assert page.evaluate("location.hash") == "#months=8&groups=Aves"
+    for route in held:
+        route.continue_()
+    page.wait_for_function("document.getElementById('status').textContent === ''")
+    assert 0 < shown(page) < POOL_N
+    assert page.errors == []
+    page.close()
+
+
 def test_click_opens_card_with_neighbours_and_jump(open_page, site):
     _, _, in_pool, _ = site
     page = open_page(drop=None)

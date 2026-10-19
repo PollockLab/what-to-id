@@ -32,3 +32,5 @@
 .sugg li{padding:6px 10px;cursor:pointer;min-height:36px}
 .sugg li span{display:block;color:var(--muted);font-size:12px}
 .sugg li[aria-selected="true"]{background:var(--chip)}
+.tag{display:inline-block;margin-left:5px;padding:0 5px;border:1px solid currentColor;border-radius:8px;
+  font-size:10px;line-height:14px;white-space:nowrap}
