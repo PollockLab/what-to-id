@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Map and photo space</title>
+<style>
+__SITE_CSS__
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+body{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);grid-template-areas:"nav nav" "note note" "map space"}
+.note{grid-area:note;margin:0;padding:6px 16px;border-bottom:1px solid var(--line);color:var(--muted);font-size:12px}
+iframe{width:100%;height:100%;border:0;min-height:0}
+#map{grid-area:map;border-right:1px solid var(--line)}
+#space{grid-area:space}
+@media (max-width:900px){body{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr) minmax(0,1fr);grid-template-areas:"nav" "note" "map" "space"}
+#map{border-right:0;border-bottom:1px solid var(--line)}}
+</style>
+</head>
+<body>
+__SITE_NAV__<p class="note" id="main-content">The map and the photo space share one selection: change a filter in either and the other follows. Dates, months, show only, groups and taxa travel across; the area and projects stay with the map.</p>
+<iframe id="map" title="Map" src="about:blank"></iframe>
+<iframe id="space" title="Photo space" src="about:blank"></iframe>
+<script>
+__MAP_FILTER__
+(function(){
+var frames=[document.getElementById('map'),document.getElementById('space')],last=MapFilter.tokens(location.hash);
+function url(file){return new URL(file,location.href).href.replace(/#.*/,'')+'?embed=1'+(last?'#'+last:'');}
+frames[0].src=url(__MAP_FILE__);frames[1].src=url(__SPACE_FILE__);
+function post(f,sel){f.contentWindow.postMessage({type:'wtid-selection',sel:sel},location.origin);}
+// A frame reports its selection; the other one applies it in place. The frames never reload.
+addEventListener('message',function(e){
+  var i=frames.findIndex(function(f){return f.contentWindow===e.source;});
+  if(i<0||e.origin!==location.origin||!e.data||e.data.type!=='wtid-selection'||typeof e.data.sel!=='string'||
+    e.data.sel===last)return;
+  last=e.data.sel;post(frames[1-i],last);
+  history.replaceState(null,'',last?'#'+last:location.pathname+location.search);
+});
+// Back and forward: the new selection goes to both.
+addEventListener('hashchange',function(){var s=MapFilter.tokens(location.hash);
+  if(s!==last){last=s;frames.forEach(function(f){post(f,s);});}});
+})();
+</script>
+</body>
+</html>

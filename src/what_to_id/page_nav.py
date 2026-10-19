@@ -18,7 +18,7 @@ PAGES = (
 )
 OPTIONAL = {"embeddings.html", "search.html"}
 # Pages outside the switcher get one extra tab while they are the current page.
-EXTRA = {"embeddings-sample.html": "Photo sample"}
+EXTRA = {"embeddings-sample.html": "Photo sample", "split.html": "Split view"}
 BLITZ = "https://pollocklab.github.io/where-to-blitz/"
 
 CSS = """
@@ -54,6 +54,7 @@ color:var(--muted);
 .site-nav a[aria-current="page"]{color:var(--ink);font-weight:650;border-bottom-color:var(--on)}
 .site-vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);
 white-space:nowrap}
+.embed .site-shell,.embed .site-skip{display:none}
 @media (max-width:640px){.site-shell{padding:0 8px;gap:0 8px}.site-nav a{padding:0 9px}
 .site-nav{--fade:linear-gradient(90deg,transparent,#000 16px,#000 calc(100% - 16px),transparent);
 -webkit-mask-image:var(--fade);mask-image:var(--fade)}}

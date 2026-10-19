@@ -5,12 +5,15 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Photo space</title>
 <script src="__DECK_JS__"></script>
+<script>if(/[?&]embed=1/.test(location.search))document.documentElement.classList.add('embed');</script>
 <style>
 __SITE_CSS__
 __SELECT_CSS__
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
 body{display:grid;grid-template-columns:260px minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);grid-template-areas:"nav nav" "head head" "side plot"}
+.embed header{display:none}
+.embed .card{top:12px;max-height:calc(100vh - 24px)}
 header{grid-area:head;padding:10px 16px;border-bottom:1px solid var(--line)}
 h1{font-size:18px;margin:0}
 .sub,.muted,.attr{color:var(--muted);margin:2px 0 0;font-size:12px}

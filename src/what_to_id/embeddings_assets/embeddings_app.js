@@ -58,12 +58,27 @@ function shown(){
 // The hash keeps the map's selection (map_filter.js writes it as the map does) beside the selected id.
 // Filters this page does not apply yet go back untouched, so a link round-trips through it.
 function writeHash(){
+  if(SYNC)SYNC.send();
   // before the join the selection is only in the hash, so it stays as it is
   var h=S.P.grp?MF.write(S).concat(S.area?['area='+S.area]:[],S.extra):location.hash.slice(1).split('&').filter(function(t){
     return t&&t.indexOf('id=')!==0;});
   if(S.sel>=0)h.push('id='+S.P.id[S.sel]);
   history.replaceState(null,'',h.length?'#'+h.join('&'):location.pathname+location.search);
 }
+// The selection as the split view hands it over (the dates, months, groups, show only and taxa; the area and
+// the filters left to the map stay as they are). Before the join it only goes into the hash, chips() reads it.
+function selKey(){return S.P&&S.P.grp?MF.write(S).join('&'):MapFilter.tokens(location.hash);}
+var SYNC=null;
+function applySel(str){
+  if(!(S.P&&S.P.grp)){
+    var h=location.hash.slice(1).split('&').filter(function(t){return t&&MapFilter.tokens(t)==='';});
+    history.replaceState(null,'','#'+h.concat(str?str.split('&'):[]).join('&'));return;}
+  var r=MF.read(new URLSearchParams(str));
+  ['up','lo','hi','months','groups','only'].forEach(function(k){S[k]=r[k];});
+  S.picks.length=0;r.picks.forEach(function(p){S.picks.push(p);});S.split=[];
+  picked();
+}
+SYNC=MapFilter.sync({key:selKey,apply:applySel});
 // CH.show rewrites the label, so the colour dot goes back in after it.
 function paint(b){
   var j=+b.getAttribute('data-g'),dot=el('i',{});dot.style.background='rgb('+color(j).join(',')+')';

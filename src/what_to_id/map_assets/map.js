@@ -39,12 +39,20 @@ var S=Object.assign({split:[],rec:null,at:null,fly:false},MF.read(new URLSearchP
 })();
 var PJ=projectFilter({meta:META,hash:new URLSearchParams(location.hash.slice(1)),changed:function(){refilter();}});
 var hashTimer=0;
+// The split view hands the selection over live; the area and projects are not part of it yet.
+var SYNC=MapFilter.sync({key:function(){return MF.write(S).join('&');},apply:function(str){
+  var r=MF.read(new URLSearchParams(str));
+  ['up','lo','hi','months','groups','only'].forEach(function(k){S[k]=r[k];});
+  S.picks.length=0;r.picks.forEach(function(p){S.picks.push(p);});S.split=[];
+  // before the taxa and records are in, refilter runs once they are
+  if(TAXA){search();showClades();}
+  showGroups();showMonths();showOnly();if(P.n)refilter();render();}});
 // The selection: the hash without the open record and the view.
 function sel(){
   var h=MF.write(S);
   if(AREA.hash())h.push(AREA.hash());if(PJ.hash())h.push(PJ.hash());
   return h;}
-function writeHash(){clearTimeout(hashTimer);hashTimer=setTimeout(function(){
+function writeHash(){SYNC.send();clearTimeout(hashTimer);hashTimer=setTimeout(function(){
   var h=sel();
   if(P.n&&SEL>=0)h.push('record='+P.id[SEL]);else if(S.rec)h.push('record='+S.rec);
   var c=map.getCenter();h.push('at='+map.getZoom().toFixed(1)+'/'+c.lat.toFixed(3)+'/'+

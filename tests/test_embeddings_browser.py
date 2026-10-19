@@ -15,6 +15,7 @@ import pytest
 
 from what_to_id.embeddings_page import build
 from what_to_id.page_map import encode_points, render_map
+from what_to_id.split_page import build as build_split
 
 from .atlas_index_fixture import FIXTURE_DELTA, FIXTURE_ROWS, write_fixture
 from .embeddings_fixture import BBOX, GROUPS, TREE, pool_frame, write_layout
@@ -76,6 +77,8 @@ def site(tmp_path_factory):
         (root / name).write_bytes(blob)
     (root / "map.html").write_text(render_map(meta, freeze=None))
     build(root, data_url="atlas/")
+    # the map needs MapLibre from a CDN, so the split page here holds two photo spaces
+    build_split(root, map_url="embeddings.html")
     handler = functools.partial(RangeHandler, directory=str(root))
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -378,6 +381,53 @@ def test_filters_in_the_hash_wait_for_the_join(browser, site):
         route.continue_()
     page.wait_for_function("document.getElementById('status').textContent === ''")
     assert 0 < shown(page) < POOL_N
+    assert page.errors == []
+    page.close()
+
+
+def test_hash_changes_apply_in_place_including_back_and_forward(open_page):
+    page = open_page("")
+    ready(page)
+    page.evaluate("window.marker = 1")
+    page.evaluate("location.hash = '#months=8'")
+    page.wait_for_function(
+        f"!document.getElementById('count').textContent.startsWith('{POOL_N:,}')"
+    )
+    aug = shown(page)
+    assert 0 < aug < POOL_N
+    assert any("August" in t for t in bar_labels(page))
+    page.go_back()
+    page.wait_for_function(f"document.getElementById('count').textContent.startsWith('{POOL_N:,}')")
+    page.go_forward()
+    page.wait_for_function(f"document.getElementById('count').textContent.startsWith('{aug:,}')")
+    assert page.evaluate("window.marker") == 1  # nothing reloaded
+    assert page.errors == []
+
+
+def test_split_page_relays_the_selection_between_frames_without_reloads(browser, site):
+    base, *_ = site
+    page = browser.new_page(viewport={"width": 1280, "height": 900})
+    page.errors = []
+    page.on("pageerror", lambda e: page.errors.append(str(e)))
+    stub_inat(page, None)
+    page.goto(f"{base}/split.html#months=8")
+    counts = (
+        "[...document.querySelectorAll('iframe')].map(f => f.contentDocument &&"
+        " f.contentDocument.getElementById('count') &&"
+        " f.contentDocument.getElementById('count').textContent)"
+    )
+    page.wait_for_function(f"{counts}.every(c => c && c.includes('shown'))")
+    left, right = page.frame_locator("#map"), page.frame_locator("#space")
+    before = left.locator("#count").inner_text()
+    assert before == right.locator("#count").inner_text()
+    for f in ("#map", "#space"):
+        page.evaluate(f"document.querySelector('{f}').contentWindow.marker = 1")
+    left.locator("#groups button[data-g='1']").click()  # pick Insecta in the left frame
+    page.wait_for_function(f"{counts}.every(c => c !== {before!r}) && new Set({counts}).size === 1")
+    assert "groups=Insecta" in page.evaluate("location.hash")
+    assert right.locator("#selbar li", has_text="Insecta").count() == 1
+    for f in ("#map", "#space"):
+        assert page.evaluate(f"document.querySelector('{f}').contentWindow.marker") == 1
     assert page.errors == []
     page.close()
 

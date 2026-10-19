@@ -6,6 +6,7 @@ body{display:grid;grid-template-columns:300px minmax(0,1fr);grid-template-rows:a
 header{grid-area:head;padding:10px 16px;border-bottom:1px solid var(--line);display:flex;
   flex-wrap:wrap;align-items:center;gap:4px 16px}
 .head{flex:1 1 360px;min-width:0}
+.embed .head{display:none}
 h1{font-size:18px;margin:0}
 .sub,.hint,.muted{color:var(--muted);margin:0;font-size:12px}
 .stat{margin:0;font-size:13px}

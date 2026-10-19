@@ -104,3 +104,27 @@ return {rest:rest,MONTH:MONTH,ONLYDEF:ONLYDEF,DAY:DAY,D0:D0,NO:NO,NOTAX:NOTAX,LA
   ST_THREAT:ST_THREAT,ST_INEXACT:ST_INEXACT,ST_KEEP:ST_KEEP,ST_SAMPLE:ST_SAMPLE,iso:iso,dayOf:dayOf,clamp:clamp,
   MOY:MOY,DOM:DOM,DOW:DOW,MI:MI,M0:M0,read:read,write:write,record:record,categories:categories,groupSet:groupSet,keep:keep};
 }
+// The hash tokens a selection is made of, as one string.
+MapFilter.tokens=function(hash){return hash.replace(/^#/,'').split('&').filter(function(t){
+  return /^(by|from|to|months|groups|only|taxa)=/.test(t);}).join('&');};
+// Live selection sync for a page inside the split view. key() is the selection the page holds, apply(str) puts
+// one in place. A change goes to the parent at most once a frame; one that comes from outside (the parent's
+// message, a hash change) is applied and not sent back.
+MapFilter.sync=function(o){
+  var last=null,raf=0;
+  function send(){
+    if(parent===window||raf)return;
+    raf=requestAnimationFrame(function(){raf=0;var k=o.key();
+      if(k!==last){last=k;parent.postMessage({type:'wtid-selection',sel:k},location.origin);}});
+  }
+  function take(str){if(str!==o.key())o.apply(str);last=str;}
+  // a slow apply (a brush dragged over 3M points) must not queue: only the latest message is applied, once a frame
+  var pend=null;
+  addEventListener('message',function(e){
+    if(e.origin===location.origin&&e.source===parent&&e.data&&e.data.type==='wtid-selection'&&
+      typeof e.data.sel==='string'){
+      if(pend===null)requestAnimationFrame(function(){var s=pend;pend=null;take(s);});
+      pend=e.data.sel;}});
+  addEventListener('hashchange',function(){take(MapFilter.tokens(location.hash));});
+  return {send:send};
+};
