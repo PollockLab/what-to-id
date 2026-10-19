@@ -15,13 +15,13 @@ size_categories:
 
 # what-to-id photo-search index
 
-A static IVF-PQ index of BioCLIP 2.5 image embeddings for British Columbia iNaturalist observations that need an ID. It is read in the browser over HTTP Range requests by the what-to-id photo search page (`atlas_search.html` in [PollockLab/what-to-id](https://github.com/PollockLab/what-to-id)), with no server.
+A static IVF-OPQ-PQ index of BioCLIP 2.5 image embeddings for British Columbia iNaturalist observations that need an ID. It is read in the browser over HTTP Range requests by the what-to-id photo search page (`atlas_search.html` in [PollockLab/what-to-id](https://github.com/PollockLab/what-to-id)), with no server.
 
 ## Contents
 
 - `manifest.json`: layout version, model, parts, neighbour sets, text model. Read it first; it is the only file rewritten in place.
-- `centroids.f16`, `pq.f32`: coarse centroids and product-quantizer codebooks.
-- `<part>.offsets.u32`, `<part>.ids.u32`, `<part>.codes.u8`: one base part plus daily delta parts, rows grouped by coarse list.
+- `centroids.f16`, `opq.f16`, `pq.f32`, `refine.f32`: coarse centroids, the OPQ rotation, product-quantizer codebooks, and the grid of the refine codes.
+- `<part>.offsets.u32`, `<part>.ids.u32`, `<part>.codes.u8`, `<part>.refine.u8`: one base part plus daily delta parts, rows grouped by coarse list. Search scores the probed lists with `codes`, then re-ranks the best 500 rows with their 3-bit `refine` codes.
 - `neighbors*.bin`, `neighbors*.dir.u32`: 12 precomputed nearest neighbours per observation.
 - `model/`: the int8 ONNX BioCLIP 2.5 text tower and its BPE merges, for free-text search in the browser.
 

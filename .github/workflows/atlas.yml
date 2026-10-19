@@ -1,6 +1,6 @@
 name: atlas
 
-# Keeps the static photo-search index (the IVF-PQ atlas read by atlas_search.html) current, on free
+# Keeps the static photo-search index (the IVF-OPQ-PQ atlas read by atlas_search.html) current, on free
 # runners and without a server. After each successful map refresh it compares the map pool with the
 # index, embeds the observations the index lacks with BioCLIP 2.5 on CPU, appends them as a delta
 # part with a neighbour delta, and uploads the result to the host. On Sundays it also compacts:
@@ -10,7 +10,7 @@ name: atlas
 # take roughly 11k photos a day against 4-9k arrivals. Each worker saves after every chunk and
 # stops before its deadline; whatever is not embedded is planned again the next day. Neighbours of
 # new observations are approximate: the raw vectors of the base are not on the runner, so they merge
-# exact cosines among the day's new photos with an IVF-PQ search of the index (see
+# exact cosines among the day's new photos with a two-stage search of the index (see
 # atlas_update.delta_neighbors). A Fir rebuild makes them exact again. The day's raw vectors (float16)
 # go to the atlas-state release for that rebuild.
 #

@@ -413,6 +413,23 @@ def test_sync_script_local_mode_orders_manifest_last_and_prunes(index, tmp_path)
     run("pull", str(tmp_path / "again"))
     assert not (tmp_path / "again" / "model").exists()
 
+    # taxon vectors are big and unchanged daily: pulls skip them, pushes without them spare the host
+    (host / "taxa-old.f16").write_bytes(b"t")
+    run("pull", str(tmp_path / "notaxa"))
+    assert not list((tmp_path / "notaxa").glob("taxa-*"))
+    run("push", str(work))
+    assert (host / "taxa-old.f16").exists()
+    (work / "taxa-new.f16").write_bytes(b"t")
+    run("push", str(work))  # a directory that has taxa vectors owns them: the old set is pruned
+    assert (host / "taxa-new.f16").exists() and not (host / "taxa-old.f16").exists()
+    (work / "taxa-new.f16").unlink()
+
+    for gone in ("delta-20260101.refine.u8", "opq.f16"):
+        saved = (work / gone).read_bytes()
+        (work / gone).unlink()
+        refused = run("push", str(work), check=False)
+        assert refused.returncode != 0 and f"names {gone}" in refused.stderr
+        (work / gone).write_bytes(saved)
     (work / "delta-20260101.codes.u8").unlink()
     broken = run("push", str(work), check=False)
     assert broken.returncode != 0 and "lacks it" in broken.stderr

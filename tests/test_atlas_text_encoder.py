@@ -205,7 +205,7 @@ def test_attach_names_hashed_files_in_the_manifest(tmp_path):
     meta = fake_export(tmp_path / "export")
     index = tmp_path / "index"
     index.mkdir()
-    (index / "manifest.json").write_text(json.dumps({"version": 1, "dims": 1024, "parts": []}))
+    (index / "manifest.json").write_text(json.dumps({"version": 2, "dims": 1024, "parts": []}))
     spec = enc.attach(tmp_path / "export", index)
     sha = meta["files"][enc.ONNX_FILE]["sha256"]
     assert spec["onnx"] == f"model/text_encoder-{sha[:12]}.onnx"
@@ -221,7 +221,7 @@ def test_attach_refuses_failed_parity_tampered_files_and_wrong_dims(tmp_path):
 
     index = tmp_path / "index"
     index.mkdir()
-    (index / "manifest.json").write_text(json.dumps({"version": 1, "dims": 1024}))
+    (index / "manifest.json").write_text(json.dumps({"version": 2, "dims": 1024}))
     fake_export(tmp_path / "failed", passed=False)
     with pytest.raises(SystemExit, match="parity"):
         enc.attach(tmp_path / "failed", index)
@@ -230,7 +230,7 @@ def test_attach_refuses_failed_parity_tampered_files_and_wrong_dims(tmp_path):
     with pytest.raises(SystemExit, match="sha256"):
         enc.attach(tmp_path / "tampered", index)
     fake_export(tmp_path / "ok")
-    (index / "manifest.json").write_text(json.dumps({"version": 1, "dims": 512}))
+    (index / "manifest.json").write_text(json.dumps({"version": 2, "dims": 512}))
     with pytest.raises(SystemExit, match="dims"):
         enc.attach(tmp_path / "ok", index)
     assert not (index / "model").exists()

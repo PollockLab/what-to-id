@@ -38,7 +38,7 @@ def pool(tmp_path):
 def index(tmp_path):
     out = tmp_path / "idx"
     out.mkdir()
-    write_manifest(out, {"version": 1, "dims": DIMS, "parts": []})
+    write_manifest(out, {"version": 2, "dims": DIMS, "parts": []})
     return out
 
 
@@ -54,7 +54,7 @@ def test_table_is_distinct_sorted_and_prefers_a_common_name(pool):
 def test_build_writes_consistent_files_and_manifest(pool, index):
     entry = atlas_taxa.build(pool, index, fake_embed)
     manifest = json.loads((index / "manifest.json").read_text())
-    assert manifest["version"] == 1 and manifest["taxa"] == entry
+    assert manifest["version"] == 2 and manifest["taxa"] == entry
     assert entry["count"] == 4 and entry["dims"] == DIMS and entry["prompt"] == "a photo of {}"
     assert entry["names"].startswith("taxa-") and entry["vectors"].startswith("taxa-")
     lines = gzip.decompress((index / entry["names"]).read_bytes()).decode().split("\n")

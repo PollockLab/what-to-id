@@ -14,6 +14,8 @@
 # After the manifest, push removes remote index files that DIR no longer has (parts that a
 # compaction folded away), so only push a directory that came from a full pull. The browser text
 # model under model/ is never pulled or pruned; a push uploads it only when DIR has it (the seed).
+# A pull skips taxa-*.f16 (the large taxon-name vectors, unchanged by the daily update); a push from a
+# directory without them leaves the host's alone, a push from one with them prunes the old ones.
 # ATLAS_SQUASH=true (hf only) then squashes the repo history, so replaced parts stop using storage.
 # ATLAS_SYNC_LOG, if set, gets one line per transferred file in transfer order.
 set -euo pipefail
@@ -40,15 +42,19 @@ check_pushable() {
   local f
   while read -r f; do
     [ -f "$dir/$f" ] || die "manifest names $f but $dir lacks it; pull the full index before pushing"
-  done < <(jq -r '.parts[].name | (.+".offsets.u32", .+".ids.u32", .+".codes.u8")' "$dir/manifest.json")
+  done < <(jq -r '"centroids.f16", "opq.f16", "pq.f32", .refine.params,
+    (.parts[].name | (.+".offsets.u32", .+".ids.u32", .+".codes.u8", .+".refine.u8"))' "$dir/manifest.json")
 }
+
+# True when DIR has taxon vectors, i.e. the host's copies are DIR's to prune.
+has_taxa() { compgen -G "$dir/taxa-*.f16" >/dev/null; }
 
 pull_local() {
   [ -n "${ATLAS_LOCAL_DIR:-}" ] && [ -s "$ATLAS_LOCAL_DIR/manifest.json" ] || die "no index at ATLAS_LOCAL_DIR"
   local f
   for f in "$ATLAS_LOCAL_DIR"/*; do
     case "$(basename "$f")" in
-      model) continue ;;
+      model | taxa-*.f16) continue ;;
       manifest.json | *.ids.u32) ;;
       *) [ -z "$only" ] || continue ;;
     esac
@@ -69,7 +75,11 @@ push_local() {
   done
   cp "$dir/manifest.json" "$ATLAS_LOCAL_DIR/" && log "push manifest.json"
   for f in "$ATLAS_LOCAL_DIR"/*; do
-    [ "$(basename "$f")" = model ] || [ -e "$dir/$(basename "$f")" ] || rm -f "$f"
+    case "$(basename "$f")" in
+      model) continue ;;
+      taxa-*.f16) has_taxa || continue ;;
+    esac
+    [ -e "$dir/$(basename "$f")" ] || rm -f "$f"
   done
 }
 
@@ -78,12 +88,13 @@ pull_hf() {
   local include=()
   [ -z "$only" ] || include=(--include manifest.json --include "*.ids.u32")
   hf_cli download "$ATLAS_HF_REPO" --repo-type dataset --local-dir "$dir" --exclude "model/*" \
+    --exclude "taxa-*.f16" \
     ${include[@]+"${include[@]}"}
 }
 
 # Index file names; prune deletes only these, never the dataset card, .gitattributes or model/.
 # The hf CLI takes one glob per flag: --delete a --delete b.
-HF_PRUNE=(--delete "*.offsets.u32" --delete "*.ids.u32" --delete "*.codes.u8" --delete "*.dir.u32"
+HF_PRUNE=(--delete "*.offsets.u32" --delete "*.ids.u32" --delete "*.codes.u8" --delete "*.refine.u8" --delete "*.dir.u32"
   --delete "neighbors*.bin")
 
 push_hf() {
@@ -111,7 +122,7 @@ pull_r2() {
   local filter=()
   [ -z "$only" ] || filter=(--exclude "*" --include manifest.json --include "*.ids.u32")
   aws s3 sync "s3://$ATLAS_R2_BUCKET/" "$dir" --endpoint-url "$ATLAS_R2_ENDPOINT" --only-show-errors \
-    --exclude "model/*" ${filter[@]+"${filter[@]}"}
+    --exclude "model/*" --exclude "taxa-*.f16" ${filter[@]+"${filter[@]}"}
 }
 
 push_r2() {
@@ -120,8 +131,10 @@ push_r2() {
     --exclude manifest.json --exclude "*.tmp"
   aws s3 cp "$dir/manifest.json" "s3://$ATLAS_R2_BUCKET/manifest.json" --endpoint-url "$ATLAS_R2_ENDPOINT" \
     --only-show-errors --cache-control "no-cache"
+  local keep=()
+  has_taxa || keep=(--exclude "taxa-*.f16")
   aws s3 sync "$dir" "s3://$ATLAS_R2_BUCKET/" --endpoint-url "$ATLAS_R2_ENDPOINT" --only-show-errors \
-    --exclude "*.tmp" --exclude "model/*" --delete
+    --exclude "*.tmp" --exclude "model/*" ${keep[@]+"${keep[@]}"} --delete
 }
 
 case "$cmd:$host" in
