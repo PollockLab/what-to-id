@@ -5,10 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Photo search</title>
 <style>
-:root{--bg:#fbfbf9;--panel:#fff;--ink:#1d1d1b;--muted:#5f5e58;--line:#dcdbd3;--chip:#f0efe9;--on:#1d1d1b;--onink:#fff;
-  --warn:#8a4b00;--warnbg:#fdf0dc;--bar:#2a78d6}
-@media (prefers-color-scheme:dark){:root{--bg:#1a1a19;--panel:#222220;--ink:#fff;--muted:#c3c2b7;--line:#3a3a37;
-  --chip:#2c2c2a;--on:#fff;--onink:#1a1a19;--warn:#ffc27a;--warnbg:#3a2a14;--bar:#3987e5}}
+__SITE_CSS__
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
 body{min-height:100vh}
@@ -58,7 +55,7 @@ progress{width:100%;height:10px}
 </style>
 </head>
 <body>
-<header>
+__SITE_NAV__<header>
 <h1>Photo search</h1>
 <p class="sub">Search the photos of British Columbia observations that still need an ID, then open the hits in iNaturalist Identify. Similarity shows how closely a photo resembles your words or your photo, not how sure anyone is of its identification. Names are the current iNaturalist identifications.</p>
 <form class="search" id="form" role="search">
@@ -68,7 +65,7 @@ progress{width:100%;height:10px}
 </form>
 <div class="examples" id="examples" role="group" aria-label="Example searches"></div>
 </header>
-<main id="main">
+<main id="main-content">
 <div id="gate" class="note" role="alert" hidden>
 <p style="margin:0 0 6px" id="gatetext"></p>
 <button type="button" id="gobtn" class="primary">Download and search</button>

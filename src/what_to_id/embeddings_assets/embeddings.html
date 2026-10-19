@@ -6,13 +6,10 @@
 <title>Photo space</title>
 <script src="__DECK_JS__"></script>
 <style>
-:root{--bg:#fbfbf9;--panel:#fff;--ink:#1d1d1b;--muted:#5f5e58;--line:#dcdbd3;--chip:#f0efe9;--on:#1d1d1b;--onink:#fff;
-  --warn:#8a4b00;--warnbg:#fdf0dc;--bar:#2a78d6;--shadow:0 4px 16px rgba(0,0,0,.18)}
-@media (prefers-color-scheme:dark){:root{--bg:#1a1a19;--panel:#222220;--ink:#fff;--muted:#c3c2b7;--line:#3a3a37;
-  --chip:#2c2c2a;--on:#fff;--onink:#1a1a19;--warn:#ffc27a;--warnbg:#3a2a14;--bar:#3987e5;--shadow:0 4px 16px rgba(0,0,0,.5)}}
+__SITE_CSS__
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
-body{display:grid;grid-template-columns:260px minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);grid-template-areas:"head head" "side plot"}
+body{display:grid;grid-template-columns:260px minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);grid-template-areas:"nav nav" "head head" "side plot"}
 header{grid-area:head;padding:10px 16px;border-bottom:1px solid var(--line)}
 h1{font-size:18px;margin:0}
 .sub,.muted,.attr{color:var(--muted);margin:2px 0 0;font-size:12px}
@@ -32,7 +29,7 @@ button,.btn{font:inherit;font-size:12px;border:1px solid var(--line);background:
 .ptip{position:fixed;z-index:20;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:6px;
   padding:4px 8px;font-size:12px;box-shadow:var(--shadow)}
 .ptip[hidden],.card[hidden]{display:none}
-.card{position:fixed;z-index:10;top:96px;right:12px;width:min(340px,calc(100vw - 24px));max-height:calc(100vh - 108px);overflow:auto;
+.card{position:fixed;z-index:10;top:140px;right:12px;width:min(340px,calc(100vw - 24px));max-height:calc(100vh - 152px);overflow:auto;
   background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow)}
 .card .x{position:absolute;top:6px;right:6px;z-index:1;width:28px;height:28px;padding:0;font-size:16px;line-height:1}
 .ph{background:var(--chip);min-height:120px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px}
@@ -43,15 +40,15 @@ button,.btn{font:inherit;font-size:12px;border:1px solid var(--line);background:
 .nbrs{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 .nbrs button{width:100%;padding:0;border-radius:6px;overflow:hidden;aspect-ratio:1;background:var(--chip)}
 .nbrs img{width:100%;height:100%;object-fit:cover;display:block}
-@media (max-width:760px){body{grid-template-columns:1fr;grid-template-rows:auto auto minmax(0,1fr);grid-template-areas:"head" "side" "plot"}
+@media (max-width:760px){body{grid-template-columns:1fr;grid-template-rows:auto auto auto minmax(0,1fr);grid-template-areas:"nav" "head" "side" "plot"}
   .side{border-right:0;border-bottom:1px solid var(--line);max-height:30vh}
   .card{top:auto;bottom:0;right:0;left:0;width:auto;max-height:60vh;border-radius:10px 10px 0 0}}
 </style>
 </head>
 <body>
-<header>
+__SITE_NAV__<header>
 <h1>Photo space</h1>
-<p class="sub" id="intro">Every observation that still needs an ID, placed so that photos the model finds alike sit near each other. Hover a dot for its name, click it for the photo and its closest matches. <a href="__MAP_URL__">Map</a> · <a href="__SEARCH_URL__">Photo search</a> · <a href="__SAMPLE_URL__">The 10,000-photo sample</a></p>
+<p class="sub" id="intro">Every observation that still needs an ID, placed so that photos the model finds alike sit near each other. Hover a dot for its name, click it for the photo and its closest matches. A <a href="__SAMPLE_URL__">10,000-photo sample</a> loads faster.</p>
 <p class="note" id="honest">This flat picture is a lossy squeeze of a much richer image space, so some points that look close are not, and some close photos land apart. <span id="fid"></span> Nearness is not identification confidence: it says two photos look alike to the model, not what either one is. The matches in the card are computed in the full space, not read off this plot.</p>
 </header>
 <section class="side" aria-label="Filters">

@@ -12,6 +12,8 @@ import argparse
 import json
 from pathlib import Path
 
+from what_to_id import page_nav
+
 HERE = Path(__file__).parent
 ASSETS = HERE / "embeddings_assets"
 # Same pin as page_map.DECK_JS; not imported because the deploy script runs on a bare python3
@@ -42,8 +44,8 @@ def build(
     for key, value in {
         "__EMBEDDINGS_CONFIG__": json.dumps(config).replace("<", "\\u003c"),
         "__DECK_JS__": DECK_JS,
-        "__MAP_URL__": map_url,
-        "__SEARCH_URL__": search_url,
+        "__SITE_CSS__": page_nav.CSS,
+        "__SITE_NAV__": page_nav.nav(PAGE_NAME, set(dict(page_nav.PAGES))),
         "__SAMPLE_URL__": sample_url,
     }.items():
         html = html.replace(key, value)

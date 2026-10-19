@@ -33,7 +33,7 @@ from what_to_id.page_order_text import order_name
 
 __all__ = ["METHOD_CSS", "ORDER_DETAIL", "ORDER_TEXT", "method_section"]
 
-_SG = '"Space Grotesk",Inter,system-ui,sans-serif'
+_SG = "system-ui,sans-serif"
 
 METHOD_JS = """
 (function() {
@@ -64,14 +64,14 @@ details.how>summary{{cursor:pointer;font-family:{_SG};font-size:.8rem;font-weigh
 text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}}
 details.how>summary:hover{{color:var(--acc)}}
 .how details.more{{margin:.6rem 0 1.1rem;padding:.15rem 0 .15rem .8rem;
-border-left:2px solid #2a3a4d}}
+border-left:2px solid var(--line)}}
 .how details.more>summary{{cursor:pointer;font-size:.86rem;font-weight:600;color:var(--acc);
 line-height:1.4;overflow-wrap:anywhere}}
 .how details.more>summary:hover{{text-decoration:underline}}
 .how details.more[open]>summary{{margin-bottom:.4rem}}
 .how details.more[open]{{border-left-color:var(--acc)}}
 @media (max-width:30rem){{.how details.more{{padding-left:0;border-left:0;
-border-top:2px solid #2a3a4d}}.how details.more[open]{{border-top-color:var(--acc)}}}}
+border-top:2px solid var(--line)}}.how details.more[open]{{border-top-color:var(--acc)}}}}
 .how ul{{margin:.3rem 0;padding-left:1.1rem}}
 .how .pipe{{display:flex;flex-wrap:wrap;gap:.9rem 1.2rem;margin:1rem 0 1.2rem}}
 .pipe .stage{{flex:1 1 15rem;min-width:0}}
@@ -84,21 +84,22 @@ text-transform:uppercase;letter-spacing:.06em;color:var(--acc);margin-bottom:.35
 .how h3{{font-family:{_SG};font-size:1.08rem;margin:2.2rem 0 .5rem;scroll-margin-top:1rem}}
 .how h4{{font-family:{_SG};font-size:.95rem;margin:1.6rem 0 .4rem;scroll-margin-top:1rem}}
 .how section p,.how section li{{line-height:1.55}}
-.how section{{border-top:1px solid #2a3a4d;scroll-margin-top:1rem}}
+.how section{{border-top:1px solid var(--line);scroll-margin-top:1rem}}
 .how details.method>summary{{cursor:pointer;padding:.65rem 0;color:var(--ink)}}
 .how details.method>summary h3{{display:inline;font-size:1rem;margin:0}}
 .how details.method>summary a{{color:var(--acc);margin-left:.5rem;text-decoration:none}}
 .how details.method>summary a:hover{{text-decoration:underline}}
 .how details.method[open]{{padding-bottom:.8rem}}
 .how summary:focus-visible{{outline:2px solid var(--acc);outline-offset:3px}}
-.how details.order{{margin:.6rem 0;border-top:1px solid #2a3a4d}}
+.how details.order{{margin:.6rem 0;border-top:1px solid var(--line)}}
 .how details.order>summary{{padding:.6rem 0;cursor:pointer;color:var(--acc);
 font-size:.95rem;font-weight:400}}
 .how .cite{{white-space:nowrap}}
 .how dl.rule{{margin:.5rem 0 1rem}}
 .how dl.rule dt{{font-weight:600;color:var(--ink);margin-top:.5rem}}
 .how dl.rule dd{{margin:.1rem 0 0}}
-.how figure.fig{{margin:1.1rem 0 1.4rem;padding:0}}
+.how figure.fig{{margin:1.1rem 0 1.4rem;padding:.6rem;background:#0f1620;border-radius:12px;
+--ink:#e8eef5;--mut:#9fb2c6;--panel:#172230;--acc:rgb(139,168,132)}}
 .how figure.fig svg{{display:block;height:auto;margin:0 auto}}
 .how figcaption{{font-size:.84rem;line-height:1.5;color:var(--mut);margin:.55rem auto 0;
 max-width:40rem}}
@@ -108,7 +109,7 @@ max-width:40rem}}
 .tablewrap{{overflow-x:auto;margin:.6rem 0 1rem}}
 .how table{{border-collapse:collapse;font-size:.85rem;width:auto;background:transparent;
 color:var(--ink)}}
-.how th,.how td{{border:1px solid #2a3a4d;padding:.3rem .55rem;text-align:left;
+.how th,.how td{{border:1px solid var(--line);padding:.3rem .55rem;text-align:left;
 white-space:nowrap;vertical-align:top}}
 .how table.wrap td{{white-space:normal;min-width:12rem;max-width:26rem}}
 .how table.wrap tbody th{{white-space:normal;min-width:7rem}}

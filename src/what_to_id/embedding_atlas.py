@@ -18,6 +18,7 @@ import numpy as np
 import pandas as pd
 from scipy.sparse.linalg import svds
 
+from what_to_id import page_nav
 from what_to_id.arms import load_embeddings
 from what_to_id.atlas_projection import display_projection, projection_fidelity
 from what_to_id.atlas_taxonomy import AtlasTaxonomy
@@ -338,7 +339,11 @@ def build(
         target = data_dir / f"{payload['group']}.json"
         target.write_text(json.dumps(payload, separators=(",", ":")))
     template = Path(__file__).with_name("embedding_atlas.html").read_text()
-    html = template.replace("__ATLAS_META__", json.dumps(metadata).replace("<", "\\u003c"))
+    # absolute links so the shell works from the dinov3/ subfolder too
+    base = map_view.rsplit("/", 1)[0] + "/"
+    html = template.replace("__SITE_CSS__", page_nav.CSS)
+    html = html.replace("__SITE_NAV__", page_nav.nav(PAGE_NAME, base=base, carry=False))
+    html = html.replace("__ATLAS_META__", json.dumps(metadata).replace("<", "\\u003c"))
     identify_links = (Path(__file__).with_name("map_assets") / "identify_links.js").read_text()
     html = html.replace("__IDENTIFY_LINKS__", identify_links)
     logic = Path(__file__).with_name("embedding_atlas_logic.js").read_text()

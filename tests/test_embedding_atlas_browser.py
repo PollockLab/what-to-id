@@ -1633,7 +1633,10 @@ def test_first_screen_prioritizes_evidence_and_preserves_disclosed_scope(
     if font_family:
         page.add_style_tag(content=f":root{{font-family:{font_family}!important}}")
     page.evaluate("window.scrollTo(0,0)")
-    assert page.locator("#map").bounding_box()["y"] <= {390: 420, 820: 450, 1440: 380}[width]
+    budget = {390: 420, 820: 450, 1440: 380}[width] + page.locator(".site-shell").bounding_box()[
+        "height"
+    ]
+    assert page.locator("#map").bounding_box()["y"] <= budget
     assert page.evaluate("document.documentElement.scrollWidth") <= width
     for selector in [
         "#group",
@@ -1674,7 +1677,10 @@ def test_first_screen_prioritizes_evidence_and_preserves_disclosed_scope(
     page.evaluate("window.scrollTo(0,0)")
     assert _scope_result_ids(page) == [107]
     assert page.locator('[data-focal-id="100"]').count() == 1
-    assert page.locator("#map").bounding_box()["y"] <= {390: 600, 820: 600, 1440: 500}[width]
+    budget = {390: 600, 820: 600, 1440: 500}[width] + page.locator(".site-shell").bounding_box()[
+        "height"
+    ]
+    assert page.locator("#map").bounding_box()["y"] <= budget
     assert page.locator("#focal-outside-results").is_visible()
     assert page.locator("#transfer-message").is_hidden()
     assert (
@@ -2607,7 +2613,10 @@ def test_actual_plant_catalog_is_searchable_without_applying_or_recomputing(
     page.wait_for_function("sampleUsable() && data.records.length===1000")
     if font_family:
         page.add_style_tag(content=f":root{{font-family:{font_family}!important}}")
-    assert page.locator("#map").bounding_box()["y"] <= {390: 420, 820: 450, 1440: 380}[width]
+    budget = {390: 420, 820: 450, 1440: 380}[width] + page.locator(".site-shell").bounding_box()[
+        "height"
+    ]
+    assert page.locator("#map").bounding_box()["y"] <= budget
     # Native intrinsic widths must not create an extra row under font fallbacks.
     tops = [
         page.locator(selector).bounding_box()["y"]

@@ -10,6 +10,8 @@ import argparse
 import json
 from pathlib import Path
 
+from what_to_id import page_nav
+
 HERE = Path(__file__).parent
 SCRIPTS = {
     "__IDENTIFY_LINKS__": HERE / "map_assets" / "identify_links.js",
@@ -30,6 +32,8 @@ def build(out_dir: str | Path, data_url: str = "atlas/", map_url: str = "map.htm
     config = json.dumps({"dataUrl": data_url, "mapUrl": map_url}).replace("<", "\\u003c")
     html = (HERE / "atlas_search_assets" / "atlas_search.html").read_text()
     html = html.replace("__ATLAS_SEARCH_CONFIG__", config)
+    html = html.replace("__SITE_CSS__", page_nav.CSS)
+    html = html.replace("__SITE_NAV__", page_nav.nav("search.html", set(dict(page_nav.PAGES))))
     for placeholder, path in SCRIPTS.items():
         html = html.replace(placeholder, path.read_text())
     target = out / "search.html"

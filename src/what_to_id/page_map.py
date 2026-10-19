@@ -55,6 +55,7 @@ import numpy as np
 import pandas as pd
 import requests
 
+from what_to_id import page_nav
 from what_to_id.batches import MAX_URL_LEN
 from what_to_id.inat import BC_PLACE_ID, INAT, SLEEP, TIMEOUT, make_session
 from what_to_id.map_parks import PARKS_NAME, parks_blob, parks_version
@@ -388,7 +389,7 @@ def over_totals(pool: pd.DataFrame, meta: dict) -> int:
     return over
 
 
-def render_map(meta: dict, *, freeze: str | None, back: str = "index.html") -> str:
+def render_map(meta: dict, *, freeze: str | None) -> str:
     """The map page. META goes inline; the points and names come from the files at load."""
     when = ""
     if freeze:
@@ -407,12 +408,12 @@ def render_map(meta: dict, *, freeze: str | None, back: str = "index.html") -> s
     fill = {
         "TITLE": "Records that need an ID in BC",
         "WHEN": when,
-        "BACK": escape(back),
         "PLACE_ID": str(BC_PLACE_ID),
         "MAPLIBRE_CSS": MAPLIBRE_CSS,
         "MAPLIBRE_JS": MAPLIBRE_JS,
         "DECK_JS": DECK_JS,
-        "CSS": _assets(MAP_CSS),
+        "CSS": page_nav.CSS + "\n" + _assets(MAP_CSS),
+        "NAV": page_nav.nav("map.html"),
         "META": json.dumps(page_meta, sort_keys=True, separators=(",", ":")).replace("</", "<\\/"),
         "BASEMAPS": json.dumps(BASEMAPS, sort_keys=True),
         "JS": _assets(MAP_JS),
