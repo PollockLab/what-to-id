@@ -39,12 +39,14 @@ CSS = """
 padding:10px 14px;
   background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px}
 .site-skip:focus{transform:none}
-.site-shell{grid-area:nav;display:flex;flex-wrap:wrap;align-items:center;gap:0 16px;padding:0 16px;
+.site-shell{grid-area:nav;display:flex;align-items:center;gap:0 16px;padding:0 16px;
   background:var(--panel);color:var(--ink);border-bottom:1px solid var(--line);
   font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
 .site-brand{display:inline-flex;align-items:center;min-height:44px;font-weight:700;font-size:15px;
   color:var(--ink);text-decoration:none;white-space:nowrap}
-.site-nav{display:flex;flex-wrap:wrap;gap:0 4px}
+.site-nav{position:relative;display:flex;flex:1 1 auto;min-width:0;gap:0 4px;
+  overflow-x:auto;scrollbar-width:none}
+.site-nav::-webkit-scrollbar{display:none}
 .site-nav a{display:inline-flex;align-items:center;min-height:44px;padding:0 12px;
 color:var(--muted);
   text-decoration:none;border-bottom:3px solid transparent;white-space:nowrap}
@@ -53,6 +55,7 @@ color:var(--muted);
 .site-vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);
 white-space:nowrap}
 @media (max-width:640px){.site-shell{padding:0 8px;gap:0 8px}.site-nav a{padding:0 9px}}
+@media (max-width:480px){.site-bc{display:none}}
 """.strip()
 
 # Points the switcher at what is open. Reads the hash the pages already write: the map keeps
@@ -73,6 +76,8 @@ else if(v==='blitz'&&c.lat!==null)u=b+'?at='+c.lat.toFixed(3)+','+c.lon.toFixed(
 a.href=u;});}
 if(!n.hasAttribute('data-fixed'))['mouseover','focusin','touchstart',
 'click'].forEach(function(e){n.addEventListener(e,sync,true);});
+var cur=n.querySelector('[aria-current]');
+if(cur)n.scrollLeft+=cur.getBoundingClientRect().left-n.getBoundingClientRect().left-(n.clientWidth-cur.offsetWidth)/2;
 if(!n.hasAttribute('data-fixed')){addEventListener('hashchange',sync);sync();}
 if(n.hasAttribute('data-probe'))n.querySelectorAll('a[data-optional]').forEach(function(a){
 fetch(a.dataset.base,{method:'HEAD'}).then(function(r){if(!r.ok)a.remove();}).catch(function(){
@@ -121,7 +126,7 @@ def nav(
     return (
         f'<a class="site-skip" href="#main-content" {_SKIP}>Skip to content</a>\n'
         f'<div class="site-shell"><a class="site-brand" href="{escape(base)}index.html">'
-        "What to ID · BC</a>"
+        'What to ID<span class="site-bc"> · BC</span></a>'
         f'<nav class="site-nav" aria-label="Views"{flags}>{"".join(links)}</nav></div>\n'
         f"<script>{JS}</script>\n"
     )

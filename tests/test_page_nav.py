@@ -113,3 +113,16 @@ def test_photo_search_switcher_points_the_map_at_the_chosen_record(browser):
     pg.keyboard.press("Enter")
     assert pg.evaluate("location.hash") == "#id=7"
     assert pg.evaluate("document.activeElement.id") == "main-content"
+
+
+def test_shell_is_one_short_row_on_a_phone(browser):
+    pg = _open(browser, "map.html")
+    pg.set_viewport_size({"width": 390, "height": 800})
+    assert pg.locator(".site-shell").bounding_box()["height"] <= 56
+    assert all(
+        b["height"] >= 44
+        for b in pg.locator(".site-nav a").evaluate_all(
+            "els => els.map(e => e.getBoundingClientRect().toJSON())"
+        )
+    )
+    assert pg.evaluate("document.documentElement.scrollWidth") <= 390
