@@ -104,7 +104,7 @@ function parseMapMeta(html){
   if(b<0)throw new Error('Could not read the map data description from the map page.');
   return JSON.parse(html.slice(a+9,b));
 }
-// The plot's accuracy as one sentence part, from manifest.layout.fidelity (see atlas_projection.projection_fidelity).
+// The plot's accuracy as one sentence part, from manifest.layout.fidelity.
 function fidelity(f){
   if(typeof f==='number')return {value:f,k:12};
   if(!f||typeof f!=='object')return null;

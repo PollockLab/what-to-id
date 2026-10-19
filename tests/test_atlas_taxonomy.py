@@ -3,12 +3,9 @@
 import hashlib
 import json
 
-import numpy as np
-import pandas as pd
 import pytest
 
 from what_to_id.atlas_taxonomy import AtlasTaxonomy, membership
-from what_to_id.embedding_atlas import build, group_payload
 from what_to_id.taxonomy import PRESETS
 
 
@@ -141,109 +138,6 @@ def test_source_provenance_rejects_nonpublic_or_malformed_urls(tmp_path, source)
         AtlasTaxonomy(cache(tmp_path, {}), source_url=source)
 
 
-def inputs(tmp_path):
-    ids = np.array([11, 12, 13])
-    vectors = np.eye(3, dtype=np.float32)
-    embeddings = tmp_path / "Plantae.npz"
-    np.savez(embeddings, ids=ids, E=vectors, backbone="fixture")
-    pool = pd.DataFrame(
-        {
-            "id": [13, 11, 12],
-            "iconic_taxon": "Plantae",
-            "lon": -123,
-            "lat": 49,
-            "taxon_name": "Recorded taxon",
-            "photo_url": "",
-            "observed_on": "2026-09-11",
-            "taxon_id": pd.array([None, 311249, 999], dtype="Int64"),
-        }
-    )
-    return pool, embeddings
-
-
-def test_payload_preserves_embedding_order_and_explicit_missing_ids(tmp_path):
-    pool, embeddings = inputs(tmp_path)
-    path = cache(tmp_path, {"1": row(None), "311249": row(1)})
-    taxonomy = AtlasTaxonomy(path)
-    original = group_payload(pool, embeddings, "Plantae")
-    actual = group_payload(pool, embeddings, "Plantae", taxonomy=taxonomy)
-    assert "taxonomy" not in original
-    assert all("taxon_id" not in record for record in original["records"])
-    assert [r["id"] for r in actual["records"]] == [11, 12, 13]
-    assert [r["taxon_id"] for r in actual["records"]] == [311249, 999, None]
-    assert [r["taxonomy_complete"] for r in actual["records"]] == [True, False, False]
-    assert actual["taxonomy"]["source_url"] is None
-    assert actual["taxonomy"]["complete_count"] == 1
-    assert actual["taxonomy"]["incomplete_count"] == 2
-    for before, after in zip(original["records"], actual["records"], strict=True):
-        assert all(after[key] == value for key, value in before.items())
-    pool.drop(columns="taxon_id", inplace=True)
-    with pytest.raises(ValueError, match="requires taxon_id"):
-        group_payload(pool, embeddings, "Plantae", taxonomy=taxonomy)
-
-
-def test_build_exports_the_requested_offline_cache_and_source(tmp_path):
-    pool, embeddings = inputs(tmp_path)
-    pool_path = tmp_path / "pool.parquet"
-    pool.to_parquet(pool_path)
-    path = cache(tmp_path, {"311249": row(None)})
-    out = tmp_path / "site"
-    source = "https://example.org/taxonomy.json"
-    build(
-        pool_path,
-        str(embeddings),
-        out,
-        snapshot_date="2026-09-11",
-        taxonomy_path=path,
-        taxonomy_source=source,
-    )
-    actual = json.loads((out / "embeddings-data/Plantae.json").read_text())
-    assert actual["taxonomy"]["source_url"] == source
-    assert actual["taxonomy"]["cache_sha256"] == hashlib.sha256(path.read_bytes()).hexdigest()
-    assert actual["records"][0]["ancestor_taxon_ids"] == [311249]
-    with pytest.raises(ValueError, match="source requires a taxonomy cache"):
-        build(pool_path, str(embeddings), out, snapshot_date="2026-09-11", taxonomy_source=source)
-    pool.drop(columns="taxon_id").to_parquet(pool_path)
-    with pytest.raises(ValueError, match="requires taxon_id"):
-        build(pool_path, str(embeddings), out, snapshot_date="2026-09-11", taxonomy_path=path)
-
-
-def test_cli_offline_taxonomy_flags_reach_the_published_payload(tmp_path, monkeypatch):
-    import sys
-
-    from what_to_id.embedding_atlas import main
-
-    pool, embeddings = inputs(tmp_path)
-    pool_path = tmp_path / "pool.parquet"
-    pool.to_parquet(pool_path)
-    taxonomy = cache(tmp_path, {"311249": row(None)})
-    out = tmp_path / "site"
-    source = "https://example.org/taxonomy.json"
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            "atlas",
-            "--pool",
-            str(pool_path),
-            "--embeddings",
-            str(embeddings),
-            "--out",
-            str(out),
-            "--snapshot-date",
-            "2026-09-11",
-            "--taxonomy",
-            str(taxonomy),
-            "--taxonomy-source",
-            source,
-        ],
-    )
-    main()
-    payload = json.loads((out / "embeddings-data/Plantae.json").read_text())
-    assert payload["taxonomy"]["source_url"] == source
-    assert payload["taxonomy"]["presets"][1]["approximate"] is True
-
-
 def test_exclusion_inverts_only_known_membership_and_preserves_unknown(tmp_path):
     tree = AtlasTaxonomy(cache(tmp_path, {"1": row(None), "2": row(1), "3": row(9)}))
     # Taxon 3 reaches a known target before its ancestry ends at the missing parent.
@@ -278,20 +172,6 @@ def test_fungal_metadata_appends_an_explicit_approximate_exclusion_without_reord
     assert included["match_count"] == 2
     assert included["nonmatch_count"] == 1
     assert outside["unknown_count"] == included["unknown_count"] == 1
-
-
-def test_fungal_payload_passes_group_context_without_changing_observations(tmp_path):
-    pool, embeddings = inputs(tmp_path)
-    pool["iconic_taxon"] = "Fungi"
-    pool["taxon_id"] = pd.array([None, 54743, 1], dtype="Int64")
-    tree = AtlasTaxonomy(cache(tmp_path, {"1": row(None), "54743": row(1)}))
-    baseline = group_payload(pool, embeddings, "Fungi")
-    actual = group_payload(pool, embeddings, "Fungi", taxonomy=tree)
-    assert len(actual["taxonomy"]["presets"]) == 3
-    assert actual["taxonomy"]["presets"][2]["match_count"] == 1
-    assert actual["taxonomy"]["presets"][2]["unknown_count"] == 1
-    for before, after in zip(baseline["records"], actual["records"], strict=True):
-        assert all(after[key] == value for key, value in before.items())
 
 
 def test_catalog_contains_only_represented_ancestors_with_explicit_missing_labels(tmp_path):

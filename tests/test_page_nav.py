@@ -56,15 +56,14 @@ def test_skip_link_keeps_the_hash():
     assert "event.preventDefault()" in link and ".focus()" in link
 
 
-def test_base_and_extra_page():
-    html = nav("embeddings-sample.html", base="https://x.test/app/", carry=False)
+def test_base_prefixes_the_links():
+    html = nav("index.html", base="https://x.test/app/")
     assert 'href="https://x.test/app/split.html"' in html
-    assert 'href="embeddings-sample.html" aria-current="page"' in html
-    assert html.count('aria-current="page"') == 1 and "data-fixed" in html
+    assert 'href="https://x.test/app/index.html" aria-current="page"' in html
 
 
 def test_no_forbidden_words():
-    low = (CSS + nav("map.html") + nav("embeddings-sample.html", carry=False)).lower()
+    low = (CSS + nav("map.html")).lower()
     assert not [w for w in FORBIDDEN if w in low]
 
 

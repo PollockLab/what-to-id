@@ -129,9 +129,6 @@ jobs:
           WHAT_TO_ID_KEY: ${{ secrets.WHAT_TO_ID_KEY }}
         run: scripts/daily.sh build
       # Deploy before saving: the served log then never lists a build that did not go live.
-      # Keep the separately published frozen demo alongside the checked study/map pages.
-      - name: Include the frozen embedding demo
-        run: cp -R demo/. out/final/site/
       - name: Include the photo-search page
         env:
           ATLAS_HF_REPO: ${{ vars.ATLAS_HF_REPO }}
