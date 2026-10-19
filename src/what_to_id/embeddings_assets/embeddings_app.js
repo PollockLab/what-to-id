@@ -332,7 +332,7 @@ function select(i,fly){
       var img=c.photo?el('img',{src:c.photo,alt:label,loading:'lazy'}):label;
       var b=el('button',{type:'button','aria-label':'Jump to '+label+(row<0?' (not in the plot)':''),'data-id':c.id},[img]);
       b.addEventListener('click',function(){row=L.find(S.P,c.id);if(row>=0)select(row,true);else window.open('https://www.inaturalist.org/observations/'+c.id,'_blank','noopener');});
-      var sc=el('span',{'class':'score'},['Cosine '+score[c.id].toFixed(2)]);
+      var sc=el('span',{'class':'score'},['Cosine '+score[c.id].toFixed(3)]);
       sc.title='cosine similarity '+score[c.id];
       b.addEventListener('mouseenter',function(){
         if(parent!==window)parent.postMessage({type:'wtid-focus',id:c.id},location.origin);});

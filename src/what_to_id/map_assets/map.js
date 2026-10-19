@@ -232,7 +232,7 @@ function layers(){
     new deck.TextLayer({id:'nbr-rank',data:NBR,getPosition:at,getText:function(d){return String(d.r);},getSize:12,
       sizeUnits:'pixels',getColor:[255,255,255],fontWeight:'bold',getTextAnchor:'middle',getAlignmentBaseline:'center'}));
   if(SEL>=0)L.push(new deck.ScatterplotLayer({id:'halo',data:[SEL],
-    getPosition:function(i){return [P.pos[2*i],P.pos[2*i+1]];},radiusUnits:'pixels',getRadius:12,
+    getPosition:function(i){return [P.pos[2*i],P.pos[2*i+1]];},radiusUnits:'pixels',getRadius:13,
     filled:false,stroked:true,lineWidthUnits:'pixels',getLineWidth:3,getLineColor:[233,168,50]}));
   if(SEL>=0)L.push(new deck.ScatterplotLayer({id:'sel',data:[SEL],
     getPosition:function(i){return [P.pos[2*i],P.pos[2*i+1]];},radiusUnits:'pixels',getRadius:8,
