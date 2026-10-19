@@ -12,6 +12,13 @@ header{grid-area:head;padding:10px 16px;border-bottom:1px solid var(--line);disp
 .embed .time{padding:4px 12px 6px}
 .embed .unit,.embed .hint{display:none}
 .embed #over{height:26px}
+/* embedded, the filters are a drawer over the map: they never take height from the plot */
+.embed body{grid-template-columns:minmax(0,1fr);grid-template-areas:"nav" "head" "map" "time"}
+.embed .toggle{display:inline-block;margin-left:auto;border:1px solid var(--line);background:var(--chip);
+  color:var(--ink);font:inherit;font-size:13px;padding:4px 12px;border-radius:14px}
+.embed .side{grid-area:map;position:relative;z-index:6;width:min(340px,100%);background:var(--panel);
+  border:0;border-right:1px solid var(--line);box-shadow:var(--shadow);display:none}
+.embed .side.open{display:flex}
 h1{font-size:18px;margin:0}
 .sub,.hint,.muted{color:var(--muted);margin:0;font-size:12px}
 .stat{margin:0;font-size:13px}
