@@ -4,15 +4,12 @@ function $(id){return document.getElementById(id);}
 var css=getComputedStyle(document.documentElement);
 function tok(n){return css.getPropertyValue(n).trim();}
 var dark=matchMedia('(prefers-color-scheme: dark)').matches,DOT=tok('--dot').split(',').map(Number);
-var DAY=864e5,D0=Date.parse(META.day0+'T00:00:00Z'),NO=65535,NOTAX=65535,LAST=META.days-1;
+var MF=MapFilter(META),DAY=MF.DAY,D0=MF.D0,NO=MF.NO,NOTAX=MF.NOTAX,LAST=MF.LAST;
 var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 var MONTH=['January','February','March','April','May','June','July','August','September',
   'October','November','December'];
-var FLAG={introduced:1,threatened:2,obscured:4,imprecise:8,earlyObs:16,earlyUp:32},ONLYFLAG={introduced:'introduced',
-  threatened:'threatened',exact:'obscured'},ONLYKEYS=Object.keys(ONLYFLAG),nf=new Intl.NumberFormat('en-CA');
-function iso(d){return new Date(D0+d*DAY).toISOString().slice(0,10);}
-function dayOf(s){var t=Date.parse(s+'T00:00:00Z');return isNaN(t)?null:Math.round((t-D0)/DAY);}
-function clamp(d){return Math.max(0,Math.min(LAST,d));}
+var FLAG=MF.FLAG,ONLYFLAG=MF.ONLYFLAG,ONLYKEYS=MF.ONLYKEYS,nf=new Intl.NumberFormat('en-CA'),
+  iso=MF.iso,dayOf=MF.dayOf,clamp=MF.clamp;
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){
   return '&#'+c.charCodeAt(0)+';';});}
 
@@ -30,28 +27,14 @@ var STALE_DAYS=2;
     el.textContent=days<=0?'today':days===1?'yesterday':days+' days ago';}
 })();
 
-// Calendar lookups by day: month of year, day of month, weekday (Monday is 0) and month number
-// counted from the first day's month, which indexes META.totals.
-var MOY=new Uint8Array(META.days),DOM=new Uint8Array(META.days),DOW=new Uint8Array(META.days),
-  MI=new Uint16Array(META.days),Y0=new Date(D0).getUTCFullYear(),M0=new Date(D0).getUTCMonth();
-for(var d=0;d<META.days;d++){var t=new Date(D0+d*DAY);MOY[d]=t.getUTCMonth();DOM[d]=t.getUTCDate();
-  DOW[d]=(t.getUTCDay()+6)%7;MI[d]=(t.getUTCFullYear()-Y0)*12+MOY[d]-M0;}
+var MOY=MF.MOY,DOM=MF.DOM,DOW=MF.DOW,MI=MF.MI,M0=MF.M0;
 
 // What the viewer picked. Written to the URL hash so a view can be shared or bookmarked.
 // Groups and show only hold chip states (see map_chips.js): {Insecta:'inc', Aves:'not'}.
-var S={up:false,lo:0,hi:LAST,months:0,groups:{},only:{},picks:[],split:[],rec:null,at:null,fly:false};
+var S=Object.assign({split:[],rec:null,at:null,fly:false},MF.read(new URLSearchParams(location.hash.slice(1))));
 (function readHash(){
   var h=new URLSearchParams(location.hash.slice(1));
-  S.up=h.get('by')==='uploaded';
-  var f=dayOf(h.get('from')||''),t=dayOf(h.get('to')||'');
-  if(f!=null)S.lo=clamp(f);if(t!=null)S.hi=clamp(t);
-  if(S.lo>S.hi){var sw=S.lo;S.lo=S.hi;S.hi=sw;}
-  (h.get('months')||'').split(',').forEach(function(m){if(+m>=1&&+m<=12)S.months|=1<<(m-1);});
-  S.groups=CH.read(h.get('groups'),META.groups);
-  S.only=CH.read(h.get('only'),ONLYKEYS.filter(function(k){return META.flags.indexOf(ONLYFLAG[k])>=0;}),['exact']);
-  S.picks=TX.read(h.get('taxa'));S.oldq=S.picks.length?'':h.get('q')||'';S.rec=+h.get('record')||null;
-  S.area=h.get('area')||'';S.park=h.get('park')||'';
-  S.bcpark=h.get('bcpark')||'';
+  S.rec=+h.get('record')||null;
   var at=(h.get('at')||'').split('/').map(Number);if(at.length===3&&at.every(isFinite))S.at=at;
   S.fly=!!S.rec&&!S.at;
 })();
@@ -59,12 +42,7 @@ var PJ=projectFilter({meta:META,hash:new URLSearchParams(location.hash.slice(1))
 var hashTimer=0;
 // The selection: the hash without the open record and the view.
 function sel(){
-  var h=[];if(S.up)h.push('by=uploaded');
-  if(S.lo>0)h.push('from='+iso(S.lo));if(S.hi<LAST)h.push('to='+iso(S.hi));
-  if(S.months){var ms=[];for(var m=0;m<12;m++)if(S.months>>m&1)ms.push(m+1);h.push('months='+ms);}
-  if(!allGroups())h.push('groups='+CH.write(S.groups,META.groups));
-  if(CH.any(S.only))h.push('only='+CH.write(S.only,ONLYKEYS));
-  if(S.picks.length)h.push('taxa='+TX.write(S.picks));
+  var h=MF.write(S);
   if(AREA.hash())h.push(AREA.hash());if(PJ.hash())h.push(PJ.hash());
   return h;}
 function writeHash(){clearTimeout(hashTimer);hashTimer=setTimeout(function(){
@@ -113,7 +91,7 @@ function addShard(buf,n){
 // only change the filter settings; the data is uploaded again only when records arrive, the picks,
 // the area or deletions change, or the groups change while a taxon is included (the groups and
 // included taxa are one set, so the kept bit then carries the groups too).
-var ST_INTRO=1,ST_THREAT=2,ST_INEXACT=4,ST_KEEP=8,ST_SAMPLE=16,PD=null,PD_KEY=null,PD_GONE=-1,PD_CAT=0,
+var ST_KEEP=MF.ST_KEEP,PD=null,PD_KEY=null,PD_GONE=-1,PD_CAT=0,
   OUT=new Uint8Array(0),RC=null,PJW=null;
 function inc(){return !!TF.inc;}
 function pointData(){
@@ -122,11 +100,7 @@ function pointData(){
   if(PD&&PD.length===n&&PD_KEY&&PD_KEY.every(function(k,j){return k===key[j];})&&PD_GONE===gone)return;
   var same=PD&&PD.length===n,days=same?PD.days:new Float32Array(2*n),
     cat=same?PD.attributes.getFilterCategory.value.slice():new Uint8Array(4*n);
-  if(!same)for(i=0;i<n;i++){var o=P.obs[i],u=P.up[i],f=P.fl[i];
-    days[2*i]=o===NO?-1:o;days[2*i+1]=u===NO?-1:u;
-    cat[4*i]=P.grp[i];cat[4*i+1]=o===NO?12:MOY[o];cat[4*i+2]=u===NO?12:MOY[u];
-    cat[4*i+3]=(f&FLAG.introduced?ST_INTRO:0)|(f&FLAG.threatened?ST_THREAT:0)|
-      (f&(FLAG.obscured|FLAG.imprecise)?ST_INEXACT:0)|(i%10===0?ST_SAMPLE:0);}
+  if(!same)for(i=0;i<n;i++)MF.record(days,cat,i,P.grp[i],P.obs[i],P.up[i],P.fl[i]);
   // only the kept bit follows the picks, the groups beside them, the area, projects and deletions
   // OUT keeps the records out for any reason but the area, for the Identify box count; PJW marks
   // the records Identify opens when it cannot say the projects exactly (see map_projects.js)
@@ -143,15 +117,7 @@ function pointData(){
     getFilterValue:{value:days,size:2},getFilterCategory:{value:cat,size:4}}};
   PD_KEY=key;PD_GONE=gone;
 }
-function categories(thin){
-  var groups=[],mon=[],all=[],st=[],req=0,hide=0,i;
-  CH.groupPass(S.groups,META.groups,inc()).forEach(function(v,j){if(v)groups.push(j);});
-  for(i=0;i<13;i++){all.push(i);if(S.months?i<12&&S.months>>i&1:true)mon.push(i);}
-  [['introduced',ST_INTRO],['threatened',ST_THREAT],['exact',ST_INEXACT]].forEach(function(o){var v=S.only[o[0]];
-    if(v==='not'||v&&o[0]==='exact')hide|=o[1];else if(v)req|=o[1];});
-  for(i=0;i<2*ST_SAMPLE;i++)if(i&ST_KEEP&&(i&req)===req&&!(i&hide)&&(!thin||i&ST_SAMPLE))st.push(i);
-  return [groups,S.up?all:mon,S.up?mon:all,st];
-}
+function categories(thin){return MF.categories(S,inc(),thin);}
 // The counts behind the histograms, header and share run on the CPU after the map has redrawn.
 var CT=0;
 function refilter(){

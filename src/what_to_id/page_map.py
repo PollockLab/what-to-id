@@ -88,7 +88,8 @@ _COLS = ("id", "lat", "lon", "observed_on", "created_at", "iconic_taxon")
 _ASSETS = files("what_to_id") / "map_assets"
 # Inlined in this order; map_taxa.js and map_area.js define the taxon and area filters map.js calls,
 # map_step.js the Identify button that steps through an area's batches, map_projects.js the
-# project filter, and map_chips.js the click rule for the short-list chips and the selection bar.
+# project filter, map_chips.js the click rule for the short-list chips and the selection bar, and
+# map_filter.js the filter state and the category values the GPU filter reads.
 MAP_CSS = ("map.css", "map_area.css")
 MAP_JS = (
     "identify_links.js",
@@ -97,6 +98,7 @@ MAP_JS = (
     "map_area.js",
     "map_projects.js",
     "map_chips.js",
+    "map_filter.js",
     "map.js",
 )
 
