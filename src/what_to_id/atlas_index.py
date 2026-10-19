@@ -32,6 +32,7 @@ from what_to_id.atlas_index_io import (
     check_vectors,
     encode_stream,
     group_by_list,
+    load_array,
     load_core,
     open_part,
     read_manifest,
@@ -195,8 +196,9 @@ def search(
 
 
 def _existing_ids(index_dir, manifest) -> np.ndarray:
+    # ids files only: the update's plan job pulls just manifest.json and *.ids.u32
     parts = [
-        np.asarray(open_part(index_dir, p["name"], manifest, p["count"])[1])
+        np.asarray(load_array(Path(index_dir) / f"{p['name']}.ids.u32", "<u4", (p["count"],)))
         for p in manifest["parts"]
     ]
     return np.concatenate(parts) if parts else np.empty(0, dtype=np.uint32)

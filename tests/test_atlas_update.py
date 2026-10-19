@@ -101,6 +101,17 @@ def test_plan_new_removed_cap_and_empty(index, new_vectors, tmp_path):
     assert json.loads(out.read_text())["ids"] == []
 
 
+def test_plan_reads_an_ids_only_index(index, new_vectors, tmp_path):
+    # the workflow's plan job pulls the index with `atlas_sync.sh pull DIR ids`
+    pool, _ = make_pool(index, new_vectors, tmp_path)
+    ids_only = tmp_path / "ids-only"
+    ids_only.mkdir()
+    for f in [index / "manifest.json", *index.glob("*.ids.u32")]:
+        shutil.copy(f, ids_only)
+    summary = au.plan(pool, ids_only, tmp_path / "todo.json")
+    assert summary == au.plan(pool, index, tmp_path / "todo-full.json")
+
+
 def test_plan_skips_rows_without_a_photo_and_rejects_duplicates(index, new_vectors, tmp_path):
     extra = pd.DataFrame({"id": [7, 8], "photo_url": [None, ""], "created_at": ["2026-01-01"] * 2})
     pool, _ = make_pool(index, new_vectors, tmp_path, extra=extra)
