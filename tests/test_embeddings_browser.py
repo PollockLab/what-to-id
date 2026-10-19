@@ -432,6 +432,32 @@ def test_split_page_relays_the_selection_between_frames_without_reloads(browser,
     page.close()
 
 
+def test_split_page_mirrors_a_picked_record_in_the_other_frame(browser, site):
+    # the fixture loads the photo space in both frames, so this pins the relay, not map.js
+    base, *_ = site
+    page = browser.new_page(viewport={"width": 1280, "height": 900})
+    page.errors = []
+    page.on("pageerror", lambda e: page.errors.append(str(e)))
+    stub_inat(page, None)
+    page.goto(f"{base}/split.html")
+    page.wait_for_function(
+        "[...document.querySelectorAll('iframe')].every(f =>"
+        " f.contentDocument.getElementById('count').textContent.includes('shown'))"
+    )
+    pick = [f for f in page.frames if "embed=1" in f.url]
+    assert len(pick) == 2
+    pick[0].evaluate("__deck.props.onClick({index: 7, layer: {id: 'pts'}})")
+    sel = "__deck.props.layers.find(x => x.id === 'sel').props.data[0]"
+    for f in pick:
+        f.wait_for_function("__deck.props.layers.some(x => x.id === 'sel')")
+        assert f.evaluate(sel) == 7
+    pick[1].evaluate("document.querySelector('#card .x').click()")
+    for f in pick:
+        f.wait_for_function("!__deck.props.layers.some(x => x.id === 'sel')")
+    assert page.errors == []
+    page.close()
+
+
 def test_click_opens_card_with_neighbours_and_jump(open_page, site):
     _, _, in_pool, _ = site
     page = open_page(drop=None)

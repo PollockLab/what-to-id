@@ -250,8 +250,17 @@ function pick(o){if(S.P&&o.index>=0&&o.layer&&o.layer.id==='pts')select(o.index,
 
 function closeCard(){
   S.sel=-1;S.nbr=[];S.run++;$('card').hidden=true;
-  writeHash();layers();
+  writeHash();layers();tell(null);
 }
+// The split view mirrors the picked record in the other frame by id; a remote pick is not posted back.
+var remote=false;
+function tell(id){if(parent!==window&&!remote)parent.postMessage({type:'wtid-record',id:id},location.origin);}
+addEventListener('message',function(e){
+  if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-record'||!S.P)return;
+  var id=e.data.id,i=id==null?-1:Array.prototype.indexOf.call(S.P.id,id);
+  if(i===S.sel||(id!=null&&i<0))return;
+  remote=true;try{if(i<0)closeCard();else select(i,true);}finally{remote=false;}
+});
 addEventListener('keydown',function(e){if(e.key==='Escape'&&!$('card').hidden)closeCard();});
 async function neighborsOf(id){
   try{return await S.idx.neighbors(id);}
@@ -262,7 +271,7 @@ async function neighborsOf(id){
 }
 function select(i,fly){
   var P=S.P,id=P.id[i],run=++S.run,t=names(i),card=$('card');
-  S.sel=i;S.nbr=[];
+  S.sel=i;S.nbr=[];tell(id);
   if(fly){
     var z=Math.max(S.vs.zoom,S.zoom0+3);
     S.vs=Object.assign({},S.vs,{target:[P.pos[2*i],P.pos[2*i+1],0],zoom:z});S.deck.setProps({viewState:S.vs});

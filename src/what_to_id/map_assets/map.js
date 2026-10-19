@@ -475,9 +475,24 @@ function place(){
   s.top=Math.max(m,Math.min(y-h/2,innerHeight-m-h))+'px';
 }
 function closeCard(){SEL=-1;card.hidden=true;if(ctl)ctl.abort();
-  if(GONE_NEW){GONE_NEW=false;refilter();}else{layers();writeHash();}}
+  if(GONE_NEW){GONE_NEW=false;refilter();}else{layers();writeHash();}
+  tell(null);}
+// The split view mirrors the picked record in the photo space by id. A record picked there is ringed
+// here without a card, and the map pans to it only when it is off screen.
+function tell(id){if(parent!==window)parent.postMessage({type:'wtid-record',id:id},location.origin);}
+function mark(i){
+  SEL=i;card.hidden=true;if(ctl)ctl.abort();layers();
+  var c=[P.pos[2*i],P.pos[2*i+1]];if(!map.getBounds().contains(c))map.easeTo({center:c});
+}
+addEventListener('message',function(e){
+  if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-record')return;
+  var id=e.data.id;
+  if(id==null){S.rec=S.mark=null;if(SEL>=0){SEL=-1;card.hidden=true;if(ctl)ctl.abort();layers();}return;}
+  for(var i=0;i<P.n;i++)if(P.id[i]===id){if(i!==SEL)mark(i);return;}
+  S.rec=id;S.fly=false;S.mark=true;  // the shards that hold it have not loaded yet
+});
 function openCard(i){
-  SEL=i;var t=names(i),id=P.id[i],lag=P.obs[i]!==NO&&P.up[i]!==NO&&!(P.fl[i]&(FLAG.earlyObs|FLAG.earlyUp))?P.up[i]-P.obs[i]:null;
+  SEL=i;tell(P.id[i]);var t=names(i),id=P.id[i],lag=P.obs[i]!==NO&&P.up[i]!==NO&&!(P.fl[i]&(FLAG.earlyObs|FLAG.earlyUp))?P.up[i]-P.obs[i]:null;
   card.innerHTML='<button type="button" class="x" aria-label="Close">×</button>'+
     '<div class="ph" id="ph">Loading photo</div><div class="body">'+
     '<h2>'+esc(t.common||t.latin)+'</h2><p class="latin"><i>'+esc(t.latin)+'</i>'+
@@ -562,7 +577,7 @@ META.shards.forEach(function(s,k){
     if(k===0)return names0;
   }).then(function(){
     refilter();
-    if(S.rec&&SEL<0){for(var i=0;i<P.n;i++)if(P.id[i]===S.rec){S.rec=null;openCard(i);
+    if(S.rec&&SEL<0){for(var i=0;i<P.n;i++)if(P.id[i]===S.rec){S.rec=null;if(S.mark){S.mark=false;mark(i);break;}openCard(i);
       if(S.fly){S.fly=false;map.flyTo({center:[P.pos[2*i],P.pos[2*i+1]],zoom:12});}break;}}
     if(k===META.shards.length-1&&S.rec){S.rec=null;writeHash();}
   });
