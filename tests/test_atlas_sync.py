@@ -82,6 +82,18 @@ def test_sync_script_local_mode_orders_manifest_last_and_prunes(index, tmp_path)
         refused = run("push", str(work), check=False)
         assert refused.returncode != 0 and f"names {gone}" in refused.stderr
         (work / gone).write_bytes(saved)
+    m = json.loads((work / "manifest.json").read_text())
+    m["layout"] = {"parts": [{"name": "layout-base", "count": 1}]}
+    (work / "manifest.json").write_text(json.dumps(m))
+    refused = run("push", str(work), check=False)  # the manifest names a layout part it lacks
+    assert refused.returncode != 0 and "names layout-base.bin" in refused.stderr
+    (work / "layout-base.bin").write_bytes(b"x")
+    run("push", str(work))
+    assert (host / "layout-base.bin").exists()
+    (work / "layout-base.bin").unlink()
+    (work / "manifest.json").write_text(json.dumps({k: v for k, v in m.items() if k != "layout"}))
+    run("push", str(work))
+    assert not (host / "layout-base.bin").exists()  # pruned once the manifest drops it
     (work / "delta-20260101.codes.u8").unlink()
     broken = run("push", str(work), check=False)
     assert broken.returncode != 0 and "lacks it" in broken.stderr

@@ -28,7 +28,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from what_to_id import atlas_index
+from what_to_id import atlas_index, atlas_layout
 from what_to_id.atlas_index_io import check_ids, read_manifest, unit_rows
 from what_to_id.atlas_neighbors import _topk_numpy, merge_neighbors, write_neighbor_records
 from what_to_id.atlas_update_encoder import Encoder
@@ -234,6 +234,25 @@ def _check_model(manifest: dict, info: dict, where: str) -> None:
             )
 
 
+def _place_delta(index, layout: dict, part: str, ids, nb_ids, nb_cos) -> int:
+    """Write the layout delta of ``part``: new rows at the mean of their placed neighbours."""
+    kid, kxy = atlas_layout.read_all(index, layout)
+    pid, pxy = atlas_layout.place(ids, nb_ids, nb_cos, kid, kxy)
+    rest = ~np.isin(ids, pid)  # second pass: neighbours among the new rows placed in the first
+    if rest.any() and len(pid):
+        pid2, pxy2 = atlas_layout.place(
+            ids[rest],
+            nb_ids[rest],
+            nb_cos[rest],
+            np.concatenate([kid, pid]),
+            np.concatenate([kxy, pxy]),
+        )
+        pid, pxy = np.concatenate([pid, pid2]), np.concatenate([pxy, pxy2])
+    if len(pid):
+        atlas_layout.add_part(index, f"layout-delta-{part.removeprefix('delta-')}", pid, pxy)
+    return int(len(pid))
+
+
 def apply(
     index: str | Path,
     vectors: list[str],
@@ -273,6 +292,8 @@ def apply(
         nb_ids, nb_cos = delta_neighbors(index, E, ids, nprobe=nprobe)
         atlas_index.append(index, part, E, ids)
         write_neighbor_records(index, f"neighbors-{part}", ids, nb_ids, nb_cos, 1024)
+        if "layout" in manifest:
+            result["placed"] = _place_delta(index, manifest["layout"], part, ids, nb_ids, nb_cos)
         raw = Path(raw_out) if raw_out else Path(index).resolve().parent / f"raw-{part}.npz"
         with open(raw, "wb") as f:
             np.savez(f, ids=ids, E=E.astype(np.float16))
@@ -291,6 +312,9 @@ def apply(
         base = "base-" + part.removeprefix("delta-")
         atlas_index.compact(index, keep_ids=live, name=base)
         merge_neighbors(index, keep_ids=live, name=f"neighbors-{base}")
+        if "layout" in manifest:
+            kept = atlas_index._existing_ids(index, read_manifest(index))
+            atlas_layout.compact(index, kept, f"layout-{base}")
         result.update(compacted=True, dropped=dropped)
     result["count"] = read_manifest(index)["count"]
     return result

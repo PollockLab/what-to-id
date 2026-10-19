@@ -43,7 +43,8 @@ check_pushable() {
   while read -r f; do
     [ -f "$dir/$f" ] || die "manifest names $f but $dir lacks it; pull the full index before pushing"
   done < <(jq -r '"centroids.f16", "opq.f16", "pq.f32", .refine.params,
-    (.parts[].name | (.+".offsets.u32", .+".ids.u32", .+".codes.u8", .+".refine.u8"))' "$dir/manifest.json")
+    (.parts[].name | (.+".offsets.u32", .+".ids.u32", .+".codes.u8", .+".refine.u8")),
+    (.layout.parts[]?.name | .+".bin")' "$dir/manifest.json")
 }
 
 # True when DIR has taxon vectors, i.e. the host's copies are DIR's to prune.
@@ -95,7 +96,7 @@ pull_hf() {
 # Index file names; prune deletes only these, never the dataset card, .gitattributes or model/.
 # The hf CLI takes one glob per flag: --delete a --delete b.
 HF_PRUNE=(--delete "*.offsets.u32" --delete "*.ids.u32" --delete "*.codes.u8" --delete "*.refine.u8" --delete "*.dir.u32"
-  --delete "neighbors*.bin")
+  --delete "neighbors*.bin" --delete "layout-*.bin")
 
 push_hf() {
   [ -n "${ATLAS_HF_REPO:-}" ] || die "ATLAS_HF_REPO is not set"
