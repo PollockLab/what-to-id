@@ -81,7 +81,7 @@ jobs:
           cache-dependency-path: requirements.lock
       - run: pip install --require-hashes -r requirements.lock
       - if: vars.ATLAS_HOST == 'hf'
-        run: pip install huggingface_hub==1.10.1 # the hf CLI, for atlas_sync.sh
+        run: pip install huggingface_hub==1.10.1 click==8.5.0 # the hf CLI, for atlas_sync.sh; typer>=0.27 no longer pulls click
       - name: Fetch the map pool and the index ids
         run: |
           set -euo pipefail
@@ -183,7 +183,7 @@ jobs:
           cache-dependency-path: requirements.lock
       - run: pip install --require-hashes -r requirements.lock
       - if: vars.ATLAS_HOST == 'hf'
-        run: pip install huggingface_hub==1.10.1 # the hf CLI, for atlas_sync.sh
+        run: pip install huggingface_hub==1.10.1 click==8.5.0 # the hf CLI, for atlas_sync.sh; typer>=0.27 no longer pulls click
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           pattern: vec-*
