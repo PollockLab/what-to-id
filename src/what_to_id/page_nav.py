@@ -39,7 +39,7 @@ CSS = """
 padding:10px 14px;
   background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px}
 .site-skip:focus{transform:none}
-.site-shell{grid-area:nav;display:flex;align-items:center;gap:0 16px;padding:0 16px;
+.site-shell{grid-area:nav;min-width:0;display:flex;align-items:center;gap:0 16px;padding:0 16px;
   background:var(--panel);color:var(--ink);border-bottom:1px solid var(--line);
   font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
 .site-brand{display:inline-flex;align-items:center;min-height:44px;font-weight:700;font-size:15px;
