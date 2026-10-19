@@ -54,7 +54,7 @@ def test_layout_sizes_and_dtypes(built, data):
     assert (man["version"], man["dims"], man["nlist"], man["m"]) == (2, D, NLIST, M)
     assert (man["nbits"], man["metric"], man["by_residual"], man["count"]) == (8, "ip", True, N)
     assert man["refine"] == {"bits": 3, "params": "refine.f32"}
-    assert man["defaults"] == {"nprobe": 64, "shortlist": 500}
+    assert man["defaults"] == {"nprobe": 96, "shortlist": 500}
     assert man["model"] == {"id": "t"}
     assert man["parts"][0]["name"] == "base" and man["parts"][0]["count"] == N
     assert (built / "centroids.f16").stat().st_size == NLIST * D * 2
