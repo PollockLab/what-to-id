@@ -74,4 +74,5 @@ def load_encoder(work: Path, threads: int = 4, batch: int = 8) -> Encoder:
         failed += [(int(ok_ids[i]), err) for i, err in bad_rows]
         return [int(ok_ids[i]) for i in kept], E.reshape(len(kept), DIMS), failed
 
-    return Encoder(encode, {"id": REPO_ID, "revision": REVISION}, DIMS)
+    # the backbone id the bulk vectors and the index manifest carry, hf-hub: prefix included
+    return Encoder(encode, {"id": embed.BACKBONES["bioclip25"][1], "revision": REVISION}, DIMS)
