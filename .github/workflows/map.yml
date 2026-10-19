@@ -138,6 +138,10 @@ jobs:
       # Keep the separately published frozen demo alongside the checked study/map pages.
       - name: Include the frozen embedding demo
         run: cp -R demo/. _site/
+      - name: Include the photo-search page
+        env:
+          ATLAS_HF_REPO: ${{ vars.ATLAS_HF_REPO }}
+        run: scripts/atlas_page.sh _site
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
       - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:

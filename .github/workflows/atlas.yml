@@ -1,6 +1,6 @@
 name: atlas
 
-# Keeps the static photo-search index (the IVF-OPQ-PQ atlas read by atlas_search.html) current, on free
+# Keeps the static photo-search index (the IVF-OPQ-PQ atlas read by search.html) current, on free
 # runners and without a server. After each successful map refresh it compares the map pool with the
 # index, embeds the observations the index lacks with BioCLIP 2.5 on CPU, appends them as a delta
 # part with a neighbour delta, and uploads the result to the host. On Sundays it also compacts:

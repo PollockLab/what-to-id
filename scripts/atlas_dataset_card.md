@@ -15,7 +15,7 @@ size_categories:
 
 # what-to-id photo-search index
 
-A static IVF-OPQ-PQ index of BioCLIP 2.5 image embeddings for British Columbia iNaturalist observations that need an ID. It is read in the browser over HTTP Range requests by the what-to-id photo search page (`atlas_search.html` in [PollockLab/what-to-id](https://github.com/PollockLab/what-to-id)), with no server.
+A static IVF-OPQ-PQ index of BioCLIP 2.5 image embeddings for British Columbia iNaturalist observations that need an ID. It is read in the browser over HTTP Range requests by the what-to-id photo search page (`search.html` in [PollockLab/what-to-id](https://github.com/PollockLab/what-to-id)), with no server.
 
 ## Contents
 
