@@ -299,6 +299,7 @@ function select(i,fly){
     var hits;
     try{hits=await neighborsOf(id);}catch(e){if(run===S.run)nbNote.textContent='Could not load matches: '+e.message;return;}
     if(run!==S.run)return;
+    if(hits)hits.sort(function(a,b){return b.score-a.score;});  // rank 1 is the highest cosine
     if(!hits){nbNote.textContent='Its closest matches are not computed yet; the index may predate this observation.';}
     else{
       S.nbr=hits.map(function(h){return L.find(S.P,h.id);}).filter(function(r){return r>=0;});
@@ -321,19 +322,21 @@ function select(i,fly){
       if(o.quality_grade&&o.quality_grade!=='needs_id')sub.textContent=t.group+' · now '+o.quality_grade+', so it no longer needs an ID';
     }
     if(!hits)return;
-    var res=Meta.build(hits,S.cache),left=[],score={};
-    hits.forEach(function(h){score[h.id]=h.score;});
+    var res=Meta.build(hits,S.cache),left=[],score={},rank={};
+    hits.forEach(function(h,k){score[h.id]=h.score;rank[h.id]=k+1;});
     if(res.notNeedsId)left.push(res.notNeedsId+' no longer need an ID');
     if(res.missing)left.push(res.missing+' no longer on iNaturalist');
-    nbNote.textContent=left.length?'Left out: '+left.join(', ')+'.':'';
+    nbNote.textContent=(left.length?'Left out: '+left.join(', ')+'. ':'')+'1 = most similar. Numbers match the map markers.';
     res.cards.forEach(function(c){
       var label=(c.common||c.name||'Unidentified'),row=L.find(S.P,c.id);
       var img=c.photo?el('img',{src:c.photo,alt:label,loading:'lazy'}):label;
       var b=el('button',{type:'button','aria-label':'Jump to '+label+(row<0?' (not in the plot)':''),'data-id':c.id},[img]);
       b.addEventListener('click',function(){row=L.find(S.P,c.id);if(row>=0)select(row,true);else window.open('https://www.inaturalist.org/observations/'+c.id,'_blank','noopener');});
-      var sc=el('span',{'class':'score'},[Math.round(score[c.id]*100)+'%']);
-      sc.title='cosine similarity '+score[c.id].toFixed(2);
-      nb.appendChild(el('li',{},[b,sc]));
+      var sc=el('span',{'class':'score'},['Cosine '+score[c.id].toFixed(2)]);
+      sc.title='cosine similarity '+score[c.id];
+      b.addEventListener('mouseenter',function(){
+        if(parent!==window)parent.postMessage({type:'wtid-focus',id:c.id},location.origin);});
+      nb.appendChild(el('li',{},[b,el('span',{'class':'rank'},[String(rank[c.id])]),sc]));
     });
   })();
 }

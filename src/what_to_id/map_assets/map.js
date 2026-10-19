@@ -226,9 +226,14 @@ function layers(){
     getFillColor:[DOT[0],DOT[1],DOT[2],110],radiusUnits:'pixels',getRadius:1.5,radiusMinPixels:1,
     radiusMaxPixels:6,stroked:false,pickable:true,
     extensions:[EXT],updateTriggers:{getFilterCategory:PD_CAT},filterRange:[S.up?any:r,S.up?r:any],filterCategories:categories(THIN)})];
-  if(NBR.length)L.push(new deck.ScatterplotLayer({id:'nbr',data:NBR,
-    getPosition:function(i){return [P.pos[2*i],P.pos[2*i+1]];},radiusUnits:'pixels',getRadius:6,
-    filled:false,stroked:true,lineWidthUnits:'pixels',getLineWidth:2,getLineColor:[230,110,30]}));
+  var at=function(d){return [P.pos[2*d.i],P.pos[2*d.i+1]];};
+  if(NBR.length)L.push(new deck.ScatterplotLayer({id:'nbr',data:NBR,getPosition:at,radiusUnits:'pixels',getRadius:11,
+    getFillColor:[27,94,76],stroked:true,lineWidthUnits:'pixels',getLineWidth:2,getLineColor:[255,255,255]}),
+    new deck.TextLayer({id:'nbr-rank',data:NBR,getPosition:at,getText:function(d){return String(d.r);},getSize:12,
+      sizeUnits:'pixels',getColor:[255,255,255],fontWeight:'bold',getTextAnchor:'middle',getAlignmentBaseline:'center'}));
+  if(SEL>=0)L.push(new deck.ScatterplotLayer({id:'halo',data:[SEL],
+    getPosition:function(i){return [P.pos[2*i],P.pos[2*i+1]];},radiusUnits:'pixels',getRadius:12,
+    filled:false,stroked:true,lineWidthUnits:'pixels',getLineWidth:3,getLineColor:[233,168,50]}));
   if(SEL>=0)L.push(new deck.ScatterplotLayer({id:'sel',data:[SEL],
     getPosition:function(i){return [P.pos[2*i],P.pos[2*i+1]];},radiusUnits:'pixels',getRadius:8,
     filled:false,stroked:true,lineWidthUnits:'pixels',getLineWidth:2.5,
@@ -491,9 +496,15 @@ function mark(i){
 addEventListener('message',function(e){
   if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-matches'||SEL<0||
     e.data.id!==P.id[SEL])return;
-  var at={};e.data.hits.forEach(function(h){at[h.id]=1;});
-  NBR=[];for(var i=0;i<P.n;i++)if(at[P.id[i]])NBR.push(i);
+  var rank={};e.data.hits.forEach(function(h,k){rank[h.id]=k+1;});
+  NBR=[];for(var i=0;i<P.n;i++)if(rank[P.id[i]])NBR.push({i:i,r:rank[P.id[i]]});
   layers();
+});
+// Hovering a tile in the photo space brings its match into view; nothing else changes.
+addEventListener('message',function(e){
+  if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-focus')return;
+  for(var i=0;i<P.n;i++)if(P.id[i]===e.data.id){var c=[P.pos[2*i],P.pos[2*i+1]];
+    if(!map.getBounds().contains(c))map.easeTo({center:c});return;}
 });
 addEventListener('message',function(e){
   if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-record')return;

@@ -456,10 +456,12 @@ def test_split_page_mirrors_a_picked_record_in_the_other_frame(browser, site):
         f.wait_for_function("__deck.props.layers.some(x => x.id === 'sel')")
         assert f.evaluate(sel) == 7
     pick[0].wait_for_selector(".nbrs li .score")
-    assert pick[0].locator(".nbrs li .score").first.inner_text().endswith("%")
+    assert pick[0].locator(".nbrs li .score").first.inner_text().startswith("Cosine 0.")
+    assert pick[0].locator(".nbrs li .rank").first.inner_text() == "1"
     pick[1].wait_for_function("got.length === 1")  # the matches reached the other frame
     hits = pick[1].evaluate("got[0].hits")
     assert len(hits) == 12 and all(0 <= h["score"] <= 1 for h in hits)
+    assert [h["score"] for h in hits] == sorted((h["score"] for h in hits), reverse=True)
     pick[1].evaluate("document.querySelector('#card .x').click()")
     for f in pick:
         f.wait_for_function("!__deck.props.layers.some(x => x.id === 'sel')")

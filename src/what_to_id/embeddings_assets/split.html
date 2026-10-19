@@ -110,8 +110,8 @@ addEventListener('message',function(e){
 var rec=null,mat=null;
 addEventListener('message',function(e){
   var n=Object.keys(frames).filter(function(k){return frames[k].contentWindow===e.source;})[0],d=e.data;
-  if(!n||e.origin!==location.origin||!d||(d.type!=='wtid-record'&&d.type!=='wtid-matches'))return;
-  if(d.type==='wtid-record'){if(d.id===rec)return;rec=d.id;mat=null;}else mat=d;
+  if(!n||e.origin!==location.origin||!d||(d.type!=='wtid-record'&&d.type!=='wtid-matches'&&d.type!=='wtid-focus'))return;
+  if(d.type==='wtid-record'){if(d.id===rec)return;rec=d.id;mat=null;}else if(d.type==='wtid-matches')mat=d;
   var o=n==='map'?'space':'map';if(visible(o))post(o,d);
 });
 // Back and forward: the new selection goes to both.
