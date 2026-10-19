@@ -8,21 +8,23 @@
 })(typeof globalThis!=='undefined'?globalThis:this,function(root){
 'use strict';
 var ORT='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/';
+// SRI of ort.min.js 1.20.1, matches the npm tarball; change it with the version.
+var ORT_SRI='sha384-RPL/K8tc0JVaNWsunkEmCzLeieefvFX2UCRLKLmLVChCI6P+CTKhzqF7VIeCc3Zp';
 var CACHE='what-to-id-atlas-model-v1';
 
 function join(base,name){return base.replace(/\/*$/,'/')+name;}
 function megabytes(spec){return Math.round(((spec&&spec.bytes)||0)/1048576);}
 
-function loadScript(src){
+function loadScript(src,integrity){
   return new Promise(function(resolve,reject){
     var s=document.createElement('script');
-    s.src=src;s.crossOrigin='anonymous';s.onload=resolve;
+    s.src=src;s.integrity=integrity;s.crossOrigin='anonymous';s.onload=resolve;
     s.onerror=function(){reject(new Error('Could not load onnxruntime-web from the CDN.'));};
     document.head.appendChild(s);
   });
 }
 async function loadOrt(){
-  if(!root.ort)await loadScript(ORT+'ort.min.js');
+  if(!root.ort)await loadScript(ORT+'ort.min.js',ORT_SRI);
   root.ort.env.wasm.wasmPaths=ORT;
   return root.ort;
 }
