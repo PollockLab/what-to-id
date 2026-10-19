@@ -11,8 +11,9 @@ var MAP=new URL(CFG.mapUrl,location.href).href;
 // One colour per life group, in the order of the map's groups: 16 distinct hues, each at least 2:1 against
 // both the light and the dark page. The map draws no per-group colour, so this is the only palette.
 var PAL=[[0,114,178],[213,94,0],[0,158,115],[190,160,0],[204,121,167],[86,180,233],[230,70,70],[120,60,170],[110,110,110],[160,60,40],[150,130,200],[40,120,60],[140,200,50],[70,90,220],[255,140,100],[0,190,190]];
-var S={idx:null,P:null,META:null,TAXA:null,groups:{},sel:-1,nbr:[],thin:false,cache:new Map(),run:0,deck:null,vs:null,PD:null};
+var S={idx:null,P:null,META:null,TAXA:null,groups:{},picks:[],split:[],extra:[],keep:null,sel:-1,nbr:[],thin:false,cache:new Map(),run:0,deck:null,vs:null,PD:null};
 
+var MF=null,TF=null,PASS=['area','park','bcpark','projects'];
 function $(id){return document.getElementById(id);}
 function el(tag,attrs,kids){
   var e=document.createElement(tag);
@@ -45,18 +46,21 @@ function applyJoin(P,taxa){
 function openIndex(){return AtlasSearchIndex.open(DATA,{whole:WHOLE});}
 
 // Counter: records the group chips leave in view, out of those the layout places.
-function passing(){return CH.groupPass(S.groups,S.META.groups,false);}
+function inc(){return !!(TF&&TF.inc);}
+function passing(){return CH.groupPass(S.groups,S.META.groups,inc());}
 function shown(){
   var P=S.P,n=0;
   if(!P.grp)return P.n;
   var ok=passing();
-  for(var i=0;i<P.n;i++)if(ok[P.grp[i]])n++;
+  for(var i=0;i<P.n;i++)if(ok[P.grp[i]]&&S.keep[i])n++;
   return n;
 }
-// The hash keeps the group states (as the map writes them) beside the selected id.
+// The hash keeps the map's selection (map_filter.js writes it as the map does) beside the selected id.
+// Filters this page does not apply yet go back untouched, so a link round-trips through it.
 function writeHash(){
-  var h=[];
-  if(CH.any(S.groups))h.push('groups='+CH.write(S.groups,S.META.groups));
+  // before the join the selection is only in the hash, so it stays as it is
+  var h=S.P.grp?MF.write(S).concat(S.extra):location.hash.slice(1).split('&').filter(function(t){
+    return t&&t.indexOf('id=')!==0;});
   if(S.sel>=0)h.push('id='+S.P.id[S.sel]);
   history.replaceState(null,'',h.length?'#'+h.join('&'):location.pathname+location.search);
 }
@@ -65,19 +69,38 @@ function paint(b){
   var j=+b.getAttribute('data-g'),dot=el('i',{});dot.style.background='rgb('+color(j).join(',')+')';
   CH.show(b,gname(j)+' '+nf.format(S.count[j]),S.groups[S.META.groups[j]]||'');b.insertBefore(dot,b.firstChild);
 }
+// Which points the taxon picks keep, with the picked groups beside them (see MapFilter.keep).
+function applyKeep(){
+  var P=S.P;
+  if(!S.keep||S.keep.length!==P.n)S.keep=new Uint8Array(P.n);
+  if(P.grp)MF.keep(TF,MF.groupSet(S,TF),P.tax,P.grp,P.n,S.keep);else S.keep.fill(1);
+  if(S.PD){var c=S.PD.attributes.getFilterCategory.value;
+    for(var i=0;i<P.n;i++)c[3*i+2]=S.keep[i];
+    S.PD.attributes.getFilterCategory={value:c,size:3};S.PDV=(S.PDV||0)+1;}
+}
 function update(){
   var s=shown(),P=S.P,total=S.META?S.META.n:P.n;
   $('count').textContent=P.grp?nf.format(s)+' shown of '+nf.format(P.n):nf.format(P.n)+' points';
   $('more').textContent=P.grp&&P.n<total?'('+nf.format(total-P.n)+' of the map’s '+nf.format(total)+
     ' records are not placed yet)':'';
   [].forEach.call($('groups').querySelectorAll('button'),paint);
-  layers();
+  if(BAR)BAR.set(items());layers();
 }
-function picked(){update();writeHash();$('gfit').hidden=!CH.any(S.groups);}
+// A pick, a left-out or a removal anywhere: the groups beside included taxa change which points are kept.
+function picked(){
+  TF=TX.filter(S.TAXA,S.picks);applyKeep();update();writeHash();$('gfit').hidden=!(CH.any(S.groups)||S.picks.length);
+}
+var PK=null,BAR=null;
+function items(){
+  return CH.items({S:S,meta:S.META,terms:TX.terms({T:S.TAXA,picks:S.picks,groups:[],meta:S.META,n:0,split:S.split}),
+    picker:PK,pj:{items:function(){return [];}},months:[],only:[],two:[],area:{term:function(){return null;}},
+    redraw:picked});
+}
+function clearAll(){S.groups={};S.picks.length=0;S.split=[];$('q').value='';picked();}
 // Zooms to the 1st-99th percentile box of the points that pass, so a few stray points do not flatten it.
 function fit(){
   var P=S.P,ok=passing(),xs=[],ys=[],box=$('plot');
-  for(var i=0;i<P.n;i++)if(ok[P.grp[i]]){xs.push(P.pos[2*i]);ys.push(P.pos[2*i+1]);}
+  for(var i=0;i<P.n;i++)if(ok[P.grp[i]]&&S.keep[i]){xs.push(P.pos[2*i]);ys.push(P.pos[2*i+1]);}
   if(!xs.length)return;
   function span(a){a=Float32Array.from(a).sort();return [a[Math.floor(.01*(a.length-1))],a[Math.ceil(.99*(a.length-1))]];}
   var x=span(xs),y=span(ys),sx=x[1]-x[0]||1,sy=y[1]-y[0]||1,
@@ -90,13 +113,19 @@ function chips(){
   var P=S.P,count=S.count=new Array(S.META.groups.length).fill(0);
   for(var i=0;i<P.n;i++)count[P.grp[i]]++;
   var box=$('groups');box.textContent='';
-  S.groups=CH.read(new URLSearchParams(location.hash.slice(1)).get('groups'),S.META.groups);
+  MF=MF||MapFilter(S.META);
+  Object.assign(S,MF.read(new URLSearchParams(location.hash.slice(1))));
+  S.extra=location.hash.slice(1).split('&').filter(function(t){return PASS.indexOf(t.split('=')[0])>=0;});
+  TF=TX.filter(S.TAXA,S.picks);
   S.META.groups.forEach(function(g,j){
     if(!count[j])return;
     var b=CH.chip(box,g,'',function(){return S.groups;},true,'',picked);
     b.setAttribute('data-g',j);paint(b);
   });
-  $('gfit').hidden=!CH.any(S.groups);
+  PK=TX.picker({input:$('q'),list:$('sugg'),msg:$('qn'),picks:S.picks,ranks:S.META.ranks,nf:nf,
+    taxa:function(){return S.TAXA;},counts:function(){return TX.counts(S.TAXA,S.P.tax,S.P.n);},onChange:picked});
+  BAR=CH.bar({box:$('selbar'),clear:clearAll,fallback:$('q')});
+  applyKeep();$('gfit').hidden=!(CH.any(S.groups)||S.picks.length);
 }
 $('gall').addEventListener('click',function(){S.groups={};picked();});
 
@@ -110,25 +139,27 @@ class Filter extends deck.DataFilterExtension{
 }
 var EXT=null;
 function pointData(){
-  var P=S.P,cat=new Uint8Array(2*P.n),col=new Uint8Array(4*P.n),g0=neutral();
+  if(!S.keep||S.keep.length!==S.P.n)applyKeep();
+  var P=S.P,cat=new Uint8Array(3*P.n),col=new Uint8Array(4*P.n),g0=neutral();
   for(var i=0;i<P.n;i++){
     var c=P.grp?color(P.grp[i]):g0;
-    cat[2*i]=P.grp?P.grp[i]:0;cat[2*i+1]=i%10===0?1:0;
+    cat[3*i]=P.grp?P.grp[i]:0;cat[3*i+1]=i%10===0?1:0;cat[3*i+2]=S.keep[i];
     col[4*i]=c[0];col[4*i+1]=c[1];col[4*i+2]=c[2];col[4*i+3]=150;
   }
-  return {length:P.n,attributes:{getPosition:{value:P.pos,size:2},getFilterCategory:{value:cat,size:2},
+  return {length:P.n,attributes:{getPosition:{value:P.pos,size:2},getFilterCategory:{value:cat,size:3},
     getFillColor:{value:col,size:4,normalized:true}}};
 }
 function layers(){
   var P=S.P;
   if(!P||!S.deck)return;
-  EXT=EXT||new Filter({filterSize:1,categorySize:2});
+  EXT=EXT||new Filter({filterSize:1,categorySize:3});
   S.PD=S.PD||pointData();
   var groups=[0];
   if(P.grp){groups=[];passing().forEach(function(v,j){if(v)groups.push(j);});}
   var thin=S.thin&&P.n>THIN_ABOVE;
   var lyr=[new deck.ScatterplotLayer({id:'pts',data:S.PD,radiusUnits:'pixels',getRadius:1.5,radiusMinPixels:1,radiusMaxPixels:3,
-    stroked:false,pickable:true,extensions:[EXT],filterCategories:[groups,thin?[1]:[0,1]]})];
+    stroked:false,pickable:true,extensions:[EXT],updateTriggers:{getFilterCategory:S.PDV},
+    filterCategories:[groups,thin?[1]:[0,1],[1]]})];
   function ring(id,rows,px,rgb,w){
     return new deck.ScatterplotLayer({id:id,data:rows,getPosition:function(i){return [P.pos[2*i],P.pos[2*i+1]];},
       radiusUnits:'pixels',getRadius:px,filled:false,stroked:true,lineWidthUnits:'pixels',getLineWidth:w,getLineColor:rgb});

@@ -17,7 +17,7 @@ from what_to_id.embeddings_page import build
 from what_to_id.page_map import encode_points, render_map
 
 from .atlas_index_fixture import FIXTURE_DELTA, FIXTURE_ROWS, write_fixture
-from .embeddings_fixture import BBOX, GROUPS, pool_frame, write_layout
+from .embeddings_fixture import BBOX, GROUPS, TREE, pool_frame, write_layout
 from .test_atlas_search_browser import PNG, RangeHandler
 
 TOTAL = FIXTURE_ROWS + FIXTURE_DELTA
@@ -71,7 +71,7 @@ def site(tmp_path_factory):
         manifest,
     )
     pool = pool_frame(ids[:POOL_N])
-    blobs, meta = encode_points(pool)
+    blobs, meta = encode_points(pool, TREE)
     for name, blob in blobs.items():
         (root / name).write_bytes(blob)
     (root / "map.html").write_text(render_map(meta, freeze=None))
@@ -217,6 +217,53 @@ def test_fit_to_selection_is_offered_and_zooms_only_on_click(open_page):
     assert after != before and abs(after["zoom"] - before["zoom"]) < 1
     page.get_by_role("button", name="All groups").click()
     assert fit.is_hidden()
+    assert page.errors == []
+
+
+def shown(page):
+    return int(page.locator("#count").inner_text().split(" shown")[0].replace(",", ""))
+
+
+def test_taxon_in_the_hash_keeps_everything_below_it(open_page):
+    page = open_page("#taxa=900")  # Genus A holds three of the seven species
+    ready(page)
+    assert shown(page) == POOL_N * 3 // 7
+    assert layer(page, "pts")["cats"][2] == [1]
+    assert (
+        page.locator("#selbar li").count() == 1
+        and "Genus A" in page.locator("#selbar").inner_text()
+    )
+    page.locator("#selbar li .x").click()
+    assert shown(page) == POOL_N and page.evaluate("location.hash") == ""
+    assert page.errors == []
+
+
+def test_taxon_search_picks_and_combines_with_group_chips_as_on_the_map(open_page):
+    page = open_page()
+    ready(page)
+    page.locator("#q").fill("Genus B")
+    page.locator("#sugg li").first.click()
+    assert shown(page) == POOL_N * 4 // 7 and page.evaluate("location.hash") == "#taxa=901"
+    page.locator("#q").fill("Genus A")
+    page.locator("#sugg li").first.click()
+    assert shown(page) == POOL_N and page.evaluate("location.hash") == "#taxa=901,900"
+    page.get_by_role("button", name="Clear all").click()
+    assert shown(page) == POOL_N and page.evaluate("location.hash") == ""
+    # a picked group beside a taxon adds to it, a left-out one subtracts (CH.groupPass)
+    page = open_page("#groups=Aves&taxa=900")
+    ready(page)
+    assert shown(page) == POOL_N // 3 + POOL_N * 3 // 7 - POOL_N // 7
+    page = open_page("#groups=-Aves&taxa=900")
+    ready(page)
+    assert shown(page) == POOL_N * 3 // 7 - POOL_N // 7
+    assert page.errors == []
+
+
+def test_filters_the_page_does_not_apply_stay_in_the_hash(open_page):
+    page = open_page("#months=8&area=abc&groups=Aves")
+    ready(page)
+    page.locator("#groups button[data-g='1']").click()
+    assert page.evaluate("location.hash") == "#months=8&groups=Aves,Insecta&area=abc"
     assert page.errors == []
 
 

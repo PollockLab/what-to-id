@@ -21,7 +21,9 @@ DECK_JS = "https://unpkg.com/deck.gl@9.1.14/dist.min.js"
 SCRIPTS = {
     "__ATLAS_SEARCH_INDEX__": HERE / "atlas_search_assets" / "atlas_search_index.js",
     "__ATLAS_SEARCH_META__": HERE / "atlas_search_assets" / "atlas_search_meta.js",
+    "__MAP_TAXA__": HERE / "map_assets" / "map_taxa.js",
     "__MAP_CHIPS__": HERE / "map_assets" / "map_chips.js",
+    "__MAP_FILTER__": HERE / "map_assets" / "map_filter.js",
     "__EMBEDDINGS_LAYOUT__": ASSETS / "embeddings_layout.js",
     "__EMBEDDINGS_APP__": ASSETS / "embeddings_app.js",
 }
@@ -45,6 +47,7 @@ def build(
         "__EMBEDDINGS_CONFIG__": json.dumps(config).replace("<", "\\u003c"),
         "__DECK_JS__": DECK_JS,
         "__SITE_CSS__": page_nav.CSS,
+        "__SELECT_CSS__": (HERE / "map_assets" / "map_select.css").read_text(),
         "__SITE_NAV__": page_nav.nav(PAGE_NAME, set(dict(page_nav.PAGES))),
     }.items():
         html = html.replace(key, value)

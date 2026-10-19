@@ -90,7 +90,7 @@ _ASSETS = files("what_to_id") / "map_assets"
 # map_step.js the Identify button that steps through an area's batches, map_projects.js the
 # project filter, map_chips.js the click rule for the short-list chips and the selection bar, and
 # map_filter.js the filter state and the category values the GPU filter reads.
-MAP_CSS = ("map.css", "map_area.css")
+MAP_CSS = ("map.css", "map_select.css", "map_area.css")
 MAP_JS = (
     "identify_links.js",
     "map_taxa.js",

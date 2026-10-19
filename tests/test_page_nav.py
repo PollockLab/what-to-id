@@ -109,6 +109,8 @@ def test_switcher_on_the_map_page_carries_the_record_and_the_centre(browser):
 def test_switcher_carries_groups_between_map_and_photo_space(browser):
     pg = _open(browser, "map.html", "#groups=Insecta,-Aves&record=42")
     assert _href(pg, "space") == "embeddings.html#id=42&groups=Insecta,-Aves"
+    pg = _open(browser, "map.html", "#taxa=311249,-64615&months=6&area=abc&at=9/49/-123")
+    assert _href(pg, "space") == "embeddings.html#taxa=311249,-64615&months=6&area=abc"
     pg = _open(browser, "embeddings.html", "#groups=-Aves")
     assert _href(pg, "map") == "map.html#groups=-Aves"
 

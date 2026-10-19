@@ -15,6 +15,13 @@ import pandas as pd
 
 BBOX = [-40.0, -25.0, 60.0, 35.0]
 GROUPS = ["Aves", "Insecta", "Plantae"]
+# taxon id -> [parent, latin, common, rank]: species 1000-1002 sit in Genus A, 1003-1006 in Genus B
+TREE = {
+    **{1000 + k: [900 if k < 3 else 901, f"Taxon {k}", "", "species"] for k in range(7)},
+    900: [800, "Genus A", "", "genus"],
+    901: [800, "Genus B", "", "genus"],
+    800: [None, "Family F", "", "family"],
+}
 
 
 def quantize(v: np.ndarray, lo: float, hi: float) -> np.ndarray:
@@ -70,6 +77,7 @@ def pool_frame(ids: np.ndarray) -> pd.DataFrame:
             "observed_on": [d.date().isoformat() for d in day],
             "created_at": [d.isoformat() + "T00:00:00Z" for d in day],
             "iconic_taxon": [GROUPS[i % 3] for i in range(n)],
+            "taxon_id": [1000 + i % 7 for i in range(n)],
             "taxon_name": [f"Taxon {i % 7}" for i in range(n)],
             "rank": ["species"] * n,
         }

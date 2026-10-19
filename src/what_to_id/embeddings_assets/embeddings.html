@@ -7,6 +7,7 @@
 <script src="__DECK_JS__"></script>
 <style>
 __SITE_CSS__
+__SELECT_CSS__
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
 body{display:grid;grid-template-columns:260px minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);grid-template-areas:"nav nav" "head head" "side plot"}
@@ -21,7 +22,6 @@ h1{font-size:18px;margin:0}
 button,.btn{font:inherit;font-size:12px;border:1px solid var(--line);background:var(--chip);color:var(--ink);padding:4px 10px;
   border-radius:14px;cursor:pointer;text-decoration:none;display:inline-block}
 .chips button[aria-pressed="true"]{background:var(--on);color:var(--onink);border-color:var(--on)}
-.chips button.not{background:var(--warnbg);color:var(--warn);border:1px dashed var(--warn)}
 .chips i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
 button[hidden]{display:none}
 .link{border:0;background:none;text-decoration:underline;padding:0;color:var(--muted)}
@@ -56,6 +56,12 @@ __SITE_NAV__<header>
 <section class="side" aria-label="Filters">
 <p class="stat" aria-live="polite"><b id="count">Loading</b> <span id="more" class="muted"></span></p>
 <p class="muted" id="status" role="status"></p>
+<div id="selbar" class="selbar" role="region" aria-label="Your selection" hidden><p class="lbl">Your selection <button type="button" class="link">Clear all</button></p><ul class="chips"></ul></div>
+<div><p class="muted">Taxa. A taxon keeps everything below it, so a family keeps all its species.</p>
+<div class="picker"><label for="q" class="vh">Find a taxon</label>
+<input id="q" type="search" placeholder="Latin or common name, e.g. Carex" autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="sugg">
+<ul id="sugg" class="sugg" role="listbox" aria-label="Matching taxa" hidden></ul></div>
+<p id="qn" class="muted" aria-live="polite"></p></div>
 <div><p class="muted">Life groups. Click a chip to pick it, again to leave it out, a third time to clear it.</p>
 <div id="groups" class="chips" role="group" aria-label="Life groups"></div>
 <p class="muted"><button type="button" class="link" id="gall">All groups</button> <button type="button" class="link" id="gfit" hidden>Fit to selection</button></p></div>
@@ -65,7 +71,9 @@ __SITE_NAV__<header>
 <script>var EMBEDDINGS_CONFIG=__EMBEDDINGS_CONFIG__;</script>
 <script>__ATLAS_SEARCH_INDEX__</script>
 <script>__ATLAS_SEARCH_META__</script>
+<script>__MAP_TAXA__</script>
 <script>__MAP_CHIPS__</script>
+<script>__MAP_FILTER__</script>
 <script>__EMBEDDINGS_LAYOUT__</script>
 <script>__EMBEDDINGS_APP__</script>
 </body>

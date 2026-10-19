@@ -63,7 +63,19 @@ function categories(S,inc,thin){
   for(i=0;i<2*ST_SAMPLE;i++)if(i&ST_KEEP&&(i&req)===req&&!(i&hide)&&(!thin||i&ST_SAMPLE))st.push(i);
   return [groups,S.up?all:mon,S.up?mon:all,st];
 }
+// With a taxon included the picked groups join the taxa as one set (see CH.groupPass): per group
+// index whether it is picked, or null with no taxon included or no group picked.
+function groupSet(S,TF){return TF.inc&&CH.picked(S.groups,META.groups,'inc').length?
+  META.groups.map(function(g){return S.groups[g]==='inc';}):null;}
+// Into out, 1 per record the taxon picks keep and 0 per record they leave out. TF is TX.filter's
+// result and gs the groupSet; tax and grp are the records' columns.
+function keep(TF,gs,tax,grp,n,out){
+  var ti=TF.inc,te=TF.exc;
+  for(var i=0;i<n;i++){var t=tax[i],k=!ti||(t!==NOTAX&&ti[t]===1)||(gs!==null&&gs[grp[i]]);
+    if(te&&t!==NOTAX&&te[t]===1)k=false;out[i]=k?1:0;}
+  return out;
+}
 return {DAY:DAY,D0:D0,NO:NO,NOTAX:NOTAX,LAST:LAST,FLAG:FLAG,ONLYFLAG:ONLYFLAG,ONLYKEYS:ONLYKEYS,ST_INTRO:ST_INTRO,
   ST_THREAT:ST_THREAT,ST_INEXACT:ST_INEXACT,ST_KEEP:ST_KEEP,ST_SAMPLE:ST_SAMPLE,iso:iso,dayOf:dayOf,clamp:clamp,
-  MOY:MOY,DOM:DOM,DOW:DOW,MI:MI,M0:M0,read:read,write:write,record:record,categories:categories};
+  MOY:MOY,DOM:DOM,DOW:DOW,MI:MI,M0:M0,read:read,write:write,record:record,categories:categories,groupSet:groupSet,keep:keep};
 }

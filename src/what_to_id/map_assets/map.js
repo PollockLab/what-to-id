@@ -104,11 +104,10 @@ function pointData(){
   // only the kept bit follows the picks, the groups beside them, the area, projects and deletions
   // OUT keeps the records out for any reason but the area, for the Identify box count; PJW marks
   // the records Identify opens when it cannot say the projects exactly (see map_projects.js)
-  var ti=TF.inc,te=TF.exc,gs=key[1]?META.groups.map(function(g){return S.groups[g]==='inc';}):null,tax=P.tax,
-    grp=P.grp,id=P.id,nt=NOTAX,am=AREA.mask(n),wide=PJ.wide();
+  var kb=MF.keep(TF,MF.groupSet(S,TF),P.tax,P.grp,n,new Uint8Array(n)),id=P.id,am=AREA.mask(n),wide=PJ.wide();
   if(OUT.length!==n)OUT=new Uint8Array(n);PJW=wide?new Uint8Array(n):null;
-  for(i=0;i<n;i++){var t=tax[i],keep=!ti||(t!==nt&&ti[t]===1)||(gs!==null&&gs[grp[i]]);
-    if(te&&t!==nt&&te[t]===1||gone>0&&GONE[id[i]]===1)keep=false;
+  for(i=0;i<n;i++){var keep=kb[i]===1;
+    if(gone>0&&GONE[id[i]]===1)keep=false;
     if(wide&&keep&&(am===null||am[i]))PJW[i]=wide(i)?1:0;if(keep&&PJ.drop(i))keep=false;
     OUT[i]=keep?0:1;cat[4*i+3]=cat[4*i+3]&~ST_KEEP|(keep&&(am===null||am[i])?ST_KEEP:0);}
   // a new pick, area or deletion swaps only the categories, so deck.gl uploads only those

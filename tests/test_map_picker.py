@@ -137,7 +137,9 @@ def browser():
 
 def _page(browser, frag=""):
     html = HARNESS % (
-        (_ASSETS / "map.css").read_text() + (_ASSETS / "map_area.css").read_text(),
+        (_ASSETS / "map.css").read_text()
+        + (_ASSETS / "map_select.css").read_text()
+        + (_ASSETS / "map_area.css").read_text(),
         ((_ASSETS / "identify_links.js").read_text() + (_ASSETS / "map_area.js").read_text()),
         json.dumps(PARKS),
         json.dumps(KINDS),

@@ -61,19 +61,21 @@ white-space:nowrap}
 """.strip()
 
 # Points the switcher at what is open. Reads the hash the pages already write: the map keeps
-# record= and at=zoom/lat/lon, the photo pages keep id=. Rewrites on hover, focus, touch and click
-# because history.replaceState fires no event.
+# record= and at=zoom/lat/lon, the photo pages keep id=; the selection (groups, taxa, dates) goes
+# to the map and the photo space as written. Rewrites on hover, focus, touch and click because
+# history.replaceState fires no event.
 JS = """
 (function(){var n=document.querySelector('.site-nav');if(!n)return;
 function ctx(){var h=new URLSearchParams(location.hash.slice(1)),
 at=(h.get('at')||'').split('/').map(Number);
 var ok=at.length===3&&at.every(isFinite);return{rec:+(h.get('record')||h.get('id'))||0,
-lat:ok?at[1]:null,lon:ok?at[2]:null,g:h.get('groups')||''};}
+lat:ok?at[1]:null,lon:ok?at[2]:null,sel:location.hash.slice(1).split('&').filter(function(t){
+return /^(by|from|to|months|groups|only|taxa|area|park|bcpark|projects)=/.test(t);})};}
 function sync(){var c=ctx();n.querySelectorAll('a[data-view]').forEach(function(a){
 var b=a.dataset.base,v=a.dataset.view,u=b;
 if(a.hasAttribute('aria-current'))return;
 if(v==='map'||v==='space'){var p=[];if(c.rec)p.push((v==='map'?'record=':'id=')+c.rec);
-if(c.g)p.push('groups='+c.g);if(p.length)u=b+'#'+p.join('&');}
+p=p.concat(c.sel);if(p.length)u=b+'#'+p.join('&');}
 else if(v==='blitz'&&c.lat!==null)u=b+'?at='+c.lat.toFixed(3)+','+c.lon.toFixed(3);
 a.href=u;});}
 if(!n.hasAttribute('data-fixed'))['mouseover','focusin','touchstart',
