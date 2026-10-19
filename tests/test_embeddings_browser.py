@@ -202,6 +202,24 @@ def test_groups_in_the_hash_open_filtered_and_survive_a_selection(open_page):
     assert page.errors == []
 
 
+def test_fit_to_selection_is_offered_and_zooms_only_on_click(open_page):
+    page = open_page()
+    ready(page)
+    fit = page.get_by_role("button", name="Fit to selection")
+    assert fit.is_hidden()
+    before = page.evaluate("__deck.props.viewState")
+    page.locator("#groups button[data-g='0']").click()
+    assert fit.is_visible()
+    assert page.evaluate("__deck.props.viewState") == before  # never zooms on its own
+    fit.click()
+    after = page.evaluate("__deck.props.viewState")
+    # the fixture spreads each group over the whole layout: only "refit, close to before" shows
+    assert after != before and abs(after["zoom"] - before["zoom"]) < 1
+    page.get_by_role("button", name="All groups").click()
+    assert fit.is_hidden()
+    assert page.errors == []
+
+
 def test_click_opens_card_with_neighbours_and_jump(open_page, site):
     _, _, in_pool, _ = site
     page = open_page(drop=None)

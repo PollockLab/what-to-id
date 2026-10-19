@@ -73,7 +73,19 @@ function update(){
   [].forEach.call($('groups').querySelectorAll('button'),paint);
   layers();
 }
-function picked(){update();writeHash();}
+function picked(){update();writeHash();$('gfit').hidden=!CH.any(S.groups);}
+// Zooms to the 1st-99th percentile box of the points that pass, so a few stray points do not flatten it.
+function fit(){
+  var P=S.P,ok=passing(),xs=[],ys=[],box=$('plot');
+  for(var i=0;i<P.n;i++)if(ok[P.grp[i]]){xs.push(P.pos[2*i]);ys.push(P.pos[2*i+1]);}
+  if(!xs.length)return;
+  function span(a){a=Float32Array.from(a).sort();return [a[Math.floor(.01*(a.length-1))],a[Math.ceil(.99*(a.length-1))]];}
+  var x=span(xs),y=span(ys),sx=x[1]-x[0]||1,sy=y[1]-y[0]||1,
+    z=Math.log2(Math.min(Math.max(box.clientWidth,1)/sx,Math.max(box.clientHeight,1)/sy)*.9);
+  S.vs=Object.assign({},S.vs,{target:[(x[0]+x[1])/2,(y[0]+y[1])/2,0],zoom:Math.min(Math.max(z,S.vs.minZoom),S.vs.maxZoom)});
+  S.deck.setProps({viewState:S.vs});
+}
+$('gfit').addEventListener('click',fit);
 function chips(){
   var P=S.P,count=S.count=new Array(S.META.groups.length).fill(0);
   for(var i=0;i<P.n;i++)count[P.grp[i]]++;
@@ -84,6 +96,7 @@ function chips(){
     var b=CH.chip(box,g,'',function(){return S.groups;},true,'',picked);
     b.setAttribute('data-g',j);paint(b);
   });
+  $('gfit').hidden=!CH.any(S.groups);
 }
 $('gall').addEventListener('click',function(){S.groups={};picked();});
 
