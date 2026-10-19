@@ -33,7 +33,6 @@ def build(
     data_url: str = "atlas/",
     map_url: str = "map.html",
     search_url: str = "search.html",
-    sample_url: str = "embeddings-sample.html",
 ) -> Path:
     """Write ``embeddings.html`` into ``out_dir`` and return its path."""
     if not data_url:
@@ -47,7 +46,6 @@ def build(
         "__DECK_JS__": DECK_JS,
         "__SITE_CSS__": page_nav.CSS,
         "__SITE_NAV__": page_nav.nav(PAGE_NAME, set(dict(page_nav.PAGES))),
-        "__SAMPLE_URL__": sample_url,
     }.items():
         html = html.replace(key, value)
     for placeholder, path in SCRIPTS.items():

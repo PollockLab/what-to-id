@@ -70,4 +70,3 @@ def test_script_with_repo_writes_page_with_data_url(tmp_path):
     assert "map.html" in page
     photo_space = (tmp_path / "site" / "embeddings.html").read_text()
     assert "https://huggingface.co/datasets/Org/atlas/resolve/main/" in photo_space
-    assert "embeddings-sample.html" in photo_space

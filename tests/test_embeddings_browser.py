@@ -156,7 +156,7 @@ def test_points_are_the_join_of_layout_and_pool(open_page):
     text = page.locator("#honest").inner_text()
     assert "Measured on the layout" in text and "50%" in text and "12" in text
     assert "not identification confidence" in text and "lossy" in text
-    assert page.locator("#intro a[href='embeddings-sample.html']").count() == 1
+    assert "sample" not in page.locator("#intro").inner_text()
     assert page.errors == []
 
 

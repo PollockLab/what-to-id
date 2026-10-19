@@ -19,9 +19,9 @@ def test_build_inlines_scripts_and_config(tmp_path):
         assert needle in html
 
 
-def test_links_to_map_search_and_sample(tmp_path):
+def test_links_to_map_and_search(tmp_path):
     html = build(tmp_path).read_text()
-    for href in ("map.html", "search.html", "embeddings-sample.html"):
+    for href in ("map.html", "search.html"):
         assert f'href="{href}"' in html
 
 
