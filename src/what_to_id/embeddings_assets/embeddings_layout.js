@@ -28,16 +28,36 @@ function decodePart(buf,n){
   var u=new Uint8Array(buf);
   return {n:n,id:unstep(column(u,0,n,Uint32Array,4)),qx:column(u,4*n,n,Uint16Array,2),qy:column(u,6*n,n,Uint16Array,2)};
 }
-// One map shard (already gunzipped); only the columns this page uses are kept.
+// One map shard (already gunzipped), every column the map filters on (page_map._decode_shard has the order).
 function decodeShard(buf,n){
   if(buf.byteLength!==SHARD_BYTES*n)throw new Error('shard holds '+buf.byteLength+' bytes, expected '+SHARD_BYTES*n);
   var u=new Uint8Array(buf);
   return {n:n,id:unstep(column(u,0,n,Uint32Array,4)),qlon:column(u,4*n,n,Uint16Array,2),
-    qlat:column(u,6*n,n,Uint16Array,2),tax:column(u,12*n,n,Uint16Array,2),grp:column(u,14*n,n,Uint8Array,1)};
+    qlat:column(u,6*n,n,Uint16Array,2),obs:column(u,8*n,n,Uint16Array,2),up:column(u,10*n,n,Uint16Array,2),
+    tax:column(u,12*n,n,Uint16Array,2),grp:column(u,14*n,n,Uint8Array,1),ids:column(u,15*n,n,Uint8Array,1),flags:column(u,16*n,n,Uint8Array,1)};
+}
+// Every record the layout parts hold, before the shards are known: ids sorted, a later part overriding an earlier one.
+// Returns {n,id,pos,start} like join, without the group and taxon columns.
+function layoutOnly(parts,layoutBbox){
+  var lx=layoutBbox[0],ly=layoutBbox[1],sx=(layoutBbox[2]-lx||1)/Q,sy=(layoutBbox[3]-ly||1)/Q;
+  var id=new Uint32Array(0),qx=new Uint16Array(0),qy=new Uint16Array(0);
+  parts.forEach(function(p){
+    var m=id.length+p.n,nid=new Uint32Array(m),nx=new Uint16Array(m),ny=new Uint16Array(m),i=0,j=0,o=0;
+    while(i<id.length||j<p.n){
+      var a=i<id.length?id[i]:Infinity,b=j<p.n?p.id[j]:Infinity;
+      if(b<=a){nid[o]=b;nx[o]=p.qx[j];ny[o]=p.qy[j];if(a===b)i++;j++;}
+      else{nid[o]=a;nx[o]=qx[i];ny[o]=qy[i];i++;}
+      o++;
+    }
+    id=nid.subarray(0,o);qx=nx.subarray(0,o);qy=ny.subarray(0,o);
+  });
+  var pos=new Float32Array(2*id.length);
+  for(var k=0;k<id.length;k++){pos[2*k]=lx+qx[k]*sx;pos[2*k+1]=ly+qy[k]*sy;}
+  return {n:id.length,id:id,pos:pos,start:[0,id.length]};
 }
 // Place every shard record that some layout part holds. Ids are sorted in a shard and in a part, so
 // each pair is one merge pass; a later part overrides an earlier one (a delta replaces the base).
-// Returns {n,id,pos,lonlat,grp,tax,start} where start[k] is the first row of shard k.
+// Returns {n,id,pos,lonlat,obs,up,grp,tax,ids,flags,start} where start[k] is the first row of shard k.
 function join(shards,parts,layoutBbox,mapBbox){
   var lx=layoutBbox[0],ly=layoutBbox[1],sx=(layoutBbox[2]-lx||1)/Q,sy=(layoutBbox[3]-ly||1)/Q;
   var mx=mapBbox[0],my=mapBbox[1],tx=(mapBbox[2]-mx||1)/Q,ty=(mapBbox[3]-my||1)/Q;
@@ -54,12 +74,14 @@ function join(shards,parts,layoutBbox,mapBbox){
   });
   var total=placed.reduce(function(t,p){return t+p.rows.length;},0);
   var out={n:total,id:new Uint32Array(total),pos:new Float32Array(2*total),lonlat:new Float32Array(2*total),
-    grp:new Uint8Array(total),tax:new Uint16Array(total),start:[]};
+    grp:new Uint8Array(total),tax:new Uint16Array(total),obs:new Uint16Array(total),up:new Uint16Array(total),
+    ids:new Uint8Array(total),flags:new Uint8Array(total),start:[]};
   var o=0;
   shards.forEach(function(s,k){
     out.start.push(o);
     placed[k].rows.forEach(function(r){
       out.id[o]=s.id[r];out.grp[o]=s.grp[r];out.tax[o]=s.tax[r];
+      out.obs[o]=s.obs[r];out.up[o]=s.up[r];out.ids[o]=s.ids[r];out.flags[o]=s.flags[r];
       out.pos[2*o]=lx+placed[k].qx[r]*sx;out.pos[2*o+1]=ly+placed[k].qy[r]*sy;
       out.lonlat[2*o]=mx+s.qlon[r]*tx;out.lonlat[2*o+1]=my+s.qlat[r]*ty;o++;
     });
@@ -90,5 +112,5 @@ function fidelity(f){
     Object.keys(f).map(function(k){return f[k];}).find(function(x){return typeof x==='number'&&x>=0&&x<=1;});
   return v===undefined?null:{value:v,k:f.k||12};
 }
-return {gunzip:gunzip,decodePart:decodePart,decodeShard:decodeShard,join:join,find:find,parseMapMeta:parseMapMeta,fidelity:fidelity};
+return {gunzip:gunzip,decodePart:decodePart,decodeShard:decodeShard,layoutOnly:layoutOnly,join:join,find:find,parseMapMeta:parseMapMeta,fidelity:fidelity};
 });

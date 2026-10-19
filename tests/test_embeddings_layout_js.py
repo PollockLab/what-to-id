@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from what_to_id.page_map import decode_points, encode_points, render_map
@@ -95,13 +96,25 @@ def test_join_places_pool_records_by_id_and_later_parts_win(world):
     L.decodePart(await L.gunzip(ab({str(d / "base.bin")!r})), {len(base_ids)}),
     L.decodePart(await L.gunzip(ab({str(d / "delta.bin")!r})), {len(delta_ids)})];
   const P = L.join(shards, parts, {BBOX}, {meta["bbox"]});
+  const early = L.layoutOnly(parts, {BBOX});
   console.log(JSON.stringify({{n: P.n, id: Array.from(P.id), pos: Array.from(P.pos),
-    lonlat: Array.from(P.lonlat), grp: Array.from(P.grp), start: P.start,
+    lonlat: Array.from(P.lonlat), obs: Array.from(P.obs), up: Array.from(P.up),
+    ids: Array.from(P.ids), flags: Array.from(P.flags),
+    early: {{n: early.n, id: Array.from(early.id), pos: Array.from(early.pos)}},
+    grp: Array.from(P.grp), start: P.start,
     found: Array.from(P.id).map((i) => L.find(P, i)), missing: L.find(P, 1)}}));
 }})();"""
     )
     assert got["n"] == len(expected) == 440  # 420 base + 20 fresh delta, moved ones counted once
     assert sorted(got["id"]) == sorted(expected)
+    # before the shards land the page draws the layout alone: every layout id once, delta winning
+    assert got["early"]["n"] == 470  # 450 base ids plus 20 fresh
+    assert got["early"]["id"] == sorted(got["early"]["id"])
+    assert set(got["early"]["id"]) >= set(got["id"])
+    xs, ys = got["early"]["pos"][::2], got["early"]["pos"][1::2]
+    early = {i: (x, y) for i, x, y in zip(got["early"]["id"], xs, ys, strict=True)}
+    for k, i in enumerate(got["id"]):
+        assert early[i] == (got["pos"][2 * k], got["pos"][2 * k + 1])
     assert got["found"] == list(range(got["n"])) and got["missing"] == -1
     assert got["start"][0] == 0 and got["start"][-1] == got["n"]
     truth = decode_points(
@@ -114,6 +127,11 @@ def test_join_places_pool_records_by_id_and_later_parts_win(world):
         assert got["pos"][2 * k + 1] == pytest.approx(y, abs=60 / 65535)
         assert got["lonlat"][2 * k] == pytest.approx(truth.lon[i], abs=1e-4)
         assert got["lonlat"][2 * k + 1] == pytest.approx(truth.lat[i], abs=1e-4)
+        assert (got["ids"][k] & 15, got["ids"][k] >> 4) == (
+            truth.ident_count[i],
+            truth.agree[i],
+        )
+        assert (got["obs"][k] == 65535) == pd.isna(truth.observed_on[i])
         assert meta["groups"][got["grp"][k]] == truth.iconic_taxon[i]
 
 

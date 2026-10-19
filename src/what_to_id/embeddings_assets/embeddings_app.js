@@ -3,6 +3,7 @@
 // from the map data and observations that left Needs ID drop out on their own.
 (function(){
 'use strict';
+var LOADING='Loading groups and names…';
 var CFG=EMBEDDINGS_CONFIG,Meta=AtlasSearchMeta,L=EmbeddingsLayout;
 var WHOLE=4<<20,THIN_ABOVE=200000,nf=new Intl.NumberFormat('en-CA');
 var DATA=new URL(CFG.dataUrl,location.href).href.replace(/\/*$/,'/');
@@ -21,25 +22,39 @@ function el(tag,attrs,kids){
 }
 function status(t){$('status').textContent=t;}
 function color(g){return PAL[g%PAL.length];}
+// Colour of every point until the shards give groups: grey that reads on the current theme.
+function neutral(){return matchMedia('(prefers-color-scheme: dark)').matches?[190,190,184]:[95,95,90];}
 function gname(g){var m=S.META;return m.names&&m.names[m.groups[g]]||m.groups[g];}
 function names(i){
-  var P=S.P,t=S.TAXA&&P.tax[i]!==65535?S.TAXA[P.tax[i]]:null;
+  var P=S.P;
+  if(!P.grp)return {common:'',latin:'',group:''};
+  var t=S.TAXA&&P.tax[i]!==65535?S.TAXA[P.tax[i]]:null;
   return {common:t&&t[1]||'',latin:t&&t[0]||'',group:gname(P.grp[i])};
 }
 function okFetch(url,init){return fetch(url,init).then(function(r){
   if(!r.ok)throw new Error('Could not load '+String(url).split('/').pop().split('?')[0]+' ('+r.status+')');return r;});}
+// Once the shards are joined: new rows replace the neutral ones, and the card and rings follow by id.
+function applyJoin(P,taxa){
+  var old=S.P,sel=S.sel>=0?old.id[S.sel]:0,nbr=S.nbr.map(function(r){return old.id[r];});
+  S.P=P;S.TAXA=taxa;S.PD=null;
+  S.sel=sel?L.find(P,sel):-1;
+  S.nbr=nbr.map(function(i){return L.find(P,i);}).filter(function(r){return r>=0;});
+  chips();update();
+  if(S.sel>=0&&S.relabel)S.relabel();
+}
 function openIndex(){return AtlasSearchIndex.open(DATA,{whole:WHOLE});}
 
 // Counter: records the group chips leave in view, out of those the layout places.
 function shown(){
   var P=S.P,n=0;
+  if(!P.grp)return P.n;
   for(var i=0;i<P.n;i++)if(S.vis[P.grp[i]])n++;
   return n;
 }
 function update(){
-  var s=shown(),P=S.P,total=S.META.n;
-  $('count').textContent=nf.format(s)+' shown of '+nf.format(P.n);
-  $('more').textContent=P.n<total?'('+nf.format(total-P.n)+' of the map’s '+nf.format(total)+
+  var s=shown(),P=S.P,total=S.META?S.META.n:P.n;
+  $('count').textContent=P.grp?nf.format(s)+' shown of '+nf.format(P.n):nf.format(P.n)+' points';
+  $('more').textContent=P.grp&&P.n<total?'('+nf.format(total-P.n)+' of the map’s '+nf.format(total)+
     ' records are not placed yet)':'';
   [].forEach.call($('groups').querySelectorAll('button'),function(b){
     b.setAttribute('aria-pressed',String(!!S.vis[+b.getAttribute('data-g')]));});
@@ -70,10 +85,10 @@ class Filter extends deck.DataFilterExtension{
 }
 var EXT=null;
 function pointData(){
-  var P=S.P,cat=new Uint8Array(2*P.n),col=new Uint8Array(4*P.n);
+  var P=S.P,cat=new Uint8Array(2*P.n),col=new Uint8Array(4*P.n),g0=neutral();
   for(var i=0;i<P.n;i++){
-    var c=color(P.grp[i]);
-    cat[2*i]=P.grp[i];cat[2*i+1]=i%10===0?1:0;
+    var c=P.grp?color(P.grp[i]):g0;
+    cat[2*i]=P.grp?P.grp[i]:0;cat[2*i+1]=i%10===0?1:0;
     col[4*i]=c[0];col[4*i+1]=c[1];col[4*i+2]=c[2];col[4*i+3]=150;
   }
   return {length:P.n,attributes:{getPosition:{value:P.pos,size:2},getFilterCategory:{value:cat,size:2},
@@ -84,7 +99,7 @@ function layers(){
   if(!P||!S.deck)return;
   EXT=EXT||new Filter({filterSize:1,categorySize:2});
   S.PD=S.PD||pointData();
-  var groups=Object.keys(S.vis).filter(function(k){return S.vis[k];}).map(Number);
+  var groups=P.grp?Object.keys(S.vis).filter(function(k){return S.vis[k];}).map(Number):[0];
   var thin=S.thin&&P.n>THIN_ABOVE;
   var lyr=[new deck.ScatterplotLayer({id:'pts',data:S.PD,radiusUnits:'pixels',getRadius:1.5,radiusMinPixels:1,radiusMaxPixels:3,
     stroked:false,pickable:true,extensions:[EXT],filterCategories:[groups,thin?[1]:[0,1]]})];
@@ -102,7 +117,7 @@ var ptip=el('div',{'class':'ptip',hidden:''});document.body.appendChild(ptip);
 function tip(o){
   if(!S.P||o.index<0||!o.layer||o.layer.id!=='pts'){ptip.hidden=true;return;}
   var t=names(o.index);
-  ptip.textContent=t.common||t.latin?(t.common||t.latin)+' · '+t.group:t.group;
+  ptip.textContent=t.common||t.latin?(t.common||t.latin)+' · '+t.group:t.group||'Loading names…';
   ptip.hidden=false;
   var g=12,x=o.x+$('plot').getBoundingClientRect().left,y=o.y+$('plot').getBoundingClientRect().top;
   ptip.style.left=Math.max(4,x+g+ptip.offsetWidth>innerWidth-4?x-g-ptip.offsetWidth:x+g)+'px';
@@ -131,17 +146,22 @@ function select(i,fly){
   }
   history.replaceState(null,'','#id='+id);
   var x=el('button',{type:'button','class':'x','aria-label':'Close'},['×']);x.addEventListener('click',closeCard);
-  var ph=el('div',{'class':'ph'},['Loading photo']),sub=el('p',{'class':'muted'},[t.group]),place=el('p',{'class':'muted'},['']);
+  var ph=el('div',{'class':'ph'},['Loading photo']),sub=el('p',{'class':'muted'},[t.group||LOADING]),place=el('p',{'class':'muted'},['']);
   var nb=el('ul',{'class':'nbrs','aria-label':'Closest matches'}),nbNote=el('p',{'class':'muted'},['Finding closest matches…']);
   var link=function(href,text,cls){return el('a',{'class':'btn '+(cls||''),href:href,target:'_blank',rel:'noopener'},[text]);};
   var actions=el('div',{'class':'actions'},[
     link('https://www.inaturalist.org/observations/'+id,'Help identify on iNaturalist','primary'),
     link(CFG.searchUrl+'#id='+id,'More like this'),link(CFG.mapUrl+'#record='+id,'Show on map')]);
-  var title=el('h2',{},[t.common||t.latin||t.group]);
+  var title=el('h2',{},[t.common||t.latin||t.group||'Observation '+id]);
   card.textContent='';
   [x,ph,el('div',{'class':'body'},[title,sub,place,actions,el('p',{'class':'muted'},['Closest matches, from the full image space']),nbNote,nb])]
     .forEach(function(c){card.appendChild(c);});
   card.hidden=false;x.focus();
+  // the shards arrived after this card opened: fill in what they know, unless iNaturalist's answer already did
+  S.relabel=function(){
+    var n=names(S.sel);if(sub.textContent!==LOADING)return;
+    sub.textContent=n.group;title.textContent=n.common||n.latin||n.group;
+  };
   layers();
   (async function(){
     var hits;
@@ -149,7 +169,7 @@ function select(i,fly){
     if(run!==S.run)return;
     if(!hits){nbNote.textContent='Its closest matches are not computed yet; the index may predate this observation.';}
     else{
-      S.nbr=hits.map(function(h){return L.find(P,h.id);}).filter(function(r){return r>=0;});
+      S.nbr=hits.map(function(h){return L.find(S.P,h.id);}).filter(function(r){return r>=0;});
       layers();
     }
     var ids=[id].concat((hits||[]).map(function(h){return h.id;}));
@@ -172,10 +192,10 @@ function select(i,fly){
     if(res.missing)left.push(res.missing+' no longer on iNaturalist');
     nbNote.textContent=left.length?'Left out: '+left.join(', ')+'.':'';
     res.cards.forEach(function(c){
-      var label=(c.common||c.name||'Unidentified'),row=L.find(P,c.id);
+      var label=(c.common||c.name||'Unidentified'),row=L.find(S.P,c.id);
       var img=c.photo?el('img',{src:c.photo,alt:label,loading:'lazy'}):label;
       var b=el('button',{type:'button','aria-label':'Jump to '+label+(row<0?' (not in the plot)':''),'data-id':c.id},[img]);
-      b.addEventListener('click',function(){if(row>=0)select(row,true);else window.open('https://www.inaturalist.org/observations/'+c.id,'_blank','noopener');});
+      b.addEventListener('click',function(){row=L.find(S.P,c.id);if(row>=0)select(row,true);else window.open('https://www.inaturalist.org/observations/'+c.id,'_blank','noopener');});
       nb.appendChild(el('li',{},[b]));
     });
   })();
@@ -183,30 +203,41 @@ function select(i,fly){
 
 async function load(){
   status('Reading the index…');
+  // the map page and the index manifest are independent, so ask for both at once
+  var mapText=okFetch(MAP).then(function(r){return r.text();});
+  mapText.catch(function(){});
   S.idx=await openIndex();
   var lay=S.idx.manifest.layout;
   if(!lay||!lay.parts||!lay.parts.length)throw new Error('This index has no photo-space layout yet.');
   var f=L.fidelity(lay.fidelity);
   $('fid').textContent=f?'Measured on the layout: on average '+Math.round(f.value*100)+'% of a photo’s '+f.k+
     ' true closest matches are among its '+f.k+' nearest points here.':'';
-  status('Reading the map data…');
-  var meta=L.parseMapMeta(await (await okFetch(MAP)).text());
-  S.META=meta;
   var get=function(u){return okFetch(u).then(function(r){return r.arrayBuffer();}).then(L.gunzip);};
-  var taxa=get(new URL(meta.taxa,MAP)).then(function(b){return JSON.parse(new TextDecoder().decode(b));});
-  var parts=lay.parts.map(function(p){return S.idx.file(p.name+'.bin').then(L.gunzip).then(function(b){return L.decodePart(b,p.count);});});
-  var shards=meta.shards.map(function(s){return get(new URL(s.file,MAP)).then(function(b){return L.decodeShard(b,s.n);});});
-  status('Downloading the layout and the map data…');
-  var got=await Promise.all([Promise.all(parts),Promise.all(shards),taxa]);
-  S.TAXA=got[2];
-  S.P=L.join(got[1],got[0],lay.bbox,meta.bbox);
-  status('');
-  chips();
+  var parts=Promise.all(lay.parts.map(function(p){
+    return S.idx.file(p.name+'.bin').then(L.gunzip).then(function(b){return L.decodePart(b,p.count);});}));
+  status('Downloading the layout…');
+  var layout=await parts;
+  // groups and names: fetched once the layout is in, so the two do not share the connection's bandwidth
+  var groups=mapText.then(function(html){
+    var meta=L.parseMapMeta(html);
+    var taxa=get(new URL(meta.taxa,MAP)).then(function(b){return JSON.parse(new TextDecoder().decode(b));});
+    var shards=meta.shards.map(function(s){return get(new URL(s.file,MAP)).then(function(b){return L.decodeShard(b,s.n);});});
+    return Promise.all([Promise.all(shards),taxa]).then(function(g){return {meta:meta,shards:g[0],taxa:g[1]};});
+  });
+  groups.catch(function(){});
+  S.P=L.layoutOnly(layout,lay.bbox);
+  status(LOADING);
   start(lay.bbox);
   update();
   var want=+new URLSearchParams(location.hash.slice(1)).get('id');
   var row=want?L.find(S.P,want):-1;
   if(row>=0)select(row,true);
+  try{
+    var g=await groups;
+    S.META=g.meta;
+    applyJoin(L.join(g.shards,layout,lay.bbox,g.meta.bbox),g.taxa);
+    status('');
+  }catch(e){status('Colours and names are unavailable: '+e.message);}
 }
 function start(bbox){
   var box=$('plot'),w=Math.max(box.clientWidth,1),h=Math.max(box.clientHeight,1),sx=bbox[2]-bbox[0]||1,sy=bbox[3]-bbox[1]||1;

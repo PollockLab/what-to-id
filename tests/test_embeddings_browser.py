@@ -144,6 +144,7 @@ def layer(page, name):
 
 def ready(page):
     page.wait_for_function("window.__deck && __deck.props.layers.length > 0")
+    page.wait_for_function("document.getElementById('status').textContent === ''")  # shards joined
 
 
 def test_points_are_the_join_of_layout_and_pool(open_page):
@@ -234,5 +235,53 @@ def test_missing_layout_says_so(browser, site):
             "document.getElementById('status').textContent.includes('no photo-space')"
         )
         assert "Could not load" in page.locator("#count").inner_text()
+    finally:
+        page.close()
+
+
+def test_points_draw_and_click_before_the_shards_arrive(browser, site):
+    base, *_ = site
+    page = browser.new_page(viewport={"width": 1280, "height": 900})
+    held = []
+    page.errors = []
+    page.on("pageerror", lambda e: page.errors.append(str(e)))
+    try:
+        page.calls = stub_inat(page, None)
+
+        page.route(
+            "**/pool-*.bin*", lambda r: held.append(r)
+        )  # park the shard requests until released
+        page.goto(f"{base}/embeddings.html")
+        ready_early = "window.__deck && __deck.props.layers.length > 0"
+        page.wait_for_function(ready_early)
+        assert layer(page, "pts")["n"] == TOTAL  # the layout alone, nothing joined yet
+        assert "Loading groups and names" in page.locator("#status").inner_text()
+        assert page.locator("#groups button").count() == 0
+        page.evaluate("__deck.props.onClick({index: 7, layer: {id: 'pts'}})")
+        page.wait_for_selector(".nbrs button")
+        assert "Loading groups and names" in page.locator("#card .muted").first.inner_text()
+        assert held  # the shard requests were parked, not answered
+        for route in held:
+            route.continue_()
+        page.wait_for_function("document.getElementById('status').textContent === ''")
+        assert layer(page, "pts")["n"] == POOL_N
+        assert page.locator("#groups button").count() == len(GROUPS)
+        assert page.locator("#card").is_visible()  # the open card survives the join
+        assert page.errors == []
+    finally:
+        page.close()
+
+
+def test_failed_shards_leave_the_plot_usable(browser, site):
+    base, *_ = site
+    page = browser.new_page(viewport={"width": 1280, "height": 900})
+    try:
+        stub_inat(page, None)
+        page.route("**/pool-*.bin*", lambda r: r.fulfill(status=500))
+        page.goto(f"{base}/embeddings.html")
+        page.wait_for_function(
+            "document.getElementById('status').textContent.includes('unavailable')"
+        )
+        assert layer(page, "pts")["n"] == TOTAL
     finally:
         page.close()
