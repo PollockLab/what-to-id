@@ -110,11 +110,11 @@ def test_range_reads_fetch_only_probed_lists(fixture):
         requests.length = 0;
         const fresh = await IDX.open('http://data.test/atlas/', {{fetch: fakeFetch}});
         await fresh.search(q, {{k: 10, nprobe}});
-        const first = requests.filter(r => r.name.includes('.ids.') || r.name.includes('.codes.'));
-        const again = requests.length;
+        const lists = () => requests.filter(r => /[.](ids|codes)[.]/.test(r.name));
+        const first = lists(), again = first.length;
         await fresh.search(q, {{k: 10, nprobe}});
         report.push({{nprobe, data: first.reduce((a, r) => a + r.bytes, 0), n: first.length,
-                     cachedExtra: requests.length - again}});
+                     cachedExtra: lists().length - again}});
       }}
       out(report);
     }})()"""
@@ -177,7 +177,7 @@ def test_redirect_target_is_reused_and_re_resolved_when_expired(fixture):
     got = node(script, directory)
     for hits, expected in zip(got["ids"], s["ids"], strict=True):
         assert hits == [i for i in expected if i != -1]
-    data = [n for n in got["before"] if ".ids." in n or ".codes." in n]
+    data = [n for n in got["before"] if ".ids." in n or ".codes." in n or ".refine." in n]
     assert data and all(got["before"][n] == 1 for n in data), got["before"]
     assert got["cdn"] > 0, "later ranges must go to the CDN URL"
     # after expiry each data file is resolved exactly once more, not once per range
@@ -193,7 +193,7 @@ def test_small_parts_load_whole_once(fixture):
       const ids = [];
       for (const v of q)
         ids.push((await idx.search(Float32Array.from(v), {{k, nprobe}})).map(h => h.id));
-      const data = requests.filter(r => r.name.includes('.ids.') || r.name.includes('.codes.'));
+      const data = requests.filter(r => /[.](ids|codes|refine)[.]/.test(r.name));
       out({{ids, data}});
     }})()"""
     got = node(script, directory)
@@ -202,7 +202,10 @@ def test_small_parts_load_whole_once(fixture):
         assert hits == [i for i in expected if i != -1]
     names = [r["name"] for r in got["data"]]
     assert sorted(names) == sorted(
-        f"{p['name']}.{e}" for p in mf["parts"] if p["count"] for e in ("ids.u32", "codes.u8")
+        f"{p['name']}.{e}"
+        for p in mf["parts"]
+        if p["count"]
+        for e in ("ids.u32", "codes.u8", "refine.u8")
     )
     assert all("start" not in r for r in got["data"])
 
@@ -395,7 +398,7 @@ def test_taxon_vector_reads_one_row_and_unit_normalises(tmp_path):
     (tmp_path / "n.tsv.gz").write_bytes(gzip.compress(b"Acer\tMaple\nPoa\t\n"))
     rows.tofile(tmp_path / "v.f16")
     manifest = {
-        "version": 1,
+        "version": 2,
         "taxa": {"names": "n.tsv.gz", "vectors": "v.f16", "count": 2, "dims": dims},
     }
     (tmp_path / "manifest.json").write_text(json.dumps(manifest))
@@ -414,3 +417,58 @@ def test_taxon_vector_reads_one_row_and_unit_normalises(tmp_path):
         {"name": "v.f16", "bytes": 8, "start": 8},
         {"name": "v.f16", "bytes": 8, "start": 0},
     ]
+
+
+def test_refine_reads_only_shortlisted_rows_with_bounded_concurrency(fixture):
+    directory, ref = fixture
+    rb = 1024 * 3 // 8
+    script = f"""(async () => {{
+      let live = 0, peak = 0;
+      const slow = async (url, opts) => {{
+        live++; peak = Math.max(peak, live);
+        await new Promise(r => setTimeout(r, 5));
+        const res = await fakeFetch(url, opts); live--; return res;
+      }};
+      const q = Float32Array.from({json.dumps(ref["queries"][0])});
+      const idx = await IDX.open('http://data.test/atlas/', {{fetch: slow, concurrency: 4}});
+      await idx.search(q, {{k: 10, nprobe: 16}});
+      peak = 0; requests.length = 0;
+      await idx.search(q, {{k: 10, nprobe: 16}});
+      out({{peak, refine: requests.filter(r => r.name.includes('.refine.'))}});
+    }})()"""
+    got = node(script, directory)
+    assert got["refine"], "refine codes must be read"
+    assert 1 < got["peak"] <= 4
+    # nprobe 16 reaches every row, so the shortlist is exactly 500 rows and nothing else is read
+    assert sum(r["bytes"] for r in got["refine"]) == 500 * rb
+    assert all(r["bytes"] % rb == 0 for r in got["refine"])
+
+
+def test_shortlist_zero_and_stage1_callback_match_python(fixture):
+    from what_to_id import atlas_index
+
+    directory, ref = fixture
+    queries = np.asarray(ref["queries"], dtype=np.float32)
+    want, _ = atlas_index.search(directory, queries, ref["k"], 4, shortlist=0)
+    script = f"""(async () => {{
+      const idx = await IDX.open('http://data.test/atlas/', {{fetch: fakeFetch}});
+      const plain = [], staged = [], final = [];
+      for (const v of {json.dumps(ref["queries"])}) {{
+        const q = Float32Array.from(v);
+        const k = {ref["k"]}, nprobe = 4;
+        plain.push((await idx.search(q, {{k, nprobe, shortlist: 0}})).map(h => h.id));
+        let first = null;
+        requests.length = 0;
+        const hits = await idx.search(q, {{k, nprobe, onStage1: h => {{
+          first = h.map(x => x.id); }}}});
+        staged.push(first); final.push(hits.map(h => h.id));
+      }}
+      out({{plain, staged, final}});
+    }})()"""
+    got = node(script, directory)
+    for ids, expected in zip(got["plain"], want.tolist(), strict=True):
+        assert ids == [i for i in expected if i != -1]
+    assert got["staged"] == got["plain"]
+    default = [s for s in ref["searches"] if s["nprobe"] == 4][0]["ids"]
+    for ids, expected in zip(got["final"], default, strict=True):
+        assert ids == [i for i in expected if i != -1]

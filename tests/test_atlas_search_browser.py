@@ -211,11 +211,14 @@ def test_more_like_this_and_id_deep_link(open_page, site):
         "button", name=re.compile("More photos like")
     ).click()
     page.wait_for_function(f"location.hash === '#id={source['id']}'")
-    page.wait_for_function("document.querySelectorAll('.card').length === 12")
-    assert card_ids(page) == source["neighbors"][0]
+    # the stubbed API drops two ids from every result, neighbours included
+    gone = {page.stub["research"], page.stub["gone"]}
+    want = [i for i in source["neighbors"][0] if i not in gone]
+    page.wait_for_function(f"document.querySelectorAll('.card').length === {len(want)}")
+    assert card_ids(page) == want
     deep = open_page(f"#id={source['id']}", fake_encoder=False)
     deep.wait_for_selector(".card")
-    assert card_ids(deep) == source["neighbors"][0]
+    assert card_ids(deep) == want
     assert deep.errors == [] and page.errors == []
 
 

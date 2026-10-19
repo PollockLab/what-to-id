@@ -2,7 +2,7 @@
 (function(){
 'use strict';
 var CFG=ATLAS_SEARCH_CONFIG,Meta=AtlasSearchMeta,Enc=AtlasEncoder;
-var K=200,NPROBE=32,WHOLE=4<<20;  // parts up to 4 MB load whole: one request, not 32 ranges
+var K=200,WHOLE=4<<20;  // parts up to 4 MB load whole: one request, not 32 ranges
 var qs=new URLSearchParams(location.search);
 var DATA=new URL(CFG.dataUrl,location.href).href.replace(/\/*$/,'/');
 var S={index:null,encoder:null,cache:new Map(),hits:[],state:null,run:0,include:[],exclude:[]};
@@ -73,7 +73,8 @@ async function hitsFrom(state,confirmed){
     status('Searching...');
     q=await enc.encode(caption(state.text));
   }
-  return {hits:await idx.search(q,{k:K,nprobe:+qs.get('nprobe')||NPROBE})};
+  // nprobe and shortlist default to the manifest's
+  return {hits:await idx.search(q,{k:K,nprobe:+qs.get('nprobe')||undefined})};
 }
 
 async function start(state,confirmed){

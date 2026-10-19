@@ -1,11 +1,12 @@
-// Browser reader for the static IVF-PQ atlas index (layout v1, see atlas_index_io.py) over HTTP Range.
-// Mirrors atlas_index.search and atlas_neighbors.lookup_neighbors: score = <q,c_l> + sum_j LUT[j][code_j].
+// Browser reader for the static IVF-OPQ-PQ atlas index (layout v2, see atlas_index_io.py) over HTTP Range.
+// Mirrors atlas_index.search and atlas_neighbors.lookup_neighbors. Stage 1: score = <q,c_l> + sum_j LUT[j][code_j]
+// with the LUT built from the OPQ-rotated query; stage 2 re-scores the shortlist with the refine codes.
 (function(root,factory){
   var api=factory();
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.AtlasSearchIndex=api;
 })(typeof globalThis!=='undefined'?globalThis:this,function(){
 'use strict';
-var KSUB=256;
+var KSUB=256,REFINE_CONCURRENCY=24;
 
 // IEEE half to float, including subnormals, infinities and NaN.
 function f16ToF32(h){
@@ -29,6 +30,22 @@ function buildLut(q,pq,m){
   }
   return lut;
 }
+// A q for a row-major (dims x dims) rotation A: the query in the space the codebooks live in.
+function rotate(A,q){
+  var d=q.length,out=new Float32Array(d);
+  for(var i=0;i<d;i++){var s=0,o=i*d;for(var j=0;j<d;j++)s+=A[o+j]*q[j];out[i]=s;}
+  return out;
+}
+// Refined score of one row: s1 + <qr,lo> + sum_d level[d]*qr[d]*step[d]. `v` is qr*step and `c0` is <qr,lo>;
+// levels are `bits` wide, little-endian, dimension d at bit d*bits of the row starting at buf[at].
+function refineScore(s1,c0,v,bits,buf,at){
+  var mask=(1<<bits)-1,s=c0;
+  for(var d=0;d<v.length;d++){
+    var p=d*bits,b=at+(p>>3);
+    s+=(((buf[b]|(buf[b+1]<<8))>>(p&7))&mask)*v[d];
+  }
+  return s1+s;
+}
 function coarseScores(q,centroids,nlist){
   var dims=q.length,out=new Float32Array(nlist);
   for(var l=0;l<nlist;l++){var s=0,o=l*dims;for(var d=0;d<dims;d++)s+=q[d]*centroids[o+d];out[l]=s;}
@@ -51,16 +68,17 @@ function adc(base,lut,codes,m,out,at){
   }
 }
 // Streaming top-k over (score,id) candidates; earlier candidates win ties, like a stable argsort.
-function Topk(k){this.k=k;this.ids=[];this.scores=[];}
-Topk.prototype.push=function(score,id){
+// An optional tag travels with each candidate (the search stores where its refine row lives).
+function Topk(k){this.k=k;this.ids=[];this.scores=[];this.tags=[];}
+Topk.prototype.push=function(score,id,tag){
   var n=this.scores.length;
   if(n===this.k&&!(score>this.scores[n-1]))return;
   var i=n<this.k?n:n-1;
   while(i>0&&this.scores[i-1]<score){
-    if(i<this.k){this.scores[i]=this.scores[i-1];this.ids[i]=this.ids[i-1];}
+    if(i<this.k){this.scores[i]=this.scores[i-1];this.ids[i]=this.ids[i-1];this.tags[i]=this.tags[i-1];}
     i--;
   }
-  this.scores[i]=score;this.ids[i]=id;
+  this.scores[i]=score;this.ids[i]=id;this.tags[i]=tag;
 };
 Topk.prototype.result=function(){
   return this.ids.map(function(id,i){return {id:id,score:this.scores[i]};},this);
@@ -80,11 +98,23 @@ function coalesce(ranges,gap){
   return out;
 }
 
+// Run the async task functions with at most `limit` in flight; results keep the task order.
+async function pool(tasks,limit){
+  var res=new Array(tasks.length),next=0;
+  async function worker(){
+    while(next<tasks.length){var i=next++;res[i]=await tasks[i]();}
+  }
+  var workers=[];
+  for(var w=0;w<Math.min(limit,tasks.length);w++)workers.push(worker());
+  await Promise.all(workers);
+  return res;
+}
+
 function join(base,name){return base.replace(/\/*$/,'/')+name;}
 
 function Index(base,opts){
-  this.base=base;this.fetch=opts.fetch;this.gap=opts.gap||0;this.whole=opts.whole||0;
-  this.offsets={};this.lists={};this.dir={};this.urls={};this.files={};
+  this.base=base;this.fetch=opts.fetch;this.gap=opts.gap||0;this.whole=opts.whole||0;this.concurrency=opts.concurrency||REFINE_CONCURRENCY;
+  this.offsets={};this.lists={};this.dir={};this.urls={};this.files={};this.resolving={};
 }
 // Fetch bytes [start,end) of a file; a server that ignores Range (200) is sliced.
 // A redirect target (Hugging Face sends large files to a signed CDN URL) is reused for later ranges,
@@ -94,8 +124,10 @@ Index.prototype.bytes=async function(name,start,end){
   if(start!==undefined)headers.Range='bytes='+start+'-'+(end-1);
   var res=await this.fetch(cached||url,{headers:headers});
   if(!res.ok&&cached){
-    delete this.urls[name];cached=null;
-    res=await this.fetch(url,{headers:headers});
+    if(this.urls[name]===cached)delete this.urls[name];
+    if(!this.urls[name])await this.resolve(name);
+    cached=this.urls[name]||null;
+    res=await this.fetch(cached||url,{headers:headers});
   }
   if(!res.ok){
     var err=new Error('Could not load '+name+' ('+res.status+')');
@@ -107,6 +139,15 @@ Index.prototype.bytes=async function(name,start,end){
   if(start!==undefined&&res.status===200)buf=buf.slice(start,end);
   return buf;
 };
+// Re-resolve an expired CDN URL once for all reads of the file that failed at the same time.
+Index.prototype.resolve=function(name){
+  var self=this;
+  if(!this.resolving[name])this.resolving[name]=this.fetch(join(this.base,name),{headers:{Range:'bytes=0-0'}})
+    .then(function(res){if(res.ok&&res.redirected&&res.url)self.urls[name]=res.url;})
+    .catch(function(){})
+    .then(function(){delete self.resolving[name];});
+  return this.resolving[name];
+};
 // Whole-file read, cached; used for parts small enough that one request beats many ranges.
 Index.prototype.file=function(name){
   if(!this.files[name])this.files[name]=this.bytes(name);
@@ -116,20 +157,24 @@ Index.prototype.init=async function(){
   var res=await this.fetch(join(this.base,'manifest.json'),{cache:'no-cache'});
   if(!res.ok)throw new Error('Could not load the search index ('+res.status+')');
   var m=this.manifest=JSON.parse(await res.text());
-  if(m.version!==1)throw new Error('Unsupported index version '+m.version);
+  if(m.version!==2)throw new Error('Unsupported index version '+m.version);
   return this;
 };
-// Centroids and codebooks, needed by text search but not by neighbour lookups.
+// Centroids, rotation, codebooks and refine grid, needed by text search but not by neighbour lookups.
 Index.prototype.core=function(){
   var self=this,mf=this.manifest;
   if(!this._core)this._core=Promise.all([
-    this.bytes('centroids.f16'),this.bytes('pq.f32')
+    this.bytes('centroids.f16'),this.bytes('pq.f32'),this.bytes('opq.f16'),this.bytes(mf.refine.params)
   ]).then(function(r){
     var c=decodeF16(new Uint16Array(r[0]));
     if(c.length!==mf.nlist*mf.dims)throw new Error('centroids.f16 has the wrong size');
     var pq=new Float32Array(r[1]);
     if(pq.length!==mf.m*KSUB*(mf.dims/mf.m))throw new Error('pq.f32 has the wrong size');
-    self.centroids=c;self.pq=pq;
+    var rot=decodeF16(new Uint16Array(r[2]));
+    if(rot.length!==mf.dims*mf.dims)throw new Error('opq.f16 has the wrong size');
+    var sq=new Float32Array(r[3]);
+    if(sq.length!==2*mf.dims)throw new Error(mf.refine.params+' has the wrong size');
+    self.centroids=c;self.pq=pq;self.rot=rot;self.sq=sq;
   });
   return this._core;
 };
@@ -167,25 +212,72 @@ Index.prototype.loadLists=async function(part,lists){
     };
   });
 };
-// Top-k {id,score} for a unit query: nprobe lists per part, ADC, merged across parts.
+// Top-k {id,score} for a unit query. Stage 1: nprobe lists per part, ADC on the rotated query, merged
+// across parts into a shortlist. Stage 2: the shortlist's refine codes are range-read and the rows
+// re-ranked. opts: k, nprobe, shortlist (0 skips stage 2), onStage1(hits) called with the stage-1 top k.
 Index.prototype.search=async function(q,opts){
-  var mf=this.manifest,k=(opts&&opts.k)||10,nprobe=Math.min((opts&&opts.nprobe)||32,mf.nlist);
+  opts=opts||{};
+  var mf=this.manifest,dfl=mf.defaults||{},k=opts.k||10,nprobe=Math.min(opts.nprobe||dfl.nprobe||64,mf.nlist);
+  var shortlist=opts.shortlist===undefined?dfl.shortlist||500:opts.shortlist;
   if(!(q instanceof Float32Array)||q.length!==mf.dims)throw new Error('Query must be a Float32Array of '+mf.dims+' values.');
   await this.core();
   var coarse=coarseScores(q,this.centroids,mf.nlist),probe=topIndices(coarse,nprobe);
-  var lut=buildLut(q,this.pq,mf.m),top=new Topk(k),self=this;
+  var qr=rotate(this.rot,q),lut=buildLut(qr,this.pq,mf.m),self=this;
+  var top=new Topk(shortlist>0?Math.max(shortlist,k):k);
   var parts=mf.parts.filter(function(p){return p.count>0;});
   await Promise.all(parts.map(function(p){return self.loadLists(p,probe);}));
-  parts.forEach(function(p){
+  var offs=await Promise.all(parts.map(function(p){return self.partOffsets(p);}));
+  parts.forEach(function(p,pi){
     probe.forEach(function(l){
       var e=self.lists[p.name+':'+l];
       if(!e)return;
       var s=new Float32Array(e.ids.length);
       adc(coarse[l],lut,e.codes,mf.m,s,0);
-      for(var i=0;i<s.length;i++)top.push(s[i],e.ids[i]);
+      for(var i=0;i<s.length;i++)top.push(s[i],e.ids[i],pi*4294967296+offs[pi][l]+i);
     });
   });
-  return top.result();
+  if(!(shortlist>0))return top.result();
+  if(opts.onStage1)opts.onStage1(top.result().slice(0,k));
+  var refined=await this.refine(top,qr,parts);
+  return topIndices(refined,k).map(function(i){return {id:top.ids[i],score:refined[i]};});
+};
+// Refined scores for a stage-1 shortlist (a Topk tagged with part index * 2^32 + row). Rows of one part
+// are read as Range requests with adjacent rows merged, `concurrency` at a time; the first read of each
+// file goes alone so later ones reuse its resolved CDN URL.
+Index.prototype.refine=async function(top,qr,parts){
+  var mf=this.manifest,bits=mf.refine.bits,rb=mf.dims*bits/8,lo=this.sq.subarray(0,mf.dims),step=this.sq.subarray(mf.dims);
+  var v=new Float32Array(mf.dims),c0=0,self=this,byPart=parts.map(function(){return [];});
+  for(var d=0;d<mf.dims;d++){v[d]=qr[d]*step[d];c0+=qr[d]*lo[d];}
+  top.tags.forEach(function(tag,i){
+    var pi=Math.floor(tag/4294967296);
+    byPart[pi].push({i:i,row:tag-pi*4294967296});
+  });
+  var pieces=parts.map(function(){return [];}),files=[];
+  parts.forEach(function(p,pi){
+    var rows=byPart[pi].sort(function(a,b){return a.row-b.row;});
+    if(!rows.length)return;
+    var name=p.name+'.refine.u8';
+    if(p.count*rb<=self.whole){  // daily delta parts: one whole-file read
+      files.push({tasks:[function(){return self.file(name).then(function(buf){pieces[pi].push({start:0,buf:new Uint8Array(buf)});});}]});
+      return;
+    }
+    var ranges=coalesce(rows.map(function(r){return [r.row*rb,(r.row+1)*rb];}),0);
+    files.push({tasks:ranges.map(function(r){
+      return function(){return self.bytes(name,r[0],r[1]).then(function(buf){pieces[pi].push({start:r[0],buf:new Uint8Array(buf)});});};
+    })});
+  });
+  await Promise.all(files.map(function(f){return f.tasks[0]();}));
+  await pool([].concat.apply([],files.map(function(f){return f.tasks.slice(1);})),this.concurrency);
+  var out=new Float32Array(top.scores.length);
+  byPart.forEach(function(rows,pi){
+    var ps=pieces[pi].sort(function(a,b){return a.start-b.start;}),j=0;
+    rows.forEach(function(r){  // rows and pieces are both ascending
+      var at=r.row*rb;
+      while(at>=ps[j].start+ps[j].buf.length)j++;
+      out[r.i]=refineScore(top.scores[r.i],c0,v,bits,ps[j].buf,at-ps[j].start);
+    });
+  });
+  return out;
 };
 Index.prototype.neighborSets=function(name){
   var sets=(this.manifest.neighbors||[]).filter(function(e){return !name||e.name===name;});
@@ -263,14 +355,14 @@ Index.prototype.taxonVector=async function(text){
   return q;
 };
 
-// open(baseUrl, {fetch, gap, whole}) -> Promise<Index>; fetch defaults to the global one, parts of at most
-// `whole` id+code bytes are read in full.
+// open(baseUrl, {fetch, gap, whole, concurrency}) -> Promise<Index>; fetch defaults to the global one, parts of
+// at most `whole` id+code (or refine) bytes are read in full, refine reads run `concurrency` (24) at a time.
 function open(base,opts){
   opts=opts||{};
   var f=opts.fetch||(typeof fetch!=='undefined'?fetch.bind(globalThis):null);
   if(!f)throw new Error('No fetch available.');
-  return new Index(base,{fetch:f,gap:opts.gap,whole:opts.whole}).init();
+  return new Index(base,{fetch:f,gap:opts.gap,whole:opts.whole,concurrency:opts.concurrency}).init();
 }
-return {open:open,f16ToF32:f16ToF32,decodeF16:decodeF16,buildLut:buildLut,coarseScores:coarseScores,
+return {open:open,f16ToF32:f16ToF32,decodeF16:decodeF16,buildLut:buildLut,coarseScores:coarseScores,rotate:rotate,refineScore:refineScore,
   normName:normName,nameRows:nameRows,topIndices:topIndices,adc:adc,topk:topk,Topk:Topk,coalesce:coalesce};
 });
