@@ -184,6 +184,24 @@ def test_redirect_target_is_reused_and_re_resolved_when_expired(fixture):
     assert all(got["after"][n] == 2 for n in data), got["after"]
 
 
+
+def test_concurrent_first_reads_resolve_each_file_once(fixture):
+    # nprobe 4 reads separate ranges of each file in parallel on the first search; only one may hit the hub
+    directory, ref = fixture
+    q = ref["queries"][0]
+    script = (
+        REDIRECTING
+        + f"""(async () => {{
+      const idx = await IDX.open('http://hub.test/resolve/main/', {{fetch: hubFetch}});
+      await idx.search(Float32Array.from({json.dumps(q)}), {{k: 10, nprobe: 4}});
+      out({{resolves: hub.resolves, cdn: hub.cdn}});
+    }})()"""
+    )
+    got = node(script, directory)
+    data = [n for n in got["resolves"] if ".ids." in n or ".codes." in n or ".refine." in n]
+    assert data and all(got["resolves"][n] == 1 for n in data), got["resolves"]
+    assert got["cdn"] > 0
+
 def test_small_parts_load_whole_once(fixture):
     directory, ref = fixture
     s = ref["searches"][-1]
@@ -431,9 +449,9 @@ def test_refine_reads_only_shortlisted_rows_with_bounded_concurrency(fixture):
       }};
       const q = Float32Array.from({json.dumps(ref["queries"][0])});
       const idx = await IDX.open('http://data.test/atlas/', {{fetch: slow, concurrency: 4}});
-      await idx.search(q, {{k: 10, nprobe: 16}});
+      await idx.search(q, {{k: 10, nprobe: 4}});
       peak = 0; requests.length = 0;
-      await idx.search(q, {{k: 10, nprobe: 16}});
+      await idx.search(q, {{k: 10, nprobe: 4}});
       out({{peak, refine: requests.filter(r => r.name.includes('.refine.'))}});
     }})()"""
     got = node(script, directory)

@@ -114,27 +114,34 @@ function join(base,name){return base.replace(/\/*$/,'/')+name;}
 
 function Index(base,opts){
   this.base=base;this.fetch=opts.fetch;this.gap=opts.gap||0;this.whole=opts.whole||0;this.concurrency=opts.concurrency||REFINE_CONCURRENCY;
-  this.offsets={};this.lists={};this.dir={};this.urls={};this.files={};this.resolving={};
+  this.offsets={};this.lists={};this.dir={};this.urls={};this.files={};this.resolving={};this.first={};
 }
 // Fetch bytes [start,end) of a file; a server that ignores Range (200) is sliced.
 // A redirect target (Hugging Face sends large files to a signed CDN URL) is reused for later ranges,
-// so only the first read of a file counts against the host's rate limit; an expired one is re-resolved.
+// so only the first read of a file counts against the host's rate limit (reads issued while it is in
+// flight wait for it); an expired one is re-resolved.
+// Range reads skip the HTTP cache: Chrome's cache lock queues parallel requests to one URL (a search
+// took 10 to 18 s instead of 1 to 2 s against Hugging Face).
 Index.prototype.bytes=async function(name,start,end){
-  var headers={},url=join(this.base,name),cached=this.urls[name];
-  if(start!==undefined)headers.Range='bytes='+start+'-'+(end-1);
-  var res=await this.fetch(cached||url,{headers:headers});
+  if(this.first[name])await this.first[name];
+  var init={headers:{}},url=join(this.base,name),cached=this.urls[name],res,done;
+  if(start!==undefined){init.headers.Range='bytes='+start+'-'+(end-1);init.cache='no-store';}
+  if(!cached&&!this.first[name])this.first[name]=new Promise(function(r){done=r;});
+  try{
+    res=await this.fetch(cached||url,init);
+    if(!cached&&res.ok&&res.redirected&&res.url)this.urls[name]=res.url;
+  }finally{if(done)done();}
   if(!res.ok&&cached){
     if(this.urls[name]===cached)delete this.urls[name];
     if(!this.urls[name])await this.resolve(name);
     cached=this.urls[name]||null;
-    res=await this.fetch(cached||url,{headers:headers});
+    res=await this.fetch(cached||url,init);
   }
   if(!res.ok){
     var err=new Error('Could not load '+name+' ('+res.status+')');
     err.stale=res.status===404;  // replaced by a newer index; reload the manifest
     throw err;
   }
-  if(!cached&&res.redirected&&res.url)this.urls[name]=res.url;
   var buf=await res.arrayBuffer();
   if(start!==undefined&&res.status===200)buf=buf.slice(start,end);
   return buf;
@@ -142,7 +149,7 @@ Index.prototype.bytes=async function(name,start,end){
 // Re-resolve an expired CDN URL once for all reads of the file that failed at the same time.
 Index.prototype.resolve=function(name){
   var self=this;
-  if(!this.resolving[name])this.resolving[name]=this.fetch(join(this.base,name),{headers:{Range:'bytes=0-0'}})
+  if(!this.resolving[name])this.resolving[name]=this.fetch(join(this.base,name),{headers:{Range:'bytes=0-0'},cache:'no-store'})
     .then(function(res){if(res.ok&&res.redirected&&res.url)self.urls[name]=res.url;})
     .catch(function(){})
     .then(function(){delete self.resolving[name];});
@@ -242,8 +249,7 @@ Index.prototype.search=async function(q,opts){
   return topIndices(refined,k).map(function(i){return {id:top.ids[i],score:refined[i]};});
 };
 // Refined scores for a stage-1 shortlist (a Topk tagged with part index * 2^32 + row). Rows of one part
-// are read as Range requests with adjacent rows merged, `concurrency` at a time; the first read of each
-// file goes alone so later ones reuse its resolved CDN URL.
+// are read as Range requests with adjacent rows merged, `concurrency` at a time.
 Index.prototype.refine=async function(top,qr,parts){
   var mf=this.manifest,bits=mf.refine.bits,rb=mf.dims*bits/8,lo=this.sq.subarray(0,mf.dims),step=this.sq.subarray(mf.dims);
   var v=new Float32Array(mf.dims),c0=0,self=this,byPart=parts.map(function(){return [];});
@@ -266,8 +272,7 @@ Index.prototype.refine=async function(top,qr,parts){
       return function(){return self.bytes(name,r[0],r[1]).then(function(buf){pieces[pi].push({start:r[0],buf:new Uint8Array(buf)});});};
     })});
   });
-  await Promise.all(files.map(function(f){return f.tasks[0]();}));
-  await pool([].concat.apply([],files.map(function(f){return f.tasks.slice(1);})),this.concurrency);
+  await pool([].concat.apply([],files.map(function(f){return f.tasks;})),this.concurrency);
   var out=new Float32Array(top.scores.length);
   byPart.forEach(function(rows,pi){
     var ps=pieces[pi].sort(function(a,b){return a.start-b.start;}),j=0;
