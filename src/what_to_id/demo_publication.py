@@ -274,7 +274,7 @@ def _extract(archive: bytes, destination: Path) -> None:
 
 
 def _demo_owned(path: PurePosixPath) -> bool:
-    return path.as_posix() in ("embeddings.html", "dinov3/embeddings.html") or (
+    return path.as_posix() in ("embeddings-sample.html", "dinov3/embeddings-sample.html") or (
         path.suffix == ".json"
         and path.parent.as_posix() in ("embeddings-data", "dinov3/embeddings-data")
     )
@@ -308,7 +308,7 @@ def _demo_files(demo: Path) -> dict[PurePosixPath, Path]:
             raise PublicationError(f"Malformed demo HTML: {relative}")
         files[relative] = path
     for prefix in (PurePosixPath("."), PurePosixPath("dinov3")):
-        if prefix / "embeddings.html" not in files or not any(
+        if prefix / "embeddings-sample.html" not in files or not any(
             path.parent == prefix / "embeddings-data" for path in files
         ):
             raise PublicationError(f"Missing demo page or group data: {prefix}")

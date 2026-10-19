@@ -4,15 +4,11 @@ function $(id){return document.getElementById(id);}
 var css=getComputedStyle(document.documentElement);
 function tok(n){return css.getPropertyValue(n).trim();}
 var dark=matchMedia('(prefers-color-scheme: dark)').matches,DOT=tok('--dot').split(',').map(Number);
-var DAY=864e5,D0=Date.parse(META.day0+'T00:00:00Z'),NO=65535,NOTAX=65535,LAST=META.days-1;
+var MF=MapFilter(META),DAY=MF.DAY,D0=MF.D0,NO=MF.NO,NOTAX=MF.NOTAX,LAST=MF.LAST;
 var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-var MONTH=['January','February','March','April','May','June','July','August','September',
-  'October','November','December'];
-var FLAG={introduced:1,threatened:2,obscured:4,imprecise:8,earlyObs:16,earlyUp:32},ONLYFLAG={introduced:'introduced',
-  threatened:'threatened',exact:'obscured'},ONLYKEYS=Object.keys(ONLYFLAG),nf=new Intl.NumberFormat('en-CA');
-function iso(d){return new Date(D0+d*DAY).toISOString().slice(0,10);}
-function dayOf(s){var t=Date.parse(s+'T00:00:00Z');return isNaN(t)?null:Math.round((t-D0)/DAY);}
-function clamp(d){return Math.max(0,Math.min(LAST,d));}
+var MONTH=MF.MONTH;
+var FLAG=MF.FLAG,ONLYFLAG=MF.ONLYFLAG,ONLYKEYS=MF.ONLYKEYS,nf=new Intl.NumberFormat('en-CA'),
+  iso=MF.iso,dayOf=MF.dayOf,clamp=MF.clamp;
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){
   return '&#'+c.charCodeAt(0)+';';});}
 
@@ -30,44 +26,33 @@ var STALE_DAYS=2;
     el.textContent=days<=0?'today':days===1?'yesterday':days+' days ago';}
 })();
 
-// Calendar lookups by day: month of year, day of month, weekday (Monday is 0) and month number
-// counted from the first day's month, which indexes META.totals.
-var MOY=new Uint8Array(META.days),DOM=new Uint8Array(META.days),DOW=new Uint8Array(META.days),
-  MI=new Uint16Array(META.days),Y0=new Date(D0).getUTCFullYear(),M0=new Date(D0).getUTCMonth();
-for(var d=0;d<META.days;d++){var t=new Date(D0+d*DAY);MOY[d]=t.getUTCMonth();DOM[d]=t.getUTCDate();
-  DOW[d]=(t.getUTCDay()+6)%7;MI[d]=(t.getUTCFullYear()-Y0)*12+MOY[d]-M0;}
+var MOY=MF.MOY,DOM=MF.DOM,DOW=MF.DOW,MI=MF.MI,M0=MF.M0;
 
 // What the viewer picked. Written to the URL hash so a view can be shared or bookmarked.
 // Groups and show only hold chip states (see map_chips.js): {Insecta:'inc', Aves:'not'}.
-var S={up:false,lo:0,hi:LAST,months:0,groups:{},only:{},picks:[],split:[],rec:null,at:null,fly:false};
+var S=Object.assign({split:[],rec:null,at:null,fly:false},MF.read(new URLSearchParams(location.hash.slice(1))));
 (function readHash(){
   var h=new URLSearchParams(location.hash.slice(1));
-  S.up=h.get('by')==='uploaded';
-  var f=dayOf(h.get('from')||''),t=dayOf(h.get('to')||'');
-  if(f!=null)S.lo=clamp(f);if(t!=null)S.hi=clamp(t);
-  if(S.lo>S.hi){var sw=S.lo;S.lo=S.hi;S.hi=sw;}
-  (h.get('months')||'').split(',').forEach(function(m){if(+m>=1&&+m<=12)S.months|=1<<(m-1);});
-  S.groups=CH.read(h.get('groups'),META.groups);
-  S.only=CH.read(h.get('only'),ONLYKEYS.filter(function(k){return META.flags.indexOf(ONLYFLAG[k])>=0;}),['exact']);
-  S.picks=TX.read(h.get('taxa'));S.oldq=S.picks.length?'':h.get('q')||'';S.rec=+h.get('record')||null;
-  S.area=h.get('area')||'';S.park=h.get('park')||'';
-  S.bcpark=h.get('bcpark')||'';
+  S.rec=+h.get('record')||null;
   var at=(h.get('at')||'').split('/').map(Number);if(at.length===3&&at.every(isFinite))S.at=at;
   S.fly=!!S.rec&&!S.at;
 })();
 var PJ=projectFilter({meta:META,hash:new URLSearchParams(location.hash.slice(1)),changed:function(){refilter();}});
 var hashTimer=0;
+// The split view hands the selection over live; the area and projects are not part of it yet.
+var SYNC=MapFilter.sync({key:function(){return MF.write(S).join('&');},apply:function(str){
+  var r=MF.read(new URLSearchParams(str));
+  ['up','lo','hi','months','groups','only'].forEach(function(k){S[k]=r[k];});
+  S.picks.length=0;r.picks.forEach(function(p){S.picks.push(p);});S.split=[];
+  // before the taxa and records are in, refilter runs once they are
+  if(TAXA){search();showClades();}
+  showGroups();showMonths();showOnly();if(P.n)refilter();render();}});
 // The selection: the hash without the open record and the view.
 function sel(){
-  var h=[];if(S.up)h.push('by=uploaded');
-  if(S.lo>0)h.push('from='+iso(S.lo));if(S.hi<LAST)h.push('to='+iso(S.hi));
-  if(S.months){var ms=[];for(var m=0;m<12;m++)if(S.months>>m&1)ms.push(m+1);h.push('months='+ms);}
-  if(!allGroups())h.push('groups='+CH.write(S.groups,META.groups));
-  if(CH.any(S.only))h.push('only='+CH.write(S.only,ONLYKEYS));
-  if(S.picks.length)h.push('taxa='+TX.write(S.picks));
+  var h=MF.write(S);
   if(AREA.hash())h.push(AREA.hash());if(PJ.hash())h.push(PJ.hash());
   return h;}
-function writeHash(){clearTimeout(hashTimer);hashTimer=setTimeout(function(){
+function writeHash(){SYNC.send();clearTimeout(hashTimer);hashTimer=setTimeout(function(){
   var h=sel();
   if(P.n&&SEL>=0)h.push('record='+P.id[SEL]);else if(S.rec)h.push('record='+S.rec);
   var c=map.getCenter();h.push('at='+map.getZoom().toFixed(1)+'/'+c.lat.toFixed(3)+'/'+
@@ -78,7 +63,7 @@ function writeHash(){clearTimeout(hashTimer);hashTimer=setTimeout(function(){
 var P={n:0,id:new Uint32Array(0),pos:new Float32Array(0),obs:new Uint16Array(0),
   up:new Uint16Array(0),tax:new Uint16Array(0),grp:new Uint8Array(0),ids:new Uint8Array(0),
   fl:new Uint8Array(0)};
-var TAXA=null,TF=TX.filter(null,[]),GONE={},GONE_NEW=false,KEEP=new Uint8Array(0),SEL=-1,
+var TAXA=null,TF=TX.filter(null,[]),GONE={},GONE_NEW=false,KEEP=new Uint8Array(0),SEL=-1,NBR=[],
   CUM=new Float64Array(META.days+1),TOT=META.totals||null,TC=null,NODAY=0,PER=null,ALT=0;
 function cat(a,b){var c=new a.constructor(a.length+b.length);c.set(a);c.set(b,a.length);return c;}
 function unzip(buf){
@@ -113,7 +98,7 @@ function addShard(buf,n){
 // only change the filter settings; the data is uploaded again only when records arrive, the picks,
 // the area or deletions change, or the groups change while a taxon is included (the groups and
 // included taxa are one set, so the kept bit then carries the groups too).
-var ST_INTRO=1,ST_THREAT=2,ST_INEXACT=4,ST_KEEP=8,ST_SAMPLE=16,PD=null,PD_KEY=null,PD_GONE=-1,PD_CAT=0,
+var ST_KEEP=MF.ST_KEEP,PD=null,PD_KEY=null,PD_GONE=-1,PD_CAT=0,
   OUT=new Uint8Array(0),RC=null,PJW=null;
 function inc(){return !!TF.inc;}
 function pointData(){
@@ -122,19 +107,14 @@ function pointData(){
   if(PD&&PD.length===n&&PD_KEY&&PD_KEY.every(function(k,j){return k===key[j];})&&PD_GONE===gone)return;
   var same=PD&&PD.length===n,days=same?PD.days:new Float32Array(2*n),
     cat=same?PD.attributes.getFilterCategory.value.slice():new Uint8Array(4*n);
-  if(!same)for(i=0;i<n;i++){var o=P.obs[i],u=P.up[i],f=P.fl[i];
-    days[2*i]=o===NO?-1:o;days[2*i+1]=u===NO?-1:u;
-    cat[4*i]=P.grp[i];cat[4*i+1]=o===NO?12:MOY[o];cat[4*i+2]=u===NO?12:MOY[u];
-    cat[4*i+3]=(f&FLAG.introduced?ST_INTRO:0)|(f&FLAG.threatened?ST_THREAT:0)|
-      (f&(FLAG.obscured|FLAG.imprecise)?ST_INEXACT:0)|(i%10===0?ST_SAMPLE:0);}
+  if(!same)for(i=0;i<n;i++)MF.record(days,cat,i,P.grp[i],P.obs[i],P.up[i],P.fl[i]);
   // only the kept bit follows the picks, the groups beside them, the area, projects and deletions
   // OUT keeps the records out for any reason but the area, for the Identify box count; PJW marks
   // the records Identify opens when it cannot say the projects exactly (see map_projects.js)
-  var ti=TF.inc,te=TF.exc,gs=key[1]?META.groups.map(function(g){return S.groups[g]==='inc';}):null,tax=P.tax,
-    grp=P.grp,id=P.id,nt=NOTAX,am=AREA.mask(n),wide=PJ.wide();
+  var kb=MF.keep(TF,MF.groupSet(S,TF),P.tax,P.grp,n,new Uint8Array(n)),id=P.id,am=AREA.mask(n),wide=PJ.wide();
   if(OUT.length!==n)OUT=new Uint8Array(n);PJW=wide?new Uint8Array(n):null;
-  for(i=0;i<n;i++){var t=tax[i],keep=!ti||(t!==nt&&ti[t]===1)||(gs!==null&&gs[grp[i]]);
-    if(te&&t!==nt&&te[t]===1||gone>0&&GONE[id[i]]===1)keep=false;
+  for(i=0;i<n;i++){var keep=kb[i]===1;
+    if(gone>0&&GONE[id[i]]===1)keep=false;
     if(wide&&keep&&(am===null||am[i]))PJW[i]=wide(i)?1:0;if(keep&&PJ.drop(i))keep=false;
     OUT[i]=keep?0:1;cat[4*i+3]=cat[4*i+3]&~ST_KEEP|(keep&&(am===null||am[i])?ST_KEEP:0);}
   // a new pick, area or deletion swaps only the categories, so deck.gl uploads only those
@@ -143,15 +123,7 @@ function pointData(){
     getFilterValue:{value:days,size:2},getFilterCategory:{value:cat,size:4}}};
   PD_KEY=key;PD_GONE=gone;
 }
-function categories(thin){
-  var groups=[],mon=[],all=[],st=[],req=0,hide=0,i;
-  CH.groupPass(S.groups,META.groups,inc()).forEach(function(v,j){if(v)groups.push(j);});
-  for(i=0;i<13;i++){all.push(i);if(S.months?i<12&&S.months>>i&1:true)mon.push(i);}
-  [['introduced',ST_INTRO],['threatened',ST_THREAT],['exact',ST_INEXACT]].forEach(function(o){var v=S.only[o[0]];
-    if(v==='not'||v&&o[0]==='exact')hide|=o[1];else if(v)req|=o[1];});
-  for(i=0;i<2*ST_SAMPLE;i++)if(i&ST_KEEP&&(i&req)===req&&!(i&hide)&&(!thin||i&ST_SAMPLE))st.push(i);
-  return [groups,S.up?all:mon,S.up?mon:all,st];
-}
+function categories(thin){return MF.categories(S,inc(),thin);}
 // The counts behind the histograms, header and share run on the CPU after the map has redrawn.
 var CT=0;
 function refilter(){
@@ -254,6 +226,14 @@ function layers(){
     getFillColor:[DOT[0],DOT[1],DOT[2],110],radiusUnits:'pixels',getRadius:1.5,radiusMinPixels:1,
     radiusMaxPixels:6,stroked:false,pickable:true,
     extensions:[EXT],updateTriggers:{getFilterCategory:PD_CAT},filterRange:[S.up?any:r,S.up?r:any],filterCategories:categories(THIN)})];
+  var at=function(d){return [P.pos[2*d.i],P.pos[2*d.i+1]];};
+  if(NBR.length)L.push(new deck.ScatterplotLayer({id:'nbr',data:NBR,getPosition:at,radiusUnits:'pixels',getRadius:11,
+    getFillColor:[27,94,76],stroked:true,lineWidthUnits:'pixels',getLineWidth:2,getLineColor:[255,255,255]}),
+    new deck.TextLayer({id:'nbr-rank',data:NBR,getPosition:at,getText:function(d){return String(d.r);},getSize:12,
+      sizeUnits:'pixels',getColor:[255,255,255],fontWeight:'bold',getTextAnchor:'middle',getAlignmentBaseline:'center'}));
+  if(SEL>=0)L.push(new deck.ScatterplotLayer({id:'halo',data:[SEL],
+    getPosition:function(i){return [P.pos[2*i],P.pos[2*i+1]];},radiusUnits:'pixels',getRadius:13,
+    filled:false,stroked:true,lineWidthUnits:'pixels',getLineWidth:3,getLineColor:[233,168,50]}));
   if(SEL>=0)L.push(new deck.ScatterplotLayer({id:'sel',data:[SEL],
     getPosition:function(i){return [P.pos[2*i],P.pos[2*i+1]];},radiusUnits:'pixels',getRadius:8,
     filled:false,stroked:true,lineWidthUnits:'pixels',getLineWidth:2.5,
@@ -407,10 +387,7 @@ function showMonths(){MB_.forEach(function(b,i){b.setAttribute('aria-pressed',St
 $('mclear').onclick=function(){S.months=0;showMonths();refilter();};
 // Introduced and threatened can be left out too. The location filter stays two-state: its opposite, hidden
 // or over 1 km uncertain, is an OR iNaturalist's Identify filters cannot say.
-var ONLYDEF=[['introduced','Introduced to BC','introduced','Species not native to BC'],
-  ['threatened','Threatened','threatened','Species with a threatened status'],
-  ['exact','Accuracy ≤1 km or unknown','obscured','Hide obscured locations and records with reported uncertainty over 1 km. Unknown accuracy is retained. Map points use rounded public coordinates']]
-  .filter(function(o){return META.flags.indexOf(o[2])>=0;}),
+var ONLYDEF=MF.ONLYDEF,
   ONLY=ONLYDEF.map(function(o){return CH.chip($('flags'),o[0],o[1],function(){return S.only;},o[0]!=='exact',
     o[3],refilter);});
 function showOnly(){ONLY.forEach(function(b,j){CH.show(b,ONLYDEF[j][1],S.only[ONLYDEF[j][0]]||'');});}
@@ -505,10 +482,39 @@ function place(){
   s.right='auto';s.left=Math.max(m,left)+'px';
   s.top=Math.max(m,Math.min(y-h/2,innerHeight-m-h))+'px';
 }
-function closeCard(){SEL=-1;card.hidden=true;if(ctl)ctl.abort();
-  if(GONE_NEW){GONE_NEW=false;refilter();}else{layers();writeHash();}}
+function closeCard(){SEL=-1;NBR=[];card.hidden=true;if(ctl)ctl.abort();
+  if(GONE_NEW){GONE_NEW=false;refilter();}else{layers();writeHash();}
+  tell(null);}
+// The split view mirrors the picked record in the photo space by id. A record picked there is ringed
+// here without a card, and the map pans to it only when it is off screen.
+function tell(id){if(parent!==window)parent.postMessage({type:'wtid-record',id:id},location.origin);}
+function mark(i){
+  SEL=i;NBR=[];card.hidden=true;if(ctl)ctl.abort();layers();
+  var c=[P.pos[2*i],P.pos[2*i+1]];if(!map.getBounds().contains(c))map.easeTo({center:c});
+}
+// The photo space sends the closest matches of the picked record; those that are on the map get a ring.
+addEventListener('message',function(e){
+  if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-matches'||SEL<0||
+    e.data.id!==P.id[SEL])return;
+  var rank={};e.data.hits.forEach(function(h,k){rank[h.id]=k+1;});
+  NBR=[];for(var i=0;i<P.n;i++)if(rank[P.id[i]])NBR.push({i:i,r:rank[P.id[i]]});
+  layers();
+});
+// Hovering a tile in the photo space brings its match into view; nothing else changes.
+addEventListener('message',function(e){
+  if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-focus')return;
+  for(var i=0;i<P.n;i++)if(P.id[i]===e.data.id){var c=[P.pos[2*i],P.pos[2*i+1]];
+    if(!map.getBounds().contains(c))map.easeTo({center:c});return;}
+});
+addEventListener('message',function(e){
+  if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-record')return;
+  var id=e.data.id;
+  if(id==null){S.rec=S.mark=null;if(SEL>=0){SEL=-1;NBR=[];card.hidden=true;if(ctl)ctl.abort();layers();}return;}
+  for(var i=0;i<P.n;i++)if(P.id[i]===id){if(i!==SEL)mark(i);return;}
+  S.rec=id;S.fly=false;S.mark=true;  // the shards that hold it have not loaded yet
+});
 function openCard(i){
-  SEL=i;var t=names(i),id=P.id[i],lag=P.obs[i]!==NO&&P.up[i]!==NO&&!(P.fl[i]&(FLAG.earlyObs|FLAG.earlyUp))?P.up[i]-P.obs[i]:null;
+  SEL=i;NBR=[];tell(P.id[i]);var t=names(i),id=P.id[i],lag=P.obs[i]!==NO&&P.up[i]!==NO&&!(P.fl[i]&(FLAG.earlyObs|FLAG.earlyUp))?P.up[i]-P.obs[i]:null;
   card.innerHTML='<button type="button" class="x" aria-label="Close">×</button>'+
     '<div class="ph" id="ph">Loading photo</div><div class="body">'+
     '<h2>'+esc(t.common||t.latin)+'</h2><p class="latin"><i>'+esc(t.latin)+'</i>'+
@@ -593,7 +599,7 @@ META.shards.forEach(function(s,k){
     if(k===0)return names0;
   }).then(function(){
     refilter();
-    if(S.rec&&SEL<0){for(var i=0;i<P.n;i++)if(P.id[i]===S.rec){S.rec=null;openCard(i);
+    if(S.rec&&SEL<0){for(var i=0;i<P.n;i++)if(P.id[i]===S.rec){S.rec=null;if(S.mark){S.mark=false;mark(i);break;}openCard(i);
       if(S.fly){S.fly=false;map.flyTo({center:[P.pos[2*i],P.pos[2*i+1]],zoom:12});}break;}}
     if(k===META.shards.length-1&&S.rec){S.rec=null;writeHash();}
   });

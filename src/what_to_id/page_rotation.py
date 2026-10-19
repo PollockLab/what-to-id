@@ -17,12 +17,13 @@ import json
 from html import escape
 from pathlib import Path
 
+from what_to_id import page_nav
 from what_to_id.manifest import Manifest
 from what_to_id.page import ARM_WORDS, group_name
 from what_to_id.page_method import METHOD_CSS, METHOD_JS, method_section
-from what_to_id.page_style import CSS, FONTS
+from what_to_id.page_style import CSS
 
-_SG = '"Space Grotesk",Inter,system-ui,sans-serif'
+_SG = "system-ui,sans-serif"
 
 ROTATION_CSS = f"""
 [hidden]{{display:none!important}}
@@ -54,7 +55,8 @@ font-family:{_SG};transition:filter .12s}}
 .hint{{display:flex;flex-wrap:wrap;gap:.3rem 1rem;color:var(--mut);font-size:.88rem;
 margin:.6rem 0 0}}
 .hint a{{font-weight:600}}
-kbd{{font:600 .8rem/1 {_SG};padding:.15rem .4rem;border:1px solid #2a3a4d;border-bottom-width:2px;
+kbd{{font:600 .8rem/1 {_SG};padding:.15rem .4rem;border:1px solid var(--line);
+border-bottom-width:2px;
 border-radius:5px;background:var(--panel);color:var(--ink)}}
 @media(hover:none){{.keys{{display:none}}}}
 #runner .crumbs{{display:flex;flex-wrap:wrap;gap:.3rem 1.2rem;align-items:center}}
@@ -70,7 +72,7 @@ letter-spacing:normal}}
 .reopenrow{{margin:.5rem 0 0}}
 .reopenrow a{{font-weight:600}}
 .donebox,.undo{{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
-gap:.6rem;margin-top:1rem;padding:.7rem 1rem;background:var(--panel);border:1px solid #2a3a4d;
+gap:.6rem;margin-top:1rem;padding:.7rem 1rem;background:var(--panel);border:1px solid var(--line);
 border-radius:12px;color:var(--ink)}}
 .donebox{{border-color:var(--gd)}}
 .pillbtn{{padding:.5rem .9rem;background:var(--card);color:var(--cink);border:0;border-radius:8px;
@@ -418,9 +420,10 @@ def render_rotation_index(manifest: Manifest, *, title: str, map_href: str | Non
     return (
         '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width,initial-scale=1">\n'
-        f"<title>{title}</title>\n{FONTS}<style>{CSS}{ROTATION_CSS}{METHOD_CSS}</style>\n</head>\n<body>\n"
+        f"<title>{title}</title>\n<style>{page_nav.CSS}\n{CSS}{ROTATION_CSS}{METHOD_CSS}</style>\n"
+        f"</head>\n<body>\n{page_nav.nav('index.html')}"
         "<noscript><p>This page needs JavaScript to deal batches.</p></noscript>\n"
-        f"<main>\n<h1>{title}</h1>\n{sub_html}{body}"
+        f'<main id="main-content">\n<h1>{title}</h1>\n{sub_html}{body}'
         f"</main>\n<script>{script}</script>\n</body>\n</html>\n"
     )
 

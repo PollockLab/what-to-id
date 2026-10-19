@@ -13,8 +13,9 @@ from pathlib import Path
 
 import pandas as pd
 
+from what_to_id import page_nav
 from what_to_id.manifest import Manifest
-from what_to_id.page_style import CSS, FONTS, JS
+from what_to_id.page_style import CSS, JS
 
 ARM_WORDS = ("recency", "gap_first", "similarity", "novelty", "gap first", "surprise")
 THUMBS_PER_BATCH = 4
@@ -48,7 +49,7 @@ def _doc(title: str, body: str, *, subtitle: str = "") -> str:
     return (
         '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width,initial-scale=1">\n'
-        f"<title>{t}</title>\n{FONTS}<style>{CSS}</style>\n</head>\n<body>\n<main>\n<h1>{t}</h1>\n{sub}"
+        f"<title>{t}</title>\n<style>{page_nav.CSS}\n{CSS}</style>\n</head>\n<body>\n<main>\n<h1>{t}</h1>\n{sub}"
         f"{body}\n</main>\n<script>{JS}</script>\n</body>\n</html>\n"
     )
 

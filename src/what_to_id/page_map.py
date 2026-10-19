@@ -55,6 +55,7 @@ import numpy as np
 import pandas as pd
 import requests
 
+from what_to_id import page_nav
 from what_to_id.batches import MAX_URL_LEN
 from what_to_id.inat import BC_PLACE_ID, INAT, SLEEP, TIMEOUT, make_session
 from what_to_id.map_parks import PARKS_NAME, parks_blob, parks_version
@@ -87,8 +88,9 @@ _COLS = ("id", "lat", "lon", "observed_on", "created_at", "iconic_taxon")
 _ASSETS = files("what_to_id") / "map_assets"
 # Inlined in this order; map_taxa.js and map_area.js define the taxon and area filters map.js calls,
 # map_step.js the Identify button that steps through an area's batches, map_projects.js the
-# project filter, and map_chips.js the click rule for the short-list chips and the selection bar.
-MAP_CSS = ("map.css", "map_area.css")
+# project filter, map_chips.js the click rule for the short-list chips and the selection bar, and
+# map_filter.js the filter state and the category values the GPU filter reads.
+MAP_CSS = ("map.css", "map_select.css", "map_area.css")
 MAP_JS = (
     "identify_links.js",
     "map_taxa.js",
@@ -96,6 +98,7 @@ MAP_JS = (
     "map_area.js",
     "map_projects.js",
     "map_chips.js",
+    "map_filter.js",
     "map.js",
 )
 
@@ -388,7 +391,7 @@ def over_totals(pool: pd.DataFrame, meta: dict) -> int:
     return over
 
 
-def render_map(meta: dict, *, freeze: str | None, back: str = "index.html") -> str:
+def render_map(meta: dict, *, freeze: str | None) -> str:
     """The map page. META goes inline; the points and names come from the files at load."""
     when = ""
     if freeze:
@@ -407,12 +410,12 @@ def render_map(meta: dict, *, freeze: str | None, back: str = "index.html") -> s
     fill = {
         "TITLE": "Records that need an ID in BC",
         "WHEN": when,
-        "BACK": escape(back),
         "PLACE_ID": str(BC_PLACE_ID),
         "MAPLIBRE_CSS": MAPLIBRE_CSS,
         "MAPLIBRE_JS": MAPLIBRE_JS,
         "DECK_JS": DECK_JS,
-        "CSS": _assets(MAP_CSS),
+        "CSS": page_nav.CSS + "\n" + _assets(MAP_CSS),
+        "NAV": page_nav.nav("map.html"),
         "META": json.dumps(page_meta, sort_keys=True, separators=(",", ":")).replace("</", "<\\/"),
         "BASEMAPS": json.dumps(BASEMAPS, sort_keys=True),
         "JS": _assets(MAP_JS),

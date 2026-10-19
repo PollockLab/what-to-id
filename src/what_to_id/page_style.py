@@ -1,27 +1,18 @@
 """Inline stylesheet and script for the identifier pages. Kept out of page.py for length.
 
-Design tokens follow the Blitz the Gap map (where-to-blitz/index.html): Inter body, Space Grotesk
-for headings and controls, dark chrome with light cards, sage accent, action green, uppercase
-section labels, pills and chips, literal arrows, no gradients, no icons, no animation beyond
-border and brightness on hover.
+Colours come from page_nav.CSS (light and dark); the names below alias them for these pages. One
+system font stack, action green, uppercase section labels, pills and chips, literal arrows, no
+gradients, no icons, no animation beyond border and brightness on hover.
 """
 
-FONTS = (
-    '<link rel="preconnect" href="https://fonts.googleapis.com">\n'
-    '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
-    '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700'
-    '&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">\n'
-)
-
 CSS = """
-:root{--bg:#0f1620;--panel:#172230;--ink:#e8eef5;--mut:#9fb2c6;--acc:rgb(139,168,132);
---gd:#22c55e;--gold:#f0a000;--card:#fff;--cink:#16202c;--cmut:#5d6b7a;--line:#dfe5ec;
---line2:#d4dde6;--inset:#f4f7fa;--acc-ink:#4f6b47;--gd-ink:#15803d;--gold-ink:#a16207}
+:root{--mut:var(--muted);--acc:var(--bar);--gd:#22c55e;--gold:#f0a000;--card:var(--panel);
+--cink:var(--ink);--cmut:var(--muted);--line2:var(--line);--inset:var(--chip);--acc-ink:var(--ink);
+--gd-ink:var(--bar);--gold-ink:var(--warn)}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Inter,system-ui,-apple-system,
-Segoe UI,Roboto,sans-serif}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,
+"Segoe UI",sans-serif}
 main{max-width:64rem;margin:0 auto;padding:1.4rem 1rem 4rem}
-h1,h2,.sec,.btn,.code,.card b,.groupnav a{font-family:"Space Grotesk",Inter,system-ui,sans-serif}
 h1{font-size:1.5rem;line-height:1.16;font-weight:700;margin:.2rem 0 .2rem}
 h1 a{color:var(--acc);text-decoration:underline;text-decoration-thickness:1px;
 text-underline-offset:3px}
@@ -35,8 +26,6 @@ p.crumbs a{color:var(--mut)}
 p.legend{color:var(--mut);font-size:.9rem}
 p.legend b{color:var(--ink);font-weight:600}
 a{color:var(--acc)}
-a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--acc);
-outline-offset:2px}
 .how ol{padding-left:1.3rem;margin:.4rem 0}
 .how li{margin:.3rem 0}
 .how b{color:var(--ink)}
@@ -44,7 +33,7 @@ outline-offset:2px}
 .cards{display:flex;gap:.8rem;flex-wrap:wrap;margin:1.4rem 0}
 .card{flex:1 1 11rem;display:flex;flex-direction:column;gap:.1rem;padding:.9rem 1rem;
 background:var(--card);border:1px solid var(--line);border-radius:12px;text-decoration:none;
-color:var(--cink);box-shadow:0 6px 22px rgba(0,0,0,.5);transition:border-color .12s}
+color:var(--cink);box-shadow:var(--shadow);transition:border-color .12s}
 .card:hover{border-color:var(--acc)}
 .card b{font-size:1.25rem;color:var(--acc-ink);margin-bottom:.25rem}
 .card b::after{content:" \\2192";color:var(--cmut)}
@@ -58,7 +47,7 @@ td a{color:var(--gd-ink)}
 tbody tr:last-child td,tbody tr:last-child th{border-bottom:0}
 .groupnav{display:flex;flex-wrap:wrap;gap:.35rem;margin:1rem 0 .5rem}
 .groupnav a{color:var(--ink);text-decoration:none;font-size:.85rem;font-weight:500;
-padding:.25rem .7rem;border:1px solid #2a3a4d;border-radius:14px;background:var(--panel);
+padding:.25rem .7rem;border:1px solid var(--line);border-radius:14px;background:var(--panel);
 transition:border-color .12s}
 .groupnav a:hover{border-color:var(--acc)}
 ul.batches{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:.45rem}
@@ -83,7 +72,7 @@ transition:filter .12s}
 .prov{margin-top:3rem;color:var(--mut);font-size:.82rem}
 p.yourset{display:flex;align-items:center;gap:.7rem;margin:1.2rem 0 0;font-size:1.02rem}
 p.yourset .swap{color:var(--mut);font-size:.88rem}
-.card.is-mine{border-color:var(--gd);box-shadow:0 0 0 2px var(--gd),0 6px 22px rgba(0,0,0,.5)}
+.card.is-mine{border-color:var(--gd);box-shadow:0 0 0 2px var(--gd),var(--shadow)}
 .card.is-mine b::after{content:" \\2192 yours";color:var(--gd-ink);font-size:.8rem}
 @media(max-width:44rem){li.batch{grid-template-columns:auto 1fr auto;grid-template-areas:
 "done code btn" "facts facts facts" "thumbs thumbs thumbs"}

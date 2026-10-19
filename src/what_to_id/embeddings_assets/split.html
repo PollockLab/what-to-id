@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Explore: map and photo space</title>
+<style>
+__SITE_CSS__
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+body{display:flex;flex-direction:column}
+.site-shell{flex-wrap:wrap;position:relative}
+.site-nav{flex:0 1 auto}
+.xbar{display:flex;align-items:center;gap:8px 14px;margin-left:auto;font-size:13px;white-space:nowrap}
+.counts{color:var(--muted)}
+.counts b{color:var(--ink);font-weight:650;font-variant-numeric:tabular-nums}
+.seg{display:inline-flex}
+.seg button,.xbar .i{font:inherit;font-size:12px;min-height:28px;padding:0 11px;border:1px solid var(--line);background:var(--chip);color:var(--ink);cursor:pointer}
+.seg button:first-child{border-radius:14px 0 0 14px}
+.seg button:last-child{border-radius:0 14px 14px 0}
+.seg button+button{border-left:0}
+.seg button[aria-pressed="true"]{background:var(--on);color:var(--onink);border-color:var(--on)}
+.xbar .i{border-radius:50%;width:28px;padding:0;font-style:italic;font-weight:700;font-family:Georgia,serif}
+.note{position:absolute;z-index:30;top:100%;right:16px;width:min(380px,calc(100vw - 24px));margin:6px 0 0;padding:10px 12px;
+  background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);font-size:12px;color:var(--muted);white-space:normal}
+.note[hidden]{display:none}
+#main-content{flex:1 1 0;min-height:0;display:flex}
+#main-content iframe{flex:1 1 0;min-width:0;height:100%;border:0;background:var(--bg)}
+#main-content iframe[hidden]{display:none}
+#main-content.side #map{flex:0 0 var(--split,50%)}
+#sep{flex:0 0 7px;cursor:col-resize;background:var(--line);touch-action:none;outline-offset:-2px}
+#sep:hover,#sep:focus-visible,#sep.on{background:var(--on)}
+#main-content:not(.side) #sep{display:none}
+@media (max-width:800px){#sep{display:none}.xbar{flex:1 1 100%;margin:0 0 6px;justify-content:space-between}
+.seg [data-v="side"]{display:none}}
+</style>
+</head>
+<body>
+__SITE_NAV__
+<div id="main-content" tabindex="-1"><div id="sep" role="separator" aria-orientation="vertical" aria-label="Resize the map and photo space" aria-valuemin="20" aria-valuemax="80" tabindex="0"></div></div>
+<script>
+__MAP_FILTER__
+(function(){
+var box=document.getElementById("main-content"),frames={},last=MapFilter.tokens(location.hash),
+  h0=location.hash.slice(1).split('&').filter(Boolean),want=new URLSearchParams(location.search).get('view'),
+  FILES={map:__MAP_FILE__,space:__SPACE_FILE__},view,
+  rest=h0.filter(function(t){return MapFilter.tokens(t)==='';});
+// Tokens the sync leaves alone (the area, parks, camera, an open photo) go to the frame they belong to, once.
+function hashFor(n){
+  var own=rest.filter(function(t){var k=t.split('=')[0];
+    if(k==='id')return true;
+    if(k==='at')return n===(want==='space'?'space':'map');
+    return n==='map';});
+  return (last?[last]:[]).concat(own.map(function(t){
+    return n==='map'&&t.indexOf('id=')===0?'record='+t.slice(3):t;})).join('&');}
+function visible(n){return frames[n]&&!frames[n].hidden;}
+function post(n,m){if(frames[n]&&frames[n].contentWindow)frames[n].contentWindow.postMessage(m,location.origin);}
+function sendSel(n,sel){post(n,{type:'wtid-selection',sel:sel});}
+function mk(n){
+  var f=document.createElement('iframe');f.id=n;f.title=n==='map'?'Map':'Photo space';
+  f.src=new URL(FILES[n],location.href).href.replace(/#.*/,'')+'?embed=1'+(n==='space'&&view==='side'?'&peer=1':'')+'#'+hashFor(n);
+  box.insertBefore(f,n==='map'?box.firstChild:null);frames[n]=f;}
+function setView(v){
+  if(innerWidth<800&&v==='side')v='map';
+  view=v;
+  ['map','space'].forEach(function(n){
+    var show=v==='side'||v===n,f=frames[n];
+    if(show&&!f)mk(n);
+    else if(f&&!show&&innerWidth<800){f.remove();delete frames[n];}  // a phone holds one view at a time
+    else if(f){var was=f.hidden;f.hidden=!show;if(show&&was){sendSel(n,last);post(n,{type:'wtid-record',id:rec});if(mat)post(n,mat);}}});
+  box.classList.toggle('side',v==='side');
+  post('space',{type:'wtid-layout',peer:v==='side'});
+  [].forEach.call(document.querySelectorAll('[data-v]'),function(b){b.setAttribute('aria-pressed',b.dataset.v===v);});
+  count();}
+function num(n,id){
+  try{var m=/^[\d,]+/.exec(frames[n].contentDocument.getElementById(id).textContent);return m?m[0]:'…';}catch(e){return '…';}}
+function count(){
+  var p=[];if(visible('map'))p.push('<b>'+num('map','count')+'</b> on map');
+  if(visible('space'))p.push('<b>'+num('space','count')+'</b> in photo space');
+  var c=document.getElementById('counts'),h=p.join(' · ');if(c.innerHTML!==h)c.innerHTML=h;}
+setInterval(count,400);
+document.getElementById('xbar').addEventListener('click',function(e){
+  var b=e.target.closest('[data-v]');if(!b)return;
+  setView(b.dataset.v);history.replaceState(null,'','?view='+b.dataset.v+location.hash);});
+var i=document.getElementById('i'),note=document.getElementById('note');
+i.addEventListener('click',function(){note.hidden=!note.hidden;i.setAttribute('aria-expanded',!note.hidden);});
+addEventListener('keydown',function(e){if(e.key==='Escape'&&!note.hidden)i.click();});
+// The divider: drag it, or use the arrow keys; a double click goes back to 50/50. The share is remembered.
+var sep=document.getElementById('sep'),pct=+localStorage.getItem('wtid-split')||50;
+function share(p){pct=Math.max(20,Math.min(80,p));box.style.setProperty('--split',pct+'%');
+  sep.setAttribute('aria-valuenow',Math.round(pct));localStorage.setItem('wtid-split',pct);}
+share(pct);
+sep.addEventListener('pointerdown',function(e){sep.setPointerCapture(e.pointerId);sep.classList.add('on');});
+sep.addEventListener('pointermove',function(e){
+  if(sep.classList.contains('on')){var r=box.getBoundingClientRect();share((e.clientX-r.left)/r.width*100);}});
+sep.addEventListener('pointerup',function(){sep.classList.remove('on');});
+sep.addEventListener('dblclick',function(){share(50);});
+sep.addEventListener('keydown',function(e){
+  var d={ArrowLeft:-2,ArrowRight:2}[e.key];if(d){share(pct+d);e.preventDefault();}
+  else if(e.key==='Home'||e.key==='Enter'){share(50);e.preventDefault();}});
+// A frame reports its selection; the other one applies it in place. The frames never reload.
+addEventListener('message',function(e){
+  var n=Object.keys(frames).filter(function(k){return frames[k].contentWindow===e.source;})[0];
+  if(!n||e.origin!==location.origin||!e.data||e.data.type!=='wtid-selection'||typeof e.data.sel!=='string'||
+    e.data.sel===last)return;
+  last=e.data.sel;var o=n==='map'?'space':'map';if(visible(o))sendSel(o,last);
+  history.replaceState(null,'',location.search+(last?'#'+last:''));
+});
+// A picked record and its closest matches are mirrored by id in the other frame, and in one that shows up later.
+var rec=null,mat=null;
+addEventListener('message',function(e){
+  var n=Object.keys(frames).filter(function(k){return frames[k].contentWindow===e.source;})[0],d=e.data;
+  if(!n||e.origin!==location.origin||!d||(d.type!=='wtid-record'&&d.type!=='wtid-matches'&&d.type!=='wtid-focus'))return;
+  if(d.type==='wtid-record'){if(d.id===rec)return;rec=d.id;mat=null;}else if(d.type==='wtid-matches')mat=d;
+  var o=n==='map'?'space':'map';if(visible(o))post(o,d);
+});
+// Back and forward: the new selection goes to both.
+addEventListener('hashchange',function(){var s=MapFilter.tokens(location.hash);
+  if(s!==last){last=s;['map','space'].forEach(function(n){if(visible(n))sendSel(n,s);});}});
+setView(['side','map','space'].indexOf(want)<0?(innerWidth>=1280?'side':'map'):want);
+})();
+</script>
+</body>
+</html>
