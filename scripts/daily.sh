@@ -5,7 +5,7 @@
 #   scripts/daily.sh fetch   download the pool and served log from the pool-state release
 #   scripts/daily.sh build   load the prepared pool, build, drop identified records, rebuild,
 #                            keep the day's pool and build record, check for leaks, replay
-#   scripts/daily.sh save    upload the state back to the release
+#   scripts/daily.sh save    upload the state and study.html back to the release
 #
 # build needs WHAT_TO_ID_KEY (the private list key) and WTB_DIR (where-to-blitz's
 # cluster_results/ca, checked out at the commit in what_to_id.manifest.WHERE_TO_BLITZ_REF).
@@ -95,7 +95,7 @@ check_wtb() {
 
 check_leaks() {
   local site="$OUT/final/site"
-  [ -s "$site/index.html" ] || die "no page was built"
+  [ -s "$site/study.html" ] || die "no page was built"
   if find "$site" -type f ! -name '*.html' ! -name 'pool*.bin' ! -name bc-parks.bin | grep -q .; then
     die "the site must hold only HTML pages, the map's pool*.bin files and its bc-parks.bin"
   fi
@@ -171,6 +171,9 @@ save() {
   for f in "${files[@]}"; do
     [ -s "$f" ] || die "missing $f; run build first"
   done
+  # The study page rides on the release too: map.yml, the only Pages deployer, fetches it.
+  [ -s "$OUT/final/site/study.html" ] || die "missing $OUT/final/site/study.html; run build first"
+  files+=("$OUT/final/site/study.html")
   if ! state_release_exists "$state_repo"; then
     gh release create "$STATE_TAG" --repo "$state_repo" \
       --prerelease --latest=false --title "Daily pool state" \

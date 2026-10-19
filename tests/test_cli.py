@@ -122,12 +122,12 @@ def test_build_design_rotation_writes_only_index(tmp_path, webapp_dir):
     site = out / "site"
     assert sorted(p.name for p in site.iterdir()) == [
         "bc-parks.bin",
-        "index.html",
         "map.html",
         "pool-0.bin",
         "pool-taxa.bin",
+        "study.html",
     ]
-    html = (site / "index.html").read_text().lower()
+    html = (site / "study.html").read_text().lower()
     assert 'href="map.html"' in html
     for word in ("recency", "gap_first", "novelty", "batch_id"):
         assert word not in html
@@ -151,7 +151,7 @@ def test_build_surprise_arm_reads_scores_and_stays_blind(tmp_path, webapp_dir):
     for _, row in first.iterrows():
         rest = b[(b["arm"] == "surprise") & (b["group"] == row["group"])]
         assert by_id[row["id"]] == max(by_id[i] for i in rest["id"])
-    html = (tmp_path / "out" / "site" / "index.html").read_text().lower()
+    html = (tmp_path / "out" / "site" / "study.html").read_text().lower()
     assert "surprise" not in html and "unexpected sightings first" in html
 
 

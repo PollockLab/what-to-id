@@ -22,8 +22,8 @@ def _upload_jobs():
                 yield pytest.param(steps, uploads[0]["with"]["path"], id=f"{workflow.name}:{name}")
 
 
-def test_three_deploy_paths_are_covered():
-    assert len(list(_upload_jobs())) == 3
+def test_one_deploy_path_is_covered():
+    assert len(list(_upload_jobs())) == 1
 
 
 @pytest.mark.parametrize("steps,path", _upload_jobs())

@@ -1,4 +1,4 @@
-"""Rotation design: one blind index.html where every identifier cycles through all lists.
+"""Rotation design: one blind study.html where every identifier cycles through all lists.
 
 Unlike the "sets" design (page.py), no browser is stuck on one list: each click on "Next batch"
 advances a per-browser, per-group cycle through the blind list labels in a random permutation
@@ -421,7 +421,7 @@ def render_rotation_index(manifest: Manifest, *, title: str, map_href: str | Non
         '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width,initial-scale=1">\n'
         f"<title>{title}</title>\n<style>{page_nav.CSS}\n{CSS}{ROTATION_CSS}{METHOD_CSS}</style>\n"
-        f"</head>\n<body>\n{page_nav.nav('index.html')}"
+        f"</head>\n<body>\n{page_nav.nav('study.html')}"
         "<noscript><p>This page needs JavaScript to deal batches.</p></noscript>\n"
         f'<main id="main-content">\n<h1>{title}</h1>\n{sub_html}{body}'
         f"</main>\n<script>{script}</script>\n</body>\n</html>\n"
@@ -431,14 +431,14 @@ def render_rotation_index(manifest: Manifest, *, title: str, map_href: str | Non
 def write_rotation_site(
     out_dir: Path | str, manifest: Manifest, *, map_href: str | None = None
 ) -> list[Path]:
-    """Write a single blind index.html for the rotation design."""
+    """Write a single blind study.html for the rotation design."""
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     html = render_rotation_index(manifest, title="What to ID next in BC", map_href=map_href)
     low = html.lower()
     for w in ARM_WORDS:
         if w in low:
-            raise ValueError(f"index.html: arm name {w!r} leaked into the rotation page")
-    path = out / "index.html"
+            raise ValueError(f"study.html: arm name {w!r} leaked into the rotation page")
+    path = out / "study.html"
     path.write_text(html)
     return [path]

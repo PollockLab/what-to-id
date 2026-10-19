@@ -34,6 +34,8 @@ def daily(tmp_path):
         "days/build-2026-09-28.json",
     ):
         (state / filename).write_text("existing state")
+    (tmp_path / "out/final/site").mkdir(parents=True)
+    (tmp_path / "out/final/site/study.html").write_text("study")
     log = tmp_path / "calls.jsonl"
 
     def invoke(command, status, assets="", repo=None):
@@ -41,6 +43,7 @@ def daily(tmp_path):
             **os.environ,
             "PATH": str(tmp_path) + os.pathsep + os.environ["PATH"],
             "STATE_DIR": str(state),
+            "OUT_DIR": str(tmp_path / "out"),
             "TODAY": "2026-09-28",
             "STATE_TAG": "pool-state",
             "CALL_LOG": str(log),

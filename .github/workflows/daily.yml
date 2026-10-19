@@ -1,7 +1,9 @@
 name: daily
 
-# Rebuilds the rotation page every morning from the day's BC needs-ID pool and deploys it to
-# GitHub Pages. The steps live in scripts/daily.sh so a laptop can run exactly the same build.
+# Rebuilds the rotation page every morning from the day's BC needs-ID pool and keeps it as
+# study.html on the pool-state release. It does not deploy: map.yml runs after it and is the
+# only workflow that publishes the full site, taking study.html from the release.
+# The steps live in scripts/daily.sh so a laptop can run exactly the same build.
 # The repository is public, so nothing here may print or upload the list key or anything that
 # maps list letters to lists: the only files kept are the pool, the served log (letters only),
 # and each day's pool and public build record, as assets on the pool-state release. out/ holds
@@ -19,7 +21,7 @@ on:
 permissions:
   contents: read
 
-# Shared with pages.yml so two deploys never race.
+# Shared with the other workflows so the builds never race.
 concurrency:
   group: pages
   cancel-in-progress: false
@@ -37,11 +39,6 @@ jobs:
     timeout-minutes: 350
     permissions:
       contents: write
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     env:
       GH_TOKEN: ${{ github.token }}
       BLITZ_D1: ${{ vars.BLITZ_D1 || '2026-11-01' }}
@@ -128,23 +125,4 @@ jobs:
         env:
           WHAT_TO_ID_KEY: ${{ secrets.WHAT_TO_ID_KEY }}
         run: scripts/daily.sh build
-      # Deploy before saving: the served log then never lists a build that did not go live.
-      - name: Include the photo-search page
-        env:
-          ATLAS_HF_REPO: ${{ vars.ATLAS_HF_REPO }}
-        run: scripts/atlas_page.sh out/final/site
-      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
-      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
-        with:
-          path: out/final/site
-      - id: deployment
-        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
       - run: scripts/daily.sh save
-      # The page is live but the state did not reach the release: keep it so the served log
-      # can be restored by hand. Everything in state/ passed the leak check above.
-      - if: failure() && steps.deployment.outcome == 'success'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: state-${{ github.run_id }}
-          path: state/
-          retention-days: 30
