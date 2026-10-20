@@ -415,7 +415,7 @@ def test_map_keeps_only_the_photo_spaces_lasso_ids():
     """map.js's wtid-keep end: the ids need not arrive sorted, and the records that are not in
     the list leave the kept bit and count as out (OUT) until null clears the lasso."""
     source = (ASSETS / "map.js").read_text()
-    head = source[source.index("var ST_KEEP=MF.ST_KEEP") : source.index("function categories(")]
+    head = source[source.index("var SUB=null") : source.index("function categories(")]
     ear = source.index("// The photo space's lasso keeps")
     first = source.index("addEventListener('message'", ear)
     listener = source[ear : source.index("addEventListener('message'", first + 1)]

@@ -42,6 +42,7 @@ function applyJoin(P,taxa){
   S.sel=sel?L.find(P,sel):-1;
   S.nbr=nbr.map(function(i){return L.find(P,i);}).filter(function(r){return r>=0;});
   chips();update();
+  if(S.subset&&S.deck)fit();
   if(S.sel>=0&&S.relabel)S.relabel();
 }
 function openIndex(){return AtlasSearchIndex.open(DATA,{whole:WHOLE});}
@@ -161,6 +162,7 @@ function applyKeep(){
   if(P.grp){MF.keep(TF,MF.groupSet(S,TF),P.tax,P.grp,P.n,S.keep);
     for(var k=0;k<P.n;k++)S.keep[k]&=S.base[k];}
   else S.keep.fill(1);
+  if(S.subset)for(var j=0;j<P.n;j++)if(!S.subset.has(P.id[j]))S.keep[j]=0;
   if(S.PD){var c=S.PD.attributes.getFilterCategory.value;
     for(var i=0;i<P.n;i++)c[3*i+2]=S.keep[i];
     S.PD.attributes.getFilterCategory={value:c,size:3};S.PDV=(S.PDV||0)+1;}
@@ -191,6 +193,8 @@ function items(){
   if(S.area&&!areaIndex())out.forEach(function(t){if(t.label===alabel())t.tag='map only';});
   if(viewBox())out.push({label:'Map view'});
   if(S.ring)out.push({label:'Lasso',remove:function(){lasso(null);}});
+  if(S.subset)out.push({label:'Photo search: "'+S.subLabel+'" ('+S.subset.size+')',
+    remove:function(){parent.postMessage({type:'wtid-subset',ids:null},location.origin);}});
   S.extra.forEach(function(t){var k=t.split('=')[0];
     out.push({label:MAPONLY[k]+': '+decodeURIComponent(t.slice(k.length+1)).replace(/,/g,', '),tag:'map only',
       remove:function(){S.extra=S.extra.filter(function(x){return x!==t;});picked();}});});
@@ -322,6 +326,13 @@ function closeCard(){
   S.sel=-1;S.nbr=[];S.run++;$('card').hidden=true;
   writeHash();layers();tell(null);
 }
+// The split view's photo search hands over a set of ids (null clears it); one that arrives before the join waits for it.
+addEventListener('message',function(e){
+  var d=e.data;
+  if(e.origin!==location.origin||e.source!==parent||!d||d.type!=='wtid-subset')return;
+  S.subset=d.ids?new Set(d.ids):null;S.subLabel=d.label;
+  if(S.P&&S.P.grp){applyKeep();update();$('gfit').hidden=!items().length;if(S.subset&&S.deck)fit();}
+});
 // The split view mirrors the picked record in the other frame by id; a remote pick is not posted back.
 var remote=false;
 function tell(id){if(parent!==window&&!remote)parent.postMessage({type:'wtid-record',id:id},location.origin);}

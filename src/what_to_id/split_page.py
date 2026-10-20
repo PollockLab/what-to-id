@@ -15,8 +15,20 @@ from what_to_id import page_nav
 from what_to_id.embeddings_page import ASSETS, HERE
 
 PAGE_NAME = "split.html"
+SCRIPTS = {
+    "__MAP_FILTER__": HERE / "map_assets" / "map_filter.js",
+    "__CLIP_TOKENIZER__": HERE / "atlas_assets" / "clip_tokenizer.js",
+    "__ATLAS_SEARCH_INDEX__": HERE / "atlas_search_assets" / "atlas_search_index.js",
+    "__ATLAS_SEARCH_META__": HERE / "atlas_search_assets" / "atlas_search_meta.js",
+    "__ATLAS_SEARCH_ENCODER__": HERE / "atlas_search_assets" / "atlas_search_encoder.js",
+}
 BAR = (
     '<div class="xbar" id="xbar"><span class="counts" id="counts" aria-live="polite"></span>'
+    '<form id="sf" role="search"><input id="sq" type="search" aria-label="Photo search" '
+    'autocomplete="off" spellcheck="false" '
+    'placeholder="a hummingbird feeding at a flower, or an observation link">'
+    '<button type="submit">Search</button></form>'
+    '<span id="sm" class="counts" aria-live="polite"></span>'
     '<span class="seg" role="group" aria-label="View">'
     '<button type="button" data-v="side">Side by side</button>'
     '<button type="button" data-v="map">Map</button>'
@@ -30,7 +42,10 @@ BAR = (
 
 
 def build(
-    out_dir: str | Path, map_url: str = "map.html", space_url: str = "embeddings.html"
+    out_dir: str | Path,
+    map_url: str = "map.html",
+    space_url: str = "embeddings.html",
+    data_url: str = "atlas/",
 ) -> Path:
     """Write ``split.html`` into ``out_dir`` and return its path."""
     out = Path(out_dir)
@@ -41,9 +56,11 @@ def build(
         "__SITE_NAV__": page_nav.nav(PAGE_NAME, set(dict(page_nav.PAGES)), extra=BAR),
         "__MAP_FILE__": json.dumps(map_url),
         "__SPACE_FILE__": json.dumps(space_url),
-        "__MAP_FILTER__": (HERE / "map_assets" / "map_filter.js").read_text(),
+        "__DATA_URL__": json.dumps(data_url),
     }.items():
         html = html.replace(key, value)
+    for key, path in SCRIPTS.items():
+        html = html.replace(key, path.read_text())
     target = out / PAGE_NAME
     target.write_text(html)
     return target
@@ -52,8 +69,9 @@ def build(
 def main() -> None:
     parser = argparse.ArgumentParser(prog="python -m what_to_id.split_page", description=__doc__)
     parser.add_argument("--out", type=Path, required=True, help="Output directory")
+    parser.add_argument("--data-url", default="atlas/", help="Static photo-search index base URL")
     args = parser.parse_args()
-    print(build(args.out))
+    print(build(args.out, data_url=args.data_url))
 
 
 if __name__ == "__main__":

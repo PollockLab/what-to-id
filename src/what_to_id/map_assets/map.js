@@ -98,6 +98,7 @@ function addShard(buf,n){
 // only change the filter settings; the data is uploaded again only when records arrive, the picks,
 // the area or deletions change, or the groups change while a taxon is included (the groups and
 // included taxa are one set, so the kept bit then carries the groups too).
+var SUB=null,SUBL='',SUBV=0;  // the split view's photo search: a Set of ids, its label, a version for PD_KEY
 var ST_KEEP=MF.ST_KEEP,PD=null,PD_KEY=null,PD_GONE=-1,PD_CAT=0,
   OUT=new Uint8Array(0),RC=null,PJW=null,FK=null,FKV=0,FKM=null;
 // The photo space's lasso: the ids it keeps, or null; the mask is built once per list and shard count.
@@ -107,7 +108,7 @@ function fmask(n){
 function inc(){return !!TF.inc;}
 function pointData(){
   PJ.sync(P);
-  var n=P.n,gone=Object.keys(GONE).length,i,key=[TF,inc()?CH.picked(S.groups,META.groups,'inc').join():'',AREA.ver(),PJ.key(),FKV];
+  var n=P.n,gone=Object.keys(GONE).length,i,key=[TF,inc()?CH.picked(S.groups,META.groups,'inc').join():'',AREA.ver(),PJ.key(),SUBV,FKV];
   if(PD&&PD.length===n&&PD_KEY&&PD_KEY.every(function(k,j){return k===key[j];})&&PD_GONE===gone)return;
   var same=PD&&PD.length===n,days=same?PD.days:new Float32Array(2*n),
     cat=same?PD.attributes.getFilterCategory.value.slice():new Uint8Array(4*n);
@@ -120,6 +121,7 @@ function pointData(){
   if(OUT.length!==n)OUT=new Uint8Array(n);PJW=wide?new Uint8Array(n):null;
   for(i=0;i<n;i++){var keep=kb[i]===1;
     if(gone>0&&GONE[id[i]]===1)keep=false;
+    if(SUB&&!SUB.has(id[i]))keep=false;
     if(wide&&keep&&(am===null||am[i]))PJW[i]=wide(i)?1:0;if(keep&&(PJ.drop(i)||(fm&&!fm[i])))keep=false;
     OUT[i]=keep?0:1;cat[4*i+3]=cat[4*i+3]&~ST_KEEP|(keep&&(am===null||am[i])?ST_KEEP:0);}
   // a new pick, area or deletion swaps only the categories, so deck.gl uploads only those
@@ -424,8 +426,11 @@ function clearAll(){S.months=0;S.groups={};S.only={};S.picks.length=0;S.split=[]
   search();AREA.clear();PJ.reset();redraw();}
 $('reset').onclick=function(){S.lo=0;S.hi=LAST;S.up=false;clearAll();};
 var BAR=CH.bar({box:$('selbar'),clear:clearAll,fallback:$('q')});
-function items(){return CH.items({S:S,meta:META,terms:TX.terms({T:TAXA,picks:S.picks,groups:[],meta:META,n:0,split:S.split}),
-  picker:PK,pj:PJ,months:MONTH,only:ONLYDEF,two:['exact'],area:AREA,redraw:redraw});}
+function items(){var out=CH.items({S:S,meta:META,terms:TX.terms({T:TAXA,picks:S.picks,groups:[],meta:META,n:0,split:S.split}),
+  picker:PK,pj:PJ,months:MONTH,only:ONLYDEF,two:['exact'],area:AREA,redraw:redraw});
+  if(SUB)out.push({label:'Photo search: "'+SUBL+'" ('+SUB.size+')',
+    remove:function(){parent.postMessage({type:'wtid-subset',ids:null},location.origin);}});
+  return out;}
 // Each folding section's summary counts its active chips, so a folded one still says what it holds.
 function tally(){var n=function(st){var c=0;for(var k in st)if(st[k])c++;return c;},m=0,i,e;
   for(i=0;i<12;i++)m+=S.months>>i&1;
@@ -516,6 +521,16 @@ addEventListener('message',function(e){
   if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-keep')return;
   var ids=e.data.ids;if(ids!==null&&!(ids instanceof Uint32Array))return;
   FK=ids&&ids.sort();FKV++;if(P.n)refilter();
+});
+// The photo search of the split view: a set of ids (null clears it); before the taxa load, their refilter applies it.
+addEventListener('message',function(e){
+  var d=e.data;
+  if(e.origin!==location.origin||e.source!==parent||!d||d.type!=='wtid-subset')return;
+  SUB=d.ids?new Set(d.ids):null;SUBL=d.label;SUBV++;if(TAXA)refilter();
+  var b=[Infinity,Infinity,-Infinity,-Infinity];  // zoom to the hits that are loaded, as the area does
+  if(SUB&&map)for(var i=0;i<P.n;i++)if(SUB.has(P.id[i])){var x=P.pos[2*i],y=P.pos[2*i+1];
+    b=[Math.min(b[0],x),Math.min(b[1],y),Math.max(b[2],x),Math.max(b[3],y)];}
+  if(b[0]<=b[2])map.fitBounds([[b[0],b[1]],[b[2],b[3]]],{padding:40,maxZoom:14});
 });
 addEventListener('message',function(e){
   if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-record')return;
