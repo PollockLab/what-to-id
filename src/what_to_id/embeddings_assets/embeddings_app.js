@@ -13,7 +13,8 @@ var MAP=new URL(CFG.mapUrl,location.href).href;
 var PAL=[[0,114,178],[213,94,0],[0,158,115],[190,160,0],[204,121,167],[86,180,233],[230,70,70],[120,60,170],[110,110,110],[160,60,40],[150,130,200],[40,120,60],[140,200,50],[70,90,220],[255,140,100],[0,190,190]];
 var S={idx:null,P:null,META:null,TAXA:null,groups:{},picks:[],split:[],extra:[],keep:null,sel:-1,nbr:[],thin:false,cache:new Map(),run:0,deck:null,vs:null,PD:null};
 
-var MF=null,TF=null,TR=null,PASS=['park','bcpark','projects'],MAPONLY={park:'Park',bcpark:'BC park',projects:'Projects'},AI=null;
+var MF=null,TF=null,TR=null,PASS=['park','bcpark','projects'],MAPONLY={park:'Park',bcpark:'BC park',projects:'Projects'},AI=null,
+  AREA_IN=null;
 function $(id){return document.getElementById(id);}
 function el(tag,attrs,kids){
   var e=document.createElement(tag);
@@ -84,6 +85,11 @@ SYNC=MapFilter.sync({key:selKey,apply:applySel});
 addEventListener('message',function(e){
   if(e.origin===location.origin&&e.source===parent&&e.data&&e.data.type==='wtid-layout')
     document.documentElement.classList.toggle('peer',!!e.data.peer);});
+// In the split view the map owns the area: its drawn shape and resolved parks arrive as one ring list, '' for none.
+addEventListener('message',function(e){
+  if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-area'||typeof e.data.area!=='string')return;
+  AREA_IN=e.data.area;if(S.P&&S.P.grp){S.area=AREA_IN;picked();}
+});
 $('info').addEventListener('click',function(){
   $('info').setAttribute('aria-expanded',document.documentElement.classList.toggle('about'));});
 // CH.show rewrites the label, so the colour dot goes back in after it.
@@ -142,14 +148,16 @@ function picked(){
 }
 var PK=null,BAR=null;
 // The map's selection bar plus a date chip (the map keeps dates in its inputs) and, marked "map only", the
-// filters this page leaves to the map. The area applies here when it reads.
+// filters this page leaves to the map. The area applies here when it reads; in the split view it is the map's
+// to clear, so its chip has no ×.
+function alabel(){return parent!==window?'Map area':'Drawn area';}
 function items(){
   var L=MF.LAST,out=CH.items({S:S,meta:S.META,terms:TX.terms({T:S.TAXA,picks:S.picks,groups:[],meta:S.META,n:0,split:S.split}),
     picker:PK,pj:{items:function(){return [];}},months:MF.MONTH,only:MF.ONLYDEF,two:['exact'],
-    area:{term:function(){return S.area?{label:'Drawn area'}:null;},clear:function(){S.area='';picked();}},redraw:picked});
+    area:{term:function(){return S.area?{label:alabel()}:null;},clear:parent===window&&function(){S.area='';picked();}},redraw:picked});
   if(S.lo>0||S.hi<L)out.push({label:(S.up?'Uploaded ':'Observed ')+(S.lo>0?MF.iso(S.lo):'start')+' to '+(S.hi<L?MF.iso(S.hi):'now'),
     remove:function(){S.lo=0;S.hi=L;S.up=false;picked();}});
-  if(S.area&&!areaIndex())out.forEach(function(t){if(t.label==='Drawn area')t.tag='map only';});
+  if(S.area&&!areaIndex())out.forEach(function(t){if(t.label===alabel())t.tag='map only';});
   S.extra.forEach(function(t){var k=t.split('=')[0];
     out.push({label:MAPONLY[k]+': '+decodeURIComponent(t.slice(k.length+1)).replace(/,/g,', '),tag:'map only',
       remove:function(){S.extra=S.extra.filter(function(x){return x!==t;});picked();}});});
@@ -175,6 +183,7 @@ function chips(){
   var box=$('groups');box.textContent='';
   MF=MF||MapFilter(S.META);
   Object.assign(S,MF.read(new URLSearchParams(location.hash.slice(1))));
+  if(AREA_IN!==null)S.area=AREA_IN;
   S.extra=location.hash.slice(1).split('&').filter(function(t){return PASS.indexOf(t.split('=')[0])>=0;});
   TF=TX.filter(S.TAXA,S.picks);S.baseKey=null;applyBase();
   TR=S.TAXA&&TT.make({T:S.TAXA,tax:S.P.tax,grp:S.P.grp,n:S.P.n,groups:S.META.groups.length,ranks:S.META.ranks,

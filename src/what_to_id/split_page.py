@@ -24,8 +24,8 @@ BAR = (
     '<button type="button" class="i" id="i" aria-expanded="false" aria-controls="note" '
     'aria-label="About this view">i</button>'
     '<p class="note" id="note" hidden>The map and the photo space share one selection: change '
-    "a filter in either and the other follows. Dates, months, show only, groups and taxa travel "
-    "across; the area and projects stay with the map.</p></div>"
+    "a filter in either and the other follows. Dates, months, show only, groups, taxa and the "
+    "map's area travel across; projects stay with the map.</p></div>"
 )
 
 

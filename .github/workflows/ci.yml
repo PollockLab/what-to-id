@@ -40,7 +40,7 @@ jobs:
             requirements-browser.lock
       - run: pip install --require-hashes -r requirements.lock -r requirements-atlas.lock -r requirements-browser.lock
       - run: python -m playwright install --with-deps chromium
-      - run: python -m pytest -q tests/test_embeddings_browser.py tests/test_atlas_search_browser.py tests/test_embeddings_layout_js.py
+      - run: python -m pytest -q tests/test_embeddings_browser.py tests/test_split_subsets_browser.py tests/test_atlas_search_browser.py tests/test_embeddings_layout_js.py
         env:
           PYTHONPATH: src
           WHAT_TO_ID_REQUIRE_BROWSER: "1"
