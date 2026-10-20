@@ -31,7 +31,7 @@ class Element {
 const document={documentElement:{},createElement:()=>new Element(),addEventListener(){}};
 const getComputedStyle=()=>({getPropertyValue:()=>''});
 const addEventListener=(key,fn)=>(events[key]??=[]).push(fn);
-const location={hash:'#area='+encodeURIComponent(RAW)};
+const location={hash:'#area='+encodeURIComponent(RAW)},window={},parent=window;
 const $=key=>{if(!nodes.has(key))nodes.set(key,new Element());return nodes.get(key);};
 """
     script = f"const RAW={json.dumps(raw)}, COUNT={count};\n" + script
