@@ -18,5 +18,5 @@ data="https://huggingface.co/datasets/${ATLAS_HF_REPO}/resolve/main/"
 for page in atlas_search_page embeddings_page; do
   PYTHONPATH="$root/src${PYTHONPATH:+:$PYTHONPATH}" python3 -m "what_to_id.$page" --out "$dir" --data-url "$data"
 done
-PYTHONPATH="$root/src${PYTHONPATH:+:$PYTHONPATH}" python3 -m what_to_id.split_page --out "$dir"
+PYTHONPATH="$root/src${PYTHONPATH:+:$PYTHONPATH}" python3 -m what_to_id.split_page --out "$dir" --data-url "$data"
 echo "atlas_page: wrote $dir/search.html, $dir/embeddings.html and $dir/split.html"

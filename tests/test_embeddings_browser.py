@@ -469,6 +469,38 @@ def test_split_page_mirrors_a_picked_record_in_the_other_frame(browser, site):
     page.close()
 
 
+def test_split_photo_search_narrows_both_frames_and_the_chip_clears_it(browser, site):
+    base, _, pool, _ = site
+    page = browser.new_page(viewport={"width": 1280, "height": 900})
+    page.errors = []
+    page.on("pageerror", lambda e: page.errors.append(str(e)))
+    stub_inat(page, None)
+    page.goto(f"{base}/split.html")
+    counts = (
+        "[...document.querySelectorAll('iframe')].map(f => f.contentDocument &&"
+        " f.contentDocument.getElementById('count') &&"
+        " f.contentDocument.getElementById('count').textContent)"
+    )
+    page.wait_for_function(f"{counts}.every(c => c && c.includes('shown'))")
+    before = page.evaluate(counts)
+    seed = int(sorted(pool)[0])
+    page.fill("#sq", f"https://www.inaturalist.org/observations/{seed}")
+    page.press("#sq", "Enter")
+    chip = "#selbar li:has-text('Photo search')"
+    for f in ("#map", "#space"):
+        page.frame_locator(f).locator(chip).wait_for(state="attached")  # the peer folds its panel
+    now = page.evaluate(counts)
+    num = [int(c.split(" ")[0].replace(",", "")) for c in (*now, *before)]
+    assert 0 < num[0] == num[1] < num[2] == num[3]
+    page.frame_locator("#map").locator(chip + " button").click()
+    for f in ("#map", "#space"):
+        page.frame_locator(f).locator(chip).wait_for(state="detached")
+    page.wait_for_function(f"{counts}.every(c => c === {before[0]!r})")
+    assert page.input_value("#sq") == ""
+    assert page.errors == []
+    page.close()
+
+
 def test_split_divider_resizes_by_keys_and_double_click_and_remembers(browser, site):
     base, *_ = site
     page = browser.new_page(viewport={"width": 1280, "height": 900})

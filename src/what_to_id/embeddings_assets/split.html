@@ -14,6 +14,9 @@ body{display:flex;flex-direction:column}
 .xbar{display:flex;align-items:center;gap:8px 14px;margin-left:auto;font-size:13px;white-space:nowrap}
 .counts{color:var(--muted)}
 .counts b{color:var(--ink);font-weight:650;font-variant-numeric:tabular-nums}
+#sf{display:inline-flex;gap:6px}
+#sq{font:inherit;font-size:13px;width:min(260px,30vw);min-height:28px;padding:0 10px;border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--ink)}
+#sf button{font:inherit;font-size:12px;min-height:28px;padding:0 11px;border:1px solid var(--line);border-radius:14px;background:var(--chip);color:var(--ink);cursor:pointer}
 .seg{display:inline-flex}
 .seg button,.xbar .i{font:inherit;font-size:12px;min-height:28px;padding:0 11px;border:1px solid var(--line);background:var(--chip);color:var(--ink);cursor:pointer}
 .seg button:first-child{border-radius:14px 0 0 14px}
@@ -40,6 +43,10 @@ __SITE_NAV__
 <div id="main-content" tabindex="-1"><div id="sep" role="separator" aria-orientation="vertical" aria-label="Resize the map and photo space" aria-valuemin="20" aria-valuemax="80" tabindex="0"></div></div>
 <script>
 __MAP_FILTER__
+__CLIP_TOKENIZER__
+__ATLAS_SEARCH_INDEX__
+__ATLAS_SEARCH_META__
+__ATLAS_SEARCH_ENCODER__
 (function(){
 var box=document.getElementById("main-content"),frames={},last=MapFilter.tokens(location.hash),
   h0=location.hash.slice(1).split('&').filter(Boolean),want=new URLSearchParams(location.search).get('view'),
@@ -59,6 +66,7 @@ function sendSel(n,sel){post(n,{type:'wtid-selection',sel:sel});}
 function mk(n){
   var f=document.createElement('iframe');f.id=n;f.title=n==='map'?'Map':'Photo space';
   f.src=new URL(FILES[n],location.href).href.replace(/#.*/,'')+'?embed=1'+(n==='space'&&view==='side'?'&peer=1':'')+'#'+hashFor(n);
+  f.addEventListener('load',function(){if(sub)post(n,sub);});  // a frame made after the search gets its subset
   box.insertBefore(f,n==='map'?box.firstChild:null);frames[n]=f;}
 function setView(v){
   if(innerWidth<800&&v==='side')v='map';
@@ -67,7 +75,7 @@ function setView(v){
     var show=v==='side'||v===n,f=frames[n];
     if(show&&!f)mk(n);
     else if(f&&!show&&innerWidth<800){f.remove();delete frames[n];}  // a phone holds one view at a time
-    else if(f){var was=f.hidden;f.hidden=!show;if(show&&was){sendSel(n,last);post(n,{type:'wtid-record',id:rec});if(mat)post(n,mat);}}});
+    else if(f){var was=f.hidden;f.hidden=!show;if(show&&was){sendSel(n,last);post(n,{type:'wtid-record',id:rec});if(mat)post(n,mat);if(sub)post(n,sub);}}});
   box.classList.toggle('side',v==='side');
   post('space',{type:'wtid-layout',peer:v==='side'});
   [].forEach.call(document.querySelectorAll('[data-v]'),function(b){b.setAttribute('aria-pressed',b.dataset.v===v);});
@@ -113,6 +121,51 @@ addEventListener('message',function(e){
   if(!n||e.origin!==location.origin||!d||(d.type!=='wtid-record'&&d.type!=='wtid-matches'&&d.type!=='wtid-focus'))return;
   if(d.type==='wtid-record'){if(d.id===rec)return;rec=d.id;mat=null;}else if(d.type==='wtid-matches')mat=d;
   var o=n==='map'?'space':'map';if(visible(o))post(o,d);
+});
+// Photo search: the query is resolved as search.html does, and its hits go to both frames as a subset of the points.
+var sub=null,sq=document.getElementById('sq'),sm=document.getElementById('sm'),idx=null,enc=null,run=0,
+  DATA=new URL(__DATA_URL__,location.href).href.replace(/\/*$/,'/');
+function setSub(ids,label){
+  sub=ids?{type:'wtid-subset',ids:ids,label:label}:null;
+  ['map','space'].forEach(function(n){post(n,sub||{type:'wtid-subset',ids:null});});}
+async function hitsFor(st){
+  idx=idx||AtlasSearchIndex.open(DATA,{whole:4<<20});
+  if(st.kind==='id')return (await (await idx).neighbors(st.id))||[];
+  var q=await (await idx).taxonVector(st.text);  // a taxon name has a precomputed vector: no model, no download
+  if(!q){
+    enc=enc||window.AtlasEncoderOverride;
+    if(!enc){
+      var mf=(await idx).manifest,spec=mf.text_encoder;
+      if(!spec)throw new Error('this index has no text search model yet');
+      if(!await AtlasEncoder.isCached(new URL(spec.onnx,DATA).href)&&!confirm('Text search needs a search model. '+
+        'Downloading search model, about '+AtlasEncoder.megabytes(spec)+' MB, once. It is stored in this browser afterwards. '+
+        'Searching by observation link needs no download.'))return null;
+      sm.textContent='Downloading search model…';
+      enc=await AtlasEncoder.load(mf,DATA,{});
+    }
+    q=await enc.encode(/^(an? )?(photo|picture|image)\b/i.test(st.text)?st.text:'a photo of '+st.text);
+  }
+  return (await idx).search(q,{k:200});
+}
+document.getElementById('sf').addEventListener('submit',async function(e){
+  e.preventDefault();
+  var st=AtlasSearchMeta.parseInput(sq.value),r=++run;
+  if(!st){sm.textContent='';setSub(null);return;}
+  sm.textContent='Searching…';
+  try{
+    var hits=await hitsFor(st);
+    if(r!==run)return;
+    if(!hits){sm.textContent='';return;}
+    sm.textContent=hits.length?'':'No matching photos.';
+    if(hits.length)setSub(hits.map(function(h){return h.id;}),st.kind==='id'?'like '+st.id:st.text);
+  }catch(err){if(r===run)sm.textContent='Search failed: '+err.message;}
+});
+sq.addEventListener('input',function(){if(!sq.value&&sub){sm.textContent='';setSub(null);}});  // the field's own clear button
+// A chip's remove action in either frame clears the subset.
+addEventListener('message',function(e){
+  var d=e.data;
+  if(e.origin===location.origin&&d&&d.type==='wtid-subset'&&d.ids===null&&Object.keys(frames).some(function(k){
+    return frames[k].contentWindow===e.source;})){sq.value='';sm.textContent='';setSub(null);}
 });
 // Back and forward: the new selection goes to both.
 addEventListener('hashchange',function(){var s=MapFilter.tokens(location.hash);
