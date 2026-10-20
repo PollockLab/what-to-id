@@ -12,7 +12,7 @@ from html import escape
 # (file, label). Explore is split.html, the map and the photo space side by side. The pages map.html
 # and embeddings.html keep their URLs and mark Explore as current. Without split.html (a site built
 # without the photo space) the Explore tab falls back to the map. Photo search exists only when
-# ATLAS_HF_REPO is set. The brand links to index.html, the landing page of cards.
+# ATLAS_HF_REPO is set. The brand links to index.html, a copy of Explore.
 PAGES = (
     ("split.html", "Explore"),
     ("search.html", "Photo search"),
