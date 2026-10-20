@@ -13,9 +13,10 @@ var MAP=new URL(CFG.mapUrl,location.href).href;
 var PAL=[[0,114,178],[213,94,0],[0,158,115],[190,160,0],[204,121,167],[86,180,233],[230,70,70],[120,60,170],[110,110,110],[160,60,40],[150,130,200],[40,120,60],[140,200,50],[70,90,220],[255,140,100],[0,190,190]];
 var S={idx:null,P:null,META:null,TAXA:null,groups:{},picks:[],split:[],extra:[],keep:null,sel:-1,nbr:[],thin:false,cache:new Map(),run:0,deck:null,vs:null,PD:null,ring:null,lasso:null,lassoV:0};
 
-var MF=null,TF=null,TR=null,PASS=['park','bcpark','projects'],MAPONLY={park:'Park',bcpark:'BC park',projects:'Projects'},AI=null,VI=null,
+var MF=null,TF=null,TR=null,PASS=['park','bcpark','projects'],MAPONLY={park:'Park',bcpark:'BC park',projects:'Projects'},
   AREA_IN=null,VIEW_IN=null;
 function $(id){return document.getElementById(id);}
+var X=SpaceSelect(S,$,picked,layers),areaIndex=X.areaIndex,viewBox=X.viewBox,areaMask=X.areaMask,lasso=X.lasso,lassoDrag=X.lassoDrag;
 function el(tag,attrs,kids){
   var e=document.createElement(tag);
   Object.keys(attrs||{}).forEach(function(k){if(attrs[k]!==null&&attrs[k]!==undefined)e.setAttribute(k,attrs[k]);});
@@ -103,38 +104,6 @@ function paint(b){
   var j=+b.getAttribute('data-g'),dot=el('i',{});dot.style.background='rgb('+color(j).join(',')+')';
   CH.show(b,gname(j)+' '+nf.format(S.count[j]),S.groups[S.META.groups[j]]||'');b.insertBefore(dot,b.firstChild);
 }
-// The points the dates, months, show only chips, the area and the lasso leave in, apart from the taxa and
-// groups; null when none is set. An area that does not read is left to the map and shows as map only.
-function areaIndex(){
-  if(!S.area)return null;
-  if(!AI||AI.key!==S.area){
-    AI={key:S.area,I:null};
-    try{var r=MapArea.decode(S.area);if(r.length)AI.I=MapArea.index(r);}catch(e){}
-  }
-  return AI.I;
-}
-// The view is a rectangle: its box [w,s,e,n], or null when absent or when it holds the whole data (it cuts nothing).
-function viewBox(){
-  if(!S.view)return null;
-  if(!VI||VI.key!==S.view){
-    VI={key:S.view,B:null};
-    try{var r=MapArea.decode(S.view)[0],L=S.P.lonlat,d=S.dataBox;
-      if(!d||d.P!==S.P){d=S.dataBox={P:S.P,b:[1/0,1/0,-1/0,-1/0]};
-        for(var j=0;j<S.P.n;j++){var x=L[2*j],y=L[2*j+1];
-          if(x<d.b[0])d.b[0]=x;if(x>d.b[2])d.b[2]=x;if(y<d.b[1])d.b[1]=y;if(y>d.b[3])d.b[3]=y;}}
-      if(r){var w=Math.min(r[0],r[2],r[4]),e=Math.max(r[0],r[2],r[4]),so=Math.min(r[1],r[3],r[5]),n=Math.max(r[1],r[3],r[5]);
-        if(!(w<=d.b[0]&&e>=d.b[2]&&so<=d.b[1]&&n>=d.b[3]))VI.B=[w,so,e,n];}}catch(er){}
-  }
-  return VI.B;
-}
-// The area's verdict per point, built once per area (panning re-runs applyBase but not this).
-function areaMask(){
-  var I=areaIndex(),P=S.P;
-  if(!I)return null;
-  if(!AI.M||AI.M.length!==P.n){AI.M=new Uint8Array(P.n);
-    for(var i=0;i<P.n;i++)AI.M[i]=MapArea.inside(I,P.lonlat[2*i],P.lonlat[2*i+1]);}
-  return AI.M;
-}
 function baseKey(){return [S.lo,S.hi,S.up,S.months,JSON.stringify(S.only),S.area,S.view,S.lassoV].join('|');}
 function applyBase(){
   var P=S.P,key=baseKey();
@@ -202,31 +171,6 @@ function items(){
 }
 function clearAll(){S.groups={};S.only={};S.months=0;S.lo=0;S.hi=MF.LAST;S.up=false;S.area='';S.extra=[];
   S.picks.length=0;S.split=[];$('q').value='';if(S.ring)lasso(null);else picked();}
-// The lasso: a closed ring in layout coordinates, or null. Only the points inside it stay, and their ids go
-// to the map, which keeps the same records.
-function lasso(ring){
-  var P=S.P,m=null,ids=null,i,k=0;
-  S.ring=ring&&ring.concat(ring.slice(0,2));
-  if(ring){var I=MapArea.index([ring]);m=new Uint8Array(P.n);
-    for(i=0;i<P.n;i++)if(MapArea.inside(I,P.pos[2*i],P.pos[2*i+1])){m[i]=1;k++;}
-    ids=new Uint32Array(k);k=0;for(i=0;i<P.n;i++)if(m[i])ids[k++]=P.id[i];}
-  S.lasso=m;S.lassoV++;$('lclear').hidden=!ring;picked();
-  if(parent!==window)parent.postMessage({type:'wtid-keep',ids:ids},location.origin);
-}
-$('lclear').addEventListener('click',function(){lasso(null);});
-// Shift+drag draws one. The pointer is caught before deck.gl's controller sees it, so the view stays put.
-function lassoDrag(box){
-  var draw=null;
-  function at(e){var r=box.getBoundingClientRect(),p=S.deck.getViewports()[0].unproject([e.clientX-r.left,e.clientY-r.top]);
-    return [p[0],p[1]];}
-  box.addEventListener('pointerdown',function(e){
-    if(!e.shiftKey||e.button!==0||!S.P||!S.P.grp)return;
-    e.stopPropagation();e.preventDefault();box.setPointerCapture(e.pointerId);draw=S.ring=at(e);layers();
-  },true);
-  box.addEventListener('pointermove',function(e){if(draw){draw.push.apply(draw,at(e));layers();}});
-  ['pointerup','pointercancel'].forEach(function(t){box.addEventListener(t,function(){
-    if(!draw)return;var r=draw;draw=null;lasso(r.length>=6?r:null);});});
-}
 // Zooms to the 1st-99th percentile box of the points that pass, so a few stray points do not flatten it.
 function fit(){
   var P=S.P,ok=passing(),xs=[],ys=[],box=$('plot');
@@ -262,7 +206,7 @@ function chips(){
     taxa:function(){return S.TAXA;},counts:function(){return TX.counts(S.TAXA,S.P.tax,S.P.n);},onChange:picked,
     onPick:function(r){if(TR)TR.reveal(r);}});
   BAR=CH.bar({box:$('selbar'),clear:clearAll,fallback:$('q')});
-  applyKeep();$('gfit').hidden=!items().length;
+  applyKeep();$('gfit').hidden=!items().length;$('ldraw').disabled=false;
   if(TR)TR.render();
 }
 $('gall').addEventListener('click',function(){S.groups={};picked();});
@@ -342,7 +286,7 @@ addEventListener('message',function(e){
   if(i===S.sel||(id!=null&&i<0))return;
   remote=true;try{if(i<0)closeCard();else select(i,true);}finally{remote=false;}
 });
-addEventListener('keydown',function(e){if(e.key!=='Escape')return;if(!$('card').hidden)closeCard();else if(S.ring)lasso(null);});
+addEventListener('keydown',function(e){if(e.key!=='Escape')return;X.draw(false);if(!$('card').hidden)closeCard();else if(S.ring)lasso(null);});
 // The card's left edge: drag it, or use the arrow keys; a double click goes back to the default. The width is remembered.
 function cardWidth(w){
   var c=$('card');if(w==null){c.style.width='';localStorage.removeItem('wtid-card');return;}
@@ -368,6 +312,14 @@ async function neighborsOf(id){
     S.idx=await openIndex();return S.idx.neighbors(id);
   }
 }
+// Keeps this group alone, or, when it already is the only one, goes back to all groups.
+function onlyGroup(g){
+  var name=S.META.groups[g],b=el('button',{type:'button','class':'btn'},['']);
+  function solo(){var on=Object.keys(S.groups).filter(function(k){return S.groups[k];});return on.length===1&&S.groups[name]==='inc';}
+  function label(){b.textContent=solo()?'All groups':'Only '+gname(g);}
+  b.addEventListener('click',function(){var s=solo();S.groups={};if(!s)S.groups[name]='inc';picked();label();});
+  label();return b;
+}
 function select(i,fly){
   var P=S.P,id=P.id[i],run=++S.run,t=names(i),card=$('card');
   S.sel=i;S.nbr=[];tell(id);
@@ -383,6 +335,7 @@ function select(i,fly){
   var actions=el('div',{'class':'actions'},[
     link('https://www.inaturalist.org/observations/'+id,'Help identify on iNaturalist','primary'),
     link(CFG.searchUrl+'#id='+id,'More like this'),link(CFG.mapUrl+'#record='+id,'Show on map')]);
+  if(P.grp)actions.appendChild(onlyGroup(P.grp[i]));
   var title=el('h2',{},[t.common||t.latin||t.group||'Observation '+id]);
   card.textContent='';
   [resizer(),x,ph,el('div',{'class':'body'},[title,sub,place,actions,el('p',{'class':'muted'},['Closest matches, from the full image space']),nbNote,nb])]

@@ -28,6 +28,7 @@ SCRIPTS = {
     "__MAP_FILTER__": HERE / "map_assets" / "map_filter.js",
     "__TAXON_TREE__": ASSETS / "taxon_tree.js",
     "__EMBEDDINGS_LAYOUT__": ASSETS / "embeddings_layout.js",
+    "__EMBEDDINGS_SELECT__": ASSETS / "embeddings_select.js",
     "__EMBEDDINGS_APP__": ASSETS / "embeddings_app.js",
 }
 PAGE_NAME = "embeddings.html"

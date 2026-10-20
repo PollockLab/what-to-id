@@ -18,14 +18,21 @@ body{display:grid;grid-template-columns:260px minmax(0,1fr);grid-template-rows:a
 .embed header{display:none}
 .info{display:none;position:absolute;z-index:7;top:8px;right:8px;width:28px;height:28px;padding:0;border-radius:50%;font:italic 700 14px Georgia,serif}
 .embed .info{display:block}
-#lclear{display:none;position:absolute;z-index:7;top:8px;right:44px}
-.embed #lclear:not([hidden]){display:block}
+#lclear,#ldraw{display:none;position:absolute;z-index:7;top:8px;right:44px}
+#lclear{right:104px}
+.embed #lclear:not([hidden]),.embed #ldraw{display:block}
+#ldraw[aria-pressed="true"]{background:var(--on);color:var(--onink);border-color:var(--on)}
+#plot.draw{touch-action:none;cursor:crosshair!important}
 .embed.about header{display:block;position:absolute;z-index:6;top:44px;right:8px;width:min(380px,calc(100% - 16px));padding:0;border:0}
 .embed.about header h1,.embed.about header .sub{display:none}
 .embed.about .note{margin:0;background:var(--panel);color:var(--muted);border:1px solid var(--line);box-shadow:var(--shadow)}
 .peer body{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);grid-template-areas:"nav" "head" "plot"}
 .peer .side{grid-area:plot;border-bottom:1px solid var(--line);max-height:none;position:relative;z-index:5;align-self:start;justify-self:start;margin:8px;padding:4px 10px;overflow:visible;border:1px solid var(--line);border-radius:8px;background:var(--panel);pointer-events:none;gap:0}
-.peer .side>:not(.stat):not(#status){display:none}
+.peer .side{max-width:calc(100% - 16px)}
+.peer .side>:not(.stat):not(#status):not(.lg){display:none}
+.peer .lg>:not(#groups){display:none}
+.peer #groups{pointer-events:auto;margin-top:4px}
+.peer #groups button{pointer-events:auto}
 .peer #status:empty{display:none}
 .embed .card{top:12px;max-height:calc(100vh - 24px)}
 header{grid-area:head;padding:10px 16px;border-bottom:1px solid var(--line)}
@@ -101,12 +108,13 @@ __SITE_NAV__<header>
 <input id="q" type="search" placeholder="Latin or common name, e.g. Carex" autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="sugg">
 <ul id="sugg" class="sugg" role="listbox" aria-label="Matching taxa" hidden></ul></div>
 <p id="qn" class="muted" aria-live="polite"></p></div>
-<div><p class="muted">Life groups. Click a chip to pick it, again to leave it out, a third time to clear it.</p>
+<div class="lg"><p class="muted">Life groups. Click a chip to pick it, again to leave it out, a third time to clear it.</p>
 <div id="groups" class="chips" role="group" aria-label="Life groups"></div>
 <div id="tree" class="tree" aria-label="Ranks under the groups"></div>
 <p class="muted"><button type="button" class="link" id="gall">All groups</button> <button type="button" class="link" id="gfit" hidden>Fit to selection</button></p></div>
 </section>
 <main id="plot" role="application" aria-label="Photo space of observations"></main>
+<button type="button" id="ldraw" aria-pressed="false" disabled title="Draw a lasso around the photos to keep (or shift+drag)">Draw</button>
 <button type="button" id="lclear" hidden>Clear lasso</button>
 <button type="button" class="info" id="info" aria-expanded="false" aria-controls="honest" aria-label="About this picture">i</button>
 <aside id="card" class="card" hidden aria-label="Selected observation"></aside>
@@ -120,6 +128,7 @@ __SITE_NAV__<header>
 <script>__MAP_FILTER__</script>
 <script>__TAXON_TREE__</script>
 <script>__EMBEDDINGS_LAYOUT__</script>
+<script>__EMBEDDINGS_SELECT__</script>
 <script>__EMBEDDINGS_APP__</script>
 </body>
 </html>
