@@ -11,10 +11,12 @@ var MAP=new URL(CFG.mapUrl,location.href).href;
 // One colour per life group, in the order of the map's groups: 16 distinct hues, each at least 2:1 against
 // both the light and the dark page. The map draws no per-group colour, so this is the only palette.
 var PAL=[[0,114,178],[213,94,0],[0,158,115],[190,160,0],[204,121,167],[86,180,233],[230,70,70],[120,60,170],[110,110,110],[160,60,40],[150,130,200],[40,120,60],[140,200,50],[70,90,220],[255,140,100],[0,190,190]];
-var S={idx:null,P:null,META:null,TAXA:null,groups:{},picks:[],split:[],extra:[],keep:null,sel:-1,nbr:[],thin:false,cache:new Map(),run:0,deck:null,vs:null,PD:null};
+var S={idx:null,P:null,META:null,TAXA:null,groups:{},picks:[],split:[],extra:[],keep:null,sel:-1,nbr:[],thin:false,cache:new Map(),run:0,deck:null,vs:null,PD:null,ring:null,lasso:null,lassoV:0};
 
-var MF=null,TF=null,TR=null,PASS=['park','bcpark','projects'],MAPONLY={park:'Park',bcpark:'BC park',projects:'Projects'},AI=null;
+var MF=null,TF=null,TR=null,PASS=['park','bcpark','projects'],MAPONLY={park:'Park',bcpark:'BC park',projects:'Projects'},
+  AREA_IN=null,VIEW_IN=null;
 function $(id){return document.getElementById(id);}
+var X=SpaceSelect(S,$,picked,layers),areaIndex=X.areaIndex,viewBox=X.viewBox,areaMask=X.areaMask,lasso=X.lasso,lassoDrag=X.lassoDrag;
 function el(tag,attrs,kids){
   var e=document.createElement(tag);
   Object.keys(attrs||{}).forEach(function(k){if(attrs[k]!==null&&attrs[k]!==undefined)e.setAttribute(k,attrs[k]);});
@@ -41,6 +43,7 @@ function applyJoin(P,taxa){
   S.sel=sel?L.find(P,sel):-1;
   S.nbr=nbr.map(function(i){return L.find(P,i);}).filter(function(r){return r>=0;});
   chips();update();
+  if(S.subset&&S.deck)fit();
   if(S.sel>=0&&S.relabel)S.relabel();
 }
 function openIndex(){return AtlasSearchIndex.open(DATA,{whole:WHOLE});}
@@ -84,6 +87,16 @@ SYNC=MapFilter.sync({key:selKey,apply:applySel});
 addEventListener('message',function(e){
   if(e.origin===location.origin&&e.source===parent&&e.data&&e.data.type==='wtid-layout')
     document.documentElement.classList.toggle('peer',!!e.data.peer);});
+// In the split view the map owns the area: its drawn shape and resolved parks arrive as one ring list, '' for none.
+addEventListener('message',function(e){
+  if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-area'||typeof e.data.area!=='string')return;
+  AREA_IN=e.data.area;if(S.P&&S.P.grp){S.area=AREA_IN;picked();}
+});
+// The map's viewport arrives the same way and masks the same way, but is only the map's to change.
+addEventListener('message',function(e){
+  if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-view'||typeof e.data.area!=='string')return;
+  VIEW_IN=e.data.area;if(S.P&&S.P.grp){S.view=VIEW_IN;picked();}
+});
 $('info').addEventListener('click',function(){
   $('info').setAttribute('aria-expanded',document.documentElement.classList.toggle('about'));});
 // CH.show rewrites the label, so the colour dot goes back in after it.
@@ -91,25 +104,19 @@ function paint(b){
   var j=+b.getAttribute('data-g'),dot=el('i',{});dot.style.background='rgb('+color(j).join(',')+')';
   CH.show(b,gname(j)+' '+nf.format(S.count[j]),S.groups[S.META.groups[j]]||'');b.insertBefore(dot,b.firstChild);
 }
-// The points the dates, months, show only chips and the area leave in, apart from the taxa and groups; null
-// when none is set. An area that does not read is left to the map and shows as map only.
-function areaIndex(){
-  if(!S.area)return null;
-  if(!AI||AI.key!==S.area){
-    AI={key:S.area,I:null};
-    try{var r=MapArea.decode(S.area);if(r.length)AI.I=MapArea.index(r);}catch(e){}
-  }
-  return AI.I;
-}
-function baseKey(){return [S.lo,S.hi,S.up,S.months,JSON.stringify(S.only),S.area].join('|');}
+function baseKey(){return [S.lo,S.hi,S.up,S.months,JSON.stringify(S.only),S.area,S.view,S.lassoV].join('|');}
 function applyBase(){
   var P=S.P,key=baseKey();
   if(S.baseKey===key&&S.base&&S.base.length===P.n)return;
   S.baseKey=key;S.base=new Uint8Array(P.n).fill(1);
   if(P.grp){
     MF.rest(S,P.obs,P.up,P.flags,P.n,S.base);
-    var I=areaIndex();
-    if(I)for(var i=0;i<P.n;i++)if(S.base[i]&&!MapArea.inside(I,P.lonlat[2*i],P.lonlat[2*i+1]))S.base[i]=0;
+    var M=areaMask();
+    if(M)for(var i=0;i<P.n;i++)S.base[i]&=M[i];
+    var V=viewBox();
+    if(V){var L=P.lonlat;for(var v=0;v<P.n;v++){var lo=L[2*v],la=L[2*v+1];
+      if(!(lo>=V[0]&&lo<=V[2]&&la>=V[1]&&la<=V[3]))S.base[v]=0;}}
+    if(S.lasso&&S.lasso.length===P.n)for(var k=0;k<P.n;k++)S.base[k]&=S.lasso[k];
   }
   var count=S.count=new Array(S.META?S.META.groups.length:0).fill(0);
   if(P.grp)for(var j=0;j<P.n;j++)if(S.base[j])count[P.grp[j]]++;
@@ -124,6 +131,7 @@ function applyKeep(){
   if(P.grp){MF.keep(TF,MF.groupSet(S,TF),P.tax,P.grp,P.n,S.keep);
     for(var k=0;k<P.n;k++)S.keep[k]&=S.base[k];}
   else S.keep.fill(1);
+  if(S.subset)for(var j=0;j<P.n;j++)if(!S.subset.has(P.id[j]))S.keep[j]=0;
   if(S.PD){var c=S.PD.attributes.getFilterCategory.value;
     for(var i=0;i<P.n;i++)c[3*i+2]=S.keep[i];
     S.PD.attributes.getFilterCategory={value:c,size:3};S.PDV=(S.PDV||0)+1;}
@@ -142,21 +150,27 @@ function picked(){
 }
 var PK=null,BAR=null;
 // The map's selection bar plus a date chip (the map keeps dates in its inputs) and, marked "map only", the
-// filters this page leaves to the map. The area applies here when it reads.
+// filters this page leaves to the map. The area applies here when it reads; in the split view it is the map's
+// to clear, so its chip has no ×.
+function alabel(){return parent!==window?'Map area':'Drawn area';}
 function items(){
   var L=MF.LAST,out=CH.items({S:S,meta:S.META,terms:TX.terms({T:S.TAXA,picks:S.picks,groups:[],meta:S.META,n:0,split:S.split}),
     picker:PK,pj:{items:function(){return [];}},months:MF.MONTH,only:MF.ONLYDEF,two:['exact'],
-    area:{term:function(){return S.area?{label:'Drawn area'}:null;},clear:function(){S.area='';picked();}},redraw:picked});
+    area:{term:function(){return S.area?{label:alabel()}:null;},clear:parent===window&&function(){S.area='';picked();}},redraw:picked});
   if(S.lo>0||S.hi<L)out.push({label:(S.up?'Uploaded ':'Observed ')+(S.lo>0?MF.iso(S.lo):'start')+' to '+(S.hi<L?MF.iso(S.hi):'now'),
     remove:function(){S.lo=0;S.hi=L;S.up=false;picked();}});
-  if(S.area&&!areaIndex())out.forEach(function(t){if(t.label==='Drawn area')t.tag='map only';});
+  if(S.area&&!areaIndex())out.forEach(function(t){if(t.label===alabel())t.tag='map only';});
+  if(viewBox())out.push({label:'Map view'});
+  if(S.ring)out.push({label:'Lasso',remove:function(){lasso(null);}});
+  if(S.subset)out.push({label:'Photo search: "'+S.subLabel+'" ('+S.subset.size+')',
+    remove:function(){parent.postMessage({type:'wtid-subset',ids:null},location.origin);}});
   S.extra.forEach(function(t){var k=t.split('=')[0];
     out.push({label:MAPONLY[k]+': '+decodeURIComponent(t.slice(k.length+1)).replace(/,/g,', '),tag:'map only',
       remove:function(){S.extra=S.extra.filter(function(x){return x!==t;});picked();}});});
   return out;
 }
 function clearAll(){S.groups={};S.only={};S.months=0;S.lo=0;S.hi=MF.LAST;S.up=false;S.area='';S.extra=[];
-  S.picks.length=0;S.split=[];$('q').value='';picked();}
+  S.picks.length=0;S.split=[];$('q').value='';if(S.ring)lasso(null);else picked();}
 // Zooms to the 1st-99th percentile box of the points that pass, so a few stray points do not flatten it.
 function fit(){
   var P=S.P,ok=passing(),xs=[],ys=[],box=$('plot');
@@ -175,6 +189,8 @@ function chips(){
   var box=$('groups');box.textContent='';
   MF=MF||MapFilter(S.META);
   Object.assign(S,MF.read(new URLSearchParams(location.hash.slice(1))));
+  if(AREA_IN!==null)S.area=AREA_IN;
+  if(VIEW_IN!==null)S.view=VIEW_IN;
   S.extra=location.hash.slice(1).split('&').filter(function(t){return PASS.indexOf(t.split('=')[0])>=0;});
   TF=TX.filter(S.TAXA,S.picks);S.baseKey=null;applyBase();
   TR=S.TAXA&&TT.make({T:S.TAXA,tax:S.P.tax,grp:S.P.grp,n:S.P.n,groups:S.META.groups.length,ranks:S.META.ranks,
@@ -190,7 +206,7 @@ function chips(){
     taxa:function(){return S.TAXA;},counts:function(){return TX.counts(S.TAXA,S.P.tax,S.P.n);},onChange:picked,
     onPick:function(r){if(TR)TR.reveal(r);}});
   BAR=CH.bar({box:$('selbar'),clear:clearAll,fallback:$('q')});
-  applyKeep();$('gfit').hidden=!items().length;
+  applyKeep();$('gfit').hidden=!items().length;$('ldraw').disabled=false;
   if(TR)TR.render();
 }
 $('gall').addEventListener('click',function(){S.groups={};picked();});
@@ -232,6 +248,8 @@ function layers(){
   }
   if(S.nbr.length)lyr.push(ring('nbr',S.nbr,6,[230,110,30],2));
   if(S.sel>=0)lyr.push(ring('sel',[S.sel],9,[29,29,27],2.5));
+  if(S.ring)lyr.push(new deck.PathLayer({id:'lasso',data:[S.ring],getPath:function(r){return r;},positionFormat:'XY',
+    widthUnits:'pixels',getWidth:1.5,getColor:[29,29,27,200]}));
   S.deck.setProps({layers:lyr});
 }
 
@@ -252,6 +270,13 @@ function closeCard(){
   S.sel=-1;S.nbr=[];S.run++;$('card').hidden=true;
   writeHash();layers();tell(null);
 }
+// The split view's photo search hands over a set of ids (null clears it); one that arrives before the join waits for it.
+addEventListener('message',function(e){
+  var d=e.data;
+  if(e.origin!==location.origin||e.source!==parent||!d||d.type!=='wtid-subset')return;
+  S.subset=d.ids?new Set(d.ids):null;S.subLabel=d.label;
+  if(S.P&&S.P.grp){applyKeep();update();$('gfit').hidden=!items().length;if(S.subset&&S.deck)fit();}
+});
 // The split view mirrors the picked record in the other frame by id; a remote pick is not posted back.
 var remote=false;
 function tell(id){if(parent!==window&&!remote)parent.postMessage({type:'wtid-record',id:id},location.origin);}
@@ -261,7 +286,7 @@ addEventListener('message',function(e){
   if(i===S.sel||(id!=null&&i<0))return;
   remote=true;try{if(i<0)closeCard();else select(i,true);}finally{remote=false;}
 });
-addEventListener('keydown',function(e){if(e.key==='Escape'&&!$('card').hidden)closeCard();});
+addEventListener('keydown',function(e){if(e.key!=='Escape')return;X.draw(false);if(!$('card').hidden)closeCard();else if(S.ring)lasso(null);});
 // The card's left edge: drag it, or use the arrow keys; a double click goes back to the default. The width is remembered.
 function cardWidth(w){
   var c=$('card');if(w==null){c.style.width='';localStorage.removeItem('wtid-card');return;}
@@ -287,6 +312,14 @@ async function neighborsOf(id){
     S.idx=await openIndex();return S.idx.neighbors(id);
   }
 }
+// Keeps this group alone, or, when it already is the only one, goes back to all groups.
+function onlyGroup(g){
+  var name=S.META.groups[g],b=el('button',{type:'button','class':'btn'},['']);
+  function solo(){var on=Object.keys(S.groups).filter(function(k){return S.groups[k];});return on.length===1&&S.groups[name]==='inc';}
+  function label(){b.textContent=solo()?'All groups':'Only '+gname(g);}
+  b.addEventListener('click',function(){var s=solo();S.groups={};if(!s)S.groups[name]='inc';picked();label();});
+  label();return b;
+}
 function select(i,fly){
   var P=S.P,id=P.id[i],run=++S.run,t=names(i),card=$('card');
   S.sel=i;S.nbr=[];tell(id);
@@ -302,6 +335,7 @@ function select(i,fly){
   var actions=el('div',{'class':'actions'},[
     link('https://www.inaturalist.org/observations/'+id,'Help identify on iNaturalist','primary'),
     link(CFG.searchUrl+'#id='+id,'More like this'),link(CFG.mapUrl+'#record='+id,'Show on map')]);
+  if(P.grp)actions.appendChild(onlyGroup(P.grp[i]));
   var title=el('h2',{},[t.common||t.latin||t.group||'Observation '+id]);
   card.textContent='';
   [resizer(),x,ph,el('div',{'class':'body'},[title,sub,place,actions,el('p',{'class':'muted'},['Closest matches, from the full image space']),nbNote,nb])]
@@ -411,6 +445,7 @@ function start(bbox){
     },
     onHover:tip,onClick:pick,layers:[]});
   box.addEventListener('pointerleave',function(){ptip.hidden=true;});
+  lassoDrag(box);
 }
 load().catch(function(e){
   $('count').textContent='Could not load the photo space';status(e.message);

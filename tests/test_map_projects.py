@@ -408,3 +408,67 @@ def test_note_gives_both_counts_or_says_the_map_leaves_the_project_out():
     assert _note([{**m, "st": "not"}, p], None, 0)["fewer"].endswith(
         "opens fewer records than the map shows."
     )
+
+
+@needs_node
+def test_map_keeps_only_the_photo_spaces_lasso_ids():
+    """map.js's wtid-keep end: the ids need not arrive sorted, and the records that are not in
+    the list leave the kept bit and count as out (OUT) until null clears the lasso."""
+    source = (ASSETS / "map.js").read_text()
+    head = source[source.index("var SUB=null") : source.index("function categories(")]
+    ear = source.index("// The photo space's lasso keeps")
+    first = source.index("addEventListener('message'", ear)
+    listener = source[ear : source.index("addEventListener('message'", first + 1)]
+    harness = """
+const parent={},location={origin:'o'},events=[],addEventListener=(k,f)=>events.push(f);
+const MF={ST_KEEP:8,record(){},groupSet(){},keep:(a,b,c,d,n,out)=>out.fill(1)},TF={},
+  CH={picked:()=>[]},S={groups:{}},META={groups:[]},AREA={ver:()=>0,mask:()=>null},GONE={},
+  PJ={sync(){},key:()=>'',wide:()=>null,drop:()=>false};
+const P={n:4,id:Uint32Array.of(5,300,70000,400),pos:new Float32Array(8),tax:new Uint16Array(4),
+  grp:new Uint8Array(4),obs:new Uint16Array(4),up:new Uint16Array(4),fl:new Uint8Array(4)};
+function refilter(){pointData();}
+"""
+    tail = """
+const out=[],got=()=>{out.push({out:Array.from(OUT),
+  keep:Array.from(PD.attributes.getFilterCategory.value).filter((v,i)=>i%4===3).map(v=>v>>3&1)});};
+const send=(ids,src)=>events.forEach(f=>f({origin:'o',source:src||parent,
+  data:{type:'wtid-keep',ids}}));
+pointData();got();
+send(Uint32Array.of(400,5));got();
+send([400,5]);got();send(Uint32Array.of(300),{});got();
+send(null);got();
+console.log(JSON.stringify(out));
+"""
+    got = _node(harness + head + listener + tail)
+    assert got == [
+        {"out": [0, 0, 0, 0], "keep": [1, 1, 1, 1]},
+        {"out": [0, 1, 1, 0], "keep": [1, 0, 0, 1]},
+        {"out": [0, 1, 1, 0], "keep": [1, 0, 0, 1]},
+        {"out": [0, 1, 1, 0], "keep": [1, 0, 0, 1]},
+        {"out": [0, 0, 0, 0], "keep": [1, 1, 1, 1]},
+    ]
+
+
+@needs_node
+def test_map_posts_its_viewport_as_a_clamped_ring_and_nothing_for_the_world():
+    """map.js's view(): the bounds go to the parent as one encoded ring, lat clamped to 85,
+    and a view 360 degrees wide or more posts '' (no mask)."""
+    source = (ASSETS / "map.js").read_text()
+    start = source.index("function view()")
+    body = source[start : source.index("map.once('load',view)", start)]
+    area = (ASSETS / "map_area.js").read_text()
+    enc = area[area.index("var Q=1e4") : area.index("function decode(")]
+    harness = (
+        "const window={},location={origin:'o'},sent=[],IdentifyLinks={BATCH:1};"
+        "const parent={postMessage:(m,o)=>sent.push([m.type,m.area,o])};"
+        "let B;const map={getBounds:()=>({getWest:()=>B[0],getSouth:()=>B[1],"
+        "getEast:()=>B[2],getNorth:()=>B[3]})};"
+        "const MapArea=(function(){" + enc + "return {encode};})();"
+    )
+    tail = """
+B=[-124,48,-122,50];view();B=[-190,-90,-170,90];view();B=[-180,-90,180,90];view();
+console.log(JSON.stringify([sent, MapArea.encode([[-124,48,-122,48,-122,50,-124,50]]),
+  MapArea.encode([[-180,-85,-170,-85,-170,85,-180,85]])]));
+"""
+    sent, plain, clamped = _node(harness + body + tail)
+    assert sent == [["wtid-view", plain, "o"], ["wtid-view", clamped, "o"], ["wtid-view", "", "o"]]

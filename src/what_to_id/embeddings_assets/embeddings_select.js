@@ -1,0 +1,67 @@
+// Photo space: what narrows the points by where they are. The map's area and view arrive as ring lists and the
+// lasso is drawn here; embeddings_app.js reads their verdicts through the functions this returns.
+function SpaceSelect(S,$,picked,layers){
+'use strict';
+var AI=null,VI=null,DRAW=false;
+// The points the dates, months, show only chips, the area and the lasso leave in, apart from the taxa and
+// groups; null when none is set. An area that does not read is left to the map and shows as map only.
+function areaIndex(){
+  if(!S.area)return null;
+  if(!AI||AI.key!==S.area){
+    AI={key:S.area,I:null};
+    try{var r=MapArea.decode(S.area);if(r.length)AI.I=MapArea.index(r);}catch(e){}
+  }
+  return AI.I;
+}
+// The view is a rectangle: its box [w,s,e,n], or null when absent or when it holds the whole data (it cuts nothing).
+function viewBox(){
+  if(!S.view)return null;
+  if(!VI||VI.key!==S.view){
+    VI={key:S.view,B:null};
+    try{var r=MapArea.decode(S.view)[0],L=S.P.lonlat,d=S.dataBox;
+      if(!d||d.P!==S.P){d=S.dataBox={P:S.P,b:[1/0,1/0,-1/0,-1/0]};
+        for(var j=0;j<S.P.n;j++){var x=L[2*j],y=L[2*j+1];
+          if(x<d.b[0])d.b[0]=x;if(x>d.b[2])d.b[2]=x;if(y<d.b[1])d.b[1]=y;if(y>d.b[3])d.b[3]=y;}}
+      if(r){var w=Math.min(r[0],r[2],r[4]),e=Math.max(r[0],r[2],r[4]),so=Math.min(r[1],r[3],r[5]),n=Math.max(r[1],r[3],r[5]);
+        if(!(w<=d.b[0]&&e>=d.b[2]&&so<=d.b[1]&&n>=d.b[3]))VI.B=[w,so,e,n];}}catch(er){}
+  }
+  return VI.B;
+}
+// The area's verdict per point, built once per area (panning re-runs applyBase but not this).
+function areaMask(){
+  var I=areaIndex(),P=S.P;
+  if(!I)return null;
+  if(!AI.M||AI.M.length!==P.n){AI.M=new Uint8Array(P.n);
+    for(var i=0;i<P.n;i++)AI.M[i]=MapArea.inside(I,P.lonlat[2*i],P.lonlat[2*i+1]);}
+  return AI.M;
+}
+// The lasso: a closed ring in layout coordinates, or null. Only the points inside it stay, and their ids go
+// to the map, which keeps the same records.
+function lasso(ring){
+  var P=S.P,m=null,ids=null,i,k=0;
+  S.ring=ring&&ring.concat(ring.slice(0,2));
+  if(ring){var I=MapArea.index([ring]);m=new Uint8Array(P.n);
+    for(i=0;i<P.n;i++)if(MapArea.inside(I,P.pos[2*i],P.pos[2*i+1])){m[i]=1;k++;}
+    ids=new Uint32Array(k);k=0;for(i=0;i<P.n;i++)if(m[i])ids[k++]=P.id[i];}
+  S.lasso=m;S.lassoV++;$('lclear').hidden=!ring;picked();
+  if(parent!==window)parent.postMessage({type:'wtid-keep',ids:ids},location.origin);
+}
+$('lclear').addEventListener('click',function(){lasso(null);});
+// The Draw button arms one lasso for pointers without a shift key (touch); it turns itself off after that drag.
+function draw(on){DRAW=on;$('ldraw').setAttribute('aria-pressed',String(on));$('plot').classList.toggle('draw',on);}
+$('ldraw').addEventListener('click',function(){draw(!DRAW);});
+// Shift+drag, or a drag while Draw is on, draws one. The pointer is caught before deck.gl's controller sees it, so the view stays put.
+function lassoDrag(box){
+  var cur=null;
+  function at(e){var r=box.getBoundingClientRect(),p=S.deck.getViewports()[0].unproject([e.clientX-r.left,e.clientY-r.top]);
+    return [p[0],p[1]];}
+  box.addEventListener('pointerdown',function(e){
+    if(!(e.shiftKey||DRAW)||e.button!==0||!S.P||!S.P.grp)return;
+    e.stopPropagation();e.preventDefault();box.setPointerCapture(e.pointerId);cur=S.ring=at(e);layers();
+  },true);
+  box.addEventListener('pointermove',function(e){if(cur){cur.push.apply(cur,at(e));layers();}});
+  ['pointerup','pointercancel'].forEach(function(t){box.addEventListener(t,function(){
+    if(!cur)return;var r=cur;cur=null;draw(false);lasso(r.length>=6?r:null);});});
+}
+return {areaIndex:areaIndex,viewBox:viewBox,areaMask:areaMask,lasso:lasso,lassoDrag:lassoDrag,draw:draw};
+}

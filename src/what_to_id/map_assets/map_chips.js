@@ -67,12 +67,13 @@ function items(o){var out=[],S=o.S,m=o.meta,two=o.two||[];
   o.months.forEach(function(n,i){if(S.months>>i&1)add(n,false,function(){S.months&=~(1<<i);o.redraw();});});
   o.only.forEach(function(d){if(S.only[d[0]])add(d[1],S.only[d[0]]==='not',drop(S.only,d[0]),
     two.indexOf(d[0])<0?turn(S.only,d[0]):null);});
-  var a=o.area.term();if(a)add(a.label,false,function(){o.area.clear();});
+  var a=o.area.term();if(a)add(a.label,false,o.area.clear&&function(){o.area.clear();});
   return out;}
 // The selection bar, the one list of what is picked: one chip per active pick, items [{label, not,
 // tag, remove, flip, split}], each with × to remove it, and Clear all; a tag (as "Identify only")
 // shows after the label. A chip with flip is a button that flips it between picked and left out; one
-// with split ({n, go}) has a button that lists its n taxa as chips of their own. set() redraws only
+// with split ({n, go}) has a button that lists its n taxa as chips of their own; one without remove
+// has no ×. set() redraws only
 // when the items change, and keeps focus in the bar: on the flipped chip, after a split on the first
 // of its taxa, after a removal on the next × (else Clear all), or, once the bar is empty, on fallback.
 function bar(o){
@@ -94,9 +95,9 @@ function bar(o){
         sb.title='Show the '+t.split.n+' taxa one by one, to remove or leave out any of them';
         sb.setAttribute('aria-label','Split '+text+' into its '+t.split.n+' taxa');
         sb.onclick=function(){want={flip:j};t.split.go();};}
-      x.type='button';x.setAttribute('aria-label','Remove '+text+(t.tag?' ('+t.tag+')':''));
-      x.onclick=function(){want={x:j};t.remove();};li.appendChild(x);list.appendChild(li);
-      xs.push(x);fs.push(t.flip?sp:x);});
+      if(t.remove){x.type='button';x.setAttribute('aria-label','Remove '+text+(t.tag?' ('+t.tag+')':''));
+        x.onclick=function(){want={x:j};t.remove();};li.appendChild(x);xs.push(x);}
+      list.appendChild(li);fs.push(t.flip?sp:x);});
     box.hidden=!items.length;
     if(want&&want.flip!=null&&fs[want.flip])fs[want.flip].focus();
     else if(want&&want.x!=null)(xs.length?xs[Math.min(want.x,xs.length-1)]:o.fallback).focus();

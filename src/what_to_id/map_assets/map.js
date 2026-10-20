@@ -98,24 +98,31 @@ function addShard(buf,n){
 // only change the filter settings; the data is uploaded again only when records arrive, the picks,
 // the area or deletions change, or the groups change while a taxon is included (the groups and
 // included taxa are one set, so the kept bit then carries the groups too).
+var SUB=null,SUBL='',SUBV=0;  // the split view's photo search: a Set of ids, its label, a version for PD_KEY
 var ST_KEEP=MF.ST_KEEP,PD=null,PD_KEY=null,PD_GONE=-1,PD_CAT=0,
-  OUT=new Uint8Array(0),RC=null,PJW=null;
+  OUT=new Uint8Array(0),RC=null,PJW=null,FK=null,FKV=0,FKM=null;
+// The photo space's lasso: the ids it keeps, or null; the mask is built once per list and shard count.
+function fmask(n){
+  if(!FKM||FKM.v!==FKV||FKM.m.length!==n){var m=new Uint8Array(n);projMask(P.id,[FK],m,0,n);FKM={v:FKV,m:m};}
+  return FKM.m;}
 function inc(){return !!TF.inc;}
 function pointData(){
   PJ.sync(P);
-  var n=P.n,gone=Object.keys(GONE).length,i,key=[TF,inc()?CH.picked(S.groups,META.groups,'inc').join():'',AREA.ver(),PJ.key()];
+  var n=P.n,gone=Object.keys(GONE).length,i,key=[TF,inc()?CH.picked(S.groups,META.groups,'inc').join():'',AREA.ver(),PJ.key(),SUBV,FKV];
   if(PD&&PD.length===n&&PD_KEY&&PD_KEY.every(function(k,j){return k===key[j];})&&PD_GONE===gone)return;
   var same=PD&&PD.length===n,days=same?PD.days:new Float32Array(2*n),
     cat=same?PD.attributes.getFilterCategory.value.slice():new Uint8Array(4*n);
   if(!same)for(i=0;i<n;i++)MF.record(days,cat,i,P.grp[i],P.obs[i],P.up[i],P.fl[i]);
-  // only the kept bit follows the picks, the groups beside them, the area, projects and deletions
+  // only the kept bit follows the picks, the groups beside them, the area, projects, the lasso and deletions
   // OUT keeps the records out for any reason but the area, for the Identify box count; PJW marks
   // the records Identify opens when it cannot say the projects exactly (see map_projects.js)
-  var kb=MF.keep(TF,MF.groupSet(S,TF),P.tax,P.grp,n,new Uint8Array(n)),id=P.id,am=AREA.mask(n),wide=PJ.wide();
+  var kb=MF.keep(TF,MF.groupSet(S,TF),P.tax,P.grp,n,new Uint8Array(n)),id=P.id,am=AREA.mask(n),wide=PJ.wide(),
+    fm=FK&&fmask(n);
   if(OUT.length!==n)OUT=new Uint8Array(n);PJW=wide?new Uint8Array(n):null;
   for(i=0;i<n;i++){var keep=kb[i]===1;
     if(gone>0&&GONE[id[i]]===1)keep=false;
-    if(wide&&keep&&(am===null||am[i]))PJW[i]=wide(i)?1:0;if(keep&&PJ.drop(i))keep=false;
+    if(SUB&&!SUB.has(id[i]))keep=false;
+    if(wide&&keep&&(am===null||am[i]))PJW[i]=wide(i)?1:0;if(keep&&(PJ.drop(i)||(fm&&!fm[i])))keep=false;
     OUT[i]=keep?0:1;cat[4*i+3]=cat[4*i+3]&~ST_KEEP|(keep&&(am===null||am[i])?ST_KEEP:0);}
   // a new pick, area or deletion swaps only the categories, so deck.gl uploads only those
   if(same){PD.attributes.getFilterCategory={value:cat,size:4};PD_CAT++;}
@@ -143,11 +150,11 @@ function recount(){
   NODAY=nd;ALT=0;
   if(PJW)for(i=0;i<n;i++)if(PJW[i]&&(gm>>cat[4*i]&1)&(mm>>cat[4*i+ch]&1)&(sm>>(cat[4*i+3]|ST_KEEP)&1)&&
     (day[i]===NO?full():day[i]>=S.lo&&day[i]<=S.hi))ALT++;
-  CUM=new Float64Array(META.days+1);
+  VC=null;CUM=new Float64Array(META.days+1);
   for(var d=0;d<META.days;d++)CUM[d+1]=CUM[d]+PER[d];
-  // One picked status filter reads its own totals; two together, a left-out one, or an area, have none
+  // One picked status filter reads its own totals; two together, a left-out one, an area or a lasso have none
   var on=Object.keys(S.only),
-    tt=!TOT||S.picks.length||AREA.on()||PJ.active()||on.length>1||S.only[on[0]]==='not'?null:
+    tt=!TOT||S.picks.length||AREA.on()||PJ.active()||FK||on.length>1||S.only[on[0]]==='not'?null:
       on.length?TOT.only&&TOT.only[on[0]]:TOT;
   TC=null;
   if(tt){var rows=tt[S.up?'up':'obs'],nm=rows[0].length;TC=new Float64Array(nm+1);
@@ -157,11 +164,25 @@ function recount(){
   render();
 }
 function full(){return S.lo===0&&S.hi===LAST;}
+var VC=null;  // kept records dated in S.lo..S.hi like CUM and inside the viewport; null for the world
+function inView(){
+  var n=P.n,b=map.getBounds(),w=b.getWest(),e=b.getEast(),s=b.getSouth(),t=b.getNorth(),key=[w,e,s,t,S.lo,S.hi,S.up,n].join();
+  if(!n||KEEP.length!==n||e-w>=360)return null;
+  if(VC&&VC.k===key)return VC.c;
+  w=(w+540)%360-180;e=(e+540)%360-180;  // wrap into [-180,180); w>e then means the view crosses the antimeridian
+  var day=S.up?P.up:P.obs,pos=P.pos,all=full(),c=0,i,x,y,d;
+  for(i=0;i<n;i++){
+    if(!KEEP[i])continue;y=pos[2*i+1];if(y<s||y>t)continue;x=pos[2*i];
+    if(w<=e?x<w||x>e:x<w&&x>e)continue;
+    d=day[i];if(d===NO?all:d>=S.lo&&d<=S.hi)c++;}
+  VC={k:key,c:c};return c;}
 function render(){
   // records without a date show only over all dates, as the GPU filter does
   var shown=CUM[S.hi+1]-CUM[S.lo]+(full()?NODAY:0);
+  var iv=P.n&&!AREA.invalid()?inView():null;
   $('count').textContent=AREA.invalid()?'Area unresolved · '+nf.format(shown)+' records available to browse':
-    P.n?nf.format(shown)+' of '+nf.format(META.n)+' records':'Loading';
+    P.n?iv!==null&&iv<shown?nf.format(iv)+' in view of '+nf.format(shown)+' records':
+      nf.format(shown)+' of '+nf.format(META.n)+' records':'Loading';
   var all=P.n&&!$('more').textContent?total(S.lo,S.hi):null;
   $('share').textContent=all&&!AREA.invalid()?nf.format(Math.min(shown,all))+' of '+nf.format(all)+
     ' BC records with photos '+(full()&&!S.months&&allGroups()&&!CH.any(S.only)?
@@ -419,8 +440,11 @@ function clearAll(){S.months=0;S.groups={};S.only={};S.picks.length=0;S.split=[]
   search();AREA.clear();PJ.reset();redraw();}
 $('reset').onclick=function(){S.lo=0;S.hi=LAST;S.up=false;clearAll();};
 var BAR=CH.bar({box:$('selbar'),clear:clearAll,fallback:$('q')});
-function items(){return CH.items({S:S,meta:META,terms:TX.terms({T:TAXA,picks:S.picks,groups:[],meta:META,n:0,split:S.split}),
-  picker:PK,pj:PJ,months:MONTH,only:ONLYDEF,two:['exact'],area:AREA,redraw:redraw});}
+function items(){var out=CH.items({S:S,meta:META,terms:TX.terms({T:TAXA,picks:S.picks,groups:[],meta:META,n:0,split:S.split}),
+  picker:PK,pj:PJ,months:MONTH,only:ONLYDEF,two:['exact'],area:AREA,redraw:redraw});
+  if(SUB)out.push({label:'Photo search: "'+SUBL+'" ('+SUB.size+')',
+    remove:function(){parent.postMessage({type:'wtid-subset',ids:null},location.origin);}});
+  return out;}
 // Each folding section's summary counts its active chips, so a folded one still says what it holds.
 function tally(){var n=function(st){var c=0;for(var k in st)if(st[k])c++;return c;},m=0,i,e;
   for(i=0;i<12;i++)m+=S.months>>i&1;
@@ -506,6 +530,22 @@ addEventListener('message',function(e){
   for(var i=0;i<P.n;i++)if(P.id[i]===e.data.id){var c=[P.pos[2*i],P.pos[2*i+1]];
     if(!map.getBounds().contains(c))map.easeTo({center:c});return;}
 });
+// The photo space's lasso keeps the same records here; nothing marks it but the count.
+addEventListener('message',function(e){
+  if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-keep')return;
+  var ids=e.data.ids;if(ids!==null&&!(ids instanceof Uint32Array))return;
+  FK=ids&&ids.sort();FKV++;if(P.n)refilter();
+});
+// The photo search of the split view: a set of ids (null clears it); before the taxa load, their refilter applies it.
+addEventListener('message',function(e){
+  var d=e.data;
+  if(e.origin!==location.origin||e.source!==parent||!d||d.type!=='wtid-subset')return;
+  SUB=d.ids?new Set(d.ids):null;SUBL=d.label;SUBV++;if(TAXA)refilter();
+  var b=[Infinity,Infinity,-Infinity,-Infinity];  // zoom to the hits that are loaded, as the area does
+  if(SUB&&map)for(var i=0;i<P.n;i++)if(SUB.has(P.id[i])){var x=P.pos[2*i],y=P.pos[2*i+1];
+    b=[Math.min(b[0],x),Math.min(b[1],y),Math.max(b[2],x),Math.max(b[3],y)];}
+  if(b[0]<=b[2])map.fitBounds([[b[0],b[1]],[b[2],b[3]]],{padding:40,maxZoom:14});
+});
 addEventListener('message',function(e){
   if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-record')return;
   var id=e.data.id;
@@ -578,7 +618,13 @@ function stopInvalidIdentify(e){if(AREA.invalid()){e.preventDefault();e.stopImme
 var THIN=false,THIN_BELOW=8;
 map.on('move',function(){if(!THIN&&map.getZoom()<THIN_BELOW){THIN=true;layers();}});
 map.on('move',place);
-map.on('moveend',function(){if(THIN){THIN=false;layers();}link();writeHash();});
+// The viewport masks the photo space beside the map; a view of the whole world masks nothing.
+function view(){if(parent===window)return;var b=map.getBounds(),w=b.getWest(),e=b.getEast(),
+  c=function(v,m){return Math.max(-m,Math.min(m,v));},s=c(b.getSouth(),85),n=c(b.getNorth(),85);
+  w=c(w,180);e=c(e,180);
+  parent.postMessage({type:'wtid-view',area:b.getEast()-b.getWest()>=360?'':MapArea.encode([[w,s,e,s,e,n,w,n]])},location.origin);}
+map.once('load',view);
+map.on('moveend',function(){if(THIN){THIN=false;layers();}link();writeHash();view();if(P.n&&CUM)render();});
 map.getContainer().addEventListener('pointerleave',function(){ptip.hidden=true;});
 addEventListener('resize',function(){draw();place();});
 var HINT=$('hint').textContent,HINT_TOT='Top: records still needing an ID per year, on a log scale; the line is the '+
