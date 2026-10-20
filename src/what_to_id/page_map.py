@@ -70,19 +70,25 @@ _Q = 0xFFFF
 BYTES_PER_RECORD = 17
 RECENT_DAYS = 90
 SHARD_MAX = 4_000_000
-IMPRECISE_M = 1000
+ACC_M = (1000, 100, 10)
 DAY_FLOOR = pd.Timestamp("1900-01-01")
 EARLY_OBS = 16
 EARLY_UP = 32
 FLAG_BITS = {"introduced": 1, "threatened": 2, "obscured": 4, "imprecise": 8}
+# The accuracy class in the flags byte: 0 unknown, 1 over 1 km (bit 8, as "imprecise"), then within
+# 1 km, 100 m and 10 m in the two high bits: 64, 128, 192.
+ACC_BITS = (0, 8, 64, 128, 192)
 TOTAL_GRADES = "needs_id,research"
 TOTAL_FIELDS = {"obs": "observed", "up": "created"}
-# iNaturalist's search parameters for the page's status filters; "exact" drops obscured and
-# imprecise records, as FLAG_BITS does
+# iNaturalist's search parameters for the page's status and accuracy filters. The precision choices
+# also require obscuration=none: the map draws obscured records at rounded public coordinates, so
+# their accuracy says nothing about the point. acc_below is strict, so within N m is below N + 1.
 TOTAL_ONLY = {
     "introduced": {"introduced": "true"},
     "threatened": {"threatened": "true"},
-    "exact": {"obscuration": "none", "acc_below_or_unknown": IMPRECISE_M + 1},
+    "acc_unknown": {"acc": "false"},
+    "acc_known": {"acc": "true", "obscuration": "none"},
+    **{f"acc_{m}": {"acc_below": m + 1, "obscuration": "none"} for m in ACC_M},
 }
 _COLS = ("id", "lat", "lon", "observed_on", "created_at", "iconic_taxon")
 _ASSETS = files("what_to_id") / "map_assets"
@@ -232,7 +238,12 @@ def decode_points(blobs: dict[str, bytes], meta: dict) -> pd.DataFrame:
     out["observed_before_1900"] = (raw["flags"] & EARLY_OBS) > 0
     out["uploaded_before_1900"] = (raw["flags"] & EARLY_UP) > 0
     for name in meta["flags"]:
-        out[name] = (raw["flags"] & FLAG_BITS[name]) > 0
+        if name != "accuracy":
+            out[name] = (raw["flags"] & FLAG_BITS[name]) > 0
+    if "accuracy" in meta["flags"]:
+        out["acc_class"] = np.select(
+            [raw["flags"] & b == b for b in ACC_BITS[:0:-1]], [4, 3, 2, 1], 0
+        )
     return out.sort_values("id").reset_index(drop=True)
 
 
@@ -276,9 +287,10 @@ def _flags(df: pd.DataFrame) -> tuple[list[str], np.ndarray]:
             on = df[name].astype("boolean").fillna(False).to_numpy(dtype=bool)
             bits |= np.where(on, FLAG_BITS[name], 0).astype("u1")
     if "pos_acc" in df:
-        known.append("imprecise")
-        acc = pd.to_numeric(df["pos_acc"], errors="coerce").fillna(0).to_numpy()
-        bits |= np.where(acc > IMPRECISE_M, FLAG_BITS["imprecise"], 0).astype("u1")
+        known += ["imprecise", "accuracy"]
+        acc = pd.to_numeric(df["pos_acc"], errors="coerce").to_numpy(dtype=float)
+        cls = np.where(np.isnan(acc), 0, 1 + sum(acc <= m for m in ACC_M))
+        bits |= np.array(ACC_BITS, dtype="u1")[cls]
     return known, bits
 
 
@@ -404,7 +416,6 @@ def render_map(meta: dict, *, freeze: str | None) -> str:
         "taxa": f"{meta['taxa']}?v={v}",
         "place_id": BC_PLACE_ID,
         "max_url": MAX_URL_LEN,
-        "imprecise_m": IMPRECISE_M,
         "parks": f"{PARKS_NAME}?v={parks_version(parks_blob())}",
     }
     fill = {

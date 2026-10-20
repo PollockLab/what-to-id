@@ -49,8 +49,8 @@ function chip(box,k,label,get,three,title,changed){var b=document.createElement(
 // The selection bar's chips, in the order of the filters, each with what removes it and, when its
 // filter can leave things out, what flips it between picked and left out. o: S, meta, terms (the
 // taxon terms, see TX.terms), picker (the taxon picker), pj (the project filter), months (month
-// names), only ([key, label] per status chip), two (the status keys that cannot be left out), area,
-// and redraw() after a group, month or status chip changes. A shortcut's chip also splits into its
+// names), only ([key, label] per status chip), two (the status keys that cannot be left out), acc
+// ({label, clear} of the location accuracy choice, label '' for none), area, and redraw() after a group, month or status chip changes. A shortcut's chip also splits into its
 // taxa, one chip each, by adding its name to S.split.
 function items(o){var out=[],S=o.S,m=o.meta,two=o.two||[];
   function add(label,not,remove,flip,split){out.push({label:label,not:not,remove:remove,flip:flip,split:split});}
@@ -67,6 +67,7 @@ function items(o){var out=[],S=o.S,m=o.meta,two=o.two||[];
   o.months.forEach(function(n,i){if(S.months>>i&1)add(n,false,function(){S.months&=~(1<<i);o.redraw();});});
   o.only.forEach(function(d){if(S.only[d[0]])add(d[1],S.only[d[0]]==='not',drop(S.only,d[0]),
     two.indexOf(d[0])<0?turn(S.only,d[0]):null);});
+  if(o.acc&&o.acc.label)add(o.acc.label,false,function(){o.acc.clear();o.redraw();});
   var a=o.area.term();if(a)add(a.label,false,o.area.clear&&function(){o.area.clear();});
   return out;}
 // The selection bar, the one list of what is picked: one chip per active pick, items [{label, not,

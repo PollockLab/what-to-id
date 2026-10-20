@@ -111,14 +111,14 @@ def test_groups_pass_by_picks_less_left_out():
     ]
 
 
-def link(groups, taxa=(), only=None):
+def link(groups, taxa=(), only=None, acc=""):
     """The Identify query for group states and included taxon ids, as map.js builds it."""
     body = (
         f"var gl=CH.groupLink({json.dumps(groups)},META.groups,META.group_ids,"
         f"{json.dumps(bool(taxa))}),t={json.dumps(list(taxa))};"
         "var st={groups:gl.groups,all:META.groups.length,up:false,d1:'',d2:'',months:[],"
         "taxa:gl.inc.length?null:t.concat(gl.taxa),not:[].concat(gl.not),"
-        f"only:{json.dumps(only or {})}}};"
+        f"only:{json.dumps(only or {})},acc:{json.dumps(acc)}}};"
         "return {u:TX.identifyUrl(st,BOX,META).url,inc:gl.inc,out:gl.out};"
     )
     r = run(body)
@@ -149,12 +149,30 @@ def test_identify_group_without_an_id_stays_exact_or_is_named():
 def test_identify_status_filters_pick_or_leave_out():
     q, _, _ = link({}, only={"introduced": "not", "threatened": "inc"})
     assert q["introduced"] == "false" and q["threatened"] == "true"
-    q, _, _ = link({}, only={"threatened": "not", "exact": "inc"})
+    q, _, _ = link({}, only={"threatened": "not"})
     assert q["threatened"] == "false" and "introduced" not in q
-    assert q["obscuration"] == "none" and q["acc_below_or_unknown"] == "1001"
+    assert not {"obscuration", "acc", "acc_below"} & q.keys()
     # old states (true) still read as picked
     q, _, _ = link({}, only={"introduced": True})
     assert q["introduced"] == "true"
+
+
+@pytest.mark.parametrize(
+    "acc,want",
+    [
+        ("", {}),
+        ("unknown", {"acc": "false"}),
+        ("known", {"acc": "true", "obscuration": "none"}),
+        # acc_below is strict, so within N m asks for below N + 1
+        ("1000", {"acc_below": "1001", "obscuration": "none"}),
+        ("100", {"acc_below": "101", "obscuration": "none"}),
+        ("10", {"acc_below": "11", "obscuration": "none"}),
+    ],
+)
+def test_identify_location_accuracy_choices(acc, want):
+    q, _, _ = link({}, acc=acc)
+    assert {k: q[k] for k in ("acc", "acc_below", "obscuration") if k in q} == want
+    assert "acc_below_or_unknown" not in q
 
 
 BAR = r"""

@@ -421,7 +421,8 @@ def test_map_keeps_only_the_photo_spaces_lasso_ids():
     listener = source[ear : source.index("addEventListener('message'", first + 1)]
     harness = """
 const parent={},location={origin:'o'},events=[],addEventListener=(k,f)=>events.push(f);
-const MF={ST_KEEP:8,record(){},groupSet(){},keep:(a,b,c,d,n,out)=>out.fill(1)},TF={},
+const MF={ST_KEEP:8,ST_INEXACT:4,accOut:()=>0,record(){},groupSet(){},
+  keep:(a,b,c,d,n,out)=>out.fill(1)},TF={},
   CH={picked:()=>[]},S={groups:{}},META={groups:[]},AREA={ver:()=>0,mask:()=>null},GONE={},
   PJ={sync(){},key:()=>'',wide:()=>null,drop:()=>false},PAL=[[0,0,0]];
 const P={n:4,id:Uint32Array.of(5,300,70000,400),pos:new Float32Array(8),tax:new Uint16Array(4),

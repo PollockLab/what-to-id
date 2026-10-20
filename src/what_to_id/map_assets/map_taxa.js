@@ -165,7 +165,11 @@ function identifyUrl(st,b,meta,extra){
   // iNaturalist has a search parameter for each status filter, so Identify opens the same records; a
   // left-out status ('not') is its false
   var o=st.only||{};['introduced','threatened'].forEach(function(k){if(o[k])q.set(k,String(o[k]!=='not'));});
-  if(o.exact){q.set('obscuration','none');q.set('acc_below_or_unknown',meta.imprecise_m+1);}
+  // iNaturalist's acc_below is strict, so within N m is below N + 1; known and the precision choices also
+  // need obscuration=none (see ACCDEF in map_filter.js)
+  var a=st.acc;
+  if(a==='unknown')q.set('acc','false');
+  else if(a){q.set('obscuration','none');if(a==='known')q.set('acc','true');else q.set('acc_below',+a+1);}
   var base='https://www.inaturalist.org/observations/identify?',u=base+q;
   function add(key,ids,what){if(!ids||!ids.length)return;
     if(ids.length<=MAX_IDS){q.set(key,ids.join(','));if((base+q).length<meta.max_url){u=base+q;return;}

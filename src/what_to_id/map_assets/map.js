@@ -93,13 +93,13 @@ function addShard(buf,n){
 
 // The map filters on the GPU. Each record carries its observed and uploaded day (-1 for none) as
 // filter values, and four categories: group, observed month, uploaded month (12 for no date) and a
-// status value, bit 1 introduced, 2 threatened, 4 obscured or imprecise, 8 kept by the taxon picks
+// status value, bit 1 introduced, 2 threatened, 4 outside the location accuracy choice, 8 kept by the taxon picks
 // and the area and not deleted, 16 one record in ten. Group, month, status and date changes then
 // only change the filter settings; the data is uploaded again only when records arrive, the picks,
 // the area or deletions change, or the groups change while a taxon is included (the groups and
 // included taxa are one set, so the kept bit then carries the groups too).
 var SUB=null,SUBL='',SUBV=0;  // the split view's photo search: a Set of ids, its label, a version for PD_KEY
-var ST_KEEP=MF.ST_KEEP,PD=null,PD_KEY=null,PD_GONE=-1,PD_CAT=0,
+var ST_KEEP=MF.ST_KEEP,ST_INEXACT=MF.ST_INEXACT,PD=null,PD_KEY=null,PD_GONE=-1,PD_CAT=0,
   OUT=new Uint8Array(0),RC=null,PJW=null,FK=null,FKV=0,FKM=null;
 // The photo space's lasso: the ids it keeps, or null; the mask is built once per list and shard count.
 function fmask(n){
@@ -108,12 +108,13 @@ function fmask(n){
 function inc(){return !!TF.inc;}
 function pointData(){
   PJ.sync(P);
-  var n=P.n,gone=Object.keys(GONE).length,i,key=[TF,inc()?CH.picked(S.groups,META.groups,'inc').join():'',AREA.ver(),PJ.key(),SUBV,FKV];
+  var n=P.n,gone=Object.keys(GONE).length,i,key=[TF,inc()?CH.picked(S.groups,META.groups,'inc').join():'',AREA.ver(),PJ.key(),SUBV,FKV,S.acc];
   if(PD&&PD.length===n&&PD_KEY&&PD_KEY.every(function(k,j){return k===key[j];})&&PD_GONE===gone)return;
   var same=PD&&PD.length===n,days=same?PD.days:new Float32Array(2*n),
     cat=same?PD.attributes.getFilterCategory.value.slice():new Uint8Array(4*n);
   if(!same)for(i=0;i<n;i++)MF.record(days,cat,i,P.grp[i],P.obs[i],P.up[i],P.fl[i]);
-  // only the kept bit follows the picks, the groups beside them, the area, projects, the lasso and deletions
+  // only the kept bit follows the picks, the groups beside them, the area, projects, the lasso and deletions,
+  // and the accuracy bit the location accuracy choice
   // OUT keeps the records out for any reason but the area, for the Identify box count; PJW marks
   // the records Identify opens when it cannot say the projects exactly (see map_projects.js)
   var kb=MF.keep(TF,MF.groupSet(S,TF),P.tax,P.grp,n,new Uint8Array(n)),id=P.id,am=AREA.mask(n),wide=PJ.wide(),
@@ -123,7 +124,7 @@ function pointData(){
     if(gone>0&&GONE[id[i]]===1)keep=false;
     if(SUB&&!SUB.has(id[i]))keep=false;
     if(wide&&keep&&(am===null||am[i]))PJW[i]=wide(i)?1:0;if(keep&&(PJ.drop(i)||(fm&&!fm[i])))keep=false;
-    OUT[i]=keep?0:1;cat[4*i+3]=cat[4*i+3]&~ST_KEEP|(keep&&(am===null||am[i])?ST_KEEP:0);}
+    OUT[i]=keep?0:1;cat[4*i+3]=cat[4*i+3]&~(ST_KEEP|ST_INEXACT)|(keep&&(am===null||am[i])?ST_KEEP:0)|MF.accOut(S.acc,P.fl[i]);}
   // a new pick, area or deletion swaps only the categories, so deck.gl uploads only those
   if(same){PD.attributes.getFilterCategory={value:cat,size:4};PD_CAT++;}
   else{var col=new Uint8Array(4*n);for(i=0;i<n;i++){var c=PAL[P.grp[i]%PAL.length];
@@ -156,7 +157,7 @@ function recount(){
   VC=null;CUM=new Float64Array(META.days+1);
   for(var d=0;d<META.days;d++)CUM[d+1]=CUM[d]+PER[d];
   // One picked status filter reads its own totals; two together, a left-out one, an area or a lasso have none
-  var on=Object.keys(S.only),
+  var on=Object.keys(S.only).concat(S.acc?'acc_'+S.acc:[]),
     tt=!TOT||S.picks.length||AREA.on()||PJ.active()||FK||on.length>1||S.only[on[0]]==='not'?null:
       on.length?TOT.only&&TOT.only[on[0]]:TOT;
   TC=null;
@@ -188,7 +189,7 @@ function render(){
       nf.format(shown)+' of '+nf.format(META.n)+' records':'Loading';
   var all=P.n&&!$('more').textContent?total(S.lo,S.hi):null;
   $('share').textContent=all&&!AREA.invalid()?nf.format(Math.min(shown,all))+' of '+nf.format(all)+
-    ' BC records with photos '+(full()&&!S.months&&allGroups()&&!CH.any(S.only)?
+    ' BC records with photos '+(full()&&!S.months&&allGroups()&&!CH.any(S.only)&&!S.acc?
     '':'matching these filters ')+'still need an ID ('+
     pct(shown,all)+'). All-record counts from '+TOT.on+'.':'';
   $('hint').textContent=TC?HINT_TOT:HINT;
@@ -210,7 +211,7 @@ function link(){
     taxa=gl.inc.length?null:TF.ids.concat(gl.taxa);
   var st={groups:gl.groups,
     all:META.groups.length,up:S.up,d1:S.lo>0?iso(S.lo):'',d2:S.hi<LAST?iso(S.hi):'',months:m,taxa:taxa,
-    not:TF.not.concat(gl.not),only:S.only};
+    not:TF.not.concat(gl.not),only:S.only,acc:S.acc};
   // with an area on, the link may list the records by id instead, and then u stays null
   var a=$('identify'),href=AREA.link({w:b.getWest(),s:b.getSouth(),e:b.getEast(),n:b.getNorth()},
     function(v,p,side){var r=TX.identifyUrl(st,v,META,Object.assign({},PJ.params(),p));if(!side)u=r;return r.url;},match);
@@ -413,13 +414,19 @@ var MB_=MON.map(function(m,i){var b=chip('months',m,!!(S.months>>i&1),
   return b;});
 function showMonths(){MB_.forEach(function(b,i){b.setAttribute('aria-pressed',String(!!(S.months>>i&1)));});}
 $('mclear').onclick=function(){S.months=0;showMonths();refilter();};
-// Introduced and threatened can be left out too. The location filter stays two-state: its opposite, hidden
-// or over 1 km uncertain, is an OR iNaturalist's Identify filters cannot say.
+// Introduced and threatened can be left out too. The location accuracy is one choice of several, so its
+// chips exclude each other, and a click on the chosen one clears it; a pool without accuracy has none.
 var ONLYDEF=MF.ONLYDEF,
-  ONLY=ONLYDEF.map(function(o){return CH.chip($('flags'),o[0],o[1],function(){return S.only;},o[0]!=='exact',
-    o[3],refilter);});
-function showOnly(){ONLY.forEach(function(b,j){CH.show(b,ONLYDEF[j][1],S.only[ONLYDEF[j][0]]||'');});}
-if(!ONLY.length)$('flagbox').hidden=true;
+  ONLY=ONLYDEF.map(function(o){return CH.chip($('flags'),o[0],o[1],function(){return S.only;},true,
+    o[3],refilter);}),
+  ACCDEF=META.flags.indexOf('accuracy')<0?[]:MF.ACCDEF,
+  ACC=ACCDEF.map(function(o){var b=document.createElement('button');b.type='button';b.title=o[2]+'. Click to pick.';
+    b.onclick=function(){S.acc=S.acc===o[0]?'':o[0];showOnly();refilter();};$('acc').appendChild(b);return b;});
+function accLabel(){var o=ACCDEF.filter(function(a){return a[0]===S.acc;})[0];return o?o[1]:'';}
+function showOnly(){ONLY.forEach(function(b,j){CH.show(b,ONLYDEF[j][1],S.only[ONLYDEF[j][0]]||'');});
+  ACC.forEach(function(b,j){CH.show(b,ACCDEF[j][1],S.acc===ACCDEF[j][0]?'inc':'');});}
+if(!ONLY.length&&!ACC.length)$('flagbox').hidden=true;
+if(!ACC.length)$('acc').hidden=$('acclbl').hidden=true;
 // Picked taxa: chips in the selection bar, one set with the groups. A shortcut picks, then leaves out, a set
 // of taxa, and shows only once the taxa file carries the whole tree.
 var PK=TX.picker({input:$('q'),list:$('sugg'),msg:$('qn'),picks:S.picks,ranks:META.ranks,
@@ -443,26 +450,26 @@ function oldQuery(){if(!S.oldq)return;
 function search(){TF=TX.filter(TAXA,S.picks);}
 // The selection bar lists every chip; its Clear all clears them, and reset also the dates.
 function redraw(){showGroups();showMonths();showOnly();refilter();}
-function clearAll(){S.months=0;S.groups={};S.only={};S.picks.length=0;S.split=[];$('q').value='';showClades();
+function clearAll(){S.months=0;S.groups={};S.only={};S.acc='';S.picks.length=0;S.split=[];$('q').value='';showClades();
   search();AREA.clear();PJ.reset();redraw();}
 $('reset').onclick=function(){S.lo=0;S.hi=LAST;S.up=false;clearAll();
   if(parent!==window)parent.postMessage({type:'wtid-reset'},location.origin);};  // the photo space beside it zooms out
 var BAR=CH.bar({box:$('selbar'),clear:clearAll,fallback:$('q')});
 function items(){var out=CH.items({S:S,meta:META,terms:TX.terms({T:TAXA,picks:S.picks,groups:[],meta:META,n:0,split:S.split}),
-  picker:PK,pj:PJ,months:MONTH,only:ONLYDEF,two:['exact'],area:AREA,redraw:redraw});
+  picker:PK,pj:PJ,months:MONTH,only:ONLYDEF,acc:{label:accLabel(),clear:function(){S.acc='';}},area:AREA,redraw:redraw});
   if(SUB)out.push({label:'Photo search: "'+SUBL+'" ('+SUB.size+')',
     remove:function(){parent.postMessage({type:'wtid-subset',ids:null},location.origin);}});
   return out;}
 // Each folding section's summary counts its active chips, so a folded one still says what it holds.
 function tally(){var n=function(st){var c=0;for(var k in st)if(st[k])c++;return c;},m=0,i,e;
   for(i=0;i<12;i++)m+=S.months>>i&1;
-  [['ntaxa',S.picks.length],['nonly',n(S.only)],['nproj',PJ.items().length],['ngroups',n(S.groups)],
+  [['ntaxa',S.picks.length],['nonly',n(S.only)+(S.acc?1:0)],['nproj',PJ.items().length],['ngroups',n(S.groups)],
     ['nmonths',m]].forEach(function(d){e=$(d[0]);if(e)e.textContent=d[1]?String(d[1]):'';});}
 // Taxa and Show only start open, Groups, Projects and Months folded; a section opens as the viewer
 // last left it, and one a link filters on opens regardless (projects only know theirs once loaded).
 var FOLD='wtid-map-fold';
 (function(){var saved={};try{saved=JSON.parse(localStorage.getItem(FOLD))||{};}catch(e){}
-  var on={grpsec:CH.any(S.groups),monsec:!!S.months,flagbox:CH.any(S.only),projbox:/(^|[#&])projects=/.test(location.hash)};
+  var on={grpsec:CH.any(S.groups),monsec:!!S.months,flagbox:CH.any(S.only)||!!S.acc,projbox:/(^|[#&])projects=/.test(location.hash)};
   [].forEach.call(document.querySelectorAll('details.sec'),function(d){
     if(on[d.id])d.open=true;else if(d.id in saved)d.open=saved[d.id];
     d.addEventListener('toggle',function(){saved[d.id]=d.open;
@@ -477,7 +484,7 @@ function names(i){var t=TAXA&&P.tax[i]!==NOTAX?TAXA[P.tax[i]]:null,g=META.groups
 function badges(i){var f=P.fl[i],out=[];
   if(f&FLAG.introduced)out.push(['Introduced','']);if(f&FLAG.threatened)out.push(['Threatened','']);
   if(f&FLAG.obscured)out.push(['Location hidden','warn']);
-  else if(f&FLAG.imprecise)out.push(['Location over 1 km uncertain','warn']);
+  else if(MF.accClass(f)===1)out.push(['Location over 1 km uncertain','warn']);
   return out.map(function(b){return '<span class="badge '+b[1]+'">'+b[0]+'</span>';}).join('');}
 function idText(i){var n=P.ids[i]&15,a=P.ids[i]>>4;
   return n?(n>=15?'15+':n)+(n===1?' ID':' IDs')+(a?', '+(a>=15?'15+':a)+' agreeing':''):'No IDs yet';}
