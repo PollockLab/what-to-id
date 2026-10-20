@@ -45,7 +45,7 @@ function build(T,ranks,groups){
     for(j=i;j>=0&&grp[j]===undefined&&!(j<n&&groups[T[j][2]]);j=par[j])path.push(j);
     var g=j<0?'':grp[j]!==undefined?grp[j]:groups[T[j][2]];if(j>=0)grp[j]=g;
     path.forEach(function(p){grp[p]=g;});}
-  return {T:T,ranks:ranks,n:n,root:n,par:par,own:own,tot:tot,st:st,deep:deep,sp:sp,kids:kids,row:row,grp:grp};
+  return {T:T,ranks:ranks,n:n,root:n,par:par,own:own,tot:tot,st:st,deep:deep,sp:sp,kids:kids,row:row,grp:grp,groups:groups};
 }
 function id(M,r){return r===M.n?0:M.T[r][2];}
 function name(M,r){return r===M.n?'All taxa':M.T[r][0];}
@@ -82,16 +82,39 @@ function view(M,S){
 // Opens e one level, or closes it.
 function toggle(M,S,e){if(S.open.has(e))S.open.delete(e);else if(M.kids[e].length)S.open.set(e,1);}
 function more(S,e){S.open.set(e,(S.open.get(e)||0)+1);}
-// Opens the subtree under e breadth first, biggest first, while the shown leaves stay within budget.
-// Returns whether it stopped short.
-function expandBelow(M,S,e,budget){
-  var L=view(M,S).root.leaves,q=[e];
-  while(q.length){var x=q.shift(),ks=M.kids[x],pages=S.open.get(x);
-    if(!ks.length)continue;
+// How deep an expand goes by default, per life group: the rank whose taxa it leaves closed. A click still
+// opens any taxon down to species.
+var DEPTH={Insecta:'order',Plantae:'family'},DEPTH_ELSE='family';
+function cap(M,x){return step(LEVEL[DEPTH[M.grp[x]]||DEPTH_ELSE]);}
+// Opens the subtrees under the shown nodes es (one row or a list) breadth first, biggest first, down to
+// each group's depth (or all the way from a start already at or below it), while the shown leaves stay
+// within budget. Returns whether it stopped short.
+function expandBelow(M,S,es,budget){
+  var L=view(M,S).root.leaves,q=[].concat(es).map(function(e){return [e,M.st[e]>=cap(M,e)];});
+  while(q.length){var x=q[0][0],deep=q.shift()[1],ks=M.kids[x],pages=S.open.get(x);
+    if(!ks.length||!pages&&!deep&&M.st[x]>=cap(M,x))continue;
     if(!pages){var d=Math.min(ks.length,K)+(ks.length>K?1:0)-1;if(L+d>budget)return true;
       S.open.set(x,pages=1);L+=d;}
-    ks.slice(0,pages*K).forEach(function(k){q.push(lead(M,k));});}
+    ks.slice(0,pages*K).forEach(function(k){q.push([lead(M,k),deep]);});}
   return false;
+}
+// Colours: each life group's sub-clades (the children of the group taxon) take alternating shades of the
+// group colour, kept at 2:1 or more against both page backgrounds (#fbfbf9 light, #1a1a19 dark).
+var TONES=[0,0.45,-0.35,0.25,-0.2,0.6,-0.5,0.12,-0.1];
+function lum(c){return c.reduce(function(s,v,i){v/=255;v=v<=0.04045?v/12.92:Math.pow((v+0.055)/1.055,2.4);
+  return s+v*[0.2126,0.7152,0.0722][i];},0);}
+function contrast(a,b){var x=lum(a)+0.05,y=lum(b)+0.05;return Math.max(x,y)/Math.min(x,y);}
+var BG=[[251,251,249],[26,26,25]];
+// rgb mixed toward white (t>0) or black (t<0) by |t|, backed off until it reads on both pages.
+function shade(rgb,t){
+  for(var k=0;k<8&&t;k++,t/=2){var to=t>0?255:0,c=rgb.map(function(v){return Math.round(v+(to-v)*Math.abs(t));});
+    if(BG.every(function(b){return contrast(c,b)>=2;}))return c;}
+  return rgb.slice();
+}
+// Which tone row r takes: its sub-clade's index under the nearest group taxon above it, else 0.
+function tone(M,r){
+  for(var c=r,p=M.par[r];p>=0;c=p,p=M.par[p])if(p<M.n&&M.groups[M.T[p][2]])return TONES[M.kids[p].indexOf(c)%TONES.length]||0;
+  return 0;
 }
 // Opens the way from the focus to row t, paging through "more" as needed; a t outside the focus moves
 // the focus to the root. Returns the shown node that holds t.
@@ -104,11 +127,14 @@ function reveal(M,S,t){
     if(p===f)break;}
   return e;
 }
-// The opening view: the focus at the root and the life groups (rows gs) in sight, closed.
+// The opening view: the focus at the root, the life groups (rows gs) in sight and opened toward their
+// depth while the view stays within HOME leaves.
+var HOME=150;
 function home(M,gs){
   var S={focus:lead(M,M.root),sel:-1,open:new Map()};
   gs.forEach(function(g){reveal(M,S,g);});
   if(!S.open.size)toggle(M,S,S.focus);
+  expandBelow(M,S,gs.map(function(g){return lead(M,g);}).filter(function(e){return M.st[e]<cap(M,e);}),HOME);
   return S;
 }
 // Shares [a0, a1] among the shown nodes: siblings in proportion to the square root of their records,
@@ -141,7 +167,7 @@ function read(M,hash,gs){
   var s=rowOf(q.sel);if(s>=0){S.sel=s;if(q.open==null)reveal(M,S,s);}
   return S;
 }
-return {K:K,LEVEL:LEVEL,RINGS:RINGS,step:step,build:build,id:id,name:name,common:common,rank:rank,lead:lead,
+return {K:K,LEVEL:LEVEL,RINGS:RINGS,DEPTH:DEPTH,TONES:TONES,BG:BG,cap:cap,shade:shade,tone:tone,contrast:contrast,step:step,build:build,id:id,name:name,common:common,rank:rank,lead:lead,
   chain:chain,crumbs:crumbs,within:within,view:view,toggle:toggle,more:more,expandBelow:expandBelow,reveal:reveal,
   home:home,layout:layout,write:write,read:read};
 });

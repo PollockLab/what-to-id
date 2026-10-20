@@ -87,7 +87,7 @@ out({e, focus: S.focus, open: Array.from(S.open), shown});"""
 def test_layout_fills_the_span_and_gives_each_leaf_its_minimum():
     got = node(
         """
-const S = M.home(D, [1, 7]); M.toggle(D, S, 7); M.toggle(D, S, 8);
+const S = M.home(D, [1, 7]); M.toggle(D, S, 8);
 const V = M.layout(M.view(D, S), 0, 6, 0.1), leaves = V.all.filter((n) => !n.kids.length);
 const gaps = V.all.filter((n) => n.kids.length).map((n) =>
   [n.kids[0].a0 - n.a0, n.kids[n.kids.length - 1].a1 - n.a1]);
@@ -101,16 +101,68 @@ out({sum: w(leaves).reduce((s, x) => s + x, 0), min: Math.min(...w(leaves)), gap
     assert got["tight"] == pytest.approx(1 / got["n"])  # too many leaves: all equal
 
 
-def test_expand_below_stops_at_the_budget():
+def test_expand_below_stops_at_the_group_depth_and_the_budget():
     got = node(
         """
 const S = {focus: 0, sel: -1, open: new Map()};
-const capped = M.expandBelow(D, S, 0, 5), small = Array.from(S.open.keys());
-const S2 = {focus: 0, sel: -1, open: new Map()};
-out({capped, small, full: M.expandBelow(D, S2, 0, 400), all: Array.from(S2.open.keys()).sort()});"""
+const full = M.expandBelow(D, S, 0, 400), top = Array.from(S.open.keys()).sort();
+const capped = M.expandBelow(D, S, 8, 5), shut = S.open.has(8);
+out({full, top, capped, shut, deep: M.expandBelow(D, S, 8, 400), open: S.open.has(8)});"""
     )
-    assert got["capped"] and got["small"] == [0, 7, 3]  # Bombus would add 24 leaves
-    assert not got["full"] and got["all"] == [0, 3, 7, 8]
+    # Sphagnum and Bombus are genera, below the default depth (family): left closed
+    assert not got["full"] and got["top"] == [0, 7]
+    assert got["capped"] and not got["shut"]  # Bombus would add 24 leaves
+    assert not got["deep"] and got["open"]  # from a genus, expand goes on down
+
+
+# Life > Animalia > Insecta > Hymenoptera (> Apidae > Bombus > a species) and Diptera
+INSECTS = [
+    ["Life", "", 48460, LIFE, -1, 0],  # 0
+    ["Animalia", "", 1, K_, 0, 0],  # 1
+    ["Insecta", "", 47158, 5, 1, 0],  # 2: class
+    ["Hymenoptera", "", 47201, 6, 2, 1],  # 3: order
+    ["Apidae", "", 47221, 7, 3, 1],  # 4: family
+    ["Bombus", "", 52775, G, 4, 0],  # 5
+    ["Bombus vosnesenskii", "", 121519, SP, 5, 3],  # 6
+    ["Diptera", "", 47822, 6, 2, 2],  # 7: order
+]
+INSECT_RANKS = [*RANKS, "class", "order", "family"]
+INSECT_GROUPS = {1: "Animalia", 47158: "Insecta"}
+INSECT_TREE = ", ".join(json.dumps(x) for x in (INSECTS, INSECT_RANKS, INSECT_GROUPS))
+
+
+def test_insects_stop_at_order_and_the_rest_at_family():
+    got = node(
+        f"""
+const I = M.build({INSECT_TREE});
+const S = M.home(I, [1, 2]), home = Array.from(S.open.keys()).sort();
+M.expandBelow(I, S, 3, 400);
+out({{home, below: Array.from(S.open.keys()).sort(), caps: [M.cap(I, 7), M.cap(I, 1), M.cap(D, 1)],
+  order: M.step(M.LEVEL.order), family: M.step(M.LEVEL.family)}});"""
+    )
+    assert got["home"] == [2]  # Life and Animalia merge into Insecta; its orders stay closed
+    assert got["below"] == [2, 3, 4]  # a click on an order still opens it down to species
+    assert got["caps"] == [got["order"], got["family"], got["family"]]
+
+
+def test_sub_clades_take_shades_of_their_group_colour_that_read_on_both_pages():
+    # map_filter.js is a plain script of this repo, not a module: eval loads it
+    filt = ASSET.parents[1] / "map_assets/map_filter.js"
+    got = node(
+        f"""
+eval(require('fs').readFileSync({str(filt)!r}, 'utf8'));
+const I = M.build({INSECT_TREE});
+const two = (c) => M.BG.every((b) => M.contrast(c, b) >= 2);
+const all = Object.values(MapFilter.BY).concat(MapFilter.PAL).filter(two);
+const worst = Math.min(...all.flatMap((c) => M.TONES.flatMap((t) =>
+  M.BG.map((b) => M.contrast(M.shade(c, t), b)))));
+const ins = MapFilter.BY.Insecta, kinds = new Set(M.TONES.map((t) => M.shade(ins, t).join()));
+const tones = [6, 7, 2].map((r) => M.tone(I, r));
+out({{worst, n: all.length, kinds: kinds.size, same: M.shade(ins, 0), tones}});"""
+    )
+    assert got["n"] >= 25 and got["worst"] >= 2
+    assert got["kinds"] >= 4 and got["same"] == [240, 130, 0]
+    assert got["tones"] == [0, 0.45, 0]  # Bombus under Hymenoptera (first), Diptera second
 
 
 def test_hash_round_trips_and_ignores_unknown_ids():
