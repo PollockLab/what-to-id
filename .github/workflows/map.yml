@@ -1,8 +1,11 @@
 name: map
 
-# Refreshes the map of records that need an ID (site/map.html and its pool*.bin files) every morning while
-# the daily study build is off; once DAILY_ENABLED is "true" that build writes the map itself and
-# this job stands down. It keeps its own pool on the map-state release, apart from the study's
+# Refreshes the map of records that need an ID (site/map.html and its pool*.bin files) every morning
+# and is the only workflow that publishes the full site: the landing page of cards (index.html),
+# the map, the photo pages, and the study page. The study page is the committed site/study.html,
+# or, once the repository variable DAILY_ENABLED is "true", the study.html that daily.yml saves
+# on the pool-state release. It runs on its own schedule and again after each successful daily
+# run, so a new study page goes live without waiting. It keeps its own pool on the map-state release, apart from the study's
 # pool-state, so it never changes what the study serves.
 #
 # Each run asks for every BC record iNaturalist updated since the last run, in any quality grade
@@ -36,12 +39,15 @@ name: map
 on:
   schedule:
     - cron: "47 13 * * *" # 30 minutes after the daily study build's slot
+  workflow_run:
+    workflows: [daily]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# Shared with pages.yml and daily.yml so two deploys never race.
+# Shared with pages.yml and daily.yml so the builds and the deploy never race.
 concurrency:
   group: pages
   cancel-in-progress: false
@@ -55,8 +61,9 @@ env:
 jobs:
   refresh:
     if: >-
-      vars.DAILY_ENABLED != 'true' &&
-      (github.event_name == 'workflow_dispatch' || vars.MAP_DAILY_ENABLED == 'true')
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && vars.DAILY_ENABLED == 'true') ||
+      (github.event_name == 'schedule' && vars.MAP_DAILY_ENABLED == 'true')
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
@@ -122,10 +129,16 @@ jobs:
         if: steps.projects.outcome == 'failure'
         run: echo "::warning::project lists did not update; the map uses the last ones, if any"
       - name: Build the site
+        env:
+          DAILY_ENABLED: ${{ vars.DAILY_ENABLED }}
         run: |
           set -euo pipefail
           mkdir -p _site
           cp site/*.html _site/
+          # the daily build's study page replaces the committed one only while the daily build is on
+          if [ "$DAILY_ENABLED" = true ]; then
+            gh release download pool-state -p study.html -D _site --clobber
+          fi
           python -m what_to_id.page_map --pool state/pool.parquet --out _site --totals --freeze "$(date -u +%F)" \
             --tree state/taxonomy.json \
             --projects state/projects.bin
@@ -139,6 +152,15 @@ jobs:
         env:
           ATLAS_HF_REPO: ${{ vars.ATLAS_HF_REPO }}
         run: scripts/atlas_page.sh _site
+      # Last, so its cards list exactly the pages that reached _site.
+      # The committed study page is frozen and carries no date.
+      - name: Write the landing page
+        env:
+          DAILY_ENABLED: ${{ vars.DAILY_ENABLED }}
+        run: |
+          live="split.html search.html"
+          [ "$DAILY_ENABLED" = true ] && live="$live study.html"
+          python -m what_to_id.landing_page --out _site --live $live
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
       - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:

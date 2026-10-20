@@ -32,17 +32,17 @@ def test_the_map_and_photo_space_pages_mark_explore(current):
 
 def test_available_drops_pages_that_were_not_built():
     # without the split page the Explore tab opens the map
-    html = nav("map.html", {"index.html", "map.html"})
+    html = nav("map.html", {"study.html", "map.html"})
     hrefs = [h for h, _ in _links(html)]
-    assert hrefs == ["index.html", "map.html"]
+    assert hrefs == ["map.html", "study.html"]
     assert BLITZ in html
     # the page you are on stays even when the set forgets it
-    assert 'href="search.html" aria-current="page"' in nav("search.html", {"index.html"})
+    assert 'href="search.html" aria-current="page"' in nav("search.html", {"study.html"})
 
 
 def test_unknown_availability_is_probed_by_the_page():
-    assert '"Views" data-probe' in nav("index.html")
-    assert '"Views" data-probe' not in nav("index.html", {"index.html"})
+    assert '"Views" data-probe' in nav("study.html")
+    assert '"Views" data-probe' not in nav("study.html", {"study.html"})
 
 
 def test_external_link_opens_a_new_tab_and_says_so():
@@ -57,9 +57,9 @@ def test_skip_link_keeps_the_hash():
 
 
 def test_base_prefixes_the_links():
-    html = nav("index.html", base="https://x.test/app/")
+    html = nav("study.html", base="https://x.test/app/")
     assert 'href="https://x.test/app/split.html"' in html
-    assert 'href="https://x.test/app/index.html" aria-current="page"' in html
+    assert 'href="https://x.test/app/study.html" aria-current="page"' in html
 
 
 def test_no_forbidden_words():

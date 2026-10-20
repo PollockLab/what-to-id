@@ -1,7 +1,9 @@
 name: pages
 
-# Publishes site/ (a built what-to-id page, copied from out/<build>/site) to GitHub Pages.
-# The build itself runs off-CI because it needs the frozen pool and image embeddings; the
+# Keeps the live site current when site/ changes on main. map.yml is the one workflow that
+# publishes the full site, from site/ (a built what-to-id page, copied from out/<build>/site) plus
+# its own refresh, so a push that changes site/ or a manual run here just starts map.yml. The study
+# build runs off-CI or in daily.yml because it needs the frozen pool and image embeddings; the
 # manifest with the arm map and the seed never enters site/.
 on:
   push:
@@ -17,9 +19,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Changes to the study/map source retain the existing full-map refresh path.
   handoff:
-    if: vars.MAP_DAILY_ENABLED == 'true' && vars.DAILY_ENABLED != 'true'
+    if: github.event_name == 'workflow_dispatch' || vars.MAP_DAILY_ENABLED == 'true'
     runs-on: ubuntu-24.04
     permissions:
       actions: write
@@ -27,39 +28,3 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       - run: gh workflow run map.yml --repo "$GITHUB_REPOSITORY" --ref main
-  deploy:
-    # Once the daily build is on, a push to site/ would overwrite its page until the next
-    # morning, so only a manual run deploys site/.
-    if: >-
-      (vars.DAILY_ENABLED == 'true' && github.event_name == 'workflow_dispatch') ||
-      (vars.DAILY_ENABLED != 'true' && vars.MAP_DAILY_ENABLED != 'true')
-    runs-on: ubuntu-24.04
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Check the site is present and blinded
-        run: |
-          set -euo pipefail
-          test -s site/index.html
-          if find site -type f ! -name '*.html' ! -name 'pool*.bin' ! -name bc-parks.bin | grep -q .; then
-            echo "site/ must hold only HTML pages, the map's pool*.bin files and its bc-parks.bin"
-            find site -type f ! -name '*.html' ! -name 'pool*.bin' ! -name bc-parks.bin; exit 1
-          fi
-          if grep -ril -E 'recency|gap_first|gap first|similarity|novelty|surprise' site; then
-            echo "an arm name leaked into site/"; exit 1
-          fi
-      - name: Include the photo-search page
-        env:
-          ATLAS_HF_REPO: ${{ vars.ATLAS_HF_REPO }}
-        run: scripts/atlas_page.sh site
-      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
-      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
-        with:
-          path: site
-      - id: deployment
-        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4

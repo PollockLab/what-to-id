@@ -188,7 +188,7 @@ def test_offline_daily_four_list_build(embedding_build, webapp_dir, tmp_path):
     assert len(record["arms"]) == 4 and record["design"] == "rotation"
     assert KEY.hex() not in run.stdout + run.stderr
     assert "arm_labels" not in record
-    assert (output / "final/site/index.html").is_file()
+    assert (output / "final/site/study.html").is_file()
 
 
 @pytest.mark.parametrize("field", ["dimensions", "backbone"])

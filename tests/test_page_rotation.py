@@ -244,11 +244,11 @@ def test_render_rotation_index_data_has_every_url_once_in_order():
     assert len(all_urls) == len(set(all_urls))
 
 
-def test_write_rotation_site_writes_only_index(tmp_path):
+def test_write_rotation_site_writes_only_study(tmp_path):
     written = write_rotation_site(tmp_path, _manifest())
     names = sorted(p.name for p in written)
-    assert names == ["index.html"]
-    html = (tmp_path / "index.html").read_text()
+    assert names == ["study.html"]
+    html = (tmp_path / "study.html").read_text()
     _assert_blind(html)
 
 
