@@ -150,7 +150,7 @@ function recount(){
   NODAY=nd;ALT=0;
   if(PJW)for(i=0;i<n;i++)if(PJW[i]&&(gm>>cat[4*i]&1)&(mm>>cat[4*i+ch]&1)&(sm>>(cat[4*i+3]|ST_KEEP)&1)&&
     (day[i]===NO?full():day[i]>=S.lo&&day[i]<=S.hi))ALT++;
-  CUM=new Float64Array(META.days+1);
+  VC=null;CUM=new Float64Array(META.days+1);
   for(var d=0;d<META.days;d++)CUM[d+1]=CUM[d]+PER[d];
   // One picked status filter reads its own totals; two together, a left-out one, an area or a lasso have none
   var on=Object.keys(S.only),
@@ -164,11 +164,25 @@ function recount(){
   render();
 }
 function full(){return S.lo===0&&S.hi===LAST;}
+var VC=null;  // kept records dated in S.lo..S.hi like CUM and inside the viewport; null for the world
+function inView(){
+  var n=P.n,b=map.getBounds(),w=b.getWest(),e=b.getEast(),s=b.getSouth(),t=b.getNorth(),key=[w,e,s,t,S.lo,S.hi,S.up,n].join();
+  if(!n||KEEP.length!==n||e-w>=360)return null;
+  if(VC&&VC.k===key)return VC.c;
+  w=(w+540)%360-180;e=(e+540)%360-180;  // wrap into [-180,180); w>e then means the view crosses the antimeridian
+  var day=S.up?P.up:P.obs,pos=P.pos,all=full(),c=0,i,x,y,d;
+  for(i=0;i<n;i++){
+    if(!KEEP[i])continue;y=pos[2*i+1];if(y<s||y>t)continue;x=pos[2*i];
+    if(w<=e?x<w||x>e:x<w&&x>e)continue;
+    d=day[i];if(d===NO?all:d>=S.lo&&d<=S.hi)c++;}
+  VC={k:key,c:c};return c;}
 function render(){
   // records without a date show only over all dates, as the GPU filter does
   var shown=CUM[S.hi+1]-CUM[S.lo]+(full()?NODAY:0);
+  var iv=P.n&&!AREA.invalid()?inView():null;
   $('count').textContent=AREA.invalid()?'Area unresolved · '+nf.format(shown)+' records available to browse':
-    P.n?nf.format(shown)+' of '+nf.format(META.n)+' records':'Loading';
+    P.n?iv!==null&&iv<shown?nf.format(iv)+' in view of '+nf.format(shown)+' records':
+      nf.format(shown)+' of '+nf.format(META.n)+' records':'Loading';
   var all=P.n&&!$('more').textContent?total(S.lo,S.hi):null;
   $('share').textContent=all&&!AREA.invalid()?nf.format(Math.min(shown,all))+' of '+nf.format(all)+
     ' BC records with photos '+(full()&&!S.months&&allGroups()&&!CH.any(S.only)?
@@ -610,7 +624,7 @@ function view(){if(parent===window)return;var b=map.getBounds(),w=b.getWest(),e=
   w=c(w,180);e=c(e,180);
   parent.postMessage({type:'wtid-view',area:b.getEast()-b.getWest()>=360?'':MapArea.encode([[w,s,e,s,e,n,w,n]])},location.origin);}
 map.once('load',view);
-map.on('moveend',function(){if(THIN){THIN=false;layers();}link();writeHash();view();});
+map.on('moveend',function(){if(THIN){THIN=false;layers();}link();writeHash();view();if(P.n&&CUM)render();});
 map.getContainer().addEventListener('pointerleave',function(){ptip.hidden=true;});
 addEventListener('resize',function(){draw();place();});
 var HINT=$('hint').textContent,HINT_TOT='Top: records still needing an ID per year, on a log scale; the line is the '+

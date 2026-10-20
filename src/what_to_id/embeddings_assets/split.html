@@ -89,9 +89,9 @@ function setView(v){
 function num(n,id){
   try{var m=/^[\d,]+/.exec(frames[n].contentDocument.getElementById(id).textContent);return m?m[0]:'…';}catch(e){return '…';}}
 function count(){
-  var p=[];if(visible('map'))p.push('<b>'+num('map','count')+'</b> on map');
-  var vw=late['wtid-view'];  // the map's view narrows the space, the map's own count stays global
-  if(visible('space'))p.push('<b>'+num('space','count')+'</b> in photo space'+(vw&&vw.area&&visible('map')?', in map view':''));
+  var vw=late['wtid-view'],cut=vw&&vw.area&&visible('map');  // the view narrows both counts
+  var p=[];if(visible('map'))p.push('<b>'+num('map','count')+'</b> on map'+(cut?', in view':''));
+  if(visible('space'))p.push('<b>'+num('space','count')+'</b> in photo space'+(cut?', in map view':''));
   var c=document.getElementById('counts'),h=p.join(' · ');if(c.innerHTML!==h)c.innerHTML=h;}
 setInterval(count,400);
 document.getElementById('xbar').addEventListener('click',function(e){
