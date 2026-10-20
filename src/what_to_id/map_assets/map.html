@@ -36,7 +36,9 @@ fetch('split.html',{method:'HEAD'}).then(function(r){if(r.ok)location.replace('s
 <p class="muted">Pick several to combine. A taxon keeps everything below it, so Bryophyta keeps all mosses.</p>
 </details>
 <details class="sec" id="flagbox" open><summary>Show only <span class="n" id="nonly"></span></summary>
-<div id="flags" class="chips" role="group" aria-label="Show only"></div></details>
+<div id="flags" class="chips" role="group" aria-label="Show only"></div>
+<p class="lbl" id="acclbl">Location accuracy <span class="muted">(pick one)</span></p>
+<div id="acc" class="chips" role="group" aria-labelledby="acclbl"></div></details>
 <details class="sec" id="projbox" hidden></details>
 <details class="sec" id="grpsec"><summary>Groups <span class="n" id="ngroups"></span></summary>
 <div id="groups" class="chips" role="group" aria-label="Taxon groups"></div>

@@ -15,7 +15,6 @@ from what_to_id.page import ARM_WORDS
 from what_to_id.page_map import (
     _ASSETS,
     BYTES_PER_RECORD,
-    IMPRECISE_M,
     MAP_NAME,
     NO_DAY,
     PARKS_NAME,
@@ -78,11 +77,14 @@ def test_encode_round_trips_within_quantization(monkeypatch):
     assert back["taxon_id"].tolist() == want["taxon_id"].tolist()
     assert back["ident_count"].tolist() == np.minimum(want["ident_count"], 15).tolist()
     assert back["agree"].tolist() == want["agree"].tolist()
-    assert meta["flags"] == ["introduced", "threatened", "obscured", "imprecise"]
+    assert meta["flags"] == ["introduced", "threatened", "obscured", "imprecise", "accuracy"]
     assert back["introduced"].tolist() == want["introduced"].tolist()
     assert back["threatened"].tolist() == want["threatened"].fillna(False).tolist()
     assert back["obscured"].tolist() == want["obscured"].tolist()
     assert back["imprecise"].tolist() == (want["pos_acc"].fillna(0) > 1000).tolist()
+    acc = want["pos_acc"].astype(float)
+    cls = np.select([acc.isna(), acc > 1000, acc > 100, acc > 10], [0, 1, 2, 3], 4)
+    assert back["acc_class"].tolist() == cls.tolist() and set(cls) >= {0, 1, 2}
     assert meta["sha256"] and meta["groups"] == sorted(pool["iconic_taxon"].unique())
 
 
@@ -270,7 +272,6 @@ def test_page_passes_the_place_and_url_limit_and_has_the_identify_link():
     html = render_map(meta, freeze=None)
     page_meta = json.loads(re.search(r"var META=(\{.*?\});var BASEMAPS", html).group(1))
     assert page_meta["place_id"] == BC_PLACE_ID and page_meta["max_url"] == MAX_URL_LEN
-    assert page_meta["imprecise_m"] == IMPRECISE_M
     assert f"place_id={BC_PLACE_ID}" in html
     assert 'id="identify"' in html and 'rel="noopener"' in html
     assert "function identifyUrl(" in html
@@ -288,15 +289,28 @@ def test_page_carries_the_update_date_for_the_age_check():
     assert 'id="updated"' not in render_map(meta, freeze=None).split("<script>")[0]
 
 
-def test_location_filter_label_does_not_promise_known_or_exact_accuracy():
+def test_accuracy_class_bits_cover_every_class_and_unknown_is_not_zero_metres():
+    pool = make_pool(7)
+    pool["pos_acc"] = pd.array([None, 5000, 1000, 101, 100, 10, 0], dtype="Int64")
+    blobs, meta = encode_points(pool)
+    assert meta["flags"] == ["imprecise", "accuracy"]
+    back = decode_points(blobs, meta).set_index("id").loc[pool["id"]]
+    assert back["acc_class"].tolist() == [0, 1, 2, 2, 3, 4, 4]
+    assert back["imprecise"].tolist() == [False, True, False, False, False, False, False]
+
+
+def test_page_offers_the_location_accuracy_choices():
     _, meta = encode_points(_with_extras(make_pool(20)))
     html = render_map(meta, freeze=None)
-    assert (
-        "['exact','Accuracy ≤1 km or unknown','obscured',"
-        "'Hide obscured locations and records with reported uncertainty over 1 km. "
-        "Unknown accuracy is retained. Map points use rounded public coordinates']"
-    ) in html
-    assert "Exact location" not in html
+    for label in (
+        "Accuracy unknown",
+        "Accuracy known",
+        "Within 1 km",
+        "Within 100 m",
+        "Within 10 m",
+    ):
+        assert label in html
+    assert 'id="acc"' in html and "Accuracy ≤1 km or unknown" not in html
 
 
 def test_records_before_1900_sit_at_the_floor_and_are_marked():
@@ -364,11 +378,19 @@ def test_fetch_totals_asks_once_per_group_date_and_status_filter():
                 "obs": {"Aves": {"2026-08": 1}, "Unknown": {}},
                 "up": {"Aves": {}, "Unknown": {}},
             },
-            "exact": {"obs": {"Aves": {}, "Unknown": {}}, "up": {"Aves": {}, "Unknown": {}}},
+            **{
+                k: {"obs": {"Aves": {}, "Unknown": {}}, "up": {"Aves": {}, "Unknown": {}}}
+                for k in ("acc_unknown", "acc_known", "acc_1000", "acc_100", "acc_10")
+            },
         },
     }
-    exact = [p for _, p in s.calls if "obscuration" in p]
-    assert exact and exact[0]["obscuration"] == "none" and exact[0]["acc_below_or_unknown"] == 1001
+    below = sorted(p["acc_below"] for _, p in s.calls if "acc_below" in p)
+    assert below == [11] * 4 + [101] * 4 + [1001] * 4
+    assert {p["acc"] for _, p in s.calls if "acc" in p} == {"true", "false"}
+    assert all(
+        p["obscuration"] == "none" for _, p in s.calls if "acc_below" in p or p.get("acc") == "true"
+    )
+    assert not any("acc_below_or_unknown" in p for _, p in s.calls)
 
 
 def test_align_totals_folds_early_months_and_drops_late_ones():

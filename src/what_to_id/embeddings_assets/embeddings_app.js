@@ -75,7 +75,7 @@ function applySel(str){
     var h=location.hash.slice(1).split('&').filter(function(t){return t&&MapFilter.tokens(t)==='';});
     history.replaceState(null,'','#'+h.concat(str?str.split('&'):[]).join('&'));return;}
   var r=MF.read(new URLSearchParams(str));
-  ['up','lo','hi','months','groups','only'].forEach(function(k){S[k]=r[k];});
+  ['up','lo','hi','months','groups','only','acc'].forEach(function(k){S[k]=r[k];});
   S.picks.length=0;r.picks.forEach(function(p){S.picks.push(p);});S.split=[];
   picked();
 }
@@ -107,7 +107,7 @@ function paint(b){
   var j=+b.getAttribute('data-g'),dot=el('i',{});dot.style.background='rgb('+color(j).join(',')+')';
   CH.show(b,gname(j)+' '+nf.format(S.count[j]),S.groups[S.META.groups[j]]||'');b.insertBefore(dot,b.firstChild);
 }
-function baseKey(){return [S.lo,S.hi,S.up,S.months,JSON.stringify(S.only),S.area,S.view,S.lassoV].join('|');}
+function baseKey(){return [S.lo,S.hi,S.up,S.months,JSON.stringify(S.only),S.acc,S.area,S.view,S.lassoV].join('|');}
 function applyBase(){
   var P=S.P,key=baseKey();
   if(S.baseKey===key&&S.base&&S.base.length===P.n)return;
@@ -158,7 +158,8 @@ var PK=null,BAR=null;
 function alabel(){return parent!==window?'Map area':'Drawn area';}
 function items(){
   var L=MF.LAST,out=CH.items({S:S,meta:S.META,terms:TX.terms({T:S.TAXA,picks:S.picks,groups:[],meta:S.META,n:0,split:S.split}),
-    picker:PK,pj:{items:function(){return [];}},months:MF.MONTH,only:MF.ONLYDEF,two:['exact'],
+    picker:PK,pj:{items:function(){return [];}},months:MF.MONTH,only:MF.ONLYDEF,
+    acc:{label:(MF.ACCDEF.filter(function(a){return a[0]===S.acc;})[0]||[])[1]||'',clear:function(){S.acc='';}},
     area:{term:function(){return S.area?{label:alabel()}:null;},clear:parent===window&&function(){S.area='';picked();}},redraw:picked});
   if(S.lo>0||S.hi<L)out.push({label:(S.up?'Uploaded ':'Observed ')+(S.lo>0?MF.iso(S.lo):'start')+' to '+(S.hi<L?MF.iso(S.hi):'now'),
     remove:function(){S.lo=0;S.hi=L;S.up=false;picked();}});
@@ -172,7 +173,7 @@ function items(){
       remove:function(){S.extra=S.extra.filter(function(x){return x!==t;});picked();}});});
   return out;
 }
-function clearAll(){S.groups={};S.only={};S.months=0;S.lo=0;S.hi=MF.LAST;S.up=false;S.area='';S.extra=[];
+function clearAll(){S.groups={};S.only={};S.acc='';S.months=0;S.lo=0;S.hi=MF.LAST;S.up=false;S.area='';S.extra=[];
   S.picks.length=0;S.split=[];$('q').value='';if(S.ring)lasso(null);else picked();}
 // The box [x0,y0,x1,y1] between the t and 1-t quantiles of the points, so a few stray points do not flatten the view.
 function span(xs,ys,t){
