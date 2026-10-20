@@ -11,7 +11,7 @@ var MAP=new URL(CFG.mapUrl,location.href).href;
 // One colour per life group, in the order of the map's groups: 16 distinct hues, each at least 2:1 against
 // both the light and the dark page. The map draws no per-group colour, so this is the only palette.
 var PAL=[[0,114,178],[213,94,0],[0,158,115],[190,160,0],[204,121,167],[86,180,233],[230,70,70],[120,60,170],[110,110,110],[160,60,40],[150,130,200],[40,120,60],[140,200,50],[70,90,220],[255,140,100],[0,190,190]];
-var S={idx:null,P:null,META:null,TAXA:null,groups:{},picks:[],split:[],extra:[],keep:null,sel:-1,nbr:[],thin:false,cache:new Map(),run:0,deck:null,vs:null,PD:null};
+var S={idx:null,P:null,META:null,TAXA:null,groups:{},picks:[],split:[],extra:[],keep:null,sel:-1,nbr:[],thin:false,cache:new Map(),run:0,deck:null,vs:null,PD:null,ring:null,lasso:null,lassoV:0};
 
 var MF=null,TF=null,TR=null,PASS=['park','bcpark','projects'],MAPONLY={park:'Park',bcpark:'BC park',projects:'Projects'},AI=null,
   AREA_IN=null;
@@ -97,8 +97,8 @@ function paint(b){
   var j=+b.getAttribute('data-g'),dot=el('i',{});dot.style.background='rgb('+color(j).join(',')+')';
   CH.show(b,gname(j)+' '+nf.format(S.count[j]),S.groups[S.META.groups[j]]||'');b.insertBefore(dot,b.firstChild);
 }
-// The points the dates, months, show only chips and the area leave in, apart from the taxa and groups; null
-// when none is set. An area that does not read is left to the map and shows as map only.
+// The points the dates, months, show only chips, the area and the lasso leave in, apart from the taxa and
+// groups; null when none is set. An area that does not read is left to the map and shows as map only.
 function areaIndex(){
   if(!S.area)return null;
   if(!AI||AI.key!==S.area){
@@ -107,7 +107,7 @@ function areaIndex(){
   }
   return AI.I;
 }
-function baseKey(){return [S.lo,S.hi,S.up,S.months,JSON.stringify(S.only),S.area].join('|');}
+function baseKey(){return [S.lo,S.hi,S.up,S.months,JSON.stringify(S.only),S.area,S.lassoV].join('|');}
 function applyBase(){
   var P=S.P,key=baseKey();
   if(S.baseKey===key&&S.base&&S.base.length===P.n)return;
@@ -116,6 +116,7 @@ function applyBase(){
     MF.rest(S,P.obs,P.up,P.flags,P.n,S.base);
     var I=areaIndex();
     if(I)for(var i=0;i<P.n;i++)if(S.base[i]&&!MapArea.inside(I,P.lonlat[2*i],P.lonlat[2*i+1]))S.base[i]=0;
+    if(S.lasso&&S.lasso.length===P.n)for(var k=0;k<P.n;k++)S.base[k]&=S.lasso[k];
   }
   var count=S.count=new Array(S.META?S.META.groups.length:0).fill(0);
   if(P.grp)for(var j=0;j<P.n;j++)if(S.base[j])count[P.grp[j]]++;
@@ -158,13 +159,39 @@ function items(){
   if(S.lo>0||S.hi<L)out.push({label:(S.up?'Uploaded ':'Observed ')+(S.lo>0?MF.iso(S.lo):'start')+' to '+(S.hi<L?MF.iso(S.hi):'now'),
     remove:function(){S.lo=0;S.hi=L;S.up=false;picked();}});
   if(S.area&&!areaIndex())out.forEach(function(t){if(t.label===alabel())t.tag='map only';});
+  if(S.ring)out.push({label:'Lasso',remove:function(){lasso(null);}});
   S.extra.forEach(function(t){var k=t.split('=')[0];
     out.push({label:MAPONLY[k]+': '+decodeURIComponent(t.slice(k.length+1)).replace(/,/g,', '),tag:'map only',
       remove:function(){S.extra=S.extra.filter(function(x){return x!==t;});picked();}});});
   return out;
 }
 function clearAll(){S.groups={};S.only={};S.months=0;S.lo=0;S.hi=MF.LAST;S.up=false;S.area='';S.extra=[];
-  S.picks.length=0;S.split=[];$('q').value='';picked();}
+  S.picks.length=0;S.split=[];$('q').value='';if(S.ring)lasso(null);else picked();}
+// The lasso: a closed ring in layout coordinates, or null. Only the points inside it stay, and their ids go
+// to the map, which keeps the same records.
+function lasso(ring){
+  var P=S.P,m=null,ids=null,i,k=0;
+  S.ring=ring&&ring.concat(ring.slice(0,2));
+  if(ring){var I=MapArea.index([ring]);m=new Uint8Array(P.n);
+    for(i=0;i<P.n;i++)if(MapArea.inside(I,P.pos[2*i],P.pos[2*i+1])){m[i]=1;k++;}
+    ids=new Uint32Array(k);k=0;for(i=0;i<P.n;i++)if(m[i])ids[k++]=P.id[i];}
+  S.lasso=m;S.lassoV++;$('lclear').hidden=!ring;picked();
+  if(parent!==window)parent.postMessage({type:'wtid-keep',ids:ids},location.origin);
+}
+$('lclear').addEventListener('click',function(){lasso(null);});
+// Shift+drag draws one. The pointer is caught before deck.gl's controller sees it, so the view stays put.
+function lassoDrag(box){
+  var draw=null;
+  function at(e){var r=box.getBoundingClientRect(),p=S.deck.getViewports()[0].unproject([e.clientX-r.left,e.clientY-r.top]);
+    return [p[0],p[1]];}
+  box.addEventListener('pointerdown',function(e){
+    if(!e.shiftKey||e.button!==0||!S.P||!S.P.grp)return;
+    e.stopPropagation();e.preventDefault();box.setPointerCapture(e.pointerId);draw=S.ring=at(e);layers();
+  },true);
+  box.addEventListener('pointermove',function(e){if(draw){draw.push.apply(draw,at(e));layers();}});
+  ['pointerup','pointercancel'].forEach(function(t){box.addEventListener(t,function(){
+    if(!draw)return;var r=draw;draw=null;lasso(r.length>=6?r:null);});});
+}
 // Zooms to the 1st-99th percentile box of the points that pass, so a few stray points do not flatten it.
 function fit(){
   var P=S.P,ok=passing(),xs=[],ys=[],box=$('plot');
@@ -241,6 +268,8 @@ function layers(){
   }
   if(S.nbr.length)lyr.push(ring('nbr',S.nbr,6,[230,110,30],2));
   if(S.sel>=0)lyr.push(ring('sel',[S.sel],9,[29,29,27],2.5));
+  if(S.ring)lyr.push(new deck.PathLayer({id:'lasso',data:[S.ring],getPath:function(r){return r;},positionFormat:'XY',
+    widthUnits:'pixels',getWidth:1.5,getColor:[29,29,27,200]}));
   S.deck.setProps({layers:lyr});
 }
 
@@ -270,7 +299,7 @@ addEventListener('message',function(e){
   if(i===S.sel||(id!=null&&i<0))return;
   remote=true;try{if(i<0)closeCard();else select(i,true);}finally{remote=false;}
 });
-addEventListener('keydown',function(e){if(e.key==='Escape'&&!$('card').hidden)closeCard();});
+addEventListener('keydown',function(e){if(e.key!=='Escape')return;if(!$('card').hidden)closeCard();else if(S.ring)lasso(null);});
 // The card's left edge: drag it, or use the arrow keys; a double click goes back to the default. The width is remembered.
 function cardWidth(w){
   var c=$('card');if(w==null){c.style.width='';localStorage.removeItem('wtid-card');return;}
@@ -420,6 +449,7 @@ function start(bbox){
     },
     onHover:tip,onClick:pick,layers:[]});
   box.addEventListener('pointerleave',function(){ptip.hidden=true;});
+  lassoDrag(box);
 }
 load().catch(function(e){
   $('count').textContent='Could not load the photo space';status(e.message);

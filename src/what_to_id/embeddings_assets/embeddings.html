@@ -18,6 +18,8 @@ body{display:grid;grid-template-columns:260px minmax(0,1fr);grid-template-rows:a
 .embed header{display:none}
 .info{display:none;position:absolute;z-index:7;top:8px;right:8px;width:28px;height:28px;padding:0;border-radius:50%;font:italic 700 14px Georgia,serif}
 .embed .info{display:block}
+#lclear{display:none;position:absolute;z-index:7;top:8px;right:44px}
+.embed #lclear:not([hidden]){display:block}
 .embed.about header{display:block;position:absolute;z-index:6;top:44px;right:8px;width:min(380px,calc(100% - 16px));padding:0;border:0}
 .embed.about header h1,.embed.about header .sub{display:none}
 .embed.about .note{margin:0;background:var(--panel);color:var(--muted);border:1px solid var(--line);box-shadow:var(--shadow)}
@@ -87,7 +89,7 @@ button[hidden]{display:none}
 <body>
 __SITE_NAV__<header>
 <h1>Photo space</h1>
-<p class="sub" id="intro">Every observation that still needs an ID, placed so that photos the model finds alike sit near each other. Hover a dot for its name, click it for the photo and its closest matches.</p>
+<p class="sub" id="intro">Every observation that still needs an ID, placed so that photos the model finds alike sit near each other. Hover a dot for its name, click it for the photo and its closest matches. Shift+drag to keep only the dots inside a lasso.</p>
 <p class="note" id="honest">This flat picture is a lossy squeeze of a much richer image space, so some points that look close are not, and some close photos land apart. <span id="fid"></span> Nearness is not identification confidence: it says two photos look alike to the model, not what either one is. The matches in the card are computed in the full space, not read off this plot.</p>
 </header>
 <section class="side" aria-label="Filters">
@@ -105,6 +107,7 @@ __SITE_NAV__<header>
 <p class="muted"><button type="button" class="link" id="gall">All groups</button> <button type="button" class="link" id="gfit" hidden>Fit to selection</button></p></div>
 </section>
 <main id="plot" role="application" aria-label="Photo space of observations"></main>
+<button type="button" id="lclear" hidden>Clear lasso</button>
 <button type="button" class="info" id="info" aria-expanded="false" aria-controls="honest" aria-label="About this picture">i</button>
 <aside id="card" class="card" hidden aria-label="Selected observation"></aside>
 <script>var EMBEDDINGS_CONFIG=__EMBEDDINGS_CONFIG__;</script>

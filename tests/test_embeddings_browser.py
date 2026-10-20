@@ -27,9 +27,11 @@ POOL_N = 2100  # the pool lacks the last 100 indexed observations, as if they ha
 DECK_STUB = """
 window.deck = {
   Deck: class { constructor(p) { this.props = p; window.__deck = this; }
-    setProps(p) { Object.assign(this.props, p); } },
+    setProps(p) { Object.assign(this.props, p); }
+    getViewports() { return [{ unproject: (p) => p }]; } },
   OrthographicView: class { constructor(p) { this.props = p; } },
   ScatterplotLayer: class { constructor(p) { this.props = p; this.id = p.id; } },
+  PathLayer: class { constructor(p) { this.props = p; this.id = p.id; } },
   DataFilterExtension: class { initializeState() {} },
 };"""
 

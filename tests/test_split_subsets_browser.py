@@ -76,3 +76,44 @@ def test_an_area_sent_before_the_frame_loads_still_arrives(browser, site):
     assert 0 < shown(right) < POOL_N
     assert page.errors == []
     page.close()
+
+
+LASSO = [(10, 10), (50, 10), (50, 30), (10, 30)]  # plot pixels; the deck stub unprojects 1:1
+INSIDE = """() => {
+  const l = __deck.props.layers.find(x => x.id === 'pts'), a = l.props.data.attributes,
+    pos = a.getPosition.value, c = a.getFilterCategory.value;
+  let inside = 0, bad = 0;
+  for (let i = 0; i < l.props.data.length; i++) {
+    const ok = pos[2*i] > 10 && pos[2*i] < 50 && pos[2*i+1] > 10 && pos[2*i+1] < 30;
+    inside += ok; if (ok !== !!c[3*i+2]) bad++; }
+  return {inside, bad, ring: !!__deck.props.layers.find(x => x.id === 'lasso')}; }"""
+
+
+def test_a_shift_drag_lasso_keeps_the_dots_inside_and_sends_their_ids_to_the_map(split):
+    page, (left, right) = split
+    page.evaluate(
+        "window.__keep = []; addEventListener('message', e => { if (e.data && e.data.type ==="
+        " 'wtid-keep') __keep.push(e.data.ids && Array.from(e.data.ids)); })"
+    )
+    box = left.locator("#plot").bounding_box()
+    page.keyboard.down("Shift")
+    page.mouse.move(box["x"] + LASSO[0][0], box["y"] + LASSO[0][1])
+    page.mouse.down()
+    for x, y in LASSO[1:]:
+        page.mouse.move(box["x"] + x, box["y"] + y)
+    page.mouse.up()
+    page.keyboard.up("Shift")
+    page.wait_for_function("__keep.length === 1")
+    got = left.evaluate(INSIDE)
+    assert got["bad"] == 0 and got["ring"] and 0 < got["inside"] < POOL_N
+    assert shown(left) == got["inside"] == len(page.evaluate("__keep[0]"))
+    assert shown(right) == POOL_N  # a photo space ignores the ids; only the map applies them
+    chips = "[...document.querySelectorAll('#selbar li')].map(l => l.textContent)"
+    assert left.evaluate(chips) == ["Lasso×"]
+    assert left.locator("#lclear").is_visible()
+    left.click("#lclear")
+    page.wait_for_function("__keep.length === 2")
+    assert page.evaluate("__keep[1]") is None
+    assert shown(left) == POOL_N and not left.evaluate(INSIDE)["ring"]
+    assert left.locator("#lclear").is_hidden()
+    assert page.errors == []
