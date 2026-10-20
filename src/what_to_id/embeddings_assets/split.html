@@ -111,7 +111,7 @@ addEventListener('message',function(e){
 });
 // A picked record and its closest matches are mirrored by id in the other frame, as are the map's area and
 // the photo space's lasso; the last of each (late) also goes to a frame that shows up later.
-var rec=null,late={},RELAY=['wtid-record','wtid-matches','wtid-focus','wtid-area','wtid-keep'];
+var rec=null,late={},RELAY=['wtid-record','wtid-matches','wtid-focus','wtid-area','wtid-view','wtid-keep'];
 addEventListener('message',function(e){
   var n=Object.keys(frames).filter(function(k){return frames[k].contentWindow===e.source;})[0],d=e.data;
   if(!n||e.origin!==location.origin||!d||RELAY.indexOf(d.type)<0)return;

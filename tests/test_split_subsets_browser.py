@@ -51,6 +51,44 @@ def test_the_maps_area_subsets_the_photo_space_which_cannot_clear_it(split, open
     assert page.errors == []
 
 
+def test_the_maps_view_subsets_the_photo_space_which_cannot_clear_it(split, open_page):
+    page, (left, right) = split
+    h = left.evaluate(f"MapArea.encode({RING})")
+    west = open_page(f"#area={h}")
+    ready(west)
+    left.evaluate("h => parent.postMessage({type: 'wtid-view', area: h}, location.origin)", h)
+    right.wait_for_function(
+        f"!document.getElementById('count').textContent.startsWith('{POOL_N:,}')"
+    )
+    assert shown(right) == shown(west) < POOL_N
+    chip = right.locator("#selbar li", has_text="Map view")
+    assert chip.count() == 1 and chip.locator("button.x").count() == 0
+    left.evaluate("parent.postMessage({type: 'wtid-view', area: ''}, location.origin)")
+    right.wait_for_function(
+        f"document.getElementById('count').textContent.startsWith('{POOL_N:,}')"
+    )
+    assert right.locator("#selbar li").count() == 0
+    assert page.errors == []
+
+
+def test_the_maps_view_and_area_intersect(split, open_page):
+    page, (left, right) = split
+    small = "[[-123.4,48.5,-123.1,48.5,-123.1,49.5,-123.4,49.5]]"
+    h, v = left.evaluate(f"[MapArea.encode({RING}), MapArea.encode({small})]")
+    west = open_page(f"#area={v}")
+    ready(west)
+    left.evaluate(
+        "([h, v]) => {parent.postMessage({type: 'wtid-area', area: h}, location.origin);"
+        "parent.postMessage({type: 'wtid-view', area: v}, location.origin);}",
+        [h, v],
+    )
+    right.wait_for_function(
+        f"!document.getElementById('count').textContent.startsWith('{POOL_N:,}')"
+    )
+    assert shown(right) == shown(west) < POOL_N
+    assert page.errors == []
+
+
 def test_an_area_sent_before_the_frame_loads_still_arrives(browser, site):
     base, *_ = site
     page = browser.new_page(viewport={"width": 1280, "height": 900})

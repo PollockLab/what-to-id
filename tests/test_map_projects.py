@@ -447,3 +447,28 @@ console.log(JSON.stringify(out));
         {"out": [0, 1, 1, 0], "keep": [1, 0, 0, 1]},
         {"out": [0, 0, 0, 0], "keep": [1, 1, 1, 1]},
     ]
+
+
+@needs_node
+def test_map_posts_its_viewport_as_a_clamped_ring_and_nothing_for_the_world():
+    """map.js's view(): the bounds go to the parent as one encoded ring, lat clamped to 85,
+    and a view 360 degrees wide or more posts '' (no mask)."""
+    source = (ASSETS / "map.js").read_text()
+    start = source.index("function view()")
+    body = source[start : source.index("map.once('load',view)", start)]
+    area = (ASSETS / "map_area.js").read_text()
+    enc = area[area.index("var Q=1e4") : area.index("function decode(")]
+    harness = (
+        "const window={},location={origin:'o'},sent=[],IdentifyLinks={BATCH:1};"
+        "const parent={postMessage:(m,o)=>sent.push([m.type,m.area,o])};"
+        "let B;const map={getBounds:()=>({getWest:()=>B[0],getSouth:()=>B[1],"
+        "getEast:()=>B[2],getNorth:()=>B[3]})};"
+        "const MapArea=(function(){" + enc + "return {encode};})();"
+    )
+    tail = """
+B=[-124,48,-122,50];view();B=[-190,-90,-170,90];view();B=[-180,-90,180,90];view();
+console.log(JSON.stringify([sent, MapArea.encode([[-124,48,-122,48,-122,50,-124,50]]),
+  MapArea.encode([[-180,-85,-170,-85,-170,85,-180,85]])]));
+"""
+    sent, plain, clamped = _node(harness + body + tail)
+    assert sent == [["wtid-view", plain, "o"], ["wtid-view", clamped, "o"], ["wtid-view", "", "o"]]

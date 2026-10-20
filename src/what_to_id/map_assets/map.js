@@ -589,7 +589,13 @@ function stopInvalidIdentify(e){if(AREA.invalid()){e.preventDefault();e.stopImme
 var THIN=false,THIN_BELOW=8;
 map.on('move',function(){if(!THIN&&map.getZoom()<THIN_BELOW){THIN=true;layers();}});
 map.on('move',place);
-map.on('moveend',function(){if(THIN){THIN=false;layers();}link();writeHash();});
+// The viewport masks the photo space beside the map; a view of the whole world masks nothing.
+function view(){if(parent===window)return;var b=map.getBounds(),w=b.getWest(),e=b.getEast(),
+  c=function(v,m){return Math.max(-m,Math.min(m,v));},s=c(b.getSouth(),85),n=c(b.getNorth(),85);
+  w=c(w,180);e=c(e,180);
+  parent.postMessage({type:'wtid-view',area:b.getEast()-b.getWest()>=360?'':MapArea.encode([[w,s,e,s,e,n,w,n]])},location.origin);}
+map.once('load',view);
+map.on('moveend',function(){if(THIN){THIN=false;layers();}link();writeHash();view();});
 map.getContainer().addEventListener('pointerleave',function(){ptip.hidden=true;});
 addEventListener('resize',function(){draw();place();});
 var HINT=$('hint').textContent,HINT_TOT='Top: records still needing an ID per year, on a log scale; the line is the '+

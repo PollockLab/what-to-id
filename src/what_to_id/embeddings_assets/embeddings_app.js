@@ -13,8 +13,8 @@ var MAP=new URL(CFG.mapUrl,location.href).href;
 var PAL=[[0,114,178],[213,94,0],[0,158,115],[190,160,0],[204,121,167],[86,180,233],[230,70,70],[120,60,170],[110,110,110],[160,60,40],[150,130,200],[40,120,60],[140,200,50],[70,90,220],[255,140,100],[0,190,190]];
 var S={idx:null,P:null,META:null,TAXA:null,groups:{},picks:[],split:[],extra:[],keep:null,sel:-1,nbr:[],thin:false,cache:new Map(),run:0,deck:null,vs:null,PD:null,ring:null,lasso:null,lassoV:0};
 
-var MF=null,TF=null,TR=null,PASS=['park','bcpark','projects'],MAPONLY={park:'Park',bcpark:'BC park',projects:'Projects'},AI=null,
-  AREA_IN=null;
+var MF=null,TF=null,TR=null,PASS=['park','bcpark','projects'],MAPONLY={park:'Park',bcpark:'BC park',projects:'Projects'},AI=null,VI=null,
+  AREA_IN=null,VIEW_IN=null;
 function $(id){return document.getElementById(id);}
 function el(tag,attrs,kids){
   var e=document.createElement(tag);
@@ -90,6 +90,11 @@ addEventListener('message',function(e){
   if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-area'||typeof e.data.area!=='string')return;
   AREA_IN=e.data.area;if(S.P&&S.P.grp){S.area=AREA_IN;picked();}
 });
+// The map's viewport arrives the same way and masks the same way, but is only the map's to change.
+addEventListener('message',function(e){
+  if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-view'||typeof e.data.area!=='string')return;
+  VIEW_IN=e.data.area;if(S.P&&S.P.grp){S.view=VIEW_IN;picked();}
+});
 $('info').addEventListener('click',function(){
   $('info').setAttribute('aria-expanded',document.documentElement.classList.toggle('about'));});
 // CH.show rewrites the label, so the colour dot goes back in after it.
@@ -107,7 +112,15 @@ function areaIndex(){
   }
   return AI.I;
 }
-function baseKey(){return [S.lo,S.hi,S.up,S.months,JSON.stringify(S.only),S.area,S.lassoV].join('|');}
+function viewIndex(){
+  if(!S.view)return null;
+  if(!VI||VI.key!==S.view){
+    VI={key:S.view,I:null};
+    try{var r=MapArea.decode(S.view);if(r.length)VI.I=MapArea.index(r);}catch(e){}
+  }
+  return VI.I;
+}
+function baseKey(){return [S.lo,S.hi,S.up,S.months,JSON.stringify(S.only),S.area,S.view,S.lassoV].join('|');}
 function applyBase(){
   var P=S.P,key=baseKey();
   if(S.baseKey===key&&S.base&&S.base.length===P.n)return;
@@ -116,6 +129,8 @@ function applyBase(){
     MF.rest(S,P.obs,P.up,P.flags,P.n,S.base);
     var I=areaIndex();
     if(I)for(var i=0;i<P.n;i++)if(S.base[i]&&!MapArea.inside(I,P.lonlat[2*i],P.lonlat[2*i+1]))S.base[i]=0;
+    var V=viewIndex();
+    if(V)for(var v=0;v<P.n;v++)if(S.base[v]&&!MapArea.inside(V,P.lonlat[2*v],P.lonlat[2*v+1]))S.base[v]=0;
     if(S.lasso&&S.lasso.length===P.n)for(var k=0;k<P.n;k++)S.base[k]&=S.lasso[k];
   }
   var count=S.count=new Array(S.META?S.META.groups.length:0).fill(0);
@@ -159,6 +174,7 @@ function items(){
   if(S.lo>0||S.hi<L)out.push({label:(S.up?'Uploaded ':'Observed ')+(S.lo>0?MF.iso(S.lo):'start')+' to '+(S.hi<L?MF.iso(S.hi):'now'),
     remove:function(){S.lo=0;S.hi=L;S.up=false;picked();}});
   if(S.area&&!areaIndex())out.forEach(function(t){if(t.label===alabel())t.tag='map only';});
+  if(S.view)out.push({label:'Map view',tag:viewIndex()?undefined:'map only'});
   if(S.ring)out.push({label:'Lasso',remove:function(){lasso(null);}});
   S.extra.forEach(function(t){var k=t.split('=')[0];
     out.push({label:MAPONLY[k]+': '+decodeURIComponent(t.slice(k.length+1)).replace(/,/g,', '),tag:'map only',
@@ -211,6 +227,7 @@ function chips(){
   MF=MF||MapFilter(S.META);
   Object.assign(S,MF.read(new URLSearchParams(location.hash.slice(1))));
   if(AREA_IN!==null)S.area=AREA_IN;
+  if(VIEW_IN!==null)S.view=VIEW_IN;
   S.extra=location.hash.slice(1).split('&').filter(function(t){return PASS.indexOf(t.split('=')[0])>=0;});
   TF=TX.filter(S.TAXA,S.picks);S.baseKey=null;applyBase();
   TR=S.TAXA&&TT.make({T:S.TAXA,tax:S.P.tax,grp:S.P.grp,n:S.P.n,groups:S.META.groups.length,ranks:S.META.ranks,
