@@ -218,7 +218,7 @@ function MapArea(ctx){
     if(status)status+='Identify is unavailable until every selected area is restored or explicitly removed. ';
     if(unresolved()){BOX=null;abox.removeAttribute('href');}
     var own=AREAS.filter(function(a){return a.key&&!a.place&&a.idx;}),
-      t=mode?(pts.length<3?'Click or tap the map to add corners.':'Double-click, tap the first corner '+
+      t=mode?(pts.length<3?'Click or tap to add corners, or drag to draw the area freehand.':'Double-click, tap the first corner '+
       'or press Finish to close the area.')+' Esc cancels.':(NOTE+' '+status+(own.length?'iNaturalist has no place for '+
       names(own)+', so the map uses '+(own.length>1?'their BC Parks boundaries. ':'its BC Parks boundary. '):'')+LINK).trim();
     note.textContent=t;note.hidden=!t;abox.hidden=mode||!BOX;
@@ -264,9 +264,9 @@ function MapArea(ctx){
     if(!r.length)throw new Error('The area has no ring with three distinct corners.');
     return {rings:r,msg:raw>MAXV?'Simplified from '+nf.format(raw)+' to '+nf.format(n)+' corners. ':''};
   }
-  function start(){mode=true;pts=[];cursor=null;map.doubleClickZoom.disable();
+  function start(){mode=true;pts=[];cursor=null;map.doubleClickZoom.disable();map.dragPan.disable();
     map.getCanvas().style.cursor='crosshair';paint();ui();}
-  function stop(){mode=false;ended=performance.now();pts=[];cursor=null;map.doubleClickZoom.enable();
+  function stop(){mode=false;ended=performance.now();pts=[];cursor=null;drag=null;map.doubleClickZoom.enable();map.dragPan.enable();
     map.getCanvas().style.cursor='';paint();ui();}
   function finish(){if(pts.length<3)return;
     var r=[];pts.forEach(function(p){r.push(p[0],p[1]);});stop();
@@ -277,7 +277,17 @@ function MapArea(ctx){
     if(pts.length&&near(pts[pts.length-1],e.point,6))return;
     pts.push([e.lngLat.lng,e.lngLat.lat]);paint();ui();});
   map.on('dblclick',function(e){if(mode){e.preventDefault();finish();}});
-  map.on('mousemove',function(e){if(mode&&pts.length){cursor=[e.lngLat.lng,e.lngLat.lat];paint();}});
+  map.on('mousemove',function(e){if(mode&&pts.length&&!(drag&&drag.on)){cursor=[e.lngLat.lng,e.lngLat.lat];paint();}});
+  // A drag draws freehand, as the photo space's lasso does: started with no corners it closes the area on
+  // release, after corners it adds to them. A press that moves under 4px stays a click.
+  var drag=null;
+  function down(e){if(mode&&!(e.points&&e.points.length>1))drag={on:false,at:e.point,ll:[e.lngLat.lng,e.lngLat.lat],fresh:!pts.length};}
+  function move(e){if(!drag||(e.points&&e.points.length>1))return;
+    if(!drag.on){if(Math.hypot(e.point.x-drag.at.x,e.point.y-drag.at.y)<4)return;drag.on=true;cursor=null;pts.push(drag.ll);}
+    if(!near(pts[pts.length-1],e.point,3)){pts.push([e.lngLat.lng,e.lngLat.lat]);paint();}}
+  function up(){var d=drag;drag=null;if(d&&d.on){if(d.fresh)finish();else ui();}}
+  map.on('mousedown',down);map.on('touchstart',down);map.on('mousemove',move);map.on('touchmove',move);
+  map.on('touchend',up);addEventListener('mouseup',up);
   addEventListener('keydown',function(e){if(e.key==='Escape'&&mode)stop();});
   el('draw').onclick=start;el('cancel').onclick=stop;el('finish').onclick=finish;
   el('clear').onclick=function(){set(null);};

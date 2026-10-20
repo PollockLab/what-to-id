@@ -68,20 +68,24 @@ function send(force){
 function moved(){clearTimeout(T);T=setTimeout(send,250);}
 $('lclear').addEventListener('click',function(){lasso(null);});
 // The Draw button arms one lasso for pointers without a shift key (touch); it turns itself off after that drag.
-function draw(on){DRAW=on;$('ldraw').setAttribute('aria-pressed',String(on));$('plot').classList.toggle('draw',on);}
+var HINT='Drag around the photos to keep. Esc cancels.';
+function draw(on){DRAW=on;$('ldraw').setAttribute('aria-pressed',String(on));$('plot').classList.toggle('draw',on);
+  if(on)$('status').textContent=HINT;else if($('status').textContent===HINT)$('status').textContent='';}
 $('ldraw').addEventListener('click',function(){draw(!DRAW);});
 // Shift+drag, or a drag while Draw is on, draws one. The pointer is caught before deck.gl's controller sees it, so the view stays put.
+// A drag too short to enclose anything, or Esc while drawing, leaves the lasso there was.
+var cur=null,prev=null;
+function cancel(){if(cur){cur=null;S.ring=prev;layers();}}
 function lassoDrag(box){
-  var cur=null;
   function at(e){var r=box.getBoundingClientRect(),p=S.deck.getViewports()[0].unproject([e.clientX-r.left,e.clientY-r.top]);
     return [p[0],p[1]];}
   box.addEventListener('pointerdown',function(e){
     if(!(e.shiftKey||DRAW)||e.button!==0||!S.P||!S.P.grp)return;
-    e.stopPropagation();e.preventDefault();box.setPointerCapture(e.pointerId);cur=S.ring=at(e);layers();
+    e.stopPropagation();e.preventDefault();box.setPointerCapture(e.pointerId);prev=S.ring;cur=S.ring=at(e);layers();
   },true);
   box.addEventListener('pointermove',function(e){if(cur){cur.push.apply(cur,at(e));layers();}});
   ['pointerup','pointercancel'].forEach(function(t){box.addEventListener(t,function(){
-    if(!cur)return;var r=cur;cur=null;draw(false);lasso(r.length>=6?r:null);});});
+    if(!cur)return;var r=cur;cur=null;draw(false);if(r.length>=6)lasso(r);else{S.ring=prev;layers();}});});
 }
-return {moved:moved,areaIndex:areaIndex,viewBox:viewBox,areaMask:areaMask,lasso:lasso,lassoDrag:lassoDrag,draw:draw};
+return {cancel:cancel,moved:moved,areaIndex:areaIndex,viewBox:viewBox,areaMask:areaMask,lasso:lasso,lassoDrag:lassoDrag,draw:draw};
 }
