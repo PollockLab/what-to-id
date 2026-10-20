@@ -89,6 +89,72 @@ def test_the_maps_view_and_area_intersect(split, open_page):
     assert page.errors == []
 
 
+def _view(left, area):
+    left.evaluate("a => parent.postMessage({type: 'wtid-view', area: a}, location.origin)", area)
+
+
+def test_the_view_chip_and_bar_wording_follow_a_visible_map(split):
+    page, (left, right) = split
+    _view(left, left.evaluate(f"MapArea.encode({RING})"))
+    right.wait_for_function(
+        f"!document.getElementById('count').textContent.startsWith('{POOL_N:,}')"
+    )
+    page.wait_for_function(
+        "document.getElementById('counts').textContent.includes('in photo space, in map view')"
+    )
+    page.click("[data-v='space']")  # the hidden map's view masks nothing
+    right.wait_for_function(
+        f"document.getElementById('count').textContent.startsWith('{POOL_N:,}')"
+    )
+    assert right.locator("#selbar li").count() == 0
+    assert "map view" not in page.inner_text("#counts")
+    page.click("[data-v='side']")
+    right.wait_for_function("document.querySelectorAll('#selbar li').length === 1")
+    assert right.locator("#selbar li", has_text="Map view").count() == 1
+    page.wait_for_function("document.getElementById('counts').textContent.includes('in map view')")
+    assert page.errors == []
+
+
+def test_a_view_holding_all_the_data_masks_nothing_and_has_no_chip(split):
+    page, (left, right) = split
+    _view(left, left.evaluate("MapArea.encode([[-180,-85,180,-85,180,85,-180,85]])"))
+    page.wait_for_timeout(500)
+    assert shown(right) == POOL_N and right.locator("#selbar li").count() == 0
+    assert page.errors == []
+
+
+def test_a_removed_space_takes_its_lasso_off_the_map(browser, site):
+    base, *_ = site
+    page = browser.new_page(viewport={"width": 390, "height": 844})
+    page.errors = []
+    page.on("pageerror", lambda e: page.errors.append(str(e)))
+    stub_inat(page, None)
+    # the stub map is a photo space that ignores ids, so record what each frame is sent
+    page.add_init_script(
+        "window.__keep = []; addEventListener('message', e => { if (e.data && e.data.type ==="
+        " 'wtid-keep') __keep.push(e.data.ids && Array.from(e.data.ids)); })"
+    )
+    page.goto(f"{base}/split.html?view=space")
+    ok = (
+        "document.querySelector('#%s')?.contentDocument?.getElementById('status')?.textContent===''"
+    )
+    page.wait_for_function(ok % "space")
+    space = next(f for f in page.frames if "embed=1" in f.url)
+    space.evaluate(
+        "parent.postMessage({type: 'wtid-keep', ids: new Uint32Array([0, 1, 2])}, location.origin)"
+    )
+    page.click("[data-v='map']")
+    page.wait_for_function(ok % "map")
+    page.click("[data-v='space']")
+    page.wait_for_function(ok % "space")
+    page.click("[data-v='map']")  # a new map must not inherit the lasso of the removed space
+    page.wait_for_function(ok % "map")
+    frame = next(f for f in page.frames if "embed=1" in f.url)
+    assert all(k is None for k in frame.evaluate("__keep"))
+    assert page.errors == []
+    page.close()
+
+
 def test_an_area_sent_before_the_frame_loads_still_arrives(browser, site):
     base, *_ = site
     page = browser.new_page(viewport={"width": 1280, "height": 900})

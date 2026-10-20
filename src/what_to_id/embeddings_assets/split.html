@@ -60,7 +60,7 @@ function mk(n){
   var f=document.createElement('iframe');f.id=n;f.title=n==='map'?'Map':'Photo space';
   f.src=new URL(FILES[n],location.href).href.replace(/#.*/,'')+'?embed=1'+(n==='space'&&view==='side'?'&peer=1':'')+'#'+hashFor(n);
   // what the other frame sent while this one was still loading
-  f.addEventListener('load',function(){Object.keys(late).forEach(function(k){post(n,late[k]);});});
+  f.addEventListener('load',function(){Object.keys(late).forEach(function(k){if(k!=='wtid-view'||visible('map'))post(n,late[k]);});});
   box.insertBefore(f,n==='map'?box.firstChild:null);frames[n]=f;}
 function setView(v){
   if(innerWidth<800&&v==='side')v='map';
@@ -68,9 +68,13 @@ function setView(v){
   ['map','space'].forEach(function(n){
     var show=v==='side'||v===n,f=frames[n];
     if(show&&!f)mk(n);
-    else if(f&&!show&&innerWidth<800){f.remove();delete frames[n];}  // a phone holds one view at a time
+    else if(f&&!show&&innerWidth<800){f.remove();delete frames[n];
+    // what a removed frame sent describes something that is gone
+    if(n==='map')delete late['wtid-view'];else{delete late['wtid-keep'];post('map',{type:'wtid-keep',ids:null});}}  // a phone holds one view at a time
     else if(f){var was=f.hidden;f.hidden=!show;if(show&&was){sendSel(n,last);post(n,{type:'wtid-record',id:rec});
       Object.keys(late).forEach(function(k){post(n,late[k]);});}}});
+  // a hidden map masks nothing; a re-shown one fires no moveend, so its last view goes again
+  if(!visible('map'))post('space',{type:'wtid-view',area:''});else if(late['wtid-view'])post('space',late['wtid-view']);
   box.classList.toggle('side',v==='side');
   post('space',{type:'wtid-layout',peer:v==='side'});
   [].forEach.call(document.querySelectorAll('[data-v]'),function(b){b.setAttribute('aria-pressed',b.dataset.v===v);});
@@ -79,7 +83,8 @@ function num(n,id){
   try{var m=/^[\d,]+/.exec(frames[n].contentDocument.getElementById(id).textContent);return m?m[0]:'…';}catch(e){return '…';}}
 function count(){
   var p=[];if(visible('map'))p.push('<b>'+num('map','count')+'</b> on map');
-  if(visible('space'))p.push('<b>'+num('space','count')+'</b> in photo space');
+  var vw=late['wtid-view'];  // the map's view narrows the space, the map's own count stays global
+  if(visible('space'))p.push('<b>'+num('space','count')+'</b> in photo space'+(vw&&vw.area&&visible('map')?', in map view':''));
   var c=document.getElementById('counts'),h=p.join(' · ');if(c.innerHTML!==h)c.innerHTML=h;}
 setInterval(count,400);
 document.getElementById('xbar').addEventListener('click',function(e){
@@ -114,7 +119,7 @@ addEventListener('message',function(e){
 var rec=null,late={},RELAY=['wtid-record','wtid-matches','wtid-focus','wtid-area','wtid-view','wtid-keep'];
 addEventListener('message',function(e){
   var n=Object.keys(frames).filter(function(k){return frames[k].contentWindow===e.source;})[0],d=e.data;
-  if(!n||e.origin!==location.origin||!d||RELAY.indexOf(d.type)<0)return;
+  if(!n||e.origin!==location.origin||!d||RELAY.indexOf(d.type)<0||d.type==='wtid-view'&&!visible(n))return;
   if(d.type==='wtid-record'){if(d.id===rec)return;rec=d.id;delete late['wtid-matches'];}
   else if(d.type!=='wtid-focus')late[d.type]=d;
   var o=n==='map'?'space':'map';if(visible(o))post(o,d);

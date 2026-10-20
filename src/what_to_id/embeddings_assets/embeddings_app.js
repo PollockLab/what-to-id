@@ -112,13 +112,27 @@ function areaIndex(){
   }
   return AI.I;
 }
-function viewIndex(){
+// The view is a rectangle: its box [w,s,e,n], or null when absent or when it holds the whole data (it cuts nothing).
+function viewBox(){
   if(!S.view)return null;
   if(!VI||VI.key!==S.view){
-    VI={key:S.view,I:null};
-    try{var r=MapArea.decode(S.view);if(r.length)VI.I=MapArea.index(r);}catch(e){}
+    VI={key:S.view,B:null};
+    try{var r=MapArea.decode(S.view)[0],L=S.P.lonlat,d=S.dataBox;
+      if(!d||d.P!==S.P){d=S.dataBox={P:S.P,b:[1/0,1/0,-1/0,-1/0]};
+        for(var j=0;j<S.P.n;j++){var x=L[2*j],y=L[2*j+1];
+          if(x<d.b[0])d.b[0]=x;if(x>d.b[2])d.b[2]=x;if(y<d.b[1])d.b[1]=y;if(y>d.b[3])d.b[3]=y;}}
+      if(r){var w=Math.min(r[0],r[2],r[4]),e=Math.max(r[0],r[2],r[4]),so=Math.min(r[1],r[3],r[5]),n=Math.max(r[1],r[3],r[5]);
+        if(!(w<=d.b[0]&&e>=d.b[2]&&so<=d.b[1]&&n>=d.b[3]))VI.B=[w,so,e,n];}}catch(er){}
   }
-  return VI.I;
+  return VI.B;
+}
+// The area's verdict per point, built once per area (panning re-runs applyBase but not this).
+function areaMask(){
+  var I=areaIndex(),P=S.P;
+  if(!I)return null;
+  if(!AI.M||AI.M.length!==P.n){AI.M=new Uint8Array(P.n);
+    for(var i=0;i<P.n;i++)AI.M[i]=MapArea.inside(I,P.lonlat[2*i],P.lonlat[2*i+1]);}
+  return AI.M;
 }
 function baseKey(){return [S.lo,S.hi,S.up,S.months,JSON.stringify(S.only),S.area,S.view,S.lassoV].join('|');}
 function applyBase(){
@@ -127,10 +141,11 @@ function applyBase(){
   S.baseKey=key;S.base=new Uint8Array(P.n).fill(1);
   if(P.grp){
     MF.rest(S,P.obs,P.up,P.flags,P.n,S.base);
-    var I=areaIndex();
-    if(I)for(var i=0;i<P.n;i++)if(S.base[i]&&!MapArea.inside(I,P.lonlat[2*i],P.lonlat[2*i+1]))S.base[i]=0;
-    var V=viewIndex();
-    if(V)for(var v=0;v<P.n;v++)if(S.base[v]&&!MapArea.inside(V,P.lonlat[2*v],P.lonlat[2*v+1]))S.base[v]=0;
+    var M=areaMask();
+    if(M)for(var i=0;i<P.n;i++)S.base[i]&=M[i];
+    var V=viewBox();
+    if(V){var L=P.lonlat;for(var v=0;v<P.n;v++){var lo=L[2*v],la=L[2*v+1];
+      if(!(lo>=V[0]&&lo<=V[2]&&la>=V[1]&&la<=V[3]))S.base[v]=0;}}
     if(S.lasso&&S.lasso.length===P.n)for(var k=0;k<P.n;k++)S.base[k]&=S.lasso[k];
   }
   var count=S.count=new Array(S.META?S.META.groups.length:0).fill(0);
@@ -174,7 +189,7 @@ function items(){
   if(S.lo>0||S.hi<L)out.push({label:(S.up?'Uploaded ':'Observed ')+(S.lo>0?MF.iso(S.lo):'start')+' to '+(S.hi<L?MF.iso(S.hi):'now'),
     remove:function(){S.lo=0;S.hi=L;S.up=false;picked();}});
   if(S.area&&!areaIndex())out.forEach(function(t){if(t.label===alabel())t.tag='map only';});
-  if(S.view)out.push({label:'Map view',tag:viewIndex()?undefined:'map only'});
+  if(viewBox())out.push({label:'Map view'});
   if(S.ring)out.push({label:'Lasso',remove:function(){lasso(null);}});
   S.extra.forEach(function(t){var k=t.split('=')[0];
     out.push({label:MAPONLY[k]+': '+decodeURIComponent(t.slice(k.length+1)).replace(/,/g,', '),tag:'map only',
