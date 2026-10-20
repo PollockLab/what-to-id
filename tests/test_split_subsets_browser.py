@@ -221,3 +221,52 @@ def test_a_shift_drag_lasso_keeps_the_dots_inside_and_sends_their_ids_to_the_map
     assert shown(left) == POOL_N and not left.evaluate(INSIDE)["ring"]
     assert left.locator("#lclear").is_hidden()
     assert page.errors == []
+
+
+KEEP = (
+    "window.__keep = []; addEventListener('message', e => { if (e.data && e.data.type ==="
+    " 'wtid-keep') __keep.push({ids: e.data.ids && Array.from(e.data.ids), view: e.data.view}); })"
+)
+IN_VIEW = """() => {
+  const vs = __deck.props.viewState, k = 2 ** vs.zoom, box = document.getElementById('plot'),
+    hw = box.clientWidth / 2 / k, hh = box.clientHeight / 2 / k,
+    pos = __deck.props.layers.find(x => x.id === 'pts').props.data.attributes.getPosition.value;
+  let n = 0;
+  for (let i = 0; i < pos.length / 2; i++)
+    n += Math.abs(pos[2*i] - vs.target[0]) <= hw && Math.abs(pos[2*i+1] - vs.target[1]) <= hh;
+  return n; }"""
+
+
+def test_the_photo_views_region_narrows_the_map_and_the_maps_reset_shows_it_all(split):
+    page, (left, right) = split
+    page.evaluate(KEEP)
+    right.evaluate(
+        "() => { const vs = __deck.props.viewState;"
+        " __deck.props.onViewStateChange({viewState: {...vs, zoom: vs.zoom + 2}}); }"
+    )
+    page.wait_for_function("__keep.length === 1")
+    got = page.evaluate("__keep[0]")
+    assert got["view"] and 0 < len(got["ids"]) == right.evaluate(IN_VIEW) < POOL_N
+    assert shown(right) == POOL_N  # its own view narrows only the map
+    page.wait_for_function(
+        "document.getElementById('counts').textContent.includes('on map, in photo view')"
+    )
+    left.evaluate("parent.postMessage({type: 'wtid-reset'}, location.origin)")
+    page.wait_for_function("__keep.length === 2")
+    assert page.evaluate("__keep[1]") == {"ids": None, "view": False}
+    page.wait_for_function("!document.getElementById('counts').textContent.includes('photo view')")
+    assert page.errors == []
+
+
+def test_a_hidden_photo_space_takes_its_views_cut_off_the_map(split):
+    page, (left, right) = split
+    page.evaluate(KEEP)
+    right.evaluate(
+        "() => { const vs = __deck.props.viewState;"
+        " __deck.props.onViewStateChange({viewState: {...vs, zoom: vs.zoom + 2}}); }"
+    )
+    page.wait_for_function("__keep.length === 1")
+    page.click("[data-v='map']")
+    page.wait_for_function("__keep.length === 2")
+    assert page.evaluate("__keep[1]") == {"ids": None, "view": False}
+    assert page.errors == []

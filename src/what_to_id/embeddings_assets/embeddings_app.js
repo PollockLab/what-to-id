@@ -14,7 +14,7 @@ var S={idx:null,P:null,META:null,TAXA:null,groups:{},picks:[],split:[],extra:[],
 var MF=null,TF=null,TR=null,PASS=['park','bcpark','projects'],MAPONLY={park:'Park',bcpark:'BC park',projects:'Projects'},
   AREA_IN=null,VIEW_IN=null;
 function $(id){return document.getElementById(id);}
-var X=SpaceSelect(S,$,picked,layers),areaIndex=X.areaIndex,viewBox=X.viewBox,areaMask=X.areaMask,lasso=X.lasso,lassoDrag=X.lassoDrag;
+var X=SpaceSelect(S,$,picked,layers),areaIndex=X.areaIndex,viewBox=X.viewBox,areaMask=X.areaMask,lasso=X.lasso,lassoDrag=X.lassoDrag,moved=X.moved;
 function el(tag,attrs,kids){
   var e=document.createElement(tag);
   Object.keys(attrs||{}).forEach(function(k){if(attrs[k]!==null&&attrs[k]!==undefined)e.setAttribute(k,attrs[k]);});
@@ -84,7 +84,12 @@ SYNC=MapFilter.sync({key:selKey,apply:applySel});
 // says when this view is alone. The "i" button shows the page's warning note over the plot.
 addEventListener('message',function(e){
   if(e.origin===location.origin&&e.source===parent&&e.data&&e.data.type==='wtid-layout')
-    document.documentElement.classList.toggle('peer',!!e.data.peer);});
+    {document.documentElement.classList.toggle('peer',!!e.data.peer);moved();}});
+// The map's Reset all filters also shows the whole space again, which takes the view's cut off the map.
+addEventListener('message',function(e){
+  if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-reset'||!S.deck)return;
+  S.vs=Object.assign({},S.home);S.deck.setProps({viewState:S.vs});moved();
+});
 // In the split view the map owns the area: its drawn shape and resolved parks arrive as one ring list, '' for none.
 addEventListener('message',function(e){
   if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-area'||typeof e.data.area!=='string')return;
@@ -178,7 +183,7 @@ function fit(){
   var x=span(xs),y=span(ys),sx=x[1]-x[0]||1,sy=y[1]-y[0]||1,
     z=Math.log2(Math.min(Math.max(box.clientWidth,1)/sx,Math.max(box.clientHeight,1)/sy)*.9);
   S.vs=Object.assign({},S.vs,{target:[(x[0]+x[1])/2,(y[0]+y[1])/2,0],zoom:Math.min(Math.max(z,S.vs.minZoom),S.vs.maxZoom)});
-  S.deck.setProps({viewState:S.vs});
+  S.deck.setProps({viewState:S.vs});moved();
 }
 $('gfit').addEventListener('click',fit);
 function chips(){
@@ -323,7 +328,7 @@ function select(i,fly){
   S.sel=i;S.nbr=[];tell(id);
   if(fly){
     var z=Math.max(S.vs.zoom,S.zoom0+3);
-    S.vs=Object.assign({},S.vs,{target:[P.pos[2*i],P.pos[2*i+1],0],zoom:z});S.deck.setProps({viewState:S.vs});
+    S.vs=Object.assign({},S.vs,{target:[P.pos[2*i],P.pos[2*i+1],0],zoom:z});S.deck.setProps({viewState:S.vs});moved();
   }
   writeHash();
   var x=el('button',{type:'button','class':'x','aria-label':'Close'},['×']);x.addEventListener('click',closeCard);
@@ -432,10 +437,10 @@ async function load(){
 function start(bbox){
   var box=$('plot'),w=Math.max(box.clientWidth,1),h=Math.max(box.clientHeight,1),sx=bbox[2]-bbox[0]||1,sy=bbox[3]-bbox[1]||1;
   S.zoom0=Math.log2(Math.min(w/sx,h/sy)*0.95);
-  S.vs={target:[(bbox[0]+bbox[2])/2,(bbox[1]+bbox[3])/2,0],zoom:S.zoom0,minZoom:S.zoom0-1,maxZoom:S.zoom0+16};
+  S.vs={target:[(bbox[0]+bbox[2])/2,(bbox[1]+bbox[3])/2,0],zoom:S.zoom0,minZoom:S.zoom0-1,maxZoom:S.zoom0+16};S.home=S.vs;
   S.deck=new deck.Deck({parent:box,views:new deck.OrthographicView({id:'photo-space',flipY:false}),controller:true,
     viewState:S.vs,pickingRadius:4,
-    onViewStateChange:function(e){S.vs=e.viewState;S.deck.setProps({viewState:S.vs});},
+    onViewStateChange:function(e){S.vs=e.viewState;S.deck.setProps({viewState:S.vs});moved();},
     // while the view moves it draws one record in ten, and all of them once it stops
     onInteractionStateChange:function(st){
       var t=!!(st.isDragging||st.isZooming||st.isPanning);
@@ -443,7 +448,7 @@ function start(bbox){
     },
     onHover:tip,onClick:pick,layers:[]});
   box.addEventListener('pointerleave',function(){ptip.hidden=true;});
-  lassoDrag(box);
+  lassoDrag(box);new ResizeObserver(moved).observe(box);  // the split's divider changes what is in view
 }
 load().catch(function(e){
   $('count').textContent='Could not load the photo space';status(e.message);
