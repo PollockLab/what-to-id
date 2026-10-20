@@ -306,7 +306,8 @@ addEventListener('message',function(e){
   if(i===S.sel||(id!=null&&i<0))return;
   remote=true;try{if(i<0)closeCard();else select(i,true);}finally{remote=false;}
 });
-addEventListener('keydown',function(e){if(e.key!=='Escape')return;X.draw(false);if(!$('card').hidden)closeCard();else if(S.ring)lasso(null);});
+// Esc cancels what is in progress, as on the map; a finished lasso goes only with its Clear button or chip.
+addEventListener('keydown',function(e){if(e.key!=='Escape')return;X.cancel();X.draw(false);if(!$('card').hidden)closeCard();});
 // The card's left edge: drag it, or use the arrow keys; a double click goes back to the default. The width is remembered.
 function cardWidth(w){
   var c=$('card');if(w==null){c.style.width='';localStorage.removeItem('wtid-card');return;}

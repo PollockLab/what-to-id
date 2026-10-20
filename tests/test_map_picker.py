@@ -107,7 +107,7 @@ var CHANGES=0,map={addControl:function(c){document.body.appendChild(c.onAdd());}
   getBounds:function(){return {getWest:function(){return -124;},getEast:function(){return -122.9;},
     getSouth:function(){return 49;},getNorth:function(){return 49.5;}};},
   fitBounds:function(){},getCanvas:function(){return {style:{}};},
-  doubleClickZoom:{enable:function(){},disable:function(){}}};
+  doubleClickZoom:{enable:function(){},disable:function(){}},dragPan:{enable:function(){},disable:function(){}}};
 var h=new URLSearchParams(location.hash.slice(1)),PARKS=%s,
   AREA=MapArea({map:map,S:{},LAST:0,P:function(){return {n:0};},keep:function(){},
     change:function(){CHANGES++;},hash:h.get('area')||'',park:h.get('park')||'',

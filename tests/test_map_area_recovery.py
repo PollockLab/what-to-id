@@ -132,7 +132,7 @@ const $=id=>document.getElementById(id);
 var P={n:3,id:[101,102,103],pos:[.5,.5,2,2,3,3],obs:[0,0,0],up:[0,0,0]},KEEP=[];
 var S={lo:0,hi:0,months:0,groups:{},only:{}},LAST=0;
 const map={addControl:c=>document.body.append(c.onAdd()),on(){},fitBounds(){},
-  getCanvas:()=>({style:{}}),doubleClickZoom:{enable(){},disable(){}},
+  getCanvas:()=>({style:{}}),doubleClickZoom:{enable(){},disable(){}},dragPan:{enable(){},disable(){}},
   getBounds:()=>({getWest:()=>0,getSouth:()=>0,getEast:()=>4,getNorth:()=>4})};
 const CH={groupLink:()=>({inc:[],taxa:[],not:[],groups:[],out:[]})},TF={ids:[],not:[]};
 const META={groups:['Plantae'],place_id:7085,max_url:8000};
