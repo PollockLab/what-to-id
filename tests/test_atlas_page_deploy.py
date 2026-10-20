@@ -22,15 +22,12 @@ def _upload_jobs():
                 yield pytest.param(steps, uploads[0]["with"]["path"], id=f"{workflow.name}:{name}")
 
 
-def test_four_deploy_paths_are_covered():
-    assert len(list(_upload_jobs())) == 4
+def test_three_deploy_paths_are_covered():
+    assert len(list(_upload_jobs())) == 3
 
 
 @pytest.mark.parametrize("steps,path", _upload_jobs())
 def test_deploy_path_adds_the_search_page_before_upload(steps, path):
-    # The overlay job keeps the deployed site's bytes, which already hold search.html.
-    if any("demo_publication" in s.get("run", "") for s in steps):
-        pytest.skip("overlay preserves the deployed site")
     upload = next(i for i, s in enumerate(steps) if "upload-pages-artifact" in s.get("uses", ""))
     page = [
         s for s in steps[:upload] if s.get("run", "").strip() == f"scripts/atlas_page.sh {path}"
