@@ -99,23 +99,28 @@ function addShard(buf,n){
 // the area or deletions change, or the groups change while a taxon is included (the groups and
 // included taxa are one set, so the kept bit then carries the groups too).
 var ST_KEEP=MF.ST_KEEP,PD=null,PD_KEY=null,PD_GONE=-1,PD_CAT=0,
-  OUT=new Uint8Array(0),RC=null,PJW=null;
+  OUT=new Uint8Array(0),RC=null,PJW=null,FK=null,FKV=0,FKM=null;
+// The photo space's lasso: the ids it keeps, or null; the mask is built once per list and shard count.
+function fmask(n){
+  if(!FKM||FKM.v!==FKV||FKM.m.length!==n){var m=new Uint8Array(n);projMask(P.id,[FK],m,0,n);FKM={v:FKV,m:m};}
+  return FKM.m;}
 function inc(){return !!TF.inc;}
 function pointData(){
   PJ.sync(P);
-  var n=P.n,gone=Object.keys(GONE).length,i,key=[TF,inc()?CH.picked(S.groups,META.groups,'inc').join():'',AREA.ver(),PJ.key()];
+  var n=P.n,gone=Object.keys(GONE).length,i,key=[TF,inc()?CH.picked(S.groups,META.groups,'inc').join():'',AREA.ver(),PJ.key(),FKV];
   if(PD&&PD.length===n&&PD_KEY&&PD_KEY.every(function(k,j){return k===key[j];})&&PD_GONE===gone)return;
   var same=PD&&PD.length===n,days=same?PD.days:new Float32Array(2*n),
     cat=same?PD.attributes.getFilterCategory.value.slice():new Uint8Array(4*n);
   if(!same)for(i=0;i<n;i++)MF.record(days,cat,i,P.grp[i],P.obs[i],P.up[i],P.fl[i]);
-  // only the kept bit follows the picks, the groups beside them, the area, projects and deletions
+  // only the kept bit follows the picks, the groups beside them, the area, projects, the lasso and deletions
   // OUT keeps the records out for any reason but the area, for the Identify box count; PJW marks
   // the records Identify opens when it cannot say the projects exactly (see map_projects.js)
-  var kb=MF.keep(TF,MF.groupSet(S,TF),P.tax,P.grp,n,new Uint8Array(n)),id=P.id,am=AREA.mask(n),wide=PJ.wide();
+  var kb=MF.keep(TF,MF.groupSet(S,TF),P.tax,P.grp,n,new Uint8Array(n)),id=P.id,am=AREA.mask(n),wide=PJ.wide(),
+    fm=FK&&fmask(n);
   if(OUT.length!==n)OUT=new Uint8Array(n);PJW=wide?new Uint8Array(n):null;
   for(i=0;i<n;i++){var keep=kb[i]===1;
     if(gone>0&&GONE[id[i]]===1)keep=false;
-    if(wide&&keep&&(am===null||am[i]))PJW[i]=wide(i)?1:0;if(keep&&PJ.drop(i))keep=false;
+    if(wide&&keep&&(am===null||am[i]))PJW[i]=wide(i)?1:0;if(keep&&(PJ.drop(i)||(fm&&!fm[i])))keep=false;
     OUT[i]=keep?0:1;cat[4*i+3]=cat[4*i+3]&~ST_KEEP|(keep&&(am===null||am[i])?ST_KEEP:0);}
   // a new pick, area or deletion swaps only the categories, so deck.gl uploads only those
   if(same){PD.attributes.getFilterCategory={value:cat,size:4};PD_CAT++;}
@@ -145,9 +150,9 @@ function recount(){
     (day[i]===NO?full():day[i]>=S.lo&&day[i]<=S.hi))ALT++;
   CUM=new Float64Array(META.days+1);
   for(var d=0;d<META.days;d++)CUM[d+1]=CUM[d]+PER[d];
-  // One picked status filter reads its own totals; two together, a left-out one, or an area, have none
+  // One picked status filter reads its own totals; two together, a left-out one, an area or a lasso have none
   var on=Object.keys(S.only),
-    tt=!TOT||S.picks.length||AREA.on()||PJ.active()||on.length>1||S.only[on[0]]==='not'?null:
+    tt=!TOT||S.picks.length||AREA.on()||PJ.active()||FK||on.length>1||S.only[on[0]]==='not'?null:
       on.length?TOT.only&&TOT.only[on[0]]:TOT;
   TC=null;
   if(tt){var rows=tt[S.up?'up':'obs'],nm=rows[0].length;TC=new Float64Array(nm+1);
@@ -505,6 +510,12 @@ addEventListener('message',function(e){
   if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-focus')return;
   for(var i=0;i<P.n;i++)if(P.id[i]===e.data.id){var c=[P.pos[2*i],P.pos[2*i+1]];
     if(!map.getBounds().contains(c))map.easeTo({center:c});return;}
+});
+// The photo space's lasso keeps the same records here; nothing marks it but the count.
+addEventListener('message',function(e){
+  if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-keep')return;
+  var ids=e.data.ids;if(ids!==null&&!(ids instanceof Uint32Array))return;
+  FK=ids&&ids.sort();FKV++;if(P.n)refilter();
 });
 addEventListener('message',function(e){
   if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-record')return;

@@ -408,3 +408,42 @@ def test_note_gives_both_counts_or_says_the_map_leaves_the_project_out():
     assert _note([{**m, "st": "not"}, p], None, 0)["fewer"].endswith(
         "opens fewer records than the map shows."
     )
+
+
+@needs_node
+def test_map_keeps_only_the_photo_spaces_lasso_ids():
+    """map.js's wtid-keep end: the ids need not arrive sorted, and the records that are not in
+    the list leave the kept bit and count as out (OUT) until null clears the lasso."""
+    source = (ASSETS / "map.js").read_text()
+    head = source[source.index("var ST_KEEP=MF.ST_KEEP") : source.index("function categories(")]
+    ear = source.index("// The photo space's lasso keeps")
+    first = source.index("addEventListener('message'", ear)
+    listener = source[ear : source.index("addEventListener('message'", first + 1)]
+    harness = """
+const parent={},location={origin:'o'},events=[],addEventListener=(k,f)=>events.push(f);
+const MF={ST_KEEP:8,record(){},groupSet(){},keep:(a,b,c,d,n,out)=>out.fill(1)},TF={},
+  CH={picked:()=>[]},S={groups:{}},META={groups:[]},AREA={ver:()=>0,mask:()=>null},GONE={},
+  PJ={sync(){},key:()=>'',wide:()=>null,drop:()=>false};
+const P={n:4,id:Uint32Array.of(5,300,70000,400),pos:new Float32Array(8),tax:new Uint16Array(4),
+  grp:new Uint8Array(4),obs:new Uint16Array(4),up:new Uint16Array(4),fl:new Uint8Array(4)};
+function refilter(){pointData();}
+"""
+    tail = """
+const out=[],got=()=>{out.push({out:Array.from(OUT),
+  keep:Array.from(PD.attributes.getFilterCategory.value).filter((v,i)=>i%4===3).map(v=>v>>3&1)});};
+const send=(ids,src)=>events.forEach(f=>f({origin:'o',source:src||parent,
+  data:{type:'wtid-keep',ids}}));
+pointData();got();
+send(Uint32Array.of(400,5));got();
+send([400,5]);got();send(Uint32Array.of(300),{});got();
+send(null);got();
+console.log(JSON.stringify(out));
+"""
+    got = _node(harness + head + listener + tail)
+    assert got == [
+        {"out": [0, 0, 0, 0], "keep": [1, 1, 1, 1]},
+        {"out": [0, 1, 1, 0], "keep": [1, 0, 0, 1]},
+        {"out": [0, 1, 1, 0], "keep": [1, 0, 0, 1]},
+        {"out": [0, 1, 1, 0], "keep": [1, 0, 0, 1]},
+        {"out": [0, 0, 0, 0], "keep": [1, 1, 1, 1]},
+    ]
