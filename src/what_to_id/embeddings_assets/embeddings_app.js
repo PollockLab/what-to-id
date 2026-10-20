@@ -8,7 +8,6 @@ var CFG=EMBEDDINGS_CONFIG,Meta=AtlasSearchMeta,L=EmbeddingsLayout;
 var WHOLE=4<<20,THIN_ABOVE=200000,nf=new Intl.NumberFormat('en-CA');
 var DATA=new URL(CFG.dataUrl,location.href).href.replace(/\/*$/,'/');
 var MAP=new URL(CFG.mapUrl,location.href).href;
-var PAL=MapFilter.PAL;
 var S={idx:null,P:null,META:null,TAXA:null,groups:{},picks:[],split:[],extra:[],keep:null,sel:-1,nbr:[],thin:false,cache:new Map(),run:0,deck:null,vs:null,PD:null,ring:null,lasso:null,lassoV:0};
 
 var MF=null,TF=null,TR=null,PASS=['park','bcpark','projects'],MAPONLY={park:'Park',bcpark:'BC park',projects:'Projects'},
@@ -22,7 +21,7 @@ function el(tag,attrs,kids){
   return e;
 }
 function status(t){$('status').textContent=t;}
-function color(g){return PAL[g%PAL.length];}
+function color(g){return MapFilter.color(S.META.groups[g],g);}
 // Colour of every point until the shards give groups: grey that reads on the current theme.
 function neutral(){return matchMedia('(prefers-color-scheme: dark)').matches?[190,190,184]:[95,95,90];}
 function gname(g){var m=S.META;return m.names&&m.names[m.groups[g]]||m.groups[g];}
@@ -243,9 +242,9 @@ class Filter extends deck.DataFilterExtension{
 var EXT=null;
 function pointData(){
   if(!S.keep||S.keep.length!==S.P.n)applyKeep();
-  var P=S.P,cat=new Uint8Array(3*P.n),col=new Uint8Array(4*P.n),g0=neutral();
+  var P=S.P,cat=new Uint8Array(3*P.n),col=new Uint8Array(4*P.n),g0=neutral(),gc=P.grp?S.META.groups.map(function(g,j){return color(j);}):null;
   for(var i=0;i<P.n;i++){
-    var c=P.grp?color(P.grp[i]):g0;
+    var c=P.grp?gc[P.grp[i]]:g0;
     cat[3*i]=P.grp?P.grp[i]:0;cat[3*i+1]=i%10===0?1:0;cat[3*i+2]=S.keep[i];
     col[4*i]=c[0];col[4*i+1]=c[1];col[4*i+2]=c[2];col[4*i+3]=150;
   }

@@ -3,7 +3,7 @@
 function $(id){return document.getElementById(id);}
 var css=getComputedStyle(document.documentElement);
 function tok(n){return css.getPropertyValue(n).trim();}
-var dark=matchMedia('(prefers-color-scheme: dark)').matches,PAL=MapFilter.PAL;
+var dark=matchMedia('(prefers-color-scheme: dark)').matches;
 var MF=MapFilter(META),DAY=MF.DAY,D0=MF.D0,NO=MF.NO,NOTAX=MF.NOTAX,LAST=MF.LAST;
 var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 var MONTH=MF.MONTH;
@@ -127,7 +127,7 @@ function pointData(){
     OUT[i]=keep?0:1;cat[4*i+3]=cat[4*i+3]&~(ST_KEEP|ST_INEXACT)|(keep&&(am===null||am[i])?ST_KEEP:0)|MF.accOut(S.acc,P.fl[i]);}
   // a new pick, area or deletion swaps only the categories, so deck.gl uploads only those
   if(same){PD.attributes.getFilterCategory={value:cat,size:4};PD_CAT++;}
-  else{var col=new Uint8Array(4*n);for(i=0;i<n;i++){var c=PAL[P.grp[i]%PAL.length];
+  else{var col=new Uint8Array(4*n),gc=META.groups.map(function(g,j){return MapFilter.color(g,j);});for(i=0;i<n;i++){var c=gc[P.grp[i]];
       col[4*i]=c[0];col[4*i+1]=c[1];col[4*i+2]=c[2];col[4*i+3]=110;}
     PD={length:n,days:days,attributes:{getPosition:{value:P.pos,size:2},
     getFilterValue:{value:days,size:2},getFilterCategory:{value:cat,size:4},
@@ -403,7 +403,7 @@ function gname(g){return META.names[g]||g;}
 function gshort(g){return gname(g).replace(/ \([^)]*\)$/,'');}
 // CH.show rewrites the label, so the colour dot goes back in after it.
 function showGroups(){GB.forEach(function(b,i){var g=META.groups[i],dot=document.createElement('i');
-  dot.style.background='rgb('+PAL[i%PAL.length].join(',')+')';CH.show(b,gshort(g),S.groups[g]||'');
+  dot.style.background='rgb('+MapFilter.color(g,i).join(',')+')';CH.show(b,gshort(g),S.groups[g]||'');
   b.insertBefore(dot,b.firstChild);});}
 var GB=META.groups.map(function(g){return CH.chip($('groups'),g,gshort(g),function(){return S.groups;},true,
   gname(g),function(){showGroups();refilter();});});
