@@ -425,6 +425,7 @@ var ONLYDEF=MF.ONLYDEF,
 function accLabel(){var o=ACCDEF.filter(function(a){return a[0]===S.acc;})[0];return o?o[1]:'';}
 function showOnly(){ONLY.forEach(function(b,j){CH.show(b,ONLYDEF[j][1],S.only[ONLYDEF[j][0]]||'');});
   ACC.forEach(function(b,j){CH.show(b,ACCDEF[j][1],S.acc===ACCDEF[j][0]?'inc':'');});}
+showOnly();
 if(!ONLY.length&&!ACC.length)$('flagbox').hidden=true;
 if(!ACC.length)$('acc').hidden=$('acclbl').hidden=true;
 // Picked taxa: chips in the selection bar, one set with the groups. A shortcut picks, then leaves out, a set
