@@ -122,9 +122,12 @@ return {rest:rest,ACCDEF:ACCDEF,accClass:accClass,accOut:accOut,MONTH:MONTH,ONLY
   ST_THREAT:ST_THREAT,ST_INEXACT:ST_INEXACT,ST_KEEP:ST_KEEP,ST_SAMPLE:ST_SAMPLE,iso:iso,dayOf:dayOf,clamp:clamp,
   MOY:MOY,DOM:DOM,DOW:DOW,MI:MI,M0:M0,read:read,write:write,record:record,categories:categories,groupSet:groupSet,keep:keep};
 }
-// One colour per life group, by index in META.groups, shared by the map and the photo space: 16 distinct
+// One colour per life group, shared by the map and the photo space: BY gives the big groups a fixed colour by
+// name (so they never shift when the group list does), PAL the rest by index in META.groups. All distinct
 // hues, each at least 2:1 against both the light and the dark page.
 MapFilter.PAL=[[0,114,178],[213,94,0],[0,158,115],[190,160,0],[204,121,167],[86,180,233],[230,70,70],[120,60,170],[110,110,110],[160,60,40],[150,130,200],[40,120,60],[140,200,50],[70,90,220],[255,140,100],[0,190,190]];
+MapFilter.BY={Actinopterygii:[0,150,200],Amphibia:[0,190,150],Animalia:[120,120,120],Arachnida:[210,40,40],Aves:[50,90,220],Chromista:[190,160,0],Fungi:[150,90,50],Insecta:[240,130,0],Mammalia:[150,60,170],Mollusca:[230,110,160],Plantae:[40,160,60],Protozoa:[120,185,30],Reptilia:[90,110,0],Unknown:[160,160,160]};
+MapFilter.color=function(name,i){return MapFilter.BY[name]||MapFilter.PAL[i%MapFilter.PAL.length];};
 // The hash tokens a selection is made of, as one string.
 MapFilter.tokens=function(hash){return hash.replace(/^#/,'').split('&').filter(function(t){
   return /^(by|from|to|months|groups|only|acc|taxa)=/.test(t);}).join('&');};

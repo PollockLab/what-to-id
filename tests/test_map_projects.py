@@ -423,8 +423,8 @@ def test_map_keeps_only_the_photo_spaces_lasso_ids():
 const parent={},location={origin:'o'},events=[],addEventListener=(k,f)=>events.push(f);
 const MF={ST_KEEP:8,ST_INEXACT:4,accOut:()=>0,record(){},groupSet(){},
   keep:(a,b,c,d,n,out)=>out.fill(1)},TF={},
-  CH={picked:()=>[]},S={groups:{}},META={groups:[]},AREA={ver:()=>0,mask:()=>null},GONE={},
-  PJ={sync(){},key:()=>'',wide:()=>null,drop:()=>false},PAL=[[0,0,0]];
+  CH={picked:()=>[]},S={groups:{}},META={groups:['g']},AREA={ver:()=>0,mask:()=>null},GONE={},
+  PJ={sync(){},key:()=>'',wide:()=>null,drop:()=>false},MapFilter={color:()=>[0,0,0]};
 const P={n:4,id:Uint32Array.of(5,300,70000,400),pos:new Float32Array(8),tax:new Uint16Array(4),
   grp:new Uint8Array(4),obs:new Uint16Array(4),up:new Uint16Array(4),fl:new Uint8Array(4)};
 function refilter(){pointData();}
