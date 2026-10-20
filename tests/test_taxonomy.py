@@ -124,6 +124,8 @@ def test_taxa_table_with_tree_appends_ancestors_by_id():
     assert [r[2] for r in rows] == [5, 6, 1, 2, 3, 4]
     parent = {r[2]: (rows[r[4]][2] if r[4] >= 0 else None) for r in rows}
     assert parent == {k: v[0] for k, v in TREE.items()}
+    # the sixth element counts records of exactly that taxon; ancestors no record carries hold 0
+    assert {r[2]: r[5] for r in rows} == {5: 2, 6: 1, 1: 0, 2: 0, 3: 0, 4: 0}
     assert rows[2][3] == ranks.index("stateofmatter") and list(idx) == [0, 0, 1]
 
 
@@ -143,7 +145,7 @@ def test_encode_points_with_tree_offers_presets():
     blobs, meta = encode_points(pool, TREE)
     assert meta["presets"] == PRESETS and meta["taxa_n"] == 2
     rows = json.loads(gzip.decompress(blobs[TAXA_NAME]))
-    assert len(rows) == 6 and all(len(r) == 5 for r in rows)
+    assert len(rows) == 6 and all(len(r) == 6 for r in rows)
     assert meta["group_ids"] == {g: GROUP_TAXA[g] for g in meta["groups"] if g in GROUP_TAXA}
 
 
