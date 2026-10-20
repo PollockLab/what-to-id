@@ -41,7 +41,7 @@ function applyJoin(P,taxa){
   S.sel=sel?L.find(P,sel):-1;
   S.nbr=nbr.map(function(i){return L.find(P,i);}).filter(function(r){return r>=0;});
   chips();update();
-  if(S.subset&&S.deck)fit();
+  if(S.subset&&S.deck)fit();else if(S.deck&&S.vs===S.home)goHome();
   if(S.sel>=0&&S.relabel)S.relabel();
 }
 function openIndex(){return AtlasSearchIndex.open(DATA,{whole:WHOLE});}
@@ -84,11 +84,11 @@ SYNC=MapFilter.sync({key:selKey,apply:applySel});
 // says when this view is alone. The "i" button shows the page's warning note over the plot.
 addEventListener('message',function(e){
   if(e.origin===location.origin&&e.source===parent&&e.data&&e.data.type==='wtid-layout')
-    {document.documentElement.classList.toggle('peer',!!e.data.peer);moved();}});
+    {document.documentElement.classList.toggle('peer',!!e.data.peer);resized();}});
 // The map's Reset all filters also shows the whole space again, which takes the view's cut off the map.
 addEventListener('message',function(e){
   if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-reset'||!S.deck)return;
-  S.vs=Object.assign({},S.home);S.deck.setProps({viewState:S.vs});moved();
+  goHome();
 });
 // In the split view the map owns the area: its drawn shape and resolved parks arrive as one ring list, '' for none.
 addEventListener('message',function(e){
@@ -174,17 +174,34 @@ function items(){
 }
 function clearAll(){S.groups={};S.only={};S.months=0;S.lo=0;S.hi=MF.LAST;S.up=false;S.area='';S.extra=[];
   S.picks.length=0;S.split=[];$('q').value='';if(S.ring)lasso(null);else picked();}
-// Zooms to the 1st-99th percentile box of the points that pass, so a few stray points do not flatten it.
-function fit(){
-  var P=S.P,ok=passing(),xs=[],ys=[],box=$('plot');
-  for(var i=0;i<P.n;i++)if(ok[P.grp[i]]&&S.keep[i]){xs.push(P.pos[2*i]);ys.push(P.pos[2*i+1]);}
-  if(!xs.length)return;
-  function span(a){a=Float32Array.from(a).sort();return [a[Math.floor(.01*(a.length-1))],a[Math.ceil(.99*(a.length-1))]];}
-  var x=span(xs),y=span(ys),sx=x[1]-x[0]||1,sy=y[1]-y[0]||1,
-    z=Math.log2(Math.min(Math.max(box.clientWidth,1)/sx,Math.max(box.clientHeight,1)/sy)*.9);
-  S.vs=Object.assign({},S.vs,{target:[(x[0]+x[1])/2,(y[0]+y[1])/2,0],zoom:Math.min(Math.max(z,S.vs.minZoom),S.vs.maxZoom)});
+// The box [x0,y0,x1,y1] between the t and 1-t quantiles of the points, so a few stray points do not flatten the view.
+function span(xs,ys,t){
+  function q(a){a=Float32Array.from(a).sort();return [a[Math.floor(t*(a.length-1))],a[Math.ceil((1-t)*(a.length-1))]];}
+  var x=q(xs),y=q(ys);return [x[0],y[0],x[1],y[1]];
+}
+// Shows the box in the plot; beside the map, below the panel that floats over the plot's top.
+function frame(b){
+  var box=$('plot'),top=document.documentElement.classList.contains('peer')?
+      Math.max(0,document.querySelector('.side').getBoundingClientRect().bottom-box.getBoundingClientRect().top):0,
+    z=Math.log2(Math.min(Math.max(box.clientWidth,1)/(b[2]-b[0]||1),Math.max(box.clientHeight-top,1)/(b[3]-b[1]||1))*.9);
+  z=Math.min(Math.max(z,S.vs.minZoom),S.vs.maxZoom);
+  S.vs=Object.assign({},S.vs,{target:[(b[0]+b[2])/2,(b[1]+b[3])/2+top/2/Math.pow(2,z),0],zoom:z});
   S.deck.setProps({viewState:S.vs});moved();
 }
+function fit(){
+  var P=S.P,ok=passing(),xs=[],ys=[];
+  for(var i=0;i<P.n;i++)if(ok[P.grp[i]]&&S.keep[i]){xs.push(P.pos[2*i]);ys.push(P.pos[2*i+1]);}
+  if(xs.length)frame(span(xs,ys,.01));
+}
+// Home shows all the points. It holds until the view is moved, so a resize or a panel that grows refits it.
+function goHome(){
+  var P=S.P;
+  if(!S.homeBox||S.homeBox.P!==P){var xs=new Float32Array(P.n),ys=new Float32Array(P.n);
+    for(var i=0;i<P.n;i++){xs[i]=P.pos[2*i];ys[i]=P.pos[2*i+1];}
+    S.homeBox={P:P,b:span(xs,ys,.001)};}
+  frame(S.homeBox.b);S.home=S.vs;
+}
+function resized(){if(S.deck&&S.vs===S.home)goHome();else moved();}
 $('gfit').addEventListener('click',fit);
 function chips(){
   var P=S.P,count=new Array(S.META.groups.length).fill(0);
@@ -437,7 +454,7 @@ async function load(){
 function start(bbox){
   var box=$('plot'),w=Math.max(box.clientWidth,1),h=Math.max(box.clientHeight,1),sx=bbox[2]-bbox[0]||1,sy=bbox[3]-bbox[1]||1;
   S.zoom0=Math.log2(Math.min(w/sx,h/sy)*0.95);
-  S.vs={target:[(bbox[0]+bbox[2])/2,(bbox[1]+bbox[3])/2,0],zoom:S.zoom0,minZoom:S.zoom0-1,maxZoom:S.zoom0+16};S.home=S.vs;
+  S.vs={target:[(bbox[0]+bbox[2])/2,(bbox[1]+bbox[3])/2,0],zoom:S.zoom0,minZoom:S.zoom0-1,maxZoom:S.zoom0+16};
   S.deck=new deck.Deck({parent:box,views:new deck.OrthographicView({id:'photo-space',flipY:false}),controller:true,
     viewState:S.vs,pickingRadius:4,
     onViewStateChange:function(e){S.vs=e.viewState;S.deck.setProps({viewState:S.vs});moved();},
@@ -448,7 +465,7 @@ function start(bbox){
     },
     onHover:tip,onClick:pick,layers:[]});
   box.addEventListener('pointerleave',function(){ptip.hidden=true;});
-  lassoDrag(box);new ResizeObserver(moved).observe(box);  // the split's divider changes what is in view
+  lassoDrag(box);goHome();new ResizeObserver(resized).observe(box);  // the split's divider changes what is in view
 }
 load().catch(function(e){
   $('count').textContent='Could not load the photo space';status(e.message);
