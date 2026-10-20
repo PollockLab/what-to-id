@@ -90,7 +90,8 @@ function num(n,id){
   try{var m=/^[\d,]+/.exec(frames[n].contentDocument.getElementById(id).textContent);return m?m[0]:'…';}catch(e){return '…';}}
 function count(){
   var vw=late['wtid-view'],cut=vw&&vw.area&&visible('map');  // the view narrows both counts
-  var p=[];if(visible('map'))p.push('<b>'+num('map','count')+'</b> on map'+(cut?', in view':''));
+  var pv=late['wtid-keep'],pcut=pv&&pv.view&&visible('space');  // as does the photo space's
+  var p=[];if(visible('map'))p.push('<b>'+num('map','count')+'</b> on map'+(cut?', in view':'')+(pcut?', in photo view':''));
   if(visible('space'))p.push('<b>'+num('space','count')+'</b> in photo space'+(cut?', in map view':''));
   var c=document.getElementById('counts'),h=p.join(' · ');if(c.innerHTML!==h)c.innerHTML=h;}
 setInterval(count,400);
@@ -123,12 +124,12 @@ addEventListener('message',function(e){
 });
 // A picked record and its closest matches are mirrored by id in the other frame, as are the map's area and
 // the photo space's lasso; the last of each (late) also goes to a frame that shows up later.
-var rec=null,late={},RELAY=['wtid-record','wtid-matches','wtid-focus','wtid-area','wtid-view','wtid-keep'];
+var rec=null,late={},RELAY=['wtid-record','wtid-matches','wtid-focus','wtid-area','wtid-view','wtid-keep','wtid-reset'];
 addEventListener('message',function(e){
   var n=Object.keys(frames).filter(function(k){return frames[k].contentWindow===e.source;})[0],d=e.data;
   if(!n||e.origin!==location.origin||!d||RELAY.indexOf(d.type)<0||d.type==='wtid-view'&&!visible(n))return;
   if(d.type==='wtid-record'){if(d.id===rec)return;rec=d.id;delete late['wtid-matches'];}
-  else if(d.type!=='wtid-focus')late[d.type]=d;
+  else if(d.type!=='wtid-focus'&&d.type!=='wtid-reset')late[d.type]=d;
   var o=n==='map'?'space':'map';if(visible(o))post(o,d);
 });
 // Photo search: the query is resolved as search.html does, and its hits go to both frames as a subset of the points.

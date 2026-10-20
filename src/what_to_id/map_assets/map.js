@@ -445,7 +445,8 @@ function search(){TF=TX.filter(TAXA,S.picks);}
 function redraw(){showGroups();showMonths();showOnly();refilter();}
 function clearAll(){S.months=0;S.groups={};S.only={};S.picks.length=0;S.split=[];$('q').value='';showClades();
   search();AREA.clear();PJ.reset();redraw();}
-$('reset').onclick=function(){S.lo=0;S.hi=LAST;S.up=false;clearAll();};
+$('reset').onclick=function(){S.lo=0;S.hi=LAST;S.up=false;clearAll();
+  if(parent!==window)parent.postMessage({type:'wtid-reset'},location.origin);};  // the photo space beside it zooms out
 var BAR=CH.bar({box:$('selbar'),clear:clearAll,fallback:$('q')});
 function items(){var out=CH.items({S:S,meta:META,terms:TX.terms({T:TAXA,picks:S.picks,groups:[],meta:META,n:0,split:S.split}),
   picker:PK,pj:PJ,months:MONTH,only:ONLYDEF,two:['exact'],area:AREA,redraw:redraw});

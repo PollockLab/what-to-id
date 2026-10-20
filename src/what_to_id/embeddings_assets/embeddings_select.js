@@ -43,9 +43,30 @@ function lasso(ring){
   if(ring){var I=MapArea.index([ring]);m=new Uint8Array(P.n);
     for(i=0;i<P.n;i++)if(MapArea.inside(I,P.pos[2*i],P.pos[2*i+1])){m[i]=1;k++;}
     ids=new Uint32Array(k);k=0;for(i=0;i<P.n;i++)if(m[i])ids[k++]=P.id[i];}
-  S.lasso=m;S.lassoV++;$('lclear').hidden=!ring;picked();
-  if(parent!==window)parent.postMessage({type:'wtid-keep',ids:ids},location.origin);
+  S.lasso=m;S.lassoV++;$('lclear').hidden=!ring;picked();send(true);
 }
+// Beside the map, the part of the space in view: its box [x0,y0,x1,y1] in layout coordinates, or null when it
+// shows every point or the map is not beside it. The map keeps its points, so each view narrows the other, never itself.
+function shownBox(){
+  var P=S.P,vs=S.vs,box=$('plot');
+  if(!P||!vs||parent===window||!document.documentElement.classList.contains('peer'))return null;
+  var k=Math.pow(2,vs.zoom),hw=box.clientWidth/2/k,hh=box.clientHeight/2/k,b=[vs.target[0]-hw,vs.target[1]-hh,vs.target[0]+hw,vs.target[1]+hh];
+  for(var i=0;i<P.n;i++)if(!inBox(b,i))return b;
+  return null;
+}
+function inBox(b,i){var x=S.P.pos[2*i],y=S.P.pos[2*i+1];return x>=b[0]&&x<=b[2]&&y>=b[1]&&y<=b[3];}
+// The ids the lasso and the view both keep go to the map (null for all); a view that did not change sends nothing.
+var SENT='',T=0;
+function send(force){
+  var P=S.P,b=shownBox(),key=b?b.join():'',ids=null,i,k=0;
+  if((!force&&key===SENT)||parent===window)return;
+  SENT=key;
+  if(S.lasso||b){var m=new Uint8Array(P.n);
+    for(i=0;i<P.n;i++)if((!S.lasso||S.lasso[i])&&(!b||inBox(b,i))){m[i]=1;k++;}
+    ids=new Uint32Array(k);k=0;for(i=0;i<P.n;i++)if(m[i])ids[k++]=P.id[i];}
+  parent.postMessage({type:'wtid-keep',ids:ids,view:!!b},location.origin);
+}
+function moved(){clearTimeout(T);T=setTimeout(send,250);}
 $('lclear').addEventListener('click',function(){lasso(null);});
 // The Draw button arms one lasso for pointers without a shift key (touch); it turns itself off after that drag.
 function draw(on){DRAW=on;$('ldraw').setAttribute('aria-pressed',String(on));$('plot').classList.toggle('draw',on);}
@@ -63,5 +84,5 @@ function lassoDrag(box){
   ['pointerup','pointercancel'].forEach(function(t){box.addEventListener(t,function(){
     if(!cur)return;var r=cur;cur=null;draw(false);lasso(r.length>=6?r:null);});});
 }
-return {areaIndex:areaIndex,viewBox:viewBox,areaMask:areaMask,lasso:lasso,lassoDrag:lassoDrag,draw:draw};
+return {moved:moved,areaIndex:areaIndex,viewBox:viewBox,areaMask:areaMask,lasso:lasso,lassoDrag:lassoDrag,draw:draw};
 }
