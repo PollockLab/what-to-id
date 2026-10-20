@@ -21,6 +21,7 @@ fetch('split.html',{method:'HEAD'}).then(function(r){if(r.ok)location.replace('s
 <p class="stat" aria-live="polite"><b id="count">Loading</b> <span id="more"></span><span id="share" class="share"></span></p>
 <span class="idstep"><button type="button" id="idprev" class="idarrow" aria-label="Previous batch" hidden>‹</button><a id="identify" class="idlink" target="_blank" rel="noopener" href="https://www.inaturalist.org/observations/identify?quality_grade=needs_id&amp;place_id={{PLACE_ID}}">Identify these</a><button type="button" id="idnext" class="idarrow" aria-label="Next batch" hidden>›</button></span>
 <p id="idnote" class="idnote" role="status" hidden></p>
+<button type="button" id="reset" class="reset">Reset all filters</button>
 <button type="button" id="toggle" class="toggle" aria-expanded="false" aria-controls="side">Filters</button>
 </header>
 <section id="side" class="side" aria-label="Filters">
@@ -45,7 +46,6 @@ fetch('split.html',{method:'HEAD'}).then(function(r){if(r.ok)location.replace('s
 <div id="months" class="chips months" role="group" aria-label="Months of the year"></div>
 <p class="muted">Compare the same season across years. <button type="button" id="mclear" class="link">Any month</button></p>
 </details>
-<button type="button" id="reset" class="link">Reset all filters</button>
 </section>
 <main id="map" role="application" aria-label="Map of records"></main>
 <section id="time" class="time" aria-label="Dates">
