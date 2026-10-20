@@ -46,13 +46,12 @@ function lasso(ring){
   S.lasso=m;S.lassoV++;$('lclear').hidden=!ring;picked();send(true);
 }
 // Beside the map, the part of the space in view: its box [x0,y0,x1,y1] in layout coordinates, or null when it
-// shows every point or the map is not beside it. The map keeps its points, so each view narrows the other, never itself.
+// holds the home view's points or the map is not beside it. The map keeps its points, so each view narrows the other, never itself.
 function shownBox(){
-  var P=S.P,vs=S.vs,box=$('plot');
-  if(!P||!vs||parent===window||!document.documentElement.classList.contains('peer'))return null;
+  var P=S.P,vs=S.vs,box=$('plot'),h=S.homeBox&&S.homeBox.b;
+  if(!P||!vs||!h||parent===window||!document.documentElement.classList.contains('peer'))return null;
   var k=Math.pow(2,vs.zoom),hw=box.clientWidth/2/k,hh=box.clientHeight/2/k,b=[vs.target[0]-hw,vs.target[1]-hh,vs.target[0]+hw,vs.target[1]+hh];
-  for(var i=0;i<P.n;i++)if(!inBox(b,i))return b;
-  return null;
+  return b[0]<=h[0]&&b[1]<=h[1]&&b[2]>=h[2]&&b[3]>=h[3]?null:b;
 }
 function inBox(b,i){var x=S.P.pos[2*i],y=S.P.pos[2*i+1];return x>=b[0]&&x<=b[2]&&y>=b[1]&&y<=b[3];}
 // The ids the lasso and the view both keep go to the map (null for all); a view that did not change sends nothing.
