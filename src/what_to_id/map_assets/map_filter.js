@@ -104,6 +104,9 @@ return {rest:rest,MONTH:MONTH,ONLYDEF:ONLYDEF,DAY:DAY,D0:D0,NO:NO,NOTAX:NOTAX,LA
   ST_THREAT:ST_THREAT,ST_INEXACT:ST_INEXACT,ST_KEEP:ST_KEEP,ST_SAMPLE:ST_SAMPLE,iso:iso,dayOf:dayOf,clamp:clamp,
   MOY:MOY,DOM:DOM,DOW:DOW,MI:MI,M0:M0,read:read,write:write,record:record,categories:categories,groupSet:groupSet,keep:keep};
 }
+// One colour per life group, by index in META.groups, shared by the map and the photo space: 16 distinct
+// hues, each at least 2:1 against both the light and the dark page.
+MapFilter.PAL=[[0,114,178],[213,94,0],[0,158,115],[190,160,0],[204,121,167],[86,180,233],[230,70,70],[120,60,170],[110,110,110],[160,60,40],[150,130,200],[40,120,60],[140,200,50],[70,90,220],[255,140,100],[0,190,190]];
 // The hash tokens a selection is made of, as one string.
 MapFilter.tokens=function(hash){return hash.replace(/^#/,'').split('&').filter(function(t){
   return /^(by|from|to|months|groups|only|taxa)=/.test(t);}).join('&');};

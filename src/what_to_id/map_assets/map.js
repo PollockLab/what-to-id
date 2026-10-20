@@ -3,7 +3,7 @@
 function $(id){return document.getElementById(id);}
 var css=getComputedStyle(document.documentElement);
 function tok(n){return css.getPropertyValue(n).trim();}
-var dark=matchMedia('(prefers-color-scheme: dark)').matches,DOT=tok('--dot').split(',').map(Number);
+var dark=matchMedia('(prefers-color-scheme: dark)').matches,PAL=MapFilter.PAL;
 var MF=MapFilter(META),DAY=MF.DAY,D0=MF.D0,NO=MF.NO,NOTAX=MF.NOTAX,LAST=MF.LAST;
 var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 var MONTH=MF.MONTH;
@@ -126,8 +126,11 @@ function pointData(){
     OUT[i]=keep?0:1;cat[4*i+3]=cat[4*i+3]&~ST_KEEP|(keep&&(am===null||am[i])?ST_KEEP:0);}
   // a new pick, area or deletion swaps only the categories, so deck.gl uploads only those
   if(same){PD.attributes.getFilterCategory={value:cat,size:4};PD_CAT++;}
-  else PD={length:n,days:days,attributes:{getPosition:{value:P.pos,size:2},
-    getFilterValue:{value:days,size:2},getFilterCategory:{value:cat,size:4}}};
+  else{var col=new Uint8Array(4*n);for(i=0;i<n;i++){var c=PAL[P.grp[i]%PAL.length];
+      col[4*i]=c[0];col[4*i+1]=c[1];col[4*i+2]=c[2];col[4*i+3]=110;}
+    PD={length:n,days:days,attributes:{getPosition:{value:P.pos,size:2},
+    getFilterValue:{value:days,size:2},getFilterCategory:{value:cat,size:4},
+    getFillColor:{value:col,size:4,normalized:true}}};}
   PD_KEY=key;PD_GONE=gone;
 }
 function categories(thin){return MF.categories(S,inc(),thin);}
@@ -244,7 +247,7 @@ function layers(){
   EXT=EXT||new Filter({filterSize:2,categorySize:4});
   var r=[full()?-1:S.lo,S.hi],any=[-1,LAST];
   var L=[new deck.ScatterplotLayer({id:'pts',data:PD,
-    getFillColor:[DOT[0],DOT[1],DOT[2],110],radiusUnits:'pixels',getRadius:1.5,radiusMinPixels:1,
+    radiusUnits:'pixels',getRadius:1.5,radiusMinPixels:1,
     radiusMaxPixels:6,stroked:false,pickable:true,
     extensions:[EXT],updateTriggers:{getFilterCategory:PD_CAT},filterRange:[S.up?any:r,S.up?r:any],filterCategories:categories(THIN)})];
   var at=function(d){return [P.pos[2*d.i],P.pos[2*d.i+1]];};
@@ -397,9 +400,13 @@ function allGroups(){return !CH.any(S.groups);}
 function gname(g){return META.names[g]||g;}
 // a group chip shows the plain name only, "Fish" for "Fish (Actinopterygii)"; its title has both
 function gshort(g){return gname(g).replace(/ \([^)]*\)$/,'');}
-function showGroups(){GB.forEach(function(b,i){var g=META.groups[i];CH.show(b,gshort(g),S.groups[g]||'');});}
+// CH.show rewrites the label, so the colour dot goes back in after it.
+function showGroups(){GB.forEach(function(b,i){var g=META.groups[i],dot=document.createElement('i');
+  dot.style.background='rgb('+PAL[i%PAL.length].join(',')+')';CH.show(b,gshort(g),S.groups[g]||'');
+  b.insertBefore(dot,b.firstChild);});}
 var GB=META.groups.map(function(g){return CH.chip($('groups'),g,gshort(g),function(){return S.groups;},true,
-  gname(g),refilter);});
+  gname(g),function(){showGroups();refilter();});});
+showGroups();
 $('gall').onclick=function(){S.groups={};showGroups();refilter();};
 var MB_=MON.map(function(m,i){var b=chip('months',m,!!(S.months>>i&1),
   function(){S.months^=1<<i;return !!(S.months>>i&1);});b.setAttribute('aria-label',MONTH[i]);

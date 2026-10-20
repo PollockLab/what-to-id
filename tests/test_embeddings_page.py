@@ -36,8 +36,8 @@ def test_deck_pin_matches_the_map():
 
 def test_group_palette_has_no_repeats_at_fifteen_groups():
     src = (
-        Path(embeddings_page.__file__).parent / "embeddings_assets" / "embeddings_app.js"
+        Path(embeddings_page.__file__).parent / "map_assets" / "map_filter.js"
     ).read_text()
-    pal = re.search(r"var PAL=(\[\[.*?\]\]);", src).group(1)
+    pal = re.search(r"MapFilter.PAL=(\[\[.*?\]\]);", src).group(1)
     colours = [tuple(c) for c in json.loads(pal)]
     assert len(set(colours)) == len(colours) >= 15
