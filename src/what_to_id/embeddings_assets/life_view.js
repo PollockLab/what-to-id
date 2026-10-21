@@ -44,7 +44,7 @@ function draw(r,fit){
   if(cache.has(r)){show(cache.get(r),fit);return;}
   o.status('Drawing the map of life…');
   lookFile().then(function(L){
-    look=L;if(L===null&&mode==='look')mode='life';
+    look=L;if(L===null&&mode==='look'){mode='life';o.writeHash();}
     setTimeout(function(){
       if(me!==run)return;
       var P=S.P,t0=performance.now(),m=LM.build({pos:P.pos,n:P.n,tax:P.tax,grp:P.grp,groups:S.META.groups.length,
@@ -131,6 +131,7 @@ function hash(h){
   return h;
 }
 // The join brings the names and the rows the map needs; a map asked for in the hash is drawn then.
+// The look-alike file is fetched with the first map, so Points alone never asks for it.
 function joined(){
   if(!S.TAXA||!S.META)return;
   A=LM.ancestors(S.TAXA,S.META.ranks);byId=new Map();
@@ -139,7 +140,6 @@ function joined(){
   var r=want&&byId.has(want)?byId.get(want):-1;want=0;
   if(r>=0&&!LM.canZoom(S.TAXA,S.META.ranks,r))r=-1;
   row=r;
-  lookFile().then(function(L){look=L;bar();if(L===null&&mode==='look')set('life');});
   if(mode!=='pts')draw(row,true);else bar();
 }
 return {on:on,layers:layers,text:text,click:click,hash:hash,joined:joined};
