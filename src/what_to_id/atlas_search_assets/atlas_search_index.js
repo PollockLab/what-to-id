@@ -325,8 +325,16 @@ Index.prototype.neighborsIn=async function(set,obsId){
   return null;
 };
 
-// Lookup key for a taxon name: case-insensitive, whitespace collapsed, a leading "a photo of " dropped.
-function normName(text){return String(text).toLowerCase().trim().replace(/\s+/g,' ').replace(/^a photo of /,'');}
+// Lookup key for a taxon name: case-insensitive, whitespace collapsed, a leading "a photo of " and
+// an article dropped, so the example "a nudibranch" is the row "Nudibranchs" and needs no model.
+function normName(text){return String(text).toLowerCase().trim().replace(/\s+/g,' ').replace(/^a photo of /,'').replace(/^(?:an?|the) /,'');}
+// The row for a key, or for its plural or singular (common names are listed as "Hummingbirds").
+function nameRow(rows,key){
+  var row=rows.get(key);
+  if(row===undefined&&key)row=rows.get(key+'s');
+  if(row===undefined&&/s$/.test(key))row=rows.get(key.slice(0,-1));
+  return row;
+}
 async function gunzipText(buf){
   var s=new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'));
   return new Response(s).text();
@@ -350,7 +358,7 @@ Index.prototype.taxonVector=async function(text){
   if(!t)return null;
   if(!this._taxa)this._taxa=this.bytes(t.names).then(gunzipText).then(nameRows);
   var self=this;this._taxa.catch(function(){self._taxa=null;});
-  var row=(await this._taxa).get(normName(text));
+  var row=nameRow(await this._taxa,normName(text));
   if(row===undefined)return null;
   var size=t.dims*2,buf=await this.bytes(t.vectors,row*size,(row+1)*size);
   var q=decodeF16(new Uint16Array(buf)),n=0;
@@ -369,5 +377,5 @@ function open(base,opts){
   return new Index(base,{fetch:f,gap:opts.gap,whole:opts.whole,concurrency:opts.concurrency}).init();
 }
 return {open:open,f16ToF32:f16ToF32,decodeF16:decodeF16,buildLut:buildLut,coarseScores:coarseScores,rotate:rotate,refineScore:refineScore,
-  normName:normName,nameRows:nameRows,topIndices:topIndices,adc:adc,topk:topk,Topk:Topk,coalesce:coalesce};
+  normName:normName,nameRow:nameRow,nameRows:nameRows,topIndices:topIndices,adc:adc,topk:topk,Topk:Topk,coalesce:coalesce};
 });

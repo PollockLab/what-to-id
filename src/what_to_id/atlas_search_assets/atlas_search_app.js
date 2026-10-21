@@ -38,6 +38,7 @@ async function encoderFor(state,confirmed){
     $('gatetext').textContent='Text search needs a search model. Downloading search model, about '+mb+
       ' MB, once. It is stored in this browser afterwards. Searching by observation link needs no download.';
     $('gate').hidden=false;$('gobtn').focus();
+    $('results').hidden=true;  // the last query's cards would sit under a prompt about the new one
     status('');
     return null;
   }
@@ -122,7 +123,8 @@ function render(message){
   $('dropped').textContent=bits.length?'Left out: '+bits.join(', ')+'.':'';
   var parts=(st.kind==='text'&&S.parts)||[];
   $('how').textContent=parts.length>1?'Each photo matches all of: '+parts.join(', ')+'. The search sees what is in the photo, not who does what to whom.':'';
-  status(message||(res.cards.length?'':'No matching photos.'));
+  var none=res.filtered&&!res.cards.length?'None of the best '+S.hits.length+' matches are inside your taxon filter. Name the taxon in your words instead.':'No matching photos.';
+  status(message||(res.cards.length?'':none));
   res.cards.forEach(function(c){grid.appendChild(cardEl(c));});
   var actions=$('actions');actions.textContent='';
   if(!res.cards.length)return;
@@ -182,14 +184,15 @@ function suggest(){
   timer=setTimeout(async function(){
     try{
       var found=await Meta.autocomplete(q,function(u){return fetch(u);});
+      if($('tq').value.trim()!==q)return;  // a slower reply for an older prefix must not win
       ul.textContent='';
       found.forEach(function(t){
-        var label=t.name+(t.common?' ('+t.common+')':'');
+        var label=t.name+(t.common?' ('+t.common+')':''),rank=t.rank?', '+t.rank:'';
         var keep=el('button',{type:'button','aria-label':'Keep only '+label},['Keep']);
         var drop=el('button',{type:'button','aria-label':'Leave out '+label},['Leave out']);
         keep.addEventListener('click',function(){addTaxon(S.include,t);});
         drop.addEventListener('click',function(){addTaxon(S.exclude,t);});
-        ul.appendChild(el('li',{},[el('span',{'class':'muted'},[label+' ']),keep,drop]));
+        ul.appendChild(el('li',{},[el('span',{'class':'muted'},[label+rank+' ']),keep,drop]));
       });
       if(!found.length)ul.appendChild(el('li',{'class':'muted'},['No taxa found.']));
     }catch(e){ul.textContent='';status('Taxon search failed: '+e.message);}

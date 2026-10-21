@@ -467,15 +467,22 @@ def test_taxon_vector_reads_one_row_and_unit_normalises(tmp_path):
         """(async () => {
       const idx = await IDX.open('http://data.test/atlas/', {fetch: fakeFetch});
       const q = await idx.taxonVector('poa'), a = await idx.taxonVector('Maple');
+      const plural = await idx.taxonVector('a photo of the maples');
+      const one = await idx.taxonVector('an acer');
       out({q: Array.from(q), a: Array.from(a), none: await idx.taxonVector('zzz'),
+        plural: Array.from(plural), one: Array.from(one),
+        norm: IDX.normName('  A Photo of   the Acer'),
         reqs: requests.filter(r => r.name === 'v.f16')});
     })()""",
         tmp_path,
     )
     assert got["q"] == [0.5] * 4 and got["a"] == pytest.approx([0.6, 0, 0, 0.8])
+    assert got["plural"] == got["a"] and got["one"] == got["a"] and got["norm"] == "acer"
     assert got["none"] is None
     assert got["reqs"] == [
         {"name": "v.f16", "bytes": 8, "start": 8},
+        {"name": "v.f16", "bytes": 8, "start": 0},
+        {"name": "v.f16", "bytes": 8, "start": 0},
         {"name": "v.f16", "bytes": 8, "start": 0},
     ]
 
