@@ -303,6 +303,37 @@ def test_pure_functions():
     assert got["lut"] == [3, 7] and got["s"] == [10.5, 10.5]
 
 
+def test_subjects_split_on_connectives_and_fuse_takes_the_min():
+    got = node("""(() => {
+      const S = META.subjects, h = (id, score) => ({id, score});
+      out({
+        split: [S('a bird eating a frog'), S('a photo of a hummingbird feeding at a flower'),
+          S('colourful mushrooms on moss'), S('a bird'), S('a bird in flight'),
+          S('Amanita muscaria, with a slug.'), S('on'), S('  ')],
+        fused: META.fuse([[h(1, 0.9), h(2, 0.8), h(3, 0.5)], [h(2, 0.7), h(4, 0.6), h(1, 0.4)]], 3),
+        empty: META.fuse([[h(1, 0.9)], []], 5),
+      });
+    })()""")
+    assert got["split"] == [
+        ["a bird", "a frog"],
+        ["a hummingbird", "a flower"],
+        ["colourful mushrooms", "moss"],
+        ["a bird"],
+        ["a bird in flight"],
+        ["Amanita muscaria", "a slug"],
+        ["on"],
+        [""],
+    ]
+    # 2 is in both lists (min 0.7); 1 scores 0.4 in the second; 4 is absent from the first, so it
+    # takes that list's floor 0.5; 3 takes the second list's floor 0.4 and ties with 1, lower id first
+    assert got["fused"] == [
+        {"id": 2, "score": 0.7},
+        {"id": 4, "score": 0.5},
+        {"id": 1, "score": 0.4},
+    ]
+    assert got["empty"] == [{"id": 1, "score": -1}]
+
+
 def test_meta_parsing_and_filtering():
     got = node("""(() => {
       const P = META.parseInput, H = META.parseHash;

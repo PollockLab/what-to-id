@@ -274,6 +274,22 @@ def test_pasted_url_absent_id_and_taxon_filter(open_page, site):
     assert page.errors == [] and text.errors == []
 
 
+def test_two_subject_query_searches_each_and_says_so(open_page):
+    page = open_page("#q=a+bird+eating+a+frog")
+    page.wait_for_selector(".card")
+    # the whole sentence and each subject are encoded; the same fake vector keeps the hits identical
+    assert page.evaluate("window.encoded") == [
+        "a photo of a bird eating a frog",
+        "a photo of a bird",
+        "a photo of a frog",
+    ]
+    assert page.locator("#how").inner_text().startswith("Each photo matches all of: a bird, a frog.")
+    page.fill("#q", "a bird")
+    page.press("#q", "Enter")
+    page.wait_for_function("document.getElementById('how').textContent === ''")
+    assert page.errors == []
+
+
 def test_text_search_without_encoder_asks_before_downloading(open_page):
     page = open_page("#q=a+bird", fake_encoder=False)
     page.wait_for_function("document.getElementById('status').textContent.includes('went wrong')")

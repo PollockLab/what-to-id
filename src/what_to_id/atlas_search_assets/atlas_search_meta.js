@@ -77,6 +77,36 @@ async function autocomplete(q,fetchFn){
     return {id:t.id,name:t.name,common:t.preferred_common_name||'',rank:t.rank||''};
   });
 }
+// CLIP text towers score a sentence much like its bag of words, so "a bird eating a frog" ranks lone
+// frogs and lone birds high. Connectives that put a second organism or object in frame split the query
+// into subjects the page searches separately and fuses with min: every subject must be in the photo.
+var LINK=/\b(?:eating|eats|preying on|catching|carrying|holding|feeding (?:on|at|from)|pollinating|visiting|perched on|sitting on|resting on|growing on|covered (?:in|with)|infected (?:by|with)|parasiti[sz]ed by|attacked by|with|and|on)\b/i;
+function subjects(text){
+  var raw=String(text||'').trim().replace(/^(?:an? )?(?:photo|picture|image) of /i,'');
+  var parts=raw.split(LINK).map(function(p){return p.trim().replace(/[,;.!?]+$/,'');}).filter(function(p){return p.length>2;});
+  return parts.length>1?parts:[raw];
+}
+// Min-fuse ranked lists of {id,score}: an id missing from a list takes that list's lowest score, the
+// tightest bound the list gives. Highest fused score first, ties by lower id.
+function fuse(lists,k){
+  var floors=lists.map(function(l){return l.length?l[l.length-1].score:-1;}),best=new Map();
+  lists.forEach(function(l,j){
+    l.forEach(function(h){
+      if(best.has(h.id))return;
+      var s=Infinity;
+      lists.forEach(function(m,i){
+        var hit=null;
+        for(var x=0;x<m.length;x++)if(m[x].id===h.id){hit=m[x];break;}
+        s=Math.min(s,hit?hit.score:floors[i]);
+      });
+      best.set(h.id,s);
+    });
+  });
+  var out=[];
+  best.forEach(function(s,id){out.push({id:id,score:s});});
+  out.sort(function(a,b){return b.score-a.score||a.id-b.id;});
+  return out.slice(0,k);
+}
 return {BATCH:BATCH,parseInput:parseInput,parseHash:parseHash,toHash:toHash,smallPhoto:smallPhoto,
-  fetchObservations:fetchObservations,build:build,autocomplete:autocomplete};
+  fetchObservations:fetchObservations,build:build,autocomplete:autocomplete,subjects:subjects,fuse:fuse};
 });

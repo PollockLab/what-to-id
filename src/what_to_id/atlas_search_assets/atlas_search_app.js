@@ -5,7 +5,7 @@ var CFG=ATLAS_SEARCH_CONFIG,Meta=AtlasSearchMeta,Enc=AtlasEncoder;
 var K=200,WHOLE=4<<20;  // parts up to 4 MB load whole: one request, not 32 ranges
 var qs=new URLSearchParams(location.search);
 var DATA=new URL(CFG.dataUrl,location.href).href.replace(/\/*$/,'/');
-var S={index:null,encoder:null,cache:new Map(),hits:[],state:null,run:0,include:[],exclude:[]};
+var S={index:null,encoder:null,cache:new Map(),hits:[],parts:[],state:null,run:0,include:[],exclude:[]};
 var EXAMPLES=['a nudibranch','a hummingbird feeding at a flower','colourful mushrooms on moss','a jellyfish'];
 
 function $(id){return document.getElementById(id);}
@@ -66,20 +66,27 @@ async function hitsFrom(state,confirmed){
     if(!nb)return {error:'Observation '+state.id+' is not in the index. It may be new, or no longer need an ID.'};
     return {hits:nb};
   }
+  var opts={k:K,nprobe:+qs.get('nprobe')||undefined};  // nprobe and shortlist default to the manifest's
   var q=await idx.taxonVector(state.text);  // a taxon name has a precomputed vector: no model, no download
-  if(!q){
-    var enc=await encoderFor(state,confirmed);
-    if(!enc)return {gated:true};
-    status('Searching...');
-    q=await enc.encode(caption(state.text));
-  }
-  // nprobe and shortlist default to the manifest's
-  return {hits:await idx.search(q,{k:K,nprobe:+qs.get('nprobe')||undefined})};
+  if(q)return {hits:await idx.search(q,opts)};
+  var enc=await encoderFor(state,confirmed);
+  if(!enc)return {gated:true};
+  status('Searching...');
+  var parts=Meta.subjects(state.text);
+  if(parts.length===1)return {hits:await idx.search(await enc.encode(caption(state.text)),opts)};
+  // every subject (and the whole sentence) is searched on its own, then min-fused: deeper lists so
+  // the fused top K has candidates scored in all of them
+  var texts=[state.text].concat(parts),deep={k:K*3,nprobe:opts.nprobe};
+  var lists=await Promise.all(texts.map(async function(t){
+    var v=(await idx.taxonVector(t))||(await enc.encode(caption(t)));
+    return idx.search(v,deep);
+  }));
+  return {hits:Meta.fuse(lists,K),parts:parts};
 }
 
 async function start(state,confirmed){
   var run=++S.run;
-  S.state=state;$('gate').hidden=true;
+  S.state=state;S.parts=[];$('gate').hidden=true;
   if(!state){render();return;}
   $('q').value=state.kind==='id'?String(state.id):state.text;
   status('Searching...');
@@ -88,7 +95,7 @@ async function start(state,confirmed){
     if(run!==S.run||r.gated)return;
     if(r.error){S.hits=[];render(r.error);return;}
     status('Loading photo details from iNaturalist...');
-    S.hits=r.hits;
+    S.hits=r.hits;S.parts=r.parts||[];
     await Meta.fetchObservations(S.hits.map(function(h){return h.id;}),function(u){return fetch(u);},S.cache);
     if(run!==S.run)return;
     render();
@@ -113,6 +120,8 @@ function render(message){
   if(res.missing)bits.push(res.missing+' no longer returned by iNaturalist');
   if(res.filtered)bits.push(res.filtered+' outside the taxon filter');
   $('dropped').textContent=bits.length?'Left out: '+bits.join(', ')+'.':'';
+  var parts=(st.kind==='text'&&S.parts)||[];
+  $('how').textContent=parts.length>1?'Each photo matches all of: '+parts.join(', ')+'. The search sees what is in the photo, not who does what to whom.':'';
   status(message||(res.cards.length?'':'No matching photos.'));
   res.cards.forEach(function(c){grid.appendChild(cardEl(c));});
   var actions=$('actions');actions.textContent='';
