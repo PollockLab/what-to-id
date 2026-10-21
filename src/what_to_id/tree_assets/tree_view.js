@@ -27,6 +27,8 @@ function fit(s,w,b){CX.font=(b?'600 ':'')+'11px '+getComputedStyle(document.body
 // n as a share of d (by default all records needing an ID); a share above nil never reads 0%.
 function pct(n,d){var p=100*n/(d||D.tot[D.root]);return p>=10?Math.round(p)+'%':p>=0.1?p.toFixed(1)+'%':p>0?'<0.1%':'0%';}
 function rk(r){return r===M.lead(D,D.root)?'':M.rank(D,r);}
+// The circle's text s for shown row r; the Unknown group's row is iNaturalist's Life, so it takes the group's map name.
+function cname(r,s){return r===D.nr&&r!==D.root&&cmn(r)||s;}
 // The life group (a map chip) that shown node r stands for, or ''.
 function grpOf(r){return M.chain(D,r).map(function(x){return G[M.id(D,x)];}).filter(Boolean).pop()||'';}
 function recs(n){return nf.format(n)+(n===1?' record':' records');}
@@ -127,7 +129,7 @@ function render(V,pos){
 // pixels photo and text take, nw the full name's width at MINF px; null when the slot is less than a MINF px line high;
 // no text when the name does not fit whole even at MINF px.
 function rim(n,g){var room=(n.a1-n.a0)*g.RL,b=Math.min(g.lab,edge(g,n.a)-g.RL-6);if(n.kids.length||room<MINF+3)return null;
-  var nm=n.row>=0&&grpOf(n.row)?'':n.row<0?'+'+nf.format(n.more)+' more':M.name(D,n.row),
+  var nm=n.row>=0&&grpOf(n.row)?'':n.row<0?'+'+nf.format(n.more)+' more':cname(n.row,M.name(D,n.row)),
     nw=nm?CX.measureText(fit(nm,Infinity)).width*MINF/11:0;if(nw>b-1)return {txt:'',w:0,nw:nw};
   var th=room>=TH+2&&n.row>=0&&b>=TH+4+nw,o=th?TH+4:0,
     fs=Math.max(MINF,Math.min(11,room-3,nw?MINF*(b-o-1)/nw:11)),txt=nm&&fit(nm,(b-o)*11/fs);
@@ -151,7 +153,7 @@ function labels(V,h,on){
   V.all.filter(function(n){return n.row>=0&&(n.kids.length||grpOf(n.row));}).map(function(n){return [n,n.parent?grpOf(n.row):'',up[n.key]||0];})
     .sort(function(a,b){return b[2]-a[2]||!a[1]-!b[1]||b[0].tot-a[0].tot;}).slice(0,60).forEach(function(q){
     var n=q[0],xy=P(g,n.a,n.r).split(','),x=+xy[0],y=+xy[1],
-      txt=fit(q[1]||(n.parent?label(n.row):M.name(D,n.row)+' · '+recs(n.tot)),Infinity,1),
+      txt=fit(q[1]||(n.parent?cname(n.row,label(n.row)):M.name(D,n.row)+' · '+recs(n.tot)),Infinity,1),
       w=CX.measureText(txt).width+3,right=Math.sin(n.a)>=-0.01,
       at=function(r,d){return n.parent?[r?x+7:x-7-w,y-16+d,r?x+7+w:x-7,y-2+d]:[x-w/2,y+8+d,x+w/2,y+22+d];},
       // the groups move up or down a line or two, the selection's line also to the node's other side
@@ -187,7 +189,8 @@ function el(tag,attrs,kids){var e=document.createElement(tag);for(var k in attrs
 function card(){
   var c=$('card');c.textContent='';if(S.sel<0){c.hidden=true;return;}c.hidden=false;
   var e=M.lead(D,S.sel),id=M.id(D,e),tot=D.tot[e],own=D.own[e],k=rk(e),cm=cmn(e),ks=D.kids[e],f=M.lead(D,S.focus),
-    pk=M.pick(D,e),gp=/^groups=/.test(pk)?pk.slice(7):'';
+    pk=M.pick(D,e),gp=/^groups=/.test(pk)?pk.slice(7):'',
+    hd=cm||M.name(D,e),sub=gp===M.REST?'Records not identified past Life, or with no taxon.':label(e)+(k?' · '+k:'');
   if(id)want(id);
   var link=function(href,text,cls){return el('a',{'class':'btn '+(cls||''),href:href,target:EMBED?'_blank':'_self',rel:'noopener'},[text]);};
   var btn=function(text,fn){var b=el('button',{type:'button','class':'btn'},[text]);b.addEventListener('click',fn);return b;};
@@ -215,7 +218,7 @@ function card(){
     b.addEventListener('click',function(){if(x<0)fill(true);else pick(x);});path.appendChild(b);});})();
   var x=el('button',{type:'button','class':'x','aria-label':'Close'},['×']);x.addEventListener('click',function(){S.sel=-1;go(false,true);});
   [x,id?el('div',{'class':'ph big','data-ph':id},['']):null,el('div',{'class':'body'},[
-    pp.length?path:null,el('h2',{},[cm||M.name(D,e)]),el('p',{'class':'muted'},[gp===M.REST?'Records not identified past Life, or with no taxon.':label(e)+(k?' · '+k:'')]),
+    pp.length?path:null,el('h2',{},[hd]),sub===hd?null:el('p',{'class':'muted'},[sub]),
     el('dl',{},[el('dt',{},['Need an ID']),el('dd',{},[nf.format(tot)]),
       el('dt',{},['Share of all needing ID']),el('dd',{},[pct(tot)]),
       el('dt',{},['Identified only to this rank']),el('dd',{},[nf.format(own)+(tot?' ('+pct(own,tot)+')':'')]),

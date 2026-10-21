@@ -75,7 +75,7 @@ def life_site(tmp_path_factory):
     root = tmp_path_factory.mktemp("tree-life")
     pool = pool_frame(np.arange(1, 41))
     pool["taxon_id"] = [2000] * 20 + [67333] * 10 + [48460] * 5 + [None] * 5
-    pool["taxon_name"] = ["x"] * 35 + [None] * 5
+    pool["taxon_name"] = ["x"] * 30 + ["Life"] * 5 + [None] * 5
     pool["iconic_taxon"] = ["Aves"] * 20 + [None] * 20
     blobs, meta = encode_points(pool, LIFE_TREE)
     for name, blob in blobs.items():
@@ -397,6 +397,11 @@ def test_the_root_is_life_and_the_group_cards_link_to_their_records(browser, lif
     page = open_tree(browser, life_site, hash_="#sel=0")
     page.wait_for_selector("#card:not([hidden])")
     assert page.inner_text("#card h2") == "Life" and "40" in page.inner_text("#card dl")
+    assert page.locator("#card .body > p.muted").first.inner_text() != "Life"  # no repeat subtitle
+    # each circle label's own text, less its hover title
+    own = "[...e.childNodes].filter(n => n.nodeType === 3).map(n => n.data).join('')"
+    names = page.eval_on_selector_all("#svg text.lb", f"es => es.map(e => {own})")
+    assert "Unknown" in names and "Life" not in names  # the group's tip, named as its card and chip
     page.close()
     page = open_tree(browser, life_site, hash_="#sel=48460")
     page.wait_for_selector("#card:not([hidden])")
