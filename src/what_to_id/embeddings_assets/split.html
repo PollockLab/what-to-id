@@ -183,7 +183,8 @@ addEventListener('message',function(e){
 // Back and forward: the new selection goes to both.
 addEventListener('hashchange',function(){var s=MapFilter.tokens(location.hash);
   if(s!==last){last=s;Object.keys(frames).forEach(function(n){if(visible(n))sendSel(n,s);});}});
-setView(PANES[want]?want:'tree');
+if(!FILES.tree){delete FILES.tree;delete PANES.tree;}  // a site built without the taxon tree
+setView(PANES[want]?want:PANES.tree?'tree':innerWidth>=1280?'side':'map');
 })();
 </script>
 </body>

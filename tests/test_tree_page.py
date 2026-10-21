@@ -7,7 +7,7 @@ import re
 import numpy as np
 import pytest
 
-from what_to_id import page_nav, tree_page
+from what_to_id import page_nav, split_page, tree_page
 from what_to_id.page_map import encode_points, render_map
 
 from .embeddings_fixture import TREE, pool_frame
@@ -50,3 +50,12 @@ def test_every_page_offers_the_tree_and_only_when_built():
     assert 'href="tree.html"' in page_nav.nav("split.html", set(dict(page_nav.PAGES)))
     html = page_nav.nav("map.html")
     assert re.search(r'href="tree.html"[^>]*data-optional', html) and "data-probe" in html
+
+
+def test_the_split_page_offers_the_tree_only_once_it_is_built(tmp_path):
+    html = split_page.build(tmp_path).read_text()
+    assert 'data-v="tree"' not in html and 'href="tree.html"' not in html and "tree:null" in html
+    write_site(tmp_path)
+    tree_page.build(tmp_path)
+    html = split_page.build(tmp_path).read_text()
+    assert 'data-v="tree"' in html and 'href="tree.html"' in html and 'tree:"tree.html"' in html

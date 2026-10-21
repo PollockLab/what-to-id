@@ -81,8 +81,8 @@ def site(tmp_path_factory):
     (root / "map.html").write_text(render_map(meta, freeze=None))
     build(root, data_url="atlas/")
     # the map needs MapLibre from a CDN, so the split page here holds two photo spaces
-    build_split(root, map_url="embeddings.html")
     tree_page.build(root)
+    build_split(root, map_url="embeddings.html")
     handler = functools.partial(RangeHandler, directory=str(root))
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
