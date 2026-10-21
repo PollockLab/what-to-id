@@ -278,7 +278,7 @@ function layers(){
     return new deck.ScatterplotLayer({id:id,data:rows,getPosition:function(i){return [P.pos[2*i],P.pos[2*i+1]];},
       radiusUnits:'pixels',getRadius:px,filled:false,stroked:true,lineWidthUnits:'pixels',getLineWidth:w,getLineColor:rgb});
   }
-  if(LV.on()&&S.few)lyr.push(ring('few',S.few,6,[29,29,27],1.5));
+  if(LV.on()&&S.few)lyr.push(ring('few',S.few,9,[29,29,27],2.5));
   if(S.nbr.length)lyr.push(ring('nbr',S.nbr,6,[230,110,30],2));
   if(S.sel>=0)lyr.push(ring('sel',[S.sel],9,[29,29,27],2.5));
   if(S.ring)lyr.push(new deck.PathLayer({id:'lasso',data:[S.ring],getPath:function(r){return r;},positionFormat:'XY',
