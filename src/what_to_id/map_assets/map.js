@@ -41,12 +41,14 @@ var PJ=projectFilter({meta:META,hash:new URLSearchParams(location.hash.slice(1))
 var hashTimer=0;
 // The split view hands the selection over live; the area and projects are not part of it yet.
 var SYNC=MapFilter.sync({key:function(){return MF.write(S).join('&');},apply:function(str){
-  var r=MF.read(new URLSearchParams(str));
+  var r=MF.read(new URLSearchParams(str)),was=taxaKey();
   ['up','lo','hi','months','groups','only'].forEach(function(k){S[k]=r[k];});
   S.picks.length=0;r.picks.forEach(function(p){S.picks.push(p);});S.split=[];
   // before the taxa and records are in, refilter runs once they are
   if(TAXA){search();showClades();}
+  FIT=taxaKey()!==was&&taxaKey()!=='';  // a taxon or group picked in the tree or photo space brings its records into view
   showGroups();showMonths();showOnly();if(P.n)refilter();render();}});
+function taxaKey(){return MF.write(S).filter(function(t){return /^(taxa|groups)=/.test(t);}).join('&');}
 // The selection: the hash without the open record and the view.
 function sel(){
   var h=MF.write(S);
@@ -64,7 +66,7 @@ var P={n:0,id:new Uint32Array(0),pos:new Float32Array(0),obs:new Uint16Array(0),
   up:new Uint16Array(0),tax:new Uint16Array(0),grp:new Uint8Array(0),ids:new Uint8Array(0),
   fl:new Uint8Array(0)};
 var TAXA=null,TF=TX.filter(null,[]),GONE={},GONE_NEW=false,KEEP=new Uint8Array(0),SEL=-1,NBR=[],
-  CUM=new Float64Array(META.days+1),TOT=META.totals||null,TC=null,NODAY=0,PER=null,ALT=0;
+  CUM=new Float64Array(META.days+1),TOT=META.totals||null,TC=null,NODAY=0,PER=null,ALT=0,FIT=false;
 function cat(a,b){var c=new a.constructor(a.length+b.length);c.set(a);c.set(b,a.length);return c;}
 function unzip(buf){
   var u=new Uint8Array(buf,0,Math.min(2,buf.byteLength));
@@ -166,8 +168,18 @@ function recount(){
       TC[k+1]=TC[k]+v;}}
   if(SEL>=0&&!KEEP[SEL])closeCard();
   render();
+  if(FIT){FIT=false;fitTo(function(i){var d=day[i];return KEEP[i]&&(d===NO?full():d>=S.lo&&d<=S.hi);});}
 }
 function full(){return S.lo===0&&S.hi===LAST;}
+// records without a date show only over all dates, as the GPU filter does
+function nShown(){return CUM[S.hi+1]-CUM[S.lo]+(full()?NODAY:0);}
+function fitTo(keep){
+  var w=Infinity,s=Infinity,e=-Infinity,n=-Infinity,x,y;
+  if(map)for(var i=0;i<P.n;i++)if(keep(i)){x=P.pos[2*i];y=P.pos[2*i+1];
+    if(x<w)w=x;if(x>e)e=x;if(y<s)s=y;if(y>n)n=y;}
+  // the new count can rewrap the bar above the map; MapLibre sees the new size only a frame later, so a fit
+  // to the old one sits off centre
+  if(w<=e){map.resize();map.fitBounds([[w,s],[e,n]],{padding:40,maxZoom:14});}}
 var VC=null;  // kept records dated in S.lo..S.hi like CUM and inside the viewport; null for the world
 function inView(){
   var n=P.n,b=map.getBounds(),w=b.getWest(),e=b.getEast(),s=b.getSouth(),t=b.getNorth(),key=[w,e,s,t,S.lo,S.hi,S.up,n].join();
@@ -181,8 +193,7 @@ function inView(){
     d=day[i];if(d===NO?all:d>=S.lo&&d<=S.hi)c++;}
   VC={k:key,c:c};return c;}
 function render(){
-  // records without a date show only over all dates, as the GPU filter does
-  var shown=CUM[S.hi+1]-CUM[S.lo]+(full()?NODAY:0);
+  var shown=nShown();
   var iv=P.n&&!AREA.invalid()?inView():null;
   $('count').textContent=AREA.invalid()?'Area unresolved · '+nf.format(shown)+' records available to browse':
     P.n?iv!==null&&iv<shown?nf.format(iv)+' in view of '+nf.format(shown)+' records':
@@ -247,9 +258,12 @@ function layers(){
   if(!P.n||!PD)return;
   EXT=EXT||new Filter({filterSize:2,categorySize:4});
   var r=[full()?-1:S.lo,S.hi],any=[-1,LAST];
+  // fewer than 5,000 records grow up to 3.5x with an outline, so a handful stay findable at BC-wide zoom
+  var sh=PER?nShown():Infinity,k=!(sh<5000)?1:sh<=50?3.5:1+2.5*Math.log(5000/sh)/Math.log(100);
   var L=[new deck.ScatterplotLayer({id:'pts',data:PD,
-    radiusUnits:'pixels',getRadius:1.5,radiusMinPixels:1,
-    radiusMaxPixels:6,stroked:false,pickable:true,
+    radiusUnits:'pixels',getRadius:1.5*k,radiusMinPixels:k,
+    radiusMaxPixels:6*k,stroked:k>1,lineWidthUnits:'pixels',getLineWidth:1,
+    getLineColor:dark?[255,255,255]:[29,29,27],pickable:true,
     extensions:[EXT],updateTriggers:{getFilterCategory:PD_CAT},filterRange:[S.up?any:r,S.up?r:any],filterCategories:categories(THIN)})];
   var at=function(d){return [P.pos[2*d.i],P.pos[2*d.i+1]];};
   if(NBR.length)L.push(new deck.ScatterplotLayer({id:'nbr',data:NBR,getPosition:at,radiusUnits:'pixels',getRadius:11,
@@ -557,10 +571,7 @@ addEventListener('message',function(e){
   var d=e.data;
   if(e.origin!==location.origin||e.source!==parent||!d||d.type!=='wtid-subset')return;
   SUB=d.ids?new Set(d.ids):null;SUBL=d.label;SUBV++;if(TAXA)refilter();
-  var b=[Infinity,Infinity,-Infinity,-Infinity];  // zoom to the hits that are loaded, as the area does
-  if(SUB&&map)for(var i=0;i<P.n;i++)if(SUB.has(P.id[i])){var x=P.pos[2*i],y=P.pos[2*i+1];
-    b=[Math.min(b[0],x),Math.min(b[1],y),Math.max(b[2],x),Math.max(b[3],y)];}
-  if(b[0]<=b[2])map.fitBounds([[b[0],b[1]],[b[2],b[3]]],{padding:40,maxZoom:14});
+  if(SUB)fitTo(function(i){return SUB.has(P.id[i]);});  // zoom to the hits that are loaded, as the area does
 });
 addEventListener('message',function(e){
   if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-record')return;

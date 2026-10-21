@@ -8,9 +8,11 @@ iNaturalist has since swapped keeps its place: ``is_active=any`` returns inactiv
 
 The taxa table (pool-taxa.bin) is one row per taxon a record carries, most records first:
 [latin, common, iNaturalist taxon id, rank]. With a tree, each row gains a fifth element, the
-row of its parent (-1 for none), and rows for ancestors no record carries follow the record rows,
-by id. A record then matches a taxon when that taxon is its own or any ancestor, so a search for
-Bryophyta keeps every moss.
+row of its parent (-1 for none), and a sixth, how many records carry exactly that taxon (0 for an
+ancestor no record carries), and rows for ancestors no record carries follow the record rows, by
+id. A record then matches a taxon when that taxon is its own or any ancestor, so a search for
+Bryophyta keeps every moss. Rows without a tree keep four elements: readers take a fifth as the
+tree's parent column.
 """
 
 from __future__ import annotations
@@ -162,6 +164,9 @@ def taxa_table(df: pd.DataFrame, tree: dict[int, list] | None = None):
     complete = False
     if tree is not None:
         rows, complete = _with_ancestors(rows, tree)
+        own = table["n"].tolist()
+        for i, r in enumerate(rows):
+            r.append(int(own[i]) if i < len(own) else 0)
     ranks = sorted({r[3] for r in rows if r[3]})
     at = {r: i for i, r in enumerate(ranks)}
     for r in rows:

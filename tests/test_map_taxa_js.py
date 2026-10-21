@@ -86,6 +86,8 @@ def test_identify_url_for_clades_groups_and_not():
     r = url({"groups": ["Fungi"], "not": [54743]})
     assert r["q"]["iconic_taxa"] == "Fungi" and r["q"]["without_taxon_id"] == "54743"
     assert "taxon_id" not in r["q"]
+    # iNaturalist finds nothing for iconic_taxa=Unknown
+    assert url({"groups": ["Unknown"], "all": 3})["q"]["iconic_taxa"] == "unknown"
 
 
 def test_identify_url_says_what_it_leaves_out():

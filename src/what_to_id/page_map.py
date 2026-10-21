@@ -18,9 +18,10 @@ record's is the id itself. lon and lat are quantized over META.bbox; obs (observ
 (gzipped JSON of [latin, common, iNaturalist taxon id, rank] rows, most recorded taxon first; rank
 indexes META.ranks) and group META.groups, with 0xFFFF and 0xFF for none. A taxon's rank is the one
 its first record by id carries. Built with the taxon tree, each row also names its parent's row and
-ancestor rows follow the META.taxa_n record rows (see taxonomy.py); META.presets, the shortcut
-chips, is set only when every record taxon has its whole line of ancestors. META.group_ids holds
-the iNaturalist taxon of each group that has one, for the Identify link.
+then its own record count, and ancestor rows follow the META.taxa_n record rows (see
+taxonomy.py); META.presets, the shortcut chips, is set only when every record taxon has its whole
+line of ancestors. META.group_ids holds the iNaturalist taxon of each group that has one, for the
+Identify link.
 ids holds min(IDs, 15) in the low nibble and min(agreements, 15) in the high nibble. flags sets
 FLAG_BITS for the flags META.flags names; a pool pulled before those columns existed has none.
 Dates before DAY_FLOOR (1900-01-01) are stored at that day, so day0 is never earlier, and the

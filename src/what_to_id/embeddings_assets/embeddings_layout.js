@@ -57,7 +57,8 @@ function layoutOnly(parts,layoutBbox){
 }
 // Place every shard record that some layout part holds. Ids are sorted in a shard and in a part, so
 // each pair is one merge pass; a later part overrides an earlier one (a delta replaces the base).
-// Returns {n,id,pos,lonlat,obs,up,grp,tax,ids,flags,start} where start[k] is the first row of shard k.
+// Returns {n,id,pos,lonlat,obs,up,grp,tax,ids,flags,start,src} where start[k] is the first row of shard k
+// and src[i] is point i's row in the shards laid end to end, as files written per shard row are.
 function join(shards,parts,layoutBbox,mapBbox){
   var lx=layoutBbox[0],ly=layoutBbox[1],sx=(layoutBbox[2]-lx||1)/Q,sy=(layoutBbox[3]-ly||1)/Q;
   var mx=mapBbox[0],my=mapBbox[1],tx=(mapBbox[2]-mx||1)/Q,ty=(mapBbox[3]-my||1)/Q;
@@ -75,16 +76,17 @@ function join(shards,parts,layoutBbox,mapBbox){
   var total=placed.reduce(function(t,p){return t+p.rows.length;},0);
   var out={n:total,id:new Uint32Array(total),pos:new Float32Array(2*total),lonlat:new Float32Array(2*total),
     grp:new Uint8Array(total),tax:new Uint16Array(total),obs:new Uint16Array(total),up:new Uint16Array(total),
-    ids:new Uint8Array(total),flags:new Uint8Array(total),start:[]};
-  var o=0;
+    ids:new Uint8Array(total),flags:new Uint8Array(total),start:[],src:new Uint32Array(total)};
+  var o=0,base=0;
   shards.forEach(function(s,k){
     out.start.push(o);
     placed[k].rows.forEach(function(r){
-      out.id[o]=s.id[r];out.grp[o]=s.grp[r];out.tax[o]=s.tax[r];
+      out.src[o]=base+r;out.id[o]=s.id[r];out.grp[o]=s.grp[r];out.tax[o]=s.tax[r];
       out.obs[o]=s.obs[r];out.up[o]=s.up[r];out.ids[o]=s.ids[r];out.flags[o]=s.flags[r];
       out.pos[2*o]=lx+placed[k].qx[r]*sx;out.pos[2*o+1]=ly+placed[k].qy[r]*sy;
       out.lonlat[2*o]=mx+s.qlon[r]*tx;out.lonlat[2*o+1]=my+s.qlat[r]*ty;o++;
     });
+    base+=s.n;
   });
   out.start.push(o);
   return out;

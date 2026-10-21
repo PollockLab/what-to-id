@@ -1,0 +1,7 @@
+# Same-phylum pairs photographed together, added by hand; host_pairs.tsv.gz keeps only cross-phylum pairs.
+# globi_rows is 0 for a hand row; source gives the reason and the GloBI count the rule left out.
+family_a	family_b	types	globi_rows	source
+Arrenuridae	Coenagrionidae	parasiteOf	0	water mites ride on damselflies; GloBI has 150 rows, same phylum
+Cupressaceae	Santalaceae	parasiteOf	0	mistletoes grow on junipers and cypresses; GloBI has 199 rows, same phylum
+Helvellaceae	Hypocreaceae	parasiteOf	0	Hypomyces moulds cover Helvella fruit bodies; GloBI has 111 rows, same phylum
+Pinaceae	Santalaceae	parasiteOf	0	dwarf mistletoe (Arceuthobium) on conifers; GloBI has 276 rows, same phylum

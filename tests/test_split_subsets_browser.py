@@ -1,11 +1,12 @@
-"""The split page's two subset relays in Chromium: the map's area into the photo space, and the
-photo space's lasso into the map. The fixture loads the photo space in both frames, so these pin the
-relay and the photo space's two ends; map.js's end is covered in test_map_projects.py."""
+"""The split page's relays in Chromium: the map's area into the photo space, the photo space's
+lasso into the map, and the tree's taxon into the map. The fixture loads the photo space in both
+frames, so these pin the relay and the photo space's ends; map.js's is in test_map_projects.py."""
 
 import pytest
 
 from . import test_embeddings_browser as eb
 from .test_embeddings_browser import POOL_N, ready, shown, stub_inat
+from .test_tree_browser import stub_taxa
 
 browser, site, open_page = eb.browser, eb.site, eb.open_page
 
@@ -19,7 +20,7 @@ def split(browser, site):
     page.errors = []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     stub_inat(page, None)
-    page.goto(f"{base}/split.html")
+    page.goto(f"{base}/split.html?view=side")
     page.wait_for_function(
         "[...document.querySelectorAll('iframe')].every(f =>"
         " f.contentDocument.getElementById('status').textContent === '')"
@@ -270,3 +271,47 @@ def test_a_hidden_photo_space_takes_its_views_cut_off_the_map(split):
     page.wait_for_function("__keep.length === 2")
     assert page.evaluate("__keep[1]") == {"ids": None, "view": False}
     assert page.errors == []
+
+
+def test_the_split_opens_on_the_tree_whose_selection_is_the_maps_and_back(browser, site):
+    base, *_ = site
+    page = browser.new_page(viewport={"width": 1280, "height": 900})
+    page.errors = []
+    page.on("pageerror", lambda e: page.errors.append(str(e)))
+    stub_inat(page, None)
+    stub_taxa(page)
+    page.goto(f"{base}/split.html")
+    tree, left = page.frame_locator("#tree"), page.frame_locator("#map")
+    tree.locator("#outline .nm", has_text="Genus A").click()
+    page.wait_for_function("location.hash.includes('taxa=900')")
+    left.locator("#selbar li").first.wait_for()
+    on = tree.locator("#outline [aria-selected=true] > .row .nm", has_text="Genus A")
+    page.evaluate("location.hash = ''")
+    on.wait_for(state="detached")
+    page.evaluate("location.hash = '#taxa=900'")  # as when the map picks it
+    on.wait_for()
+    assert page.errors == []
+    page.close()
+
+
+def test_going_back_in_the_tree_keeps_its_selection_the_maps(browser, site):
+    base, *_ = site
+    page = browser.new_page(viewport={"width": 1280, "height": 900})
+    page.errors = []
+    page.on("pageerror", lambda e: page.errors.append(str(e)))
+    stub_inat(page, None)
+    stub_taxa(page)
+    page.goto(f"{base}/split.html")
+    tree = page.frame_locator("#tree")
+    tree.locator("#outline .nm", has_text="Genus A").click()
+    page.wait_for_function("location.hash.includes('taxa=900')")
+    tree.locator("#outline .nm", has_text="Genus B").dispatch_event("click")  # under the card
+    page.wait_for_function("location.hash.includes('taxa=901')")
+    frame = next(f for f in page.frames if "tree.html" in f.url)
+    frame.evaluate("history.back()")  # its own hash holds no filter, which must not clear the pick
+    page.wait_for_function("location.hash.includes('taxa=900')")
+    page.wait_for_timeout(500)
+    on = tree.locator("#outline [aria-selected=true] > .row .nm")
+    assert on.inner_text() == "Genus A" and "taxa=900" in page.evaluate("location.hash")
+    assert page.errors == []
+    page.close()

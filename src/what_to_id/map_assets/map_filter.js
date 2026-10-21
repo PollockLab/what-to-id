@@ -133,7 +133,7 @@ MapFilter.tokens=function(hash){return hash.replace(/^#/,'').split('&').filter(f
   return /^(by|from|to|months|groups|only|acc|taxa)=/.test(t);}).join('&');};
 // Live selection sync for a page inside the split view. key() is the selection the page holds, apply(str) puts
 // one in place. A change goes to the parent at most once a frame; one that comes from outside (the parent's
-// message, a hash change) is applied and not sent back.
+// message, a hash change unless o.hash is false) is applied and not sent back.
 MapFilter.sync=function(o){
   var last=null,raf=0;
   function send(){
@@ -149,6 +149,6 @@ MapFilter.sync=function(o){
       typeof e.data.sel==='string'){
       if(pend===null)requestAnimationFrame(function(){var s=pend;pend=null;take(s);});
       pend=e.data.sel;}});
-  addEventListener('hashchange',function(){take(MapFilter.tokens(location.hash));});
+  if(o.hash!==false)addEventListener('hashchange',function(){take(MapFilter.tokens(location.hash));});
   return {send:send};
 };

@@ -4,6 +4,7 @@ The iNaturalist API is stubbed and deck.gl is replaced by a recorder (the CDN bu
 """
 
 import functools
+import gzip
 import http.server
 import json
 import os
@@ -13,6 +14,7 @@ from urllib.parse import parse_qs, urlparse
 import numpy as np
 import pytest
 
+from what_to_id import tree_page
 from what_to_id.embeddings_page import build
 from what_to_id.page_map import encode_points, render_map
 from what_to_id.split_page import build as build_split
@@ -32,6 +34,8 @@ window.deck = {
   OrthographicView: class { constructor(p) { this.props = p; } },
   ScatterplotLayer: class { constructor(p) { this.props = p; this.id = p.id; } },
   PathLayer: class { constructor(p) { this.props = p; this.id = p.id; } },
+  BitmapLayer: class { constructor(p) { this.props = p; this.id = p.id; } },
+  TextLayer: class { constructor(p) { this.props = p; this.id = p.id; } },
   DataFilterExtension: class { initializeState() {} },
 };"""
 
@@ -78,8 +82,11 @@ def site(tmp_path_factory):
     for name, blob in blobs.items():
         (root / name).write_bytes(blob)
     (root / "map.html").write_text(render_map(meta, freeze=None))
+    # the map of life's look-alike file, every record unknown (its contract: two planes of n bytes)
+    (root / "pool-lookalike.bin").write_bytes(gzip.compress(b"\xff" * POOL_N + b"\x0f" * POOL_N))
     build(root, data_url="atlas/")
     # the map needs MapLibre from a CDN, so the split page here holds two photo spaces
+    tree_page.build(root)
     build_split(root, map_url="embeddings.html")
     handler = functools.partial(RangeHandler, directory=str(root))
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
@@ -370,7 +377,10 @@ def test_filters_in_the_hash_wait_for_the_join(browser, site):
     base, *_ = site
     page = browser.new_page(viewport={"width": 1280, "height": 900})
     held = []
-    page.route("**/pool-*.bin*", lambda r: held.append(r))
+    page.route(
+        "**/pool-*.bin*",
+        lambda r: r.continue_() if "lookalike" in r.request.url else held.append(r),
+    )
     page.errors = []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     stub_inat(page, None)
@@ -404,327 +414,3 @@ def test_hash_changes_apply_in_place_including_back_and_forward(open_page):
     page.wait_for_function(f"document.getElementById('count').textContent.startsWith('{aug:,}')")
     assert page.evaluate("window.marker") == 1  # nothing reloaded
     assert page.errors == []
-
-
-def test_split_page_relays_the_selection_between_frames_without_reloads(browser, site):
-    base, *_ = site
-    page = browser.new_page(viewport={"width": 1280, "height": 900})
-    page.errors = []
-    page.on("pageerror", lambda e: page.errors.append(str(e)))
-    stub_inat(page, None)
-    page.goto(f"{base}/split.html#months=8")
-    counts = (
-        "[...document.querySelectorAll('iframe')].map(f => f.contentDocument &&"
-        " f.contentDocument.getElementById('count') &&"
-        " f.contentDocument.getElementById('count').textContent)"
-    )
-    page.wait_for_function(f"{counts}.every(c => c && c.includes('shown'))")
-    left, right = page.frame_locator("#map"), page.frame_locator("#space")
-    before = left.locator("#count").inner_text()
-    assert before == right.locator("#count").inner_text()
-    for f in ("#map", "#space"):
-        page.evaluate(f"document.querySelector('{f}').contentWindow.marker = 1")
-    left.locator("#groups button[data-g='1']").click()  # pick Insecta in the left frame
-    page.wait_for_function(f"{counts}.every(c => c !== {before!r}) && new Set({counts}).size === 1")
-    assert "groups=Insecta" in page.evaluate("location.hash")
-    assert right.locator("#selbar li", has_text="Insecta").count() == 1
-    for f in ("#map", "#space"):
-        assert page.evaluate(f"document.querySelector('{f}').contentWindow.marker") == 1
-    assert page.errors == []
-    page.close()
-
-
-def test_split_page_mirrors_a_picked_record_in_the_other_frame(browser, site):
-    # the fixture loads the photo space in both frames, so this pins the relay, not map.js
-    base, *_ = site
-    page = browser.new_page(viewport={"width": 1280, "height": 900})
-    page.errors = []
-    page.on("pageerror", lambda e: page.errors.append(str(e)))
-    stub_inat(page, None)
-    page.goto(f"{base}/split.html")
-    page.wait_for_function(
-        "[...document.querySelectorAll('iframe')].every(f =>"
-        " f.contentDocument.getElementById('count').textContent.includes('shown'))"
-    )
-    pick = [f for f in page.frames if "embed=1" in f.url]
-    assert len(pick) == 2
-    pick[1].evaluate(
-        "window.got = []; addEventListener('message', e =>"
-        " e.data.type === 'wtid-matches' && got.push(e.data))"
-    )
-    pick[0].evaluate("__deck.props.onClick({index: 7, layer: {id: 'pts'}})")
-    sel = "__deck.props.layers.find(x => x.id === 'sel').props.data[0]"
-    for f in pick:
-        f.wait_for_function("__deck.props.layers.some(x => x.id === 'sel')")
-        assert f.evaluate(sel) == 7
-    pick[0].wait_for_selector(".nbrs li .score")
-    assert pick[0].locator(".nbrs li .score").first.inner_text().startswith("Cosine 0.")
-    assert pick[0].locator(".nbrs li .rank").first.inner_text() == "1"
-    pick[1].wait_for_function("got.length === 1")  # the matches reached the other frame
-    hits = pick[1].evaluate("got[0].hits")
-    assert len(hits) == 12 and all(0 <= h["score"] <= 1 for h in hits)
-    assert [h["score"] for h in hits] == sorted((h["score"] for h in hits), reverse=True)
-    pick[1].evaluate("document.querySelector('#card .x').click()")
-    for f in pick:
-        f.wait_for_function("!__deck.props.layers.some(x => x.id === 'sel')")
-    assert page.errors == []
-    page.close()
-
-
-def test_split_photo_search_narrows_both_frames_and_the_chip_clears_it(browser, site):
-    base, _, pool, _ = site
-    page = browser.new_page(viewport={"width": 1280, "height": 900})
-    page.errors = []
-    page.on("pageerror", lambda e: page.errors.append(str(e)))
-    stub_inat(page, None)
-    page.goto(f"{base}/split.html")
-    counts = (
-        "[...document.querySelectorAll('iframe')].map(f => f.contentDocument &&"
-        " f.contentDocument.getElementById('count') &&"
-        " f.contentDocument.getElementById('count').textContent)"
-    )
-    page.wait_for_function(f"{counts}.every(c => c && c.includes('shown'))")
-    before = page.evaluate(counts)
-    seed = int(sorted(pool)[0])
-    page.fill("#sq", f"https://www.inaturalist.org/observations/{seed}")
-    page.press("#sq", "Enter")
-    chip = "#selbar li:has-text('Photo search')"
-    for f in ("#map", "#space"):
-        page.frame_locator(f).locator(chip).wait_for(state="attached")  # the peer folds its panel
-    now = page.evaluate(counts)
-    num = [int(c.split(" ")[0].replace(",", "")) for c in (*now, *before)]
-    assert 0 < num[0] == num[1] < num[2] == num[3]
-    page.frame_locator("#map").locator(chip + " button").click()
-    for f in ("#map", "#space"):
-        page.frame_locator(f).locator(chip).wait_for(state="detached")
-    page.wait_for_function(f"{counts}.every(c => c === {before[0]!r})")
-    assert page.input_value("#sq") == ""
-    assert page.errors == []
-    page.close()
-
-
-def test_split_divider_resizes_by_keys_and_double_click_and_remembers(browser, site):
-    base, *_ = site
-    page = browser.new_page(viewport={"width": 1280, "height": 900})
-    page.goto(f"{base}/split.html")
-    width = "document.getElementById('map').getBoundingClientRect().width"
-    page.wait_for_selector("#map")
-    half = page.evaluate(width)
-    sep = page.locator("#sep")
-    sep.focus()
-    for _ in range(5):
-        page.keyboard.press("ArrowRight")
-    assert page.evaluate(width) == pytest.approx(half + 0.1 * 1280, abs=3)
-    page.reload()
-    page.wait_for_selector("#map")
-    assert page.evaluate(width) > half + 100  # remembered
-    sep.dblclick()
-    assert page.evaluate(width) == pytest.approx(half, abs=3)
-    page.close()
-
-
-def test_card_resizes_from_its_left_edge_and_remembers(open_page):
-    page = open_page(drop=None)
-    ready(page)
-    page.evaluate("__deck.props.onClick({index: 7, layer: {id: 'pts'}})")
-    width = "document.getElementById('card').getBoundingClientRect().width"
-    assert page.evaluate(width) == 300
-    rz = page.locator("#card .rz")
-    rz.focus()
-    for _ in range(5):
-        page.keyboard.press("ArrowLeft")
-    assert page.evaluate(width) == 400
-    box = rz.bounding_box()
-    page.mouse.move(box["x"] + 3, box["y"] + 50)
-    page.mouse.down()
-    page.mouse.move(box["x"] + 100, box["y"] + 50, steps=4)
-    page.mouse.up()
-    assert page.evaluate(width) == pytest.approx(300, abs=3)
-    page.reload()
-    ready(page)
-    page.evaluate("__deck.props.onClick({index: 7, layer: {id: 'pts'}})")
-    assert (
-        page.evaluate(width) == pytest.approx(300, abs=3) and page.evaluate(width) != 300
-    )  # remembered
-    page.locator("#card .rz").dblclick()
-    assert page.evaluate(width) == 300
-    assert page.errors == []
-
-
-def test_click_opens_card_with_neighbours_and_jump(open_page, site):
-    _, _, in_pool, _ = site
-    page = open_page(drop=None)
-    ready(page)
-    page.evaluate("__deck.props.onClick({index: 7, layer: {id: 'pts'}})")
-    page.wait_for_selector(".nbrs button")
-    assert page.locator(".nbrs button").count() == 12
-    card = page.locator("#card")
-    mine = int(
-        card.get_by_role("link", name="More like this").get_attribute("href").split("#id=")[1]
-    )
-    assert card.get_by_role("link", name="Help identify on iNaturalist").get_attribute("href") == (
-        f"https://www.inaturalist.org/observations/{mine}"
-    )
-    assert card.get_by_role("link", name="Show on map").get_attribute("href") == (
-        f"map.html#record={mine}"
-    )
-    assert "Vancouver" in card.inner_text() and page.locator(".ph img").count() == 1
-    near = [int(b.get_attribute("data-id")) for b in page.locator(".nbrs button").all()]
-    assert layer(page, "nbr")["n"] == len([i for i in near if i in in_pool])
-    assert layer(page, "sel")["n"] == 1
-    target = next(i for i in near if i in in_pool)
-    page.locator(f".nbrs button[data-id='{target}']").click()
-    page.wait_for_function(f"location.hash === '#id={target}'")
-    page.wait_for_function(f"document.querySelector('#card a[href$=\"#id={target}\"]')")
-    page.keyboard.press("Escape")
-    assert page.locator("#card").is_hidden() and layer(page, "sel") is None
-    assert page.errors == []
-
-
-def test_deep_link_lists_the_exact_neighbours_and_drops_those_that_left_needs_id(open_page, site):
-    _, ref, _, _ = site
-    source = ref["lookups"][0]
-    want = source["neighbors"][0]
-    page = open_page(f"#id={source['id']}", drop=want[3])
-    page.wait_for_selector(".nbrs button")
-    got = [int(b.get_attribute("data-id")) for b in page.locator(".nbrs button").all()]
-    assert got == [i for i in want if i != want[3]]
-    assert "1 no longer need an ID" in page.locator("#card").inner_text()
-    assert page.calls == [[source["id"], *want]]
-    assert page.errors == []
-
-
-def test_missing_layout_says_so(browser, site):
-    base, *_ = site
-    page = browser.new_page()
-    try:
-        page.on("pageerror", lambda e: pytest.fail(str(e)))
-
-        def without_layout(route):
-            manifest = json.loads(route.fetch().text())
-            manifest.pop("layout")
-            route.fulfill(json=manifest)
-
-        page.route("**/atlas/manifest.json", without_layout)
-        page.route("https://unpkg.com/**", lambda r: r.fulfill(body=DECK_STUB))
-        page.goto(f"{base}/embeddings.html?standalone=1")
-        page.wait_for_function(
-            "document.getElementById('status').textContent.includes('no photo-space')"
-        )
-        assert "Could not load" in page.locator("#count").inner_text()
-    finally:
-        page.close()
-
-
-def test_points_draw_and_click_before_the_shards_arrive(browser, site):
-    base, *_ = site
-    page = browser.new_page(viewport={"width": 1280, "height": 900})
-    held = []
-    page.errors = []
-    page.on("pageerror", lambda e: page.errors.append(str(e)))
-    try:
-        page.calls = stub_inat(page, None)
-
-        page.route(
-            "**/pool-*.bin*", lambda r: held.append(r)
-        )  # park the shard requests until released
-        page.goto(f"{base}/embeddings.html?standalone=1")
-        ready_early = "window.__deck && __deck.props.layers.length > 0"
-        page.wait_for_function(ready_early)
-        assert layer(page, "pts")["n"] == TOTAL  # the layout alone, nothing joined yet
-        assert "Loading groups and names" in page.locator("#status").inner_text()
-        assert page.locator("#groups button").count() == 0
-        page.evaluate("__deck.props.onClick({index: 7, layer: {id: 'pts'}})")
-        page.wait_for_selector(".nbrs button")
-        assert "Loading groups and names" in page.locator("#card .muted").first.inner_text()
-        assert held  # the shard requests were parked, not answered
-        for route in held:
-            route.continue_()
-        page.wait_for_function("document.getElementById('status').textContent === ''")
-        assert layer(page, "pts")["n"] == POOL_N
-        assert page.locator("#groups button[data-g]").count() == len(GROUPS)
-        assert page.locator("#card").is_visible()  # the open card survives the join
-        assert page.errors == []
-    finally:
-        page.close()
-
-
-def test_failed_shards_leave_the_plot_usable(browser, site):
-    base, *_ = site
-    page = browser.new_page(viewport={"width": 1280, "height": 900})
-    try:
-        stub_inat(page, None)
-        page.route("**/pool-*.bin*", lambda r: r.fulfill(status=500))
-        page.goto(f"{base}/embeddings.html?standalone=1")
-        page.wait_for_function(
-            "document.getElementById('status').textContent.includes('unavailable')"
-        )
-        assert layer(page, "pts")["n"] == TOTAL
-    finally:
-        page.close()
-
-
-def _split(browser, site, w, h, query="", hash_=""):
-    base, *_ = site
-    page = browser.new_page(viewport={"width": w, "height": h})
-    page.errors = []
-    page.on("pageerror", lambda e: page.errors.append(str(e)))
-    stub_inat(page, None)
-    page.goto(f"{base}/split.html{query}{hash_}")
-    return page
-
-
-FRAMES = "[...document.querySelectorAll('iframe')].filter(f => !f.hidden).map(f => f.id)"
-
-
-def test_split_shows_both_views_wide_and_the_map_alone_when_narrower(browser, site):
-    page = _split(browser, site, 1280, 800)
-    assert page.evaluate(FRAMES) == ["map", "space"]
-    assert page.locator("[data-v=side]").get_attribute("aria-pressed") == "true"
-    page.close()
-    page = _split(browser, site, 1100, 800)
-    assert page.evaluate(FRAMES) == ["map"]
-    page.click("[data-v=space]")
-    page.wait_for_function(f"{FRAMES}.join() === 'space'")
-    assert "view=space" in page.evaluate("location.search")
-    page.click("[data-v=side]")
-    page.wait_for_function(f"{FRAMES}.join() === 'map,space'")
-    page.close()
-
-
-def test_split_has_one_header_and_the_note_behind_an_i_button(browser, site):
-    page = _split(browser, site, 1280, 800)
-    page.wait_for_function(f"{FRAMES}.length === 2")
-    assert page.locator(".site-shell:visible").count() == 1
-    for f in ("#map", "#space"):
-        shell = page.frame_locator(f).locator(".site-shell")
-        assert shell.count() == 0 or not shell.is_visible()
-    assert page.locator("#note").is_hidden()
-    page.click("#i")
-    assert page.locator("#note").is_visible() and "share one selection" in page.inner_text("#note")
-    page.keyboard.press("Escape")
-    assert page.locator("#note").is_hidden()
-    assert page.errors == []
-    page.close()
-
-
-def test_a_phone_holds_one_frame_at_a_time(browser, site):
-    page = _split(browser, site, 390, 800, hash_="#months=8")
-    assert page.evaluate("document.querySelectorAll('iframe').length") == 1
-    assert page.locator("[data-v=side]").is_hidden()
-    page.click("[data-v=space]")
-    page.wait_for_function(
-        "document.querySelectorAll('iframe').length === 1 && document.querySelector('#space')"
-    )
-    assert "months=8" in page.evaluate("document.querySelector('#space').src")
-    page.close()
-
-
-def test_old_page_urls_open_the_matching_explore_view_with_the_hash(browser, site):
-    base, *_ = site
-    page = browser.new_page(viewport={"width": 1280, "height": 800})
-    stub_inat(page, None)
-    page.goto(f"{base}/embeddings.html#months=8")
-    page.wait_for_url(f"{base}/split.html?view=space#months=8")
-    assert page.evaluate(FRAMES) == ["space"]
-    page.close()
