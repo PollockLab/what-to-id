@@ -61,7 +61,8 @@ def build(
     out.mkdir(parents=True, exist_ok=True)
     html = (ASSETS / "split.html").read_text()
     has_tree = (out / tree_url).exists()
-    pages = set(dict(page_nav.PAGES)) - (set() if has_tree else {"tree.html"})
+    # split.html is written last, so an optional page missing here is missing from the site
+    pages = {p for p, _ in page_nav.PAGES if p not in page_nav.OPTIONAL or (out / p).exists()}
     bar = BAR if has_tree else BAR.replace(TREE_BUTTON, "")
     for key, value in {
         "__SITE_CSS__": page_nav.CSS,

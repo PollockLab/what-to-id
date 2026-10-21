@@ -59,3 +59,9 @@ def test_the_split_page_offers_the_tree_only_once_it_is_built(tmp_path):
     tree_page.build(tmp_path)
     html = split_page.build(tmp_path).read_text()
     assert 'data-v="tree"' in html and 'href="tree.html"' in html and 'tree:"tree.html"' in html
+
+
+def test_the_split_page_links_an_optional_page_only_once_it_is_built(tmp_path):
+    assert 'href="confusion.html"' not in split_page.build(tmp_path).read_text()
+    (tmp_path / "confusion.html").write_text("<html></html>")
+    assert 'href="confusion.html"' in split_page.build(tmp_path).read_text()
