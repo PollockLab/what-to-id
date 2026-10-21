@@ -169,6 +169,24 @@ console.log(JSON.stringify({{fine: M.fine, lep: region(M, -6.5, 0), col: region(
     assert x0 < -7.5 and x1 > -2 and x1 < 0 and y1 < 3
 
 
+def test_a_second_zoom_into_the_same_points_crops_as_the_first_and_new_points_are_not_stale(world):
+    got = node(
+        world,
+        f"""
+const ins = map({ROW["Insecta"]}, null).ext, lep = map({ROW["Lepidoptera"]}, null).ext,
+  again = map({ROW["Insecta"]}, null).ext;
+delete require.cache[require.resolve({str(ASSET)!r})];
+const cold = require({str(ASSET)!r});  // a fresh module: no life pass kept from an earlier zoom
+const fresh = (o) => cold.build(Object.assign({{}}, base, o)).ext;
+console.log(JSON.stringify({{ins, lep, again, coldIns: fresh({{clade: {ROW["Insecta"]}}}),
+  coldLep: fresh({{clade: {ROW["Lepidoptera"]}}}),
+  twice: fresh({{clade: {ROW["Insecta"]}, pos: base.pos.map((v) => 2 * v)}})}}));""",
+    )
+    assert got["ins"] == got["again"] == got["coldIns"] and got["lep"] == got["coldLep"]
+    assert got["ins"] != got["lep"]
+    assert got["twice"] == [2 * v for v in got["ins"]]  # another point set, not the kept one
+
+
 def test_look_alike_mean_skips_undecidable_and_none(world):
     got = node(
         world,
