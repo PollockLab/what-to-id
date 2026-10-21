@@ -180,11 +180,12 @@ function focusOn(r){S.focus=r;if(!S.open.has(r))M.toggle(D,S,r);go(true,true);}
 function go(animate,push){
   var base=location.pathname+location.search,h=M.write(D,S),u=base+(h?'#'+h:'');
   if(u!==base+location.hash)history[push?'pushState':'replaceState'](null,'',u);
-  // in the split view a new selection is the map's and the photo space's too
-  if(SY&&S.sel!==PS){PS=S.sel;SEL=SEL.split('&').filter(function(t){return !/^(taxa|groups)=/.test(t);})
-    .concat(M.pick(D,S.sel)).filter(Boolean).join('&');SY.send();}
-  draw(animate);
+  share();draw(animate);
 }
+// in the split view a new selection is the map's and the photo space's too
+function share(){
+  if(SY&&S.sel!==PS){PS=S.sel;SEL=SEL.split('&').filter(function(t){return !/^(taxa|groups)=/.test(t);})
+    .concat(M.pick(D,S.sel)).filter(Boolean).join('&');SY.send();}}
 function crumbs(){
   var c=$('crumbs'),f=M.lead(D,S.focus),path=M.crumbs(D,f).concat(f);c.textContent='';
   path.forEach(function(r,i){var b=el('button',{type:'button','class':'link'},[cut(M.name(D,M.chain(D,r).pop()),24)]);
@@ -201,8 +202,8 @@ $('reset').addEventListener('click',function(){var s=S.sel;S=M.home(D,GS);S.sel=
 $('mode').addEventListener('click',function(){var r=document.body.classList.toggle('radial');
   this.setAttribute('aria-pressed',String(r));draw(false);});
 $('info').addEventListener('click',function(){var a=$('about');a.hidden=!a.hidden;this.setAttribute('aria-expanded',String(!a.hidden));});
-addEventListener('popstate',function(){if(D){S=M.read(D,location.hash,GS);draw(true);}});
-addEventListener('hashchange',function(){if(D){S=M.read(D,location.hash,GS);draw(true);}});
+function back(){if(D){S=M.read(D,location.hash,GS);share();draw(true);}}
+addEventListener('popstate',back);addEventListener('hashchange',back);
 var rz=0;new ResizeObserver(function(){if(!rz)rz=requestAnimationFrame(function(){rz=0;if(V)draw(false);});}).observe($('radial'));
 var picks=[];
 TX.picker({input:$('q'),list:$('sugg'),msg:$('qn'),picks:picks,ranks:META.ranks,nf:nf,
@@ -210,7 +211,7 @@ TX.picker({input:$('q'),list:$('sugg'),msg:$('qn'),picks:picks,ranks:META.ranks,
   onPick:function(r){if(!D.tot[r])return status('No record of this taxon needs an ID.');S.sel=r;M.reveal(D,S,r);go(true,true);}});
 // The map's selection selects its taxon or group here; one this side already shows is left as it is.
 function take(){var r=M.find(D,SEL);if(r!==S.sel){S.sel=r;if(r>=0)M.reveal(D,S,r);}PS=S.sel;}
-if(EMBED&&parent!==window)SY=MapFilter.sync({key:function(){return SEL;},apply:function(s){SEL=s;if(D){take();draw(true);}}});
+if(EMBED&&parent!==window)SY=MapFilter.sync({hash:false,key:function(){return SEL;},apply:function(s){SEL=s;if(D){take();draw(true);}}});
 async function load(){
   status('Loading the taxa…');
   var has=fetch('split.html',{method:'HEAD'}).then(function(r){return r.ok;},function(){return false;});

@@ -292,3 +292,26 @@ def test_the_split_opens_on_the_tree_whose_selection_is_the_maps_and_back(browse
     on.wait_for()
     assert page.errors == []
     page.close()
+
+
+def test_going_back_in_the_tree_keeps_its_selection_the_maps(browser, site):
+    base, *_ = site
+    page = browser.new_page(viewport={"width": 1280, "height": 900})
+    page.errors = []
+    page.on("pageerror", lambda e: page.errors.append(str(e)))
+    stub_inat(page, None)
+    stub_taxa(page)
+    page.goto(f"{base}/split.html")
+    tree = page.frame_locator("#tree")
+    tree.locator("#outline .nm", has_text="Genus A").click()
+    page.wait_for_function("location.hash.includes('taxa=900')")
+    tree.locator("#outline .nm", has_text="Genus B").dispatch_event("click")  # under the card
+    page.wait_for_function("location.hash.includes('taxa=901')")
+    frame = next(f for f in page.frames if "tree.html" in f.url)
+    frame.evaluate("history.back()")  # its own hash holds no filter, which must not clear the pick
+    page.wait_for_function("location.hash.includes('taxa=900')")
+    page.wait_for_timeout(500)
+    on = tree.locator("#outline [aria-selected=true] > .row .nm")
+    assert on.inner_text() == "Genus A" and "taxa=900" in page.evaluate("location.hash")
+    assert page.errors == []
+    page.close()
