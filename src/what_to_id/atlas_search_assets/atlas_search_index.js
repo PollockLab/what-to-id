@@ -246,7 +246,31 @@ Index.prototype.search=async function(q,opts){
   if(!(shortlist>0))return top.result();
   if(opts.onStage1)opts.onStage1(top.result().slice(0,k));
   var refined=await this.refine(top,qr,parts);
-  return topIndices(refined,k).map(function(i){return {id:top.ids[i],score:refined[i]};});
+  // tag locates the row for vector(): part index * 2^32 + row
+  return topIndices(refined,k).map(function(i){return {id:top.ids[i],score:refined[i],tag:top.tags[i]};});
+};
+// Approximate unit vector of a search hit from its codes: x = c_l + A^T (decode(pq code) + lo + step * level),
+// the inverse of encode in atlas_index_io.py, so the page can fold picked photos into the query.
+Index.prototype.vector=async function(tag){
+  var mf=this.manifest,dims=mf.dims,m=mf.m,dsub=dims/m,bits=mf.refine.bits,rb=dims*bits/8,self=this;
+  await this.core();
+  var parts=mf.parts.filter(function(p){return p.count>0;}),pi=Math.floor(tag/4294967296),row=tag-pi*4294967296;
+  var part=parts[pi],off=await this.partOffsets(part),lo=0,hi=mf.nlist-1,l=0;
+  while(lo<=hi){var mid=(lo+hi)>>1;if(off[mid]<=row){l=mid;lo=mid+1;}else hi=mid-1;}
+  await this.loadLists(part,[l]);
+  var codes=this.lists[part.name+':'+l].codes,at=(row-off[l])*m;
+  var name=part.name+'.refine.u8',buf=part.count*rb<=this.whole?new Uint8Array(await this.file(name)).subarray(row*rb,(row+1)*rb)
+    :new Uint8Array(await this.bytes(name,row*rb,(row+1)*rb));
+  var y=new Float32Array(dims),mask=(1<<bits)-1,sqlo=this.sq.subarray(0,dims),step=this.sq.subarray(dims);
+  for(var d=0;d<dims;d++){
+    var j=Math.floor(d/dsub),p=d*bits,b=p>>3;
+    y[d]=self.pq[(j*KSUB+codes[at+j])*dsub+d%dsub]+sqlo[d]+step[d]*(((buf[b]|(buf[b+1]<<8))>>(p&7))&mask);
+  }
+  var x=new Float32Array(dims),n=0;
+  for(var i=0;i<dims;i++){var s=self.centroids[l*dims+i];for(d=0;d<dims;d++)s+=self.rot[d*dims+i]*y[d];x[i]=s;n+=s*s;}
+  n=Math.sqrt(n);
+  for(i=0;i<dims;i++)x[i]/=n;
+  return x;
 };
 // Refined scores for a stage-1 shortlist (a Topk tagged with part index * 2^32 + row). Rows of one part
 // are read as Range requests with adjacent rows merged, `concurrency` at a time.

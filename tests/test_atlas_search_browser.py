@@ -360,3 +360,19 @@ def test_unknown_query_still_uses_the_encoder_when_taxa_exist(open_page):
     page.wait_for_selector(".card")
     assert page.evaluate("window.encoded") == ["a photo of a bird"]
     assert page.errors == []
+
+
+def test_ticking_matches_reruns_the_search_toward_the_picked_photos(open_page, site):
+    page = open_page("#q=a+bird+eating+a+frog")
+    page.wait_for_selector(".card")
+    again = page.locator("#again")
+    assert again.is_disabled()
+    page.locator(".card .pick input").first.check()
+    page.locator(".card .pick input").nth(1).check()
+    assert again.inner_text() == "Search again with 2 picked photos"
+    before = card_ids(page)
+    again.click()
+    page.wait_for_function("document.querySelector('#rh').textContent.includes('2 picked photos')")
+    assert set(before[:2]) <= set(card_ids(page)[:8])
+    assert page.locator("#again").is_disabled()
+    assert page.url.endswith("#q=a+bird+eating+a+frog")

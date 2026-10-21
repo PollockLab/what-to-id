@@ -11,7 +11,13 @@ import pytest
 
 from what_to_id.atlas_neighbors import lookup_neighbors, write_neighbor_records
 
-from .atlas_index_fixture import write_fixture
+from .atlas_index_fixture import (
+    FIXTURE_DELTA,
+    FIXTURE_DIMS,
+    FIXTURE_ROWS,
+    clustered_unit,
+    write_fixture,
+)
 
 ASSETS = Path(__file__).parents[1] / "src/what_to_id/atlas_search_assets"
 NODE = shutil.which("node")
@@ -91,6 +97,32 @@ def test_search_matches_python_reference_exactly(fixture):
             assert max(ids) > 2**31, "fixture should exercise ids above int32"
             np.testing.assert_allclose([h["score"] for h in hits], scores[:n], atol=1e-4)
     assert any(h["id"] > 2**31 for per in got for hits in per for h in hits)
+
+
+def test_vector_reconstructs_a_hit_from_its_codes(fixture):
+    """The first six reference queries are rows of the index: each top hit is that row, and its
+    reconstruction from PQ plus refine codes lands close to the stored vector (both parts)."""
+    directory, ref = fixture
+    # the reference queries all sit in the base part; one delta row covers the whole-file read
+    delta = clustered_unit(FIXTURE_ROWS + FIXTURE_DELTA, FIXTURE_DIMS, 24, seed=0)[FIXTURE_ROWS]
+    queries = ref["queries"][:6] + [delta.tolist()]
+    script = f"""(async () => {{
+      const idx = await IDX.open('http://data.test/atlas/', {{fetch: fakeFetch, whole: 4 << 20}});
+      const res = [];
+      for (const q of {json.dumps(queries)}) {{
+        const hits = await idx.search(Float32Array.from(q), {{k: 3, nprobe: 16}});
+        const x = await idx.vector(hits[0].tag);
+        let dot = 0, n = 0;
+        for (let i = 0; i < x.length; i++) {{ dot += x[i] * q[i]; n += x[i] * x[i]; }}
+        const part = Math.floor(hits[0].tag / 4294967296);
+        res.push({{top: hits[0].score, cos: dot, norm: n, part: part}});
+      }}
+      out(res);
+    }})()"""
+    got = node(script, directory)
+    assert {r["part"] for r in got} == {0, 1}
+    for r in got:
+        assert r["top"] > 0.95 and r["cos"] > 0.9 and abs(r["norm"] - 1) < 1e-4
 
 
 def test_range_reads_fetch_only_probed_lists(fixture):

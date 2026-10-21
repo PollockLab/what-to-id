@@ -54,7 +54,7 @@ async function fetchObservations(ids,fetchFn,cache){
 function card(o,hit){
   var t=o.taxon||{},ph=o.photos&&o.photos[0];
   return {
-    id:o.id,score:hit.score,grade:o.quality_grade,
+    id:o.id,score:hit.score,tag:hit.tag,grade:o.quality_grade,
     photo:ph?smallPhoto(ph.url):'',
     name:t.name||'',common:t.preferred_common_name||'',rank:t.rank||'',
     date:o.observed_on||'',place:o.place_guess||'',
@@ -111,11 +111,11 @@ function fuse(lists,k){
       seen.add(h.id);
       var s=Infinity;
       maps.forEach(function(m,i){s=Math.min(s,m.has(h.id)?m.get(h.id):floors[i]);});
-      out.push({id:h.id,score:s,whole:maps[0].has(h.id)?maps[0].get(h.id):floors[0]});
+      out.push({id:h.id,score:s,tag:h.tag,whole:maps[0].has(h.id)?maps[0].get(h.id):floors[0]});
     });
   });
   out.sort(function(a,b){return b.score-a.score||b.whole-a.whole||a.id-b.id;});
-  return out.slice(0,k).map(function(h){return {id:h.id,score:h.score};});
+  return out.slice(0,k).map(function(h){return {id:h.id,score:h.score,tag:h.tag};});
 }
 return {BATCH:BATCH,parseInput:parseInput,parseHash:parseHash,toHash:toHash,smallPhoto:smallPhoto,
   fetchObservations:fetchObservations,build:build,autocomplete:autocomplete,subjects:subjects,fuse:fuse};
