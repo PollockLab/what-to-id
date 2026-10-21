@@ -31,7 +31,8 @@ function step(l){
 // iconic taxa), each row takes the group of its nearest group ancestor, else REST. The group taxa hang from
 // the root, so its children are the map's groups; a taxon they leave keeps the rest (ex: the group taxa
 // taken out from under it). opt: order (the map's group list, the root's child order), names (the map's
-// group names) and total (all records, so those with no taxon count in Life, which holds REST).
+// group names) and total (all records: those with no taxon, none, count in the totals of Life, which holds REST,
+// but not in its own records; nr is the row that holds them).
 var REST='Unknown',LIFE=48460;
 function build(T,ranks,groups,opt){
   opt=opt||{};
@@ -42,7 +43,8 @@ function build(T,ranks,groups,opt){
     st[i]=step(LEVEL[ranks[t[3]]]);}
   par[n]=-1;st[n]=0;row.set(0,n);
   for(i=0;i<n;i++)if(groups[T[i][2]]){for(j=par[i];j<n&&!groups[T[j][2]];j=par[j])(ex[j]=ex[j]||[]).push(T[i][2]);par[i]=n;}
-  if(opt.total){var lf=row.get(LIFE);own[lf!=null?lf:n]+=Math.max(0,opt.total-own.reduce(function(s,v){return s+v;},0));}
+  var nr=row.get(LIFE),none=opt.total?Math.max(0,opt.total-own.reduce(function(s,v){return s+v;},0)):0;if(nr==null)nr=n;
+  for(j=nr;none&&j>=0;j=par[j])tot[j]+=none;
   for(i=0;i<N;i++){kids.push([]);if(own[i])for(j=i;j>=0;j=par[j])tot[j]+=own[i];}
   for(i=0;i<n;i++)if(tot[i]){kids[par[i]].push(i);
     if(T[i][3]>=0&&ranks[T[i][3]]==='species')for(j=i;j>=0;j=par[j])sp[j]++;}
@@ -56,18 +58,20 @@ function build(T,ranks,groups,opt){
   kids.forEach(function(k,p){k.sort(function(a,b){return (p===n?ord.indexOf(grp[a])-ord.indexOf(grp[b]):0)||tot[b]-tot[a]||a-b;});});
   kids[n].forEach(function(k){if(gr[grp[k]]==null)gr[grp[k]]=k;});
   return {T:T,ranks:ranks,n:n,root:n,par:par,own:own,tot:tot,st:st,deep:deep,sp:sp,kids:kids,row:row,grp:grp,groups:groups,
-    ex:ex,gr:gr,names:opt.names||{}};
+    ex:ex,gr:gr,names:opt.names||{},none:none,nr:nr};
 }
 function id(M,r){return r===M.n?0:M.T[r][2];}
-function name(M,r){return r===M.n?'All taxa':M.T[r][0];}
+function name(M,r){return r===M.n?'Life':M.T[r][0];}
 // A group's node takes the map's name for the group, "Other animals" for Animalia.
 function common(M,r){var g=r<M.n&&M.par[r]===M.n&&M.names[M.grp[r]];
   return r===M.n?'':g?g.replace(/ \([^)]*\)$/,''):M.T[r][1];}
 function rank(M,r){return r===M.n?'':M.ranks[M.T[r][3]]||'';}
-function lead(M,x){for(;;){var k=M.kids[x];if(k.length!==1||M.own[x])return x;x=k[0];}}
+// Whether row x holds records of its own, those with no taxon included.
+function stop(M,x){return M.own[x]||x===M.nr&&M.none;}
+function lead(M,x){for(;;){var k=M.kids[x];if(k.length!==1||stop(M,x))return x;x=k[0];}}
 // The rows merged into shown node e, top first.
 function chain(M,e){var out=[e];
-  for(var p=M.par[e];p>=0&&p!==M.n&&M.kids[p].length===1&&!M.own[p];p=M.par[p])out.unshift(p);
+  for(var p=M.par[e];p>=0&&p!==M.n&&M.kids[p].length===1&&!stop(M,p);p=M.par[p])out.unshift(p);
   return out;}
 // The shown nodes above e, top first, down to (not including) e: the focus trail.
 function crumbs(M,e){var out=[];for(var p=M.par[chain(M,e)[0]];p>=0;p=M.par[chain(M,p)[0]])
@@ -190,7 +194,7 @@ function read(M,hash,gs){
   var s=rowOf(q.sel);if(s>=0){S.sel=s;if(q.open==null)reveal(M,S,s);}
   return S;
 }
-return {K:K,LEVEL:LEVEL,RINGS:RINGS,DEPTH:DEPTH,TONES:TONES,BG:BG,cap:cap,shade:shade,tone:tone,contrast:contrast,step:step,build:build,id:id,name:name,common:common,rank:rank,lead:lead,pick:pick,find:find,
+return {K:K,REST:REST,LEVEL:LEVEL,RINGS:RINGS,DEPTH:DEPTH,TONES:TONES,BG:BG,cap:cap,shade:shade,tone:tone,contrast:contrast,step:step,build:build,id:id,name:name,common:common,rank:rank,lead:lead,pick:pick,find:find,
   chain:chain,crumbs:crumbs,within:within,view:view,toggle:toggle,more:more,expandBelow:expandBelow,reveal:reveal,
   home:home,layout:layout,write:write,read:read};
 });

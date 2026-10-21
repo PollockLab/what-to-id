@@ -8,11 +8,14 @@ import json
 import threading
 from urllib.parse import urlparse
 
+import numpy as np
 import pytest
 
 from what_to_id import tree_page
+from what_to_id.page_map import encode_points, render_map
 
 from . import test_embeddings_browser as eb
+from .embeddings_fixture import pool_frame
 from .test_atlas_search_browser import PNG
 from .test_tree_page import write_site
 
@@ -40,15 +43,48 @@ def stub_taxa(page):
     return calls
 
 
+def serve(root):
+    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(root))
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server, f"http://127.0.0.1:{server.server_port}"
+
+
 @pytest.fixture(scope="module")
 def site(tmp_path_factory):
     root = tmp_path_factory.mktemp("tree-site")
     write_site(root)
     tree_page.build(root)
-    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(root))
-    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
-    yield f"http://127.0.0.1:{server.server_port}"
+    server, url = serve(root)
+    yield url
+    server.shutdown()
+
+
+# Life > Animalia > Aves > a robin, and Life > Bacteria: 20 birds, then 20 Unknown records, 10 in
+# Bacteria, 5 identified only to Life and 5 with no taxon
+LIFE_TREE = {
+    2000: [3, "Turdus migratorius", "American Robin", "species"],
+    3: [1, "Aves", "Birds", "class"],
+    1: [48460, "Animalia", "Animals", "kingdom"],
+    48460: [None, "Life", "Life", "stateofmatter"],
+    67333: [48460, "Bacteria", "", "kingdom"],
+}
+
+
+@pytest.fixture(scope="module")
+def life_site(tmp_path_factory):
+    root = tmp_path_factory.mktemp("tree-life")
+    pool = pool_frame(np.arange(1, 41))
+    pool["taxon_id"] = [2000] * 20 + [67333] * 10 + [48460] * 5 + [None] * 5
+    pool["taxon_name"] = ["x"] * 35 + [None] * 5
+    pool["iconic_taxon"] = ["Aves"] * 20 + [None] * 20
+    blobs, meta = encode_points(pool, LIFE_TREE)
+    for name, blob in blobs.items():
+        (root / name).write_bytes(blob)
+    (root / "map.html").write_text(render_map(meta, freeze=None))
+    tree_page.build(root)
+    server, url = serve(root)
+    yield url
     server.shutdown()
 
 
@@ -129,4 +165,32 @@ def test_the_page_names_the_missing_tree(browser, site):
     page.route("**/pool-taxa.bin*", lambda r: r.fulfill(body=old))
     page.goto(f"{site}/tree.html")
     page.wait_for_function("document.getElementById('status').textContent.includes('without')")
+    page.close()
+
+
+def test_the_root_is_life_and_the_group_cards_link_to_their_records(browser, life_site):
+    page = open_tree(browser, life_site, hash_="#sel=0")
+    page.wait_for_selector("#card:not([hidden])")
+    assert page.inner_text("#card h2") == "Life" and "40" in page.inner_text("#card dl")
+    page.close()
+    page = open_tree(browser, life_site, hash_="#sel=48460")
+    page.wait_for_selector("#card:not([hidden])")
+    assert page.inner_text("#card h2") == "Unknown"
+    assert page.inner_text("#card .body > p.muted") == (
+        "Records not identified past Life, or with no taxon."
+    )
+    dl = page.locator("#card dd").all_inner_texts()
+    assert dl[:3] == ["20", "5 (25%)", "5"]  # need an ID, only to Life, no taxon
+    assert "No taxon" in page.inner_text("#card dl")
+    ident = page.get_attribute("#card a:has-text('Help identify')", "href")
+    assert "iconic_taxa=unknown" in ident and "taxon_id" not in ident  # not all of Life
+    on_map = page.get_attribute("#card a:has-text('Show on map')", "href")
+    assert on_map == "map.html#groups=Unknown"
+    page.close()
+    page = open_tree(browser, life_site, hash_="#sel=3")
+    page.wait_for_selector("#card:not([hidden])")
+    ident = page.get_attribute("#card a:has-text('Help identify')", "href")
+    assert "iconic_taxa=Aves" in ident and "taxon_id" not in ident
+    assert "No taxon" not in page.inner_text("#card dl")
+    assert page.errors == []
     page.close()

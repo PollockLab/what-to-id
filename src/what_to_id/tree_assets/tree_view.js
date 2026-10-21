@@ -115,15 +115,18 @@ function el(tag,attrs,kids){var e=document.createElement(tag);for(var k in attrs
   (kids||[]).forEach(function(c){if(c!=null)e.appendChild(typeof c==='string'?document.createTextNode(c):c);});return e;}
 function card(){
   var c=$('card');c.textContent='';if(S.sel<0){c.hidden=true;return;}c.hidden=false;
-  var e=M.lead(D,S.sel),id=M.id(D,e),tot=D.tot[e],own=D.own[e],rk=M.rank(D,e),cm=cmn(e),ks=D.kids[e];
+  var e=M.lead(D,S.sel),id=M.id(D,e),tot=D.tot[e],own=D.own[e],rk=M.rank(D,e),cm=cmn(e),ks=D.kids[e],
+    pk=M.pick(D,e),gp=/^groups=/.test(pk)?pk.slice(7):'';
   if(id)want(id);
   var link=function(href,text,cls){return el('a',{'class':'btn '+(cls||''),href:href,target:EMBED?'_blank':'_self',rel:'noopener'},[text]);};
   var btn=function(text,fn){var b=el('button',{type:'button','class':'btn'},[text]);b.addEventListener('click',fn);return b;};
   var acts=el('div',{'class':'actions'});
-  if(id){acts.appendChild(link(TX.identifyUrl({groups:[],all:0,months:[],only:{},acc:'',taxa:[id],not:[]},null,META).url,
+  // a group's node opens its iconic taxon, as its chip on the map does (Other animals and Unknown are not one
+  // taxon), any other node its taxon less the groups taken out from under it, as M.pick
+  if(id){acts.appendChild(link(TX.identifyUrl({groups:gp?[gp]:[],all:META.groups.length,months:[],only:{},acc:'',taxa:gp?[]:[id],not:gp?[]:D.ex[e]||[]},null,META).url,
     'Help identify on iNaturalist','primary'));acts.lastChild.target='_blank';
-    if(!(EMBED&&SY)){acts.appendChild(link(CFG.mapUrl+'#taxa='+id,'Show on map'));
-      if(split)acts.appendChild(link('split.html?view=space#taxa='+id,'Show in photo space'));}}
+    if(!(EMBED&&SY)){acts.appendChild(link(CFG.mapUrl+'#'+pk,'Show on map'));
+      if(split)acts.appendChild(link('split.html?view=space#'+pk,'Show in photo space'));}}
   if(e!==M.lead(D,S.focus))acts.appendChild(btn('Focus here',function(){focusOn(e);}));
   if(ks.length)acts.appendChild(btn('Expand all below',function(){act(String(e),'expand');}));
   var kids=el('ul',{'class':'kids','aria-label':'Biggest taxa below'});
@@ -132,9 +135,10 @@ function card(){
     b.addEventListener('click',function(){S.sel=x;M.reveal(D,S,x);go(true,true);});kids.appendChild(el('li',{},[b]));});
   var x=el('button',{type:'button','class':'x','aria-label':'Close'},['×']);x.addEventListener('click',function(){S.sel=-1;go(false,true);});
   [x,id?el('div',{'class':'ph big','data-ph':id},['']):null,el('div',{'class':'body'},[
-    el('h2',{},[cm||M.name(D,e)]),el('p',{'class':'muted'},[label(e)+(rk?' · '+rk:'')]),
+    el('h2',{},[cm||M.name(D,e)]),el('p',{'class':'muted'},[gp===M.REST?'Records not identified past Life, or with no taxon.':label(e)+(rk?' · '+rk:'')]),
     el('dl',{},[el('dt',{},['Need an ID']),el('dd',{},[nf.format(tot)]),
       el('dt',{},['Identified only to this rank']),el('dd',{},[nf.format(own)+(tot?' ('+Math.round(100*own/tot)+'%)':'')]),
+      e===D.nr&&D.none?el('dt',{},['No taxon']):null,e===D.nr&&D.none?el('dd',{},[nf.format(D.none)]):null,
       el('dt',{},['Species below']),el('dd',{},[nf.format(D.sp[e])])]),
     acts,ks.length?el('p',{'class':'muted'},[e===D.root?'Groups, as on the map':'Biggest below']):null,ks.length?kids:null])].forEach(function(n){if(n)c.appendChild(n);});
   photos();

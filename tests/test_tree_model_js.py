@@ -191,7 +191,7 @@ def test_an_empty_table_is_one_empty_root():
 const E = M.build([], [], {}), V = M.layout(M.view(E, M.home(E, [])), 0, 6, 0.1);
 out({row: V.root.row, kids: V.root.kids.length, a: V.root.a, name: M.name(E, V.root.row)});"""
     )
-    assert got == {"row": 0, "kids": 0, "a": 3, "name": "All taxa"}
+    assert got == {"row": 0, "kids": 0, "a": 3, "name": "Life"}
 
 
 # Life > Animalia > (Chordata > Aves), (Arthropoda > Insecta, Malacostraca), Plantae, Bacteria.
@@ -232,7 +232,7 @@ const map = ['taxa=-3,47120', 'groups=-Aves,Insecta', 'groups=Aves,Insecta']
   .map((s) => M.find(I, s));
 out({{top: top.map((r) => I.grp[r]), grp: I.grp.slice(0, I.n), tot: top.map((r) => I.tot[r]), picks,
   back: picks.map((p) => M.find(I, 'by=uploaded&' + p)), map,
-  names: [1, 0, 3].map((r) => M.common(I, r))}});"""
+  names: [1, 0, 3].map((r) => M.common(I, r)), own: I.own[0], none: I.none, nr: I.nr}});"""
     )
     assert got["top"] == ORDER and got["grp"] == ICONIC_GROUP
     assert got["tot"] == [1 + 2 + 1, 4, 6, 7, 3 + 2 + 5]  # the same counts as the map's group chips
@@ -249,3 +249,17 @@ out({{top: top.map((r) => I.grp[r]), grp: I.grp.slice(0, I.n), tot: top.map((r) 
     assert got["back"] == [1, 3, 5, 7, 0, 4, 6, 8]
     assert got["names"] == ["Other animals", "Unknown", "Birds"]
     assert got["map"] == [4, 5, -1]
+    # the records with no taxon count in Life's total, not in its own
+    assert [got["own"], got["none"], got["nr"]] == [3, 5, 0]
+
+
+def test_records_with_no_taxon_keep_life_from_merging_into_its_one_child():
+    got = node(
+        f"""
+const I = M.build({ICONIC_TREE});
+I.T[0][5] = 0;
+const G = {{1: 'Animalia', 3: 'Aves', 47158: 'Insecta', 47126: 'Plantae'}};
+const J = M.build(I.T, [...R, 'class'], G, {{order: {json.dumps(ORDER)}, total: 26 + 5 - 3}});
+out({{lead: M.lead(J, 0), tot: J.tot[0], own: J.own[0], pick: M.pick(J, 0)}});"""
+    )
+    assert got == {"lead": 0, "tot": 2 + 5, "own": 0, "pick": "groups=Unknown"}
