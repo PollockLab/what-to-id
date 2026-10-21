@@ -1,7 +1,13 @@
 import numpy as np
 import pandas as pd
 
-from what_to_id.confusion import confused_pairs, confusion_scores, prototype_scores
+from what_to_id.confusion import (
+    confused_pairs,
+    confusion_scores,
+    prototype_scores,
+    read_taxa_vectors,
+    text_scores,
+)
 
 
 def _unit(v):
@@ -38,6 +44,7 @@ def test_confusion_scores_joins_species_rows_to_embeddings():
         {
             "id": [10, 11, 12, 13, 14, 15, 16],
             "taxon_id": [1, 1, 1, 1, 2, 2, 2],
+            "taxon_name": ["G a"] * 4 + ["G", "G b", "G b"],
             "rank": ["species"] * 4 + ["genus", "species", "species"],
         }
     )
@@ -58,3 +65,64 @@ def test_confused_pairs_counts_negative_margins_per_pair():
     )
     out = confused_pairs(scores, pd.Series({1: "a", 2: "b", 3: "c"}))
     assert out[["taxon", "looks_like", "n"]].values.tolist() == [["a", "b", 2], ["b", "a", 1]]
+
+
+def test_confused_pairs_text_uses_the_other_name_directly():
+    scores = pd.DataFrame(
+        {
+            "taxon_id": [1, 1, 2],
+            "text_other_name": ["Genus beta", "Genus beta", "Genus alpha"],
+            "text_margin": [-0.1, -0.2, 0.3],
+        }
+    )
+    out = confused_pairs(scores, pd.Series({1: "Genus alpha", 2: "Genus beta"}), text=True)
+    assert out[["taxon", "looks_like", "n"]].values.tolist() == [["Genus alpha", "Genus beta", 2]]
+
+
+def test_text_scores_use_only_species_names_and_skip_the_own_prototype():
+    T = _unit(np.eye(3))
+    taxa = pd.Series(["Genus", "Genus alpha", "Genus beta"])
+    E = _unit([[1, 0.2, 0], [0, 0, 1], [0, 1, 0]])
+    names = pd.Series(["Genus alpha", "Genus beta", "Genus"])
+    own, other, other_name = text_scores(E, names, taxa, T)
+    assert own[0] > other[0] and other_name[0] == "Genus beta"
+    assert np.isnan(own[2]) and other_name[2] == "Genus alpha"
+    # "Genus" is not a species, so it never acts as a prototype even though row 1 points at it.
+    assert other_name[1] == "Genus alpha" and own[1] == 1.0 and other[1] == 0.0
+
+
+def test_confusion_scores_adds_text_columns_and_cli_reads_atlas_files(tmp_path):
+    import gzip
+
+    from what_to_id.confusion import main
+
+    E = _unit(np.eye(4))
+    ids = np.array([10, 11, 12, 13])
+    pool = pd.DataFrame(
+        {
+            "id": ids,
+            "taxon_id": [1, 1, 2, 2],
+            "taxon_name": ["G a", "G a", "G b", "G b"],
+            "rank": "species",
+        }
+    )
+    with gzip.open(tmp_path / "taxa.tsv.gz", "wt") as f:
+        f.write("G a\tcommon\nG b\t\n")
+    T = _unit([[1, 1, 0, 0], [0, 0, 1, 1]]).astype(np.float16)
+    T.tofile(tmp_path / "taxa.f16")
+    taxa, Tv = read_taxa_vectors(tmp_path / "taxa.tsv.gz", tmp_path / "taxa.f16")
+    out = confusion_scores(pool, E, ids, min_per_class=2, taxa=taxa, T=Tv)
+    assert out["text_other_name"].tolist() == ["G b", "G b", "G a", "G a"]
+    assert (out["text_margin"] > 0).all()
+    pool.to_parquet(tmp_path / "pool.parquet", index=False)
+    np.savez(tmp_path / "emb.npz", ids=ids, E=E)
+    args = [str(tmp_path / "pool.parquet"), "--emb", str(tmp_path / "emb.npz")]
+    args += ["--out", str(tmp_path / "out.parquet"), "--min-per-class", "2"]
+    args += [
+        "--taxa-names",
+        str(tmp_path / "taxa.tsv.gz"),
+        "--taxa-vectors",
+        str(tmp_path / "taxa.f16"),
+    ]
+    assert main(args) == 0
+    assert "text_margin" in pd.read_parquet(tmp_path / "out.parquet").columns
