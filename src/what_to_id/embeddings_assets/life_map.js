@@ -15,7 +15,7 @@ var FINE={life:'class',kingdom:'class',phylum:'class','class':'order',order:'fam
 var UP={phylum:'kingdom','class':'kingdom',order:'class'};
 var LONG=512,SIG=0.8,SIG_LOOK=1.5,K_LIFE=28,K_ZOOM=12;
 var CAT=[[42,120,214],[235,104,52],[27,175,122],[237,161,0],[232,123,164],[0,131,0],[98,80,214],[227,73,72]];
-var OTHER=[179,179,168],OUT=219,NODATA=[225,224,217];
+var OTHER=[179,179,168],OUT=236,NODATA=[225,224,217];
 var RAMP=[[205,226,251],[158,197,244],[109,167,236],[57,135,229],[37,106,191],[24,79,149],[13,54,107]];
 var LEVELS=['same family','same order','same class','same phylum','same kingdom','other kingdom'];
 var SEA=255,OUTSIDE=254;  // cell codes past the region slots
@@ -66,8 +66,8 @@ function blur(a,W,H,k,tmp){
   for(y=0;y<H;y++)for(x=0;x<W;x++){
     s=0;for(j=Math.max(-r,-y);j<=r&&y+j<H;j++)s+=tmp[(y+j)*W+x]*k[j+r];a[y*W+x]=s;}
 }
-function grid(ext){
-  var dx=ext[2]-ext[0]||1,dy=ext[3]-ext[1]||1,cs=Math.max(dx,dy)/LONG,
+function grid(ext,long){
+  var dx=ext[2]-ext[0]||1,dy=ext[3]-ext[1]||1,cs=Math.max(dx,dy)/long,
     W=Math.max(1,Math.round(dx/cs)),H=Math.max(1,Math.round(dy/cs));
   return {ext:ext,W:W,H:H,cs:cs,sx:W/dx,sy:H/dy};
 }
@@ -110,7 +110,7 @@ function landOf(tot){
 // The zoom's crop: the life-level cells where the clade holds over half the smoothed density, boxed by the
 // quantiles of its records there. A clade with no such cells gets the box of all its records.
 function territoryExtent(o,inTax){
-  var g=grid(lifeExtent(o.pos,o.n)),WH=g.W*g.H,cell=cellsOf(o.pos,o.n,g),tot=new Float32Array(WH),
+  var g=grid(lifeExtent(o.pos,o.n),LONG),WH=g.W*g.H,cell=cellsOf(o.pos,o.n,g),tot=new Float32Array(WH),
     cz=new Float32Array(WH),raw,tmp=new Float32Array(WH),k=kernel(SIG),i;
   for(i=0;i<o.n;i++){var c=cell[i];if(c<0)continue;tot[c]++;if(inTax[o.tax[i]])cz[c]++;}
   raw=cz.slice();blur(tot,g.W,g.H,k,tmp);blur(cz,g.W,g.H,k,tmp);
@@ -131,15 +131,16 @@ function ramp(t){
 
 // o: {pos (x,y per point), n, tax (taxa row per point, 65535 unknown), grp (group per point), groups (count),
 // color(g) -> rgb, T, ranks, A (ancestors), clade (taxa row, -1 for the whole of life), look (decodeLookalike,
-// or null), src (each point's row in the look-alike file)}.
+// or null), src (each point's row in the look-alike file), long (cells on the long side, default LONG)}.
 function build(o){
-  var T=o.T,R=T.length,A=o.A,clade=o.clade==null?-1:o.clade,zr=rankOf(T,o.ranks,clade),fine=FINE[zr];
+  // sc: cells per LONG cell; every length or count in cells scales with it, so a finer grid draws the same map
+  var long=o.long||LONG,sc=long/LONG,T=o.T,R=T.length,A=o.A,clade=o.clade==null?-1:o.clade,zr=rankOf(T,o.ranks,clade),fine=FINE[zr];
   if(!fine)throw new Error('cannot zoom into a '+zr);
   var NT=65536,inTax=new Uint8Array(NT),fineOf=new Int32Array(NT).fill(-1),t,i;
   for(t=0;t<NT;t++){inTax[t]=clade<0||(t<R&&A[zr][t]===clade)?1:0;if(t<R)fineOf[t]=A[fine][t];}
   var ext=clade<0?lifeExtent(o.pos,o.n):territoryExtent(o,inTax);
   if(!ext)return null;
-  var g=grid(ext),W=g.W,H=g.H,WH=W*H,cell=cellsOf(o.pos,o.n,g);
+  var g=grid(ext,long),W=g.W,H=g.H,WH=W*H,cell=cellsOf(o.pos,o.n,g);
   // the slots: the K commonest fine-rank clades inside the view, then one for everything else
   var tc=new Float64Array(NT),byRow=new Map();
   for(i=0;i<o.n;i++)if(cell[i]>=0)tc[o.tax[i]]++;
@@ -161,7 +162,7 @@ function build(o){
     if(a<=12){aS[c]+=a/12;aC[c]++;sA[s]+=a/12;sAc[s]++;}
     if(v>=2&&v<=7){vS[c]+=v-2;vC[c]++;if(LH[(v-2)*WH+c]<65535)LH[(v-2)*WH+c]++;}
   }
-  var raw=tot.slice(),tmp=new Float32Array(WH),k=kernel(SIG),kl=kernel(SIG_LOOK);
+  var raw=tot.slice(),tmp=new Float32Array(WH),k=kernel(SIG*sc),kl=kernel(SIG_LOOK*sc),few=.05/(sc*sc);
   for(s=0;s<=K;s++)blur(S.subarray(s*WH,(s+1)*WH),W,H,k,tmp);
   blur(tot,W,H,k,tmp);
   if(L){blur(aS,W,H,k,tmp);blur(aC,W,H,k,tmp);blur(vS,W,H,kl,tmp);blur(vC,W,H,kl,tmp);}
@@ -190,13 +191,13 @@ function build(o){
     if(cd===SEA)continue;
     if(cd===OUTSIDE){put(img,c,[OUT,OUT,OUT],255);if(look)put(look,c,[OUT,OUT,OUT],255);continue;}
     // contested cells, and cells whose records' photo neighbours mostly lie outside their clade, read paler
-    var f=.35+.65*dom[c]*(aC[c]>.05?Math.min(1,aS[c]/aC[c]):1);
+    var f=.35+.65*dom[c]*(aC[c]>few?Math.min(1,aS[c]/aC[c]):1);
     put(img,c,mix(slots[cd].rgb,WHITE,1-f),255);
-    if(look)put(look,c,vC[c]>.05?ramp(vS[c]/vC[c]/3):NODATA,255);
+    if(look)put(look,c,vC[c]>few?ramp(vS[c]/vC[c]/3):NODATA,255);
   }
   borders(img,code,W,H,clade<0?kOf:null);
-  return {ext:ext,W:W,H:H,cs:g.cs,sx:g.sx,sy:g.sy,clade:clade,rank:zr,fine:fine,code:code,raw:raw,levels:LH,
-    slots:slots,K:K,image:img,look:look,labels:labels(code,W,H,g,slots,T,K,clade<0?kOf:null,nLand)};
+  return {ext:ext,W:W,H:H,cs:g.cs,sc:sc,sx:g.sx,sy:g.sy,clade:clade,rank:zr,fine:fine,code:code,raw:raw,levels:LH,
+    slots:slots,K:K,image:img,look:look,labels:labels(code,W,H,g,slots,T,K,clade<0?kOf:null,nLand,sc)};
 }
 // Thin lines between regions, a darker coast, thick black between kingdoms (kOf given, at life only).
 function borders(img,code,W,H,kOf){
@@ -216,7 +217,7 @@ function borders(img,code,W,H,kOf){
 }
 // A label at the pole of inaccessibility of each region's largest island, italic repeats on the next two
 // sizeable ones, and at life each kingdom's share of the map around the edge. Sizes are in layout units.
-function labels(code,W,H,g,slots,T,K,kOf,nLand){
+function labels(code,W,H,g,slots,T,K,kOf,nLand,sc){
   var WH=W*H,d=new Float32Array(WH),c,x,y,INF=1e9,R2=Math.SQRT2;
   for(c=0;c<WH;c++){
     if(code[c]>K){d[c]=0;continue;}
@@ -243,10 +244,10 @@ function labels(code,W,H,g,slots,T,K,kOf,nLand){
     var row=slots[s].row;if(row<0||!cs.length)return;
     cs.sort(function(a,b){return b.size-a.size;});
     var area=cs.reduce(function(t,q){return t+q.size;},0),size=.2*Math.sqrt(area)*g.cs;
-    if(cs[0].size<8)return;
+    if(cs[0].size<8*sc*sc)return;
     out.push({text:T[row][0],pos:pt(cs[0].at),size:size,row:row,area:area,italic:false});
     cs.slice(1,3).forEach(function(q){
-      if(q.size>.08*area&&q.size>40)out.push({text:T[row][0],pos:pt(q.at),size:size*.55,row:row,area:q.size,italic:true});});
+      if(q.size>.08*area&&q.size>40*sc*sc)out.push({text:T[row][0],pos:pt(q.at),size:size*.55,row:row,area:q.size,italic:true});});
   });
   if(kOf){
     var kc=new Map();
@@ -281,7 +282,7 @@ function place(L,z,minPx){
 function hit(M,x,y){
   var ix=Math.floor((x-M.ext[0])*M.sx),iy=Math.floor((y-M.ext[1])*M.sy),W=M.W,H=M.H;
   if(ix<0||iy<0||ix>=W||iy>=H)return null;
-  var c=iy*W+ix,cd=M.code[c],lev=null,r=Math.ceil(2*SIG_LOOK);
+  var c=iy*W+ix,cd=M.code[c],lev=null,r=Math.ceil(2*SIG_LOOK*M.sc);
   if(M.levels){lev=[0,0,0,0,0,0];
     for(var yy=Math.max(0,iy-r);yy<=Math.min(H-1,iy+r);yy++)for(var xx=Math.max(0,ix-r);xx<=Math.min(W-1,ix+r);xx++)
       for(var v=0;v<6;v++)lev[v]+=M.levels[v*W*H+yy*W+xx];}

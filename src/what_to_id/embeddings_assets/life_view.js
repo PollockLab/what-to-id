@@ -7,6 +7,9 @@ var S=o.S,$=o.$,LM=LifeMap,nf=new Intl.NumberFormat('en-CA'),cache=new Map(),M=n
 var h0=new URLSearchParams(location.hash.slice(1)),mode=h0.get('life')==='look'?'look':'life',
   want=+h0.get('clade')||0,row=-1,A=null,byId=null,placed=null;
 var MIN_PX=11;  // a label drawn smaller than this does not read, so it is left out
+// Zoom grid cells on the long side, from the screen at load (a resize keeps it, so the cache stays valid):
+// about one cell a device pixel, in steps of 256, at most 1024 (a 3M-record zoom builds in about 1 s there).
+var ZOOM_LONG=Math.max(512,Math.min(1024,256*Math.ceil(Math.max(innerWidth,innerHeight)*(devicePixelRatio||1)/256)));
 function on(){return !!M;}
 function name(r){var t=S.TAXA[r];return t[0]+(t[1]?' ('+t[1]+')':'');}
 function press(id,v){$(id).setAttribute('aria-pressed',v?'true':'false');}
@@ -55,7 +58,8 @@ function draw(r,fit){
     setTimeout(function(){
       if(me!==run)return;
       var P=S.P,t0=performance.now(),m=LM.build({pos:P.pos,n:P.n,tax:P.tax,grp:P.grp,groups:S.META.groups.length,
-        color:o.color,T:S.TAXA,ranks:S.META.ranks,A:A,clade:r,look:L,src:P.src});
+        color:o.color,T:S.TAXA,ranks:S.META.ranks,A:A,clade:r,look:L,src:P.src,
+        long:r<0?512:ZOOM_LONG});  // all life keeps 512: its 28 density planes would cost four times the memory
       console.info('map of life built in '+Math.round(performance.now()-t0)+' ms');
       o.status('');
       if(!m){if(r>=0)draw(-1,true);else{M=null;bar();o.redraw();}return;}  // too few records: points alone
