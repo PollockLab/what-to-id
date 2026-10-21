@@ -167,8 +167,8 @@ function recount(){
     for(var k=0;k<nm;k++){var v=0;if(!m||m>>(M0+k)%12&1)for(var j=0;j<rows.length;j++)if(g[j])v+=rows[j][k];
       TC[k+1]=TC[k]+v;}}
   if(SEL>=0&&!KEEP[SEL])closeCard();
-  if(FIT){FIT=false;fitTo(function(i){var d=day[i];return KEEP[i]&&(d===NO?full():d>=S.lo&&d<=S.hi);});}
   render();
+  if(FIT){FIT=false;fitTo(function(i){var d=day[i];return KEEP[i]&&(d===NO?full():d>=S.lo&&d<=S.hi);});}
 }
 function full(){return S.lo===0&&S.hi===LAST;}
 // records without a date show only over all dates, as the GPU filter does
@@ -177,7 +177,9 @@ function fitTo(keep){
   var w=Infinity,s=Infinity,e=-Infinity,n=-Infinity,x,y;
   if(map)for(var i=0;i<P.n;i++)if(keep(i)){x=P.pos[2*i];y=P.pos[2*i+1];
     if(x<w)w=x;if(x>e)e=x;if(y<s)s=y;if(y>n)n=y;}
-  if(w<=e)map.fitBounds([[w,s],[e,n]],{padding:40,maxZoom:14});}
+  // the new count can rewrap the bar above the map; MapLibre sees the new size only a frame later, so a fit
+  // to the old one sits off centre
+  if(w<=e){map.resize();map.fitBounds([[w,s],[e,n]],{padding:40,maxZoom:14});}}
 var VC=null;  // kept records dated in S.lo..S.hi like CUM and inside the viewport; null for the world
 function inView(){
   var n=P.n,b=map.getBounds(),w=b.getWest(),e=b.getEast(),s=b.getSouth(),t=b.getNorth(),key=[w,e,s,t,S.lo,S.hi,S.up,n].join();

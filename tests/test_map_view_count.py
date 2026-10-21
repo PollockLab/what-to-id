@@ -72,7 +72,7 @@ def _node(harness, start, end, script):
 def test_fit_frames_the_kept_records_and_skips_an_empty_set():
     harness = """
 const S={lo:0,hi:9},LAST=9,NODAY=0,CUM=[],out=[];
-const map={fitBounds:(b,o)=>out.push([b,o.maxZoom])};
+const map={resize:()=>out.push('resize'),fitBounds:(b,o)=>out.push([b,o.maxZoom])};
 const P={n:3,pos:Float32Array.of(-123,49,-120,50,-125,48)};
 """
     got = _node(
@@ -81,7 +81,9 @@ const P={n:3,pos:Float32Array.of(-123,49,-120,50,-125,48)};
         "var VC=null;",
         "fitTo(i=>i!==2);fitTo(()=>false);fitTo(i=>i===1);console.log(JSON.stringify(out))",
     )
-    assert got == [[[[-123, 49], [-120, 50]], 14], [[[-120, 50], [-120, 50]], 14]]
+    # each fit first takes the map's new size: the count above it may have rewrapped
+    fits = [[[[-123, 49], [-120, 50]], 14], [[[-120, 50], [-120, 50]], 14]]
+    assert got == ["resize", fits[0], "resize", fits[1]]
 
 
 @needs_node
