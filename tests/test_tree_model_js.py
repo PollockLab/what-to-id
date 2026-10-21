@@ -27,6 +27,7 @@ T = [
 ] + [[f"Bombus s{k}", "", 100 + k, SP, 8, 30 - k] for k in range(30)]
 BOMBUS_TOT = sum(30 - k for k in range(30))
 GROUPS = {"47126": "Plantae", "1": "Animalia"}
+ROOT = len(T)  # the root above the groups
 
 
 def node(script):
@@ -40,12 +41,14 @@ def node(script):
 
 def test_rollup_counts_records_and_species_and_drops_empty_taxa():
     got = node("out({tot: Array.from(D.tot), sp: Array.from(D.sp), kids: D.kids, grp: D.grp});")
-    assert got["tot"][0] == got["tot"][len(T)] == 6 + 2 + BOMBUS_TOT
+    assert got["tot"][ROOT] == 6 + 2 + BOMBUS_TOT
+    assert got["tot"][0] == 0  # the groups hang from the root, not from Life
     assert got["tot"][1] == 6 and got["tot"][5] == got["tot"][6] == 0
     assert got["kids"][2] == [3]  # Polytrichum has no records: not drawn
     assert got["kids"][8][:3] == [9, 10, 11]  # most records first
-    assert got["sp"][0] == 31 and got["sp"][1] == 1
-    assert got["grp"][4] == "Plantae" and got["grp"][20] == "Animalia" and got["grp"][0] == ""
+    assert got["sp"][ROOT] == 31 and got["sp"][1] == 1
+    assert got["grp"][4] == "Plantae" and got["grp"][20] == "Animalia"
+    assert got["grp"][0] == "Unknown"
 
 
 def test_a_taxon_with_one_child_and_no_records_merges_into_it():
@@ -54,14 +57,14 @@ def test_a_taxon_with_one_child_and_no_records_merges_into_it():
         " crumbs: M.crumbs(D, 4)});"
     )
     assert got["lead"] == 3 and got["chain"] == [1, 2, 3]
-    assert got["root"] == 0  # the synthetic root above Life is hidden
-    assert got["crumbs"] == [0, 3]
+    assert got["root"] == ROOT  # two groups below it: the root shows
+    assert got["crumbs"] == [ROOT, 3]
 
 
 def test_an_open_node_shows_k_children_then_a_bucket_for_the_rest():
     got = node(
         """
-const S = {focus: 0, sel: -1, open: new Map([[0, 1], [7, 1], [8, 1]])};
+const S = {focus: D.root, sel: -1, open: new Map([[D.root, 1], [7, 1], [8, 1]])};
 const kids = (V) => V.all.find((n) => n.row === 8).kids;
 const one = kids(M.view(D, S)); M.more(S, 8); const two = kids(M.view(D, S));
 const last = {more: one[one.length - 1].more, tot: one[one.length - 1].tot};
@@ -80,8 +83,8 @@ const e = M.reveal(D, S, 9 + 27);
 const shown = M.view(D, S).all.some((n) => n.row === e);
 out({e, focus: S.focus, open: Array.from(S.open), shown});"""
     )
-    assert got["e"] == 36 and got["focus"] == 0
-    assert dict(got["open"]) == {0: 1, 7: 1, 8: 2} and got["shown"]
+    assert got["e"] == 36 and got["focus"] == ROOT
+    assert dict(got["open"]) == {ROOT: 1, 7: 1, 8: 2} and got["shown"]
 
 
 def test_layout_fills_the_span_and_gives_each_leaf_its_minimum():
@@ -104,13 +107,14 @@ out({sum: w(leaves).reduce((s, x) => s + x, 0), min: Math.min(...w(leaves)), gap
 def test_expand_below_stops_at_the_group_depth_and_the_budget():
     got = node(
         """
-const S = {focus: 0, sel: -1, open: new Map()};
-const full = M.expandBelow(D, S, 0, 400), top = Array.from(S.open.keys()).sort();
+const S = {focus: D.root, sel: -1, open: new Map()};
+const full = M.expandBelow(D, S, D.root, 400);
+const top = Array.from(S.open.keys()).sort((a, b) => a - b);
 const capped = M.expandBelow(D, S, 8, 5), shut = S.open.has(8);
 out({full, top, capped, shut, deep: M.expandBelow(D, S, 8, 400), open: S.open.has(8)});"""
     )
     # Sphagnum and Bombus are genera, below the default depth (family): left closed
-    assert not got["full"] and got["top"] == [0, 7]
+    assert not got["full"] and got["top"] == [7, ROOT]
     assert got["capped"] and not got["shut"]  # Bombus would add 24 leaves
     assert not got["deep"] and got["open"]  # from a genus, expand goes on down
 
@@ -135,12 +139,12 @@ def test_insects_stop_at_order_and_the_rest_at_family():
     got = node(
         f"""
 const I = M.build({INSECT_TREE});
-const S = M.home(I, [1, 2]), home = Array.from(S.open.keys()).sort();
+const S = M.home(I, [2]), home = Array.from(S.open.keys()).sort();
 M.expandBelow(I, S, 3, 400);
 out({{home, below: Array.from(S.open.keys()).sort(), caps: [M.cap(I, 7), M.cap(I, 1), M.cap(D, 1)],
   order: M.step(M.LEVEL.order), family: M.step(M.LEVEL.family)}});"""
     )
-    assert got["home"] == [2]  # Life and Animalia merge into Insecta; its orders stay closed
+    assert got["home"] == [2]  # no other animal: the root merges into Insecta, its orders closed
     assert got["below"] == [2, 3, 4]  # a click on an order still opens it down to species
     assert got["caps"] == [got["order"], got["family"], got["family"]]
 
@@ -177,7 +181,7 @@ out({h, back: [back.focus, back.sel, Array.from(back.open)], bad: [bad.focus, ba
     )
     assert got["h"] == "focus=1&sel=111&open=1,70.2"
     assert got["back"] == [7, 20, [[7, 1], [8, 2]]]
-    assert got["bad"] == [0, -1]
+    assert got["bad"] == [ROOT, -1]
     assert dict(got["plain"])[8] == 2  # without open=: home, with the selection revealed
 
 
@@ -188,3 +192,60 @@ const E = M.build([], [], {}), V = M.layout(M.view(E, M.home(E, [])), 0, 6, 0.1)
 out({row: V.root.row, kids: V.root.kids.length, a: V.root.a, name: M.name(E, V.root.row)});"""
     )
     assert got == {"row": 0, "kids": 0, "a": 3, "name": "All taxa"}
+
+
+# Life > Animalia > (Chordata > Aves), (Arthropoda > Insecta, Malacostraca), Plantae, Bacteria.
+# As on the map (iNaturalist's iconic taxa) a record takes its nearest group taxon, Animalia
+# for any other animal, else Unknown.
+ICONIC = [
+    ["Life", "", 48460, LIFE, -1, 3],  # 0
+    ["Animalia", "Animals", 1, K_, 0, 1],  # 1
+    ["Chordata", "", 2, P_, 1, 0],  # 2
+    ["Aves", "Birds", 3, 5, 2, 4],  # 3: class
+    ["Arthropoda", "", 47120, P_, 1, 2],  # 4
+    ["Insecta", "Insects", 47158, 5, 4, 6],  # 5
+    ["Malacostraca", "", 85493, 5, 4, 1],  # 6
+    ["Plantae", "Plants", 47126, K_, 0, 7],  # 7
+    ["Bacteria", "", 67333, K_, 0, 2],  # 8
+]
+ORDER = ["Animalia", "Aves", "Insecta", "Plantae", "Unknown"]
+NAMES = {"Animalia": "Other animals (Animalia)", "Aves": "Birds (Aves)", "Unknown": "Unknown"}
+ICONIC_TREE = ", ".join(
+    json.dumps(x)
+    for x in (
+        ICONIC,
+        [*RANKS, "class"],
+        {1: "Animalia", 3: "Aves", 47158: "Insecta", 47126: "Plantae"},
+        {"order": ORDER, "names": NAMES, "total": 26 + 5},  # five records have no taxon
+    )
+)
+ICONIC_GROUP = ["Unknown", "Animalia", "Animalia", "Aves", "Animalia", "Insecta", "Animalia"]
+ICONIC_GROUP += ["Plantae", "Unknown"]
+
+
+def test_the_root_children_are_the_map_groups_and_each_record_keeps_its_map_group():
+    got = node(
+        f"""
+const I = M.build({ICONIC_TREE}), top = I.kids[I.root];
+const picks = top.concat([4, 6, 8]).map((r) => M.pick(I, r));
+const map = ['taxa=-3,47120', 'groups=-Aves,Insecta', 'groups=Aves,Insecta']
+  .map((s) => M.find(I, s));
+out({{top: top.map((r) => I.grp[r]), grp: I.grp.slice(0, I.n), tot: top.map((r) => I.tot[r]), picks,
+  back: picks.map((p) => M.find(I, 'by=uploaded&' + p)), map,
+  names: [1, 0, 3].map((r) => M.common(I, r))}});"""
+    )
+    assert got["top"] == ORDER and got["grp"] == ICONIC_GROUP
+    assert got["tot"] == [1 + 2 + 1, 4, 6, 7, 3 + 2 + 5]  # the same counts as the map's group chips
+    assert got["picks"] == [
+        "groups=Animalia",
+        "groups=Aves",
+        "groups=Insecta",
+        "groups=Plantae",
+        "groups=Unknown",
+        "taxa=47120,-47158",  # the other arthropods: Insecta is its own group
+        "taxa=85493",
+        "taxa=67333",
+    ]
+    assert got["back"] == [1, 3, 5, 7, 0, 4, 6, 8]
+    assert got["names"] == ["Other animals", "Unknown", "Birds"]
+    assert got["map"] == [4, 5, -1]

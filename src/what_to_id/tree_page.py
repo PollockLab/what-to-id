@@ -25,7 +25,7 @@ SCRIPTS = {
     "__TREE_MODEL__": ASSETS / "tree_model.js",
     "__TREE_VIEW__": ASSETS / "tree_view.js",
 }
-KEYS = ("ranks", "taxa", "groups", "group_ids", "names", "place_id", "max_url")
+KEYS = ("ranks", "taxa", "groups", "group_ids", "names", "place_id", "max_url", "n")
 
 
 def map_meta(out: Path) -> dict:

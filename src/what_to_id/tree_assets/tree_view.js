@@ -216,7 +216,8 @@ async function load(){
   var T=JSON.parse(new TextDecoder().decode(await L.gunzip(await r.arrayBuffer())));
   if(!T.length||T[0].length<6)throw new Error('this site was built without the taxon tree');
   Object.keys(META.group_ids||{}).forEach(function(g){G[META.group_ids[g]]=g;});
-  D=M.build(T,META.ranks,G);
+  if(META.groups.indexOf('Animalia')>=0)G[1]=G[1]||'Animalia';  // iNaturalist's iconic Animalia: kingdom 1, less the other groups
+  D=M.build(T,META.ranks,G,{order:META.groups,names:META.names,total:META.n});
   GS=Object.keys(G).map(function(i){return D.row.get(+i);}).filter(function(x){return x!=null&&D.tot[x];});
   S=M.read(D,location.hash,GS);split=await has;status('');draw(false);
 }

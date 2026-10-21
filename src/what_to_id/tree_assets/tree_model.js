@@ -27,29 +27,42 @@ function step(l){
     return a[1]+(a[0]-l)/(a[0]-b[0])*(b[1]-a[1]);}
   return 7.5;
 }
-// groups: {iNaturalist id: life group name}; each row takes the group of its nearest group ancestor.
-function build(T,ranks,groups){
+// groups: {iNaturalist id: life group name}, the map's groups that have a taxon. As on the map (iNaturalist's
+// iconic taxa), each row takes the group of its nearest group ancestor, else REST. The group taxa hang from
+// the root, so its children are the map's groups; a taxon they leave keeps the rest (ex: the group taxa
+// taken out from under it). opt: order (the map's group list, the root's child order), names (the map's
+// group names) and total (all records, so those with no taxon count in Life, which holds REST).
+var REST='Unknown',LIFE=48460;
+function build(T,ranks,groups,opt){
+  opt=opt||{};
   var n=T.length,N=n+1,par=new Int32Array(N),own=new Float64Array(N),tot=new Float64Array(N),
-    st=new Float64Array(N),deep=new Float64Array(N),sp=new Float64Array(N),kids=[],row=new Map(),grp=[],i,j;
+    st=new Float64Array(N),deep=new Float64Array(N),sp=new Float64Array(N),kids=[],row=new Map(),grp=[],ex=[],gr={},
+    ord=opt.order||[],i,j;
   for(i=0;i<n;i++){var t=T[i];row.set(t[2],i);par[i]=t.length>4&&t[4]>=0?t[4]:n;own[i]=t[5]||0;
     st[i]=step(LEVEL[ranks[t[3]]]);}
   par[n]=-1;st[n]=0;row.set(0,n);
+  for(i=0;i<n;i++)if(groups[T[i][2]]){for(j=par[i];j<n&&!groups[T[j][2]];j=par[j])(ex[j]=ex[j]||[]).push(T[i][2]);par[i]=n;}
+  if(opt.total){var lf=row.get(LIFE);own[lf!=null?lf:n]+=Math.max(0,opt.total-own.reduce(function(s,v){return s+v;},0));}
   for(i=0;i<N;i++){kids.push([]);if(own[i])for(j=i;j>=0;j=par[j])tot[j]+=own[i];}
   for(i=0;i<n;i++)if(tot[i]){kids[par[i]].push(i);
     if(T[i][3]>=0&&ranks[T[i][3]]==='species')for(j=i;j>=0;j=par[j])sp[j]++;}
   // a rank iNaturalist lacks: half a step below the nearest ranked ancestor
   for(i=0;i<n;i++)if(isNaN(st[i])){for(j=par[i];j>=0&&isNaN(st[j]);j=par[j]);st[i]=(j>=0?st[j]:0)+0.5;}
   for(i=0;i<N;i++){deep[i]=Math.max(deep[i],st[i]);if(tot[i])for(j=par[i];j>=0&&deep[j]<st[i];j=par[j])deep[j]=st[i];}
-  kids.forEach(function(k){k.sort(function(a,b){return tot[b]-tot[a]||a-b;});});
   for(i=0;i<N;i++)if(grp[i]===undefined){var path=[];
     for(j=i;j>=0&&grp[j]===undefined&&!(j<n&&groups[T[j][2]]);j=par[j])path.push(j);
-    var g=j<0?'':grp[j]!==undefined?grp[j]:groups[T[j][2]];if(j>=0)grp[j]=g;
+    var g=j<0?REST:grp[j]!==undefined?grp[j]:groups[T[j][2]];if(j>=0)grp[j]=g;
     path.forEach(function(p){grp[p]=g;});}
-  return {T:T,ranks:ranks,n:n,root:n,par:par,own:own,tot:tot,st:st,deep:deep,sp:sp,kids:kids,row:row,grp:grp,groups:groups};
+  kids.forEach(function(k,p){k.sort(function(a,b){return (p===n?ord.indexOf(grp[a])-ord.indexOf(grp[b]):0)||tot[b]-tot[a]||a-b;});});
+  kids[n].forEach(function(k){if(gr[grp[k]]==null)gr[grp[k]]=k;});
+  return {T:T,ranks:ranks,n:n,root:n,par:par,own:own,tot:tot,st:st,deep:deep,sp:sp,kids:kids,row:row,grp:grp,groups:groups,
+    ex:ex,gr:gr,names:opt.names||{}};
 }
 function id(M,r){return r===M.n?0:M.T[r][2];}
 function name(M,r){return r===M.n?'All taxa':M.T[r][0];}
-function common(M,r){return r===M.n?'':M.T[r][1];}
+// A group's node takes the map's name for the group, "Other animals" for Animalia.
+function common(M,r){var g=r<M.n&&M.par[r]===M.n&&M.names[M.grp[r]];
+  return r===M.n?'':g?g.replace(/ \([^)]*\)$/,''):M.T[r][1];}
 function rank(M,r){return r===M.n?'':M.ranks[M.T[r][3]]||'';}
 function lead(M,x){for(;;){var k=M.kids[x];if(k.length!==1||M.own[x])return x;x=k[0];}}
 // The rows merged into shown node e, top first.
@@ -59,6 +72,16 @@ function chain(M,e){var out=[e];
 // The shown nodes above e, top first, down to (not including) e: the focus trail.
 function crumbs(M,e){var out=[];for(var p=M.par[chain(M,e)[0]];p>=0;p=M.par[chain(M,p)[0]])
   if(p!==M.n||lead(M,p)===p)out.unshift(p);return out;}
+// The selection the map and the photo space read for shown node e: a group's node is its group chip, any other
+// taxon its pick less the groups taken out from under it (taxa=47120,-47158,-47119 for the other arthropods).
+function pick(M,e){if(e<0||e===M.n)return '';if(M.par[chain(M,e)[0]]===M.n)return 'groups='+M.grp[e];
+  return 'taxa='+[M.T[e][2]].concat((M.ex[e]||[]).map(function(i){return -i;})).join(',');}
+// The row a map selection names: its first included taxon, else its one included group, else -1.
+function find(M,s){var q={};String(s||'').split('&').forEach(function(t){var k=t.indexOf('=');
+    if(k>0)q[t.slice(0,k)]=decodeURIComponent(t.slice(k+1));});
+  var m=/(?:^|,)(\d+)/.exec(q.taxa||''),r=m?M.row.get(+m[1]):null;if(r!=null&&M.tot[r])return r;
+  var g=(q.groups||'').split(',').filter(function(x){return x&&x[0]!=='-';});
+  return g.length===1&&M.gr[g[0]]!=null?M.gr[g[0]]:-1;}
 function within(M,a,t){for(var x=t;x>=0;x=M.par[x])if(x===a)return true;return false;}
 // The shown tree from S.focus: each node {key, row, parent, depth, kids, open, tot, own, t (ring
 // position), lo (deepest ring below), leaves}; a "more" node stands for the children past the open
@@ -111,9 +134,9 @@ function shade(rgb,t){
     if(BG.every(function(b){return contrast(c,b)>=2;}))return c;}
   return rgb.slice();
 }
-// Which tone row r takes: its sub-clade's index under the nearest group taxon above it, else 0.
+// Which tone row r takes: its sub-clade's index under its group's node, else 0.
 function tone(M,r){
-  for(var c=r,p=M.par[r];p>=0;c=p,p=M.par[p])if(p<M.n&&M.groups[M.T[p][2]])return TONES[M.kids[p].indexOf(c)%TONES.length]||0;
+  for(var c=r,p=M.par[r];p>=0;c=p,p=M.par[p])if(p<M.n&&M.par[p]===M.n)return TONES[M.kids[p].indexOf(c)%TONES.length]||0;
   return 0;
 }
 // Opens the way from the focus to row t, paging through "more" as needed; a t outside the focus moves
@@ -167,7 +190,7 @@ function read(M,hash,gs){
   var s=rowOf(q.sel);if(s>=0){S.sel=s;if(q.open==null)reveal(M,S,s);}
   return S;
 }
-return {K:K,LEVEL:LEVEL,RINGS:RINGS,DEPTH:DEPTH,TONES:TONES,BG:BG,cap:cap,shade:shade,tone:tone,contrast:contrast,step:step,build:build,id:id,name:name,common:common,rank:rank,lead:lead,
+return {K:K,LEVEL:LEVEL,RINGS:RINGS,DEPTH:DEPTH,TONES:TONES,BG:BG,cap:cap,shade:shade,tone:tone,contrast:contrast,step:step,build:build,id:id,name:name,common:common,rank:rank,lead:lead,pick:pick,find:find,
   chain:chain,crumbs:crumbs,within:within,view:view,toggle:toggle,more:more,expandBelow:expandBelow,reveal:reveal,
   home:home,layout:layout,write:write,read:read};
 });
