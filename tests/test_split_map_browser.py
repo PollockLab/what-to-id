@@ -37,6 +37,7 @@ def site(tmp_path_factory):
     pool.loc[four[1:], ["taxon_id", "taxon_name"]] = [1003, "Taxon 3"]
     pool.loc[six[:2], ["lon", "lat"]] = SPREAD
     pool.loc[four[:1], ["lon", "lat"]] = [ONE]
+    pool["pos_acc"] = [50 if i % 2 else 5000 for i in range(300)]  # 150 within 100 m
     blobs, meta = encode_points(pool, TREE)
     for name, blob in blobs.items():
         (root / name).write_bytes(blob)
@@ -86,5 +87,28 @@ def test_a_tiny_taxon_picked_in_the_tree_fits_the_map_pane(browser, site, name, 
     # the points' box is centred, a single point in the middle
     assert abs((min(xs) + max(xs)) / 2 - got["w"] / 2) < 2, got
     assert abs((min(ys) + max(ys)) / 2 - got["h"] / 2) < 2, got
+    assert page.errors == []
+    page.close()
+
+
+def test_an_accuracy_choice_sent_by_the_other_frame_reaches_the_map(browser, site):
+    page = browser.new_page(viewport={"width": 1400, "height": 900})
+    page.errors = []
+    page.on("pageerror", lambda e: page.errors.append(str(e)))
+    stub_taxa(page)
+    page.route("https://basemaps.cartocdn.com/**", lambda r: r.fulfill(body=BLANK))
+    page.goto(f"{site}/split.html")
+    page.wait_for_function(
+        "() => { const d = document.getElementById('map')?.contentDocument;"
+        " return d && /^300 of 300/.test(d.getElementById('count').textContent); }",
+        timeout=60000,
+    )
+    left = next(f for f in page.frames if "map.html" in f.url)
+    page.evaluate(
+        "document.querySelector('#map').contentWindow.postMessage("
+        "{type: 'wtid-selection', sel: 'acc=100'}, location.origin)"
+    )
+    left.wait_for_function("/^150 of 300/.test(document.getElementById('count').textContent)")
+    assert left.locator("#acc button[aria-pressed=true]").inner_text() == "Within 100 m"
     assert page.errors == []
     page.close()

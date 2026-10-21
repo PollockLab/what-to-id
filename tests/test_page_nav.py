@@ -103,10 +103,12 @@ def _href(pg, view):
 
 
 def test_explore_tab_on_the_map_page_carries_the_record_and_the_selection(browser):
-    pg = _open(browser, "map.html", "#record=42&groups=Insecta,-Aves&at=9.5/49.123456/-123.987654")
+    pg = _open(
+        browser, "map.html", "#record=42&groups=Insecta,-Aves&acc=100&at=9.5/49.123456/-123.987654"
+    )
     assert pg.get_attribute(".site-nav [aria-current=page]", "href").startswith("split.html")
     assert pg.locator(".site-nav a").first.bounding_box()["height"] >= 44
-    assert _href(pg, "explore") == "split.html#id=42&groups=Insecta,-Aves"
+    assert _href(pg, "explore") == "split.html#id=42&groups=Insecta,-Aves&acc=100"
     assert _href(pg, "blitz") == BLITZ + "?at=49.123,-123.988"
     # replaceState fires no event: the next hover reads the new hash
     pg.evaluate("history.replaceState(null,'','#at=9.5/50.5/-120.25')")
