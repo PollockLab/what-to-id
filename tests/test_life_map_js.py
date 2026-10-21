@@ -20,7 +20,7 @@ RAMP_LO, RAMP_HI = (
     [205, 226, 251],
     [13, 54, 107],
 )  # the blue ramp's ends: level 0 and level 3 or more
-OUT_GREY = 219
+OUT_GREY = 236
 # [latin, common, inat id, rank, parent row]
 TAXA = [
     ["Animalia", "Animals", 1, "kingdom", -1],
@@ -248,3 +248,23 @@ console.log(JSON.stringify({z2: at(2, [near, tiny, far, big]), z5: at(5, [near, 
     assert sorted(got["z5"]) == ["Ascidiacea", "Aves", "Aves", "Insecta"]
     assert got["king"] == ["ANIMALIA\n31% of map"]  # a kingdom outranks any class label
     assert got["tie"] == ["Large"]  # both capped at 30 px: the larger region keeps its name
+
+
+def test_a_finer_grid_samples_the_same_zoom_at_twice_the_cells(world):
+    got = node(
+        world,
+        f"""
+const L = LM.decodeLookalike(fileBuf(), n), lo = map({ROW["Insecta"]}, L),
+  hi = LM.build(Object.assign({{}}, base, {{clade: {ROW["Insecta"]}, look: L, long: 1024}}));
+const rows = (M) => M.slots.map((s) => s.row);
+console.log(JSON.stringify({{lo: [lo.W, lo.H], hi: [hi.W, hi.H], loRows: rows(lo), hiRows: rows(hi),
+  ext: [lo.ext, hi.ext], lep: region(hi, -6.5, 0), col: region(hi, -3, 0),
+  patch: px(hi, hi.image, -4.75, 0), lev: LM.hit(hi, -3, 0).levels[3] > 0,
+  labels: [lo.labels.map((l) => l.text).sort(), hi.labels.map((l) => l.text).sort()]}}));""",
+    )
+    assert max(got["hi"]) == 1024 and max(got["lo"]) == 512
+    assert all(abs(h - 2 * lo) <= 1 for h, lo in zip(got["hi"], got["lo"], strict=True))
+    assert got["hiRows"] == got["loRows"] and got["ext"][0] == got["ext"][1]
+    assert (got["lep"], got["col"]) == ("Lepidoptera", "Coleoptera")
+    assert got["patch"] == [OUT_GREY, OUT_GREY, OUT_GREY, 255]  # the birds' patch is still outside
+    assert got["lev"] and got["labels"][0] == got["labels"][1]
