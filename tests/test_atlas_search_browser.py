@@ -288,6 +288,14 @@ def test_pasted_url_absent_id_and_taxon_filter(open_page, site):
     text.get_by_role("button", name="Leave out Fungi (Fungi)").click()
     text.wait_for_function("document.querySelectorAll('.card').length === 197")
     assert "1 outside the taxon filter" in text.locator("#dropped").inner_text()
+    # the filter is in the link: a reload keeps the chip and the list, and the query ran once
+    assert text.evaluate("location.hash") == "#q=a+bird&drop=47170:Fungi"
+    text.reload()
+    text.wait_for_function("document.querySelectorAll('.card').length === 197")
+    text.locator("#filter summary").click()
+    assert text.locator("#chips").inner_text().startswith("Not Fungi")
+    assert text.evaluate("window.encoded") == ["a photo of a bird"]
+    text.fill("#tq", "Fung")
     # keeping a taxon with no hits empties the list: the message says why, not "no photos"
     text.get_by_role("button", name="Keep only Plantae (Plants)").click()
     text.wait_for_function("document.querySelectorAll('.card').length === 0")
