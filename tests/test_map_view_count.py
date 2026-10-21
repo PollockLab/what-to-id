@@ -56,3 +56,48 @@ def test_in_view_handles_the_antimeridian_and_the_whole_world():
     assert _counts([-185, -1, -175, 1]) == 2  # wraps to 175..-175
     assert _counts([-180, -1, -178, 1]) == 1  # -179 only
     assert _counts([-180, -90, 180, 90]) is None  # 360 degrees wide: no restriction
+
+
+def _node(harness, start, end, script):
+    source = (ASSETS / "map.js").read_text()
+    i = source.index(start)
+    body = source[i : source.index(end, i)]
+    run = subprocess.run(
+        ["node", "-e", harness + body + script], capture_output=True, text=True, check=True
+    )
+    return json.loads(run.stdout)
+
+
+@needs_node
+def test_fit_frames_the_kept_records_and_skips_an_empty_set():
+    harness = """
+const S={lo:0,hi:9},LAST=9,NODAY=0,CUM=[],out=[];
+const map={fitBounds:(b,o)=>out.push([b,o.maxZoom])};
+const P={n:3,pos:Float32Array.of(-123,49,-120,50,-125,48)};
+"""
+    got = _node(
+        harness,
+        "function full()",
+        "var VC=null;",
+        "fitTo(i=>i!==2);fitTo(()=>false);fitTo(i=>i===1);console.log(JSON.stringify(out))",
+    )
+    assert got == [[[[-123, 49], [-120, 50]], 14], [[[-120, 50], [-120, 50]], 14]]
+
+
+@needs_node
+def test_a_taxon_or_group_from_the_split_view_asks_for_a_fit_and_nothing_else_does():
+    harness = """
+let SY=null,FIT=false,TAXA=null;const P={n:0},S={picks:[],groups:'',months:0};
+const MapFilter={sync:o=>{SY=o;return {send(){}};}},noop=()=>{};
+const [search,showClades,showGroups,showMonths,showOnly,refilter,render]=Array(7).fill(noop);
+const MF={read:p=>({up:false,lo:0,hi:9,months:p.get('months')||0,groups:p.get('groups')||'',only:{},
+  picks:(p.get('taxa')||'').split(',').filter(Boolean)}),
+  write:s=>[s.groups&&'groups='+s.groups,s.picks.length&&'taxa='+s.picks.join(','),
+    s.months&&'months='+s.months].filter(Boolean)};
+"""
+    script = (
+        "console.log(JSON.stringify(['taxa=5','taxa=5','taxa=5&months=3','groups=Aves','']"
+        ".map(s=>{SY.apply(s);const f=FIT;FIT=false;return f;})))"
+    )
+    got = _node(harness, "var SYNC=", "// The selection:", script)
+    assert got == [True, False, False, True, False]
