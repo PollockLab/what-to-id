@@ -303,7 +303,7 @@ function pickOut(pk){var tx=/^taxa=/.test(pk)?pk.slice(5).split(','):[];
 // Leaves taxon id out of the map and the tree. The selection is that taxon, so the taxa token keeps only the exclusions.
 function leaveOut(id){SEL=SEL.split('&').filter(function(t){return !/^taxa=/.test(t);})
   .concat('taxa='+taxaOut().filter(function(i){return i!==id;}).concat(id).map(function(i){return -i;}).join(',')).join('&');
-  SY.send();take();draw(true);}
+  SY.send();take();if(S.sel<0)S.sel=PS=M.lead(D,D.root);draw(true);}  // the card moves to Life, whose pick is the exclusions alone
 function crumbs(){
   var c=$('crumbs'),f=M.lead(D,S.focus),path=M.crumbs(D,f).concat(f);c.textContent='';
   path.forEach(function(r,i){var b=el('button',{type:'button','class':'link'},[cut(M.name(D,M.chain(D,r).pop()),24)]);
