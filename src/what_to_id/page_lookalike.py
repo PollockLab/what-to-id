@@ -12,9 +12,9 @@ Plane A holds class agreement in the low nibble and order agreement in the high 
 agreement low and the look-alike level + 2 high. Agreement at a rank is the share of the record's
 neighbours, among those in the site with a known ancestor there, that share its ancestor, in
 twelfths (half up). The look-alike is the first neighbour in cosine order with another known
-taxon, skipping host pairs (host_pairs.load); its level is the rank of their lowest common
-ancestor: 0 same family, 1 order, 2 class, 3 phylum, 4 kingdom, 5 other kingdom, -1 undecidable,
--2 no such neighbour. UNKNOWN (15) marks a nibble with nothing to say.
+taxon, skipping pairs photographed together (host_pairs.load); its level is the rank of their
+lowest common ancestor: 0 same family, 1 order, 2 class, 3 phylum, 4 kingdom, 5 other kingdom,
+-1 undecidable, -2 no such neighbour. UNKNOWN (15) marks a nibble with nothing to say.
 """
 
 from __future__ import annotations
@@ -184,7 +184,7 @@ def lookalike(lev: np.ndarray, candidate: np.ndarray) -> np.ndarray:
     return np.where(candidate.any(1), out, NONE).astype(np.int8)
 
 
-def host_flags(fam: np.ndarray, nb: np.ndarray, pairs: dict, rows: list[list], ranks) -> tuple:
+def together_flags(fam: np.ndarray, nb: np.ndarray, pairs: dict, rows: list[list], ranks) -> tuple:
     """``(n, k)`` True where record and neighbour are a flagged family pair, and the pair keys."""
     at = ranks.index("family") if "family" in ranks else -1
     by_name: dict[str, list[int]] = {}
@@ -246,7 +246,7 @@ def build(
     del rec
     agree = agreement(anc, nb, covered)
     pairs = host_pairs.load(pair_files)
-    flag, cross, key, keys = host_flags(anc[:, FAMILY], nb, pairs, rows, ranks)
+    flag, cross, key, keys = together_flags(anc[:, FAMILY], nb, pairs, rows, ranks)
     edge_lev = lca_level(anc, nb)
     tnb = _at(tax, nb)
     candidate = (tnb >= 0) & (tnb != tax[:, None])
@@ -260,7 +260,7 @@ def build(
 
 
 class Edges(NamedTuple):
-    """Per record and neighbour: position, LCA level, host flag, cross-family, family-pair key."""
+    """Per record and neighbour: position, LCA level, together flag, cross-family, pair key."""
 
     nb: np.ndarray
     level: np.ndarray
@@ -276,7 +276,7 @@ def _pair_counts(pair_key: np.ndarray, label, limit: int = 10) -> list[tuple]:
 
 
 def summarize(names, anc, e: Edges, covered, known, before, after, keys, pairs) -> dict:
-    """The build summary: host-filter effect, look-alike levels, top cross-phylum class pairs."""
+    """Build summary: together-filter effect, look-alike levels, top cross-phylum class pairs."""
     big = len(names)
 
     def dist(lev):

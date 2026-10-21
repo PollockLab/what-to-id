@@ -1,4 +1,5 @@
-"""GloBI interactions lifted to unordered host family pairs, and the committed pair files."""
+"""GloBI interactions lifted to unordered photographed-together family pairs, and the committed
+pair files."""
 
 from __future__ import annotations
 
@@ -24,7 +25,7 @@ ROWS = [
     ["Ustilaginaceae", "hasHost", "Poaceae", "10.1/a", ""],
     ["Poaceae", "hostOf", "Ustilaginaceae", "", "Some survey"],  # same pair, other way round
     ["Ustilaginaceae", "eats", "Cyperaceae", "10.1/b", ""],  # not a kept type
-    ["Ustilaginaceae", "visitsFlowersOf", "Cyperaceae", "10.1/b", ""],
+    ["Ustilaginaceae", "interactsWith", "Cyperaceae", "10.1/b", ""],
     ["Ustilaginaceae", "pathogenOf", "Cyperaceae", "10.1/c", ""],  # one row only
     ["Poaceae", "parasiteOf", "Poaceae", "10.1/d", ""],  # same family
     ["Poaceae", "parasiteOf", "Poaceae", "10.1/d", ""],
@@ -77,6 +78,26 @@ def test_the_header_pins_the_dump_and_a_wrong_sha256_writes_nothing(site, tmp_pa
     with pytest.raises(ValueError, match=f"has sha256 {sha}, expected 00"):
         host_pairs.main([*args, "--sha256", "00"])
     assert not out.exists()
+
+
+def test_flower_visits_count_as_photographed_together(site, tmp_path):
+    dump = tmp_path / "interactions.tsv.gz"
+    _dump(
+        dump,
+        [
+            ["Ustilaginaceae", "visitsFlowersOf", "Cyperaceae", "10.1/g", ""],
+            ["Cyperaceae", "pollinatedBy", "Ustilaginaceae", "10.1/g", ""],
+        ],
+    )
+    out = tmp_path / "pairs.tsv"
+    host_pairs.main(["--site", str(site), "--dump", str(dump), "--out", str(out)])
+    assert host_pairs.load([out]) == {
+        ("Cyperaceae", "Ustilaginaceae"): {
+            "types": "pollinatedBy,visitsFlowersOf",
+            "rows": 2,
+            "source": "10.1/g",
+        }
+    }
 
 
 def test_a_dump_without_the_family_columns_is_refused(site, tmp_path):

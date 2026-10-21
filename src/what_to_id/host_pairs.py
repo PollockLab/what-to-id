@@ -1,8 +1,8 @@
-"""Parasite, pathogen, epiphyte and host family pairs from GloBI, for the look-alike stats.
+"""Family pairs photographed together, from GloBI, for the look-alike stats.
 
-A smut photographed on its grass, a rust on its rose, a gall on its oak or a mistletoe on its pine
-shares the photo with its host, so BioCLIP puts the two side by side although neither looks like
-the other. page_lookalike skips such neighbour pairs. This module lifts the Global Biotic
+A smut on its grass, a rust on its rose, a gall on its oak, a mistletoe on its pine or a bee on
+its aster shares the photo with the other, so BioCLIP puts the two side by side although neither
+looks like the other. page_lookalike skips such neighbour pairs. This module lifts the Global Biotic
 Interactions (GloBI) dump to unordered family pairs:
 
     python -m what_to_id.host_pairs --site SITE_DIR [--dump PATH_OR_URL] \\
@@ -41,7 +41,8 @@ DUMP_SHA256 = "021a206a1459bcca7e251c73f5bd180fc3ac342a09c499855fe42e21fc09edcf"
 ASSETS = Path(__file__).parent / "lookalike_assets"
 PAIR_FILES = (ASSETS / "host_pairs.tsv", ASSETS / "host_pairs_extra.tsv")
 COLUMNS = ("family_a", "family_b", "types", "globi_rows", "source")
-# Living on or in the other, so photographed with it. Not eats, visits, pollinates or mycorrhiza.
+# Living on or in the other, or visiting its flowers, so photographed with it. Not eats, the
+# generic visits, or mycorrhiza (below ground).
 TYPES = frozenset(
     [
         "parasiteOf",
@@ -61,10 +62,14 @@ TYPES = frozenset(
         "epiphyteOf",
         "hasEpiphyte",
         "kleptoparasiteOf",
+        "visitsFlowersOf",
+        "flowersVisitedBy",
+        "pollinates",
+        "pollinatedBy",
     ]
 )
 # Every kept type holds one of these, so most of the dump is skipped before it is split.
-_HINTS = (b"arasit", b"ostOf", b"asHost", b"athogen", b"piphyte")
+_HINTS = (b"arasit", b"ostOf", b"asHost", b"athogen", b"piphyte", b"lowers", b"ollinat")
 MIN_ROWS = 2
 _FIELDS = ("sourceTaxonFamilyName", "interactionTypeName", "targetTaxonFamilyName")
 _REFS = ("referenceDoi", "sourceCitation")

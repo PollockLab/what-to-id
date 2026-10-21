@@ -151,7 +151,7 @@ jobs:
             echo "::error::a list name leaked into the site"; exit 1
           fi
       # pool-lookalike.bin: per-record agreement and nearest other-taxon rank from the photo-space
-      # neighbours on the index repo, host pairs skipped. The photo-space page works without it.
+      # neighbours on the index repo, pairs photographed together skipped. The photo-space page works without it.
       - name: Add the look-alike stats
         id: lookalike
         continue-on-error: true
