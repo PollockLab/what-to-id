@@ -21,20 +21,40 @@ bundle the text margin predicts identifier disagreement better than the image ma
 0.80 vs 0.76, same 58k rows), so when text vectors are given the pairs table comes from it.
 A Research Grade photo sample as prototype source was tried and does not transfer (AUROC 0.39
 on the 466 species it covers), and trimming or filtering the proposals changes nothing.
+
+`fir_table` and the `fir` subcommand are the manual Fir job: they stream the memory-mapped bulk
+embeddings in chunks, score text margins only, and write the per-species confused pairs table
+(`confusion.parquet`) next to the atlas index, registered in its manifest for the page to fetch.
 """
 
 from __future__ import annotations
 
 import argparse
 import gzip
+import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
+from what_to_id.atlas_index_io import read_manifest, write_manifest
+
 MIN_PER_CLASS = 4
 CHUNK = 4096
 COLUMNS = ("id", "taxon_id", "n_class", "own", "other", "other_taxon_id", "margin")
+FIR_SLICE = 1 << 18  # rows of E read into memory at once on Fir (1 GB at 1024 floats)
+FIR_PAIRS_PER_SPECIES = 3
+TABLE_COLUMNS = (
+    "taxon_id",
+    "taxon_name",
+    "looks_like_taxon_id",
+    "looks_like_name",
+    "n_photos",
+    "n_species_photos",
+    "share",
+    "built_at",
+)
 TEXT_COLUMNS = ("text_own", "text_other", "text_other_name", "text_margin")
 
 
@@ -173,7 +193,102 @@ def confused_pairs(
     return pairs[["taxon", "looks_like", "n", "taxon_id", other]].reset_index(drop=True)
 
 
+def fir_table(
+    pool: pd.DataFrame,
+    E: np.ndarray,
+    ids: np.ndarray,
+    taxa: pd.Series,
+    T: np.ndarray,
+    built_at: str,
+    min_photos: int = MIN_PER_CLASS,
+) -> pd.DataFrame:
+    """The confused pairs table (`TABLE_COLUMNS`) from text margins only.
+
+    `E` may be a memory map: rows are read in `FIR_SLICE` slices in file order. A photo counts for
+    a pair when its text margin is below zero; its pair partner is the nearest other species text
+    prototype, the first in `taxa` order on an exact tie. Species with fewer than `min_photos`
+    scored photos are dropped, and pairs with a single photo.
+    """
+    p = pool.loc[pool["rank"] == "species", ["id", "taxon_id", "taxon_name"]].dropna()
+    p = p.assign(
+        pos=pd.Series(np.arange(len(ids)), index=ids).reindex(p["id"].to_numpy()).to_numpy()
+    )
+    p = p.dropna(subset=["pos"]).sort_values("pos")
+    parts = []
+    for s in range(0, len(p), FIR_SLICE):
+        q = p.iloc[s : s + FIR_SLICE]
+        own, other, other_name = text_scores(
+            E[q["pos"].to_numpy().astype(np.int64)], q["taxon_name"], taxa, T
+        )
+        parts.append(
+            pd.DataFrame(
+                {
+                    "taxon_id": q["taxon_id"].to_numpy().astype(np.int64),
+                    "margin": own - other,
+                    "other_name": other_name,
+                }
+            )
+        )
+    scores = (
+        pd.concat(parts, ignore_index=True)
+        if parts
+        else pd.DataFrame({"taxon_id": [], "margin": [], "other_name": []})
+    )
+    scores = scores[scores["margin"].notna()]
+    n_species = scores.groupby("taxon_id").size().rename("n_species_photos")
+    n_species = n_species[n_species >= min_photos]
+    neg = scores[(scores["margin"] < 0) & scores["taxon_id"].isin(n_species.index)]
+    pairs = neg.groupby(["taxon_id", "other_name"]).size().rename("n_photos").reset_index()
+    # shortcut: at most 3 pairs per species, 2+ photos each; raise if the page needs a longer tail.
+    pairs = pairs[pairs["n_photos"] >= 2].sort_values(
+        ["taxon_id", "n_photos", "other_name"], ascending=[True, False, True]
+    )
+    pairs = pairs.groupby("taxon_id").head(FIR_PAIRS_PER_SPECIES)
+    sp = p.drop_duplicates("taxon_id").set_index("taxon_id")["taxon_name"]
+    by_name = p.drop_duplicates("taxon_name").set_index("taxon_name")["taxon_id"]
+    out = pd.DataFrame(
+        {
+            "taxon_id": pairs["taxon_id"].to_numpy(),
+            "taxon_name": pairs["taxon_id"].map(sp).to_numpy(),
+            "looks_like_taxon_id": pairs["other_name"].map(by_name).astype("Int64").array,
+            "looks_like_name": pairs["other_name"].to_numpy(),
+            "n_photos": pairs["n_photos"].to_numpy(),
+            "n_species_photos": pairs["taxon_id"].map(n_species).to_numpy(),
+        }
+    )
+    out["share"] = out["n_photos"] / out["n_species_photos"]
+    out["built_at"] = built_at
+    return out[list(TABLE_COLUMNS)].reset_index(drop=True)
+
+
+def fir_main(argv: list[str]) -> int:
+    ap = argparse.ArgumentParser(prog="confusion fir", description="Write confusion.parquet")
+    ap.add_argument("--emb", required=True, help="E.npy, float32 (n x d), memory-mapped")
+    ap.add_argument("--ids", required=True, help="ids.npy, int64 observation ids, rows of E")
+    ap.add_argument(
+        "--pool", required=True, help="pool parquet with id, taxon_id, taxon_name, rank"
+    )
+    ap.add_argument("--taxa-names", required=True, help="atlas taxa-<sha>.tsv.gz")
+    ap.add_argument("--taxa-vectors", required=True, help="atlas taxa-<sha>.f16")
+    ap.add_argument("--atlas-dir", required=True, help="atlas index dir holding manifest.json")
+    args = ap.parse_args(argv)
+    manifest = read_manifest(args.atlas_dir)
+    pool = pd.read_parquet(args.pool, columns=["id", "taxon_id", "taxon_name", "rank"])
+    taxa, T = read_taxa_vectors(args.taxa_names, args.taxa_vectors)
+    E = np.load(args.emb, mmap_mode="r")
+    built_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    out = fir_table(pool, E, np.load(args.ids), taxa, T, built_at)
+    out.to_parquet(Path(args.atlas_dir) / "confusion.parquet", index=False)
+    manifest["confusion"] = {"name": "confusion.parquet", "built_at": built_at, "count": len(out)}
+    write_manifest(args.atlas_dir, manifest)
+    print(f"{len(out)} pairs for {out['taxon_id'].nunique()} species")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv[:1] == ["fir"]:
+        return fir_main(argv[1:])
     ap = argparse.ArgumentParser(description="Label confusion scores (prototype margin) for a pool")
     ap.add_argument("pool", help="pool parquet with id, taxon_id, rank")
     ap.add_argument("--emb", required=True, nargs="+", help="embeddings npz files (ids, E)")
