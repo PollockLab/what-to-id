@@ -275,6 +275,17 @@ def test_page_decodes_the_file_and_marks_records():
 
 
 @needs_node
+def test_page_lists_the_ids_its_projects_keep_sorted_for_the_photo_space():
+    got = _node(
+        "var id=new Uint32Array([300,400,4294967295,5,70000,71000]),"
+        "m=new Uint8Array([3,1,2,2,2,0]);"
+        "var a=projIds(id,m,0,2),b=projIds(id,m,1,0),c=projIds(id,m,0,0);"
+        "console.log(JSON.stringify({a:Array.from(a),b:Array.from(b),c:c}));"
+    )
+    assert got == {"a": [400, 71000], "b": [300, 400], "c": None}
+
+
+@needs_node
 def test_page_keeps_records_in_any_picked_project_less_the_left_out():
     got = _node(
         "var c={};[0,1,2,3].forEach(function(m){"
