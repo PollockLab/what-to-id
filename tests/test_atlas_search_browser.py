@@ -199,7 +199,9 @@ def test_text_search_renders_hits_drops_unneeded_and_hands_off(open_page, site):
     assert page.locator(".card").count() == 198
     assert "1 no longer need an ID" in page.locator("#dropped").inner_text()
     assert "1 no longer returned" in page.locator("#dropped").inner_text()
-    assert "Similarity" in page.locator(".card").first.inner_text()
+    assert "#1 · Similarity 0." in page.locator(".card").first.inner_text()
+    assert "#2 · Similarity" in page.locator(".card").nth(1).inner_text()
+    assert page.locator(".card [title^='How close']").first.is_visible()
     assert page.locator(".card img").first.get_attribute("src").endswith("/small.jpg")
     assert [len(c) for c in page.stub["calls"]] == [200]
     identify = page.locator("#actions a").first.get_attribute("href")
@@ -303,9 +305,9 @@ def test_two_subject_query_searches_each_and_says_so(open_page):
         "a photo of a bird",
         "a photo of a frog",
     ]
-    assert (
-        page.locator("#how").inner_text().startswith("Each photo matches all of: a bird, a frog.")
-    )
+    assert page.locator("#how").inner_text().startswith(
+        "Each photo matches all of: a bird, a frog."
+    ) and page.locator("#how").inner_text().endswith("Similarity is the weaker subject's.")
     page.fill("#q", "a bird")
     page.press("#q", "Enter")
     page.wait_for_function("document.getElementById('how').textContent === ''")
