@@ -57,6 +57,7 @@ var box=document.getElementById("main-content"),frames={},last=MapFilter.tokens(
 function hashFor(n){
   var own=rest.filter(function(t){var k=t.split('=')[0];
     if(k==='id')return true;
+    if(k==='life'||k==='clade')return n==='space';
     if(k==='at')return n===(want==='space'?'space':'map');
     return n==='map';});
   return (last?[last]:[]).concat(own.map(function(t){

@@ -54,7 +54,18 @@ button[hidden]{display:none}
 #plot{grid-area:plot;position:relative;min-height:0;overflow:hidden}
 .ptip{position:fixed;z-index:20;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:6px;
   padding:4px 8px;font-size:12px;box-shadow:var(--shadow)}
+.ptip{white-space:pre-line}
 .ptip[hidden],.card[hidden]{display:none}
+.lifebar{grid-area:plot;align-self:end;justify-self:start;position:relative;z-index:6;margin:8px;padding:6px 8px;max-width:calc(100% - 16px);display:flex;flex-wrap:wrap;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);font-size:12px}
+.lifebar[hidden],.lifebar [hidden]{display:none}
+.lifebar .seg{display:inline-flex}
+.lifebar .seg button{border-radius:0}
+.lifebar .seg button:first-child{border-radius:14px 0 0 14px}
+.lifebar .seg button:last-child{border-radius:0 14px 14px 0;margin-left:-1px}
+.lifebar button[aria-pressed="true"]{background:var(--on);color:var(--onink);border-color:var(--on)}
+.lifebar button:disabled{opacity:.5;cursor:not-allowed}
+.llg{display:inline-flex;align-items:center;gap:4px;color:var(--muted)}
+.llg i{display:inline-block;width:12px;height:12px;border-radius:2px;margin-left:4px}
 .card{position:fixed;z-index:10;top:140px;right:12px;width:min(300px,calc(100vw - 24px));max-height:calc(100vh - 152px);overflow:auto;
   background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow)}
 .card .rz{position:absolute;z-index:1;left:0;top:0;bottom:0;width:7px;padding:0;border:0;border-radius:10px 0 0 10px;background:none;cursor:col-resize;touch-action:none}
@@ -114,6 +125,13 @@ __SITE_NAV__<header>
 <p class="muted"><button type="button" class="link" id="gall">All groups</button> <button type="button" class="link" id="gfit" hidden>Fit to selection</button></p></div>
 </section>
 <main id="plot" role="application" aria-label="Photo space of observations"></main>
+<div id="lifebar" class="lifebar" role="group" aria-label="How the photo space is drawn" hidden>
+<span class="seg"><button type="button" id="vpts" aria-pressed="true">Points</button><button type="button" id="vlife" aria-pressed="false">Map of life</button></span>
+<span class="seg" id="lmodes" hidden><button type="button" id="vclade" aria-pressed="false">Clades</button><button type="button" id="vlook" aria-pressed="false">Look-alikes</button></span>
+<button type="button" id="lup" hidden>Up</button> <b id="lwhere" hidden></b>
+<span id="llegend" class="llg" hidden></span>
+<span id="lnote" class="muted"></span>
+</div>
 <button type="button" id="ldraw" aria-pressed="false" disabled title="Draw a lasso around the photos to keep (or shift+drag)">Draw</button>
 <button type="button" id="lclear" hidden>Clear lasso</button>
 <button type="button" class="info" id="info" aria-expanded="false" aria-controls="honest" aria-label="About this picture">i</button>
@@ -129,6 +147,8 @@ __SITE_NAV__<header>
 <script>__TAXON_TREE__</script>
 <script>__EMBEDDINGS_LAYOUT__</script>
 <script>__EMBEDDINGS_SELECT__</script>
+<script>__LIFE_MAP__</script>
+<script>__LIFE_VIEW__</script>
 <script>__EMBEDDINGS_APP__</script>
 </body>
 </html>

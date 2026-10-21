@@ -29,6 +29,8 @@ SCRIPTS = {
     "__TAXON_TREE__": ASSETS / "taxon_tree.js",
     "__EMBEDDINGS_LAYOUT__": ASSETS / "embeddings_layout.js",
     "__EMBEDDINGS_SELECT__": ASSETS / "embeddings_select.js",
+    "__LIFE_MAP__": ASSETS / "life_map.js",
+    "__LIFE_VIEW__": ASSETS / "life_view.js",
     "__EMBEDDINGS_APP__": ASSETS / "embeddings_app.js",
 }
 PAGE_NAME = "embeddings.html"

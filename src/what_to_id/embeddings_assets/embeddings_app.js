@@ -14,6 +14,7 @@ var MF=null,TF=null,TR=null,PASS=['park','bcpark','projects'],MAPONLY={park:'Par
   AREA_IN=null,VIEW_IN=null;
 function $(id){return document.getElementById(id);}
 var X=SpaceSelect(S,$,picked,layers),areaIndex=X.areaIndex,viewBox=X.viewBox,areaMask=X.areaMask,lasso=X.lasso,lassoDrag=X.lassoDrag,moved=X.moved;
+var LV=LifeView({S:S,$:$,MAP:MAP,frame:frame,redraw:layers,status:status,color:color,writeHash:writeHash});
 function el(tag,attrs,kids){
   var e=document.createElement(tag);
   Object.keys(attrs||{}).forEach(function(k){if(attrs[k]!==null&&attrs[k]!==undefined)e.setAttribute(k,attrs[k]);});
@@ -42,6 +43,7 @@ function applyJoin(P,taxa){
   chips();update();
   if(S.subset&&S.deck)fit();else if(S.deck&&S.vs===S.home)goHome();
   if(S.sel>=0&&S.relabel)S.relabel();
+  LV.joined();
 }
 function openIndex(){return AtlasSearchIndex.open(DATA,{whole:WHOLE});}
 
@@ -62,6 +64,7 @@ function writeHash(){
   // before the join the selection is only in the hash, so it stays as it is
   var h=S.P.grp?MF.write(S).concat(S.area?['area='+S.area]:[],S.extra):location.hash.slice(1).split('&').filter(function(t){
     return t&&t.indexOf('id=')!==0;});
+  h=LV.hash(h);
   if(S.sel>=0)h.push('id='+S.P.id[S.sel]);
   history.replaceState(null,'',h.length?'#'+h.join('&'):location.pathname+location.search);
 }
@@ -259,7 +262,7 @@ function layers(){
   var groups=[0];
   if(P.grp){groups=[];passing().forEach(function(v,j){if(v)groups.push(j);});}
   var thin=S.thin&&P.n>THIN_ABOVE;
-  var lyr=[new deck.ScatterplotLayer({id:'pts',data:S.PD,radiusUnits:'pixels',getRadius:1.5,radiusMinPixels:1,radiusMaxPixels:3,
+  var lyr=LV.on()?LV.layers():[new deck.ScatterplotLayer({id:'pts',data:S.PD,radiusUnits:'pixels',getRadius:1.5,radiusMinPixels:1,radiusMaxPixels:3,
     stroked:false,pickable:true,extensions:[EXT],updateTriggers:{getFilterCategory:S.PDV},
     filterCategories:[groups,thin?[1]:[0,1],[1]]})];
   function ring(id,rows,px,rgb,w){
@@ -276,15 +279,16 @@ function layers(){
 // Hover and click.
 var ptip=el('div',{'class':'ptip',hidden:''});document.body.appendChild(ptip);
 function tip(o){
-  if(!S.P||o.index<0||!o.layer||o.layer.id!=='pts'){ptip.hidden=true;return;}
-  var t=names(o.index);
-  ptip.textContent=t.common||t.latin?(t.common||t.latin)+' · '+t.group:t.group||'Loading names…';
+  var lt=LV.text(o);
+  if(lt===''||lt===null&&(!S.P||o.index<0||!o.layer||o.layer.id!=='pts')){ptip.hidden=true;return;}
+  var t=lt===null&&names(o.index);
+  ptip.textContent=lt!==null?lt:t.common||t.latin?(t.common||t.latin)+' · '+t.group:t.group||'Loading names…';
   ptip.hidden=false;
   var g=12,x=o.x+$('plot').getBoundingClientRect().left,y=o.y+$('plot').getBoundingClientRect().top;
   ptip.style.left=Math.max(4,x+g+ptip.offsetWidth>innerWidth-4?x-g-ptip.offsetWidth:x+g)+'px';
   ptip.style.top=Math.max(4,y+g+ptip.offsetHeight>innerHeight-4?y-g-ptip.offsetHeight:y+g)+'px';
 }
-function pick(o){if(S.P&&o.index>=0&&o.layer&&o.layer.id==='pts')select(o.index,false);}
+function pick(o){if(LV.click(o))return;if(S.P&&o.index>=0&&o.layer&&o.layer.id==='pts')select(o.index,false);}
 
 function closeCard(){
   S.sel=-1;S.nbr=[];S.run++;$('card').hidden=true;
