@@ -402,6 +402,12 @@ def test_the_root_is_life_and_the_group_cards_link_to_their_records(browser, lif
     own = "[...e.childNodes].filter(n => n.nodeType === 3).map(n => n.data).join('')"
     names = page.eval_on_selector_all("#svg text.lb", f"es => es.map(e => {own})")
     assert "Unknown" in names and "Life" not in names  # the group's tip, named as its card and chip
+    titles = page.eval_on_selector_all(
+        "#svg text.lb", "es => es.map(e => e.querySelector('title').textContent)"
+    )
+    assert titles[names.index("Unknown")].startswith(
+        "Unknown: 20 records need ID"
+    )  # the hover title too
     page.close()
     page = open_tree(browser, life_site, hash_="#sel=48460")
     page.wait_for_selector("#card:not([hidden])")
