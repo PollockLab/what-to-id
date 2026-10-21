@@ -34,8 +34,8 @@ function grpOf(r){return M.chain(D,r).map(function(x){return G[M.id(D,x)];}).fil
 function recs(n){return nf.format(n)+(n===1?' record':' records');}
 function tip(n){
   if(n.row<0)return '+'+nf.format(n.more)+' more taxa ('+recs(n.tot)+')';
-  var r=n.row,cm=cmn(r),k=rk(r);
-  return label(r)+(cm?' ('+cm+')':'')+(k?', '+k:'')+': '+recs(n.tot)+' need ID'+(n.own?', '+nf.format(n.own)+' only to here':'');}
+  var r=n.row,un=r===D.nr&&r!==D.root,cm=un?'':cmn(r),k=un?'':rk(r);
+  return (un?cmn(r):label(r))+(cm?' ('+cm+')':'')+(k?', '+k:'')+': '+recs(n.tot)+' need ID'+(n.own?', '+nf.format(n.own)+' only to here':'');}
 // ---- the radial tree
 // A view of a few leaves fans out over span (centred on the right, where labels read level) and the circle
 // grows and shifts so the fan's bounding box fills the canvas, left of the card where it floats over the plot.
