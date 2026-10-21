@@ -101,7 +101,7 @@ def test_join_places_pool_records_by_id_and_later_parts_win(world):
     lonlat: Array.from(P.lonlat), obs: Array.from(P.obs), up: Array.from(P.up),
     ids: Array.from(P.ids), flags: Array.from(P.flags),
     early: {{n: early.n, id: Array.from(early.id), pos: Array.from(early.pos)}},
-    grp: Array.from(P.grp), start: P.start,
+    grp: Array.from(P.grp), start: P.start, src: Array.from(P.src),
     found: Array.from(P.id).map((i) => L.find(P, i)), missing: L.find(P, 1)}}));
 }})();"""
     )
@@ -120,7 +120,10 @@ def test_join_places_pool_records_by_id_and_later_parts_win(world):
     truth = decode_points(
         {n: (d / n).read_bytes() for n in (*(s["file"] for s in meta["shards"]), meta["taxa"])},
         meta,
-    ).set_index("id")
+    )
+    # src is the row in the shards laid end to end, the order files written per shard row follow
+    assert [int(truth.id[r]) for r in got["src"]] == got["id"]
+    truth = truth.set_index("id")
     for k, i in enumerate(got["id"]):
         x, y = expected[i]
         assert got["pos"][2 * k] == pytest.approx(x, abs=100 / 65535)
