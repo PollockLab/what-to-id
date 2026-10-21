@@ -60,11 +60,14 @@ function build(T,ranks,groups,opt){
   return {T:T,ranks:ranks,n:n,root:n,par:par,own:own,tot:tot,st:st,deep:deep,sp:sp,kids:kids,row:row,grp:grp,groups:groups,
     ex:ex,gr:gr,names:opt.names||{},none:none,nr:nr,opt:opt};
 }
-// The tree less the map's left-out groups: the same table with those groups' records gone, so their nodes
-// drop out and every count above them falls. Leaving out Unknown drops the records with no taxon too.
-function without(M,names){
-  if(!names.length)return M;
-  var gone=0,T=M.T.map(function(t,i){if(names.indexOf(M.grp[i])<0)return t;gone+=t[5]||0;return t.slice(0,5).concat([0]);}),
+// The tree less what the map leaves out: the groups named in names and the taxa with an iNaturalist id in ids
+// (with everything below them), the same table with those records gone, so their nodes drop out and every count
+// above them falls. Leaving out Unknown drops the records with no taxon too.
+function without(M,names,ids){
+  if(!names.length&&!(ids&&ids.length))return M;
+  var out=new Set(ids),gone=0,T=M.T.map(function(t,i){
+    var x=i;while(x<M.n&&!out.has(M.T[x][2]))x=M.par[x];
+    if(x===M.n&&names.indexOf(M.grp[i])<0)return t;gone+=t[5]||0;return t.slice(0,5).concat([0]);}),
     o=Object.assign({},M.opt,{total:names.indexOf(REST)>=0?0:Math.max(0,(M.opt.total||0)-gone)});
   return build(T,M.ranks,M.groups,o);
 }
