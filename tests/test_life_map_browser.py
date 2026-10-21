@@ -172,6 +172,7 @@ def hover(page, x, y):
 def test_points_to_map_of_life_to_look_alikes_and_a_reload_keeps_it(open_page):
     page = open_page()
     assert "pts" in ids(page) and "life-img" not in ids(page)
+    assert page.locator("#vclade").is_hidden()  # Clades / Look-alikes only beside the map
     page.click("#vlife")
     assert "life=1" in drawn(page)
     assert "pts" not in ids(page) and {"life-lbl", "life-lbl-k"} <= set(ids(page))
@@ -191,6 +192,7 @@ def test_points_to_map_of_life_to_look_alikes_and_a_reload_keeps_it(open_page):
     assert pixel(page, 30, -5) == blue
     page.click("#vpts")
     page.wait_for_function("__deck.props.layers.some(l => l.id === 'pts')")
+    assert page.locator("#vlook").is_hidden()
     assert not any(
         t.startswith("life=") for t in page.evaluate("location.hash.slice(1).split('&')")
     )

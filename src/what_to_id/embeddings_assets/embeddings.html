@@ -58,7 +58,7 @@ button[hidden]{display:none}
 .ptip[hidden],.card[hidden]{display:none}
 .lifebar{grid-area:plot;align-self:end;justify-self:start;position:relative;z-index:6;margin:8px;padding:6px 8px;max-width:calc(100% - 16px);display:flex;flex-wrap:wrap;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);font-size:12px}
 .lifebar[hidden],.lifebar [hidden]{display:none}
-.lifebar .seg{display:inline-flex}
+.lifebar .seg:not([hidden]){display:inline-flex}
 .lifebar .seg button{border-radius:0}
 .lifebar .seg button:first-child{border-radius:14px 0 0 14px}
 .lifebar .seg button:last-child{border-radius:0 14px 14px 0;margin-left:-1px}
