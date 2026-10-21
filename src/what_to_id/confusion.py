@@ -11,11 +11,22 @@ score low.
 
 This is the leave-one-out centroid score LabelFirst uses to grade open-set separability
 (`labelfirst.eval.diagnose.osr`), applied per photo instead of aggregated to an AUROC.
+
+A second, label-independent prototype is the BioCLIP text vector of "a photo of <species>"
+that `atlas_taxa` already writes next to the atlas index. `text_own`, `text_other`,
+`text_other_name` and `text_margin` are the same quantities against those vectors. They never
+see the pool's proposals, so a species whose proposals are mostly wrong still gets a sound
+prototype, and the runner can compute them without the raw photo vectors. On the BC Needs ID
+bundle the text margin predicts identifier disagreement better than the image margin (AUROC
+0.80 vs 0.76, same 58k rows), so when text vectors are given the pairs table comes from it.
+A Research Grade photo sample as prototype source was tried and does not transfer (AUROC 0.39
+on the 466 species it covers), and trimming or filtering the proposals changes nothing.
 """
 
 from __future__ import annotations
 
 import argparse
+import gzip
 from pathlib import Path
 
 import numpy as np
@@ -24,6 +35,7 @@ import pandas as pd
 MIN_PER_CLASS = 4
 CHUNK = 4096
 COLUMNS = ("id", "taxon_id", "n_class", "own", "other", "other_taxon_id", "margin")
+TEXT_COLUMNS = ("text_own", "text_other", "text_other_name", "text_margin")
 
 
 def prototype_scores(E: np.ndarray, labels: np.ndarray, min_per_class: int = MIN_PER_CLASS):
@@ -70,17 +82,56 @@ def prototype_scores(E: np.ndarray, labels: np.ndarray, min_per_class: int = MIN
     return n_class, own, other, other_label
 
 
+def text_scores(E: np.ndarray, names: pd.Series, taxa: pd.Series, T: np.ndarray):
+    """Per row (own, other, other_name) against unit text vectors `T`, one per name in `taxa`.
+
+    `names` are the rows' proposed species names. Only species names (two words) in `taxa` act
+    as prototypes. A row whose name has no prototype gets NaN `own`; `other` is always the best
+    cosine to any prototype but the row's own.
+    """
+    E = np.asarray(E, dtype=np.float32)
+    is_species = taxa.str.split().str.len() == 2
+    protos = np.asarray(T, dtype=np.float32)[np.flatnonzero(is_species.to_numpy())]
+    proto_names = taxa[is_species].to_numpy()
+    col = pd.Series(np.arange(len(proto_names)), index=proto_names)
+    own_col = names.map(col).fillna(-1).astype(int).to_numpy()
+    n = len(names)
+    own = np.full(n, np.nan)
+    other = np.full(n, np.nan)
+    other_name = np.full(n, None, dtype=object)
+    if n == 0 or len(proto_names) < 2:
+        return own, other, other_name
+    for s in range(0, n, CHUNK):
+        X = E[s : s + CHUNK]
+        sims = X @ protos.T
+        ar = np.arange(len(X))
+        oc = own_col[s : s + CHUNK]
+        ok = oc >= 0
+        own[s : s + CHUNK][ok] = sims[ar[ok], oc[ok]]
+        sims[ar[ok], oc[ok]] = -np.inf
+        best = sims.argmax(1)
+        other[s : s + CHUNK] = sims[ar, best]
+        other_name[s : s + CHUNK] = proto_names[best]
+    return own, other, other_name
+
+
 def confusion_scores(
-    pool: pd.DataFrame, E: np.ndarray, ids: np.ndarray, min_per_class: int = MIN_PER_CLASS
+    pool: pd.DataFrame,
+    E: np.ndarray,
+    ids: np.ndarray,
+    min_per_class: int = MIN_PER_CLASS,
+    taxa: pd.Series | None = None,
+    T: np.ndarray | None = None,
 ) -> pd.DataFrame:
-    """`COLUMNS` for the pool rows ranked at species that have an embedding row in `ids`."""
-    p = pool.loc[pool["rank"] == "species", ["id", "taxon_id"]].dropna()
+    """`COLUMNS` for the pool rows ranked at species that have an embedding row in `ids`,
+    plus `TEXT_COLUMNS` when text prototypes (`taxa` names and their vectors `T`) are given."""
+    p = pool.loc[pool["rank"] == "species", ["id", "taxon_id", "taxon_name"]].dropna()
     pos = pd.Series(np.arange(len(ids)), index=ids)
     p = p[p["id"].isin(pos.index)]
     rows = pos[p["id"].to_numpy()].to_numpy()
     labels = p["taxon_id"].to_numpy().astype(np.int64)
     n_class, own, other, other_label = prototype_scores(E[rows], labels, min_per_class)
-    return pd.DataFrame(
+    out = pd.DataFrame(
         {
             "id": p["id"].to_numpy(),
             "taxon_id": labels,
@@ -91,16 +142,35 @@ def confusion_scores(
             "margin": own - other,
         }
     )
+    if taxa is not None and T is not None:
+        t_own, t_other, t_name = text_scores(E[rows], p["taxon_name"], taxa, T)
+        out["text_own"], out["text_other"], out["text_other_name"] = t_own, t_other, t_name
+        out["text_margin"] = t_own - t_other
+    return out
 
 
-def confused_pairs(scores: pd.DataFrame, names: pd.Series, top: int = 20) -> pd.DataFrame:
-    """The labelled-species / looks-like-species pairs with most negative-margin photos."""
-    neg = scores[scores["margin"] < 0]
-    pairs = neg.groupby(["taxon_id", "other_taxon_id"]).size().rename("n").reset_index()
+def read_taxa_vectors(names_path: str | Path, vectors_path: str | Path):
+    """(names, unit vectors) from the `taxa-<sha>.tsv.gz` and `taxa-<sha>.f16` atlas files."""
+    with gzip.open(names_path, "rt") as f:
+        names = pd.Series([line.split("\t")[0] for line in f.read().splitlines()])
+    T = np.fromfile(vectors_path, dtype=np.float16).reshape(len(names), -1).astype(np.float32)
+    return names, T / np.linalg.norm(T, axis=1, keepdims=True).clip(1e-12)
+
+
+def confused_pairs(
+    scores: pd.DataFrame, names: pd.Series, top: int = 20, text: bool = False
+) -> pd.DataFrame:
+    """The labelled-species / looks-like-species pairs with most negative-margin photos.
+
+    `text=True` uses the text-prototype columns; `looks_like` is then a name, not a taxon id.
+    """
+    margin, other = ("text_margin", "text_other_name") if text else ("margin", "other_taxon_id")
+    neg = scores[scores[margin] < 0]
+    pairs = neg.groupby(["taxon_id", other]).size().rename("n").reset_index()
     pairs = pairs.sort_values("n", ascending=False).head(top)
     pairs["taxon"] = pairs["taxon_id"].map(names)
-    pairs["looks_like"] = pairs["other_taxon_id"].map(names)
-    return pairs[["taxon", "looks_like", "n", "taxon_id", "other_taxon_id"]].reset_index(drop=True)
+    pairs["looks_like"] = pairs[other] if text else pairs[other].map(names)
+    return pairs[["taxon", "looks_like", "n", "taxon_id", other]].reset_index(drop=True)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -109,12 +179,19 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--emb", required=True, nargs="+", help="embeddings npz files (ids, E)")
     ap.add_argument("--out", required=True, help="output parquet")
     ap.add_argument("--min-per-class", type=int, default=MIN_PER_CLASS)
+    ap.add_argument("--taxa-names", help="atlas taxa-<sha>.tsv.gz (text prototypes)")
+    ap.add_argument("--taxa-vectors", help="atlas taxa-<sha>.f16, same rows as --taxa-names")
     args = ap.parse_args(argv)
+    if bool(args.taxa_names) != bool(args.taxa_vectors):
+        ap.error("--taxa-names and --taxa-vectors go together")
     pool = pd.read_parquet(args.pool, columns=["id", "taxon_id", "taxon_name", "rank"])
+    taxa, T = (
+        read_taxa_vectors(args.taxa_names, args.taxa_vectors) if args.taxa_names else (None, None)
+    )
     parts = []
     for f in args.emb:
         z = np.load(f)
-        parts.append(confusion_scores(pool, z["E"], z["ids"], args.min_per_class))
+        parts.append(confusion_scores(pool, z["E"], z["ids"], args.min_per_class, taxa, T))
     out = pd.concat(parts, ignore_index=True)
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     out.to_parquet(args.out, index=False)
@@ -125,6 +202,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     names = pool.drop_duplicates("taxon_id").set_index("taxon_id")["taxon_name"]
     print(confused_pairs(out, names).to_string(index=False))
+    if taxa is not None:
+        print(f"\n{int((out['text_margin'] < 0).sum())} closer to another species' text prototype")
+        print(confused_pairs(out, names, text=True).to_string(index=False))
     return 0
 
 
