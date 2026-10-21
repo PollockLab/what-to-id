@@ -59,6 +59,10 @@ BLOBS = [
     ((10.0, 22.0), 1003, "Plantae", 1, 12),
 ]
 LEVEL = {"same family": 0, "same phylum": 3}
+IDS = np.random.default_rng(1).choice(2**32 - 2, TOTAL, replace=False) + 1  # as the fixture
+BLOB = np.arange(TOTAL) % len(BLOBS)
+PLACED = np.arange(TOTAL) % 9 != 4  # unplaced records shift each later point's row in the file
+BIRDS = IDS[:POOL_N][(BLOB == 2)[:POOL_N] & PLACED[:POOL_N]].tolist()
 
 
 def lookalike_file(root, blobs, meta, value):
@@ -79,14 +83,12 @@ def site(tmp_path_factory):
     root = tmp_path_factory.mktemp("life-map-site")
     atlas = root / "atlas"
     write_fixture(atlas)
-    ids = np.random.default_rng(1).choice(2**32 - 2, TOTAL, replace=False) + 1  # as the fixture
+    ids, blob, placed = IDS, BLOB, PLACED
     rng = np.random.default_rng(6)
-    blob = np.arange(TOTAL) % len(BLOBS)
     centre = np.array([BLOBS[k][0] for k in blob])
     xy = centre + rng.normal(0, 2.5, (TOTAL, 2))
     assert (xy.min(0) > BBOX[:2]).all() and (xy.max(0) < BBOX[2:]).all()
     manifest = json.loads((atlas / "manifest.json").read_text())
-    placed = np.arange(TOTAL) % 9 != 4  # unplaced records shift each later point's row in the file
     write_layout(atlas, {"layout-base-20261025": (ids[placed], xy[placed])}, manifest)
     pool = pool_frame(ids[:POOL_N])
     pool["taxon_id"] = [BLOBS[k][1] for k in blob[:POOL_N]]
@@ -169,13 +171,26 @@ def hover(page, x, y):
     return page.locator(".ptip").evaluate("e => e.hidden ? '' : e.textContent")
 
 
-def test_points_to_map_of_life_to_look_alikes_and_a_reload_keeps_it(open_page):
+def tokens(page):
+    return set(page.evaluate("location.hash.slice(1).split('&')"))
+
+
+def layer(page, id_):
+    return page.evaluate(
+        "id => { const l = __deck.props.layers.find(l => l.id === id);"
+        " return {visible: l.props.visible, opacity: l.props.opacity}; }",
+        id_,
+    )
+
+
+def test_the_map_of_life_is_the_view_and_look_alikes_survives_a_reload(open_page):
     page = open_page()
-    assert "pts" in ids(page) and "life-img" not in ids(page)
-    assert page.locator("#vclade").is_hidden()  # Clades / Look-alikes only beside the map
-    page.click("#vlife")
-    assert "life=1" in drawn(page)
-    assert "pts" not in ids(page) and {"life-lbl", "life-lbl-k"} <= set(ids(page))
+    drawn(page)
+    assert not any(t.startswith("life=") for t in tokens(page))  # the default writes nothing
+    assert page.locator("#vpts").count() == 0  # no Points view to switch to
+    # the points stay in the layers, hidden while nothing holds any back, so the map reads
+    assert layer(page, "pts")["visible"] is False and layer(page, "life-img")["opacity"] == 1
+    assert {"life-lbl", "life-lbl-k"} <= set(ids(page))
     labels = page.evaluate(
         "__deck.props.layers.find(l => l.id === 'life-lbl').props.data.map(d => d.text)"
     )
@@ -185,17 +200,15 @@ def test_points_to_map_of_life_to_look_alikes_and_a_reload_keeps_it(open_page):
     assert "life=look" in drawn(page, look=True)
     blue = pixel(page, 30, -5)
     assert blue != clades and blue[2] > blue[0] + 60  # the look-alike ramp is blue
-    assert "same class" in page.locator("#llegend").inner_text()
+    legend = page.locator("#llegend").inner_text()
+    assert "same class" in legend and "often photographed together (GloBI)" in legend
     page.reload()
     page.wait_for_function("document.getElementById('lifebar').hidden === false")
     assert "life=look" in drawn(page, look=True)
     assert pixel(page, 30, -5) == blue
-    page.click("#vpts")
-    page.wait_for_function("__deck.props.layers.some(l => l.id === 'pts')")
-    assert page.locator("#vlook").is_hidden()
-    assert not any(
-        t.startswith("life=") for t in page.evaluate("location.hash.slice(1).split('&')")
-    )
+    page.click("#vclade")
+    page.wait_for_function("!location.hash.includes('life=')")
+    assert pixel(page, 30, -5) == clades
     assert page.errors == []
 
 
@@ -211,7 +224,7 @@ def test_hover_reads_agreement_and_levels_from_the_file_in_both_shards(open_page
 
 
 def test_click_zooms_into_a_clade_without_filtering_and_up_returns(open_page):
-    page = open_page("#life=1")
+    page = open_page()
     drawn(page)
     count = page.locator("#count").inner_text()
     page.evaluate("__deck.props.onClick({coordinate: [-25, -5], index: -1})")  # the Insecta region
@@ -236,16 +249,54 @@ def test_click_zooms_into_a_clade_without_filtering_and_up_returns(open_page):
 
 def test_without_the_file_the_map_still_draws_and_look_alikes_is_off(open_page):
     page = open_page("#life=look", missing=True)
-    tokens = drawn(page)
+    assert "life=look" not in drawn(page)
     assert page.locator("#vlook").is_disabled()
-    assert "life=1" in tokens and "life=look" not in tokens
     assert "No look-alike file" in page.locator("#lnote").inner_text()
     text = hover(page, 30, -5)
     assert text.startswith("Aves (Birds)") and "photo neighbours" not in text
 
 
 def test_split_view_hands_the_map_tokens_to_the_photo_frame(open_page):
-    page = open_page("#life=1&clade=47158", path="split.html?view=space")
+    page = open_page("#life=look&clade=47158", path="split.html?view=space")
     page.wait_for_function("document.querySelector('iframe#space')")
     src = page.evaluate("document.querySelector('iframe#space').src")
-    assert "life=1" in src and "clade=47158" in src
+    assert "life=look" in src and "clade=47158" in src
+
+
+def test_a_subset_from_the_tree_draws_over_the_dimmed_map_and_its_points_open_records(open_page):
+    page = open_page(path="split.html?view=space")
+    page.wait_for_function(
+        "document.querySelector('iframe#space')?.contentDocument?.getElementById('lifebar')"
+        "?.hidden === false"
+    )
+    space = next(f for f in page.frames if "embed=1" in f.url)
+    drawn(space)
+    page.evaluate(
+        "window.__records = []; addEventListener('message', e => {"
+        " if (e.data && e.data.type === 'wtid-record') __records.push(e.data.id); })"
+    )
+    # the split view hands the frame the tree's pick as it does: the ids under the taxon
+    page.evaluate(
+        "ids => document.querySelector('iframe#space').contentWindow.postMessage("
+        "{type: 'wtid-subset', ids, label: 'Aves'}, location.origin)",
+        BIRDS,
+    )
+    space.wait_for_function("__deck.props.layers.find(l => l.id === 'pts').props.visible === true")
+    assert layer(space, "life-img")["opacity"] < 1  # the map dims under the subset
+    assert (
+        space.locator("#count").inner_text() == f"{len(BIRDS):,} shown of {PLACED[:POOL_N].sum():,}"
+    )
+    row = space.evaluate(
+        """() => { const D = __deck.props.layers.find(l => l.id === 'pts').props.data,
+          p = D.attributes.getPosition.value, k = D.attributes.getFilterCategory.value;
+          for (let i = 0; i < D.length; i++) if (k[3 * i + 2] && p[2 * i] > 22) return i;
+          return -1; }"""
+    )
+    assert row >= 0
+    space.evaluate("i => __deck.props.onClick({index: i, layer: {id: 'pts'}})", row)
+    space.wait_for_selector("#card:not([hidden])")
+    page.wait_for_function("__records.length > 0")
+    assert page.evaluate("__records[0]") in BIRDS
+    # a click on the map away from any point still zooms into the clade under it
+    space.evaluate("__deck.props.onClick({coordinate: [-25, -5], index: -1})")
+    space.wait_for_function("location.hash.includes('clade=47158')")

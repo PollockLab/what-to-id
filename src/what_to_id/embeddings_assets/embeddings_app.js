@@ -142,7 +142,7 @@ function applyKeep(){
     S.PD.attributes.getFilterCategory={value:c,size:3};S.PDV=(S.PDV||0)+1;}
 }
 function update(){
-  var s=shown(),P=S.P,total=S.META?S.META.n:P.n;
+  var s=S.shown=shown(),P=S.P,total=S.META?S.META.n:P.n;
   $('count').textContent=P.grp?nf.format(s)+' shown of '+nf.format(P.n):nf.format(P.n)+' points';
   $('more').textContent=P.grp&&P.n<total?'('+nf.format(total-P.n)+' of the map’s '+nf.format(total)+
     ' records are not placed yet)':'';
@@ -254,6 +254,9 @@ function pointData(){
   return {length:P.n,attributes:{getPosition:{value:P.pos,size:2},getFilterCategory:{value:cat,size:3},
     getFillColor:{value:col,size:4,normalized:true}}};
 }
+// Over the map of life the points show, and take clicks, while the filters hold some back or once the view is
+// close enough to tell them apart; otherwise a click on the map zooms into its clade.
+function dots(){return (S.shown!=null&&S.shown<S.P.n)||S.vs.zoom>=S.zoom0+3;}
 function layers(){
   var P=S.P;
   if(!P||!S.deck)return;
@@ -261,10 +264,11 @@ function layers(){
   S.PD=S.PD||pointData();
   var groups=[0];
   if(P.grp){groups=[];passing().forEach(function(v,j){if(v)groups.push(j);});}
-  var thin=S.thin&&P.n>THIN_ABOVE;
-  var lyr=LV.on()?LV.layers():[new deck.ScatterplotLayer({id:'pts',data:S.PD,radiusUnits:'pixels',getRadius:1.5,radiusMinPixels:1,radiusMaxPixels:3,
-    stroked:false,pickable:true,extensions:[EXT],updateTriggers:{getFilterCategory:S.PDV},
-    filterCategories:[groups,thin?[1]:[0,1],[1]]})];
+  var thin=S.thin&&P.n>THIN_ABOVE,d=dots();
+  var pts=new deck.ScatterplotLayer({id:'pts',data:S.PD,radiusUnits:'pixels',getRadius:1.5,radiusMinPixels:1,radiusMaxPixels:3,
+    stroked:false,pickable:true,visible:!LV.on()||d,extensions:[EXT],updateTriggers:{getFilterCategory:S.PDV},
+    filterCategories:[groups,thin?[1]:[0,1],[1]]});
+  var lyr=LV.on()?LV.layers(pts,d):[pts];
   function ring(id,rows,px,rgb,w){
     return new deck.ScatterplotLayer({id:id,data:rows,getPosition:function(i){return [P.pos[2*i],P.pos[2*i+1]];},
       radiusUnits:'pixels',getRadius:px,filled:false,stroked:true,lineWidthUnits:'pixels',getLineWidth:w,getLineColor:rgb});
@@ -279,7 +283,7 @@ function layers(){
 // Hover and click.
 var ptip=el('div',{'class':'ptip',hidden:''});document.body.appendChild(ptip);
 function tip(o){
-  var lt=LV.text(o);
+  var lt=o.layer&&o.layer.id==='pts'?null:LV.text(o);
   if(lt===''||lt===null&&(!S.P||o.index<0||!o.layer||o.layer.id!=='pts')){ptip.hidden=true;return;}
   var t=lt===null&&names(o.index);
   ptip.textContent=lt!==null?lt:t.common||t.latin?(t.common||t.latin)+' · '+t.group:t.group||'Loading names…';
@@ -288,7 +292,7 @@ function tip(o){
   ptip.style.left=Math.max(4,x+g+ptip.offsetWidth>innerWidth-4?x-g-ptip.offsetWidth:x+g)+'px';
   ptip.style.top=Math.max(4,y+g+ptip.offsetHeight>innerHeight-4?y-g-ptip.offsetHeight:y+g)+'px';
 }
-function pick(o){if(LV.click(o))return;if(S.P&&o.index>=0&&o.layer&&o.layer.id==='pts')select(o.index,false);}
+function pick(o){if(S.P&&o.index>=0&&o.layer&&o.layer.id==='pts')select(o.index,false);else LV.click(o);}
 
 function closeCard(){
   S.sel=-1;S.nbr=[];S.run++;$('card').hidden=true;
@@ -454,8 +458,8 @@ async function load(){
   try{
     var g=await groups;
     S.META=g.meta;
+    status('');  // before the join, which may start drawing the map
     applyJoin(L.join(g.shards,layout,lay.bbox,g.meta.bbox),g.taxa);
-    status('');
   }catch(e){status('Colours and names are unavailable: '+e.message);}
 }
 function start(bbox){
@@ -464,7 +468,8 @@ function start(bbox){
   S.vs={target:[(bbox[0]+bbox[2])/2,(bbox[1]+bbox[3])/2,0],zoom:S.zoom0,minZoom:S.zoom0-1,maxZoom:S.zoom0+16};
   S.deck=new deck.Deck({parent:box,views:new deck.OrthographicView({id:'photo-space',flipY:false}),controller:true,
     viewState:S.vs,pickingRadius:4,
-    onViewStateChange:function(e){S.vs=e.viewState;S.deck.setProps({viewState:S.vs});moved();},
+    onViewStateChange:function(e){S.vs=e.viewState;S.deck.setProps({viewState:S.vs});moved();
+      var k=Math.round(S.vs.zoom*4)+(dots()?'d':'');if(k!==S.zk){S.zk=k;layers();}},  // labels and points by zoom
     // while the view moves it draws one record in ten, and all of them once it stops
     onInteractionStateChange:function(st){
       var t=!!(st.isDragging||st.isZooming||st.isPanning);
