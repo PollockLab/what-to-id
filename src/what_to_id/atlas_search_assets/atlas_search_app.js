@@ -5,7 +5,7 @@ var CFG=ATLAS_SEARCH_CONFIG,Meta=AtlasSearchMeta,Enc=AtlasEncoder;
 var K=200,WHOLE=4<<20;  // parts up to 4 MB load whole: one request, not 32 ranges
 var qs=new URLSearchParams(location.search);
 var DATA=new URL(CFG.dataUrl,location.href).href.replace(/\/*$/,'/');
-var S={index:null,encoder:null,cache:new Map(),hits:[],parts:[],state:null,run:0,include:[],exclude:[]};
+var S={index:null,encoder:null,cache:new Map(),hits:[],parts:[],state:null,run:0,include:[],exclude:[],qvec:null,picks:new Set(),picked:0};
 var EXAMPLES=['a nudibranch','a hummingbird feeding at a flower','colourful mushrooms on moss','a jellyfish'];
 
 function $(id){return document.getElementById(id);}
@@ -69,17 +69,18 @@ async function hitsFrom(state,confirmed){
   }
   var opts={k:K,nprobe:+qs.get('nprobe')||undefined};  // nprobe and shortlist default to the manifest's
   var q=await idx.taxonVector(state.text);  // a taxon name has a precomputed vector: no model, no download
-  if(q)return {hits:await idx.search(q,opts)};
+  if(q){S.qvec=q;return {hits:await idx.search(q,opts)};}
   var enc=await encoderFor(state,confirmed);
   if(!enc)return {gated:true};
   status('Searching...');
   var parts=Meta.subjects(state.text);
-  if(parts.length===1)return {hits:await idx.search(await enc.encode(caption(state.text)),opts)};
+  if(parts.length===1){S.qvec=await enc.encode(caption(state.text));return {hits:await idx.search(S.qvec,opts)};}
   // every subject (and the whole sentence) is searched on its own, then min-fused: deeper lists so
   // the fused top K has candidates scored in all of them
   var texts=[state.text].concat(parts),deep={k:K*3,nprobe:opts.nprobe};
-  var lists=await Promise.all(texts.map(async function(t){
+  var lists=await Promise.all(texts.map(async function(t,i){
     var v=(await idx.taxonVector(t))||(await enc.encode(caption(t)));
+    if(i===0)S.qvec=v;
     return idx.search(v,deep);
   }));
   return {hits:Meta.fuse(lists,K),parts:parts};
@@ -89,7 +90,7 @@ async function hitsFrom(state,confirmed){
 function setFilters(state){S.include=state.include||[];S.exclude=state.exclude||[];chips();}
 async function start(state,confirmed){
   var run=++S.run;
-  S.state=state;S.parts=[];$('gate').hidden=true;
+  S.state=state;S.parts=[];S.qvec=null;S.picks.clear();S.picked=0;$('gate').hidden=true;
   if(!state){render();return;}
   setFilters(state);
   $('q').value=state.kind==='id'?String(state.id):state.text;
@@ -111,6 +112,31 @@ async function start(state,confirmed){
   }
 }
 
+// Rocchio relevance feedback: the query moves toward the mean of the picked photos' vectors
+// (reconstructed from their index codes) and the search runs again. Not in the link.
+async function refine(){
+  var run=++S.run,idx=await getIndex(),ids=Array.from(S.picks);
+  status('Searching again with '+ids.length+' picked photo'+(ids.length>1?'s':'')+'...');
+  try{
+    var tags=S.hits.filter(function(h){return S.picks.has(h.id);}).map(function(h){return h.tag;});
+    var vs=await Promise.all(tags.map(function(t){return idx.vector(t);})),q=new Float32Array(S.qvec.length),n=0;
+    for(var i=0;i<q.length;i++){var s=S.qvec[i];for(var j=0;j<vs.length;j++)s+=vs[j][i]/vs.length;q[i]=s;n+=s*s;}
+    n=Math.sqrt(n);
+    for(i=0;i<q.length;i++)q[i]/=n;
+    var hits=await idx.search(q,{k:K,nprobe:+qs.get('nprobe')||undefined});
+    if(run!==S.run)return;
+    S.qvec=q;S.hits=hits;S.parts=[];S.picked=ids.length;S.picks.clear();
+    status('Loading photo details from iNaturalist...');
+    await Meta.fetchObservations(hits.map(function(h){return h.id;}),function(u){return fetch(u);},S.cache);
+    if(run!==S.run)return;
+    render();
+    $('rh').focus();
+  }catch(e){
+    if(run!==S.run)return;
+    status('Something went wrong: '+e.message);
+  }
+}
+
 function render(message){
   var res=Meta.build(S.hits,S.cache,{include:S.include.map(taxonId),exclude:S.exclude.map(taxonId)}),grid=$('grid');
   grid.textContent='';
@@ -118,6 +144,7 @@ function render(message){
   if(!S.state)return;
   var st=S.state;
   var head=st.kind==='id'?'Photos like observation '+st.id:'Photos matching "'+st.text+'"';
+  if(S.picked)head+=' and '+S.picked+' picked photo'+(S.picked>1?'s':'');
   $('rh').textContent=head+' ('+res.cards.length+')';
   var bits=[];
   if(res.notNeedsId)bits.push(res.notNeedsId+' no longer need an ID');
@@ -131,6 +158,12 @@ function render(message){
   res.cards.forEach(function(c,i){grid.appendChild(cardEl(c,i));});
   var actions=$('actions');actions.textContent='';
   if(!res.cards.length)return;
+  if(S.qvec){
+    var n=S.picks.size,again=el('button',{type:'button','class':'btn',id:'again',disabled:n?null:''},
+      [n?'Search again with '+n+' picked photo'+(n>1?'s':''):'Tick photos that match, then search again']);
+    again.addEventListener('click',refine);
+    actions.appendChild(again);
+  }
   var batches=IdentifyLinks.prepare(res.cards.map(function(c){return c.id;})).batches;
   batches.forEach(function(b){
     var label=batches.length>1?'Identify '+b.n+' (IDs '+b.lo+' to '+b.hi+')':'Open in iNaturalist Identify ('+b.n+')';
@@ -151,7 +184,7 @@ function cardEl(c,i){
     el('span',{'class':'muted'},[c.place||'Place unknown']),
     el('span',{'class':'muted',title:'How close the photo is to the query, 0 to 1. Compare within this list only: a sentence scores lower than a photo-to-photo search.'},
       ['#'+(i+1)+' · Similarity '+c.score.toFixed(3)]),
-    el('div',{'class':'links'},[more,
+    el('div',{'class':'links'},[more,pick(c),
       el('a',{'class':'btn',href:CFG.mapUrl+'#record='+c.id,target:'_blank',rel:'noopener'},['Show on map'])])
   ]);
   return el('li',{'class':'card'},[
@@ -159,6 +192,20 @@ function cardEl(c,i){
       'aria-label':'Open observation '+c.id+' on iNaturalist: '+alt},[img]),body]);
 }
 
+// A "Matches" tick on a text-search card; the button under the grid counts the ticks.
+function pick(c){
+  if(!S.qvec||c.tag===undefined)return el('span');
+  var box=el('input',{type:'checkbox','aria-label':'Observation '+c.id+' matches'});
+  box.checked=S.picks.has(c.id);
+  box.addEventListener('change',function(){
+    if(box.checked)S.picks.add(c.id);else S.picks.delete(c.id);
+    var n=S.picks.size,b=$('again');
+    if(!b)return;
+    b.disabled=!n;
+    b.textContent=n?'Search again with '+n+' picked photo'+(n>1?'s':''):'Tick photos that match, then search again';
+  });
+  return el('label',{'class':'pick'},[box,' Matches']);
+}
 // Setting the hash is the navigation: back/forward and shared links all arrive through start().
 function go(state){
   if(state)state=Object.assign({},state,{include:S.include,exclude:S.exclude});
