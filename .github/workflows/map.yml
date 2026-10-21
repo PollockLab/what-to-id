@@ -165,6 +165,17 @@ jobs:
       - name: Warn that the look-alike stats failed
         if: steps.lookalike.outcome == 'failure'
         run: echo "::warning::no look-alike stats; the photo-space page ships without them"
+      # confusion.html: per species, the species its photos most often look like, from the small parquet
+      # beside the atlas index. The tree card links to it through confusion-taxa.json.
+      - name: Add the confused pairs page
+        continue-on-error: true
+        env:
+          ATLAS_HF_REPO: ${{ vars.ATLAS_HF_REPO }}
+        run: |
+          set -euo pipefail
+          if [ -z "$ATLAS_HF_REPO" ]; then echo "no ATLAS_HF_REPO; no confused pairs page"; exit 0; fi
+          python -m what_to_id.page_confusion --out _site \
+            --data-url "https://huggingface.co/datasets/${ATLAS_HF_REPO}/resolve/main/"
       - name: Include the photo-search page
         env:
           ATLAS_HF_REPO: ${{ vars.ATLAS_HF_REPO }}

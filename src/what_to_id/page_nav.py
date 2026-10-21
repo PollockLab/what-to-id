@@ -12,15 +12,17 @@ from html import escape
 # (file, label). Explore is split.html, the map and the photo space side by side. The pages map.html
 # and embeddings.html keep their URLs and mark Explore as current. Without split.html (a site built
 # without the photo space) the Explore tab falls back to the map. Photo search exists only when
-# ATLAS_HF_REPO is set, the tree of life only when the map was built with its taxon tree. The brand
-# links to index.html, a copy of Explore.
+# ATLAS_HF_REPO is set, the tree of life only when the map was built with its taxon tree, the
+# confused pairs only when the atlas manifest lists a confusion table. The brand links to
+# index.html, a copy of Explore.
 PAGES = (
     ("split.html", "Explore"),
     ("search.html", "Photo search"),
     ("tree.html", "Tree of life"),
     ("study.html", "Study"),
+    ("confusion.html", "Confused pairs"),
 )
-OPTIONAL = {"search.html", "tree.html"}
+OPTIONAL = {"search.html", "tree.html", "confusion.html"}
 EXPLORE = "split.html"
 BLITZ = "https://pollocklab.github.io/where-to-blitz/"
 

@@ -3,7 +3,7 @@
 // the split view (?embed=1) "Show on map" sends the taxon as the shared selection, as the photo space does.
 (function(){
 'use strict';
-var M=TreeModel,L=EmbeddingsLayout,META=CFG.meta,nf=new Intl.NumberFormat('en'),
+var CT=new Set(),M=TreeModel,L=EmbeddingsLayout,META=CFG.meta,nf=new Intl.NumberFormat('en'),
   nc=new Intl.NumberFormat('en',{notation:'compact',maximumFractionDigits:1}),EMBED=/[?&]embed=1/.test(location.search),
   BUDGET=400,BAR=26,TH=24,MINF=9,MINR=420,reduce=matchMedia('(prefers-reduced-motion: reduce)'),
   D=null,S=null,V=null,G={},GS=[],COL=new Map(),prev=null,anim=0,SEL='',SY=null,PS=-1,PH={},Q=[],qt=0,qlast=0,lt=0,split=false,OL=null;
@@ -201,6 +201,7 @@ function card(){
     'Help identify on iNaturalist','primary'));acts.lastChild.target='_blank';
     if(!(EMBED&&SY)){acts.appendChild(link(CFG.mapUrl+'#'+pk,'Show on map'));
       if(split)acts.appendChild(link('split.html?view=space#'+pk,'Show in photo space'));}}
+  if(id&&!EMBED&&CT.has(id))acts.appendChild(link('confusion.html#t'+id,'Often confused with \u2026'));
   if(e!==f&&ks.length)acts.append(btn('Focus here',function(){focusOn(e);}),
     btn(S.open.has(e)?'Close':'Open',function(){act(String(e),'toggle',true);}));
   if(ks.length)acts.appendChild(btn('Open more below',function(){act(String(e),'expand');}));
@@ -325,6 +326,8 @@ TX.picker({input:$('q'),list:$('sugg'),msg:$('qn'),picks:picks,ranks:META.ranks,
 // The map's selection selects its taxon or group here; one this side already shows is left as it is.
 // The groups the map leaves out leave the tree too; a focus or selection inside one goes back to the root.
 var D0=null,EX='';
+// taxa with a row on confusion.html; absent on a site built without it
+fetch('confusion-taxa.json').then(function(r){return r.ok?r.json():[];}).then(function(a){CT=new Set(a);}).catch(function(){});
 function groupsOut(){return SEL.split('&').filter(function(t){return /^groups=/.test(t);}).map(function(t){return t.slice(7);}).join(',')
   .split(',').filter(function(x){return x[0]==='-';}).map(function(x){return decodeURIComponent(x.slice(1));}).sort().join(',');}
 function take(){var ex=groupsOut();
