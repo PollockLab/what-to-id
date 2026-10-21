@@ -122,10 +122,10 @@ function render(message){
   if(res.filtered)bits.push(res.filtered+' outside the taxon filter');
   $('dropped').textContent=bits.length?'Left out: '+bits.join(', ')+'.':'';
   var parts=(st.kind==='text'&&S.parts)||[];
-  $('how').textContent=parts.length>1?'Each photo matches all of: '+parts.join(', ')+'. The search sees what is in the photo, not who does what to whom.':'';
+  $('how').textContent=parts.length>1?'Each photo matches all of: '+parts.join(', ')+'. The search sees what is in the photo, not who does what to whom. Similarity is the weaker subject\'s.':'';
   var none=res.filtered&&!res.cards.length?'None of the best '+S.hits.length+' matches are inside your taxon filter. Name the taxon in your words instead.':'No matching photos.';
   status(message||(res.cards.length?'':none));
-  res.cards.forEach(function(c){grid.appendChild(cardEl(c));});
+  res.cards.forEach(function(c,i){grid.appendChild(cardEl(c,i));});
   var actions=$('actions');actions.textContent='';
   if(!res.cards.length)return;
   var batches=IdentifyLinks.prepare(res.cards.map(function(c){return c.id;})).batches;
@@ -135,7 +135,7 @@ function render(message){
   });
 }
 
-function cardEl(c){
+function cardEl(c,i){
   var title=c.common||c.name||'Unidentified',alt=title+(c.common&&c.name?' ('+c.name+')':'');
   var img=c.photo?el('img',{src:c.photo,alt:alt,loading:'lazy'}):el('span',{'class':'muted'},['No photo']);
   var more=el('button',{type:'button'},['More like this']);
@@ -146,7 +146,8 @@ function cardEl(c){
     el('span',{'class':'common'},[c.common]),
     el('span',{},[c.date||'Date unknown']),
     el('span',{'class':'muted'},[c.place||'Place unknown']),
-    el('span',{'class':'muted'},['Similarity '+c.score.toFixed(3)]),
+    el('span',{'class':'muted',title:'How close the photo is to the query, 0 to 1. Compare within this list only: a sentence scores lower than a photo-to-photo search.'},
+      ['#'+(i+1)+' · Similarity '+c.score.toFixed(3)]),
     el('div',{'class':'links'},[more,
       el('a',{'class':'btn',href:CFG.mapUrl+'#record='+c.id,target:'_blank',rel:'noopener'},['Show on map'])])
   ]);
