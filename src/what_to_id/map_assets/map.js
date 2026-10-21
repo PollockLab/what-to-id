@@ -42,7 +42,7 @@ var hashTimer=0;
 // The split view hands the selection over live; the area and projects are not part of it yet.
 var SYNC=MapFilter.sync({key:function(){return MF.write(S).join('&');},apply:function(str){
   var r=MF.read(new URLSearchParams(str)),was=taxaKey();
-  ['up','lo','hi','months','groups','only'].forEach(function(k){S[k]=r[k];});
+  ['up','lo','hi','months','groups','only','acc'].forEach(function(k){S[k]=r[k];});
   S.picks.length=0;r.picks.forEach(function(p){S.picks.push(p);});S.split=[];
   // before the taxa and records are in, refilter runs once they are
   if(TAXA){search();showClades();}

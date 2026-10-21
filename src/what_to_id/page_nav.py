@@ -74,7 +74,7 @@ function ctx(){var h=new URLSearchParams(location.hash.slice(1)),
 at=(h.get('at')||'').split('/').map(Number);
 var ok=at.length===3&&at.every(isFinite);return{rec:+(h.get('record')||h.get('id'))||0,
 lat:ok?at[1]:null,lon:ok?at[2]:null,sel:location.hash.slice(1).split('&').filter(function(t){
-return /^(by|from|to|months|groups|only|taxa|area|park|bcpark|projects)=/.test(t);})};}
+return /^(by|from|to|months|groups|only|acc|taxa|area|park|bcpark|projects)=/.test(t);})};}
 function sync(){var c=ctx();n.querySelectorAll('a[data-view]').forEach(function(a){
 var b=a.dataset.base,v=a.dataset.view,u=b;
 if(a.hasAttribute('aria-current')&&v!=='explore')return;
