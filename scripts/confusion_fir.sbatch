@@ -15,10 +15,10 @@
 set -euo pipefail
 BULK=/scratch/wietze/what-to-id/bulk-2026-10-15
 DIR=${ATLAS_DIR:?ATLAS_DIR is not set}
-module purge; module load StdEnv/2023 python/3.11
+module purge; module load StdEnv/2023 python/3.11 arrow/17.0.0
 virtualenv --no-download "$SLURM_TMPDIR/env"; source "$SLURM_TMPDIR/env/bin/activate"
-pip install --isolated -q numpy==2.4.6 pandas==3.0.5 pyarrow==25.0.1
-export PYTHONPATH=src OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK:-8} PYTHONUNBUFFERED=1
+pip install --no-index -q numpy pandas
+export PYTHONPATH=src${PYTHONPATH:+:$PYTHONPATH} OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK:-8} PYTHONUNBUFFERED=1
 /usr/bin/time -v python -m what_to_id.confusion fir \
   --emb "$BULK/completed/E.npy" --ids "$BULK/completed/ids.npy" \
   --pool "$BULK/inputs/pool.parquet" \
