@@ -5,6 +5,7 @@ The iNaturalist API is stubbed and deck.gl is replaced by a recorder (the CDN bu
 
 import functools
 import gzip
+import hashlib
 import http.server
 import json
 import os
@@ -25,6 +26,7 @@ from .test_atlas_search_browser import PNG, RangeHandler
 
 TOTAL = FIXTURE_ROWS + FIXTURE_DELTA
 POOL_N = 2100  # the pool lacks the last 100 indexed observations, as if they had left Needs ID
+BIG = np.random.default_rng(2).bytes(8 * 2**20 + 3)  # a layout-sized file, an odd tail byte
 
 DECK_STUB = """
 window.deck = {
@@ -84,6 +86,7 @@ def site(tmp_path_factory):
     (root / "map.html").write_text(render_map(meta, freeze=None))
     # the map of life's look-alike file, every record unknown (its contract: two planes of n bytes)
     (root / "pool-lookalike.bin").write_bytes(gzip.compress(b"\xff" * POOL_N + b"\x0f" * POOL_N))
+    (atlas / "big.bin").write_bytes(BIG)
     build(root, data_url="atlas/")
     # the map needs MapLibre from a CDN, so the split page here holds two photo spaces
     tree_page.build(root)
@@ -169,6 +172,39 @@ def test_points_are_the_join_of_layout_and_pool(open_page):
     assert "Measured on the layout" in text and "50%" in text and "12" in text
     assert "not identification confidence" in text and "lossy" in text
     assert "sample" not in page.locator("#intro").inner_text()
+    assert page.errors == []
+
+
+def test_a_layout_sized_file_arrives_in_parallel_ranges_or_whole_from_a_server_without_them(
+    open_page,
+):
+    page = open_page()
+    ready(page)
+    ranges = {"big.bin": [], "plain.bin": []}
+    page.on(
+        "request",
+        lambda r: (
+            ranges[r.url.rsplit("/", 1)[1]].append(r.headers.get("range"))
+            if r.url.rsplit("/", 1)[1] in ranges
+            else None
+        ),
+    )
+    page.route("**/atlas/plain.bin", lambda r: r.fulfill(body=BIG, status=200))  # ignores Range
+    got = page.evaluate(
+        """async (names) => {
+      const idx = await AtlasSearchIndex.open(new URL('atlas/', location.href).href), out = [];
+      for (const name of names) {
+        const buf = await idx.parallel(name), h = await crypto.subtle.digest('SHA-256', buf);
+        const hex = Array.from(new Uint8Array(h), b => b.toString(16).padStart(2, '0')).join('');
+        out.push([buf.byteLength, hex]);
+      }
+      return out; }""",
+        ["big.bin", "plain.bin"],
+    )
+    want = [len(BIG), hashlib.sha256(BIG).hexdigest()]
+    assert got == [want, want]
+    assert len([r for r in ranges["big.bin"] if r]) > 2, ranges  # a probe and parallel reads
+    assert ranges["plain.bin"] == ["bytes=0-0"]  # a 200 answer is the whole file: no more reads
     assert page.errors == []
 
 

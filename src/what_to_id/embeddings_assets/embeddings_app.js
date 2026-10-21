@@ -450,7 +450,7 @@ async function load(){
     ' true closest matches are among its '+f.k+' nearest points here.':'';
   var get=function(u){return okFetch(u).then(function(r){return r.arrayBuffer();}).then(L.gunzip);};
   var parts=Promise.all(lay.parts.map(function(p){
-    return S.idx.file(p.name+'.bin').then(L.gunzip).then(function(b){return L.decodePart(b,p.count);});}));
+    return S.idx.parallel(p.name+'.bin').then(L.gunzip).then(function(b){return L.decodePart(b,p.count);});}));
   status('Downloading the layout…');
   var layout=await parts;
   // groups and names: fetched once the layout is in, so the two do not share the connection's bandwidth
