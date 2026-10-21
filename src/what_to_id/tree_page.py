@@ -28,8 +28,8 @@ SCRIPTS = {
 KEYS = ("ranks", "taxa", "groups", "group_ids", "names", "place_id", "max_url", "n")
 
 
-def map_meta(out: Path) -> dict:
-    """The META object page_map wrote into ``out/map.html``."""
+def map_meta(out: Path, keys: tuple[str, ...] = KEYS) -> dict:
+    """The ``keys`` of the META object page_map wrote into ``out/map.html``."""
     page = out / "map.html"
     if not page.exists():
         raise FileNotFoundError(f"{page} is missing: build the map first (what_to_id.page_map)")
@@ -38,10 +38,10 @@ def map_meta(out: Path) -> dict:
     if start < 0 or end < start:
         raise ValueError(f"{page} holds no META: was it written by what_to_id.page_map?")
     meta = json.loads(html[start + len("var META=") : end])
-    missing = [k for k in KEYS if k not in meta]
+    missing = [k for k in keys if k not in meta]
     if missing:
         raise ValueError(f"{page} META lacks {', '.join(missing)}")
-    return {k: meta[k] for k in KEYS}
+    return {k: meta[k] for k in keys}
 
 
 def build(out_dir: str | Path, map_url: str = "map.html") -> Path:
