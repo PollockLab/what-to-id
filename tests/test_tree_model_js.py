@@ -263,3 +263,17 @@ const J = M.build(I.T, [...R, 'class'], G, {{order: {json.dumps(ORDER)}, total: 
 out({{lead: M.lead(J, 0), tot: J.tot[0], own: J.own[0], pick: M.pick(J, 0)}});"""
     )
     assert got == {"lead": 0, "tot": 2 + 5, "own": 0, "pick": "groups=Unknown"}
+
+
+def test_without_drops_the_left_out_groups_and_their_counts_fall_out_of_every_total():
+    got = node(
+        """
+const W = M.without(D, ['Animalia']), U = M.without(D, ['Unknown']), S = M.without(D, []);
+out({root: [D.tot[ROOT], W.tot[ROOT], U.tot[ROOT]], kids: [D.kids[ROOT], W.kids[ROOT]],
+  gone: W.tot[7], same: S === D, find: M.find(W, 'groups=-Animalia&taxa=51')});""".replace(
+            "ROOT", str(ROOT)
+        )
+    )
+    assert got["root"] == [6 + 2 + BOMBUS_TOT, 6, 6 + 2 + BOMBUS_TOT]
+    assert got["kids"] == [[7, 1], [1]] and got["gone"] == 0 and got["same"]
+    assert got["find"] == 4
