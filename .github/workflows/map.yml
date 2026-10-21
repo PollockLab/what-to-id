@@ -150,6 +150,21 @@ jobs:
           if grep -ril -E 'recency|gap_first|gap first|similarity|novelty|surprise' _site; then
             echo "::error::a list name leaked into the site"; exit 1
           fi
+      # pool-lookalike.bin: per-record agreement and nearest other-taxon rank from the photo-space
+      # neighbours on the index repo, host pairs skipped. The photo-space page works without it.
+      - name: Add the look-alike stats
+        id: lookalike
+        continue-on-error: true
+        env:
+          ATLAS_HF_REPO: ${{ vars.ATLAS_HF_REPO }}
+        run: |
+          set -euo pipefail
+          if [ -z "$ATLAS_HF_REPO" ]; then echo "no ATLAS_HF_REPO; no look-alike stats"; exit 0; fi
+          python -m what_to_id.page_lookalike --out _site \
+            --data-url "https://huggingface.co/datasets/${ATLAS_HF_REPO}/resolve/main/"
+      - name: Warn that the look-alike stats failed
+        if: steps.lookalike.outcome == 'failure'
+        run: echo "::warning::no look-alike stats; the photo-space page ships without them"
       - name: Include the photo-search page
         env:
           ATLAS_HF_REPO: ${{ vars.ATLAS_HF_REPO }}
