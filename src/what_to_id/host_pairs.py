@@ -13,12 +13,17 @@ different phyla, and only pairs with at least MIN_ROWS GloBI rows. Within a phyl
 are mostly parasitoids reared from their hosts and genuine look-alikes (polypores, jelly fungi,
 cuckoo bees), so flagging them would hide real confusions. lookalike_assets/host_pairs_extra.tsv
 adds by hand the few same-phylum pairs that are photographed together, each with its reason.
+
+DUMP is a versioned Zenodo release and DUMP_SHA256 its checksum, so a rerun reads the same data;
+the GloBI depot's snapshot URL always serves the latest dump. The output header records the
+dump's date and sha256, and ``--sha256`` checks any other dump.
 """
 
 from __future__ import annotations
 
 import argparse
 import gzip
+import hashlib
 import json
 import sys
 import urllib.request
@@ -30,7 +35,9 @@ from pathlib import Path
 from what_to_id.inat import USER_AGENT
 from what_to_id.tree_page import map_meta
 
-DUMP = "https://depot.globalbioticinteractions.org/snapshot/target/data/tsv/interactions.tsv.gz"
+DUMP_RELEASE = "GloBI Interpreted Data Products 0.11 of 2026-09-10, doi:10.5281/zenodo.22691479"
+DUMP = "https://zenodo.org/records/22691479/files/interactions.tsv.gz?download=1"
+DUMP_SHA256 = "021a206a1459bcca7e251c73f5bd180fc3ac342a09c499855fe42e21fc09edcf"
 ASSETS = Path(__file__).parent / "lookalike_assets"
 PAIR_FILES = (ASSETS / "host_pairs.tsv", ASSETS / "host_pairs_extra.tsv")
 COLUMNS = ("family_a", "family_b", "types", "globi_rows", "source")
@@ -147,15 +154,27 @@ def load(paths=PAIR_FILES) -> dict[tuple[str, str], dict]:
     return out
 
 
+class _Sha256Reader:
+    """Hashes the compressed bytes as gzip reads them."""
+
+    def __init__(self, raw):
+        self.raw, self.sha = raw, hashlib.sha256()
+
+    def read(self, n=-1):
+        b = self.raw.read(n)
+        self.sha.update(b)
+        return b
+
+
 def _open(dump: str):
-    """The decompressed dump as a byte stream, and the snapshot day (Last-Modified or mtime)."""
+    """The raw dump as a byte stream, and its day (Last-Modified or mtime)."""
     if dump.startswith(("http://", "https://")):
         req = urllib.request.Request(dump, headers={"User-Agent": USER_AGENT})
         resp = urllib.request.urlopen(req, timeout=120)
         stamp = parsedate_to_datetime(resp.headers["Last-Modified"])
-        return gzip.GzipFile(fileobj=resp), stamp.date().isoformat()
+        return resp, stamp.date().isoformat()
     stamp = datetime.fromtimestamp(Path(dump).stat().st_mtime, UTC)
-    return gzip.open(dump, "rb"), stamp.date().isoformat()
+    return open(dump, "rb"), stamp.date().isoformat()
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -164,17 +183,28 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--dump", default=DUMP, help="GloBI interactions.tsv.gz, a path or URL")
     p.add_argument("--out", type=Path, required=True)
     p.add_argument("--min-rows", type=int, default=MIN_ROWS)
+    p.add_argument("--sha256", help="the dump's expected sha256 (default: DUMP_SHA256 for DUMP)")
     a = p.parse_args(argv)
+    want = a.sha256 or (DUMP_SHA256 if a.dump == DUMP else None)
     meta, rows = site_taxa(a.site)
     phyla = family_phyla(meta["ranks"], rows)
-    stream, day = _open(a.dump)
-    with stream:
-        pairs = lift(iter(stream), phyla, a.min_rows)
+    raw, day = _open(a.dump)
+    with raw:
+        dump = _Sha256Reader(raw)
+        pairs = lift(iter(gzip.GzipFile(fileobj=dump)), phyla, a.min_rows)
+        while dump.read(1 << 20):  # the hash covers every byte, not just the gzip member
+            pass
+    sha = dump.sha.hexdigest()
+    if want and sha != want.lower():
+        raise ValueError(f"{a.dump} has sha256 {sha}, expected {want}; nothing written")
     write(
         a.out,
         pairs,
         [
-            f"Generated from the GloBI interactions dump of {day} ({a.dump}); do not edit.",
+            f"Generated from {DUMP_RELEASE} ({DUMP}); do not edit."
+            if sha == DUMP_SHA256
+            else f"Generated from the GloBI interactions dump of {day} ({a.dump}); do not edit.",
+            f"Dump sha256: {sha}",
             "Regenerate: python -m what_to_id.host_pairs --site SITE_DIR --out "
             "src/what_to_id/lookalike_assets/host_pairs.tsv",
             f"Kept: {', '.join(sorted(TYPES))}; families of the site's taxa in different "

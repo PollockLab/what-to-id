@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import gzip
+import hashlib
 
 import pytest
 
@@ -62,6 +63,20 @@ def test_a_lower_threshold_keeps_single_rows_but_never_excluded_types(site, tmp_
     pairs = host_pairs.load([out])
     assert set(pairs) == {("Poaceae", "Ustilaginaceae"), ("Cyperaceae", "Ustilaginaceae")}
     assert pairs[("Cyperaceae", "Ustilaginaceae")]["types"] == "pathogenOf"
+
+
+def test_the_header_pins_the_dump_and_a_wrong_sha256_writes_nothing(site, tmp_path):
+    dump = tmp_path / "interactions.tsv.gz"
+    _dump(dump, ROWS)
+    sha = hashlib.sha256(dump.read_bytes()).hexdigest()
+    out = tmp_path / "pairs.tsv"
+    args = ["--site", str(site), "--dump", str(dump), "--out", str(out)]
+    assert host_pairs.main([*args, "--sha256", sha.upper()]) == 0
+    assert f"# Dump sha256: {sha}\n" in out.read_text()
+    out.unlink()
+    with pytest.raises(ValueError, match=f"has sha256 {sha}, expected 00"):
+        host_pairs.main([*args, "--sha256", "00"])
+    assert not out.exists()
 
 
 def test_a_dump_without_the_family_columns_is_refused(site, tmp_path):
