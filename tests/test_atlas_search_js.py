@@ -324,8 +324,8 @@ def test_subjects_split_on_connectives_and_fuse_takes_the_min():
         ["on"],
         [""],
     ]
-    # 2 is in both lists (min 0.7); 1 scores 0.4 in the second; 4 is absent from the first, so it
-    # takes that list's floor 0.5; 3 takes the second list's floor 0.4 and ties with 1, lower id first
+    # 2 is in both lists (min 0.7); 1 scores 0.4 in the second; 4 is absent from the first, so
+    # it takes that floor, 0.5; 3 takes the second floor, 0.4, ties with 1, lower id first
     assert got["fused"] == [
         {"id": 2, "score": 0.7},
         {"id": 4, "score": 0.5},

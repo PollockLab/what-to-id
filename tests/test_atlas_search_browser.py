@@ -283,7 +283,9 @@ def test_two_subject_query_searches_each_and_says_so(open_page):
         "a photo of a bird",
         "a photo of a frog",
     ]
-    assert page.locator("#how").inner_text().startswith("Each photo matches all of: a bird, a frog.")
+    assert (
+        page.locator("#how").inner_text().startswith("Each photo matches all of: a bird, a frog.")
+    )
     page.fill("#q", "a bird")
     page.press("#q", "Enter")
     page.wait_for_function("document.getElementById('how').textContent === ''")
