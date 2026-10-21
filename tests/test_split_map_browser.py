@@ -112,3 +112,32 @@ def test_an_accuracy_choice_sent_by_the_other_frame_reaches_the_map(browser, sit
     assert left.locator("#acc button[aria-pressed=true]").inner_text() == "Within 100 m"
     assert page.errors == []
     page.close()
+
+
+def test_the_tree_counts_what_the_map_keeps_as_its_dates_change(browser, site):
+    page = browser.new_page(viewport={"width": 1400, "height": 900})
+    page.errors = []
+    page.on("pageerror", lambda e: page.errors.append(str(e)))
+    stub_taxa(page)
+    page.route("https://basemaps.cartocdn.com/**", lambda r: r.fulfill(body=BLANK))
+    page.goto(f"{site}/split.html")
+    page.wait_for_function(
+        "() => { const d = document.getElementById('map')?.contentDocument;"
+        " return d && /^300 of 300/.test(d.getElementById('count').textContent); }",
+        timeout=60000,
+    )
+    left = next(f for f in page.frames if "map.html" in f.url)
+    root = (
+        "n => document.getElementById('tree').contentDocument.querySelector('#outline .tc')"
+        "?.textContent.split(' ')[0] === n"
+    )
+    page.wait_for_function(root, arg="300")
+    page.evaluate("location.hash = '#from=2026-09-01'")  # the fixture's records run Aug 1 to Sep 29
+    left.wait_for_function("!/^300 of/.test(document.getElementById('count').textContent)")
+    kept = left.evaluate("document.getElementById('count').textContent.split(' ')[0]")
+    assert 0 < int(kept) < 300
+    page.wait_for_function(root, arg=kept)
+    page.evaluate("location.hash = ''")
+    page.wait_for_function(root, arg="300")
+    assert page.errors == []
+    page.close()

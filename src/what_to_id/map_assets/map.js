@@ -102,7 +102,7 @@ function addShard(buf,n){
 // included taxa are one set, so the kept bit then carries the groups too).
 var SUB=null,SUBL='',SUBV=0;  // the split view's photo search: a Set of ids, its label, a version for PD_KEY
 var ST_KEEP=MF.ST_KEEP,ST_INEXACT=MF.ST_INEXACT,PD=null,PD_KEY=null,PD_GONE=-1,PD_CAT=0,
-  OUT=new Uint8Array(0),RC=null,PJW=null,FK=null,FKV=0,FKM=null,PJP='';
+  OUT=new Uint8Array(0),RC=null,PJW=null,FK=null,FKV=0,FKM=null,PJP='',KV=0,CNP='',CNT=0;
 // The photo space's lasso: the ids it keeps, or null; the mask is built once per list and shard count.
 function fmask(n){
   if(!FKM||FKM.v!==FKV||FKM.m.length!==n){var m=new Uint8Array(n);projMask(P.id,[FK],m,0,n);FKM={v:FKV,m:m};}
@@ -146,7 +146,7 @@ function recount(){
   var n=P.n,day=S.up?P.up:P.obs,c=categories(),gm=0,mm=0,sm=0,nd=0,cat=PD.attributes.getFilterCategory.value,
     ch=S.up?2:1,g=CH.groupPass(S.groups,META.groups,false),m=S.months;
   c[0].forEach(function(j){gm|=1<<j;});c[ch].forEach(function(j){mm|=1<<j;});c[3].forEach(function(j){sm|=1<<j;});
-  RC={gm:gm,mm:mm,sm:sm,ch:ch};
+  RC={gm:gm,mm:mm,sm:sm,ch:ch};KV++;
   if(KEEP.length!==n)KEEP=new Uint8Array(n);
   if(!PER)PER=new Float64Array(META.days);else PER.fill(0);
   for(var i=0;i<n;i++){
@@ -211,8 +211,16 @@ function render(){
   $('byUp').setAttribute('aria-pressed',String(S.up));
   PRESETS.forEach(function(p){var r=p.range();
     p.el.setAttribute('aria-pressed',String(r[0]===S.lo&&r[1]===S.hi));});
-  PJ.note(P.n?shown:null,ALT);BAR.set(items());tally();draw();layers();link();writeHash();
+  PJ.note(P.n?shown:null,ALT);BAR.set(items());tally();draw();layers();link();writeHash();counts();
 }
+// The tree beside the map counts what the map shows: how many shown records carry each taxon, sent once the filters
+// have settled for 150 ms and only when they changed (KV counts the recounts of KEEP, which holds the months too).
+function counts(){
+  if(parent===window||!TAXA)return;clearTimeout(CNT);CNT=setTimeout(function(){
+    var k=[KV,S.lo,S.hi,S.up].join();if(k===CNP)return;CNP=k;
+    var own=new Float64Array(TAXA.length),day=S.up?P.up:P.obs,all=full(),t=0,d;
+    for(var i=0;i<P.n;i++)if(KEEP[i]&&((d=day[i])===NO?all:d>=S.lo&&d<=S.hi)){t++;if(P.tax[i]<own.length)own[P.tax[i]]++;}
+    parent.postMessage({type:'wtid-counts',own:own,total:t},location.origin);},150);}
 // Whether record i matches the filters with the area left out, as recount() reads them
 function match(i){if(!RC||i>=OUT.length)return 0;var c=PD.attributes.getFilterCategory.value,s=c[4*i+3]&~ST_KEEP|(OUT[i]?0:ST_KEEP);
   return (RC.gm>>c[4*i]&1)&(RC.mm>>c[4*i+RC.ch]&1)&(RC.sm>>s&1);}

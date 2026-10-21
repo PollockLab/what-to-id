@@ -292,3 +292,20 @@ out({root: [B.tot[r], A.tot[r], P.tot[r], C.tot[r]], bombus: [A.tot[8], A.tot[9]
     assert got["root"] == [plant + animal + 27, plant + 2 + 27, plant - 5 + animal + 27, 1 + 27]
     assert got["bombus"] == [0, 0, 2] and got["sphagnum"] == [1, 1, 0]
     assert got["none"] == [27, 27, 27] and got["same"] and got["find"] == -1
+
+
+def test_recount_takes_the_maps_counts_and_records_with_no_taxon_are_the_rest_of_the_total():
+    got = node(
+        """
+const own = new Float64Array(T.length); own[4] = 2; own[9] = 3;
+const B = M.build(T, R, {"47126": "Plantae", "1": "Animalia"}, {total: 500}), r = 'ROOT';
+const C = M.recount(B, own, 9), Z = M.recount(B, new Float64Array(T.length), 0);
+out({root: C.tot[r], plants: C.tot[1], bombus: C.tot[8], own: [C.own[3], C.own[4]],
+  none: C.none, base: B.tot[r], kids: C.kids[8],
+  zero: [Z.tot[r], Z.none, Z.kids[r], M.find(Z, 'taxa=51'), M.view(Z, M.home(Z, [])).root.tot]});
+""".replace("'ROOT'", str(ROOT))
+    )
+    assert got["root"] == 9 and got["plants"] == 2 and got["bombus"] == 3
+    assert got["own"] == [0, 2] and got["none"] == 4 and got["base"] == 6 + 2 + BOMBUS_TOT + 27
+    assert got["kids"] == [9]
+    assert got["zero"] == [0, 0, [], -1, 0]

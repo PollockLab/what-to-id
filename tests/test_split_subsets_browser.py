@@ -407,3 +407,16 @@ def test_a_card_leaves_its_taxon_out_of_the_tree_and_the_map(browser, site):
     assert tree.locator("#card h2").count() == 1  # the card moves up instead of vanishing
     assert page.errors == []
     page.close()
+
+
+def test_the_maps_counts_reach_the_tree_and_replace_its_own(browser, site):
+    page, tree = _tree_page(browser, site)
+    root = tree.locator("#outline .tc").first
+    root.wait_for()
+    before = root.inner_text().split()[0]
+    left = next(f for f in page.frames if "embeddings.html" in f.url)
+    left.evaluate("parent.postMessage({type: 'wtid-counts', own: [], total: 7}, location.origin)")
+    tree.locator("#outline .tc", has_text="7 ·").first.wait_for()
+    assert root.inner_text().split()[0] == "7" != before
+    assert page.errors == []
+    page.close()
