@@ -13,8 +13,8 @@ from what_to_id.page_map import encode_points, render_map
 from .embeddings_fixture import TREE, pool_frame
 
 
-def write_site(root, tree=TREE):
-    blobs, meta = encode_points(pool_frame(np.arange(1, 301)), tree)
+def write_site(root, tree=TREE, pool=None):
+    blobs, meta = encode_points(pool_frame(np.arange(1, 301)) if pool is None else pool, tree)
     for name, blob in blobs.items():
         (root / name).write_bytes(blob)
     (root / "map.html").write_text(render_map(meta, freeze=None))

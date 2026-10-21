@@ -3,9 +3,10 @@
 // the split view (?embed=1) "Show on map" sends the taxon as the shared selection, as the photo space does.
 (function(){
 'use strict';
-var M=TreeModel,L=EmbeddingsLayout,META=CFG.meta,nf=new Intl.NumberFormat('en'),EMBED=/[?&]embed=1/.test(location.search),
-  BUDGET=400,BAR=26,TH=24,reduce=matchMedia('(prefers-reduced-motion: reduce)'),
-  D=null,S=null,V=null,G={},GS=[],COL=new Map(),prev=null,anim=0,SEL='',SY=null,PS=-1,PH={},Q=[],qt=0,qlast=0,lt=0,split=false;
+var M=TreeModel,L=EmbeddingsLayout,META=CFG.meta,nf=new Intl.NumberFormat('en'),
+  nc=new Intl.NumberFormat('en',{notation:'compact',maximumFractionDigits:1}),EMBED=/[?&]embed=1/.test(location.search),
+  BUDGET=400,BAR=26,TH=24,MINF=9,MINL=100,MINR=420,reduce=matchMedia('(prefers-reduced-motion: reduce)'),
+  D=null,S=null,V=null,G={},GS=[],COL=new Map(),prev=null,anim=0,SEL='',SY=null,PS=-1,PH={},Q=[],qt=0,qlast=0,lt=0,split=false,OL=null;
 function $(i){return document.getElementById(i);}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 function status(t){$('status').textContent=t||'';}
@@ -18,23 +19,62 @@ function cmn(r){var c=M.common(D,r);return c.toLowerCase()===M.name(D,r).toLower
 function label(r){var c=M.chain(D,r).map(function(x){return M.name(D,x);});
   return c.length>3?c[0]+' › … › '+c[c.length-1]:c.join(' › ');}
 function cut(s,n){return s.length>n?s.slice(0,Math.max(1,n-1))+'…':s;}
+var CX=document.createElement('canvas').getContext('2d');
+// s cut to w pixels in the tree's 11px type (bold for the inner labels); '' when not even 3 letters fit.
+function fit(s,w,b){CX.font=(b?'600 ':'')+'11px '+getComputedStyle(document.body).fontFamily;
+  if(CX.measureText(s).width<=w)return s;
+  while(s.length>3&&CX.measureText(s+'…').width>w)s=s.slice(0,-1);return CX.measureText(s+'…').width>w?'':s+'…';}
+// n as a share of d (by default all records needing an ID); a share above nil never reads 0%.
+function pct(n,d){var p=100*n/(d||D.tot[D.root]);return p>=10?Math.round(p)+'%':p>=0.1?p.toFixed(1)+'%':p>0?'<0.1%':'0%';}
+function rk(r){return r===M.lead(D,D.root)?'':M.rank(D,r);}
+// The life group (a map chip) that shown node r stands for, or ''.
+function grpOf(r){return M.chain(D,r).map(function(x){return G[M.id(D,x)];}).filter(Boolean).pop()||'';}
 function recs(n){return nf.format(n)+(n===1?' record':' records');}
 function tip(n){
   if(n.row<0)return '+'+nf.format(n.more)+' more taxa ('+recs(n.tot)+')';
-  var r=n.row,cm=cmn(r),rk=M.rank(D,r);
-  return label(r)+(cm?' ('+cm+')':'')+(rk?', '+rk:'')+': '+recs(n.tot)+' need ID'+(n.own?', '+nf.format(n.own)+' only to here':'');}
+  var r=n.row,cm=cmn(r),k=rk(r);
+  return label(r)+(cm?' ('+cm+')':'')+(k?', '+k:'')+': '+recs(n.tot)+' need ID'+(n.own?', '+nf.format(n.own)+' only to here':'');}
 // ---- the radial tree
-function geo(){var b=$('radial'),W=b.clientWidth,H=b.clientHeight,R=Math.max(60,Math.min(W,H)/2-6),
-  lab=Math.max(46,Math.min(120,R*0.26)),R1=Math.max(24,R-BAR-10-lab);
-  return {W:W,H:H,cx:W/2,cy:H/2,R1:R1,RL:R1+BAR+8,lab:lab};}
+// A view of a few leaves fans out over span (centred on the right, where labels read level) and the circle
+// grows and shifts so the fan's bounding box fills the canvas, left of the card where it floats over the plot.
+// The label ring takes at most cap; rl, for a full circle, sets the ring where the tip labels start.
+function geo(span,cap,rl){var b=$('radial'),r=b.getBoundingClientRect(),c=$('card').getBoundingClientRect(),
+  W=b.clientWidth-(c.width&&c.left<r.right&&c.right>r.left&&c.top<r.bottom&&c.bottom>r.top?r.right-c.left+18:12),H=b.clientHeight-12,h=span/2,x0=Math.min(0,Math.cos(h)),
+  R=Math.max(60,Math.min(W/(1-x0),H/2/(h>=Math.PI/2?1:Math.max(0.3,Math.sin(h))))),
+  lab=rl?170:Math.max(46,Math.min(170,R*0.3,cap==null?170:cap)),R1=Math.max(24,rl?rl-BAR-8:R-BAR-10-lab);
+  return {span:span,W:W+12,H:H+12,x1:6+W,y1:6+H,cx:6+(W-(1-x0)*R)/2-x0*R,cy:6+H/2,R1:R1,RL:R1+BAR+8,lab:lab,a0:span<2*Math.PI?Math.PI/2-h:0};}
+// A guide ring (the tag's start) as a full circle, or for a fan only the arc over the fan.
+function ring(g,r){return g.span<2*Math.PI?'path d="M'+P(g,g.a0,r)+arc(g,r,g.a0,g.a0+g.span,1)+'"':
+  'circle cx="'+g.cx+'" cy="'+g.cy+'" r="'+r.toFixed(1)+'"';}
+// pixels from the centre to the canvas edge (left of the card) at angle a
+function edge(g,a){var s=Math.sin(a),c=-Math.cos(a);
+  return Math.min(s>1e-6?(g.x1-g.cx)/s:s<-1e-6?(g.cx-6)/-s:1e9,c>1e-6?(g.y1-g.cy)/c:c<-1e-6?(g.cy-6)/-c:1e9);}
 function P(g,a,r){return (g.cx+r*Math.sin(a)).toFixed(1)+','+(g.cy-r*Math.cos(a)).toFixed(1);}
 function arc(g,r,a0,a1,sweep){return r<0.5||a0===a1?'':'A'+r.toFixed(1)+','+r.toFixed(1)+' 0 '+(Math.abs(a1-a0)>Math.PI?1:0)+','+
   sweep+' '+P(g,a1,r);}
 function sector(g,a0,a1,r0,r1){return 'M'+P(g,a0,r1)+arc(g,r1,a0,a1,1)+'L'+P(g,a1,r0)+arc(g,r0,a1,a0,0)+'Z';}
 function draw(animate){
   if(!D)return;
-  var g=geo();
-  V=M.layout(M.view(D,S),0,2*Math.PI,13/g.RL);
+  // the card floats beside the circle, or stacks above it where that would leave the circle under MINR px
+  var c=$('card'),bd=document.body;c.hidden=S.sel<0;bd.classList.remove('stack');
+  bd.classList.toggle('stack',!c.hidden&&$('radial').clientWidth-c.offsetWidth-24<MINR);
+  var v=M.view(D,S),span=Math.min(2*Math.PI,Math.max(Math.PI/6,v.root.leaves*Math.PI/12)),g=geo(span);
+  // each leaf at least half an even share (5 to 16px), so a small view labels every tip; a fan of a few
+  // tips shares out evenly, as one big tip would crowd the rest (the outline has the counts)
+  var lay=function(){V=M.layout(v,g.a0,g.a0+span,v.root.leaves<24?Infinity:Math.max(5,Math.min(16,span*g.RL/v.root.leaves/2))/g.RL);};
+  lay();
+  // the label ring shrinks to the longest tip label that fits, so a dense view gives the tree the room
+  var need=0;V.all.forEach(function(n){var t=rim(n,g);if(t)need=Math.max(need,t.w+4);});
+  if(need<g.lab-4){g=geo(span,need);lay();}
+  // a full circle never cuts a name, as iTOL and Nextstrain do not: a tip label shows whole in MINF px type or not at all
+  // (its name is on hover), so the label ring goes where the most labels show whole, the widest such ring, never below
+  // the default one. The tips are laid out once at the widest ring, so a narrower one only shortens the slots, a label
+  // showing from l[0] up, and lengthens the room, its name fitting up to l[1].
+  if(span===2*Math.PI){var lo=g.RL,top=Math.min(g.x1-g.cx,g.y1-g.cy)-6,L=[],best=-1,rl=lo;g=geo(span,170,top);lay();
+    V.all.forEach(function(n){var t=rim(n,g);if(t&&t.nw)L.push([(MINF+3)/(n.a1-n.a0),edge(g,n.a)-t.nw-7]);});
+    [lo,top].concat([].concat.apply([],L.map(function(l){return [l[0],l[0]-0.5,l[1]];}))).forEach(function(c){
+      var k=c<lo||c>top?-1:L.filter(function(l){return c>=l[0]&&c<=l[1];}).length;if(k>best||k===best&&c>rl){best=k;rl=c;}});
+    g=geo(span,170,rl);g.whole=1;}
   var t0=V.root.t,tm=Math.max.apply(null,V.all.map(function(n){return n.lo;})),k=tm>t0?g.R1/(tm-t0):0;
   V.all.forEach(function(n){n.r=(n.t-t0)*k;n.rl=(n.lo-t0)*k;});
   V.g=g;V.t0=t0;V.k=k;V.tm=tm;
@@ -53,9 +93,10 @@ function render(V,pos){
   var g=V.g;if(!g.W)return;
   var h=[],full=!pos,at=pos||function(n){return n;},on=S.sel>=0?String(M.lead(D,S.sel)):'',max=Math.log(V.root.tot+1)||1;
   if(full){var last=0;M.RINGS.forEach(function(x,i){if(x[1]<=V.t0||x[1]>V.tm+1e-9)return;var r=(x[1]-V.t0)*V.k;
-    if(i%2)h.push('<circle class="band" cx="'+g.cx+'" cy="'+g.cy+'" r="'+((r+last)/2).toFixed(1)+'" stroke-width="'+(r-last).toFixed(1)+'"/>');
-    h.push('<circle class="ring" cx="'+g.cx+'" cy="'+g.cy+'" r="'+r.toFixed(1)+'"/><text class="rk" x="'+(g.cx+3)+'" y="'+
-      (g.cy-r-3).toFixed(1)+'">'+x[0]+'</text>');last=r;});
+    if(i%2)h.push('<'+ring(g,(r+last)/2)+' class="band" stroke-width="'+(r-last).toFixed(1)+'"/>');
+    var t=P(g,g.a0,r+3).split(',');
+    h.push('<'+ring(g,r)+' class="ring"/><text class="rk" x="'+(+t[0]+3)+'" y="'+
+      t[1]+'">'+x[0]+'</text>');last=r;});
     V.all.forEach(function(n){if(n.kids.length)return;var w=n.a1-n.a0,pad=Math.min(0.15*w,0.004),c=col(rowOf(n));
       if(n.row<0||D.kids[n.row].length)h.push('<path class="wd'+(n.row<0?' more':'')+'" data-k="'+n.key+'" fill="'+c+'" stroke="'+c+
         '" d="'+sector(g,n.a0+pad,n.a1-pad,n.r,Math.max(n.rl,n.r+4))+'"/>');
@@ -63,34 +104,58 @@ function render(V,pos){
       h.push('<path class="br" data-k="'+n.key+'" stroke="'+c+'" stroke-width="'+bw.toFixed(1)+'" d="M'+P(g,n.a,g.R1+4)+'L'+
         P(g,n.a,g.R1+4+Math.max(1,len))+'"/>');});}
   V.all.forEach(function(n){if(!n.parent)return;var p=at(n.parent),c=at(n);
-    h.push('<path class="lk" stroke="'+col(rowOf(n))+'" d="M'+P(g,p.a,p.r)+arc(g,p.r,p.a,c.a,c.a>p.a?1:0)+'L'+P(g,c.a,c.r)+'"/>');});
+    h.push('<path class="lk" data-k="'+n.key+'" stroke="'+col(rowOf(n))+'" d="M'+P(g,p.a,p.r)+arc(g,p.r,p.a,c.a,c.a>p.a?1:0)+'L'+P(g,c.a,c.r)+'"/>');});
   V.all.forEach(function(n){if(n.row<0)return;var c=at(n),xy=P(g,c.a,c.r).split(','),x=+xy[0],y=+xy[1],
     rr=n.key===on?6:n.parent?3.5:5,f=n.tot?n.own/n.tot:0,cl=col(n.row);
     h.push('<g class="nd'+(n.key===on?' on':'')+'" data-k="'+n.key+'"><title>'+esc(tip(n))+'</title><circle cx="'+x+'" cy="'+y+
       '" r="'+rr+'" stroke="'+cl+'"/>'+(f>=1?'<circle cx="'+x+'" cy="'+y+'" r="'+(rr-1)+'" fill="'+cl+'"/>':f>0.02?'<path fill="'+cl+
       '" d="M'+x+','+y+'L'+x+','+(y-rr+1)+'A'+(rr-1)+','+(rr-1)+' 0 '+(f>0.5?1:0)+',1 '+(x+(rr-1)*Math.sin(2*Math.PI*f)).toFixed(2)+
-      ','+(y-(rr-1)*Math.cos(2*Math.PI*f)).toFixed(2)+'Z"/>':'')+'</g>');});
+      ','+(y-(rr-1)*Math.cos(2*Math.PI*f)).toFixed(2)+'Z"/>':'')+(n.key===on?'<circle class="halo" cx="'+x+'" cy="'+y+'" r="'+(rr+4)+
+      '"/>':'')+'</g>');});
   if(full)labels(V,h,on);
-  $('svg').innerHTML='<defs><clipPath id="cc" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath></defs>'+h.join('');
+  var s=$('svg'),pk=null,hp={};
+  s.innerHTML='<defs><clipPath id="cc" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath></defs>'+h.join('');
+  // a selection below the root keeps its path from the root and its own clade in colour and dims the rest
+  V.all.forEach(function(n){if(n.key===on)pk=n;});
+  s.classList.toggle('picked',!!(pk&&pk.parent));if(!pk||!pk.parent)return;
+  V.all.forEach(function(n){for(var x=n;x;x=x.parent)if(x===pk)return hp[n.key]=1;});
+  for(var x=pk;x;x=x.parent)hp[x.key]=1;
+  [].forEach.call(s.querySelectorAll('[data-k]'),function(e){if(hp[e.getAttribute('data-k')])e.classList.add('hp');});
 }
-// Tip labels run outward where a tip has room for a line (and a photo where it has room for one); the inner
-// labels go biggest first, each only where it overlaps none placed before it.
+// Tip labels (the latin name) run outward only where a tip's slot is a full line high, so none overlap; the
+// outline and the hover name the rest. The inner labels name the life groups (the map's chips) always, nudged
+// off one another, then the biggest clades, each only where it overlaps none placed before it and stays inside
+// the tip labels' ring.
+// A tip's rim label keeps its full name as iTOL and OneZoom do: the type shrinks from 11px to MINF px to fit the slot and
+// the room to the label ring and canvas edge, and only a name too long even then is cut. th when the photo fits beside the
+// name at MINF px, fs the type size, w the pixels photo and text take, nw the full name's width at MINF px; null when the
+// slot is less than a MINF px line high, or on a whole circle (g.whole) when the name does not fit whole.
+function rim(n,g){var room=(n.a1-n.a0)*g.RL,b=Math.min(g.lab,edge(g,n.a)-g.RL-6);if(n.kids.length||room<MINF+3)return null;
+  var nm=n.row>=0&&grpOf(n.row)?'':n.row<0?'+'+nf.format(n.more)+' more':M.name(D,n.row),
+    nw=nm?CX.measureText(fit(nm,Infinity)).width*MINF/11:0;if(g.whole&&nw>b-1)return null;
+  var th=room>=TH+2&&n.row>=0&&b>=TH+4+(g.whole?nw:Math.min(nw,MINL)),o=th?TH+4:0,
+    fs=Math.max(MINF,Math.min(11,room-3,nw?MINF*(b-o-1)/nw:11)),txt=nm&&fit(nm,(b-o)*11/fs);
+  return {th:th,txt:txt,fs:fs,nw:nw,w:o+(txt?CX.measureText(txt).width*fs/11:0)};}
 function labels(V,h,on){
   var g=V.g,box=[];
-  V.all.forEach(function(n){if(n.kids.length)return;var room=(n.a1-n.a0)*g.RL;if(room<11)return;
-    var id=n.row<0?0:M.id(D,n.row),ph=id&&PH[id],th=room>=TH+2&&n.row>=0,deg=n.a*180/Math.PI-90,left=n.a>Math.PI,
-      x0=g.RL+(th?TH+4:0),txt=n.row<0?'+'+nf.format(n.more)+' more':label(n.row)+(cmn(n.row)?' ('+cmn(n.row)+')':'');
+  V.all.forEach(function(n){var t=rim(n,g);if(!t)return;
+    var id=n.row<0?0:M.id(D,n.row),ph=id&&PH[id],th=t.th,txt=t.txt,deg=n.a*180/Math.PI-90,left=Math.sin(n.a)<0,x0=g.RL+(th?TH+4:0);
     if(th)want(id);
-    if(ph&&ph.ok){var c=P(g,n.a,g.RL+TH/2).split(',');h.push('<image data-k="'+n.key+'" href="'+esc(ph.sq)+'" x="'+(c[0]-TH/2)+'" y="'+
+    if(th&&ph&&ph.ok){var c=P(g,n.a,g.RL+TH/2).split(',');h.push('<image data-k="'+n.key+'" href="'+esc(ph.sq)+'" x="'+(c[0]-TH/2)+'" y="'+
       (c[1]-TH/2)+'" width="'+TH+'" height="'+TH+'" clip-path="url(#cc)" preserveAspectRatio="xMidYMid slice"/>');}
-    h.push('<text class="lb'+(n.key===on?' on':'')+'" data-k="'+n.key+'" dy=".32em" transform="translate('+g.cx+','+g.cy+') rotate('+
+    if(txt)h.push('<text class="lb'+(n.key===on?' on':'')+'" data-k="'+n.key+'"'+(t.fs<11?' font-size="'+t.fs.toFixed(1)+'"':'')+' dy=".32em" transform="translate('+g.cx+','+g.cy+') rotate('+
       (left?deg+180:deg).toFixed(2)+')" x="'+(left?-x0:x0)+'"'+(left?' text-anchor="end"':'')+'><title>'+esc(tip(n))+'</title>'+
-      esc(cut(txt,Math.floor((g.lab-(th?TH+4:0))/6.2)))+'</text>');});
-  V.all.filter(function(n){return n.kids.length;}).sort(function(a,b){return b.tot-a.tot;}).slice(0,60).forEach(function(n){
-    var xy=P(g,n.a,n.r).split(','),x=+xy[0],y=+xy[1],txt=cut(n.parent?label(n.row):M.name(D,n.row)+' · '+recs(n.tot),32),
-      w=txt.length*6.2,right=Math.sin(n.a)>=-0.01,b=[right?x+7:x-7-w,y-15,right?x+7+w:x-7,y-3];
+      esc(txt)+'</text>');});
+  var hit=function(b){return box.some(function(o){return b[0]<o[2]&&o[0]<b[2]&&b[1]<o[3]&&o[1]<b[3];});};
+  V.all.filter(function(n){return n.row>=0&&(n.kids.length||grpOf(n.row));}).map(function(n){return [n,n.parent?grpOf(n.row):''];})
+    .sort(function(a,b){return !a[1]-!b[1]||b[0].tot-a[0].tot;}).slice(0,60).forEach(function(q){
+    var n=q[0],xy=P(g,n.a,n.r).split(','),x=+xy[0],y=+xy[1],
+      txt=fit(q[1]||(n.parent?label(n.row):M.name(D,n.row)+' · '+recs(n.tot)),200,1),
+      w=CX.measureText(txt).width,right=Math.sin(n.a)>=-0.01,b=[right?x+7:x-7-w,y-15,right?x+7+w:x-7,y-3];
     if(!n.parent)b=[x-w/2,y+8,x+w/2,y+20];
-    if(box.some(function(o){return b[0]<o[2]&&o[0]<b[2]&&b[1]<o[3]&&o[1]<b[3];}))return;box.push(b);
+    if(q[1])[0,13,-13,26,-26,39,-39,52,-52].some(function(d){var c=[b[0],b[1]+d,b[2],b[3]+d];return !hit(c)&&(b=c);});
+    else if(!txt||hit(b)||[0,2].some(function(i){return [1,3].some(function(j){return Math.hypot(b[i]-g.cx,b[j]-g.cy)>g.RL-2;});}))return;
+    box.push(b);
     h.push('<text class="lb in'+(n.key===on?' on':'')+'" data-k="'+n.key+'" x="'+b[0].toFixed(1)+'" y="'+(b[3]-2).toFixed(1)+'"><title>'+
       esc(tip(n))+'</title>'+esc(txt)+'</text>');});
 }
@@ -109,13 +174,13 @@ function later(){if(!lt)lt=setTimeout(function(){lt=0;if(V&&!anim)render(V,null)
 function photos(){[].forEach.call(document.querySelectorAll('[data-ph]'),function(el){var p=PH[el.dataset.ph];
   if(!p||!p.ok||el.dataset.done)return;el.dataset.done=1;var im=new Image();im.alt='';
   im.src=el.classList.contains('big')?p.md:p.sq;el.textContent='';el.appendChild(im);
-  if(el.classList.contains('big')&&p.by){var c=document.createElement('small');c.textContent=p.by;el.appendChild(c);}});}
+  if(el.classList.contains('big')){if(p.by){var c=document.createElement('small');c.textContent=p.by;el.appendChild(c);}im.onload=seen;}});}
 // ---- the card of the selected taxon
 function el(tag,attrs,kids){var e=document.createElement(tag);for(var k in attrs||{})e.setAttribute(k,attrs[k]);
   (kids||[]).forEach(function(c){if(c!=null)e.appendChild(typeof c==='string'?document.createTextNode(c):c);});return e;}
 function card(){
   var c=$('card');c.textContent='';if(S.sel<0){c.hidden=true;return;}c.hidden=false;
-  var e=M.lead(D,S.sel),id=M.id(D,e),tot=D.tot[e],own=D.own[e],rk=M.rank(D,e),cm=cmn(e),ks=D.kids[e],
+  var e=M.lead(D,S.sel),id=M.id(D,e),tot=D.tot[e],own=D.own[e],k=rk(e),cm=cmn(e),ks=D.kids[e],f=M.lead(D,S.focus),
     pk=M.pick(D,e),gp=/^groups=/.test(pk)?pk.slice(7):'';
   if(id)want(id);
   var link=function(href,text,cls){return el('a',{'class':'btn '+(cls||''),href:href,target:EMBED?'_blank':'_self',rel:'noopener'},[text]);};
@@ -127,37 +192,60 @@ function card(){
     'Help identify on iNaturalist','primary'));acts.lastChild.target='_blank';
     if(!(EMBED&&SY)){acts.appendChild(link(CFG.mapUrl+'#'+pk,'Show on map'));
       if(split)acts.appendChild(link('split.html?view=space#'+pk,'Show in photo space'));}}
-  if(e!==M.lead(D,S.focus))acts.appendChild(btn('Focus here',function(){focusOn(e);}));
-  if(ks.length)acts.appendChild(btn('Expand all below',function(){act(String(e),'expand');}));
+  if(e!==f&&ks.length)acts.append(btn('Focus here',function(){focusOn(e);}),
+    btn(S.open.has(e)?'Close':'Open',function(){act(String(e),'toggle',true);}));
+  if(ks.length)acts.appendChild(btn('Open more below',function(){act(String(e),'expand');}));
+  // a taxon above or below selects in place, like a click on the circle
+  var pick=function(x){S.sel=x;M.reveal(D,S,x);go(true,true);},row=function(x,cn){var i=M.id(D,x),b=el('button',{type:'button'},[
+    el('span',{'class':'th','data-ph':i}),el('span',{'class':'nm'},[e===D.root&&M.common(D,x)||label(x),cn&&cmn(x)?el('span',{'class':'cm'},[' '+cmn(x)]):null]),el('span',{'class':'tc'},[nf.format(D.tot[x])])]);want(i);
+    b.addEventListener('click',function(){pick(x);});return el('li',{},[b]);};
   var kids=el('ul',{'class':'kids','aria-label':'Biggest taxa below'});
-  ks.slice(0,e===D.root?ks.length:6).forEach(function(k){var x=M.lead(D,k),i=M.id(D,x),b=el('button',{type:'button'},[el('span',{'class':'th','data-ph':i}),
-    el('span',{'class':'nm'},[e===D.root&&M.common(D,x)||label(x)]),el('span',{'class':'tc'},[nf.format(D.tot[x])])]);want(i);
-    b.addEventListener('click',function(){S.sel=x;M.reveal(D,S,x);go(true,true);});kids.appendChild(el('li',{},[b]));});
+  ks.slice(0,e===D.root?ks.length:6).forEach(function(k){kids.appendChild(row(M.lead(D,k)));});
+  // the path up to the grandparent (Part of names the parent), its middle folded into a … that unfolds
+  var up=M.crumbs(D,e).map(function(p){return M.lead(D,p);}),pp=up.slice(0,-1),path=el('nav',{'class':'path','aria-label':'Taxa above'});
+  (function fill(all){path.textContent='';(all||pp.length<5?pp:[pp[0],-1].concat(pp.slice(-2))).forEach(function(x,i){
+    var b=el('button',{type:'button','class':'link'},[x<0?'…':cut(M.name(D,x),24)]);if(i)path.appendChild(document.createTextNode(' › '));
+    if(x<0){b.title=pp.slice(1,-2).map(function(y){return M.name(D,y);}).join(' › ');b.setAttribute('aria-label','Show all taxa above');}
+    b.addEventListener('click',function(){if(x<0)fill(true);else pick(x);});path.appendChild(b);});})();
   var x=el('button',{type:'button','class':'x','aria-label':'Close'},['×']);x.addEventListener('click',function(){S.sel=-1;go(false,true);});
   [x,id?el('div',{'class':'ph big','data-ph':id},['']):null,el('div',{'class':'body'},[
-    el('h2',{},[cm||M.name(D,e)]),el('p',{'class':'muted'},[gp===M.REST?'Records not identified past Life, or with no taxon.':label(e)+(rk?' · '+rk:'')]),
+    pp.length?path:null,el('h2',{},[cm||M.name(D,e)]),el('p',{'class':'muted'},[gp===M.REST?'Records not identified past Life, or with no taxon.':label(e)+(k?' · '+k:'')]),
     el('dl',{},[el('dt',{},['Need an ID']),el('dd',{},[nf.format(tot)]),
-      el('dt',{},['Identified only to this rank']),el('dd',{},[nf.format(own)+(tot?' ('+Math.round(100*own/tot)+'%)':'')]),
+      el('dt',{},['Share of all needing ID']),el('dd',{},[pct(tot)]),
+      el('dt',{},['Identified only to this rank']),el('dd',{},[nf.format(own)+(tot?' ('+pct(own,tot)+')':'')]),
       e===D.nr&&D.none?el('dt',{},['No taxon']):null,e===D.nr&&D.none?el('dd',{},[nf.format(D.none)]):null,
       el('dt',{},['Species below']),el('dd',{},[nf.format(D.sp[e])])]),
-    acts,ks.length?el('p',{'class':'muted'},[e===D.root?'Groups, as on the map':'Biggest below']):null,ks.length?kids:null])].forEach(function(n){if(n)c.appendChild(n);});
+    acts,up.length?el('p',{'class':'muted'},['Part of']):null,up.length?el('ul',{'class':'kids up','aria-label':'Part of'},[row(up[up.length-1],1)]):null,
+    ks.length?el('p',{'class':'muted'},[shown(e)]):null,ks.length?el('p',{'class':'muted'},[e===D.root?'Groups, as on the map':'Biggest below']):null,ks.length?kids:null])].forEach(function(n){if(n)c.appendChild(n);});
   photos();
 }
+// How much below e the circle shows. Open more below stops at family (order for insects) and at BUDGET tips.
+function shown(e){var all=0,on=0,nd=null;V.all.forEach(function(n){if(n.key===String(e))nd=n;});
+  (function cnt(r){D.kids[r].forEach(function(c){if(D.tot[c]){all++;cnt(M.lead(D,c));}});})(e);
+  (function cnt(n){n.kids.forEach(function(c){if(c.row>=0){on++;cnt(c);}});})(nd||{kids:[]});
+  var tx=nf.format(all)+(all===1?' taxon':' taxa');
+  return on>=all?'The circle shows all '+tx+' below.':!on?'Its '+tx+' below are not on the circle yet: Open shows the next rank, Open more below as many as fit.':'The circle shows '+nf.format(on)+' of the '+tx+' below. Open more below goes down to family (order for insects) as far as fits; open or focus a taxon to go deeper.';}
 // ---- the outline: the same shown tree as an ARIA tree, with a roving tab stop
 function outline(){
   var o=$('outline'),had=o.contains(document.activeElement)?document.activeElement.dataset.k:null,
     on=S.sel>=0?String(M.lead(D,S.sel)):V.root.key,h=[];
   (function li(n,lv){var ex=n.row>=0&&D.kids[n.row].length?' aria-expanded="'+n.open+'"':'';
     h.push('<li role="treeitem" aria-level="'+lv+'"'+ex+' aria-selected="'+(n.key===on)+'" tabindex="'+(n.key===on?0:-1)+
-      '" data-k="'+n.key+'"><span class="row"><span class="tw" aria-hidden="true">'+(ex?n.open?'▾':'▸':'')+'</span><i style="background:'+
+      '" data-k="'+n.key+'" style="--lv:'+lv+'"><span class="row" title="'+esc(tip(n))+'"><span class="tw" aria-hidden="true">'+(ex?n.open?'▾':'▸':'')+'</span><i style="background:'+
       col(rowOf(n))+'"></i><span class="nm">'+esc(n.row<0?'+'+nf.format(n.more)+' more taxa':label(n.row))+
-      (n.row>=0&&cmn(n.row)?' <span class="cm">'+esc(cmn(n.row))+'</span>':'')+'</span><span class="tc">'+nf.format(n.tot)+
-      '</span></span>');
+      (n.row>=0&&cmn(n.row)?' <span class="cm">'+esc(cmn(n.row))+'</span>':'')+'</span><span class="tc" style="--s:'+(100*n.tot/D.tot[D.root]).toFixed(2)+'%;--c:'+col(rowOf(n))+'" title="'+
+      recs(n.tot)+', '+pct(n.tot)+' of all needing ID">'+nc.format(n.tot)+'<span class="p"> · '+pct(n.tot)+'</span></span></span>');
     if(n.kids.length){h.push('<ul role="group">');n.kids.forEach(function(k){li(k,lv+1);});h.push('</ul>');}
     h.push('</li>');})(V.root,1);
   o.innerHTML=h.join('');
   if(had){var f=o.querySelector('[data-k="'+had+'"]')||o.querySelector('[tabindex="0"]');if(f)f.focus();}
+  if(on!==OL){OL=on;seen();}
 }
+// A new selection, from the card, the circle or the map, brings its row into view below the pinned rows; again once the
+// card's photo has pushed the outline down on a phone.
+function seen(){var r=$('outline').querySelector('[aria-selected="true"]>.row');if(!r)return;
+  var sd=$('side').getBoundingClientRect(),b=r.getBoundingClientRect(),pin=Math.min(4,r.parentNode.getAttribute('aria-level')-1)*28;
+  if(b.top<sd.top+pin||b.bottom>sd.bottom)r.scrollIntoView({block:'center'});}
 function items(){return [].slice.call($('outline').querySelectorAll('[role=treeitem]'));}
 function move(to){if(!to)return;items().forEach(function(i){i.tabIndex=-1;});to.tabIndex=0;to.focus();}
 $('outline').addEventListener('click',function(e){var t=e.target.closest('[data-k]');if(!t)return;
@@ -181,8 +269,15 @@ function act(key,how,keep){
   go(true,how!=='toggle');
 }
 function focusOn(r){S.focus=r;if(!S.open.has(r))M.toggle(D,S,r);go(true,true);}
+// A focus with nothing below moves up to its parent and selects itself; a closed focus opens.
+function settle(){var f=M.lead(D,S.focus),c=M.crumbs(D,f);
+  if(!D.kids[f].length&&c.length){if(S.sel<0)S.sel=f;S.focus=f=c[c.length-1];M.reveal(D,S,S.sel);}
+  if(!S.open.has(f))M.toggle(D,S,f);}
+// With no address the page opens on the root selected, so the card names the biggest taxa below.
+function readHash(){S=M.read(D,location.hash,GS);if(!location.hash.slice(1))S.sel=M.lead(D,D.root);settle();}
+function reread(){readHash();share();draw(true);}
 function go(animate,push){
-  var base=location.pathname+location.search,h=M.write(D,S),u=base+(h?'#'+h:'');
+  settle();var base=location.pathname+location.search,h=M.write(D,S),u=base+(h?'#'+h:'');
   if(u!==base+location.hash)history[push?'pushState':'replaceState'](null,'',u);
   share();draw(animate);
 }
@@ -198,15 +293,20 @@ function crumbs(){
   $('up').disabled=path.length<2;
 }
 var svg=$('svg');
-svg.addEventListener('click',function(e){var t=e.target.closest('[data-k]');if(t)act(t.dataset.k,e.shiftKey&&t.dataset.k[0]!=='+'?'expand':'toggle');});
-svg.addEventListener('dblclick',function(e){var t=e.target.closest('[data-k]');if(t&&t.dataset.k[0]!=='+')focusOn(+t.dataset.k);});
+// A click selects and leaves the layout as it is (a more node pages on), shift+click opens below and a
+// double-click opens or closes; a click on the background or Esc clears the selection.
+function clear(){if(S&&S.sel>=0){S.sel=-1;go(false,true);}}
+svg.addEventListener('click',function(e){var t=e.target.closest('[data-k]');if(!t)return clear();
+  act(t.dataset.k,t.dataset.k[0]==='+'?'toggle':e.shiftKey?'expand':'select');});
+svg.addEventListener('dblclick',function(e){var t=e.target.closest('[data-k]');if(t&&t.dataset.k[0]!=='+')act(t.dataset.k,'toggle',true);});
+addEventListener('keydown',function(e){if(e.key==='Escape'&&!(e.target.closest&&e.target.closest('input')))clear();});
 $('up').addEventListener('click',function(){var c=M.crumbs(D,M.lead(D,S.focus));if(c.length)focusOn(c[c.length-1]);});
 $('collapse').addEventListener('click',function(){S.open=new Map([[M.lead(D,S.focus),1]]);go(true,false);});
-$('reset').addEventListener('click',function(){var s=S.sel;S=M.home(D,GS);S.sel=s;go(true,true);});
+$('reset').addEventListener('click',function(){S=M.home(D,GS);S.sel=M.lead(D,D.root);go(true,true);});
 $('mode').addEventListener('click',function(){var r=document.body.classList.toggle('radial');
   this.setAttribute('aria-pressed',String(r));draw(false);});
 $('info').addEventListener('click',function(){var a=$('about');a.hidden=!a.hidden;this.setAttribute('aria-expanded',String(!a.hidden));});
-function back(){if(D){S=M.read(D,location.hash,GS);share();draw(true);}}
+function back(){if(D)reread();}
 addEventListener('popstate',back);addEventListener('hashchange',back);
 var rz=0;new ResizeObserver(function(){if(!rz)rz=requestAnimationFrame(function(){rz=0;if(V)draw(false);});}).observe($('radial'));
 var picks=[];
@@ -226,7 +326,7 @@ async function load(){
   if(META.groups.indexOf('Animalia')>=0)G[1]=G[1]||'Animalia';  // iNaturalist's iconic Animalia: kingdom 1, less the other groups
   D=M.build(T,META.ranks,G,{order:META.groups,names:META.names,total:META.n});
   GS=Object.keys(G).map(function(i){return D.row.get(+i);}).filter(function(x){return x!=null&&D.tot[x];});
-  S=M.read(D,location.hash,GS);if(SY){SEL=SEL||MapFilter.tokens(location.hash);take();}split=await has;status('');draw(false);
+  readHash();if(SY){SEL=SEL||MapFilter.tokens(location.hash);take();if(S.sel<0)S.sel=PS=M.lead(D,D.root);}split=await has;status('');draw(false);
 }
 load().catch(function(e){status('The tree could not load: '+e.message);});
 })();

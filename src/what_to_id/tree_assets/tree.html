@@ -10,8 +10,8 @@ __SITE_CSS__
 __SELECT_CSS__
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
-body{display:grid;grid-template-columns:300px minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);grid-template-areas:"nav nav" "head head" "side plot"}
-.embed body{grid-template-columns:240px minmax(0,1fr)}
+body{display:grid;grid-template-columns:340px minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);grid-template-areas:"nav nav" "head head" "side plot"}
+.embed body{grid-template-columns:300px minmax(0,1fr)}
 header{grid-area:head;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:8px 12px;border-bottom:1px solid var(--line)}
 h1{font-size:16px;margin:0}
 .embed h1{display:none}
@@ -29,18 +29,25 @@ button[aria-pressed="true"],.btn.primary{background:var(--on);color:var(--onink)
 #crumbs{flex:1 1 100%;font-size:12px;color:var(--muted);overflow-wrap:anywhere}
 #about{flex:1 1 100%;margin:0;padding:8px 10px;border-radius:8px;background:var(--warnbg);color:var(--warn);font-size:12px}
 #about[hidden],.card[hidden]{display:none}
-#side{grid-area:side;overflow:auto;border-right:1px solid var(--line);padding:6px 0}
+#side{grid-area:side;overflow:auto;border-right:1px solid var(--line);padding:0 0 6px;container-type:inline-size}
 #outline,#outline ul{list-style:none;margin:0;padding:0}
 #outline ul{margin-left:12px;border-left:1px solid var(--line)}
+/* past four levels the indent shrinks, so depth never eats the names */
+#outline ul ul ul ul ul{margin-left:4px}
 #outline li{outline:0}
 #outline li:focus-visible>.row{outline:3px solid var(--bar);outline-offset:-3px}
-#outline .row{display:flex;align-items:center;gap:6px;min-height:28px;padding:0 10px 0 4px;cursor:pointer}
-#outline .row:hover{background:var(--chip)}
-#outline [aria-selected="true"]>.row{background:var(--chip);font-weight:650}
+#outline .row{display:flex;align-items:center;gap:6px;height:28px;padding:0 10px 0 4px;cursor:pointer;white-space:nowrap;background:var(--bg)}
+/* an open taxon's row sticks below its own open ancestors while its subtree scrolls past, so #side has no top padding to show through;
+   only the top four levels pin, so a deep path leaves room to scroll, and a closing row slides under its ancestors */
+#outline :is([aria-level="1"],[aria-level="2"],[aria-level="3"],[aria-level="4"])[aria-expanded="true"]>.row{position:sticky;top:calc(var(--lv) * 28px - 28px);z-index:calc(5 - var(--lv))}
+#outline li{scroll-margin-top:calc(min(var(--lv),5) * 28px)}
+#outline .row:hover{background-color:var(--chip)}
+#outline [aria-selected="true"]>.row{background-color:var(--chip);font-weight:650}
 #outline .tw{flex:0 0 14px;text-align:center;color:var(--muted)}
 #outline i{flex:0 0 9px;height:9px;border-radius:50%}
-#outline .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#outline .cm{color:var(--muted);font-weight:400}
+#outline .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+#outline .cm,.kids .cm{color:var(--muted);font-weight:400}
+#outline .tc{flex:0 0 92px;white-space:nowrap;text-align:right;padding-bottom:3px;background:linear-gradient(var(--c),var(--c)) no-repeat 100% 100%/var(--s) 2px}
 .tc{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
 #radial{grid-area:plot;position:relative;min-height:0;overflow:hidden}
 #svg{position:absolute;inset:0;width:100%;height:100%;font-size:11px;user-select:none}
@@ -54,6 +61,9 @@ button[aria-pressed="true"],.btn.primary{background:var(--on);color:var(--onink)
 #svg .nd{cursor:pointer}
 #svg .nd circle:first-of-type{fill:var(--bg);stroke-width:1.5}
 #svg .nd.on circle:first-of-type{stroke-width:3}
+#svg .nd .halo{fill:none;stroke:var(--ink);stroke-width:2}
+#svg.picked [data-k]:not(.hp){opacity:.2}
+#svg.picked .lk.hp{stroke-width:2.6;opacity:1}
 #svg .lb{fill:var(--ink);paint-order:stroke;stroke:var(--bg);stroke-width:3px;stroke-linejoin:round;cursor:pointer}
 #svg .lb.in{font-weight:600}
 #svg .lb.on{font-weight:700}
@@ -78,10 +88,19 @@ button[aria-pressed="true"],.btn.primary{background:var(--on);color:var(--onink)
 .kids .th img{width:100%;height:100%;object-fit:cover;display:block}
 .kids .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-@media (max-width:700px){body,.embed body{grid-template-columns:1fr;grid-template-rows:auto auto minmax(0,1fr);grid-template-areas:"nav" "head" "side"}
+@media (max-width:600px){body,.embed body{grid-template-columns:1fr;grid-template-rows:auto auto auto minmax(0,1fr);grid-template-areas:"nav" "head" "card" "side"}
   #mode{display:inline-block}#radial{display:none}
   .radial #radial{display:block;grid-area:side}.radial #side{display:none}
-  .card{top:auto;bottom:0;right:0;left:0;width:auto;max-height:60vh;border-radius:10px 10px 0 0}}
+  /* the card sits above the outline rather than over it */
+  .card,.embed .card{grid-area:card;position:relative;top:auto;right:auto;width:auto;max-height:40vh;border-width:0 0 1px;border-radius:0;box-shadow:none}
+  .card .ph img{max-height:120px}}
+/* wider, where the card would leave the circle too little room, it stacks above the plot the same way */
+@media (min-width:601px){body.stack{grid-template-rows:auto auto auto minmax(0,1fr);grid-template-areas:"nav nav" "head head" "side card" "side plot"}}
+.stack .card{grid-area:card;position:relative;top:auto;right:auto;width:auto;max-height:40vh;border-width:0 0 1px;border-radius:0;box-shadow:none}
+.stack .card .ph img{max-height:120px}
+/* a narrow outline keeps the count and drops its share */
+@container (max-width:280px){#outline .tc{flex-basis:48px}#outline .tc .p{display:none}}
+.path{font-size:12px;color:var(--muted);padding-right:28px}
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
 </style>
 </head>
@@ -99,7 +118,7 @@ __SITE_NAV__<header>
 <p id="qn" aria-live="polite"></p>
 <p id="status" role="status"></p>
 <nav id="crumbs" aria-label="Focus"></nav>
-<p id="about" hidden>Every observation in BC that still needs an ID, counted at the taxon its community ID has reached and rolled up iNaturalist's taxonomy. The rings are taxonomic ranks, not time: this is not a dated phylogeny. A filled dot means every record stops at that taxon; a part-filled one, the share that does. Bars outside the tips show the records below each tip, on a log scale. Click to open or close, shift+click to open everything below, double-click to focus.</p>
+<p id="about" hidden>Every observation in BC that still needs an ID, counted at the taxon its community ID has reached and rolled up iNaturalist's taxonomy. The rings are taxonomic ranks, not time: this is not a dated phylogeny. A filled dot means every record stops at that taxon; a part-filled one, the share that does. Branches share the circle by the square root of their records, so small clades stay in sight: an angle is not a share. The outline's percentages, and the bars under them, are each taxon's plain share of all records that need an ID. Bars outside the tips show the records below each tip, on a log scale. Click to select a taxon (the tree stays put and its branch stands out), double-click or the card's Open to open or close it, shift+click or Open more below to open further down, Focus here to make it the centre, Esc to clear.</p>
 </header>
 <section id="side" aria-label="Outline"><ul id="outline" role="tree" aria-label="Tree of life"></ul></section>
 <main id="radial" tabindex="-1"><svg id="svg" role="img" aria-label="Radial tree of the taxa that need an ID; the outline holds the same tree"></svg></main>
