@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tree of life</title>
+<script>if(/[?&]embed=1/.test(location.search))document.documentElement.classList.add('embed');</script>
+<style>
+__SITE_CSS__
+__SELECT_CSS__
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+body{display:grid;grid-template-columns:300px minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);grid-template-areas:"nav nav" "head head" "side plot"}
+.embed body{grid-template-columns:240px minmax(0,1fr)}
+header{grid-area:head;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:8px 12px;border-bottom:1px solid var(--line)}
+h1{font-size:16px;margin:0}
+.embed h1{display:none}
+button,.btn{font:inherit;font-size:12px;border:1px solid var(--line);background:var(--chip);color:var(--ink);padding:4px 10px;
+  border-radius:14px;cursor:pointer;text-decoration:none;display:inline-block;min-height:28px}
+button:disabled{opacity:.5;cursor:default}
+button[aria-pressed="true"],.btn.primary{background:var(--on);color:var(--onink);border-color:var(--on)}
+.link{border:0;background:none;padding:0;min-height:0;color:var(--muted);text-decoration:underline}
+.link[aria-current]{color:var(--ink);font-weight:650;text-decoration:none}
+.picker{position:relative;flex:0 1 240px}
+#q{font:inherit;font-size:13px;width:100%;min-height:28px;padding:0 10px;border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--ink)}
+.i{width:28px;padding:0;border-radius:50%;font:italic 700 14px Georgia,serif}
+#mode{display:none}
+.muted,#qn,#status{color:var(--muted);font-size:12px;margin:0}
+#crumbs{flex:1 1 100%;font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+#about{flex:1 1 100%;margin:0;padding:8px 10px;border-radius:8px;background:var(--warnbg);color:var(--warn);font-size:12px}
+#about[hidden],.card[hidden]{display:none}
+#side{grid-area:side;overflow:auto;border-right:1px solid var(--line);padding:6px 0}
+#outline,#outline ul{list-style:none;margin:0;padding:0}
+#outline ul{margin-left:12px;border-left:1px solid var(--line)}
+#outline li{outline:0}
+#outline li:focus-visible>.row{outline:3px solid var(--bar);outline-offset:-3px}
+#outline .row{display:flex;align-items:center;gap:6px;min-height:28px;padding:0 10px 0 4px;cursor:pointer}
+#outline .row:hover{background:var(--chip)}
+#outline [aria-selected="true"]>.row{background:var(--chip);font-weight:650}
+#outline .tw{flex:0 0 14px;text-align:center;color:var(--muted)}
+#outline i{flex:0 0 9px;height:9px;border-radius:50%}
+#outline .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#outline .cm{color:var(--muted);font-weight:400}
+.tc{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+#radial{grid-area:plot;position:relative;min-height:0;overflow:hidden}
+#svg{position:absolute;inset:0;width:100%;height:100%;font-size:11px;user-select:none}
+#svg .ring{fill:none;stroke:var(--line);stroke-dasharray:2 3}
+#svg .band{fill:none;stroke:var(--chip);opacity:.6}
+#svg .rk{fill:var(--muted);font-size:10px}
+#svg .lk{fill:none;stroke-width:1.3;opacity:.75}
+#svg .wd{fill-opacity:.22;stroke-opacity:.6;cursor:pointer}
+#svg .wd.more{fill-opacity:.08;stroke-dasharray:3 3}
+#svg .br{opacity:.55;cursor:pointer}
+#svg .nd{cursor:pointer}
+#svg .nd circle:first-of-type{fill:var(--bg);stroke-width:1.5}
+#svg .nd.on circle:first-of-type{stroke-width:3}
+#svg .lb{fill:var(--ink);paint-order:stroke;stroke:var(--bg);stroke-width:3px;stroke-linejoin:round;cursor:pointer}
+#svg .lb.in{font-weight:600}
+#svg .lb.on{font-weight:700}
+#svg image{cursor:pointer}
+.card{position:fixed;z-index:10;top:120px;right:12px;width:min(300px,calc(100vw - 24px));max-height:calc(100vh - 132px);overflow:auto;
+  background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow)}
+.embed .card{top:56px;max-height:calc(100vh - 68px)}
+.card .x{position:absolute;top:6px;right:6px;z-index:1;width:28px;height:28px;padding:0;font-size:16px;line-height:1}
+.ph{background:var(--chip);color:var(--muted);font-size:12px}
+.ph.big{min-height:120px;position:relative}
+.ph img{width:100%;display:block;max-height:240px;object-fit:cover}
+.ph small{position:absolute;left:0;right:0;bottom:0;padding:2px 6px;background:rgba(0,0,0,.55);color:#fff;font-size:10px}
+.body{padding:10px 12px 12px;display:flex;flex-direction:column;gap:6px}
+.body h2{font-size:15px;margin:0}
+.body dl{display:grid;grid-template-columns:1fr auto;gap:2px 10px;margin:0;font-size:12px}
+.body dt{color:var(--muted)}
+.body dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
+.actions{display:flex;flex-wrap:wrap;gap:6px}
+.kids{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.kids button{width:100%;display:flex;align-items:center;gap:8px;text-align:left;border-radius:8px;padding:3px 6px}
+.kids .th{flex:0 0 32px;height:32px;border-radius:50%;overflow:hidden;background:var(--chip)}
+.kids .th img{width:100%;height:100%;object-fit:cover;display:block}
+.kids .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media (max-width:700px){body,.embed body{grid-template-columns:1fr;grid-template-rows:auto auto minmax(0,1fr);grid-template-areas:"nav" "head" "side"}
+  #mode{display:inline-block}#radial{display:none}
+  .radial #radial{display:block;grid-area:side}.radial #side{display:none}
+  .card{top:auto;bottom:0;right:0;left:0;width:auto;max-height:60vh;border-radius:10px 10px 0 0}}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+__SITE_NAV__<header>
+<h1>Tree of life</h1>
+<div class="picker"><label for="q" class="vh">Find a taxon</label>
+<input id="q" type="search" placeholder="Find a taxon, e.g. Carex" autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="sugg">
+<ul id="sugg" class="sugg" role="listbox" aria-label="Matching taxa" hidden></ul></div>
+<button type="button" id="up">Up</button>
+<button type="button" id="collapse">Collapse all</button>
+<button type="button" id="reset">Home view</button>
+<button type="button" id="mode" aria-pressed="false">Radial view</button>
+<button type="button" class="i" id="info" aria-expanded="false" aria-controls="about" aria-label="About this tree">i</button>
+<p id="qn" aria-live="polite"></p>
+<p id="status" role="status"></p>
+<nav id="crumbs" aria-label="Focus"></nav>
+<p id="about" hidden>Every observation in BC that still needs an ID, counted at the taxon its community ID has reached and rolled up iNaturalist's taxonomy. The rings are taxonomic ranks, not time: this is not a dated phylogeny. A filled dot means every record stops at that taxon; a part-filled one, the share that does. Bars outside the tips show the records below each tip, on a log scale. Click to open or close, shift+click to open everything below, double-click to focus.</p>
+</header>
+<section id="side" aria-label="Outline"><ul id="outline" role="tree" aria-label="Tree of life"></ul></section>
+<main id="radial" tabindex="-1"><svg id="svg" role="img" aria-label="Radial tree of the taxa that need an ID; the outline holds the same tree"></svg></main>
+<aside id="card" class="card" hidden aria-label="Selected taxon"></aside>
+<script>var CFG=__TREE_CONFIG__;</script>
+<script>__MAP_FILTER__</script>
+<script>__MAP_TAXA__</script>
+<script>__EMBEDDINGS_LAYOUT__</script>
+<script>__TREE_MODEL__</script>
+<script>__TREE_VIEW__</script>
+</body>
+</html>
