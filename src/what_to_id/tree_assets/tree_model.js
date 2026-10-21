@@ -58,7 +58,15 @@ function build(T,ranks,groups,opt){
   kids.forEach(function(k,p){k.sort(function(a,b){return (p===n?ord.indexOf(grp[a])-ord.indexOf(grp[b]):0)||tot[b]-tot[a]||a-b;});});
   kids[n].forEach(function(k){if(gr[grp[k]]==null)gr[grp[k]]=k;});
   return {T:T,ranks:ranks,n:n,root:n,par:par,own:own,tot:tot,st:st,deep:deep,sp:sp,kids:kids,row:row,grp:grp,groups:groups,
-    ex:ex,gr:gr,names:opt.names||{},none:none,nr:nr};
+    ex:ex,gr:gr,names:opt.names||{},none:none,nr:nr,opt:opt};
+}
+// The tree less the map's left-out groups: the same table with those groups' records gone, so their nodes
+// drop out and every count above them falls. Leaving out Unknown drops the records with no taxon too.
+function without(M,names){
+  if(!names.length)return M;
+  var gone=0,T=M.T.map(function(t,i){if(names.indexOf(M.grp[i])<0)return t;gone+=t[5]||0;return t.slice(0,5).concat([0]);}),
+    o=Object.assign({},M.opt,{total:names.indexOf(REST)>=0?0:Math.max(0,(M.opt.total||0)-gone)});
+  return build(T,M.ranks,M.groups,o);
 }
 function id(M,r){return r===M.n?0:M.T[r][2];}
 function name(M,r){return r===M.n?'Life':M.T[r][0];}
@@ -194,7 +202,7 @@ function read(M,hash,gs){
   var s=rowOf(q.sel);if(s>=0){S.sel=s;if(q.open==null)reveal(M,S,s);}
   return S;
 }
-return {K:K,REST:REST,LEVEL:LEVEL,RINGS:RINGS,DEPTH:DEPTH,TONES:TONES,BG:BG,cap:cap,shade:shade,tone:tone,contrast:contrast,step:step,build:build,id:id,name:name,common:common,rank:rank,lead:lead,pick:pick,find:find,
+return {K:K,REST:REST,LEVEL:LEVEL,RINGS:RINGS,DEPTH:DEPTH,TONES:TONES,BG:BG,cap:cap,shade:shade,tone:tone,contrast:contrast,step:step,build:build,without:without,id:id,name:name,common:common,rank:rank,lead:lead,pick:pick,find:find,
   chain:chain,crumbs:crumbs,within:within,view:view,toggle:toggle,more:more,expandBelow:expandBelow,reveal:reveal,
   home:home,layout:layout,write:write,read:read};
 });

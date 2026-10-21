@@ -323,7 +323,14 @@ TX.picker({input:$('q'),list:$('sugg'),msg:$('qn'),picks:picks,ranks:META.ranks,
   taxa:function(){return D&&D.T;},counts:function(){return D.tot;},onChange:function(){picks.length=0;},
   onPick:function(r){if(!D.tot[r])return status('No record of this taxon needs an ID.');S.sel=r;M.reveal(D,S,r);go(true,true);}});
 // The map's selection selects its taxon or group here; one this side already shows is left as it is.
-function take(){var r=M.find(D,SEL);if(r!==S.sel){S.sel=r;if(r>=0)M.reveal(D,S,r);}PS=S.sel;}
+// The groups the map leaves out leave the tree too; a focus or selection inside one goes back to the root.
+var D0=null,EX='';
+function groupsOut(){return SEL.split('&').filter(function(t){return /^groups=/.test(t);}).map(function(t){return t.slice(7);}).join(',')
+  .split(',').filter(function(x){return x[0]==='-';}).map(function(x){return decodeURIComponent(x.slice(1));}).sort().join(',');}
+function take(){var ex=groupsOut();
+  if(ex!==EX){EX=ex;D=M.without(D0,ex?ex.split(','):[]);groupRows();if(!D.tot[S.focus])S.focus=D.root;if(S.sel>=0&&!D.tot[S.sel])S.sel=-1;}
+  var r=M.find(D,SEL);if(r!==S.sel){S.sel=r;if(r>=0)M.reveal(D,S,r);}PS=S.sel;}
+function groupRows(){GS=Object.keys(G).map(function(i){return D.row.get(+i);}).filter(function(x){return x!=null&&D.tot[x];});}
 if(EMBED&&parent!==window)SY=MapFilter.sync({hash:false,key:function(){return SEL;},apply:function(s){SEL=s;if(D){take();draw(true);}}});
 async function load(){
   status('Loading the taxa…');
@@ -333,8 +340,7 @@ async function load(){
   if(!T.length||T[0].length<6)throw new Error('this site was built without the taxon tree');
   Object.keys(META.group_ids||{}).forEach(function(g){G[META.group_ids[g]]=g;});
   if(META.groups.indexOf('Animalia')>=0)G[1]=G[1]||'Animalia';  // iNaturalist's iconic Animalia: kingdom 1, less the other groups
-  D=M.build(T,META.ranks,G,{order:META.groups,names:META.names,total:META.n});
-  GS=Object.keys(G).map(function(i){return D.row.get(+i);}).filter(function(x){return x!=null&&D.tot[x];});
+  D=D0=M.build(T,META.ranks,G,{order:META.groups,names:META.names,total:META.n});groupRows();
   readHash();if(SY){SEL=SEL||MapFilter.tokens(location.hash);take();if(S.sel<0)S.sel=PS=M.lead(D,D.root);}split=await has;status('');draw(false);
 }
 load().catch(function(e){status('The tree could not load: '+e.message);});

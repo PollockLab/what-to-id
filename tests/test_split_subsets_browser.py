@@ -315,3 +315,29 @@ def test_going_back_in_the_tree_keeps_its_selection_the_maps(browser, site):
     assert on.inner_text() == "Genus A" and "taxa=900" in page.evaluate("location.hash")
     assert page.errors == []
     page.close()
+
+
+def test_a_group_the_map_leaves_out_leaves_the_tree_and_its_counts(browser, site):
+    # the fixture's taxa hang from no life group, so every record counts as Unknown
+    base, *_ = site
+    page = browser.new_page(viewport={"width": 1280, "height": 900})
+    page.errors = []
+    page.on("pageerror", lambda e: page.errors.append(str(e)))
+    stub_inat(page, None)
+    stub_taxa(page)
+    page.goto(f"{base}/split.html")
+    tree = page.frame_locator("#tree")
+    root = tree.locator("#outline .tc").first
+    root.wait_for()
+    before = root.inner_text()
+    assert not before.startswith("0 ")
+    for sel, want in (("groups=-Unknown", "0 "), ("groups=-Aves", before), ("", before)):
+        page.evaluate(
+            "s => document.querySelector('#tree').contentWindow.postMessage("
+            "{type: 'wtid-selection', sel: s}, location.origin)",
+            sel,
+        )
+        page.wait_for_timeout(200)
+        assert root.inner_text().startswith(want), (sel, root.inner_text())
+    assert page.errors == []
+    page.close()
