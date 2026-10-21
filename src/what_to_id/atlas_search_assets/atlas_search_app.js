@@ -85,10 +85,13 @@ async function hitsFrom(state,confirmed){
   return {hits:Meta.fuse(lists,K),parts:parts};
 }
 
+// The taxon filter lives in the hash with the query, so a shared link carries it; chips mirror it.
+function setFilters(state){S.include=state.include||[];S.exclude=state.exclude||[];chips();}
 async function start(state,confirmed){
   var run=++S.run;
   S.state=state;S.parts=[];$('gate').hidden=true;
   if(!state){render();return;}
+  setFilters(state);
   $('q').value=state.kind==='id'?String(state.id):state.text;
   status('Searching...');
   try{
@@ -158,6 +161,7 @@ function cardEl(c,i){
 
 // Setting the hash is the navigation: back/forward and shared links all arrive through start().
 function go(state){
+  if(state)state=Object.assign({},state,{include:S.include,exclude:S.exclude});
   var h=Meta.toHash(state);
   if(h===location.hash||(!h&&!location.hash))start(state);else location.hash=h;
 }
@@ -167,7 +171,7 @@ function chips(){
   [['include',S.include],['exclude',S.exclude]].forEach(function(p){
     p[1].forEach(function(t,i){
       var rm=el('button',{type:'button','aria-label':'Remove '+t.name+' filter'},['×']);
-      rm.addEventListener('click',function(){p[1].splice(i,1);chips();render();});
+      rm.addEventListener('click',function(){p[1].splice(i,1);filtersChanged();});
       ul.appendChild(el('li',{'class':'chip'+(p[0]==='exclude'?' not':'')},[
         (p[0]==='exclude'?'Not ':'')+t.name,rm]));
     });
@@ -175,8 +179,9 @@ function chips(){
 }
 function addTaxon(list,t){
   if(S.include.concat(S.exclude).some(function(x){return x.id===t.id;}))return;
-  list.push(t);chips();render();
+  list.push(t);filtersChanged();
 }
+function filtersChanged(){chips();if(S.state)go(S.state);else render();}
 var timer=0;
 function suggest(){
   var q=$('tq').value.trim(),ul=$('sugg');
@@ -213,7 +218,7 @@ EXAMPLES.forEach(function(t){
 });
 window.addEventListener('hashchange',function(){
   var s=Meta.parseHash(location.hash);
-  if(!same(s,S.state))start(s);
+  if(!same(s,S.state))start(s);else{setFilters(s);render();}
 });
 start(Meta.parseHash(location.hash));
 })();

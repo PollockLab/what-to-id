@@ -15,16 +15,27 @@ function parseInput(raw){
   if(m&&+m[1]>0&&+m[1]<=4294967295)return {kind:'id',id:+m[1]};
   return {kind:'text',text:t};
 }
-// Hash <-> state: #q=<text> or #id=<obs>.
+// Hash <-> state: #q=<text> or #id=<obs>, plus the taxon filter as keep=<id>:<name> and drop=<id>:<name>,
+// one param per taxon, so a shared link carries the filter and its chips.
+function parseTaxa(vals){
+  return vals.map(function(v){var m=/^(\d+)(?::(.*))?$/.exec(v);return m&&+m[1]>0?{id:+m[1],name:m[2]||('taxon '+m[1])}:null;})
+    .filter(Boolean);
+}
 function parseHash(hash){
   var p=new URLSearchParams(String(hash||'').replace(/^#/,'')),id=p.get('id'),q=p.get('q');
-  if(id&&/^\d+$/.test(id)&&+id>0)return {kind:'id',id:+id};
-  if(q&&q.trim())return {kind:'text',text:q.trim()};
+  var f={include:parseTaxa(p.getAll('keep')),exclude:parseTaxa(p.getAll('drop'))};
+  if(id&&/^\d+$/.test(id)&&+id>0)return {kind:'id',id:+id,include:f.include,exclude:f.exclude};
+  if(q&&q.trim())return {kind:'text',text:q.trim(),include:f.include,exclude:f.exclude};
   return null;
 }
+function enc(text){return encodeURIComponent(text).replace(/%20/g,'+');}
 function toHash(state){
   if(!state)return '';
-  return state.kind==='id'?'#id='+state.id:'#q='+encodeURIComponent(state.text).replace(/%20/g,'+');
+  var h=state.kind==='id'?'#id='+state.id:'#q='+enc(state.text);
+  [['keep',state.include],['drop',state.exclude]].forEach(function(p){
+    (p[1]||[]).forEach(function(t){h+='&'+p[0]+'='+t.id+':'+enc(t.name);});
+  });
+  return h;
 }
 function smallPhoto(url){return url?String(url).replace(/\/square(\.\w+)/,'/small$1'):'';}
 

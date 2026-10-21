@@ -361,7 +361,10 @@ def test_meta_parsing_and_filtering():
           P('a bird eating a frog'), P('4294967296'), P('  '), P('#77')],
         hash: [H('#id=5'), H('#q=a+bird%20eating'), H('#id=x&q=y'), H(''),
           META.toHash({kind: 'text', text: 'a b&c'}),
-          META.toHash({kind: 'id', id: 9})],
+          META.toHash({kind: 'id', id: 9}),
+          H('#q=moss&keep=47126:Plantae&keep=1&drop=47170:Fungi&drop=0:x&drop=y'),
+          META.toHash({kind: 'text', text: 'moss', include: [{id: 47126, name: 'Plantae'}],
+            exclude: [{id: 3, name: 'Aves & co'}]})],
         small: META.smallPhoto('https://x/photos/1/square.jpg'),
         all: (({cards, ...r}) => [cards.map(c => c.id), c0(cards), r])(b()),
         inc: b({include: [47170]}).cards.map(c => c.id),
@@ -379,13 +382,22 @@ def test_meta_parsing_and_filtering():
         None,
         {"kind": "id", "id": 77},
     ]
+    none = {"include": [], "exclude": []}
     assert got["hash"] == [
-        {"kind": "id", "id": 5},
-        {"kind": "text", "text": "a bird eating"},
-        {"kind": "text", "text": "y"},
+        {"kind": "id", "id": 5, **none},
+        {"kind": "text", "text": "a bird eating", **none},
+        {"kind": "text", "text": "y", **none},
         None,
         "#q=a+b%26c",
         "#id=9",
+        # a taxon without a name gets a placeholder; id 0 and a non-numeric entry are dropped
+        {
+            "kind": "text",
+            "text": "moss",
+            "include": [{"id": 47126, "name": "Plantae"}, {"id": 1, "name": "taxon 1"}],
+            "exclude": [{"id": 47170, "name": "Fungi"}],
+        },
+        "#q=moss&keep=47126:Plantae&drop=3:Aves+%26+co",
     ]
     assert got["small"] == "https://x/photos/1/small.jpg"
     ids, photo, rest = got["all"]
