@@ -80,32 +80,31 @@ async function autocomplete(q,fetchFn){
 // CLIP text towers score a sentence much like its bag of words, so "a bird eating a frog" ranks lone
 // frogs and lone birds high. Connectives that put a second organism or object in frame split the query
 // into subjects the page searches separately and fuses with min: every subject must be in the photo.
-var LINK=/\b(?:eating|eats|preying on|catching|carrying|holding|feeding (?:on|at|from)|pollinating|visiting|perched on|sitting on|resting on|growing on|covered (?:in|with)|infected (?:by|with)|parasiti[sz]ed by|attacked by|with|and|on)\b/i;
+// "with" and "and" stay whole: "a bird with a red head" and "black and white" describe one subject.
+var LINK=/\b(?:eating|eats|preying on|catching|carrying|holding|feeding (?:on|at|from)|pollinating|visiting|perched on|sitting on|resting on|growing on|covered (?:in|with)|infected (?:by|with)|parasiti[sz]ed by|attacked by|on)\b/i;
 function subjects(text){
   var raw=String(text||'').trim().replace(/^(?:an? )?(?:photo|picture|image) of /i,'');
   var parts=raw.split(LINK).map(function(p){return p.trim().replace(/[,;.!?]+$/,'');}).filter(function(p){return p.length>2;});
   return parts.length>1?parts:[raw];
 }
-// Min-fuse ranked lists of {id,score}: an id missing from a list takes that list's lowest score, the
-// tightest bound the list gives. Highest fused score first, ties by lower id.
+// Min-fuse ranked lists of {id,score}, the first being the whole query's: an id missing from a list
+// takes that list's lowest score, the tightest bound the list gives. Highest fused score first, then
+// the whole query's score (ids outside one subject's list share its floor), then lower id.
 function fuse(lists,k){
-  var floors=lists.map(function(l){return l.length?l[l.length-1].score:-1;}),best=new Map();
-  lists.forEach(function(l,j){
+  var floors=lists.map(function(l){return l.length?l[l.length-1].score:-1;});
+  var maps=lists.map(function(l){var m=new Map();l.forEach(function(h){m.set(h.id,h.score);});return m;});
+  var out=[],seen=new Set();
+  lists.forEach(function(l){
     l.forEach(function(h){
-      if(best.has(h.id))return;
+      if(seen.has(h.id))return;
+      seen.add(h.id);
       var s=Infinity;
-      lists.forEach(function(m,i){
-        var hit=null;
-        for(var x=0;x<m.length;x++)if(m[x].id===h.id){hit=m[x];break;}
-        s=Math.min(s,hit?hit.score:floors[i]);
-      });
-      best.set(h.id,s);
+      maps.forEach(function(m,i){s=Math.min(s,m.has(h.id)?m.get(h.id):floors[i]);});
+      out.push({id:h.id,score:s,whole:maps[0].has(h.id)?maps[0].get(h.id):floors[0]});
     });
   });
-  var out=[];
-  best.forEach(function(s,id){out.push({id:id,score:s});});
-  out.sort(function(a,b){return b.score-a.score||a.id-b.id;});
-  return out.slice(0,k);
+  out.sort(function(a,b){return b.score-a.score||b.whole-a.whole||a.id-b.id;});
+  return out.slice(0,k).map(function(h){return {id:h.id,score:h.score};});
 }
 return {BATCH:BATCH,parseInput:parseInput,parseHash:parseHash,toHash:toHash,smallPhoto:smallPhoto,
   fetchObservations:fetchObservations,build:build,autocomplete:autocomplete,subjects:subjects,fuse:fuse};

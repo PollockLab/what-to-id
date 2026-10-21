@@ -309,8 +309,10 @@ def test_subjects_split_on_connectives_and_fuse_takes_the_min():
       out({
         split: [S('a bird eating a frog'), S('a photo of a hummingbird feeding at a flower'),
           S('colourful mushrooms on moss'), S('a bird'), S('a bird in flight'),
-          S('Amanita muscaria, with a slug.'), S('on'), S('  ')],
-        fused: META.fuse([[h(1, 0.9), h(2, 0.8), h(3, 0.5)], [h(2, 0.7), h(4, 0.6), h(1, 0.4)]], 3),
+          S('a slug on Amanita muscaria.'), S('a bird with a red head'), S('black and white'),
+          S('on'), S('  ')],
+        fused: META.fuse([[h(1, 0.9), h(2, 0.8), h(3, 0.5)], [h(2, 0.7), h(4, 0.6), h(1, 0.4)]], 4),
+        tie: META.fuse([[h(7, 0.9), h(8, 0.6), h(9, 0.5)], [h(5, 0.3)]], 3),
         empty: META.fuse([[h(1, 0.9)], []], 5),
       });
     })()""")
@@ -320,7 +322,9 @@ def test_subjects_split_on_connectives_and_fuse_takes_the_min():
         ["colourful mushrooms", "moss"],
         ["a bird"],
         ["a bird in flight"],
-        ["Amanita muscaria", "a slug"],
+        ["a slug", "Amanita muscaria"],
+        ["a bird with a red head"],
+        ["black and white"],
         ["on"],
         [""],
     ]
@@ -330,6 +334,14 @@ def test_subjects_split_on_connectives_and_fuse_takes_the_min():
         {"id": 2, "score": 0.7},
         {"id": 4, "score": 0.5},
         {"id": 1, "score": 0.4},
+        {"id": 3, "score": 0.4},
+    ]
+    # every id fuses to 0.3 (the second list's floor, or 5's own score), so the whole query's
+    # order decides: 7 (0.9), 8 (0.6), then 5 and 9 share the first list's floor 0.5, lower id first
+    assert got["tie"] == [
+        {"id": 7, "score": 0.3},
+        {"id": 8, "score": 0.3},
+        {"id": 5, "score": 0.3},
     ]
     assert got["empty"] == [{"id": 1, "score": -1}]
 
