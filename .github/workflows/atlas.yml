@@ -99,7 +99,9 @@ jobs:
           {
             echo "new=$new"
             echo "shards=$(jq -nc --argjson n "${ATLAS_WORKERS:-4}" '[range(0; $n)]')"
-            if [ "$(date -u +%u)" = 7 ]; then echo "compact=true"; else echo "compact=false"; fi
+            # weekly, or sooner once the layout has grown past 12 parts: each part costs a reader one hub resolve
+            parts=$(jq '.layout.parts | length' index/manifest.json)
+            if [ "$(date -u +%u)" = 7 ] || [ "$parts" -gt 12 ]; then echo "compact=true"; else echo "compact=false"; fi
           } >>"$GITHUB_OUTPUT"
           {
             echo "### Atlas plan"
