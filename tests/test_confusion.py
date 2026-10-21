@@ -1,9 +1,14 @@
 import numpy as np
 import pandas as pd
+import pytest
 
+from what_to_id.atlas_index_io import VERSION, read_manifest, write_manifest
 from what_to_id.confusion import (
+    TABLE_COLUMNS,
     confused_pairs,
     confusion_scores,
+    fir_table,
+    main,
     prototype_scores,
     read_taxa_vectors,
     text_scores,
@@ -94,8 +99,6 @@ def test_text_scores_use_only_species_names_and_skip_the_own_prototype():
 def test_confusion_scores_adds_text_columns_and_cli_reads_atlas_files(tmp_path):
     import gzip
 
-    from what_to_id.confusion import main
-
     E = _unit(np.eye(4))
     ids = np.array([10, 11, 12, 13])
     pool = pd.DataFrame(
@@ -126,3 +129,111 @@ def test_confusion_scores_adds_text_columns_and_cli_reads_atlas_files(tmp_path):
     ]
     assert main(args) == 0
     assert "text_margin" in pd.read_parquet(tmp_path / "out.parquet").columns
+
+
+BUILT = "2026-10-15T00:00:00Z"
+
+
+def _fir_inputs(species, per_species, vecs, text, ids_extra=0):
+    """E rows of `vecs[i]` for `per_species[i]` photos of `species[i]`; text prototypes `text`."""
+    rows, names = [], []
+    for name, n, v in zip(species, per_species, vecs, strict=True):
+        rows += [v] * n
+        names += [name] * n
+    E = _unit(rows)
+    ids = np.arange(100, 100 + len(E))
+    pool = pd.DataFrame(
+        {
+            "id": ids,
+            "taxon_id": [10 + species.index(n) for n in names],
+            "taxon_name": names,
+            "rank": "species",
+        }
+    )
+    taxa = pd.Series(list(text))
+    return pool, E, ids, taxa, _unit(list(text.values()))
+
+
+def test_fir_table_counts_photos_closer_to_another_text_prototype():
+    text = {"G a": [1, 0, 0], "G b": [0, 1, 0]}
+    pool, E, ids, taxa, T = _fir_inputs(["G a", "G b"], [5, 5], [[0, 1, 0], [0, 1, 0]], text)
+    out = fir_table(pool, E, ids, taxa, T, BUILT)
+    a = out[out.taxon_name == "G a"].iloc[0]
+    assert (a.looks_like_name, a.looks_like_taxon_id) == ("G b", 11)
+    assert (a.n_photos, a.n_species_photos, a.share) == (5, 5, 1.0)
+    assert out["built_at"].eq(BUILT).all()
+    assert out["looks_like_taxon_id"].dtype == "Int64"
+    assert "G a" not in out[out.taxon_name == "G b"]["looks_like_name"].tolist()
+
+
+def test_fir_table_empty_pool_and_single_species_give_no_rows():
+    text = {"G a": [1, 0, 0], "G b": [0, 1, 0]}
+    pool, E, ids, taxa, T = _fir_inputs(["G a"], [5], [[0, 1, 0]], text)
+    empty = fir_table(pool.iloc[:0], E, ids, taxa, T, BUILT)
+    assert empty.empty and list(empty.columns) == list(TABLE_COLUMNS)
+    one = {"G a": [1, 0, 0]}
+    pool, E, ids, taxa, T = _fir_inputs(["G a"], [5], [[0, 1, 0]], one)
+    assert fir_table(pool, E, ids, taxa, T, BUILT).empty
+
+
+def test_fir_table_tie_picks_the_first_prototype_in_taxa_order():
+    text = {"G a": [1, 0, 0], "G b": [0, 1, 0], "G c": [0, 1, 0]}
+    pool, E, ids, taxa, T = _fir_inputs(["G a"], [5], [[0, 1, 0]], text)
+    out = fir_table(pool, E, ids, taxa, T, BUILT)
+    assert out["looks_like_name"].tolist() == ["G b"]
+
+
+def test_fir_table_four_photo_floor():
+    text = {"G a": [1, 0, 0], "G b": [0, 1, 0]}
+    kw = dict(vecs=[[0, 1, 0], [0, 1, 0]], text=text)
+    pool, E, ids, taxa, T = _fir_inputs(["G a", "G b"], [3, 5], **kw)
+    out = fir_table(pool, E, ids, taxa, T, BUILT)
+    assert "G a" not in out["taxon_name"].tolist()
+    pool, E, ids, taxa, T = _fir_inputs(["G a", "G b"], [4, 5], **kw)
+    assert "G a" in fir_table(pool, E, ids, taxa, T, BUILT)["taxon_name"].tolist()
+
+
+def test_fir_table_keeps_three_pairs_per_species_with_two_photos_or_more():
+    text = {"G a": [1, 0, 0, 0, 0], "G b": [0, 1, 0, 0, 0], "G c": [0, 0, 1, 0, 0]}
+    text |= {"G d": [0, 0, 0, 1, 0], "G e": [0, 0, 0, 0, 1]}
+    rows = [[0, 1, 0, 0, 0]] * 4 + [[0, 0, 1, 0, 0]] * 3 + [[0, 0, 0, 1, 0]] * 2
+    rows += [[0, 0, 0, 0, 1]] * 2 + [[1, 0, 0, 0, 0.1]] + [[1, 0, 0, 0, 0]] * 2
+    E = _unit(rows)
+    ids = np.arange(len(E))
+    pool = pd.DataFrame({"id": ids, "taxon_id": 1, "taxon_name": "G a", "rank": "species"})
+    taxa, T = pd.Series(list(text)), _unit(list(text.values()))
+    out = fir_table(pool, E, ids, taxa, T, BUILT)
+    # b:4, c:3, d:2 and e:2 tie on count; d wins by name.
+    assert out[["looks_like_name", "n_photos"]].values.tolist() == [
+        ["G b", 4],
+        ["G c", 3],
+        ["G d", 2],
+    ]
+    assert out["n_species_photos"].eq(14).all()
+
+
+def test_fir_cli_writes_table_and_manifest_key(tmp_path):
+    import gzip
+
+    text = {"G a": [1, 0, 0], "G b": [0, 1, 0]}
+    pool, E, ids, taxa, T = _fir_inputs(["G a", "G b"], [5, 5], [[0, 1, 0], [0, 1, 0]], text)
+    np.save(tmp_path / "E.npy", E)
+    np.save(tmp_path / "ids.npy", ids.astype(np.int64))
+    pool.to_parquet(tmp_path / "pool.parquet", index=False)
+    with gzip.open(tmp_path / "taxa.tsv.gz", "wt") as f:
+        f.write("G a\t\nG b\t\n")
+    T.astype(np.float16).tofile(tmp_path / "taxa.f16")
+    atlas = tmp_path / "atlas"
+    atlas.mkdir()
+    args = ["fir", "--emb", str(tmp_path / "E.npy"), "--ids", str(tmp_path / "ids.npy")]
+    args += ["--pool", str(tmp_path / "pool.parquet"), "--atlas-dir", str(atlas)]
+    args += ["--taxa-names", str(tmp_path / "taxa.tsv.gz")]
+    args += ["--taxa-vectors", str(tmp_path / "taxa.f16")]
+    with pytest.raises(FileNotFoundError, match="manifest.json"):
+        main(args)
+    write_manifest(atlas, {"version": VERSION, "parts": []})
+    assert main(args) == 0
+    table = pd.read_parquet(atlas / "confusion.parquet")
+    entry = read_manifest(atlas)["confusion"]
+    assert entry["name"] == "confusion.parquet" and entry["count"] == len(table) == 1
+    assert entry["built_at"] == table["built_at"].iloc[0]
