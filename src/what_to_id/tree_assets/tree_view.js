@@ -5,7 +5,7 @@
 'use strict';
 var M=TreeModel,L=EmbeddingsLayout,META=CFG.meta,nf=new Intl.NumberFormat('en'),EMBED=/[?&]embed=1/.test(location.search),
   BUDGET=400,BAR=26,TH=24,reduce=matchMedia('(prefers-reduced-motion: reduce)'),
-  D=null,S=null,V=null,G={},GS=[],COL=new Map(),prev=null,anim=0,SEL='',SY=null,PH={},Q=[],qt=0,qlast=0,lt=0,split=false;
+  D=null,S=null,V=null,G={},GS=[],COL=new Map(),prev=null,anim=0,SEL='',SY=null,PS=-1,PH={},Q=[],qt=0,qlast=0,lt=0,split=false;
 function $(i){return document.getElementById(i);}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 function status(t){$('status').textContent=t||'';}
@@ -122,10 +122,7 @@ function card(){
   var acts=el('div',{'class':'actions'});
   if(id){acts.appendChild(link(TX.identifyUrl({groups:[],all:0,months:[],only:{},acc:'',taxa:[id],not:[]},null,META).url,
     'Help identify on iNaturalist','primary'));acts.lastChild.target='_blank';
-    if(EMBED&&SY)acts.appendChild(btn('Show on map',function(){
-      SEL=SEL.split('&').filter(function(t){return t&&t.indexOf('taxa=')!==0;}).concat('taxa='+id).join('&');SY.send();
-      status('The map now shows '+M.name(D,e)+'.');}));
-    else{acts.appendChild(link(CFG.mapUrl+'#taxa='+id,'Show on map'));
+    if(!(EMBED&&SY)){acts.appendChild(link(CFG.mapUrl+'#taxa='+id,'Show on map'));
       if(split)acts.appendChild(link('split.html?view=space#taxa='+id,'Show in photo space'));}}
   if(e!==M.lead(D,S.focus))acts.appendChild(btn('Focus here',function(){focusOn(e);}));
   if(ks.length)acts.appendChild(btn('Expand all below',function(){act(String(e),'expand');}));
@@ -183,6 +180,9 @@ function focusOn(r){S.focus=r;if(!S.open.has(r))M.toggle(D,S,r);go(true,true);}
 function go(animate,push){
   var base=location.pathname+location.search,h=M.write(D,S),u=base+(h?'#'+h:'');
   if(u!==base+location.hash)history[push?'pushState':'replaceState'](null,'',u);
+  // in the split view a new selection is the map's and the photo space's too
+  if(SY&&S.sel!==PS){PS=S.sel;SEL=SEL.split('&').filter(function(t){return !/^(taxa|groups)=/.test(t);})
+    .concat(M.pick(D,S.sel)).filter(Boolean).join('&');SY.send();}
   draw(animate);
 }
 function crumbs(){
@@ -208,7 +208,9 @@ var picks=[];
 TX.picker({input:$('q'),list:$('sugg'),msg:$('qn'),picks:picks,ranks:META.ranks,nf:nf,
   taxa:function(){return D&&D.T;},counts:function(){return D.tot;},onChange:function(){picks.length=0;},
   onPick:function(r){if(!D.tot[r])return status('No record of this taxon needs an ID.');S.sel=r;M.reveal(D,S,r);go(true,true);}});
-if(EMBED&&parent!==window)SY=MapFilter.sync({key:function(){return SEL;},apply:function(s){SEL=s;}});
+// The map's selection selects its taxon or group here; one this side already shows is left as it is.
+function take(){var r=M.find(D,SEL);if(r!==S.sel){S.sel=r;if(r>=0)M.reveal(D,S,r);}PS=S.sel;}
+if(EMBED&&parent!==window)SY=MapFilter.sync({key:function(){return SEL;},apply:function(s){SEL=s;if(D){take();draw(true);}}});
 async function load(){
   status('Loading the taxa…');
   var has=fetch('split.html',{method:'HEAD'}).then(function(r){return r.ok;},function(){return false;});
@@ -219,7 +221,7 @@ async function load(){
   if(META.groups.indexOf('Animalia')>=0)G[1]=G[1]||'Animalia';  // iNaturalist's iconic Animalia: kingdom 1, less the other groups
   D=M.build(T,META.ranks,G,{order:META.groups,names:META.names,total:META.n});
   GS=Object.keys(G).map(function(i){return D.row.get(+i);}).filter(function(x){return x!=null&&D.tot[x];});
-  S=M.read(D,location.hash,GS);split=await has;status('');draw(false);
+  S=M.read(D,location.hash,GS);if(SY){SEL=SEL||MapFilter.tokens(location.hash);take();}split=await has;status('');draw(false);
 }
 load().catch(function(e){status('The tree could not load: '+e.message);});
 })();

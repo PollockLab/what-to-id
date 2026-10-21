@@ -273,7 +273,7 @@ def test_a_hidden_photo_space_takes_its_views_cut_off_the_map(split):
     assert page.errors == []
 
 
-def test_the_split_opens_on_the_tree_whose_show_on_map_selects_the_taxon(browser, site):
+def test_the_split_opens_on_the_tree_whose_selection_is_the_maps_and_back(browser, site):
     base, *_ = site
     page = browser.new_page(viewport={"width": 1280, "height": 900})
     page.errors = []
@@ -283,8 +283,12 @@ def test_the_split_opens_on_the_tree_whose_show_on_map_selects_the_taxon(browser
     page.goto(f"{base}/split.html")
     tree, left = page.frame_locator("#tree"), page.frame_locator("#map")
     tree.locator("#outline .nm", has_text="Genus A").click()
-    tree.locator("#card :text('Show on map')").click()
     page.wait_for_function("location.hash.includes('taxa=900')")
     left.locator("#selbar li").first.wait_for()
+    on = tree.locator("#outline [aria-selected=true] > .row .nm", has_text="Genus A")
+    page.evaluate("location.hash = ''")
+    on.wait_for(state="detached")
+    page.evaluate("location.hash = '#taxa=900'")  # as when the map picks it
+    on.wait_for()
     assert page.errors == []
     page.close()
