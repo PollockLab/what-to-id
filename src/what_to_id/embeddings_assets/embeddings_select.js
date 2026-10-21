@@ -35,6 +35,18 @@ function areaMask(){
     for(var i=0;i<P.n;i++)AI.M[i]=MapArea.inside(I,P.lonlat[2*i],P.lonlat[2*i+1]);}
   return AI.M;
 }
+// The map's projects: the sorted ids they keep (S.proj, null for none) as a verdict per point, built once per
+// list by walking each shard's sorted rows against it.
+var PM=null;
+function projMask(){
+  var P=S.P,ids=S.proj;
+  if(!ids)return null;
+  if(!PM||PM.ids!==ids||PM.m.length!==P.n){var m=new Uint8Array(P.n);
+    for(var k=0;k+1<P.start.length;k++)for(var i=P.start[k],j=0;i<P.start[k+1]&&j<ids.length;i++){
+      var v=P.id[i];while(j<ids.length&&ids[j]<v)j++;if(ids[j]===v)m[i]=1;}
+    PM={ids:ids,m:m};}
+  return PM.m;
+}
 // The lasso: a closed ring in layout coordinates, or null. Only the points inside it stay, and their ids go
 // to the map, which keeps the same records.
 function lasso(ring){
@@ -87,5 +99,5 @@ function lassoDrag(box){
   ['pointerup','pointercancel'].forEach(function(t){box.addEventListener(t,function(){
     if(!cur)return;var r=cur;cur=null;draw(false);if(r.length>=6)lasso(r);else{S.ring=prev;layers();}});});
 }
-return {cancel:cancel,moved:moved,areaIndex:areaIndex,viewBox:viewBox,areaMask:areaMask,lasso:lasso,lassoDrag:lassoDrag,draw:draw};
+return {cancel:cancel,moved:moved,areaIndex:areaIndex,viewBox:viewBox,areaMask:areaMask,projMask:projMask,lasso:lasso,lassoDrag:lassoDrag,draw:draw};
 }

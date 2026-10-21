@@ -27,6 +27,9 @@ function projMask(id,lists,mask,a,b){
     r=e;}
 }
 function projKeep(m,inc,exc){return !(m&exc)&&(!inc||(m&inc)!==0);}
+// The ids the projects keep, sorted, for the photo space beside the map; null when none is picked.
+function projIds(id,mask,inc,exc){if(!(inc|exc))return null;var out=[];
+  for(var i=0;i<mask.length;i++)if(projKeep(mask[i],inc,exc))out.push(id[i]);return Uint32Array.from(out).sort();}
 // A pasted project: its number, or the number or slug in an iNaturalist project URL, as a string;
 // null for anything else. iNaturalist takes a slug wherever it takes a project number
 // (project_id=bc-rarities and project_id=90486 match the same records), so slugs pass as they are.
@@ -127,6 +130,7 @@ function projectFilter(o){
     inexact:function(){return lists?projNote(sel,list,shown,alt).more:'';},
     uncounted:function(){return lists?projNote(sel,list,shown,alt).fewer:'';},
     active:function(){return (inc|exc)!==0;},
+    ids:function(P){return projIds(P.id,mask,inc,exc);},
     params:function(){return lists?projParams(sel).q:{};},
     // the chips for the selection bar (map_chips.js), once the file has loaded
     items:function(){return lists?sel.map(function(s){return {label:'in '+projLabel(s,list),not:s.st==='not',

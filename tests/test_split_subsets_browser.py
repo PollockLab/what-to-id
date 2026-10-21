@@ -224,6 +224,28 @@ def test_a_shift_drag_lasso_keeps_the_dots_inside_and_sends_their_ids_to_the_map
     assert page.errors == []
 
 
+def test_the_maps_projects_subset_the_photo_space_which_cannot_clear_them(split, site):
+    page, (left, right) = split
+    _, _, pool, _ = site
+    ids = sorted(pool)[:7]
+    left.evaluate(
+        "ids => parent.postMessage({type: 'wtid-projects', ids: Uint32Array.from(ids)},"
+        " location.origin)",
+        ids,
+    )
+    right.wait_for_function("document.getElementById('count').textContent.startsWith('7 ')")
+    assert shown(left) == POOL_N  # the sender is the map's stand-in here
+    chip = right.locator("#selbar li", has_text="Map projects")
+    assert chip.count() == 1 and chip.locator("button.x").count() == 0
+    assert "map only" in chip.inner_text()
+    left.evaluate("parent.postMessage({type: 'wtid-projects', ids: null}, location.origin)")
+    right.wait_for_function(
+        f"document.getElementById('count').textContent.startsWith('{POOL_N:,}')"
+    )
+    assert right.locator("#selbar li").count() == 0
+    assert page.errors == []
+
+
 KEEP = (
     "window.__keep = []; addEventListener('message', e => { if (e.data && e.data.type ==="
     " 'wtid-keep') __keep.push({ids: e.data.ids && Array.from(e.data.ids), view: e.data.view}); })"

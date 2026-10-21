@@ -102,7 +102,7 @@ function addShard(buf,n){
 // included taxa are one set, so the kept bit then carries the groups too).
 var SUB=null,SUBL='',SUBV=0;  // the split view's photo search: a Set of ids, its label, a version for PD_KEY
 var ST_KEEP=MF.ST_KEEP,ST_INEXACT=MF.ST_INEXACT,PD=null,PD_KEY=null,PD_GONE=-1,PD_CAT=0,
-  OUT=new Uint8Array(0),RC=null,PJW=null,FK=null,FKV=0,FKM=null;
+  OUT=new Uint8Array(0),RC=null,PJW=null,FK=null,FKV=0,FKM=null,PJP='';
 // The photo space's lasso: the ids it keeps, or null; the mask is built once per list and shard count.
 function fmask(n){
   if(!FKM||FKM.v!==FKV||FKM.m.length!==n){var m=new Uint8Array(n);projMask(P.id,[FK],m,0,n);FKM={v:FKV,m:m};}
@@ -167,6 +167,8 @@ function recount(){
     for(var k=0;k<nm;k++){var v=0;if(!m||m>>(M0+k)%12&1)for(var j=0;j<rows.length;j++)if(g[j])v+=rows[j][k];
       TC[k+1]=TC[k]+v;}}
   if(SEL>=0&&!KEEP[SEL])closeCard();
+  // the photo space beside the map keeps the records the projects keep; it has no project file of its own
+  if(parent!==window&&PJP!==PJ.key()+':'+n){PJP=PJ.key()+':'+n;parent.postMessage({type:'wtid-projects',ids:PJ.ids(P)},location.origin);}
   render();
   if(FIT){FIT=false;fitTo(function(i){var d=day[i];return KEEP[i]&&(d===NO?full():d>=S.lo&&d<=S.hi);});}
 }

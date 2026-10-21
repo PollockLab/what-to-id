@@ -13,7 +13,7 @@ var S={idx:null,P:null,META:null,TAXA:null,groups:{},picks:[],split:[],extra:[],
 var MF=null,TF=null,TR=null,PASS=['park','bcpark','projects'],MAPONLY={park:'Park',bcpark:'BC park',projects:'Projects'},
   AREA_IN=null,VIEW_IN=null;
 function $(id){return document.getElementById(id);}
-var X=SpaceSelect(S,$,picked,layers),areaIndex=X.areaIndex,viewBox=X.viewBox,areaMask=X.areaMask,lasso=X.lasso,lassoDrag=X.lassoDrag,moved=X.moved;
+var X=SpaceSelect(S,$,picked,layers),areaIndex=X.areaIndex,viewBox=X.viewBox,areaMask=X.areaMask,projMask=X.projMask,lasso=X.lasso,lassoDrag=X.lassoDrag,moved=X.moved;
 var LV=LifeView({S:S,$:$,MAP:MAP,frame:frame,redraw:layers,status:status,color:color,writeHash:writeHash});
 function el(tag,attrs,kids){
   var e=document.createElement(tag);
@@ -139,6 +139,7 @@ function applyKeep(){
     for(var k=0;k<P.n;k++)S.keep[k]&=S.base[k];}
   else S.keep.fill(1);
   if(S.subset)for(var j=0;j<P.n;j++)if(!S.subset.has(P.id[j]))S.keep[j]=0;
+  var pm=projMask();if(pm)for(var q=0;q<P.n;q++)S.keep[q]&=pm[q];
   if(S.PD){var c=S.PD.attributes.getFilterCategory.value;
     for(var i=0;i<P.n;i++)c[3*i+2]=S.keep[i];
     S.PD.attributes.getFilterCategory={value:c,size:3};S.PDV=(S.PDV||0)+1;}
@@ -171,6 +172,7 @@ function items(){
     remove:function(){S.lo=0;S.hi=L;S.up=false;picked();}});
   if(S.area&&!areaIndex())out.forEach(function(t){if(t.label===alabel())t.tag='map only';});
   if(viewBox())out.push({label:'Map view'});
+  if(S.proj)out.push({label:'Map projects',tag:'map only'});
   if(S.ring)out.push({label:'Lasso',remove:function(){lasso(null);}});
   if(S.subset)out.push({label:'Photo search: "'+S.subLabel+'" ('+S.subset.size+')',
     remove:function(){parent.postMessage({type:'wtid-subset',ids:null},location.origin);}});
@@ -310,6 +312,11 @@ addEventListener('message',function(e){
   if(e.origin!==location.origin||e.source!==parent||!d||d.type!=='wtid-subset')return;
   S.subset=d.ids?new Set(d.ids):null;S.subLabel=d.label;
   if(S.P&&S.P.grp){applyKeep();update();$('gfit').hidden=!items().length;if(S.subset&&S.deck)fit();}
+});
+// The map's projects keep the same records here (null clears them); the map is the place to change them.
+addEventListener('message',function(e){
+  var d=e.data;if(e.origin!==location.origin||e.source!==parent||!d||d.type!=='wtid-projects')return;
+  S.proj=d.ids instanceof Uint32Array?d.ids:null;if(S.P&&S.P.grp){applyKeep();update();$('gfit').hidden=!items().length;}
 });
 // The split view mirrors the picked record in the other frame by id; a remote pick is not posted back.
 var remote=false;
