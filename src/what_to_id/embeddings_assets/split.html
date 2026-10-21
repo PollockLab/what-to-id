@@ -23,6 +23,7 @@ body{display:flex;flex-direction:column}
 .seg button:last-child{border-radius:0 14px 14px 0}
 .seg button+button{border-left:0}
 .seg button[aria-pressed="true"]{background:var(--on);color:var(--onink);border-color:var(--on)}
+.seg .n{display:none}
 .xbar .i{border-radius:50%;width:28px;padding:0;font-style:italic;font-weight:700;font-family:Georgia,serif}
 .note{position:absolute;z-index:30;top:100%;right:16px;width:min(380px,calc(100vw - 24px));margin:6px 0 0;padding:10px 12px;
   background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);font-size:12px;color:var(--muted);white-space:normal}
@@ -35,7 +36,7 @@ body{display:flex;flex-direction:column}
 #sep:hover,#sep:focus-visible,#sep.on{background:var(--on)}
 #main-content:not(.side) #sep{display:none}
 @media (max-width:800px){#sep{display:none}.xbar{flex:1 1 100%;margin:0 0 6px;justify-content:space-between}
-.seg [data-v="side"]{display:none}}
+.seg [data-v="side"],.seg .w{display:none}.seg .n{display:inline}}
 </style>
 </head>
 <body>
