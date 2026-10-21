@@ -127,8 +127,8 @@ function card(){
   if(e!==M.lead(D,S.focus))acts.appendChild(btn('Focus here',function(){focusOn(e);}));
   if(ks.length)acts.appendChild(btn('Expand all below',function(){act(String(e),'expand');}));
   var kids=el('ul',{'class':'kids','aria-label':'Biggest taxa below'});
-  ks.slice(0,6).forEach(function(k){var x=M.lead(D,k),i=M.id(D,x),b=el('button',{type:'button'},[el('span',{'class':'th','data-ph':i}),
-    el('span',{'class':'nm'},[label(x)]),el('span',{'class':'tc'},[nf.format(D.tot[x])])]);want(i);
+  ks.slice(0,e===D.root?ks.length:6).forEach(function(k){var x=M.lead(D,k),i=M.id(D,x),b=el('button',{type:'button'},[el('span',{'class':'th','data-ph':i}),
+    el('span',{'class':'nm'},[e===D.root&&M.common(D,x)||label(x)]),el('span',{'class':'tc'},[nf.format(D.tot[x])])]);want(i);
     b.addEventListener('click',function(){S.sel=x;M.reveal(D,S,x);go(true,true);});kids.appendChild(el('li',{},[b]));});
   var x=el('button',{type:'button','class':'x','aria-label':'Close'},['×']);x.addEventListener('click',function(){S.sel=-1;go(false,true);});
   [x,id?el('div',{'class':'ph big','data-ph':id},['']):null,el('div',{'class':'body'},[
@@ -136,7 +136,7 @@ function card(){
     el('dl',{},[el('dt',{},['Need an ID']),el('dd',{},[nf.format(tot)]),
       el('dt',{},['Identified only to this rank']),el('dd',{},[nf.format(own)+(tot?' ('+Math.round(100*own/tot)+'%)':'')]),
       el('dt',{},['Species below']),el('dd',{},[nf.format(D.sp[e])])]),
-    acts,ks.length?el('p',{'class':'muted'},['Biggest below']):null,ks.length?kids:null])].forEach(function(n){if(n)c.appendChild(n);});
+    acts,ks.length?el('p',{'class':'muted'},[e===D.root?'Groups, as on the map':'Biggest below']):null,ks.length?kids:null])].forEach(function(n){if(n)c.appendChild(n);});
   photos();
 }
 // ---- the outline: the same shown tree as an ARIA tree, with a roving tab stop
