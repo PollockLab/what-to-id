@@ -88,6 +88,42 @@ async function autocomplete(q,fetchFn){
     return {id:t.id,name:t.name,common:t.preferred_common_name||'',rank:t.rank||''};
   });
 }
+// Field terms the text tower rarely saw. INQUIRE measured a 13-point AP gap for queries with such lingo, so
+// the query keeps its words and each term's plain gloss is added at the end, once: "frogs in amplexus" ->
+// "frogs in amplexus, mating with the male clasping the female's back".
+var PLAIN=[
+  ['amplexus','mating with the male clasping the female\'s back'],
+  ['brood parasit(?:ism|e|es)','an egg or chick of another species in the nest'],
+  ['eclos(?:ion|ing|ed)','emerging from its pupa or egg'],
+  ['teneral','freshly emerged, soft and pale'],
+  ['instars?','larval stage'],
+  ['gravid','pregnant, swollen with eggs'],
+  ['leucis(?:m|tic)','pale with white patches, lacking pigment'],
+  ['melanis(?:m|tic)','unusually dark, black'],
+  ['oviposit(?:ing|ion|s)?','laying eggs'],
+  ['nuptial pads?','dark rough thumb pads of a breeding male frog'],
+  ['ocelli','eye spots'],
+  ['exuviae?','shed skin'],
+  ['galls?','a swelling growth caused by an insect or mite'],
+  ['frass','insect droppings'],
+  ['lek(?:king|s)?','males displaying together to attract females'],
+  ['mo[u]lt(?:ing|s)?','shedding old feathers or skin, patchy and scruffy'],
+  ['roost(?:ing|s)?','resting, perched for the night'],
+  ['basking','lying still in the sun'],
+  ['carrion','a dead animal'],
+  ['(?:sexually )?dimorphi(?:c|sm)','the male and female look different'],
+  ['ectoparasites?','a tick, mite or louse attached to the skin'],
+  ['cryp(?:sis|tic colou?ration)','blending into the background'],
+  ['aposematic','bright warning colours'],
+  ['fasciat(?:ion|ed)','a flattened, ribbon-like crested stem'],
+  ['chloro(?:sis|tic)','yellowing leaves'],
+  ['necro(?:sis|tic)','dead brown patches of tissue'],
+  ['mycelium|hyphae','white thread-like fungal growth'],
+].map(function(e){return [new RegExp('\\b(?:'+e[0]+')\\b','i'),e[1]];});
+function plain(text){
+  text=String(text||'');
+  return PLAIN.reduce(function(t,e){return e[0].test(text)?t+', '+e[1]:t;},text);
+}
 // CLIP text towers score a sentence much like its bag of words, so "a bird eating a frog" ranks lone
 // frogs and lone birds high. Connectives that put a second organism or object in frame split the query
 // into subjects the page searches separately and fuses with min: every subject must be in the photo.
@@ -118,5 +154,5 @@ function fuse(lists,k){
   return out.slice(0,k).map(function(h){return {id:h.id,score:h.score,tag:h.tag};});
 }
 return {BATCH:BATCH,parseInput:parseInput,parseHash:parseHash,toHash:toHash,smallPhoto:smallPhoto,
-  fetchObservations:fetchObservations,build:build,autocomplete:autocomplete,subjects:subjects,fuse:fuse};
+  fetchObservations:fetchObservations,build:build,autocomplete:autocomplete,subjects:subjects,fuse:fuse,plain:plain};
 });

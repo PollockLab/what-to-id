@@ -584,3 +584,17 @@ def test_shortlist_zero_and_stage1_callback_match_python(fixture):
     default = [s for s in ref["searches"] if s["nprobe"] == 4][0]["ids"]
     for ids, expected in zip(got["final"], default, strict=True):
         assert ids == [i for i in expected if i != -1]
+
+
+def test_plain_glosses_field_terms_once_and_leaves_other_text_alone():
+    got = node("""(() => { const P = META.plain; out([P('frogs in Amplexus'), P('oak galls'),
+      P('a bird'), P('gall'), P('a moulting duck'), P('mycelium under bark'), P('')]); })()""")
+    assert got == [
+        "frogs in Amplexus, mating with the male clasping the female's back",
+        "oak galls, a swelling growth caused by an insect or mite",
+        "a bird",
+        "gall, a swelling growth caused by an insect or mite",
+        "a moulting duck, shedding old feathers or skin, patchy and scruffy",
+        "mycelium under bark, white thread-like fungal growth",
+        "",
+    ]
