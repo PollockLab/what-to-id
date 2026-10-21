@@ -13,6 +13,7 @@ from urllib.parse import parse_qs, urlparse
 import numpy as np
 import pytest
 
+from what_to_id import tree_page
 from what_to_id.embeddings_page import build
 from what_to_id.page_map import encode_points, render_map
 from what_to_id.split_page import build as build_split
@@ -81,6 +82,7 @@ def site(tmp_path_factory):
     build(root, data_url="atlas/")
     # the map needs MapLibre from a CDN, so the split page here holds two photo spaces
     build_split(root, map_url="embeddings.html")
+    tree_page.build(root)
     handler = functools.partial(RangeHandler, directory=str(root))
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -412,7 +414,7 @@ def test_split_page_relays_the_selection_between_frames_without_reloads(browser,
     page.errors = []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     stub_inat(page, None)
-    page.goto(f"{base}/split.html#months=8")
+    page.goto(f"{base}/split.html?view=side#months=8")
     counts = (
         "[...document.querySelectorAll('iframe')].map(f => f.contentDocument &&"
         " f.contentDocument.getElementById('count') &&"
@@ -441,7 +443,7 @@ def test_split_page_mirrors_a_picked_record_in_the_other_frame(browser, site):
     page.errors = []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     stub_inat(page, None)
-    page.goto(f"{base}/split.html")
+    page.goto(f"{base}/split.html?view=side")
     page.wait_for_function(
         "[...document.querySelectorAll('iframe')].every(f =>"
         " f.contentDocument.getElementById('count').textContent.includes('shown'))"
@@ -477,7 +479,7 @@ def test_split_photo_search_narrows_both_frames_and_the_chip_clears_it(browser, 
     page.errors = []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     stub_inat(page, None)
-    page.goto(f"{base}/split.html")
+    page.goto(f"{base}/split.html?view=side")
     counts = (
         "[...document.querySelectorAll('iframe')].map(f => f.contentDocument &&"
         " f.contentDocument.getElementById('count') &&"
@@ -506,7 +508,7 @@ def test_split_photo_search_narrows_both_frames_and_the_chip_clears_it(browser, 
 def test_split_divider_resizes_by_keys_and_double_click_and_remembers(browser, site):
     base, *_ = site
     page = browser.new_page(viewport={"width": 1280, "height": 900})
-    page.goto(f"{base}/split.html")
+    page.goto(f"{base}/split.html?view=side")
     width = "document.getElementById('map').getBoundingClientRect().width"
     page.wait_for_selector("#map")
     half = page.evaluate(width)
@@ -677,13 +679,10 @@ def _split(browser, site, w, h, query="", hash_=""):
 FRAMES = "[...document.querySelectorAll('iframe')].filter(f => !f.hidden).map(f => f.id)"
 
 
-def test_split_shows_both_views_wide_and_the_map_alone_when_narrower(browser, site):
+def test_split_opens_the_map_and_the_tree_and_switches_views(browser, site):
     page = _split(browser, site, 1280, 800)
-    assert page.evaluate(FRAMES) == ["map", "space"]
-    assert page.locator("[data-v=side]").get_attribute("aria-pressed") == "true"
-    page.close()
-    page = _split(browser, site, 1100, 800)
-    assert page.evaluate(FRAMES) == ["map"]
+    assert page.evaluate(FRAMES) == ["map", "tree"]
+    assert page.locator("[data-v=tree]").get_attribute("aria-pressed") == "true"
     page.click("[data-v=space]")
     page.wait_for_function(f"{FRAMES}.join() === 'space'")
     assert "view=space" in page.evaluate("location.search")
@@ -693,7 +692,7 @@ def test_split_shows_both_views_wide_and_the_map_alone_when_narrower(browser, si
 
 
 def test_split_has_one_header_and_the_note_behind_an_i_button(browser, site):
-    page = _split(browser, site, 1280, 800)
+    page = _split(browser, site, 1280, 800, "?view=side")
     page.wait_for_function(f"{FRAMES}.length === 2")
     assert page.locator(".site-shell:visible").count() == 1
     for f in ("#map", "#space"):
@@ -710,7 +709,7 @@ def test_split_has_one_header_and_the_note_behind_an_i_button(browser, site):
 
 def test_a_phone_holds_one_frame_at_a_time(browser, site):
     page = _split(browser, site, 390, 800, hash_="#months=8")
-    assert page.evaluate("document.querySelectorAll('iframe').length") == 1
+    assert page.evaluate("[...document.querySelectorAll('iframe')].map(f => f.id)") == ["tree"]
     assert page.locator("[data-v=side]").is_hidden()
     page.click("[data-v=space]")
     page.wait_for_function(

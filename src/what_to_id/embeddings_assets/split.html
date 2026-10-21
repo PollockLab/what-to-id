@@ -40,7 +40,7 @@ body{display:flex;flex-direction:column}
 </head>
 <body>
 __SITE_NAV__
-<div id="main-content" tabindex="-1"><div id="sep" role="separator" aria-orientation="vertical" aria-label="Resize the map and photo space" aria-valuemin="20" aria-valuemax="80" tabindex="0"></div></div>
+<div id="main-content" tabindex="-1"><div id="sep" role="separator" aria-orientation="vertical" aria-label="Resize the two panes" aria-valuemin="20" aria-valuemax="80" tabindex="0"></div></div>
 <script>
 __MAP_FILTER__
 __CLIP_TOKENIZER__
@@ -50,7 +50,8 @@ __ATLAS_SEARCH_ENCODER__
 (function(){
 var box=document.getElementById("main-content"),frames={},last=MapFilter.tokens(location.hash),
   h0=location.hash.slice(1).split('&').filter(Boolean),want=new URLSearchParams(location.search).get('view'),
-  FILES={map:__MAP_FILE__,space:__SPACE_FILE__},view,
+  FILES={map:__MAP_FILE__,space:__SPACE_FILE__,tree:__TREE_FILE__},view,
+  PANES={side:['map','space'],map:['map'],space:['space'],tree:['map','tree']},
   rest=h0.filter(function(t){return MapFilter.tokens(t)==='';});
 // Tokens the sync leaves alone (the area, parks, camera, an open photo) go to the frame they belong to, once.
 function hashFor(n){
@@ -64,7 +65,7 @@ function visible(n){return frames[n]&&!frames[n].hidden;}
 function post(n,m){if(frames[n]&&frames[n].contentWindow)frames[n].contentWindow.postMessage(m,location.origin);}
 function sendSel(n,sel){post(n,{type:'wtid-selection',sel:sel});}
 function mk(n){
-  var f=document.createElement('iframe');f.id=n;f.title=n==='map'?'Map':'Photo space';
+  var f=document.createElement('iframe');f.id=n;f.title={map:'Map',space:'Photo space',tree:'Tree of life'}[n];
   f.src=new URL(FILES[n],location.href).href.replace(/#.*/,'')+'?embed=1'+(n==='space'&&view==='side'?'&peer=1':'')+'#'+hashFor(n);
   // what the other frame sent while this one was still loading
   f.addEventListener('load',function(){Object.keys(late).forEach(function(k){if(k!=='wtid-view'||visible('map'))post(n,late[k]);});});
@@ -72,17 +73,18 @@ function mk(n){
 function setView(v){
   if(innerWidth<800&&v==='side')v='map';
   view=v;
-  ['map','space'].forEach(function(n){
-    var show=v==='side'||v===n,f=frames[n];
+  var panes=innerWidth<800&&v==='tree'?['tree']:PANES[v];
+  Object.keys(FILES).forEach(function(n){
+    var show=panes.indexOf(n)>=0,f=frames[n];
     if(show&&!f)mk(n);
     else if(f&&!show&&innerWidth<800){f.remove();delete frames[n];
     // what a removed frame sent describes something that is gone
-    if(n==='map')delete late['wtid-view'];else{delete late['wtid-keep'];post('map',{type:'wtid-keep',ids:null});}}  // a phone holds one view at a time
+    if(n==='map')delete late['wtid-view'];else if(n==='space'){delete late['wtid-keep'];post('map',{type:'wtid-keep',ids:null});}}  // a phone holds one view at a time
     else if(f){var was=f.hidden;f.hidden=!show;if(show&&was){sendSel(n,last);post(n,{type:'wtid-record',id:rec});
       Object.keys(late).forEach(function(k){post(n,late[k]);});}}});
   // a hidden map masks nothing; a re-shown one fires no moveend, so its last view goes again
   if(!visible('map'))post('space',{type:'wtid-view',area:''});else if(late['wtid-view'])post('space',late['wtid-view']);
-  box.classList.toggle('side',v==='side');
+  box.classList.toggle('side',panes.length>1);
   post('space',{type:'wtid-layout',peer:v==='side'});
   [].forEach.call(document.querySelectorAll('[data-v]'),function(b){b.setAttribute('aria-pressed',b.dataset.v===v);});
   count();}
@@ -114,12 +116,12 @@ sep.addEventListener('dblclick',function(){share(50);});
 sep.addEventListener('keydown',function(e){
   var d={ArrowLeft:-2,ArrowRight:2}[e.key];if(d){share(pct+d);e.preventDefault();}
   else if(e.key==='Home'||e.key==='Enter'){share(50);e.preventDefault();}});
-// A frame reports its selection; the other one applies it in place. The frames never reload.
+// A frame reports its selection; the others apply it in place. The frames never reload.
 addEventListener('message',function(e){
   var n=Object.keys(frames).filter(function(k){return frames[k].contentWindow===e.source;})[0];
   if(!n||e.origin!==location.origin||!e.data||e.data.type!=='wtid-selection'||typeof e.data.sel!=='string'||
     e.data.sel===last)return;
-  last=e.data.sel;var o=n==='map'?'space':'map';if(visible(o))sendSel(o,last);
+  last=e.data.sel;Object.keys(frames).forEach(function(o){if(o!==n&&visible(o))sendSel(o,last);});
   history.replaceState(null,'',location.search+(last?'#'+last:''));
 });
 // A picked record and its closest matches are mirrored by id in the other frame, as are the map's area and
@@ -180,8 +182,8 @@ addEventListener('message',function(e){
 });
 // Back and forward: the new selection goes to both.
 addEventListener('hashchange',function(){var s=MapFilter.tokens(location.hash);
-  if(s!==last){last=s;['map','space'].forEach(function(n){if(visible(n))sendSel(n,s);});}});
-setView(['side','map','space'].indexOf(want)<0?(innerWidth>=1280?'side':'map'):want);
+  if(s!==last){last=s;Object.keys(frames).forEach(function(n){if(visible(n))sendSel(n,s);});}});
+setView(PANES[want]?want:'tree');
 })();
 </script>
 </body>

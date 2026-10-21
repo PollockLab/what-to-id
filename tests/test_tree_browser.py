@@ -1,5 +1,5 @@
 """The tree of life page in Chromium, with iNaturalist stubbed: it draws, selects, opens by key and
-fetches tip photos. The split view's tree pane is covered in test_embeddings_browser.py."""
+fetches tip photos. Its split-view pane is covered in test_split_subsets_browser.py."""
 
 import functools
 import gzip

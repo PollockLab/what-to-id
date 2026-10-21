@@ -124,7 +124,7 @@ function card(){
     'Help identify on iNaturalist','primary'));acts.lastChild.target='_blank';
     if(EMBED&&SY)acts.appendChild(btn('Show on map',function(){
       SEL=SEL.split('&').filter(function(t){return t&&t.indexOf('taxa=')!==0;}).concat('taxa='+id).join('&');SY.send();
-      status('The map and the photo space now show '+M.name(D,e)+'.');}));
+      status('The map now shows '+M.name(D,e)+'.');}));
     else{acts.appendChild(link(CFG.mapUrl+'#taxa='+id,'Show on map'));
       if(split)acts.appendChild(link('split.html?view=space#taxa='+id,'Show in photo space'));}}
   if(e!==M.lead(D,S.focus))acts.appendChild(btn('Focus here',function(){focusOn(e);}));
