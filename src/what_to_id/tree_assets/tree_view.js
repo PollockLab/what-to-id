@@ -5,7 +5,7 @@
 'use strict';
 var M=TreeModel,L=EmbeddingsLayout,META=CFG.meta,nf=new Intl.NumberFormat('en'),
   nc=new Intl.NumberFormat('en',{notation:'compact',maximumFractionDigits:1}),EMBED=/[?&]embed=1/.test(location.search),
-  BUDGET=400,BAR=26,TH=24,MINF=9,MINL=100,MINR=420,reduce=matchMedia('(prefers-reduced-motion: reduce)'),
+  BUDGET=400,BAR=26,TH=24,MINF=9,MINR=420,reduce=matchMedia('(prefers-reduced-motion: reduce)'),
   D=null,S=null,V=null,G={},GS=[],COL=new Map(),prev=null,anim=0,SEL='',SY=null,PS=-1,PH={},Q=[],qt=0,qlast=0,lt=0,split=false,OL=null;
 function $(i){return document.getElementById(i);}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
@@ -66,15 +66,15 @@ function draw(animate){
   // the label ring shrinks to the longest tip label that fits, so a dense view gives the tree the room
   var need=0;V.all.forEach(function(n){var t=rim(n,g);if(t)need=Math.max(need,t.w+4);});
   if(need<g.lab-4){g=geo(span,need);lay();}
-  // a full circle never cuts a name, as iTOL and Nextstrain do not: a tip label shows whole in MINF px type or not at all
-  // (its name is on hover), so the label ring goes where the most labels show whole, the widest such ring, never below
+  // a tip label shows whole in MINF px type or not at all (its name is on hover), as in iTOL and Nextstrain, so on a full
+  // circle the label ring goes where the most labels show whole, the widest such ring, never below
   // the default one. The tips are laid out once at the widest ring, so a narrower one only shortens the slots, a label
   // showing from l[0] up, and lengthens the room, its name fitting up to l[1].
   if(span===2*Math.PI){var lo=g.RL,top=Math.min(g.x1-g.cx,g.y1-g.cy)-6,L=[],best=-1,rl=lo;g=geo(span,170,top);lay();
     V.all.forEach(function(n){var t=rim(n,g);if(t&&t.nw)L.push([(MINF+3)/(n.a1-n.a0),edge(g,n.a)-t.nw-7]);});
     [lo,top].concat([].concat.apply([],L.map(function(l){return [l[0],l[0]-0.5,l[1]];}))).forEach(function(c){
       var k=c<lo||c>top?-1:L.filter(function(l){return c>=l[0]&&c<=l[1];}).length;if(k>best||k===best&&c>rl){best=k;rl=c;}});
-    g=geo(span,170,rl);g.whole=1;}
+    g=geo(span,170,rl);}
   var t0=V.root.t,tm=Math.max.apply(null,V.all.map(function(n){return n.lo;})),k=tm>t0?g.R1/(tm-t0):0;
   V.all.forEach(function(n){n.r=(n.t-t0)*k;n.rl=(n.lo-t0)*k;});
   V.g=g;V.t0=t0;V.k=k;V.tm=tm;
@@ -92,11 +92,9 @@ function tween(from,e){return function(n){var s=null;for(var x=n;x&&!s;x=x.paren
 function render(V,pos){
   var g=V.g;if(!g.W)return;
   var h=[],full=!pos,at=pos||function(n){return n;},on=S.sel>=0?String(M.lead(D,S.sel)):'',max=Math.log(V.root.tot+1)||1;
-  if(full){var last=0;M.RINGS.forEach(function(x,i){if(x[1]<=V.t0||x[1]>V.tm+1e-9)return;var r=(x[1]-V.t0)*V.k;
+  if(full){var last=0;V.rk=[];M.RINGS.forEach(function(x,i){if(x[1]<=V.t0||x[1]>V.tm+1e-9)return;var r=(x[1]-V.t0)*V.k;
     if(i%2)h.push('<'+ring(g,(r+last)/2)+' class="band" stroke-width="'+(r-last).toFixed(1)+'"/>');
-    var t=P(g,g.a0,r+3).split(',');
-    h.push('<'+ring(g,r)+' class="ring"/><text class="rk" x="'+(+t[0]+3)+'" y="'+
-      t[1]+'">'+x[0]+'</text>');last=r;});
+    var t=P(g,g.a0,r+3).split(',');h.push('<'+ring(g,r)+' class="ring"/>');V.rk.push([+t[0]+3,+t[1],x[0]]);last=r;});
     V.all.forEach(function(n){if(n.kids.length)return;var w=n.a1-n.a0,pad=Math.min(0.15*w,0.004),c=col(rowOf(n));
       if(n.row<0||D.kids[n.row].length)h.push('<path class="wd'+(n.row<0?' more':'')+'" data-k="'+n.key+'" fill="'+c+'" stroke="'+c+
         '" d="'+sector(g,n.a0+pad,n.a1-pad,n.r,Math.max(n.rl,n.r+4))+'"/>');
@@ -123,17 +121,15 @@ function render(V,pos){
   [].forEach.call(s.querySelectorAll('[data-k]'),function(e){if(hp[e.getAttribute('data-k')])e.classList.add('hp');});
 }
 // Tip labels (the latin name) run outward only where a tip's slot is a full line high, so none overlap; the
-// outline and the hover name the rest. The inner labels name the life groups (the map's chips) always, nudged
-// off one another, then the biggest clades, each only where it overlaps none placed before it and stays inside
-// the tip labels' ring.
+// outline and the hover name the rest.
 // A tip's rim label keeps its full name as iTOL and OneZoom do: the type shrinks from 11px to MINF px to fit the slot and
-// the room to the label ring and canvas edge, and only a name too long even then is cut. th when the photo fits beside the
-// name at MINF px, fs the type size, w the pixels photo and text take, nw the full name's width at MINF px; null when the
-// slot is less than a MINF px line high, or on a whole circle (g.whole) when the name does not fit whole.
+// the room to the label ring and canvas edge. th when the photo fits beside the name at MINF px, fs the type size, w the
+// pixels photo and text take, nw the full name's width at MINF px; null when the slot is less than a MINF px line high;
+// no text when the name does not fit whole even at MINF px.
 function rim(n,g){var room=(n.a1-n.a0)*g.RL,b=Math.min(g.lab,edge(g,n.a)-g.RL-6);if(n.kids.length||room<MINF+3)return null;
   var nm=n.row>=0&&grpOf(n.row)?'':n.row<0?'+'+nf.format(n.more)+' more':M.name(D,n.row),
-    nw=nm?CX.measureText(fit(nm,Infinity)).width*MINF/11:0;if(g.whole&&nw>b-1)return null;
-  var th=room>=TH+2&&n.row>=0&&b>=TH+4+(g.whole?nw:Math.min(nw,MINL)),o=th?TH+4:0,
+    nw=nm?CX.measureText(fit(nm,Infinity)).width*MINF/11:0;if(nw>b-1)return {txt:'',w:0,nw:nw};
+  var th=room>=TH+2&&n.row>=0&&b>=TH+4+nw,o=th?TH+4:0,
     fs=Math.max(MINF,Math.min(11,room-3,nw?MINF*(b-o-1)/nw:11)),txt=nm&&fit(nm,(b-o)*11/fs);
   return {th:th,txt:txt,fs:fs,nw:nw,w:o+(txt?CX.measureText(txt).width*fs/11:0)};}
 function labels(V,h,on){
@@ -146,18 +142,28 @@ function labels(V,h,on){
     if(txt)h.push('<text class="lb'+(n.key===on?' on':'')+'" data-k="'+n.key+'"'+(t.fs<11?' font-size="'+t.fs.toFixed(1)+'"':'')+' dy=".32em" transform="translate('+g.cx+','+g.cy+') rotate('+
       (left?deg+180:deg).toFixed(2)+')" x="'+(left?-x0:x0)+'"'+(left?' text-anchor="end"':'')+'><title>'+esc(tip(n))+'</title>'+
       esc(txt)+'</text>');});
-  var hit=function(b){return box.some(function(o){return b[0]<o[2]&&o[0]<b[2]&&b[1]<o[3]&&o[1]<b[3];});};
-  V.all.filter(function(n){return n.row>=0&&(n.kids.length||grpOf(n.row));}).map(function(n){return [n,n.parent?grpOf(n.row):''];})
-    .sort(function(a,b){return !a[1]-!b[1]||b[0].tot-a[0].tot;}).slice(0,60).forEach(function(q){
+  // the inner labels show whole or not at all, by their screen boxes (a line of 11px type is 14px high): the selection and
+  // its ancestors first, always, then the life groups, then the biggest clades; a hidden one keeps its name on hover. The
+  // ring names (species, genus, ...) give way to them. 3px more width keeps a gap and fits the bolder selected label.
+  var hit=function(b){return box.some(function(o){return b[0]<o[2]&&o[0]<b[2]&&b[1]<o[3]&&o[1]<b[3];});},
+    out=function(b){return [0,2].some(function(i){return [1,3].some(function(j){return Math.hypot(b[i]-g.cx,b[j]-g.cy)>g.RL-2;});});},
+    up={};V.all.forEach(function(n){if(n.key===on)for(var x=n;x;x=x.parent)up[x.key]=1;});
+  V.all.filter(function(n){return n.row>=0&&(n.kids.length||grpOf(n.row));}).map(function(n){return [n,n.parent?grpOf(n.row):'',up[n.key]||0];})
+    .sort(function(a,b){return b[2]-a[2]||!a[1]-!b[1]||b[0].tot-a[0].tot;}).slice(0,60).forEach(function(q){
     var n=q[0],xy=P(g,n.a,n.r).split(','),x=+xy[0],y=+xy[1],
-      txt=fit(q[1]||(n.parent?label(n.row):M.name(D,n.row)+' · '+recs(n.tot)),200,1),
-      w=CX.measureText(txt).width,right=Math.sin(n.a)>=-0.01,b=[right?x+7:x-7-w,y-15,right?x+7+w:x-7,y-3];
-    if(!n.parent)b=[x-w/2,y+8,x+w/2,y+20];
-    if(q[1])[0,13,-13,26,-26,39,-39,52,-52].some(function(d){var c=[b[0],b[1]+d,b[2],b[3]+d];return !hit(c)&&(b=c);});
-    else if(!txt||hit(b)||[0,2].some(function(i){return [1,3].some(function(j){return Math.hypot(b[i]-g.cx,b[j]-g.cy)>g.RL-2;});}))return;
+      txt=fit(q[1]||(n.parent?label(n.row):M.name(D,n.row)+' · '+recs(n.tot)),Infinity,1),
+      w=CX.measureText(txt).width+3,right=Math.sin(n.a)>=-0.01,
+      at=function(r,d){return n.parent?[r?x+7:x-7-w,y-16+d,r?x+7+w:x-7,y-2+d]:[x-w/2,y+8+d,x+w/2,y+22+d];},
+      // the groups move up or down a line or two, the selection's line also to the node's other side
+      cs=[0,14,-14,28,-28].slice(0,q[1]||q[2]?5:1).reduce(function(a,d){return a.concat([at(right,d)],q[2]?[at(!right,d)]:[]);},[]),
+      b=cs.filter(function(c){return !hit(c)&&(!n.parent||!out(c));})[0]||q[2]&&(cs.filter(function(c){return !hit(c);})[0]||cs[0]);
+    if(!txt||!b)return;
     box.push(b);
-    h.push('<text class="lb in'+(n.key===on?' on':'')+'" data-k="'+n.key+'" x="'+b[0].toFixed(1)+'" y="'+(b[3]-2).toFixed(1)+'"><title>'+
+    h.push('<text class="lb in'+(n.key===on?' on':'')+'" data-k="'+n.key+'" x="'+b[0].toFixed(1)+'" y="'+(b[3]-3).toFixed(1)+'"><title>'+
       esc(tip(n))+'</title>'+esc(txt)+'</text>');});
+  CX.font='10px '+getComputedStyle(document.body).fontFamily;
+  V.rk.forEach(function(r){var b=[r[0],r[1]-10,r[0]+CX.measureText(r[2]).width,r[1]+3];
+    if(!hit(b)&&box.push(b))h.push('<text class="rk" x="'+r[0]+'" y="'+r[1]+'">'+r[2]+'</text>');});
 }
 // ---- photos: iNaturalist's default photo per taxon, at most 30 taxa a request and a request a second; an
 // image shows only once it has loaded, and a taxon that failed is not asked again.
