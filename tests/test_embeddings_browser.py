@@ -4,6 +4,7 @@ The iNaturalist API is stubbed and deck.gl is replaced by a recorder (the CDN bu
 """
 
 import functools
+import gzip
 import http.server
 import json
 import os
@@ -33,6 +34,8 @@ window.deck = {
   OrthographicView: class { constructor(p) { this.props = p; } },
   ScatterplotLayer: class { constructor(p) { this.props = p; this.id = p.id; } },
   PathLayer: class { constructor(p) { this.props = p; this.id = p.id; } },
+  BitmapLayer: class { constructor(p) { this.props = p; this.id = p.id; } },
+  TextLayer: class { constructor(p) { this.props = p; this.id = p.id; } },
   DataFilterExtension: class { initializeState() {} },
 };"""
 
@@ -79,6 +82,8 @@ def site(tmp_path_factory):
     for name, blob in blobs.items():
         (root / name).write_bytes(blob)
     (root / "map.html").write_text(render_map(meta, freeze=None))
+    # the map of life's look-alike file, every record unknown (its contract: two planes of n bytes)
+    (root / "pool-lookalike.bin").write_bytes(gzip.compress(b"\xff" * POOL_N + b"\x0f" * POOL_N))
     build(root, data_url="atlas/")
     # the map needs MapLibre from a CDN, so the split page here holds two photo spaces
     tree_page.build(root)
@@ -372,7 +377,10 @@ def test_filters_in_the_hash_wait_for_the_join(browser, site):
     base, *_ = site
     page = browser.new_page(viewport={"width": 1280, "height": 900})
     held = []
-    page.route("**/pool-*.bin*", lambda r: held.append(r))
+    page.route(
+        "**/pool-*.bin*",
+        lambda r: r.continue_() if "lookalike" in r.request.url else held.append(r),
+    )
     page.errors = []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     stub_inat(page, None)
@@ -632,9 +640,10 @@ def test_points_draw_and_click_before_the_shards_arrive(browser, site):
     try:
         page.calls = stub_inat(page, None)
 
-        page.route(
-            "**/pool-*.bin*", lambda r: held.append(r)
-        )  # park the shard requests until released
+        page.route(  # park the shard requests until released; the map's look-alike file comes after
+            "**/pool-*.bin*",
+            lambda r: r.continue_() if "lookalike" in r.request.url else held.append(r),
+        )
         page.goto(f"{base}/embeddings.html?standalone=1")
         ready_early = "window.__deck && __deck.props.layers.length > 0"
         page.wait_for_function(ready_early)
