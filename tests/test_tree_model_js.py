@@ -277,3 +277,18 @@ out({root: [D.tot[ROOT], W.tot[ROOT], U.tot[ROOT]], kids: [D.kids[ROOT], W.kids[
     assert got["root"] == [6 + 2 + BOMBUS_TOT, 6, 6 + 2 + BOMBUS_TOT]
     assert got["kids"] == [[7, 1], [1]] and got["gone"] == 0 and got["same"]
     assert got["find"] == 4
+
+
+def test_without_drops_left_out_taxa_with_everything_below_and_combines_with_groups():
+    got = node(
+        """
+const B = M.build(T, R, {"47126": "Plantae", "1": "Animalia"}, {total: 500}), r = 'ROOT';
+const A = M.without(B, [], [70]), P = M.without(B, [], [51]), C = M.without(B, ['Animalia'], [51]);
+out({root: [B.tot[r], A.tot[r], P.tot[r], C.tot[r]], bombus: [A.tot[8], A.tot[9], A.tot[7]],
+  sphagnum: [P.tot[1], P.tot[3], P.tot[4]], none: [B.none, A.none, C.none],
+  same: M.without(B, [], []) === B, find: M.find(A, 'taxa=-70')});""".replace("'ROOT'", str(ROOT))
+    )
+    plant, animal = 6, 2 + BOMBUS_TOT
+    assert got["root"] == [plant + animal + 27, plant + 2 + 27, plant - 5 + animal + 27, 1 + 27]
+    assert got["bombus"] == [0, 0, 2] and got["sphagnum"] == [1, 1, 0]
+    assert got["none"] == [27, 27, 27] and got["same"] and got["find"] == -1

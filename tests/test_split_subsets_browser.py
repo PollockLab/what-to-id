@@ -363,3 +363,46 @@ def test_a_group_the_map_leaves_out_leaves_the_tree_and_its_counts(browser, site
         assert root.inner_text().startswith(want), (sel, root.inner_text())
     assert page.errors == []
     page.close()
+
+
+def _tree_page(browser, site):
+    base, *_ = site
+    page = browser.new_page(viewport={"width": 1280, "height": 900})
+    page.errors = []
+    page.on("pageerror", lambda e: page.errors.append(str(e)))
+    stub_inat(page, None)
+    stub_taxa(page)
+    page.goto(f"{base}/split.html")
+    return page, page.frame_locator("#tree")
+
+
+def test_a_taxon_the_map_leaves_out_leaves_the_tree_with_everything_below_it(browser, site):
+    page, tree = _tree_page(browser, site)
+    root = tree.locator("#outline .tc").first
+    root.wait_for()
+    before = root.inner_text().split()[0]
+    page.evaluate(
+        "s => document.querySelector('#tree').contentWindow.postMessage("
+        "{type: 'wtid-selection', sel: s}, location.origin)",
+        "taxa=-900",
+    )
+    page.wait_for_function(
+        "b => document.querySelector('#tree').contentDocument.querySelector('#outline .tc')"
+        ".textContent.split(' ')[0] !== b",
+        arg=before,
+    )
+    assert tree.locator("#outline .nm", has_text="Genus A").count() == 0
+    assert page.errors == []
+    page.close()
+
+
+def test_a_card_leaves_its_taxon_out_of_the_tree_and_the_map(browser, site):
+    page, tree = _tree_page(browser, site)
+    tree.locator("#outline .nm", has_text="Genus A").click()
+    page.wait_for_function("location.hash.includes('taxa=900')")
+    tree.locator("#card button", has_text="Leave out").click()
+    page.wait_for_function("/taxa=-900/.test(location.hash) && !/taxa=900/.test(location.hash)")
+    tree.locator("#outline .nm", has_text="Genus A").wait_for(state="detached")
+    assert tree.locator("#outline .nm", has_text="Genus B").count() == 1
+    assert page.errors == []
+    page.close()

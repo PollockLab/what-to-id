@@ -201,6 +201,7 @@ function card(){
     'Help identify on iNaturalist','primary'));acts.lastChild.target='_blank';
     if(!(EMBED&&SY)){acts.appendChild(link(CFG.mapUrl+'#'+pk,'Show on map'));
       if(split)acts.appendChild(link('split.html?view=space#'+pk,'Show in photo space'));}}
+  if(EMBED&&SY&&id&&!gp)acts.appendChild(btn('Leave out',function(){leaveOut(id);}));
   if(id&&!EMBED&&CT.has(id))acts.appendChild(link('confusion.html#t'+id,'Often confused with \u2026'));
   if(e!==f&&ks.length)acts.append(btn('Focus here',function(){focusOn(e);}),
     btn(S.open.has(e)?'Close':'Open',function(){act(String(e),'toggle',true);}));
@@ -294,7 +295,15 @@ function go(animate,push){
 // in the split view a new selection is the map's and the photo space's too
 function share(){
   if(SY&&S.sel!==PS){PS=S.sel;SEL=SEL.split('&').filter(function(t){return !/^(taxa|groups)=/.test(t);})
-    .concat(M.pick(D,S.sel)).filter(Boolean).join('&');SY.send();}}
+    .concat(pickOut(M.pick(D,S.sel))).filter(Boolean).join('&');SY.send();}}
+// A pick as the shared selection: the taxa the map leaves out stay with it, in a taxa token of their own beside a group's.
+function pickOut(pk){var tx=/^taxa=/.test(pk)?pk.slice(5).split(','):[];
+  taxaOut().forEach(function(i){if(tx.indexOf('-'+i)<0)tx.push('-'+i);});
+  return [/^taxa=/.test(pk)?'':pk,tx.length?'taxa='+tx.join(','):''];}
+// Leaves taxon id out of the map and the tree. The selection is that taxon, so the taxa token keeps only the exclusions.
+function leaveOut(id){SEL=SEL.split('&').filter(function(t){return !/^taxa=/.test(t);})
+  .concat('taxa='+taxaOut().filter(function(i){return i!==id;}).concat(id).map(function(i){return -i;}).join(',')).join('&');
+  SY.send();take();draw(true);}
 function crumbs(){
   var c=$('crumbs'),f=M.lead(D,S.focus),path=M.crumbs(D,f).concat(f);c.textContent='';
   path.forEach(function(r,i){var b=el('button',{type:'button','class':'link'},[cut(M.name(D,M.chain(D,r).pop()),24)]);
@@ -324,14 +333,17 @@ TX.picker({input:$('q'),list:$('sugg'),msg:$('qn'),picks:picks,ranks:META.ranks,
   taxa:function(){return D&&D.T;},counts:function(){return D.tot;},onChange:function(){picks.length=0;},
   onPick:function(r){if(!D.tot[r])return status('No record of this taxon needs an ID.');S.sel=r;M.reveal(D,S,r);go(true,true);}});
 // The map's selection selects its taxon or group here; one this side already shows is left as it is.
-// The groups the map leaves out leave the tree too; a focus or selection inside one goes back to the root.
+// The groups and taxa the map leaves out leave the tree too; a focus or selection inside one goes back to the root.
 var D0=null,EX='';
 // taxa with a row on confusion.html; absent on a site built without it
 fetch('confusion-taxa.json').then(function(r){return r.ok?r.json():[];}).then(function(a){CT=new Set(a);}).catch(function(){});
 function groupsOut(){return SEL.split('&').filter(function(t){return /^groups=/.test(t);}).map(function(t){return t.slice(7);}).join(',')
   .split(',').filter(function(x){return x[0]==='-';}).map(function(x){return decodeURIComponent(x.slice(1));}).sort().join(',');}
-function take(){var ex=groupsOut();
-  if(ex!==EX){EX=ex;D=M.without(D0,ex?ex.split(','):[]);groupRows();if(!D.tot[S.focus])S.focus=D.root;if(S.sel>=0&&!D.tot[S.sel])S.sel=-1;}
+// The taxa the map leaves out, as iNaturalist ids: the -ids of the taxa= token.
+function taxaOut(){var m=/(?:^|&)taxa=([^&]*)/.exec(SEL);
+  return (m?m[1].split(','):[]).filter(function(x){return /^-\d+$/.test(x);}).map(function(x){return -x;});}
+function take(){var g=groupsOut(),ids=taxaOut().sort(function(a,b){return a-b;}),ex=g+'|'+ids.join(',');
+  if(ex!==EX){EX=ex;D=M.without(D0,g?g.split(','):[],ids);groupRows();if(!D.tot[S.focus])S.focus=D.root;if(S.sel>=0&&!D.tot[S.sel])S.sel=-1;}
   var r=M.find(D,SEL);if(r!==S.sel){S.sel=r;if(r>=0)M.reveal(D,S,r);}PS=S.sel;}
 function groupRows(){GS=Object.keys(G).map(function(i){return D.row.get(+i);}).filter(function(x){return x!=null&&D.tot[x];});}
 if(EMBED&&parent!==window)SY=MapFilter.sync({hash:false,key:function(){return SEL;},apply:function(s){SEL=s;if(D){take();draw(true);}}});
