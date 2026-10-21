@@ -6,7 +6,7 @@ looks like the other. page_lookalike skips such neighbour pairs. This module lif
 Interactions (GloBI) dump to unordered family pairs:
 
     python -m what_to_id.host_pairs --site SITE_DIR [--dump PATH_OR_URL] \\
-        --out src/what_to_id/lookalike_assets/host_pairs.tsv
+        --out src/what_to_id/lookalike_assets/host_pairs.tsv.gz
 
 It keeps only the interaction types in TYPES, only pairs of two site families (pool-taxa.bin) in
 different phyla, and only pairs with at least MIN_ROWS GloBI rows. Within a phylum the GloBI rows
@@ -39,10 +39,11 @@ DUMP_RELEASE = "GloBI Interpreted Data Products 0.11 of 2026-09-10, doi:10.5281/
 DUMP = "https://zenodo.org/records/22691479/files/interactions.tsv.gz?download=1"
 DUMP_SHA256 = "021a206a1459bcca7e251c73f5bd180fc3ac342a09c499855fe42e21fc09edcf"
 ASSETS = Path(__file__).parent / "lookalike_assets"
-PAIR_FILES = (ASSETS / "host_pairs.tsv", ASSETS / "host_pairs_extra.tsv")
+PAIR_FILES = (ASSETS / "host_pairs.tsv.gz", ASSETS / "host_pairs_extra.tsv")
 COLUMNS = ("family_a", "family_b", "types", "globi_rows", "source")
-# Living on or in the other, or visiting its flowers, so photographed with it. Not eats, the
-# generic visits, or mycorrhiza (below ground).
+# Living on or in the other (incl. eggs laid on it, parasitoids and their hyperparasites), or
+# visiting its flowers, so photographed with it. Not eats, the generic visits, or mycorrhiza
+# (below ground). GloBI's dump has no inverse names for the last four.
 TYPES = frozenset(
     [
         "parasiteOf",
@@ -62,6 +63,10 @@ TYPES = frozenset(
         "epiphyteOf",
         "hasEpiphyte",
         "kleptoparasiteOf",
+        "livesOn",
+        "laysEggsOn",
+        "endoparasitoidOf",
+        "hyperparasiteOf",
         "visitsFlowersOf",
         "flowersVisitedBy",
         "pollinates",
@@ -69,7 +74,17 @@ TYPES = frozenset(
     ]
 )
 # Every kept type holds one of these, so most of the dump is skipped before it is split.
-_HINTS = (b"arasit", b"ostOf", b"asHost", b"athogen", b"piphyte", b"lowers", b"ollinat")
+_HINTS = (
+    b"arasit",
+    b"ostOf",
+    b"asHost",
+    b"athogen",
+    b"piphyte",
+    b"lowers",
+    b"ollinat",
+    b"ivesOn",
+    b"aysEggsOn",
+)
 MIN_ROWS = 2
 _FIELDS = ("sourceTaxonFamilyName", "interactionTypeName", "targetTaxonFamilyName")
 _REFS = ("referenceDoi", "sourceCitation")
@@ -140,14 +155,21 @@ def write(path: Path, pairs: dict, header: list[str]) -> None:
     lines = [f"# {h}" for h in header] + ["\t".join(COLUMNS)]
     for (a, b), p in pairs.items():
         lines.append("\t".join([a, b, p["types"], str(p["rows"]), _clean(p["source"])]))
-    path.write_text("\n".join(lines) + "\n")
+    text = ("\n".join(lines) + "\n").encode()
+    # mtime=0 and no stored name keep the bytes identical across reruns
+    path.write_bytes(gzip.compress(text, mtime=0) if path.suffix == ".gz" else text)
+
+
+def _read(path) -> str:
+    path = Path(path)
+    return gzip.decompress(path.read_bytes()).decode() if path.suffix == ".gz" else path.read_text()
 
 
 def load(paths=PAIR_FILES) -> dict[tuple[str, str], dict]:
     """The flagged pairs of every file in ``paths``; later files add to earlier ones."""
     out: dict[tuple[str, str], dict] = {}
     for path in paths:
-        rows = [ln for ln in Path(path).read_text().splitlines() if ln and not ln.startswith("#")]
+        rows = [ln for ln in _read(path).splitlines() if ln and not ln.startswith("#")]
         if not rows or tuple(rows[0].split("\t")) != COLUMNS:
             raise ValueError(f"{path} must start with the columns {', '.join(COLUMNS)}")
         for ln in rows[1:]:
@@ -211,7 +233,7 @@ def main(argv: list[str] | None = None) -> int:
             else f"Generated from the GloBI interactions dump of {day} ({a.dump}); do not edit.",
             f"Dump sha256: {sha}",
             "Regenerate: python -m what_to_id.host_pairs --site SITE_DIR --out "
-            "src/what_to_id/lookalike_assets/host_pairs.tsv",
+            "src/what_to_id/lookalike_assets/host_pairs.tsv.gz",
             f"Kept: {', '.join(sorted(TYPES))}; families of the site's taxa in different "
             f"phyla; at least {a.min_rows} GloBI rows per pair.",
         ],

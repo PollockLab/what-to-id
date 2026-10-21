@@ -111,3 +111,20 @@ def test_the_committed_pair_files_load_with_a_source_on_every_row():
     pairs = host_pairs.load()
     assert pairs and all(p["source"] for p in pairs.values())
     assert all(a < b for a, b in pairs)
+
+
+def test_new_living_on_types_are_kept(site, tmp_path):
+    dump = tmp_path / "interactions.tsv.gz"
+    _dump(dump, [["Ustilaginaceae", "laysEggsOn", "Cyperaceae", "10.1/h", ""]] * 2)
+    out = tmp_path / "pairs.tsv"
+    host_pairs.main(["--site", str(site), "--dump", str(dump), "--out", str(out)])
+    assert host_pairs.load([out])[("Cyperaceae", "Ustilaginaceae")]["types"] == "laysEggsOn"
+
+
+def test_gz_pairs_round_trip_with_identical_bytes_on_rewrite(tmp_path):
+    pairs = {("A", "B"): {"types": "hostOf", "rows": 3, "source": "10.1/x"}}
+    a, b = tmp_path / "a.tsv.gz", tmp_path / "b.tsv.gz"
+    host_pairs.write(a, pairs, ["h"])
+    host_pairs.write(b, pairs, ["h"])
+    assert a.read_bytes()[:2] == b"\x1f\x8b" and a.read_bytes() == b.read_bytes()
+    assert host_pairs.load([a]) == pairs
