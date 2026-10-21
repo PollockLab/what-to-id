@@ -263,14 +263,55 @@ def test_split_view_hands_the_map_tokens_to_the_photo_frame(open_page):
     assert "life=look" in src and "clade=47158" in src
 
 
-def test_a_subset_from_the_tree_draws_over_the_dimmed_map_and_its_points_open_records(open_page):
-    page = open_page(path="split.html?view=space")
+def space_frame(page):
     page.wait_for_function(
         "document.querySelector('iframe#space')?.contentDocument?.getElementById('lifebar')"
         "?.hidden === false"
     )
     space = next(f for f in page.frames if "embed=1" in f.url)
     drawn(space)
+    return space
+
+
+def test_split_view_keeps_the_map_tokens_in_its_address_for_a_reload(open_page):
+    page = open_page(path="split.html?view=space")
+    space = space_frame(page)
+    space.click("#vlook")
+    page.wait_for_function("location.hash.includes('life=look')")
+    space.evaluate("__deck.props.onClick({coordinate: [-25, -5], index: -1})")
+    page.wait_for_function("location.hash.includes('clade=47158')")
+    page.reload()
+    space = space_frame(page)
+    drawn(space, look=True)
+    assert space.locator("#lwhere").inner_text() == "Insecta (Insects)"
+    assert {"life=look", "clade=47158"} <= tokens(page)
+    space.click("#vclade")
+    page.wait_for_function("!location.hash.includes('life=')")
+    assert "clade=47158" in tokens(page)
+
+
+def test_reset_undoes_a_clade_zoom_and_a_resize_refits_the_view(open_page):
+    page = open_page()
+    drawn(page)
+    home = page.evaluate("__deck.props.viewState.zoom")
+    page.evaluate("__deck.props.onClick({coordinate: [-25, -5], index: -1})")
+    page.wait_for_function("location.hash.includes('clade=47158')")
+    drawn(page)
+    zoomed = page.evaluate("__deck.props.viewState.zoom")
+    assert zoomed > home
+    page.set_viewport_size({"width": 900, "height": 700})
+    page.wait_for_function(f"__deck.props.viewState.zoom < {zoomed}")  # the clade is framed again
+    page.set_viewport_size({"width": 1280, "height": 900})
+    page.wait_for_function(f"Math.abs(__deck.props.viewState.zoom - {zoomed}) < 1e-6")
+    page.evaluate("postMessage({type: 'wtid-reset'}, location.origin)")  # the map's Reset all
+    page.wait_for_function("!location.hash.includes('clade=')")
+    page.wait_for_function(f"Math.abs(__deck.props.viewState.zoom - {home}) < 1e-6")
+    assert page.locator("#lwhere").inner_text() == "All life"
+
+
+def test_a_subset_from_the_tree_draws_over_the_dimmed_map_and_its_points_open_records(open_page):
+    page = open_page(path="split.html?view=space")
+    space = space_frame(page)
     page.evaluate(
         "window.__records = []; addEventListener('message', e => {"
         " if (e.data && e.data.type === 'wtid-record') __records.push(e.data.id); })"
@@ -283,6 +324,8 @@ def test_a_subset_from_the_tree_draws_over_the_dimmed_map_and_its_points_open_re
     )
     space.wait_for_function("__deck.props.layers.find(l => l.id === 'pts').props.visible === true")
     assert layer(space, "life-img")["opacity"] < 1  # the map dims under the subset
+    assert len(set(pixel(space, 30, -5)[:3])) == 1  # and turns grey, so the points are the colour
+    assert "few" not in ids(space)
     assert (
         space.locator("#count").inner_text() == f"{len(BIRDS):,} shown of {PLACED[:POOL_N].sum():,}"
     )
@@ -300,3 +343,12 @@ def test_a_subset_from_the_tree_draws_over_the_dimmed_map_and_its_points_open_re
     # a click on the map away from any point still zooms into the clade under it
     space.evaluate("__deck.props.onClick({coordinate: [-25, -5], index: -1})")
     space.wait_for_function("location.hash.includes('clade=47158')")
+    # a subset of two is ringed, so it is found on the map
+    page.evaluate(
+        "ids => document.querySelector('iframe#space').contentWindow.postMessage("
+        "{type: 'wtid-subset', ids, label: 'two'}, location.origin)",
+        BIRDS[:2],
+    )
+    space.wait_for_function(
+        "__deck.props.layers.find(l => l.id === 'few')?.props.data.length === 2"
+    )

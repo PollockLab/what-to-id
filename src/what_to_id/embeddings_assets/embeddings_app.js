@@ -5,7 +5,7 @@
 'use strict';
 var LOADING='Loading groups and names…';
 var CFG=EMBEDDINGS_CONFIG,Meta=AtlasSearchMeta,L=EmbeddingsLayout;
-var WHOLE=4<<20,THIN_ABOVE=200000,nf=new Intl.NumberFormat('en-CA');
+var WHOLE=4<<20,THIN_ABOVE=200000,FEW=50,nf=new Intl.NumberFormat('en-CA');
 var DATA=new URL(CFG.dataUrl,location.href).href.replace(/\/*$/,'/');
 var MAP=new URL(CFG.mapUrl,location.href).href;
 var S={idx:null,P:null,META:null,TAXA:null,groups:{},picks:[],split:[],extra:[],keep:null,sel:-1,nbr:[],thin:false,cache:new Map(),run:0,deck:null,vs:null,PD:null,ring:null,lasso:null,lassoV:0};
@@ -65,6 +65,8 @@ function writeHash(){
   var h=S.P.grp?MF.write(S).concat(S.area?['area='+S.area]:[],S.extra):location.hash.slice(1).split('&').filter(function(t){
     return t&&t.indexOf('id=')!==0;});
   h=LV.hash(h);
+  // the split view keeps the map of life's tokens in its own address, so a reload or a shared link keeps the view
+  if(parent!==window)parent.postMessage({type:'wtid-life',tokens:LV.hash([])},location.origin);
   if(S.sel>=0)h.push('id='+S.P.id[S.sel]);
   history.replaceState(null,'',h.length?'#'+h.join('&'):location.pathname+location.search);
 }
@@ -90,7 +92,7 @@ addEventListener('message',function(e){
 // The map's Reset all filters also shows the whole space again, which takes the view's cut off the map.
 addEventListener('message',function(e){
   if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-reset'||!S.deck)return;
-  goHome();
+  if(!LV.home())goHome();
 });
 // In the split view the map owns the area: its drawn shape and resolved parks arrive as one ring list, '' for none.
 addEventListener('message',function(e){
@@ -143,6 +145,8 @@ function applyKeep(){
 }
 function update(){
   var s=S.shown=shown(),P=S.P,total=S.META?S.META.n:P.n;
+  S.few=null;  // a handful of kept points gets rings, so it is found on the map of life
+  if(P.grp&&s<=FEW){var ok=passing();S.few=[];for(var i=0;i<P.n;i++)if(ok[P.grp[i]]&&S.keep[i])S.few.push(i);}
   $('count').textContent=P.grp?nf.format(s)+' shown of '+nf.format(P.n):nf.format(P.n)+' points';
   $('more').textContent=P.grp&&P.n<total?'('+nf.format(total-P.n)+' of the map’s '+nf.format(total)+
     ' records are not placed yet)':'';
@@ -189,14 +193,14 @@ function frame(b){
     z=Math.log2(Math.min(Math.max(box.clientWidth,1)/(b[2]-b[0]||1),Math.max(box.clientHeight-top,1)/(b[3]-b[1]||1))*.9);
   z=Math.min(Math.max(z,S.vs.minZoom),S.vs.maxZoom);
   S.vs=Object.assign({},S.vs,{target:[(b[0]+b[2])/2,(b[1]+b[3])/2+top/2/Math.pow(2,z),0],zoom:z});
-  S.deck.setProps({viewState:S.vs});moved();
+  S.deck.setProps({viewState:S.vs});moved();S.framed={b:b,vs:S.vs};
 }
 function fit(){
   var P=S.P,ok=passing(),xs=[],ys=[];
   for(var i=0;i<P.n;i++)if(ok[P.grp[i]]&&S.keep[i]){xs.push(P.pos[2*i]);ys.push(P.pos[2*i+1]);}
   if(xs.length)frame(span(xs,ys,.01));
 }
-// Home shows all the points. It holds until the view is moved, so a resize or a panel that grows refits it.
+// Home shows all the points. A framed view holds until it is moved, so a resize or a panel that grows refits it.
 function goHome(){
   var P=S.P;
   if(!S.homeBox||S.homeBox.P!==P){var xs=new Float32Array(P.n),ys=new Float32Array(P.n);
@@ -204,7 +208,7 @@ function goHome(){
     S.homeBox={P:P,b:span(xs,ys,.001)};}
   frame(S.homeBox.b);S.home=S.vs;
 }
-function resized(){if(S.deck&&S.vs===S.home)goHome();else moved();}
+function resized(){if(S.deck&&S.framed&&S.vs===S.framed.vs)frame(S.framed.b);else moved();}
 $('gfit').addEventListener('click',fit);
 function chips(){
   var P=S.P,count=new Array(S.META.groups.length).fill(0);
@@ -256,7 +260,8 @@ function pointData(){
 }
 // Over the map of life the points show, and take clicks, while the filters hold some back or once the view is
 // close enough to tell them apart; otherwise a click on the map zooms into its clade.
-function dots(){return (S.shown!=null&&S.shown<S.P.n)||S.vs.zoom>=S.zoom0+3;}
+function filtered(){return S.shown!=null&&S.shown<S.P.n;}
+function dots(){return filtered()||S.vs.zoom>=S.zoom0+3;}
 function layers(){
   var P=S.P;
   if(!P||!S.deck)return;
@@ -268,11 +273,12 @@ function layers(){
   var pts=new deck.ScatterplotLayer({id:'pts',data:S.PD,radiusUnits:'pixels',getRadius:1.5,radiusMinPixels:1,radiusMaxPixels:3,
     stroked:false,pickable:true,visible:!LV.on()||d,extensions:[EXT],updateTriggers:{getFilterCategory:S.PDV},
     filterCategories:[groups,thin?[1]:[0,1],[1]]});
-  var lyr=LV.on()?LV.layers(pts,d):[pts];
+  var lyr=LV.on()?LV.layers(pts,d,filtered()):[pts];
   function ring(id,rows,px,rgb,w){
     return new deck.ScatterplotLayer({id:id,data:rows,getPosition:function(i){return [P.pos[2*i],P.pos[2*i+1]];},
       radiusUnits:'pixels',getRadius:px,filled:false,stroked:true,lineWidthUnits:'pixels',getLineWidth:w,getLineColor:rgb});
   }
+  if(LV.on()&&S.few)lyr.push(ring('few',S.few,6,[29,29,27],1.5));
   if(S.nbr.length)lyr.push(ring('nbr',S.nbr,6,[230,110,30],2));
   if(S.sel>=0)lyr.push(ring('sel',[S.sel],9,[29,29,27],2.5));
   if(S.ring)lyr.push(new deck.PathLayer({id:'lasso',data:[S.ring],getPath:function(r){return r;},positionFormat:'XY',

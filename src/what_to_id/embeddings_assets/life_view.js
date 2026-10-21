@@ -39,6 +39,13 @@ function canvas(m,px){
   var c=document.createElement('canvas');c.width=m.W;c.height=m.H;
   c.getContext('2d').putImageData(new ImageData(px,m.W,m.H),0,0);return c;
 }
+// The map in greys, so the points a filter keeps are the only colour over it.
+function grey(m,k){
+  if(!m[k+'G']){var a=new Uint8ClampedArray(k==='look'?m.look:m.image);
+    for(var i=0;i<a.length;i+=4)a[i]=a[i+1]=a[i+2]=.3*a[i]+.59*a[i+1]+.11*a[i+2];
+    m[k+'G']=canvas(m,a);}
+  return m[k+'G'];
+}
 function draw(r,fit){
   var me=++run;row=r;bar();o.writeHash();
   if(cache.has(r)){show(cache.get(r),fit);return;}
@@ -71,6 +78,8 @@ function set(m){
   mode=m;bar();o.writeHash();o.redraw();
 }
 function go(r){if(r!==row)draw(r,true);}
+// Back to all life, framed as on load; false when there is no map to go back to.
+function home(){if(!on())return false;draw(-1,true);return true;}
 $('vclade').addEventListener('click',function(){set('life');});
 $('vlook').addEventListener('click',function(){set('look');});
 $('lup').addEventListener('click',function(){go(LM.parentOf(A,S.TAXA,S.META.ranks,row));});
@@ -105,8 +114,8 @@ function click(t){
   return true;
 }
 // The map, then pts (the app's points layer), then the labels that read at the view's zoom; the map dims while
-// points are drawn over it.
-function layers(pts,dim){
+// points are drawn over it, and turns grey while a filter holds some back.
+function layers(pts,dim,filt){
   var z=Math.round(S.vs.zoom*4)/4;
   if(!placed||placed.z!==z)placed={z:z,L:LM.place(M.labels,z,MIN_PX)};
   function lbl(id,data,weight){
@@ -115,8 +124,8 @@ function layers(pts,dim){
       fontFamily:'system-ui,-apple-system,"Segoe UI",sans-serif',fontWeight:weight,characterSet:'auto',
       getColor:[29,29,27,235],fontSettings:{sdf:true},outlineWidth:3,outlineColor:[255,255,255,220],pickable:true});
   }
-  var L=placed.L,b=[M.ext[0],M.ext[1],M.ext[2],M.ext[3]];
-  return [new deck.BitmapLayer({id:'life-img',image:mode==='look'&&M.lookC?M.lookC:M.imgC,bounds:b,opacity:dim?.4:1}),pts,
+  var L=placed.L,b=[M.ext[0],M.ext[1],M.ext[2],M.ext[3]],k=mode==='look'&&M.lookC?'look':'img';
+  return [new deck.BitmapLayer({id:'life-img',image:filt?grey(M,k):M[k+'C'],bounds:b,opacity:dim?.4:1}),pts,
     lbl('life-lbl',L.filter(function(d){return !d.italic&&!d.bold;}),'600'),
     lbl('life-lbl-i',L.filter(function(d){return d.italic;}),'italic 500'),
     lbl('life-lbl-k',L.filter(function(d){return d.bold;}),'800')];
@@ -125,7 +134,7 @@ function layers(pts,dim){
 function hash(h){
   h=h.filter(function(t){var k=t.split('=')[0];return k!=='life'&&k!=='clade';});
   if(mode==='look')h.push('life=look');
-  if(row>=0)h.push('clade='+S.TAXA[row][2]);
+  if(row>=0||want)h.push('clade='+(row>=0?S.TAXA[row][2]:want));  // a clade still waiting for the join stays
   return h;
 }
 // The join brings the names and the rows the map needs, and the map is drawn then; a subset or an opened record
@@ -139,5 +148,5 @@ function joined(){
   if(r>=0&&!LM.canZoom(S.TAXA,S.META.ranks,r))r=-1;
   draw(r,!S.subset&&S.sel<0);
 }
-return {on:on,layers:layers,text:text,click:click,hash:hash,joined:joined};
+return {on:on,layers:layers,text:text,click:click,hash:hash,joined:joined,home:home};
 }
