@@ -334,7 +334,8 @@ TX.picker({input:$('q'),list:$('sugg'),msg:$('qn'),picks:picks,ranks:META.ranks,
   onPick:function(r){if(!D.tot[r])return status('No record of this taxon needs an ID.');S.sel=r;M.reveal(D,S,r);go(true,true);}});
 // The map's selection selects its taxon or group here; one this side already shows is left as it is.
 // The groups and taxa the map leaves out leave the tree too; a focus or selection inside one goes back to the root.
-var D0=null,EX='';
+// In the split view the map sends how many of the records it shows carry each taxon (CN), and the tree counts those.
+var D0=null,EX='',CN=null,CP=null;
 // taxa with a row on confusion.html; absent on a site built without it
 fetch('confusion-taxa.json').then(function(r){return r.ok?r.json():[];}).then(function(a){CT=new Set(a);}).catch(function(){});
 function groupsOut(){return SEL.split('&').filter(function(t){return /^groups=/.test(t);}).map(function(t){return t.slice(7);}).join(',')
@@ -343,10 +344,17 @@ function groupsOut(){return SEL.split('&').filter(function(t){return /^groups=/.
 function taxaOut(){var m=/(?:^|&)taxa=([^&]*)/.exec(SEL);
   return (m?m[1].split(','):[]).filter(function(x){return /^-\d+$/.test(x);}).map(function(x){return -x;});}
 function take(){var g=groupsOut(),ids=taxaOut().sort(function(a,b){return a-b;}),ex=g+'|'+ids.join(',');
-  if(ex!==EX){EX=ex;D=M.without(D0,g?g.split(','):[],ids);groupRows();if(!D.tot[S.focus])S.focus=D.root;if(S.sel>=0&&!D.tot[S.sel])S.sel=-1;}
+  if(ex!==EX){EX=ex;D=M.without(CN?M.recount(D0,CN.own,CN.total):D0,g?g.split(','):[],ids);groupRows();if(!D.tot[S.focus])S.focus=D.root;if(S.sel>=0&&!D.tot[S.sel])S.sel=-1;}
   var r=M.find(D,SEL);if(r!==S.sel){S.sel=r;if(r>=0)M.reveal(D,S,r);}PS=S.sel;}
 function groupRows(){GS=Object.keys(G).map(function(i){return D.row.get(+i);}).filter(function(x){return x!=null&&D.tot[x];});}
 if(EMBED&&parent!==window)SY=MapFilter.sync({hash:false,key:function(){return SEL;},apply:function(s){SEL=s;if(D){take();draw(true);}}});
+// only the latest counts are applied, once a frame; own null (the map gone) goes back to the whole table
+if(SY)addEventListener('message',function(e){var d=e.data;
+  if(e.origin!==location.origin||e.source!==parent||!d||d.type!=='wtid-counts')return;
+  if(CP===null)requestAnimationFrame(function(){CN=CP.own?CP:null;CP=null;EX=null;
+    // a selection that still has records stays: take() drops the root's, as the map's selection names no taxon
+    if(D){var s=S.sel;take();if(s>=0&&S.sel<0&&D.tot[s])S.sel=PS=s;draw(true);}});
+  CP=d;});
 async function load(){
   status('Loading the taxa…');
   var has=fetch('split.html',{method:'HEAD'}).then(function(r){return r.ok;},function(){return false;});

@@ -84,7 +84,7 @@ function setView(v){
     if(show&&!f)mk(n);
     else if(f&&!show&&innerWidth<800){f.remove();delete frames[n];
     // what a removed frame sent describes something that is gone
-    if(n==='map'){delete late['wtid-view'];delete late['wtid-projects'];post('space',{type:'wtid-projects',ids:null});}else if(n==='space'){delete late['wtid-keep'];post('map',{type:'wtid-keep',ids:null});}}  // a phone holds one view at a time
+    if(n==='map'){delete late['wtid-view'];delete late['wtid-projects'];delete late['wtid-counts'];post('space',{type:'wtid-projects',ids:null});post('tree',{type:'wtid-counts',own:null});}else if(n==='space'){delete late['wtid-keep'];post('map',{type:'wtid-keep',ids:null});}}  // a phone holds one view at a time
     else if(f){var was=f.hidden;f.hidden=!show;if(show&&was){sendSel(n,last);post(n,{type:'wtid-record',id:rec});
       Object.keys(late).forEach(function(k){post(n,late[k]);});}}});
   // a hidden map masks nothing; a re-shown one fires no moveend, so its last view goes again
@@ -139,14 +139,14 @@ addEventListener('message',function(e){
   rest=rest.filter(function(x){return !life(x);}).concat(t);addr();
 });
 // A picked record and its closest matches are mirrored by id in the other frame, as are the map's area and
-// the photo space's lasso; the last of each (late) also goes to a frame that shows up later.
-var rec=null,late={},RELAY=['wtid-record','wtid-matches','wtid-focus','wtid-area','wtid-view','wtid-keep','wtid-projects','wtid-reset'];
+// the photo space's lasso; the last of each (late) also goes to a frame that shows up later. The map's counts per taxon go to the tree.
+var rec=null,late={},RELAY=['wtid-record','wtid-matches','wtid-focus','wtid-area','wtid-view','wtid-keep','wtid-projects','wtid-reset','wtid-counts'];
 addEventListener('message',function(e){
   var n=Object.keys(frames).filter(function(k){return frames[k].contentWindow===e.source;})[0],d=e.data;
-  if(!n||e.origin!==location.origin||!d||RELAY.indexOf(d.type)<0||d.type==='wtid-view'&&!visible(n))return;
+  if(!n||e.origin!==location.origin||!d||RELAY.indexOf(d.type)<0||d.type==='wtid-view'&&!visible(n)||d.type==='wtid-counts'&&n!=='map')return;
   if(d.type==='wtid-record'){if(d.id===rec)return;rec=d.id;delete late['wtid-matches'];}
   else if(d.type!=='wtid-focus'&&d.type!=='wtid-reset')late[d.type]=d;
-  var o=n==='map'?'space':'map';if(visible(o))post(o,d);
+  var o=d.type==='wtid-counts'?'tree':n==='map'?'space':'map';if(visible(o))post(o,d);
 });
 // Photo search: the query is resolved as search.html does, and its hits go to both frames as a subset of the points.
 var sub=null,sq=document.getElementById('sq'),sm=document.getElementById('sm'),idx=null,enc=null,run=0,

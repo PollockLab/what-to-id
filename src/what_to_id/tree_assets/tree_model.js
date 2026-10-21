@@ -71,6 +71,11 @@ function without(M,names,ids){
     o=Object.assign({},M.opt,{total:names.indexOf(REST)>=0?0:Math.max(0,(M.opt.total||0)-gone)});
   return build(T,M.ranks,M.groups,o);
 }
+// The tree of the records the map keeps: own[i] of them carry row i's taxon, total in all (those with no taxon too).
+function recount(M,own,total){
+  return build(M.T.map(function(t,i){return t.slice(0,5).concat([own[i]||0]);}),M.ranks,M.groups,
+    Object.assign({},M.opt,{total:total}));
+}
 function id(M,r){return r===M.n?0:M.T[r][2];}
 function name(M,r){return r===M.n?'Life':M.T[r][0];}
 // A group's node takes the map's name for the group, "Other animals" for Animalia.
@@ -205,7 +210,7 @@ function read(M,hash,gs){
   var s=rowOf(q.sel);if(s>=0){S.sel=s;if(q.open==null)reveal(M,S,s);}
   return S;
 }
-return {K:K,REST:REST,LEVEL:LEVEL,RINGS:RINGS,DEPTH:DEPTH,TONES:TONES,BG:BG,cap:cap,shade:shade,tone:tone,contrast:contrast,step:step,build:build,without:without,id:id,name:name,common:common,rank:rank,lead:lead,pick:pick,find:find,
+return {K:K,REST:REST,LEVEL:LEVEL,RINGS:RINGS,DEPTH:DEPTH,TONES:TONES,BG:BG,cap:cap,shade:shade,tone:tone,contrast:contrast,step:step,build:build,without:without,recount:recount,id:id,name:name,common:common,rank:rank,lead:lead,pick:pick,find:find,
   chain:chain,crumbs:crumbs,within:within,view:view,toggle:toggle,more:more,expandBelow:expandBelow,reveal:reveal,
   home:home,layout:layout,write:write,read:read};
 });
