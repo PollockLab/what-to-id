@@ -6,7 +6,7 @@
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.AtlasSearchIndex=api;
 })(typeof globalThis!=='undefined'?globalThis:this,function(){
 'use strict';
-var KSUB=256,REFINE_CONCURRENCY=24;
+var KSUB=256,REFINE_CONCURRENCY=24,WAYS=8,CHUNK_MIN=1<<20;  // whole-file reads: parallel ranges of at least CHUNK_MIN
 
 // IEEE half to float, including subnormals, infinities and NaN.
 function f16ToF32(h){
@@ -116,13 +116,13 @@ function Index(base,opts){
   this.base=base;this.fetch=opts.fetch;this.gap=opts.gap||0;this.whole=opts.whole||0;this.concurrency=opts.concurrency||REFINE_CONCURRENCY;
   this.offsets={};this.lists={};this.dir={};this.urls={};this.files={};this.resolving={};this.first={};
 }
-// Fetch bytes [start,end) of a file; a server that ignores Range (200) is sliced.
+// The response for bytes [start,end) of a file, or the whole file without a range.
 // A redirect target (Hugging Face sends large files to a signed CDN URL) is reused for later ranges,
 // so only the first read of a file counts against the host's rate limit (reads issued while it is in
 // flight wait for it); an expired one is re-resolved.
 // Range reads skip the HTTP cache: Chrome's cache lock queues parallel requests to one URL (a search
 // took 10 to 18 s instead of 1 to 2 s against Hugging Face).
-Index.prototype.bytes=async function(name,start,end){
+Index.prototype.response=async function(name,start,end){
   if(this.first[name])await this.first[name];
   var init={headers:{}},url=join(this.base,name),cached=this.urls[name],res,done;
   if(start!==undefined){init.headers.Range='bytes='+start+'-'+(end-1);init.cache='no-store';}
@@ -142,9 +142,28 @@ Index.prototype.bytes=async function(name,start,end){
     err.stale=res.status===404;  // replaced by a newer index; reload the manifest
     throw err;
   }
-  var buf=await res.arrayBuffer();
+  return res;
+};
+// Fetch bytes [start,end) of a file; a server that ignores Range (200) is sliced.
+Index.prototype.bytes=async function(name,start,end){
+  var res=await this.response(name,start,end),buf=await res.arrayBuffer();
   if(start!==undefined&&res.status===200)buf=buf.slice(start,end);
   return buf;
+};
+// A whole file as up to WAYS parallel range reads, so one slow stream does not bound a large download
+// (the 15 MB layout took 54 s on a 378 KB/s link). A one-byte probe learns the size from Content-Range
+// and resolves the CDN URL the reads share; a server that answers it with 200 has sent the whole file,
+// and one that gives no total is asked for it whole.
+Index.prototype.parallel=async function(name){
+  var res=await this.response(name,0,1),probe=await res.arrayBuffer();
+  if(res.status!==206)return probe;
+  var m=/\/(\d+)$/.exec(res.headers.get('Content-Range')||'');
+  if(!m)return this.bytes(name);
+  var total=+m[1],size=Math.max(Math.ceil(total/WAYS),CHUNK_MIN),out=new Uint8Array(total),self=this,reads=[];
+  function read(a,b){return self.bytes(name,a,b).then(function(buf){out.set(new Uint8Array(buf),a);});}
+  for(var a=0;a<total;a+=size)reads.push(read(a,Math.min(a+size,total)));
+  await Promise.all(reads);
+  return out.buffer;
 };
 // Re-resolve an expired CDN URL once for all reads of the file that failed at the same time.
 Index.prototype.resolve=function(name){
