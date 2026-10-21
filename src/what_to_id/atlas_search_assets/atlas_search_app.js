@@ -36,7 +36,7 @@ async function encoderFor(state,confirmed){
   if(!confirmed&&!await Enc.isCached(new URL(spec.onnx,DATA).href)){
     S.pending=state;
     $('gatetext').textContent='Text search needs a search model. Downloading search model, about '+mb+
-      ' MB, once. It is stored in this browser afterwards. Searching by observation link needs no download.';
+      ' MB, once, best on Wi-Fi. It is stored in this browser afterwards. Searching by observation link needs no download.';
     $('gate').hidden=false;$('gobtn').focus();
     $('results').hidden=true;  // the last query's cards would sit under a prompt about the new one
     status('');

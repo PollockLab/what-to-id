@@ -13,7 +13,7 @@ var ORT_SRI='sha384-RPL/K8tc0JVaNWsunkEmCzLeieefvFX2UCRLKLmLVChCI6P+CTKhzqF7VIeC
 var CACHE='what-to-id-atlas-model-v1';
 
 function join(base,name){return base.replace(/\/*$/,'/')+name;}
-function megabytes(spec){return Math.round(((spec&&spec.bytes)||0)/1048576);}
+function megabytes(spec){return Math.round(((spec&&spec.bytes)||0)/1e6);}  // decimal MB, as browsers and phones report downloads
 
 function loadScript(src,integrity){
   return new Promise(function(resolve,reject){

@@ -423,7 +423,7 @@ def test_text_encoder_wraps_tokens_and_normalizes():
         "head": ["49406", "5", "49407"],
         "text": "hi",
     }
-    assert got["mb"] == 485 and "no text search model" in got["err"]
+    assert got["mb"] == 509 and "no text search model" in got["err"]
 
 
 def test_text_encoder_load_finds_page_globals():
