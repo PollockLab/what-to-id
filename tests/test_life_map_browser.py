@@ -352,3 +352,32 @@ def test_a_subset_from_the_tree_draws_over_the_dimmed_map_and_its_points_open_re
     space.wait_for_function(
         "__deck.props.layers.find(l => l.id === 'few')?.props.data.length === 2"
     )
+
+
+def label_texts(page):
+    """Label texts by layer id, for the map's label layers (those ending -f are the faded ones)."""
+    return page.evaluate(
+        """() => Object.fromEntries(__deck.props.layers.filter(l => l.id.startsWith('life-lbl'))
+          .map(l => [l.id, {t: l.props.data.map(d => d.text), a: l.props.getColor[3],
+            o: l.props.outlineColor[3]}]))"""
+    )
+
+
+def test_labels_outside_the_selection_fade_and_those_around_it_stay(open_page):
+    page = open_page(path="split.html?view=space")
+    space = space_frame(page)
+    space.wait_for_function("__deck.props.layers.some(l => l.id === 'life-lbl')")
+    assert not [i for i in label_texts(space) if i.endswith("-f")]  # no filter: nothing fades
+    page.evaluate(
+        "ids => document.querySelector('iframe#space').contentWindow.postMessage("
+        "{type: 'wtid-subset', ids, label: 'Aves'}, location.origin)",
+        BIRDS,
+    )
+    space.wait_for_function("__deck.props.layers.some(l => l.id === 'life-lbl-f')")
+    got = label_texts(space)
+    faded = {t for i, v in got.items() if i.endswith("-f") for t in v["t"]}
+    kept = {t for i, v in got.items() if not i.endswith("-f") for t in v["t"]}
+    assert "Insecta" in faded and "Insecta" not in kept
+    assert "Aves" in kept and "Aves" not in faded
+    assert got["life-lbl-f"]["a"] < 100 and got["life-lbl-f"]["o"] < 100
+    assert got["life-lbl"]["a"] > 200 and got["life-lbl"]["o"] > 200

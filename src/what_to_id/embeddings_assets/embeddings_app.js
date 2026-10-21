@@ -273,7 +273,7 @@ function layers(){
   var pts=new deck.ScatterplotLayer({id:'pts',data:S.PD,radiusUnits:'pixels',getRadius:1.5,radiusMinPixels:1,radiusMaxPixels:3,
     stroked:false,pickable:true,visible:!LV.on()||d,extensions:[EXT],updateTriggers:{getFilterCategory:S.PDV},
     filterCategories:[groups,thin?[1]:[0,1],[1]]});
-  var lyr=LV.on()?LV.layers(pts,d,filtered()):[pts];
+  var lyr=LV.on()?LV.layers(pts,d,filtered(),groups):[pts];
   function ring(id,rows,px,rgb,w){
     return new deck.ScatterplotLayer({id:id,data:rows,getPosition:function(i){return [P.pos[2*i],P.pos[2*i+1]];},
       radiusUnits:'pixels',getRadius:px,filled:false,stroked:true,lineWidthUnits:'pixels',getLineWidth:w,getLineColor:rgb});

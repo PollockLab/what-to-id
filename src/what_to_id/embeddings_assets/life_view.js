@@ -114,21 +114,39 @@ function click(t){
   return true;
 }
 // The map, then pts (the app's points layer), then the labels that read at the view's zoom; the map dims while
-// points are drawn over it, and turns grey while a filter holds some back.
-function layers(pts,dim,filt){
+// points are drawn over it, and turns grey while a filter holds some back; labels whose clade has no kept point
+// fade then (own layers, as a text layer's outline colour is one value for the layer).
+var fk=null,fh=null;
+// Per taxon row, whether its clade holds a kept point (grp: the picked groups); rebuilt per filter change.
+function holds(grp){
+  var key=S.PDV+':'+grp;
+  if(fk!==key){
+    var P=S.P,ok=new Set(grp),seen=new Uint8Array(S.TAXA.length),ks=Object.keys(A);fh=new Uint8Array(S.TAXA.length);
+    for(var i=0;i<P.n;i++){var r=P.tax[i];
+      if(r>=0&&!seen[r]&&S.keep[i]&&ok.has(P.grp[i])){seen[r]=fh[r]=1;ks.forEach(function(k){if(A[k][r]>=0)fh[A[k][r]]=1;});}}
+    fk=key;
+  }
+  return fh;
+}
+function layers(pts,dim,filt,grp){
   var z=Math.round(S.vs.zoom*4)/4;
   if(!placed||placed.z!==z)placed={z:z,L:LM.place(M.labels,z,MIN_PX)};
-  function lbl(id,data,weight){
+  var h=filt?holds(grp):null;
+  function lbl(id,data,weight,f){
     return new deck.TextLayer({id:id,data:data,getPosition:function(d){return d.pos;},getText:function(d){return d.text;},
       getSize:function(d){return d.size;},sizeUnits:'common',sizeMaxPixels:weight==='800'?22:30,
       fontFamily:'system-ui,-apple-system,"Segoe UI",sans-serif',fontWeight:weight,characterSet:'auto',
-      getColor:[29,29,27,235],fontSettings:{sdf:true},outlineWidth:3,outlineColor:[255,255,255,220],pickable:true});
+      getColor:[29,29,27,f?55:235],fontSettings:{sdf:true},outlineWidth:3,outlineColor:[255,255,255,f?55:220],pickable:true});
+  }
+  function lbls(id,data,weight){
+    return h?[lbl(id+'-f',data.filter(function(d){return !h[d.row];}),weight,1),
+      lbl(id,data.filter(function(d){return h[d.row];}),weight)]:[lbl(id,data,weight)];
   }
   var L=placed.L,b=[M.ext[0],M.ext[1],M.ext[2],M.ext[3]],k=mode==='look'&&M.lookC?'look':'img';
-  return [new deck.BitmapLayer({id:'life-img',image:filt?grey(M,k):M[k+'C'],bounds:b,opacity:dim?.4:1}),pts,
-    lbl('life-lbl',L.filter(function(d){return !d.italic&&!d.bold;}),'600'),
-    lbl('life-lbl-i',L.filter(function(d){return d.italic;}),'italic 500'),
-    lbl('life-lbl-k',L.filter(function(d){return d.bold;}),'800')];
+  return [new deck.BitmapLayer({id:'life-img',image:filt?grey(M,k):M[k+'C'],bounds:b,opacity:dim?.4:1}),pts].concat(
+    lbls('life-lbl',L.filter(function(d){return !d.italic&&!d.bold;}),'600'),
+    lbls('life-lbl-i',L.filter(function(d){return d.italic;}),'italic 500'),
+    lbls('life-lbl-k',L.filter(function(d){return d.bold;}),'800'));
 }
 // The view's tokens replace any already in the hash list h.
 function hash(h){
@@ -143,7 +161,7 @@ function joined(){
   if(!S.TAXA||!S.META)return;
   A=LM.ancestors(S.TAXA,S.META.ranks);byId=new Map();
   S.TAXA.forEach(function(t,i){byId.set(t[2],i);});
-  cache.clear();M=null;$('lifebar').hidden=false;
+  cache.clear();fk=null;M=null;$('lifebar').hidden=false;
   var r=want&&byId.has(want)?byId.get(want):-1;want=0;
   if(r>=0&&!LM.canZoom(S.TAXA,S.META.ranks,r))r=-1;
   draw(r,!S.subset&&S.sel<0);
