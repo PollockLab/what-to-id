@@ -226,3 +226,25 @@ console.log(JSON.stringify({{ins: up({ROW["Insecta"]}), lep: up({ROW["Lepidopter
     )
     assert (got["ins"], got["lep"], got["ani"]) == (ROW["Animalia"], ROW["Insecta"], -1)
     assert got["fam"] is False and got["ord"] is True and got["famMap"] == "family"
+
+
+def test_labels_that_would_collide_or_read_too_small_are_dropped(world):
+    got = node(
+        world,
+        """
+const big = {text: 'Insecta', pos: [0, 0], size: 4, area: 900},
+  near = {text: 'Aves', pos: [4, 0.5], size: 3, area: 100, italic: true},
+  far = {text: 'Aves', pos: [40, 0], size: 3, area: 100},
+  tiny = {text: 'Ascidiacea', pos: [-40, 0], size: 0.5, area: 5},
+  king = {text: 'ANIMALIA\\n31% of map', pos: [0, 0.2], size: 4, area: 1, bold: true};
+const at = (z, L) => LM.place(L, z, 11).map((l) => l.text);
+console.log(JSON.stringify({z2: at(2, [near, tiny, far, big]), z5: at(5, [near, tiny, far, big]),
+  king: at(2, [big, king]), tie: at(5, [{text: 'Small', pos: [0, 0], size: 4, area: 10},
+    {text: 'Large', pos: [0, 0], size: 5, area: 20}])}));""",
+    )
+    # at zoom 2 (4 px a unit) the small label beside the big one and the 2 px one go
+    assert got["z2"] == ["Insecta", "Aves"]
+    # zoomed in, there is room for both and the tiny one reads
+    assert sorted(got["z5"]) == ["Ascidiacea", "Aves", "Aves", "Insecta"]
+    assert got["king"] == ["ANIMALIA\n31% of map"]  # a kingdom outranks any class label
+    assert got["tie"] == ["Large"]  # both capped at 30 px: the larger region keeps its name

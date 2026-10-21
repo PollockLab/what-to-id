@@ -262,6 +262,20 @@ function labels(code,W,H,g,slots,T,K,kOf,nLand){
   }
   return out;
 }
+// The labels that read at zoom z (2^z px a layout unit, as the text layer draws common units): kingdoms first,
+// then the largest; a label goes when it would draw under minPx or overlap one already placed.
+function place(L,z,minPx){
+  var k=Math.pow(2,z),out=[],box=[];
+  function px(d){return Math.min(d.size*k,d.bold?22:30);}
+  L.slice().sort(function(a,b){return (b.bold?1:0)-(a.bold?1:0)||px(b)-px(a)||b.area-a.area;}).forEach(function(d){
+    var p=px(d);if(p<minPx)return;
+    var ln=String(d.text).split('\n'),w=p*(d.bold?.62:.55)*Math.max.apply(null,ln.map(function(t){return t.length;}))/k/2,
+      h=p*1.2*ln.length/k/2,b=[d.pos[0]-w,d.pos[1]-h,d.pos[0]+w,d.pos[1]+h];
+    if(box.some(function(q){return b[0]<q[2]&&q[0]<b[2]&&b[1]<q[3]&&q[1]<b[3];}))return;
+    box.push(b);out.push(d);
+  });
+  return out;
+}
 // What lies under layout point (x,y): the cell's region slot (-1 for none), its records, and the levels of
 // the records within the look-alike blur's reach (one cell holds too few to read).
 function hit(M,x,y){
@@ -274,5 +288,5 @@ function hit(M,x,y){
   return {slot:cd<=M.K?cd:-1,sea:cd===SEA,outside:cd===OUTSIDE,n:M.raw[c],levels:lev};
 }
 return {RANKS:RANKS,FINE:FINE,LEVELS:LEVELS,RAMP:RAMP,ancestors:ancestors,rankOf:rankOf,canZoom:canZoom,
-  parentOf:parentOf,decodeLookalike:decodeLookalike,level:level,build:build,hit:hit};
+  parentOf:parentOf,decodeLookalike:decodeLookalike,level:level,build:build,hit:hit,place:place};
 });
