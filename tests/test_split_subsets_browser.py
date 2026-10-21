@@ -404,5 +404,6 @@ def test_a_card_leaves_its_taxon_out_of_the_tree_and_the_map(browser, site):
     page.wait_for_function("/taxa=-900/.test(location.hash) && !/taxa=900/.test(location.hash)")
     tree.locator("#outline .nm", has_text="Genus A").wait_for(state="detached")
     assert tree.locator("#outline .nm", has_text="Genus B").count() == 1
+    assert tree.locator("#card h2").count() == 1  # the card moves up instead of vanishing
     assert page.errors == []
     page.close()
