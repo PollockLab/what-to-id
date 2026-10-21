@@ -107,14 +107,23 @@ function landOf(tot){
   for(i=0;i<tot.length;i++)land[i]=tot[i]>cut?1:0;
   return land;
 }
+// The life-level grid, each point's cell, the smoothed density and the land of one point set: the half of a
+// zoom's crop that does not depend on the clade, kept for the next zoom into the same points.
+var LIFE=null;
+function lifePass(pos,n){
+  if(LIFE&&LIFE.pos===pos&&LIFE.n===n)return LIFE;
+  var g=grid(lifeExtent(pos,n),LONG),WH=g.W*g.H,cell=cellsOf(pos,n,g),tot=new Float32Array(WH),i;
+  for(i=0;i<n;i++)if(cell[i]>=0)tot[cell[i]]++;
+  blur(tot,g.W,g.H,kernel(SIG),new Float32Array(WH));
+  return LIFE={pos:pos,n:n,g:g,cell:cell,tot:tot,land:landOf(tot)};
+}
 // The zoom's crop: the life-level cells where the clade holds over half the smoothed density, boxed by the
 // quantiles of its records there. A clade with no such cells gets the box of all its records.
 function territoryExtent(o,inTax){
-  var g=grid(lifeExtent(o.pos,o.n),LONG),WH=g.W*g.H,cell=cellsOf(o.pos,o.n,g),tot=new Float32Array(WH),
-    cz=new Float32Array(WH),raw,tmp=new Float32Array(WH),k=kernel(SIG),i;
-  for(i=0;i<o.n;i++){var c=cell[i];if(c<0)continue;tot[c]++;if(inTax[o.tax[i]])cz[c]++;}
-  raw=cz.slice();blur(tot,g.W,g.H,k,tmp);blur(cz,g.W,g.H,k,tmp);
-  var land=landOf(tot),hx=new Float64Array(g.W),hy=new Float64Array(g.H),m=0;
+  var P=lifePass(o.pos,o.n),g=P.g,WH=g.W*g.H,cell=P.cell,tot=P.tot,land=P.land,cz=new Float32Array(WH),raw,i;
+  for(i=0;i<o.n;i++){var c=cell[i];if(c>=0&&inTax[o.tax[i]])cz[c]++;}
+  raw=cz.slice();blur(cz,g.W,g.H,kernel(SIG),new Float32Array(WH));
+  var hx=new Float64Array(g.W),hy=new Float64Array(g.H),m=0;
   for(var pass=0;pass<2&&!m;pass++)for(i=0;i<WH;i++){
     if(!raw[i]||(!pass&&!(land[i]&&cz[i]>.5*tot[i])))continue;
     hx[i%g.W]+=raw[i];hy[Math.floor(i/g.W)]+=raw[i];m+=raw[i];}
