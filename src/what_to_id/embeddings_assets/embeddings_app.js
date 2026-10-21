@@ -356,6 +356,8 @@ function select(i,fly){
   var actions=el('div',{'class':'actions'},[
     link('https://www.inaturalist.org/observations/'+id,'Help identify on iNaturalist','primary'),
     link(CFG.searchUrl+'#id='+id,'More like this'),link(CFG.mapUrl+'#record='+id,'Show on map')]);
+  var tx=S.TAXA&&P.tax&&P.tax[i]!==65535&&S.TAXA[P.tax[i]];
+  if(tx&&tx.length>5)actions.appendChild(link('tree.html#sel='+tx[2],'Show in tree'));  // counts ship only with the tree page
   if(P.grp)actions.appendChild(onlyGroup(P.grp[i]));
   var title=el('h2',{},[t.common||t.latin||t.group||'Observation '+id]);
   card.textContent='';

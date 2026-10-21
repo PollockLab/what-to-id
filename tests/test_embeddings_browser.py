@@ -570,6 +570,11 @@ def test_click_opens_card_with_neighbours_and_jump(open_page, site):
     assert card.get_by_role("link", name="Show on map").get_attribute("href") == (
         f"map.html#record={mine}"
     )
+    assert (
+        card.get_by_role("link", name="Show in tree")
+        .get_attribute("href")
+        .startswith("tree.html#sel=")
+    )
     assert "Vancouver" in card.inner_text() and page.locator(".ph img").count() == 1
     near = [int(b.get_attribute("data-id")) for b in page.locator(".nbrs button").all()]
     assert layer(page, "nbr")["n"] == len([i for i in near if i in in_pool])
