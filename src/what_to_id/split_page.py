@@ -23,7 +23,11 @@ SCRIPTS = {
     "__ATLAS_SEARCH_META__": HERE / "atlas_search_assets" / "atlas_search_meta.js",
     "__ATLAS_SEARCH_ENCODER__": HERE / "atlas_search_assets" / "atlas_search_encoder.js",
 }
-TREE_BUTTON = '<button type="button" data-v="tree">Tree</button>'
+# Each option names the panes it shows; a phone holds one pane, so its tree option is just Tree.
+TREE_BUTTON = (
+    '<button type="button" data-v="tree">'
+    '<span class="w">Map + tree</span><span class="n">Tree</span></button>'
+)
 BAR = (
     '<div class="xbar" id="xbar"><span class="counts" id="counts" aria-live="polite"></span>'
     '<form id="sf" role="search"><input id="sq" type="search" aria-label="Photo search" '
@@ -32,9 +36,9 @@ BAR = (
     '<button type="submit">Search</button></form>'
     '<span id="sm" class="counts" aria-live="polite"></span>'
     '<span class="seg" role="group" aria-label="View">'
-    '<button type="button" data-v="side">Side by side</button>'
+    '<button type="button" data-v="side">Map + photos</button>'
     '<button type="button" data-v="map">Map</button>'
-    '<button type="button" data-v="space">Photo</button>'
+    '<button type="button" data-v="space">Photos</button>'
     f"{TREE_BUTTON}</span>"
     '<button type="button" class="i" id="i" aria-expanded="false" aria-controls="note" '
     'aria-label="About this view">i</button>'

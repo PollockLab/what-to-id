@@ -145,6 +145,7 @@ def test_split_opens_the_map_and_the_tree_and_switches_views(browser, site):
     page = _split(browser, site, 1280, 800)
     assert page.evaluate(FRAMES) == ["map", "tree"]
     assert page.locator("[data-v=tree]").get_attribute("aria-pressed") == "true"
+    assert page.inner_text(".seg") == "Map + photos\nMap\nPhotos\nMap + tree"  # names its panes
     page.click("[data-v=space]")
     page.wait_for_function(f"{FRAMES}.join() === 'space'")
     assert "view=space" in page.evaluate("location.search")
@@ -173,6 +174,7 @@ def test_a_phone_holds_one_frame_at_a_time(browser, site):
     page = _split(browser, site, 390, 800, hash_="#months=8")
     assert page.evaluate("[...document.querySelectorAll('iframe')].map(f => f.id)") == ["tree"]
     assert page.locator("[data-v=side]").is_hidden()
+    assert page.inner_text("[data-v=tree]") == "Tree"  # one pane at a time, so no pair to name
     page.click("[data-v=space]")
     page.wait_for_function(
         "document.querySelectorAll('iframe').length === 1 && document.querySelector('#space')"
