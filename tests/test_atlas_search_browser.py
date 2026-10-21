@@ -131,7 +131,22 @@ def stub_inat(page, ref):
 
     def taxa(route):
         route.fulfill(
-            json={"results": [{"id": 47170, "name": "Fungi", "preferred_common_name": "Fungi"}]},
+            json={
+                "results": [
+                    {
+                        "id": 47170,
+                        "name": "Fungi",
+                        "preferred_common_name": "Fungi",
+                        "rank": "kingdom",
+                    },
+                    {
+                        "id": 47126,
+                        "name": "Plantae",
+                        "preferred_common_name": "Plants",
+                        "rank": "kingdom",
+                    },
+                ]
+            },
             headers={"access-control-allow-origin": "*"},
         )
 
@@ -271,6 +286,11 @@ def test_pasted_url_absent_id_and_taxon_filter(open_page, site):
     text.get_by_role("button", name="Leave out Fungi (Fungi)").click()
     text.wait_for_function("document.querySelectorAll('.card').length === 197")
     assert "1 outside the taxon filter" in text.locator("#dropped").inner_text()
+    # keeping a taxon with no hits empties the list: the message says why, not "no photos"
+    text.get_by_role("button", name="Keep only Plantae (Plants)").click()
+    text.wait_for_function("document.querySelectorAll('.card').length === 0")
+    assert text.locator("#status").inner_text().startswith("None of the best 200 matches")
+    assert text.locator("#sugg").inner_text().startswith("Fungi (Fungi), kingdom")
     assert page.errors == [] and text.errors == []
 
 
@@ -312,7 +332,7 @@ def test_layout_has_no_horizontal_scroll_at_375px(open_page):
 
 
 @pytest.mark.parametrize(
-    "query", ["Lobaria+pulmonaria", "LUNGWORT", "a+photo+of+lobaria++pulmonaria"]
+    "query", ["Lobaria+pulmonaria", "LUNGWORT", "a+photo+of+lobaria++pulmonaria", "the+lungworts"]
 )
 def test_taxon_query_uses_precomputed_vector_not_the_encoder(open_page, site, query):
     _, ref = site
