@@ -250,6 +250,11 @@ def test_click_flies_to_a_clade_whose_map_draws_over_life_and_zooming_out_return
     assert {"Lepidoptera", "Coleoptera"} <= set(labels)  # the labels follow the rank in view
     assert page.locator("#lup").count() == 0  # zooming out is the way back
     assert page.locator("#count").inner_text() == count  # zooming filters nothing
+    opacity = "id => __deck.props.layers.find(l => l.id === id).props.opacity"
+    assert page.evaluate(opacity, "life-zoom") == 1
+    zoom_by(page, 8)  # far past 12 px a zoom cell: its blocks give way to the points and life map
+    assert page.evaluate(opacity, "life-zoom") == 0 and page.evaluate(opacity, "life-img") > 0
+    zoom_by(page, -8)
     zoom_by(page, -3)
     page.wait_for_function("!location.hash.includes('clade=')")
     assert page.locator("#lwhere").inner_text() == "All life" and "life-zoom" not in ids(page)

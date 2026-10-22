@@ -9,6 +9,9 @@ var S=o.S,$=o.$,LM=LifeMap,nf=new Intl.NumberFormat('en-CA'),cache=new Map(),lif
 var h0=new URLSearchParams(location.hash.slice(1)),mode=h0.get('life')==='look'?'look':'life',
   want=+h0.get('clade')||0,row=-1,A=null,byId=null,placed=null;
 var MIN_PX=11,FLY=600;  // a label drawn smaller than MIN_PX does not read, so it is left out
+// Deep in, a zoom's cells draw as blocks: its map fades out as a cell grows from FADE[0] to FADE[1] screen px,
+// and the points over the life map carry the picture.
+var FADE=[6,12];
 // Zoom grid cells on the long side, from the screen at load (a resize keeps it, so the cache stays valid):
 // about one cell a device pixel, in steps of 256, at most 1024 (a 3M-record zoom builds in about 1 s there).
 var ZOOM_LONG=Math.max(512,Math.min(1024,256*Math.ceil(Math.max(innerWidth,innerHeight)*(devicePixelRatio||1)/256)));
@@ -177,7 +180,8 @@ function layers(pts,dim,filt,grp){
       lbl(id,data.filter(function(d){return h[d.row];}),weight)]:[lbl(id,data,weight)];
   }
   var k=mode==='look'&&life.lookC?'look':'img';
-  function map(id,m){return new deck.BitmapLayer({id:id,image:filt?grey(m,k):m[k+'C'],bounds:m.ext.slice(),opacity:dim?.4:1});}
+  function map(id,m){var f=m===life?1:Math.min(1,Math.max(0,(FADE[1]-m.cs*Math.pow(2,z))/(FADE[1]-FADE[0])));
+    return new deck.BitmapLayer({id:id,image:filt?grey(m,k):m[k+'C'],bounds:m.ext.slice(),opacity:(dim?.4:1)*f});}
   var L=placed.L,out=[map('life-img',life)];
   if(M)out.push(map('life-zoom',M));
   return out.concat([pts],
