@@ -151,7 +151,7 @@ console.log(JSON.stringify({ins: region(M, -6.5, 0), aves: region(M, 6, 0), pl: 
     assert got["look"] is None  # no look-alike file: no look-alike picture
 
 
-def test_tidy_absorbs_small_islands_and_unset_land_but_keeps_large_regions_and_the_sea(world):
+def test_tidy_absorbs_small_islands_pockets_and_unset_land_but_keeps_large_areas_and_the_sea(world):
     got = node(
         world,
         """
@@ -163,17 +163,22 @@ for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
   if (x >= 40 && x < 55 && y >= 15 && y < 30) code[c] = 0;    // a 225-cell island inside B
   if (y >= 36) code[c] = LM.SEA;
   if (x === 5 && y === 30) code[c] = 253;                       // land with no record near
+  if (x >= 15 && x < 29 && y >= 20 && y < 36) code[c] = LM.OUTSIDE;  // 224 cells off the clade
+  if (x >= 20 && x < 22 && y >= 25 && y < 27) code[c] = 0;      // a 4-cell speck among them
 }
-code[2 * W + 2] = LM.OUTSIDE;
+code[2 * W + 2] = LM.OUTSIDE;                                   // a 1-cell pocket inside A
 LM.tidy(code, W, H, 1, 1);
 const at = (x, y) => code[y * W + x];
 console.log(JSON.stringify({stray: at(11, 11), island: at(47, 22), left: at(29, 5),
-  right: at(30, 5), sea: at(20, 38), unset: at(5, 30), outside: at(2, 2)}));""",
+  right: at(30, 5), sea: at(20, 38), unset: at(5, 30), pocket: at(2, 2), outside: at(16, 22),
+  speck: at(20, 25)}));""",
     )
     assert got["stray"] == 0  # under MIN_ISLAND cells: joins the region around it
     assert got["island"] == 0  # a large island keeps its region
     assert (got["left"], got["right"]) == (0, 1)  # a straight border stays where it is
-    assert got["sea"] == 255 and got["unset"] == 0 and got["outside"] == 254
+    assert got["sea"] == 255 and got["unset"] == 0
+    assert got["pocket"] == 0  # a small pocket outside the clade fills in with the region around it
+    assert got["outside"] == 254 and got["speck"] == 254  # a large one stays, speck and all
 
 
 def test_zoom_crops_to_the_territory_and_leaves_other_clades_clear_without_dropping_them(world):

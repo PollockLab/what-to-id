@@ -107,8 +107,9 @@ function landOf(tot){
   return land;
 }
 // Smooths a region raster in place: land with no record near takes the nearest region, islands under
-// MIN_ISLAND cells join the region they border most, then a 3x3 majority rounds the boundaries. The sea and
-// the cells outside a zoom's clade stay as they are.
+// MIN_ISLAND cells join the region they border most, then a 3x3 majority rounds the boundaries. At a zoom the
+// cells outside the clade take part as one more region, so a small pocket of them inside the clade fills in
+// and a small speck of the clade out among them goes. The sea stays as it is.
 function tidy(code,W,H,K,sc){
   var WH=W*H,q=new Int32Array(WH),cnt=new Int32Array(256),h=0,t=0,c,k,r,i;
   function nb(c,k){var x=c%W;return k===0?(x>0?c-1:-1):k===1?(x<W-1?c+1:-1):k===2?(c>=W?c-W:-1):c+W<WH?c+W:-1;}
@@ -119,10 +120,10 @@ function tidy(code,W,H,K,sc){
   for(var pass=0,changed=1;pass<3&&changed;pass++){
     changed=0;cmp.fill(0);
     for(c=0;c<WH;c++){
-      if(cmp[c]||code[c]>K)continue;
+      if(cmp[c]||code[c]>K&&code[c]!==OUTSIDE)continue;
       var cd=code[c];h=t=0;q[t++]=c;cmp[c]=1;
       while(h<t){var p=q[h++];for(k=0;k<4;k++){r=nb(p,k);if(r<0)continue;
-        if(code[r]===cd){if(!cmp[r]){cmp[r]=1;q[t++]=r;}}else if(code[r]<=K)cnt[code[r]]++;}}
+        if(code[r]===cd){if(!cmp[r]){cmp[r]=1;q[t++]=r;}}else if(code[r]<=K||code[r]===OUTSIDE)cnt[code[r]]++;}}
       if(t<min){var best=-1;for(i=0;i<256;i++)if(cnt[i]&&(best<0||cnt[i]>cnt[best]))best=i;
         if(best>=0){for(i=0;i<t;i++)code[q[i]]=best;changed=1;}}
       cnt.fill(0);
@@ -312,8 +313,9 @@ function build(o){
     // contested cells, and cells whose records' photo neighbours mostly lie outside their clade, read paler
     var dom=den[c]>0?S[cd*WH+c]/den[c]:1,f=.35+.65*dom*(aC[c]>few?Math.min(1,aS[c]/aC[c]):1);
     f*=LIFE_TINT;
-    // a zoom fades out where its clade's share falls to the half it needs, so its edge blends into the life map
-    var al=clade<0?255:255*Math.min(1,Math.max(0,(den[c]/tot[c]-.5)/.25));
+    // a zoom fades out where its clade's share falls to the half it needs, so its edge blends into the life map;
+    // a cell with no share is one tidy filled in, solid like the region around it
+    var al=clade<0||!den[c]?255:255*Math.min(1,Math.max(0,(den[c]/tot[c]-.5)/.25));
     put(img,c,mix(slots[cd].rgb,WHITE,1-f),al);
     if(look)put(look,c,vC[c]>few?ramp(vS[c]/vC[c]/3):NODATA,al);
   }
