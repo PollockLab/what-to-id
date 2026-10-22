@@ -275,11 +275,11 @@ function layers(){
   var groups=[0];
   if(P.grp){groups=[];passing().forEach(function(v,j){if(v)groups.push(j);});}
   var d=dots(),far=LV.on()&&!d,thin=(S.thin||far)&&P.n>THIN_ABOVE,D=S.PD,a=D.attributes;
-  // far out the points are one ink, not their group's colour, which would fight a zoom's palette
+  // far out the points are one ink, not their group's colour, which would fight a zoom's palette, and faint enough that clumps of thousands stay grey
   if(far){if(!D.far||D.far.attributes.getFilterCategory!==a.getFilterCategory)
     D.far={length:D.length,attributes:{getPosition:a.getPosition,getFilterCategory:a.getFilterCategory}};D=D.far;}
   var pts=new deck.ScatterplotLayer({id:'pts',data:D,radiusUnits:'pixels',getRadius:far?1:1.5,radiusMinPixels:1,radiusMaxPixels:3,
-    getFillColor:[29,29,27,22],stroked:false,pickable:true,extensions:[EXT],updateTriggers:{getFilterCategory:S.PDV},
+    getFillColor:[29,29,27,8],stroked:false,pickable:true,extensions:[EXT],updateTriggers:{getFilterCategory:S.PDV},
     filterCategories:[groups,thin?[1]:[0,1],[1]]});
   var lyr=LV.on()?LV.layers(pts,d,filtered(),groups):[pts];
   function ring(id,rows,px,rgb,w){
