@@ -13,8 +13,8 @@ var S={idx:null,P:null,META:null,TAXA:null,groups:{},picks:[],split:[],extra:[],
 var MF=null,TF=null,TR=null,PASS=['park','bcpark','projects'],MAPONLY={park:'Park',bcpark:'BC park',projects:'Projects'},
   AREA_IN=null,VIEW_IN=null;
 function $(id){return document.getElementById(id);}
-var X=SpaceSelect(S,$,picked,layers),areaIndex=X.areaIndex,viewBox=X.viewBox,areaMask=X.areaMask,projMask=X.projMask,lasso=X.lasso,lassoDrag=X.lassoDrag,moved=X.moved;
-var LV=LifeView({S:S,$:$,MAP:MAP,frame:frame,redraw:layers,status:status,color:color,writeHash:writeHash});
+var X=SpaceSelect(S,$,picked,layers),areaIndex=X.areaIndex,viewBox=X.viewBox,areaMask=X.areaMask,projMask=X.projMask,lasso=X.lasso,lassoDrag=X.lassoDrag,moved=function(){X.moved();LV.moved();};
+var LV=LifeView({S:S,$:$,MAP:MAP,frame:frame,redraw:layers,status:status,color:color,writeHash:writeHash,only:function(id){while(PK.state([id])!=='inc')PK.cycle([id]);}});
 function el(tag,attrs,kids){
   var e=document.createElement(tag);
   Object.keys(attrs||{}).forEach(function(k){if(attrs[k]!==null&&attrs[k]!==undefined)e.setAttribute(k,attrs[k]);});
@@ -189,13 +189,14 @@ function span(xs,ys,t){
   function q(a){a=Float32Array.from(a).sort();return [a[Math.floor(t*(a.length-1))],a[Math.ceil((1-t)*(a.length-1))]];}
   var x=q(xs),y=q(ys);return [x[0],y[0],x[1],y[1]];
 }
-// Shows the box in the plot; beside the map, below the panel that floats over the plot's top.
-function frame(b){
+// Shows the box in the plot, flying there over ms; beside the map, below the panel that floats over the plot's top.
+function frame(b,ms){
   var box=$('plot'),top=document.documentElement.classList.contains('peer')?
       Math.max(0,document.querySelector('.side').getBoundingClientRect().bottom-box.getBoundingClientRect().top):0,
     z=Math.log2(Math.min(Math.max(box.clientWidth,1)/(b[2]-b[0]||1),Math.max(box.clientHeight-top,1)/(b[3]-b[1]||1))*.9);
   z=Math.min(Math.max(z,S.vs.minZoom),S.vs.maxZoom);
-  S.vs=Object.assign({},S.vs,{target:[(b[0]+b[2])/2,(b[1]+b[3])/2+top/2/Math.pow(2,z),0],zoom:z});
+  S.vs=Object.assign({},S.vs,{target:[(b[0]+b[2])/2,(b[1]+b[3])/2+top/2/Math.pow(2,z),0],zoom:z,transitionDuration:ms||0,
+    transitionInterpolator:ms?new deck.LinearInterpolator({transitionProps:['target','zoom']}):null,onTransitionEnd:function(){S.framed.vs=S.vs;}});
   S.deck.setProps({viewState:S.vs});moved();S.framed={b:b,vs:S.vs};
 }
 function fit(){
@@ -263,7 +264,7 @@ function pointData(){
 }
 // Over the map of life the points always show and take clicks; while no filter holds any back and the view is
 // too far out to tell them apart, they draw as a faint texture (one in ten above THIN_ABOVE) and the map keeps
-// its full strength. A click away from a point zooms into the clade under it.
+// its full strength. A click away from a point flies to the clade under it.
 function filtered(){return S.shown!=null&&S.shown<S.P.n;}
 function dots(){return filtered()||S.vs.zoom>=S.zoom0+3;}
 function layers(){
