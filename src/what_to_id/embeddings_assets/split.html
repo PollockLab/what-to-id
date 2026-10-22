@@ -23,7 +23,6 @@ body{display:flex;flex-direction:column}
 .seg button:last-child{border-radius:0 14px 14px 0}
 .seg button+button{border-left:0}
 .seg button[aria-pressed="true"]{background:var(--on);color:var(--onink);border-color:var(--on)}
-.seg .n{display:none}
 .xbar .i{border-radius:50%;width:28px;padding:0;font-style:italic;font-weight:700;font-family:Georgia,serif}
 .note{position:absolute;z-index:30;top:100%;right:16px;width:min(380px,calc(100vw - 24px));margin:6px 0 0;padding:10px 12px;
   background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);font-size:12px;color:var(--muted);white-space:normal}
@@ -31,12 +30,11 @@ body{display:flex;flex-direction:column}
 #main-content{flex:1 1 0;min-height:0;display:flex}
 #main-content iframe{flex:1 1 0;min-width:0;height:100%;border:0;background:var(--bg)}
 #main-content iframe[hidden]{display:none}
-#main-content.side #map{flex:0 0 var(--split,50%)}
+#main-content.two iframe.first{flex:0 0 var(--split,50%)}
 #sep{flex:0 0 7px;cursor:col-resize;background:var(--line);touch-action:none;outline-offset:-2px}
 #sep:hover,#sep:focus-visible,#sep.on{background:var(--on)}
-#main-content:not(.side) #sep{display:none}
-@media (max-width:800px){#sep{display:none}.xbar{flex:1 1 100%;margin:0 0 6px;justify-content:space-between}
-.seg [data-v="side"],.seg .w{display:none}.seg .n{display:inline}}
+#main-content:not(.two) #sep{display:none}
+@media (max-width:800px){#sep{display:none}.xbar{flex:1 1 100%;margin:0 0 6px;justify-content:space-between}}
 </style>
 </head>
 <body>
@@ -52,14 +50,21 @@ __ATLAS_SEARCH_ENCODER__
 var box=document.getElementById("main-content"),frames={},last=MapFilter.tokens(location.hash),
   h0=location.hash.slice(1).split('&').filter(Boolean),want=new URLSearchParams(location.search).get('view'),
   FILES={map:__MAP_FILE__,space:__SPACE_FILE__,tree:__TREE_FILE__},view,
-  PANES={side:['map','space'],map:['map'],space:['space'],tree:['map','tree']},
+  ORDER=['map','space','tree'],ALIAS={side:'map-space',tree:'map-tree'},
   rest=h0.filter(function(t){return MapFilter.tokens(t)==='';});
+if(!FILES.tree)delete FILES.tree;  // a site built without the taxon tree
+// The view is the panes shown, left to right as in ORDER, written as their names joined by '-'. The old
+// one-word views still read; a tree alone is tree-only, since a bare tree is the old Map + tree.
+function parse(s){var p=String(ALIAS[s]||s||'').split('-');
+  return ORDER.filter(function(n){return FILES[n]&&p.indexOf(n)>=0;});}
+function serialize(v){var s=v.join('-');return s==='tree'?'tree-only':s;}
+var v0=parse(want);if(!v0.length)v0=FILES.tree?['map','tree']:innerWidth>=1280?['map','space']:['map'];
 // Tokens the sync leaves alone (the area, parks, camera, an open photo) go to the frame they belong to, once.
 function hashFor(n){
   var own=rest.filter(function(t){var k=t.split('=')[0];
     if(k==='id')return true;
     if(k==='life'||k==='clade')return n==='space';
-    if(k==='at')return n===(want==='space'?'space':'map');
+    if(k==='at')return n===(v0.indexOf('map')<0?'space':'map');
     return n==='map';});
   return (last?[last]:[]).concat(own.map(function(t){
     return n==='map'&&t.indexOf('id=')===0?'record='+t.slice(3):t;})).join('&');}
@@ -71,27 +76,32 @@ function post(n,m){if(frames[n]&&frames[n].contentWindow)frames[n].contentWindow
 function sendSel(n,sel){post(n,{type:'wtid-selection',sel:sel});}
 function mk(n){
   var f=document.createElement('iframe');f.id=n;f.title={map:'Map',space:'Photo space',tree:'Tree of life'}[n];
-  f.src=new URL(FILES[n],location.href).href.replace(/#.*/,'')+'?embed=1'+(n==='space'&&view==='side'?'&peer=1':'')+'#'+hashFor(n);
+  f.src=new URL(FILES[n],location.href).href.replace(/#.*/,'')+'?embed=1'+(n==='space'&&view.indexOf('map')>=0?'&peer=1':'')+'#'+hashFor(n);
   // what the other frame sent while this one was still loading
-  f.addEventListener('load',function(){Object.keys(late).forEach(function(k){if(k!=='wtid-view'||visible('map'))post(n,late[k]);});});
-  box.insertBefore(f,n==='map'?box.firstChild:null);frames[n]=f;}
+  f.addEventListener('load',function(){Object.keys(late).forEach(function(k){if(k!=='wtid-view'||visible('map'))post(n,late[k]);});
+    if(n==='tree')tally(true);});
+  // in ORDER in the page too, so the keys move through the panes as they are seen
+  box.insertBefore(f,ORDER.slice(ORDER.indexOf(n)+1).map(function(k){return frames[k];}).filter(Boolean)[0]||null);frames[n]=f;}
+// shortcut: three panes take equal thirds with no divider, add a second splitter if users ask to resize them.
 function setView(v){
-  if(innerWidth<800&&v==='side')v='map';
+  if(innerWidth<800&&v.length>1)v=[v.indexOf('tree')>=0?'tree':v[0]];  // a phone holds one pane
   view=v;
-  var panes=innerWidth<800&&v==='tree'?['tree']:PANES[v];
+  var tree0=visible('tree');
   Object.keys(FILES).forEach(function(n){
-    var show=panes.indexOf(n)>=0,f=frames[n];
+    var show=v.indexOf(n)>=0,f=frames[n];
     if(show&&!f)mk(n);
     else if(f&&!show&&innerWidth<800){f.remove();delete frames[n];
     // what a removed frame sent describes something that is gone
-    if(n==='map'){delete late['wtid-view'];delete late['wtid-projects'];delete late['wtid-counts'];post('space',{type:'wtid-projects',ids:null});post('tree',{type:'wtid-counts',own:null});}else if(n==='space'){delete late['wtid-keep'];post('map',{type:'wtid-keep',ids:null});}}  // a phone holds one view at a time
+    if(n==='map'){delete late['wtid-view'];delete late['wtid-projects'];delete cnt.map;post('space',{type:'wtid-projects',ids:null});}else if(n==='space'){delete late['wtid-keep'];delete cnt.space;post('map',{type:'wtid-keep',ids:null});}}  // a phone holds one view at a time
     else if(f){var was=f.hidden;f.hidden=!show;if(show&&was){sendSel(n,last);post(n,{type:'wtid-record',id:rec});
-      Object.keys(late).forEach(function(k){post(n,late[k]);});}}});
+      Object.keys(late).forEach(function(k){post(n,late[k]);});}}
+    if(frames[n])frames[n].classList.toggle('first',n===v[0]);});
   // a hidden map masks nothing; a re-shown one fires no moveend, so its last view goes again
   if(!visible('map'))post('space',{type:'wtid-view',area:''});else if(late['wtid-view'])post('space',late['wtid-view']);
-  box.classList.toggle('side',panes.length>1);
-  post('space',{type:'wtid-layout',peer:v==='side'});
-  [].forEach.call(document.querySelectorAll('[data-v]'),function(b){b.setAttribute('aria-pressed',b.dataset.v===v);});
+  box.classList.toggle('two',v.length===2);if(v.length===2)box.insertBefore(sep,frames[v[1]]);
+  post('space',{type:'wtid-layout',peer:visible('map')&&visible('space')});
+  tally(!tree0&&visible('tree'));
+  [].forEach.call(document.querySelectorAll('[data-p]'),function(b){b.setAttribute('aria-pressed',v.indexOf(b.dataset.p)>=0);});
   count();}
 function num(n,id){
   try{var m=/^[\d,]+/.exec(frames[n].contentDocument.getElementById(id).textContent);return m?m[0]:'…';}catch(e){return '…';}}
@@ -103,8 +113,11 @@ function count(){
   var c=document.getElementById('counts'),h=p.join(' · ');if(c.innerHTML!==h)c.innerHTML=h;}
 setInterval(count,400);
 document.getElementById('xbar').addEventListener('click',function(e){
-  var b=e.target.closest('[data-v]');if(!b)return;
-  setView(b.dataset.v);history.replaceState(null,'','?view='+b.dataset.v+location.hash);});
+  var b=e.target.closest('[data-p]');if(!b)return;
+  var p=b.dataset.p,on=view.indexOf(p)>=0;
+  if(on&&view.length===1)return;  // the last pane stays
+  setView(innerWidth<800?[p]:ORDER.filter(function(n){return n===p?!on:view.indexOf(n)>=0;}));
+  history.replaceState(null,'','?view='+serialize(view)+location.hash);});
 var i=document.getElementById('i'),note=document.getElementById('note');
 i.addEventListener('click',function(){note.hidden=!note.hidden;i.setAttribute('aria-expanded',!note.hidden);});
 addEventListener('keydown',function(e){if(e.key==='Escape'&&!note.hidden)i.click();});
@@ -139,15 +152,19 @@ addEventListener('message',function(e){
   rest=rest.filter(function(x){return !life(x);}).concat(t);addr();
 });
 // A picked record and its closest matches are mirrored by id in the other frame, as are the map's area and
-// the photo space's lasso; the last of each (late) also goes to a frame that shows up later. The map's counts per taxon go to the tree.
-var rec=null,late={},RELAY=['wtid-record','wtid-matches','wtid-focus','wtid-area','wtid-view','wtid-keep','wtid-projects','wtid-reset','wtid-counts'];
+// the photo space's lasso, to every other frame shown; the last of each (late) also goes to a frame that shows up later.
+// The counts per taxon go to the tree: the map's, or the photo space's when the map is hidden; with neither, none.
+var rec=null,late={},cnt={},src,RELAY=['wtid-record','wtid-matches','wtid-focus','wtid-area','wtid-view','wtid-keep','wtid-projects','wtid-reset','wtid-counts'];
 addEventListener('message',function(e){
   var n=Object.keys(frames).filter(function(k){return frames[k].contentWindow===e.source;})[0],d=e.data;
-  if(!n||e.origin!==location.origin||!d||RELAY.indexOf(d.type)<0||d.type==='wtid-view'&&!visible(n)||d.type==='wtid-counts'&&n!=='map')return;
+  if(!n||e.origin!==location.origin||!d||RELAY.indexOf(d.type)<0||d.type==='wtid-view'&&!visible(n))return;
+  if(d.type==='wtid-counts'){cnt[n]=d;if(n===src&&visible('tree'))post('tree',d);return;}
   if(d.type==='wtid-record'){if(d.id===rec)return;rec=d.id;delete late['wtid-matches'];}
   else if(d.type!=='wtid-focus'&&d.type!=='wtid-reset')late[d.type]=d;
-  var o=d.type==='wtid-counts'?'tree':n==='map'?'space':'map';if(visible(o))post(o,d);
+  Object.keys(frames).forEach(function(o){if(o!==n&&visible(o))post(o,d);});
 });
+function tally(force){var s=visible('map')?'map':visible('space')?'space':null;
+  if(visible('tree')&&(force||s!==src)){src=s;post('tree',cnt[s]||{type:'wtid-counts',own:null});}}
 // Photo search: the query is resolved as search.html does, and its hits go to both frames as a subset of the points.
 var sub=null,sq=document.getElementById('sq'),sm=document.getElementById('sm'),idx=null,enc=null,run=0,
   DATA=new URL(__DATA_URL__,location.href).href.replace(/\/*$/,'/');
@@ -197,8 +214,7 @@ addEventListener('message',function(e){
 // Back and forward: the new selection goes to both.
 addEventListener('hashchange',function(){var s=MapFilter.tokens(location.hash);
   if(s!==last){last=s;Object.keys(frames).forEach(function(n){if(visible(n))sendSel(n,s);});}});
-if(!FILES.tree){delete FILES.tree;delete PANES.tree;}  // a site built without the taxon tree
-setView(PANES[want]?want:PANES.tree?'tree':innerWidth>=1280?'side':'map');
+setView(v0);
 })();
 </script>
 </body>

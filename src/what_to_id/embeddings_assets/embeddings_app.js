@@ -13,8 +13,8 @@ var S={idx:null,P:null,META:null,TAXA:null,groups:{},picks:[],split:[],extra:[],
 var MF=null,TF=null,TR=null,PASS=['park','bcpark','projects'],MAPONLY={park:'Park',bcpark:'BC park',projects:'Projects'},
   AREA_IN=null,VIEW_IN=null;
 function $(id){return document.getElementById(id);}
-var X=SpaceSelect(S,$,picked,layers),areaIndex=X.areaIndex,viewBox=X.viewBox,areaMask=X.areaMask,projMask=X.projMask,lasso=X.lasso,lassoDrag=X.lassoDrag,moved=X.moved;
-var LV=LifeView({S:S,$:$,MAP:MAP,frame:frame,redraw:layers,status:status,color:color,writeHash:writeHash});
+var X=SpaceSelect(S,$,picked,layers),areaIndex=X.areaIndex,viewBox=X.viewBox,areaMask=X.areaMask,projMask=X.projMask,lasso=X.lasso,lassoDrag=X.lassoDrag,moved=function(){X.moved();LV.moved();};
+var LV=LifeView({S:S,$:$,MAP:MAP,frame:frame,redraw:layers,status:status,color:color,writeHash:writeHash,only:function(id){while(PK.state([id])!=='inc')PK.cycle([id]);}});
 function el(tag,attrs,kids){
   var e=document.createElement(tag);
   Object.keys(attrs||{}).forEach(function(k){if(attrs[k]!==null&&attrs[k]!==undefined)e.setAttribute(k,attrs[k]);});
@@ -104,8 +104,8 @@ addEventListener('message',function(e){
   if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-view'||typeof e.data.area!=='string')return;
   VIEW_IN=e.data.area;if(S.P&&S.P.grp){S.view=VIEW_IN;picked();}
 });
-$('info').addEventListener('click',function(){
-  $('info').setAttribute('aria-expanded',document.documentElement.classList.toggle('about'));});
+var infos=document.querySelectorAll('.info'),about=function(on){document.documentElement.classList.toggle('about',on);infos.forEach(function(b){b.setAttribute('aria-expanded',on);});};
+infos.forEach(function(b){b.addEventListener('click',function(){about(!document.documentElement.classList.contains('about'));});});
 // CH.show rewrites the label, so the colour dot goes back in after it.
 function paint(b){
   var j=+b.getAttribute('data-g'),dot=el('i',{});dot.style.background='rgb('+color(j).join(',')+')';
@@ -153,6 +153,7 @@ function update(){
     ' records are not placed yet)':'';
   [].forEach.call($('groups').querySelectorAll('button[data-g]'),paint);
   if(BAR)BAR.set(items());if(TR)TR.render();layers();
+  X.counts(passing);
 }
 // A pick, a left-out or a removal anywhere: the groups beside included taxa change which points are kept.
 function picked(){
@@ -188,13 +189,14 @@ function span(xs,ys,t){
   function q(a){a=Float32Array.from(a).sort();return [a[Math.floor(t*(a.length-1))],a[Math.ceil((1-t)*(a.length-1))]];}
   var x=q(xs),y=q(ys);return [x[0],y[0],x[1],y[1]];
 }
-// Shows the box in the plot; beside the map, below the panel that floats over the plot's top.
-function frame(b){
+// Shows the box in the plot, flying there over ms; beside the map, below the panel that floats over the plot's top.
+function frame(b,ms){
   var box=$('plot'),top=document.documentElement.classList.contains('peer')?
       Math.max(0,document.querySelector('.side').getBoundingClientRect().bottom-box.getBoundingClientRect().top):0,
     z=Math.log2(Math.min(Math.max(box.clientWidth,1)/(b[2]-b[0]||1),Math.max(box.clientHeight-top,1)/(b[3]-b[1]||1))*.9);
   z=Math.min(Math.max(z,S.vs.minZoom),S.vs.maxZoom);
-  S.vs=Object.assign({},S.vs,{target:[(b[0]+b[2])/2,(b[1]+b[3])/2+top/2/Math.pow(2,z),0],zoom:z});
+  S.vs=Object.assign({},S.vs,{target:[(b[0]+b[2])/2,(b[1]+b[3])/2+top/2/Math.pow(2,z),0],zoom:z,transitionDuration:ms||0,
+    transitionInterpolator:ms?new deck.LinearInterpolator({transitionProps:['target','zoom']}):null,onTransitionEnd:function(){S.framed.vs=S.vs;}});
   S.deck.setProps({viewState:S.vs});moved();S.framed={b:b,vs:S.vs};
 }
 function fit(){
@@ -260,8 +262,9 @@ function pointData(){
   return {length:P.n,attributes:{getPosition:{value:P.pos,size:2},getFilterCategory:{value:cat,size:3},
     getFillColor:{value:col,size:4,normalized:true}}};
 }
-// Over the map of life the points show, and take clicks, while the filters hold some back or once the view is
-// close enough to tell them apart; otherwise a click on the map zooms into its clade.
+// Over the map of life the points always show and take clicks; while no filter holds any back and the view is
+// too far out to tell them apart, they draw as a faint texture (one in ten above THIN_ABOVE) and the map keeps
+// its full strength. A click away from a point flies to the clade under it.
 function filtered(){return S.shown!=null&&S.shown<S.P.n;}
 function dots(){return filtered()||S.vs.zoom>=S.zoom0+3;}
 function layers(){
@@ -271,9 +274,12 @@ function layers(){
   S.PD=S.PD||pointData();
   var groups=[0];
   if(P.grp){groups=[];passing().forEach(function(v,j){if(v)groups.push(j);});}
-  var thin=S.thin&&P.n>THIN_ABOVE,d=dots();
-  var pts=new deck.ScatterplotLayer({id:'pts',data:S.PD,radiusUnits:'pixels',getRadius:1.5,radiusMinPixels:1,radiusMaxPixels:3,
-    stroked:false,pickable:true,visible:!LV.on()||d,extensions:[EXT],updateTriggers:{getFilterCategory:S.PDV},
+  var d=dots(),far=LV.on()&&!d,thin=(S.thin||far)&&P.n>THIN_ABOVE,D=S.PD,a=D.attributes;
+  // far out the points are one ink, not their group's colour, which would fight a zoom's palette, and faint enough that clumps of thousands stay grey
+  if(far){if(!D.far||D.far.attributes.getFilterCategory!==a.getFilterCategory)
+    D.far={length:D.length,attributes:{getPosition:a.getPosition,getFilterCategory:a.getFilterCategory}};D=D.far;}
+  var pts=new deck.ScatterplotLayer({id:'pts',data:D,radiusUnits:'pixels',getRadius:far?1:1.5,radiusMinPixels:1,radiusMaxPixels:3,
+    getFillColor:[29,29,27,8],stroked:false,pickable:true,extensions:[EXT],updateTriggers:{getFilterCategory:S.PDV},
     filterCategories:[groups,thin?[1]:[0,1],[1]]});
   var lyr=LV.on()?LV.layers(pts,d,filtered(),groups):[pts];
   function ring(id,rows,px,rgb,w){
@@ -285,7 +291,8 @@ function layers(){
   if(S.sel>=0)lyr.push(ring('sel',[S.sel],9,[29,29,27],2.5));
   if(S.ring)lyr.push(new deck.PathLayer({id:'lasso',data:[S.ring],getPath:function(r){return r;},positionFormat:'XY',
     widthUnits:'pixels',getWidth:1.5,getColor:[29,29,27,200]}));
-  S.deck.setProps({layers:lyr});
+  // far out the faint points cover most of the map at 4 px, which would leave no region to click into
+  S.deck.setProps({layers:lyr,pickingRadius:far?0:4});
 }
 
 // Hover and click.
@@ -328,7 +335,7 @@ addEventListener('message',function(e){
   remote=true;try{if(i<0)closeCard();else select(i,true);}finally{remote=false;}
 });
 // Esc cancels what is in progress, as on the map; a finished lasso goes only with its Clear button or chip.
-addEventListener('keydown',function(e){if(e.key!=='Escape')return;X.cancel();X.draw(false);if(!$('card').hidden)closeCard();});
+addEventListener('keydown',function(e){if(e.key!=='Escape')return;X.cancel();about(false);X.draw(false);if(!$('card').hidden)closeCard();});
 // The card's left edge: drag it, or use the arrow keys; a double click goes back to the default. The width is remembered.
 function cardWidth(w){
   var c=$('card');if(w==null){c.style.width='';localStorage.removeItem('wtid-card');return;}

@@ -1,7 +1,7 @@
 // The map of life: the photo-space layout drawn as a political map. A grid over the layout gives each cell
 // the clade whose smoothed record density is highest there. Zooming into a clade crops the view to the cells
-// it holds and colours them by the rank below; no record is filtered out, so other clades' territory stays
-// in view as grey. Agreement and look-alike levels come from pool-lookalike.bin (per record, measured on the
+// it holds and colours them by the rank below, in hues near the clade's own; the cells outside it stay clear,
+// so the map of all life drawn under it shows through. Agreement and look-alike levels come from pool-lookalike.bin (per record, measured on the
 // full BioCLIP neighbours), never from distances on this plot. Pure: arrays in, pixels and labels out.
 (function(root,factory){
   var api=factory();
@@ -11,14 +11,15 @@
 var RANKS=['kingdom','phylum','class','order','family'];
 // The rank each view's regions are drawn at: the rank below the clade's, as far as the file measures agreement.
 var FINE={life:'class',kingdom:'class',phylum:'class','class':'order',order:'family'};
-// Where Up goes from a clade of each rank.
-var UP={phylum:'kingdom','class':'kingdom',order:'class'};
 var LONG=512,SIG=0.8,SIG_LOOK=1.5,K_LIFE=28,K_ZOOM=12;
-var CAT=[[42,120,214],[235,104,52],[27,175,122],[237,161,0],[232,123,164],[0,131,0],[98,80,214],[227,73,72]];
-var OTHER=[179,179,168],OUT=236,NODATA=[225,224,217];
+// The coast follows a wider blur than the regions, islands under MIN_ISLAND cells join their surroundings, and
+// every region, at life and at a zoom, is drawn at LIFE_TINT of its strength, so the points over it read and a
+// zoom sits on the life map as a pastel like it (all at LONG cells).
+var SIG_COAST=5,MIN_ISLAND=150,LIFE_TINT=.55;
+var OTHER=[179,179,168],NODATA=[225,224,217];
 var RAMP=[[205,226,251],[158,197,244],[109,167,236],[57,135,229],[37,106,191],[24,79,149],[13,54,107]];
 var LEVELS=['same family','same order','same class','same phylum','same kingdom','other kingdom'];
-var SEA=255,OUTSIDE=254;  // cell codes past the region slots
+var SEA=255,OUTSIDE=254,UNSET=253;  // cell codes past the region slots; UNSET is land with no record near
 
 // Each taxa row's ancestor row at every rank in RANKS (itself at its own rank), or -1.
 // T rows are [latin, common, inat_id, rank index into ranks, parent row, ...].
@@ -37,8 +38,6 @@ function ancestors(T,ranks){
 }
 function rankOf(T,ranks,row){return row<0?'life':ranks[T[row][3]]||'';}
 function canZoom(T,ranks,row){return row>=0&&!!FINE[rankOf(T,ranks,row)];}
-// The clade Up goes to from row, or -1 for the whole of life.
-function parentOf(A,T,ranks,row){var u=UP[rankOf(T,ranks,row)];return u?A[u][row]:-1;}
 
 // pool-lookalike.bin, already gunzipped: plane A low nibble class, high nibble order agreement; plane B low
 // nibble family agreement, high nibble look-alike level + 2. Agreement is in twelfths, 15 unknown.
@@ -107,6 +106,39 @@ function landOf(tot){
   for(i=0;i<tot.length;i++)land[i]=tot[i]>cut?1:0;
   return land;
 }
+// Smooths a region raster in place: land with no record near takes the nearest region, islands under
+// MIN_ISLAND cells join the region they border most, then a 3x3 majority rounds the boundaries. At a zoom the
+// cells outside the clade take part as one more region, so a small pocket of them inside the clade fills in
+// and a small speck of the clade out among them goes. The sea stays as it is.
+function tidy(code,W,H,K,sc){
+  var WH=W*H,q=new Int32Array(WH),cnt=new Int32Array(256),h=0,t=0,c,k,r,i;
+  function nb(c,k){var x=c%W;return k===0?(x>0?c-1:-1):k===1?(x<W-1?c+1:-1):k===2?(c>=W?c-W:-1):c+W<WH?c+W:-1;}
+  for(c=0;c<WH;c++)if(code[c]!==SEA&&code[c]!==UNSET)q[t++]=c;
+  while(h<t){c=q[h++];for(k=0;k<4;k++){r=nb(c,k);if(r>=0&&code[r]===UNSET){code[r]=code[c];q[t++]=r;}}}
+  for(c=0;c<WH;c++)if(code[c]===UNSET)code[c]=SEA;
+  var cmp=new Uint8Array(WH),min=MIN_ISLAND*sc*sc;
+  for(var pass=0,changed=1;pass<3&&changed;pass++){
+    changed=0;cmp.fill(0);
+    for(c=0;c<WH;c++){
+      if(cmp[c]||code[c]>K&&code[c]!==OUTSIDE)continue;
+      var cd=code[c];h=t=0;q[t++]=c;cmp[c]=1;
+      while(h<t){var p=q[h++];for(k=0;k<4;k++){r=nb(p,k);if(r<0)continue;
+        if(code[r]===cd){if(!cmp[r]){cmp[r]=1;q[t++]=r;}}else if(code[r]<=K||code[r]===OUTSIDE)cnt[code[r]]++;}}
+      if(t<min){var best=-1;for(i=0;i<256;i++)if(cnt[i]&&(best<0||cnt[i]>cnt[best]))best=i;
+        if(best>=0){for(i=0;i<t;i++)code[q[i]]=best;changed=1;}}
+      cnt.fill(0);
+    }
+  }
+  var src=code.slice(),v=[],x,y,dx,dy;
+  for(y=0;y<H;y++)for(x=0;x<W;x++){
+    c=y*W+x;if(src[c]>K)continue;
+    v.length=0;
+    for(dy=Math.max(0,y-1);dy<=Math.min(H-1,y+1);dy++)for(dx=Math.max(0,x-1);dx<=Math.min(W-1,x+1);dx++){
+      var u=src[dy*W+dx];if(u<=K){if(!cnt[u])v.push(u);cnt[u]++;}}
+    var m=src[c];for(i=0;i<v.length;i++)if(cnt[v[i]]>cnt[m])m=v[i];
+    code[c]=m;for(i=0;i<v.length;i++)cnt[v[i]]=0;
+  }
+}
 // The life-level grid, each point's cell, the smoothed density and the land of one point set: the half of a
 // zoom's crop that does not depend on the clade, kept for the next zoom into the same points.
 var LIFE=null;
@@ -117,16 +149,28 @@ function lifePass(pos,n){
   blur(tot,g.W,g.H,kernel(SIG),new Float32Array(WH));
   return LIFE={pos:pos,n:n,g:g,cell:cell,tot:tot,land:landOf(tot)};
 }
-// The zoom's crop: the life-level cells where the clade holds over half the smoothed density, boxed by the
-// quantiles of its records there. A clade with no such cells gets the box of all its records.
+// The zoom's crop: the connected patches of life-level cells where the clade holds over half the smoothed
+// density, those with at least PATCH of the largest one's records (a big clade also holds scattered small
+// patches, whose box would be the whole map), boxed by the quantiles of its records there. A clade with no such cells gets the box of all its records.
+var PATCH=.25;
 function territoryExtent(o,inTax){
-  var P=lifePass(o.pos,o.n),g=P.g,WH=g.W*g.H,cell=P.cell,tot=P.tot,land=P.land,cz=new Float32Array(WH),raw,i;
+  var P=lifePass(o.pos,o.n),g=P.g,W=g.W,WH=W*g.H,cell=P.cell,tot=P.tot,land=P.land,cz=new Float32Array(WH),raw,i;
   for(i=0;i<o.n;i++){var c=cell[i];if(c>=0&&inTax[o.tax[i]])cz[c]++;}
-  raw=cz.slice();blur(cz,g.W,g.H,kernel(SIG),new Float32Array(WH));
-  var hx=new Float64Array(g.W),hy=new Float64Array(g.H),m=0;
+  raw=cz.slice();blur(cz,W,g.H,kernel(SIG),new Float32Array(WH));
+  var own=new Int32Array(WH),q=new Int32Array(WH),wt=[0],bw=0,id=0,k;
+  for(i=0;i<WH;i++)own[i]=land[i]&&cz[i]>.5*tot[i]?-1:0;
+  for(i=0;i<WH;i++){
+    if(own[i]!==-1)continue;
+    var h=0,t=0,w=0;own[i]=++id;q[t++]=i;
+    while(h<t){var p=q[h++],x=p%W;w+=raw[p];
+      for(k=0;k<4;k++){var r=k===0?(x>0?p-1:-1):k===1?(x<W-1?p+1:-1):k===2?p-W:p+W;
+        if(r>=0&&r<WH&&own[r]===-1){own[r]=id;q[t++]=r;}}}
+    wt.push(w);bw=Math.max(bw,w);
+  }
+  var hx=new Float64Array(W),hy=new Float64Array(g.H),m=0;
   for(var pass=0;pass<2&&!m;pass++)for(i=0;i<WH;i++){
-    if(!raw[i]||(!pass&&!(land[i]&&cz[i]>.5*tot[i])))continue;
-    hx[i%g.W]+=raw[i];hy[Math.floor(i/g.W)]+=raw[i];m+=raw[i];}
+    if(!raw[i]||(!pass&&!(wt[own[i]]>=PATCH*bw)))continue;
+    hx[i%W]+=raw[i];hy[Math.floor(i/W)]+=raw[i];m+=raw[i];}
   if(!m)return null;
   var qx=qrange(hx,.001),qy=qrange(hy,.001),e=g.ext;
   return padded(e[0]+qx[0]/g.sx,e[0]+qx[1]/g.sx,e[1]+qy[0]/g.sy,e[1]+qy[1]/g.sy,.04);
@@ -138,15 +182,77 @@ function ramp(t){
   return mix(RAMP[i],RAMP[i+1],t-i);
 }
 
+// Sibling s of a clade drawn in rgb: a hue within HUE degrees of the clade's, then lighter or darker, so a zoom
+// keeps its parent's colour family and siblings still tell apart.
+var HUE=28,HUES=[0,-1,1,-.5,.5],LIGHT=[0,.12,-.12];
+function hsl(c){
+  var r=c[0]/255,g=c[1]/255,b=c[2]/255,mx=Math.max(r,g,b),mn=Math.min(r,g,b),l=(mx+mn)/2,d=mx-mn,h=0;
+  if(d)h=60*(mx===r?(g-b)/d+(g<b?6:0):mx===g?(b-r)/d+2:(r-g)/d+4);
+  return [h,d?d/(1-Math.abs(2*l-1)):0,l];
+}
+function rgb(h,s,l){
+  var c=(1-Math.abs(2*l-1))*s,x=c*(1-Math.abs(h/60%2-1)),m=l-c/2,k=Math.floor(h/60)%6,
+    v=[[c,x,0],[x,c,0],[0,c,x],[0,x,c],[x,0,c],[c,0,x]][k];
+  return [255*(v[0]+m),255*(v[1]+m),255*(v[2]+m)];
+}
+function shade(c,s){
+  var p=hsl(c);
+  return rgb((p[0]+HUE*HUES[s%5]+360)%360,p[1],Math.max(.2,Math.min(.8,p[2]+LIGHT[Math.floor(s/5)%3])));
+}
+// Per taxa row (65535 unknown), whether it lies in clade (-1: everything).
+function within(T,A,ranks,clade){
+  var R=T.length,zr=rankOf(T,ranks,clade),a=new Uint8Array(65536);
+  for(var t=0;t<65536;t++)a[t]=clade<0||(t<R&&A[zr][t]===clade)?1:0;
+  return a;
+}
+// The box a zoom into o.clade crops to (o as for build), or null.
+function extent(o){return territoryExtent(o,within(o.T,o.A,o.ranks,o.clade));}
+// The region at layout point (x,y): on the deepest zoomed map of Z (a map, or maps from shallow to deep) that has
+// its clade there, else on the life map; with the clade it is the region of (the map's own clade for its "other"
+// region), or null over the sea.
+function region(life,Z,x,y){
+  for(var zs=[].concat(Z||[]),i=zs.length-1,h;i>=0;i--){
+    h=hit(zs[i],x,y);
+    if(h&&h.slot>=0){var r=zs[i].slots[h.slot].row;return {map:zs[i],hit:h,row:r>=0?r:zs[i].clade};}
+  }
+  h=hit(life,x,y);
+  return h&&h.slot>=0?{map:life,hit:h,row:life.slots[h.slot].row}:null;
+}
+// The clade view box b looks at: -1 (all life) while it holds over LIFE_VIEW of the life map's land, else the
+// deepest clade a map can be drawn for whose regions hold over FILL of the land of a grid of samples over b, read
+// as region reads Z. Z holds the focused clade's ancestors' maps too: its own map keeps only the cells it holds a
+// majority of, where its parent's gave it every cell it led, so on its own map its share would drop once in focus.
+var LIFE_VIEW=.6,FILL=.5,SAMPLES=24;
+function focus(life,Z,A,T,ranks,b){
+  var W=life.W,e=life.ext,x0=Math.max(0,Math.floor((b[0]-e[0])*life.sx)),x1=Math.min(W,Math.ceil((b[2]-e[0])*life.sx)),
+    y0=Math.max(0,Math.floor((b[1]-e[1])*life.sy)),y1=Math.min(life.H,Math.ceil((b[3]-e[1])*life.sy)),land=0,x,y,i,j;
+  for(y=y0;y<y1;y++)for(x=x0;x<x1;x++)if(life.code[y*W+x]!==SEA)land++;
+  if(land>LIFE_VIEW*life.nLand)return -1;
+  var n=0,cnt={};RANKS.forEach(function(k){cnt[k]=new Map();});
+  for(i=0;i<SAMPLES;i++)for(j=0;j<SAMPLES;j++){
+    var u=region(life,Z,b[0]+(i+.5)/SAMPLES*(b[2]-b[0]),b[1]+(j+.5)/SAMPLES*(b[3]-b[1]));
+    if(!u)continue;
+    n++;if(u.row<0)continue;
+    RANKS.forEach(function(k){var a=A[k][u.row];if(a>=0)cnt[k].set(a,(cnt[k].get(a)||0)+1);});
+  }
+  for(var q=RANKS.length-1;q>=0;q--){
+    if(!FINE[RANKS[q]])continue;
+    var best=-1,bn=0;cnt[RANKS[q]].forEach(function(v,r){if(v>bn){bn=v;best=r;}});
+    if(bn>FILL*n)return best;
+  }
+  return -1;
+}
+
 // o: {pos (x,y per point), n, tax (taxa row per point, 65535 unknown), grp (group per point), groups (count),
 // color(g) -> rgb, T, ranks, A (ancestors), clade (taxa row, -1 for the whole of life), look (decodeLookalike,
-// or null), src (each point's row in the look-alike file), long (cells on the long side, default LONG)}.
+// or null), src (each point's row in the look-alike file), long (cells on the long side, default LONG), rgb (the
+// clade's colour, or null), known(row) -> a class's colour on the map of life, or null}.
 function build(o){
   // sc: cells per LONG cell; every length or count in cells scales with it, so a finer grid draws the same map
   var long=o.long||LONG,sc=long/LONG,T=o.T,R=T.length,A=o.A,clade=o.clade==null?-1:o.clade,zr=rankOf(T,o.ranks,clade),fine=FINE[zr];
   if(!fine)throw new Error('cannot zoom into a '+zr);
-  var NT=65536,inTax=new Uint8Array(NT),fineOf=new Int32Array(NT).fill(-1),t,i;
-  for(t=0;t<NT;t++){inTax[t]=clade<0||(t<R&&A[zr][t]===clade)?1:0;if(t<R)fineOf[t]=A[fine][t];}
+  var NT=65536,inTax=within(T,A,o.ranks,clade),fineOf=new Int32Array(NT).fill(-1),t,i;
+  for(t=0;t<R;t++)fineOf[t]=A[fine][t];
   var ext=clade<0?lifeExtent(o.pos,o.n):territoryExtent(o,inTax);
   if(!ext)return null;
   var g=grid(ext,long),W=g.W,H=g.H,WH=W*H,cell=cellsOf(o.pos,o.n,g);
@@ -175,38 +281,47 @@ function build(o){
   for(s=0;s<=K;s++)blur(S.subarray(s*WH,(s+1)*WH),W,H,k,tmp);
   blur(tot,W,H,k,tmp);
   if(L){blur(aS,W,H,k,tmp);blur(aC,W,H,k,tmp);blur(vS,W,H,kl,tmp);blur(vC,W,H,kl,tmp);}
-  var land=landOf(tot),code=new Uint8Array(WH),dom=new Float32Array(WH),nLand=0;
+  var coast=raw.slice();blur(coast,W,H,kernel(SIG_COAST*sc),tmp);
+  var land=landOf(coast),code=new Uint8Array(WH),den=new Float32Array(WH),nLand=0;
   for(c=0;c<WH;c++){
     if(!land[c]){code[c]=SEA;continue;}
-    nLand++;var best=0,mx=-1,sum=0;
+    nLand++;
+    if(!(tot[c]>0)){code[c]=UNSET;continue;}
+    var best=0,mx=-1,sum=0;
     for(s=0;s<=K;s++){var d=S[s*WH+c];sum+=d;if(d>mx){mx=d;best=s;}}
     if(clade>=0&&!(sum>.5*tot[c])){code[c]=OUTSIDE;continue;}
-    code[c]=best;dom[c]=mx/((clade<0?tot[c]:sum)||1);
+    code[c]=best;den[c]=clade<0?tot[c]:sum;
   }
-  // colours: at life a class takes its group's colour, siblings in one group paler; inside a zoom, a palette
-  var seen={},slots=rows.map(function(row,s){
-    var rgb;
-    if(clade<0){var bg=0;for(var q=1;q<G;q++)if(sGrp[s*G+q]>sGrp[s*G+bg])bg=q;
-      var sib=seen[bg]=(seen[bg]===undefined?-1:seen[bg])+1;rgb=mix(o.color(bg),WHITE,.28*(sib%3));}
-    else rgb=s<8?CAT[s]:mix(CAT[s-8],WHITE,.38);
+  tidy(code,W,H,K,sc);
+  // colours: a class keeps the colour the map of life gave it (o.known), else its group's colour, siblings in
+  // one group paler; an order or family is a shade of its clade's colour (o.rgb, else its commonest group's)
+  function major(s0,s1){var bg=0,q,s,t=new Float64Array(G);
+    for(s=s0;s<s1;s++)for(q=0;q<G;q++)t[q]+=sGrp[s*G+q];
+    for(q=1;q<G;q++)if(t[q]>t[bg])bg=q;return bg;}
+  var seen={},base=fine==='class'?null:o.rgb||o.color(major(0,K+1)),slots=rows.map(function(row,s){
+    var rgb=base?shade(base,s):o.known&&o.known(row);
+    if(!rgb){var bg=major(s,s+1),sib=seen[bg]=(seen[bg]===undefined?-1:seen[bg])+1;rgb=mix(o.color(bg),WHITE,.28*(sib%3));}
     return {row:row,rgb:rgb,n:sN[s],agree:sAc[s]?sA[s]/sAc[s]:null};
   });
-  slots.push({row:-1,rgb:OTHER,n:sN[K],agree:null});
+  slots.push({row:-1,rgb:o.rgb||base?mix(o.rgb||base,WHITE,.55):OTHER,n:sN[K],agree:null});
   var kOf=slots.map(function(sl){return sl.row>=0?A.kingdom[sl.row]:-1;}),
     img=new Uint8ClampedArray(4*WH),look=L?new Uint8ClampedArray(4*WH):null;
   function put(a,c,rgb,al){var p=4*((H-1-Math.floor(c/W))*W+c%W);a[p]=rgb[0];a[p+1]=rgb[1];a[p+2]=rgb[2];a[p+3]=al;}
   for(c=0;c<WH;c++){
     var cd=code[c];
-    if(cd===SEA)continue;
-    if(cd===OUTSIDE){put(img,c,[OUT,OUT,OUT],255);if(look)put(look,c,[OUT,OUT,OUT],255);continue;}
+    if(cd===SEA||cd===OUTSIDE)continue;
     // contested cells, and cells whose records' photo neighbours mostly lie outside their clade, read paler
-    var f=.35+.65*dom[c]*(aC[c]>few?Math.min(1,aS[c]/aC[c]):1);
-    put(img,c,mix(slots[cd].rgb,WHITE,1-f),255);
-    if(look)put(look,c,vC[c]>few?ramp(vS[c]/vC[c]/3):NODATA,255);
+    var dom=den[c]>0?S[cd*WH+c]/den[c]:1,f=.35+.65*dom*(aC[c]>few?Math.min(1,aS[c]/aC[c]):1);
+    f*=LIFE_TINT;
+    // a zoom fades out where its clade's share falls to the half it needs, so its edge blends into the life map;
+    // a cell with no share is one tidy filled in, solid like the region around it
+    var al=clade<0||!den[c]?255:255*Math.min(1,Math.max(0,(den[c]/tot[c]-.5)/.25));
+    put(img,c,mix(slots[cd].rgb,WHITE,1-f),al);
+    if(look)put(look,c,vC[c]>few?ramp(vS[c]/vC[c]/3):NODATA,al);
   }
   borders(img,code,W,H,clade<0?kOf:null);
-  return {ext:ext,W:W,H:H,cs:g.cs,sc:sc,sx:g.sx,sy:g.sy,clade:clade,rank:zr,fine:fine,code:code,raw:raw,levels:LH,
-    slots:slots,K:K,image:img,look:look,labels:labels(code,W,H,g,slots,T,K,clade<0?kOf:null,nLand,sc)};
+  return {ext:ext,W:W,H:H,cs:g.cs,sc:sc,sx:g.sx,sy:g.sy,clade:clade,rank:zr,fine:fine,code:code,raw:raw,levels:LH,nLand:nLand,
+    slots:slots,K:K,image:img,look:look,labels:labels(code,raw,W,H,g,slots,T,K,clade<0?kOf:null,nLand,sc)};
 }
 // Thin lines between regions, a darker coast, thick black between kingdoms (kOf given, at life only).
 function borders(img,code,W,H,kOf){
@@ -224,9 +339,10 @@ function borders(img,code,W,H,kOf){
     for(var j=0;j<3;j++)img[p+j]=img[p+j]*(1-ink[3])+ink[j]*ink[3];
   }
 }
-// A label at the pole of inaccessibility of each region's largest island, italic repeats on the next two
-// sizeable ones, and at life each kingdom's share of the map around the edge. Sizes are in layout units.
-function labels(code,W,H,g,slots,T,K,kOf,nLand,sc){
+// A label at the pole of inaccessibility of each region's largest island, an italic repeat on the largest other
+// island holding a third of the region's records (raw, per cell), and at life each kingdom's share of the map
+// around the edge. Sizes are in layout units.
+function labels(code,raw,W,H,g,slots,T,K,kOf,nLand,sc){
   var WH=W*H,d=new Float32Array(WH),c,x,y,INF=1e9,R2=Math.SQRT2;
   for(c=0;c<WH;c++){
     if(code[c]>K){d[c]=0;continue;}
@@ -241,22 +357,23 @@ function labels(code,W,H,g,slots,T,K,kOf,nLand,sc){
   var seen=new Uint8Array(WH),stack=new Int32Array(WH),comps=slots.map(function(){return [];});
   for(c=0;c<WH;c++){
     if(seen[c]||code[c]>K)continue;
-    var cd=code[c],top=0,size=0,best=c;stack[top++]=c;seen[c]=1;
-    while(top){var q=stack[--top];size++;if(d[q]>d[best])best=q;
+    var cd=code[c],top=0,size=0,rec=0,best=c;stack[top++]=c;seen[c]=1;
+    while(top){var q=stack[--top];size++;rec+=raw[q];if(d[q]>d[best])best=q;
       var qx=q%W,nb=[qx>0?q-1:-1,qx<W-1?q+1:-1,q>=W?q-W:-1,q+W<WH?q+W:-1];
       for(var m=0;m<4;m++){var r=nb[m];if(r>=0&&!seen[r]&&code[r]===cd){seen[r]=1;stack[top++]=r;}}}
-    comps[cd].push({size:size,at:best});
+    comps[cd].push({size:size,rec:rec,at:best});
   }
   function pt(c){var x=c%W,y=(c-x)/W;return [g.ext[0]+(x+.5)/g.sx,g.ext[1]+(y+.5)/g.sy];}
   var out=[];
   comps.forEach(function(cs,s){
     var row=slots[s].row;if(row<0||!cs.length)return;
     cs.sort(function(a,b){return b.size-a.size;});
-    var area=cs.reduce(function(t,q){return t+q.size;},0),size=.2*Math.sqrt(area)*g.cs;
+    var area=cs.reduce(function(t,q){return t+q.size;},0),rec=cs.reduce(function(t,q){return t+q.rec;},0),
+      size=.2*Math.sqrt(area)*g.cs,main={text:T[row][0],pos:pt(cs[0].at),size:size,row:row,area:area,italic:false};
     if(cs[0].size<8*sc*sc)return;
-    out.push({text:T[row][0],pos:pt(cs[0].at),size:size,row:row,area:area,italic:false});
-    cs.slice(1,3).forEach(function(q){
-      if(q.size>.08*area&&q.size>40*sc*sc)out.push({text:T[row][0],pos:pt(q.at),size:size*.55,row:row,area:q.size,italic:true});});
+    out.push(main);
+    var q=cs.slice(1).find(function(q){return q.rec>=rec/3;});
+    if(q)out.push({text:T[row][0],pos:pt(q.at),size:size*.55,row:row,area:q.size,italic:true,of:main});
   });
   if(kOf){
     var kc=new Map();
@@ -273,12 +390,14 @@ function labels(code,W,H,g,slots,T,K,kOf,nLand,sc){
   return out;
 }
 // The labels that read at zoom z (2^z px a layout unit, as the text layer draws common units): kingdoms first,
-// then the largest; a label goes when it would draw under minPx or overlap one already placed.
+// then the largest; a label goes when it would draw under minPx or overlap one already placed, and a repeat
+// (d.of, its region's main label) when it would draw within REPEAT_PX of that label.
+var REPEAT_PX=60;
 function place(L,z,minPx){
   var k=Math.pow(2,z),out=[],box=[];
   function px(d){return Math.min(d.size*k,d.bold?22:30);}
   L.slice().sort(function(a,b){return (b.bold?1:0)-(a.bold?1:0)||px(b)-px(a)||b.area-a.area;}).forEach(function(d){
-    var p=px(d);if(p<minPx)return;
+    var p=px(d);if(p<minPx||d.of&&Math.hypot(d.pos[0]-d.of.pos[0],d.pos[1]-d.of.pos[1])*k<REPEAT_PX)return;
     var ln=String(d.text).split('\n'),w=p*(d.bold?.62:.55)*Math.max.apply(null,ln.map(function(t){return t.length;}))/k/2,
       h=p*1.2*ln.length/k/2,b=[d.pos[0]-w,d.pos[1]-h,d.pos[0]+w,d.pos[1]+h];
     if(box.some(function(q){return b[0]<q[2]&&q[0]<b[2]&&b[1]<q[3]&&q[1]<b[3];}))return;
@@ -298,5 +417,6 @@ function hit(M,x,y){
   return {slot:cd<=M.K?cd:-1,sea:cd===SEA,outside:cd===OUTSIDE,n:M.raw[c],levels:lev};
 }
 return {RANKS:RANKS,FINE:FINE,LEVELS:LEVELS,RAMP:RAMP,ancestors:ancestors,rankOf:rankOf,canZoom:canZoom,
-  parentOf:parentOf,decodeLookalike:decodeLookalike,level:level,build:build,hit:hit,place:place};
+  decodeLookalike:decodeLookalike,level:level,build:build,hit:hit,place:place,tidy:tidy,extent:extent,region:region,
+  focus:focus,shade:shade,hsl:hsl,SEA:SEA,OUTSIDE:OUTSIDE};
 });

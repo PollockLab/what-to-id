@@ -1,4 +1,4 @@
-"""The photo space's Map of life in Chromium: view switch, hash, zoom by click, look-alike file.
+"""The photo space's Map of life in Chromium: view switch, hash, semantic zoom, look-alike file.
 
 deck.gl is replaced by a recorder, as in test_embeddings_browser.py; the map's pixels are read
 back from the canvas the page hands the bitmap layer.
@@ -30,7 +30,7 @@ window.deck = {
   Deck: class { constructor(p) { this.props = p; window.__deck = this; }
     setProps(p) { Object.assign(this.props, p); } },
   OrthographicView: Layer, ScatterplotLayer: Layer, PathLayer: Layer, BitmapLayer: Layer,
-  TextLayer: Layer,
+  TextLayer: Layer, LinearInterpolator: Layer,
   DataFilterExtension: class { initializeState() {} },
 };"""
 # taxon id -> [parent, latin, common, rank]
@@ -178,7 +178,7 @@ def tokens(page):
 def layer(page, id_):
     return page.evaluate(
         "id => { const l = __deck.props.layers.find(l => l.id === id);"
-        " return {visible: l.props.visible, opacity: l.props.opacity}; }",
+        " return {radius: l.props.getRadius, opacity: l.props.opacity}; }",
         id_,
     )
 
@@ -188,8 +188,8 @@ def test_the_map_of_life_is_the_view_and_look_alikes_survives_a_reload(open_page
     drawn(page)
     assert not any(t.startswith("life=") for t in tokens(page))  # the default writes nothing
     assert page.locator("#vpts").count() == 0  # no Points view to switch to
-    # the points stay in the layers, hidden while nothing holds any back, so the map reads
-    assert layer(page, "pts")["visible"] is False and layer(page, "life-img")["opacity"] == 1
+    # far out with nothing held back the points draw as a faint texture over the full-strength map
+    assert layer(page, "pts")["radius"] == 1 and layer(page, "life-img")["opacity"] == 1
     assert {"life-lbl", "life-lbl-k"} <= set(ids(page))
     labels = page.evaluate(
         "__deck.props.layers.find(l => l.id === 'life-lbl').props.data.map(d => d.text)"
@@ -223,28 +223,53 @@ def test_hover_reads_agreement_and_levels_from_the_file_in_both_shards(open_page
     assert hover(page, 55, 30) == ""  # empty space says nothing
 
 
-def test_click_zooms_into_a_clade_without_filtering_and_up_returns(open_page):
+def zoom_by(page, dz):
+    """Scroll-zoom as the controller does: a new view state, about the same centre."""
+    page.evaluate(
+        "dz => __deck.props.onViewStateChange({viewState: Object.assign({}, __deck.props.viewState,"
+        " {zoom: __deck.props.viewState.zoom + dz})})",
+        dz,
+    )
+
+
+def test_click_flies_to_a_clade_whose_map_draws_over_life_and_zooming_out_returns(open_page):
     page = open_page()
     drawn(page)
     count = page.locator("#count").inner_text()
+    home = page.evaluate("__deck.props.viewState.zoom")
     page.evaluate("__deck.props.onClick({coordinate: [-25, -5], index: -1})")  # the Insecta region
     page.wait_for_function("location.hash.includes('clade=47158')")
     drawn(page)
+    assert page.evaluate("__deck.props.viewState.zoom") > home  # the camera flew in
+    assert page.evaluate("__deck.props.viewState.transitionDuration") > 0
+    assert ids(page)[:2] == ["life-img", "life-zoom"]  # the world stays drawn around the clade
     labels = page.evaluate(
-        "__deck.props.layers.find(l => l.id === 'life-lbl').props.data.map(d => d.text)"
+        "__deck.props.layers.filter(l => l.id === 'life-lbl')"
+        ".flatMap(l => l.props.data.map(d => d.text))"
     )
-    assert {"Lepidoptera", "Coleoptera"} <= set(labels)
-    assert page.locator("#lup").inner_text() == "Up to Animalia"
+    assert {"Lepidoptera", "Coleoptera"} <= set(labels)  # the labels follow the rank in view
+    assert page.locator("#lup").count() == 0  # zooming out is the way back
     assert page.locator("#count").inner_text() == count  # zooming filters nothing
-    page.reload()
-    page.wait_for_function("document.getElementById('lifebar').hidden === false")
-    drawn(page)
-    assert page.locator("#lwhere").inner_text() == "Insecta (Insects)"
-    page.click("#lup")
-    page.wait_for_function("document.getElementById('lwhere').textContent.startsWith('Animalia')")
-    page.click("#lup")
+    opacity = "id => __deck.props.layers.find(l => l.id === id).props.opacity"
+    assert page.evaluate(opacity, "life-zoom") == 1
+    zoom_by(page, 8)  # far past 12 px a zoom cell: its blocks give way to the points and life map
+    assert page.evaluate(opacity, "life-zoom") == 0 and page.evaluate(opacity, "life-img") > 0
+    zoom_by(page, -8)
+    zoom_by(page, -3)
     page.wait_for_function("!location.hash.includes('clade=')")
-    assert page.locator("#lwhere").inner_text() == "All life"
+    assert page.locator("#lwhere").inner_text() == "All life" and "life-zoom" not in ids(page)
+
+
+def test_a_clade_in_the_address_is_where_the_view_starts_and_show_only_picks_it(open_page):
+    page = open_page("#clade=47158")
+    drawn(page)
+    page.wait_for_function("document.getElementById('lwhere').textContent.startsWith('Insecta')")
+    count = page.locator("#count").inner_text()
+    assert not any(t.startswith("taxa=") for t in tokens(page))  # a camera target, not a filter
+    page.click("#lonly")
+    page.wait_for_function("location.hash.includes('taxa=')")
+    assert page.locator("#count").inner_text() != count
+    assert "Insecta" in page.locator("#selbar").inner_text()
 
 
 def test_without_the_file_the_map_still_draws_and_look_alikes_is_off(open_page):
@@ -322,7 +347,7 @@ def test_a_subset_from_the_tree_draws_over_the_dimmed_map_and_its_points_open_re
         "{type: 'wtid-subset', ids, label: 'Aves'}, location.origin)",
         BIRDS,
     )
-    space.wait_for_function("__deck.props.layers.find(l => l.id === 'pts').props.visible === true")
+    space.wait_for_function("__deck.props.layers.find(l => l.id === 'pts').props.getRadius === 1.5")
     assert layer(space, "life-img")["opacity"] < 1  # the map dims under the subset
     assert len(set(pixel(space, 30, -5)[:3])) == 1  # and turns grey, so the points are the colour
     assert "few" not in ids(space)

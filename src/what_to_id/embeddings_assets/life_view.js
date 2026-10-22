@@ -1,26 +1,30 @@
-// The photo space drawn as a map of life (life_map.js draws it): Clades / Look-alikes, zoom by click with Up back
-// out, the hover text and the hash tokens life=look and clade=. The map draws every placed record; the app draws
-// the points the filters keep over it.
+// The photo space drawn as a map of life (life_map.js draws it): Clades / Look-alikes, the hover text and the
+// hash tokens life=look and clade=. The map of all life is always drawn; over it, the clade that fills the view
+// gets a sharper map of its own, transparent outside the clade, so zooming is the way in and back out. A click
+// on a region flies to it. The map draws every placed record; the app draws the points the filters keep over it.
 function LifeView(o){
 'use strict';
-var S=o.S,$=o.$,LM=LifeMap,nf=new Intl.NumberFormat('en-CA'),cache=new Map(),M=null,look,lookP=null,run=0;
+var S=o.S,$=o.$,LM=LifeMap,nf=new Intl.NumberFormat('en-CA'),cache=new Map(),life=null,M=null,look,lookP=null,run=0,
+  tm=0,pin=-1,pinB=null;
 var h0=new URLSearchParams(location.hash.slice(1)),mode=h0.get('life')==='look'?'look':'life',
   want=+h0.get('clade')||0,row=-1,A=null,byId=null,placed=null;
-var MIN_PX=11;  // a label drawn smaller than this does not read, so it is left out
+var MIN_PX=11,FLY=600;  // a label drawn smaller than MIN_PX does not read, so it is left out
+// Deep in, a zoom's cells draw as blocks: its map fades out as a cell grows from FADE[0] to FADE[1] screen px,
+// and the points over the life map carry the picture.
+var FADE=[6,12];
 // Zoom grid cells on the long side, from the screen at load (a resize keeps it, so the cache stays valid):
 // about one cell a device pixel, in steps of 256, at most 1024 (a 3M-record zoom builds in about 1 s there).
 var ZOOM_LONG=Math.max(512,Math.min(1024,256*Math.ceil(Math.max(innerWidth,innerHeight)*(devicePixelRatio||1)/256)));
-function on(){return !!M;}
+function on(){return !!life;}
 function name(r){var t=S.TAXA[r];return t[0]+(t[1]?' ('+t[1]+')':'');}
 function press(id,v){$(id).setAttribute('aria-pressed',v?'true':'false');}
 function bar(){
   press('vclade',mode==='life');press('vlook',mode==='look');
   $('vlook').disabled=look===null;
   $('vlook').title=look===null?'This map has no look-alike file yet':'';
-  var up=row>=0?LM.parentOf(A,S.TAXA,S.META.ranks,row):-2;
-  $('lup').hidden=up===-2;
-  $('lup').textContent=up>=0?'Up to '+S.TAXA[up][0]:'Up to all life';
   $('lwhere').textContent=row>=0?name(row):'All life';
+  $('lonly').hidden=row<0;
+  if(row>=0)$('lonly').title='Keep only the records of '+S.TAXA[row][0];
   $('lnote').textContent=look===null?'No look-alike file for this map.':'';
   var lg=$('llegend');lg.hidden=mode!=='look';
   if(mode==='look'&&!lg.childNodes.length){LM.LEVELS.slice(0,4).forEach(function(t,v){
@@ -49,77 +53,98 @@ function grey(m,k){
     m[k+'G']=canvas(m,a);}
   return m[k+'G'];
 }
-function draw(r,fit){
+function opts(r){
+  var P=S.P;
+  return {pos:P.pos,n:P.n,tax:P.tax,grp:P.grp,groups:S.META.groups.length,color:o.color,T:S.TAXA,ranks:S.META.ranks,
+    A:A,clade:r,src:P.src};
+}
+// A clade's colour as a region of a map already drawn, or null.
+function rgbOf(r){
+  var ms=[life].concat(Array.from(cache.values()));
+  for(var i=0;i<ms.length;i++)for(var s=0;ms[i]&&s<ms[i].slots.length;s++)if(ms[i].slots[s].row===r)return ms[i].slots[s].rgb;
+  return null;
+}
+function make(r){
+  var k=S.META.ranks,c=r>=0?A['class'][r]:-1;
+  // an order's families take their hues from the order's colour on its class's map, so that map comes first
+  if(LM.rankOf(S.TAXA,k,r)==='order'&&c>=0&&!rgbOf(r)&&!cache.has(c))make(c);
+  var t0=performance.now(),m=LM.build(Object.assign(opts(r),{look:look,long:r<0?512:ZOOM_LONG,rgb:rgbOf(r),known:rgbOf}));
+  console.info('map of '+(r<0?'life':S.TAXA[r][0])+' built in '+Math.round(performance.now()-t0)+' ms');
+  if(m){if(m.look)m.lookC=canvas(m,m.look);m.imgC=canvas(m,m.image);}
+  if(r<0)life=m;else{if(cache.size>8)cache.clear();cache.set(r,m);}
+  return m;
+}
+// The layout box the plot shows.
+function view(){
+  var b=$('plot'),k=Math.pow(2,S.vs.zoom),w=b.clientWidth/2/k,h=b.clientHeight/2/k,t=S.vs.target;
+  return [t[0]-w,t[1]-h,t[0]+w,t[1]+h];
+}
+// The clade the view looks at, its map drawn on first use; a new map may show a deeper clade still. A clade flown
+// to holds until the view moves, though its box may hold more of its parent than of it.
+function refocus(){
+  if(!life)return;
+  if(!(S.framed&&S.framed.b===pinB&&S.vs===S.framed.vs))pin=-1;
+  var r=pin>=0?pin:LM.focus(life,chain(),A,S.TAXA,S.META.ranks,view());
+  if(r===row)return;
   var me=++run;row=r;bar();o.writeHash();
-  if(cache.has(r)){show(cache.get(r),fit);return;}
-  o.status('Drawing the map of life…');
-  lookFile().then(function(L){
-    look=L;if(L===null&&mode==='look'){mode='life';o.writeHash();}
-    setTimeout(function(){
-      if(me!==run)return;
-      var P=S.P,t0=performance.now(),m=LM.build({pos:P.pos,n:P.n,tax:P.tax,grp:P.grp,groups:S.META.groups.length,
-        color:o.color,T:S.TAXA,ranks:S.META.ranks,A:A,clade:r,look:L,src:P.src,
-        long:r<0?512:ZOOM_LONG});  // all life keeps 512: its 28 density planes would cost four times the memory
-      console.info('map of life built in '+Math.round(performance.now()-t0)+' ms');
-      o.status('');
-      if(!m){if(r>=0)draw(-1,true);else{M=null;bar();o.redraw();}return;}  // too few records: points alone
-      if(m.look)m.lookC=canvas(m,m.look);
-      m.imgC=canvas(m,m.image);
-      if(cache.size>8)cache.clear();
-      cache.set(r,m);show(m,fit);
-    },20);
-  });
+  if(r<0||cache.has(r)){M=r<0?null:cache.get(r);o.redraw();return;}
+  o.status('Drawing the map of '+S.TAXA[r][0]+'…');
+  setTimeout(function(){
+    if(me!==run)return;
+    M=make(r);o.status('');o.redraw();refocus();  // too few records: M is null and the life map stays alone
+  },20);
 }
-function show(m,fit){
-  M=m;placed=null;bar();
-  // with room around the land for the kingdom labels
-  var e=m.ext,p=.1*Math.max(e[2]-e[0],e[3]-e[1]);
-  if(fit)o.frame([e[0]-p,e[1]-p,e[2]+p,e[3]+p]);
-  o.redraw();
+// The focused map and its ancestors' maps still cached, shallow to deep.
+function chain(){
+  return M?Array.from(cache.values()).filter(function(m){return m&&A[m.rank][M.clade]===m.clade;})
+    .sort(function(a,b){return LM.RANKS.indexOf(a.rank)-LM.RANKS.indexOf(b.rank);}):null;
 }
+function moved(){clearTimeout(tm);tm=setTimeout(refocus,200);}
 function set(m){
   if(m==='look'&&look===null)return;
   mode=m;bar();o.writeHash();o.redraw();
 }
-function go(r){if(r!==row)draw(r,true);}
+// with room around the land for the kingdom labels
+function padded(e){var p=.1*Math.max(e[2]-e[0],e[3]-e[1]);return [e[0]-p,e[1]-p,e[2]+p,e[3]+p];}
 // Back to all life, framed as on load; false when there is no map to go back to.
-function home(){if(!on())return false;draw(-1,true);return true;}
+function home(){if(!on())return false;o.frame(padded(life.ext));return true;}
+// Flies the view to clade r's territory, where the view's focus then finds it.
+function fly(r,ms){var b=LM.extent(opts(r));if(b){pin=r;pinB=b;o.frame(b,ms);}}
 $('vclade').addEventListener('click',function(){set('life');});
 $('vlook').addEventListener('click',function(){set('look');});
-$('lup').addEventListener('click',function(){go(LM.parentOf(A,S.TAXA,S.META.ranks,row));});
+$('lonly').addEventListener('click',function(){if(row>=0)o.only(S.TAXA[row][2]);});
 
 function text(t){
   if(!on())return null;
   if(t.layer&&t.layer.id.indexOf('life-lbl')===0&&t.object)return name(t.object.row);
-  var h=t.coordinate&&LM.hit(M,t.coordinate[0],t.coordinate[1]);
-  if(!h||h.sea)return '';
-  if(h.outside)return 'Outside '+S.TAXA[row][0];
-  var sl=M.slots[h.slot],out=[],fine=M.fine;
+  var u=t.coordinate&&LM.region(life,M,t.coordinate[0],t.coordinate[1]);
+  if(!u)return '';
+  var m=u.map,sl=m.slots[u.hit.slot],out=[],fine=m.fine;
   if(sl.row>=0){
     out.push(name(sl.row),nf.format(sl.n)+' records');
     if(sl.agree!=null)out.push(Math.round(100*sl.agree)+'% of its photo neighbours are also '+S.TAXA[sl.row][0]);
   }else out.push('Other '+(fine==='class'?'classes':fine==='family'?'families':'orders'),nf.format(sl.n)+' records');
-  if(mode==='look'&&h.levels){
-    var tot=h.levels.reduce(function(a,b){return a+b;},0);
+  var lev=u.hit.levels;
+  if(mode==='look'&&lev){
+    var tot=lev.reduce(function(a,b){return a+b;},0);
     if(tot)out.push('Closest look-alike here:');
-    h.levels.forEach(function(v,i){if(tot&&v/tot>=.01)out.push('  '+Math.round(100*v/tot)+'% '+LM.LEVELS[i]);});
+    lev.forEach(function(v,i){if(tot&&v/tot>=.01)out.push('  '+Math.round(100*v/tot)+'% '+LM.LEVELS[i]);});
   }
   return out.join('\n');
 }
-// A click the points did not take: a label or a region zooms into its clade, outside the clade goes up.
+// A click the points did not take: a label or a region flies the view to its clade.
 function click(t){
   if(!on())return false;
   var r=-1;
   if(t.layer&&t.layer.id.indexOf('life-lbl')===0&&t.object)r=t.object.row;
-  else{var h=t.coordinate&&LM.hit(M,t.coordinate[0],t.coordinate[1]);
-    if(h&&h.outside){go(LM.parentOf(A,S.TAXA,S.META.ranks,row));return true;}
-    if(h&&h.slot>=0)r=M.slots[h.slot].row;}
-  if(r>=0&&LM.canZoom(S.TAXA,S.META.ranks,r))go(r);
+  else{var u=t.coordinate&&LM.region(life,M,t.coordinate[0],t.coordinate[1]);if(u)r=u.row;}
+  if(r>=0)fly(r,FLY);
   return true;
 }
-// The map, then pts (the app's points layer), then the labels that read at the view's zoom; the map dims while
-// points are drawn over it, and turns grey while a filter holds some back; labels whose clade has no kept point
-// fade then (own layers, as a text layer's outline colour is one value for the layer).
+// The life map, the focused clade's map, then pts (the app's points layer), then the labels that read at the
+// view's zoom; the maps dim while points are drawn over them, and turn grey while a filter holds some back;
+// labels whose clade has no kept point fade then (own layers, as a text layer's outline colour is one value for
+// the layer).
 var fk=null,fh=null;
 // Per taxon row, whether its clade holds a kept point (grp: the picked groups); rebuilt per filter change.
 function holds(grp){
@@ -132,9 +157,17 @@ function holds(grp){
   }
   return fh;
 }
+// The labels to place: the focused map's, and the life map's for the clades beside the focus (those inside it or
+// above it would repeat or cover its own).
+function candidates(){
+  if(!M)return life.labels;
+  var T=S.TAXA,k=S.META.ranks,fr=LM.rankOf(T,k,row);
+  return life.labels.filter(function(d){return A[fr][d.row]!==row&&A[LM.rankOf(T,k,d.row)][row]!==d.row;})
+    .concat(M.labels);
+}
 function layers(pts,dim,filt,grp){
   var z=Math.round(S.vs.zoom*4)/4;
-  if(!placed||placed.z!==z)placed={z:z,L:LM.place(M.labels,z,MIN_PX)};
+  if(!placed||placed.z!==z||placed.M!==M)placed={z:z,M:M,L:LM.place(candidates(),z,MIN_PX)};
   var h=filt?holds(grp):null;
   function lbl(id,data,weight,f){
     return new deck.TextLayer({id:id,data:data,getPosition:function(d){return d.pos;},getText:function(d){return d.text;},
@@ -146,8 +179,12 @@ function layers(pts,dim,filt,grp){
     return h?[lbl(id+'-f',data.filter(function(d){return !h[d.row];}),weight,1),
       lbl(id,data.filter(function(d){return h[d.row];}),weight)]:[lbl(id,data,weight)];
   }
-  var L=placed.L,b=[M.ext[0],M.ext[1],M.ext[2],M.ext[3]],k=mode==='look'&&M.lookC?'look':'img';
-  return [new deck.BitmapLayer({id:'life-img',image:filt?grey(M,k):M[k+'C'],bounds:b,opacity:dim?.4:1}),pts].concat(
+  var k=mode==='look'&&life.lookC?'look':'img';
+  function map(id,m){var f=m===life?1:Math.min(1,Math.max(0,(FADE[1]-m.cs*Math.pow(2,z))/(FADE[1]-FADE[0])));
+    return new deck.BitmapLayer({id:id,image:filt?grey(m,k):m[k+'C'],bounds:m.ext.slice(),opacity:(dim?.4:1)*f});}
+  var L=placed.L,out=[map('life-img',life)];
+  if(M)out.push(map('life-zoom',M));
+  return out.concat([pts],
     lbls('life-lbl',L.filter(function(d){return !d.italic&&!d.bold;}),'600'),
     lbls('life-lbl-i',L.filter(function(d){return d.italic;}),'italic 500'),
     lbls('life-lbl-k',L.filter(function(d){return d.bold;}),'800'));
@@ -159,16 +196,26 @@ function hash(h){
   if(row>=0||want)h.push('clade='+(row>=0?S.TAXA[row][2]:want));  // a clade still waiting for the join stays
   return h;
 }
-// The join brings the names and the rows the map needs, and the map is drawn then; a subset or an opened record
-// keeps its own view.
+// The join brings the names and the rows the map needs, and the map is drawn then; a clade in the address is
+// where the view starts, and a subset or an opened record keeps its own view.
 function joined(){
   if(!S.TAXA||!S.META)return;
   A=LM.ancestors(S.TAXA,S.META.ranks);byId=new Map();
   S.TAXA.forEach(function(t,i){byId.set(t[2],i);});
-  cache.clear();fk=null;M=null;$('lifebar').hidden=false;
-  var r=want&&byId.has(want)?byId.get(want):-1;want=0;
+  cache.clear();fk=null;life=M=null;row=-1;placed=null;$('lifebar').hidden=false;
+  var r=want&&byId.has(want)?byId.get(want):-1,me=++run;
   if(r>=0&&!LM.canZoom(S.TAXA,S.META.ranks,r))r=-1;
-  draw(r,!S.subset&&S.sel<0);
+  o.status('Drawing the map of life…');
+  lookFile().then(function(L){
+    look=L;if(L===null&&mode==='look'){mode='life';o.writeHash();}
+    setTimeout(function(){
+      if(me!==run)return;
+      make(-1);o.status('');want=0;bar();o.writeHash();
+      if(!life){o.redraw();return;}  // too few records: points alone
+      if(!S.subset&&S.sel<0){if(r>=0)fly(r);else home();}
+      o.redraw();refocus();
+    },20);
+  });
 }
-return {on:on,layers:layers,text:text,click:click,hash:hash,joined:joined,home:home};
+return {on:on,layers:layers,text:text,click:click,hash:hash,joined:joined,home:home,moved:moved};
 }

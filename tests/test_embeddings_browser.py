@@ -168,10 +168,16 @@ def test_points_are_the_join_of_layout_and_pool(open_page):
     assert layer(page, "pts")["n"] == POOL_N  # layout holds 2150, the pool 2100: the join is 2100
     assert page.locator("#count").inner_text() == f"{POOL_N:,} shown of {POOL_N:,}"
     assert page.locator("#groups button[data-g]").count() == len(GROUPS)
-    text = page.locator("#honest").inner_text()
+    info, honest = page.locator("#hinfo"), page.locator("#honest")
+    assert not honest.is_visible() and info.get_attribute("aria-expanded") == "false"
+    info.click()
+    assert honest.is_visible() and info.get_attribute("aria-expanded") == "true"
+    text = honest.inner_text()
     assert "Measured on the layout" in text and "50%" in text and "12" in text
     assert "not identification confidence" in text and "lossy" in text
     assert "sample" not in page.locator("#intro").inner_text()
+    page.keyboard.press("Escape")
+    assert not honest.is_visible() and info.get_attribute("aria-expanded") == "false"
     assert page.errors == []
 
 

@@ -20,7 +20,7 @@ RAMP_LO, RAMP_HI = (
     [205, 226, 251],
     [13, 54, 107],
 )  # the blue ramp's ends: level 0 and level 3 or more
-OUT_GREY = 236
+CLEAR = [0, 0, 0, 0]
 # [latin, common, inat id, rank, parent row]
 TAXA = [
     ["Animalia", "Animals", 1, "kingdom", -1],
@@ -141,14 +141,47 @@ console.log(JSON.stringify({ins: region(M, -6.5, 0), aves: region(M, 6, 0), pl: 
     )
     assert (got["ins"], got["aves"], got["pl"]) == ("Insecta", "Aves", "Magnoliopsida")
     assert got["sea"]["sea"] and got["seaPx"][3] == 0  # empty space stays transparent
-    assert close(got["insPx"], COLOURS[1] + [255])
+    life_tint = 0.55  # at life a region is at most this strong, so the points over it read
+    assert close(
+        got["insPx"], [round(v * life_tint + 255 * (1 - life_tint)) for v in COLOURS[1]] + [255]
+    )
     assert {"Insecta", "Aves", "Magnoliopsida"} <= set(got["labels"])
     kingdoms = [t for t in got["labels"] if "% of map" in t]
     assert sorted(t.split("\n")[0] for t in kingdoms) == ["ANIMALIA", "PLANTAE"]
     assert got["look"] is None  # no look-alike file: no look-alike picture
 
 
-def test_zoom_crops_to_the_territory_and_greys_other_clades_without_dropping_them(world):
+def test_tidy_absorbs_small_islands_pockets_and_unset_land_but_keeps_large_areas_and_the_sea(world):
+    got = node(
+        world,
+        """
+const W = 60, H = 40, code = new Uint8Array(W * H);
+for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+  const c = y * W + x;
+  code[c] = x < 30 ? 0 : 1;
+  if (x >= 10 && x < 13 && y >= 10 && y < 13) code[c] = 1;    // a 9-cell stray inside A
+  if (x >= 40 && x < 55 && y >= 15 && y < 30) code[c] = 0;    // a 225-cell island inside B
+  if (y >= 36) code[c] = LM.SEA;
+  if (x === 5 && y === 30) code[c] = 253;                       // land with no record near
+  if (x >= 15 && x < 29 && y >= 20 && y < 36) code[c] = LM.OUTSIDE;  // 224 cells off the clade
+  if (x >= 20 && x < 22 && y >= 25 && y < 27) code[c] = 0;      // a 4-cell speck among them
+}
+code[2 * W + 2] = LM.OUTSIDE;                                   // a 1-cell pocket inside A
+LM.tidy(code, W, H, 1, 1);
+const at = (x, y) => code[y * W + x];
+console.log(JSON.stringify({stray: at(11, 11), island: at(47, 22), left: at(29, 5),
+  right: at(30, 5), sea: at(20, 38), unset: at(5, 30), pocket: at(2, 2), outside: at(16, 22),
+  speck: at(20, 25)}));""",
+    )
+    assert got["stray"] == 0  # under MIN_ISLAND cells: joins the region around it
+    assert got["island"] == 0  # a large island keeps its region
+    assert (got["left"], got["right"]) == (0, 1)  # a straight border stays where it is
+    assert got["sea"] == 255 and got["unset"] == 0
+    assert got["pocket"] == 0  # a small pocket outside the clade fills in with the region around it
+    assert got["outside"] == 254 and got["speck"] == 254  # a large one stays, speck and all
+
+
+def test_zoom_crops_to_the_territory_and_leaves_other_clades_clear_without_dropping_them(world):
     got = node(
         world,
         f"""
@@ -156,14 +189,25 @@ const M = map({ROW["Insecta"]}, LM.decodeLookalike(fileBuf(), n));
 const h = LM.hit(M, -4.75, 0);
 console.log(JSON.stringify({{fine: M.fine, lep: region(M, -6.5, 0), col: region(M, -3, 0),
   patch: h, patchPx: px(M, M.image, -4.75, 0), lookPx: px(M, M.look, -4.75, 0),
-  plants: LM.hit(M, 0, 5), birds: LM.hit(M, 6, 0), ext: M.ext}}));""",
+  plants: LM.hit(M, 0, 5), birds: LM.hit(M, 6, 0), ext: M.ext,
+  lep_px: px(M, M.image, -6.5, 0),
+  names: [M, map(-1, null)].map((m) => m.labels.filter((l) => !l.bold)
+    .map((l) => [l.text, !!l.italic, l.of ? l.of.text : null]))}}));""",
     )
     assert got["fine"] == "order"
+    for names in got[
+        "names"
+    ]:  # a region is named once, and at most once more beside its main label
+        mains = [t for t, italic, _ in names if not italic]
+        assert len(mains) == len(set(mains)) and all(of == t for t, italic, of in names if italic)
+        assert all(sum(1 for t, it, _ in names if it and t == m) <= 1 for m in mains)
+    assert got["lep_px"][3] == 255  # solid where the clade holds every record
+    assert min(got["lep_px"][:3]) >= round(255 * (1 - 0.55))  # a pastel, like the life map under it
     assert (got["lep"], got["col"]) == ("Lepidoptera", "Coleoptera")
     patch = got["patch"]
     assert patch["outside"] and patch["n"] > 0  # the birds between the orders are still counted
-    assert got["patchPx"] == [OUT_GREY, OUT_GREY, OUT_GREY, 255]
-    assert got["lookPx"] == [OUT_GREY, OUT_GREY, OUT_GREY, 255]
+    # the map of life under it shows through
+    assert got["patchPx"] == CLEAR and got["lookPx"] == CLEAR
     assert got["plants"] is None and got["birds"] is None  # cropped to the Insecta territory
     x0, y0, x1, y1 = got["ext"]
     assert x0 < -7.5 and x1 > -2 and x1 < 0 and y1 < 3
@@ -232,17 +276,14 @@ console.log(JSON.stringify({cls: Array.from(L.agree.class), ord: Array.from(L.ag
     assert "expected 6" in got["err"]
 
 
-def test_zoom_ranks_and_the_way_back_up(world):
+def test_zoom_ranks(world):
     got = node(
         world,
         f"""
-const up = (r) => LM.parentOf(A, D.T, RANKS, r);
-console.log(JSON.stringify({{ins: up({ROW["Insecta"]}), lep: up({ROW["Lepidoptera"]}),
-  ani: up({ROW["Animalia"]}), fam: LM.canZoom(D.T, RANKS, {ROW["Nymphalidae"]}),
+console.log(JSON.stringify({{fam: LM.canZoom(D.T, RANKS, {ROW["Nymphalidae"]}),
   ord: LM.canZoom(D.T, RANKS, {ROW["Lepidoptera"]}),
   famMap: map({ROW["Lepidoptera"]}, null).fine}}));""",
     )
-    assert (got["ins"], got["lep"], got["ani"]) == (ROW["Animalia"], ROW["Insecta"], -1)
     assert got["fam"] is False and got["ord"] is True and got["famMap"] == "family"
 
 
@@ -258,7 +299,9 @@ const big = {text: 'Insecta', pos: [0, 0], size: 4, area: 900},
 const at = (z, L) => LM.place(L, z, 11).map((l) => l.text);
 console.log(JSON.stringify({z2: at(2, [near, tiny, far, big]), z5: at(5, [near, tiny, far, big]),
   king: at(2, [big, king]), tie: at(5, [{text: 'Small', pos: [0, 0], size: 4, area: 10},
-    {text: 'Large', pos: [0, 0], size: 5, area: 20}])}));""",
+    {text: 'Large', pos: [0, 0], size: 5, area: 20}]),
+  rep: [4, 5].map((z) => at(z, [far,
+    {text: 'Aves', pos: [40, 2.5], size: 3, area: 50, italic: true, of: far}]))}));""",
     )
     # at zoom 2 (4 px a unit) the small label beside the big one and the 2 px one go
     assert got["z2"] == ["Insecta", "Aves"]
@@ -266,6 +309,8 @@ console.log(JSON.stringify({z2: at(2, [near, tiny, far, big]), z5: at(5, [near, 
     assert sorted(got["z5"]) == ["Ascidiacea", "Aves", "Aves", "Insecta"]
     assert got["king"] == ["ANIMALIA\n31% of map"]  # a kingdom outranks any class label
     assert got["tie"] == ["Large"]  # both capped at 30 px: the larger region keeps its name
+    # a repeat 2.5 units from its main label: 40 px at zoom 4 is too close, 80 px at zoom 5 reads
+    assert got["rep"] == [["Aves"], ["Aves", "Aves"]]
 
 
 def test_a_finer_grid_samples_the_same_zoom_at_twice_the_cells(world):
@@ -284,5 +329,65 @@ console.log(JSON.stringify({{lo: [lo.W, lo.H], hi: [hi.W, hi.H], loRows: rows(lo
     assert all(abs(h - 2 * lo) <= 1 for h, lo in zip(got["hi"], got["lo"], strict=True))
     assert got["hiRows"] == got["loRows"] and got["ext"][0] == got["ext"][1]
     assert (got["lep"], got["col"]) == ("Lepidoptera", "Coleoptera")
-    assert got["patch"] == [OUT_GREY, OUT_GREY, OUT_GREY, 255]  # the birds' patch is still outside
+    assert got["patch"] == CLEAR  # the birds' patch is still outside
     assert got["lev"] and got["labels"][0] == got["labels"][1]
+
+
+def hue_gap(a, b):
+    d = abs(a - b) % 360
+    return min(d, 360 - d)
+
+
+def test_a_zoom_shades_its_clade_colour_and_a_kingdom_keeps_the_class_colours_of_life(world):
+    got = node(
+        world,
+        f"""
+const life = map(-1, null), INS = {ROW["Insecta"]}, LEP = {ROW["Lepidoptera"]};
+const known = (r) => (life.slots.find((s) => s.row === r) || {{}}).rgb || null;
+const zoom = (o) => LM.build(Object.assign({{}}, base, o));
+const ins = zoom({{clade: INS, rgb: known(INS)}});
+const lepRgb = ins.slots.find((s) => s.row === LEP).rgb, lep = zoom({{clade: LEP, rgb: lepRgb}});
+const ani = zoom({{clade: {ROW["Animalia"]}, known}});
+const hues = (M) => M.slots.filter((s) => s.row >= 0).map((s) => LM.hsl(s.rgb)[0]);
+const many = Array.from({{length: 15}}, (_, s) => LM.shade([60, 140, 200], s).map(Math.round));
+console.log(JSON.stringify({{insHue: LM.hsl(known(INS))[0], orders: hues(ins),
+  lepHue: LM.hsl(lepRgb)[0], families: hues(lep), lifeIns: known(INS),
+  aniIns: ani.slots.find((s) => s.row === INS).rgb, distinct: new Set(many.map(String)).size,
+  gray: LM.shade([128, 128, 128], 3).map(Math.round)}}));""",
+    )
+    assert len(got["orders"]) == 2 and all(hue_gap(h, got["insHue"]) <= 28.5 for h in got["orders"])
+    assert got["families"] and all(hue_gap(h, got["lepHue"]) <= 28.5 for h in got["families"])
+    assert got["aniIns"] == got["lifeIns"]  # a class keeps the colour the map of life gave it
+    assert got["distinct"] == 15  # siblings still tell apart
+    assert got["gray"] == [128, 128, 128]  # no hue to keep, no hue added
+
+
+def test_the_view_focuses_the_deepest_clade_filling_it_and_a_zoom_defers_to_life_outside(world):
+    got = node(
+        world,
+        f"""
+const life = map(-1, null), ins = map({ROW["Insecta"]}, null);
+const lepZ = map({ROW["Lepidoptera"]}, null);
+const focus = (Z, b) => LM.focus(life, Z, A, D.T, RANKS, b);
+const name = (u) => u && D.T[u.row][0];
+console.log(JSON.stringify({{all: focus(null, [-12, -6, 12, 9]),
+  insects: focus(null, [-8.5, -2, -1.2, 2]), lep: focus(ins, [-7.6, -1, -5.4, 1]),
+  plants: focus(null, [-1.5, 3.5, 1.5, 6.5]),
+  keep: [focus(lepZ, [-4.1, -1, -1.9, 1]), focus([ins, lepZ], [-4.1, -1, -1.9, 1])],
+  leave: focus([ins, lepZ], [-12, -6, 12, 9]), birds: focus([ins, lepZ], [5, -1, 7, 1]),
+  sea: focus(null, [20, 20, 21, 21]), onLep: name(LM.region(life, ins, -6.5, 0)),
+  onPatch: name(LM.region(life, ins, -4.75, 0)), onBirds: name(LM.region(life, ins, 6, 0)),
+  overSea: LM.region(life, ins, 1.5, -1), insExt: ins.ext,
+  ext: LM.extent(Object.assign({{}}, base, {{clade: {ROW["Insecta"]}}}))}}));""",
+    )
+    assert got["all"] == -1  # the whole map in view: all of life
+    assert got["insects"] == ROW["Insecta"]  # both orders in view: their class
+    assert got["lep"] == ROW["Lepidoptera"]  # one order fills the view: the order, not its class
+    assert got["plants"] == ROW["Magnoliopsida"] and got["sea"] == -1
+    # past an order's own map, its class's map, still cached, reads the view before the map of life
+    assert got["keep"] == [ROW["Insecta"], ROW["Coleoptera"]]
+    assert got["leave"] == -1 and got["birds"] == ROW["Aves"]
+    assert got["onLep"] == "Lepidoptera"  # the zoom map's own region
+    assert got["onPatch"] == got["onBirds"] == "Aves"  # outside the zoom's clade, the map of life
+    assert got["overSea"] is None
+    assert got["ext"] == got["insExt"]  # the camera flies to the box the zoom map is cropped to
