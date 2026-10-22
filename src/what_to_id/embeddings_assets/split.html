@@ -30,7 +30,6 @@ body{display:flex;flex-direction:column}
 #main-content{flex:1 1 0;min-height:0;display:flex}
 #main-content iframe{flex:1 1 0;min-width:0;height:100%;border:0;background:var(--bg)}
 #main-content iframe[hidden]{display:none}
-#map{order:1}#space{order:3}#tree{order:5}
 #main-content.two iframe.first{flex:0 0 var(--split,50%)}
 #sep{flex:0 0 7px;cursor:col-resize;background:var(--line);touch-action:none;outline-offset:-2px}
 #sep:hover,#sep:focus-visible,#sep.on{background:var(--on)}
@@ -81,7 +80,8 @@ function mk(n){
   // what the other frame sent while this one was still loading
   f.addEventListener('load',function(){Object.keys(late).forEach(function(k){if(k!=='wtid-view'||visible('map'))post(n,late[k]);});
     if(n==='tree')tally(true);});
-  box.insertBefore(f,n==='map'?box.firstChild:null);frames[n]=f;}
+  // in ORDER in the page too, so the keys move through the panes as they are seen
+  box.insertBefore(f,ORDER.slice(ORDER.indexOf(n)+1).map(function(k){return frames[k];}).filter(Boolean)[0]||null);frames[n]=f;}
 // shortcut: three panes take equal thirds with no divider, add a second splitter if users ask to resize them.
 function setView(v){
   if(innerWidth<800&&v.length>1)v=[v.indexOf('tree')>=0?'tree':v[0]];  // a phone holds one pane
@@ -98,7 +98,7 @@ function setView(v){
     if(frames[n])frames[n].classList.toggle('first',n===v[0]);});
   // a hidden map masks nothing; a re-shown one fires no moveend, so its last view goes again
   if(!visible('map'))post('space',{type:'wtid-view',area:''});else if(late['wtid-view'])post('space',late['wtid-view']);
-  box.classList.toggle('two',v.length===2);sep.style.order=2*ORDER.indexOf(v[0])+2;  // between the first two panes
+  box.classList.toggle('two',v.length===2);if(v.length===2)box.insertBefore(sep,frames[v[1]]);
   post('space',{type:'wtid-layout',peer:visible('map')&&visible('space')});
   tally(!tree0&&visible('tree'));
   [].forEach.call(document.querySelectorAll('[data-p]'),function(b){b.setAttribute('aria-pressed',v.indexOf(b.dataset.p)>=0);});

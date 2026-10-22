@@ -175,8 +175,9 @@ def test_an_area_sent_before_the_frame_loads_still_arrives(browser, site):
     page.click("[data-p='space']")  # the second frame is created now, after the message
     page.wait_for_function(joined % "#space")
     right = next(f for f in page.frames if "embed=1" in f.url and f is not left)
-    right.wait_for_function(
-        f"!document.getElementById('count').textContent.startsWith('{POOL_N:,}')"
+    right.wait_for_function(  # a count, not the page's opening "Loading", and not the whole pool
+        "t => /^[0-9]/.test(t = document.getElementById('count').textContent)"
+        f" && !t.startsWith('{POOL_N:,}')"
     )
     assert 0 < shown(right) < POOL_N
     assert page.errors == []
