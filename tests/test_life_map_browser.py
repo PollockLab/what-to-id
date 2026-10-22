@@ -178,7 +178,7 @@ def tokens(page):
 def layer(page, id_):
     return page.evaluate(
         "id => { const l = __deck.props.layers.find(l => l.id === id);"
-        " return {visible: l.props.visible, opacity: l.props.opacity}; }",
+        " return {radius: l.props.getRadius, opacity: l.props.opacity}; }",
         id_,
     )
 
@@ -188,8 +188,8 @@ def test_the_map_of_life_is_the_view_and_look_alikes_survives_a_reload(open_page
     drawn(page)
     assert not any(t.startswith("life=") for t in tokens(page))  # the default writes nothing
     assert page.locator("#vpts").count() == 0  # no Points view to switch to
-    # the points stay in the layers, hidden while nothing holds any back, so the map reads
-    assert layer(page, "pts")["visible"] is False and layer(page, "life-img")["opacity"] == 1
+    # far out with nothing held back the points draw as a faint texture over the map at full strength
+    assert layer(page, "pts")["radius"] == 1 and layer(page, "life-img")["opacity"] == 1
     assert {"life-lbl", "life-lbl-k"} <= set(ids(page))
     labels = page.evaluate(
         "__deck.props.layers.find(l => l.id === 'life-lbl').props.data.map(d => d.text)"
@@ -322,7 +322,7 @@ def test_a_subset_from_the_tree_draws_over_the_dimmed_map_and_its_points_open_re
         "{type: 'wtid-subset', ids, label: 'Aves'}, location.origin)",
         BIRDS,
     )
-    space.wait_for_function("__deck.props.layers.find(l => l.id === 'pts').props.visible === true")
+    space.wait_for_function("__deck.props.layers.find(l => l.id === 'pts').props.getRadius === 1.5")
     assert layer(space, "life-img")["opacity"] < 1  # the map dims under the subset
     assert len(set(pixel(space, 30, -5)[:3])) == 1  # and turns grey, so the points are the colour
     assert "few" not in ids(space)

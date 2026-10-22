@@ -14,11 +14,14 @@ var FINE={life:'class',kingdom:'class',phylum:'class','class':'order',order:'fam
 // Where Up goes from a clade of each rank.
 var UP={phylum:'kingdom','class':'kingdom',order:'class'};
 var LONG=512,SIG=0.8,SIG_LOOK=1.5,K_LIFE=28,K_ZOOM=12;
+// The coast follows a wider blur than the regions, islands under MIN_ISLAND cells join their surroundings, and
+// at life every region is drawn at LIFE_TINT of its strength, so the points over it read (all at LONG cells).
+var SIG_COAST=5,MIN_ISLAND=150,LIFE_TINT=.55;
 var CAT=[[42,120,214],[235,104,52],[27,175,122],[237,161,0],[232,123,164],[0,131,0],[98,80,214],[227,73,72]];
 var OTHER=[179,179,168],OUT=236,NODATA=[225,224,217];
 var RAMP=[[205,226,251],[158,197,244],[109,167,236],[57,135,229],[37,106,191],[24,79,149],[13,54,107]];
 var LEVELS=['same family','same order','same class','same phylum','same kingdom','other kingdom'];
-var SEA=255,OUTSIDE=254;  // cell codes past the region slots
+var SEA=255,OUTSIDE=254,UNSET=253;  // cell codes past the region slots; UNSET is land with no record near
 
 // Each taxa row's ancestor row at every rank in RANKS (itself at its own rank), or -1.
 // T rows are [latin, common, inat_id, rank index into ranks, parent row, ...].
@@ -107,6 +110,38 @@ function landOf(tot){
   for(i=0;i<tot.length;i++)land[i]=tot[i]>cut?1:0;
   return land;
 }
+// Smooths a region raster in place: land with no record near takes the nearest region, islands under
+// MIN_ISLAND cells join the region they border most, then a 3x3 majority rounds the boundaries. The sea and
+// the cells outside a zoom's clade stay as they are.
+function tidy(code,W,H,K,sc){
+  var WH=W*H,q=new Int32Array(WH),cnt=new Int32Array(256),h=0,t=0,c,k,r,i;
+  function nb(c,k){var x=c%W;return k===0?(x>0?c-1:-1):k===1?(x<W-1?c+1:-1):k===2?(c>=W?c-W:-1):c+W<WH?c+W:-1;}
+  for(c=0;c<WH;c++)if(code[c]!==SEA&&code[c]!==UNSET)q[t++]=c;
+  while(h<t){c=q[h++];for(k=0;k<4;k++){r=nb(c,k);if(r>=0&&code[r]===UNSET){code[r]=code[c];q[t++]=r;}}}
+  for(c=0;c<WH;c++)if(code[c]===UNSET)code[c]=SEA;
+  var cmp=new Uint8Array(WH),min=MIN_ISLAND*sc*sc;
+  for(var pass=0,changed=1;pass<3&&changed;pass++){
+    changed=0;cmp.fill(0);
+    for(c=0;c<WH;c++){
+      if(cmp[c]||code[c]>K)continue;
+      var cd=code[c];h=t=0;q[t++]=c;cmp[c]=1;
+      while(h<t){var p=q[h++];for(k=0;k<4;k++){r=nb(p,k);if(r<0)continue;
+        if(code[r]===cd){if(!cmp[r]){cmp[r]=1;q[t++]=r;}}else if(code[r]<=K)cnt[code[r]]++;}}
+      if(t<min){var best=-1;for(i=0;i<256;i++)if(cnt[i]&&(best<0||cnt[i]>cnt[best]))best=i;
+        if(best>=0){for(i=0;i<t;i++)code[q[i]]=best;changed=1;}}
+      cnt.fill(0);
+    }
+  }
+  var src=code.slice(),v=[],x,y,dx,dy;
+  for(y=0;y<H;y++)for(x=0;x<W;x++){
+    c=y*W+x;if(src[c]>K)continue;
+    v.length=0;
+    for(dy=Math.max(0,y-1);dy<=Math.min(H-1,y+1);dy++)for(dx=Math.max(0,x-1);dx<=Math.min(W-1,x+1);dx++){
+      var u=src[dy*W+dx];if(u<=K){if(!cnt[u])v.push(u);cnt[u]++;}}
+    var m=src[c];for(i=0;i<v.length;i++)if(cnt[v[i]]>cnt[m])m=v[i];
+    code[c]=m;for(i=0;i<v.length;i++)cnt[v[i]]=0;
+  }
+}
 // The life-level grid, each point's cell, the smoothed density and the land of one point set: the half of a
 // zoom's crop that does not depend on the clade, kept for the next zoom into the same points.
 var LIFE=null;
@@ -175,14 +210,18 @@ function build(o){
   for(s=0;s<=K;s++)blur(S.subarray(s*WH,(s+1)*WH),W,H,k,tmp);
   blur(tot,W,H,k,tmp);
   if(L){blur(aS,W,H,k,tmp);blur(aC,W,H,k,tmp);blur(vS,W,H,kl,tmp);blur(vC,W,H,kl,tmp);}
-  var land=landOf(tot),code=new Uint8Array(WH),dom=new Float32Array(WH),nLand=0;
+  var coast=raw.slice();blur(coast,W,H,kernel(SIG_COAST*sc),tmp);
+  var land=landOf(coast),code=new Uint8Array(WH),den=new Float32Array(WH),nLand=0;
   for(c=0;c<WH;c++){
     if(!land[c]){code[c]=SEA;continue;}
-    nLand++;var best=0,mx=-1,sum=0;
+    nLand++;
+    if(!(tot[c]>0)){code[c]=UNSET;continue;}
+    var best=0,mx=-1,sum=0;
     for(s=0;s<=K;s++){var d=S[s*WH+c];sum+=d;if(d>mx){mx=d;best=s;}}
     if(clade>=0&&!(sum>.5*tot[c])){code[c]=OUTSIDE;continue;}
-    code[c]=best;dom[c]=mx/((clade<0?tot[c]:sum)||1);
+    code[c]=best;den[c]=clade<0?tot[c]:sum;
   }
+  tidy(code,W,H,K,sc);
   // colours: at life a class takes its group's colour, siblings in one group paler; inside a zoom, a palette
   var seen={},slots=rows.map(function(row,s){
     var rgb;
@@ -200,7 +239,8 @@ function build(o){
     if(cd===SEA)continue;
     if(cd===OUTSIDE){put(img,c,[OUT,OUT,OUT],255);if(look)put(look,c,[OUT,OUT,OUT],255);continue;}
     // contested cells, and cells whose records' photo neighbours mostly lie outside their clade, read paler
-    var f=.35+.65*dom[c]*(aC[c]>few?Math.min(1,aS[c]/aC[c]):1);
+    var dom=den[c]>0?S[cd*WH+c]/den[c]:1,f=.35+.65*dom*(aC[c]>few?Math.min(1,aS[c]/aC[c]):1);
+    if(clade<0)f*=LIFE_TINT;
     put(img,c,mix(slots[cd].rgb,WHITE,1-f),255);
     if(look)put(look,c,vC[c]>few?ramp(vS[c]/vC[c]/3):NODATA,255);
   }
@@ -298,5 +338,6 @@ function hit(M,x,y){
   return {slot:cd<=M.K?cd:-1,sea:cd===SEA,outside:cd===OUTSIDE,n:M.raw[c],levels:lev};
 }
 return {RANKS:RANKS,FINE:FINE,LEVELS:LEVELS,RAMP:RAMP,ancestors:ancestors,rankOf:rankOf,canZoom:canZoom,
-  parentOf:parentOf,decodeLookalike:decodeLookalike,level:level,build:build,hit:hit,place:place};
+  parentOf:parentOf,decodeLookalike:decodeLookalike,level:level,build:build,hit:hit,place:place,tidy:tidy,
+  SEA:SEA,OUTSIDE:OUTSIDE};
 });

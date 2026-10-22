@@ -141,12 +141,38 @@ console.log(JSON.stringify({ins: region(M, -6.5, 0), aves: region(M, 6, 0), pl: 
     )
     assert (got["ins"], got["aves"], got["pl"]) == ("Insecta", "Aves", "Magnoliopsida")
     assert got["sea"]["sea"] and got["seaPx"][3] == 0  # empty space stays transparent
-    assert close(got["insPx"], COLOURS[1] + [255])
+    life_tint = 0.55  # at life a region is at most this strong, so the points over it read
+    assert close(got["insPx"], [round(v * life_tint + 255 * (1 - life_tint)) for v in COLOURS[1]] + [255])
     assert {"Insecta", "Aves", "Magnoliopsida"} <= set(got["labels"])
     kingdoms = [t for t in got["labels"] if "% of map" in t]
     assert sorted(t.split("\n")[0] for t in kingdoms) == ["ANIMALIA", "PLANTAE"]
     assert got["look"] is None  # no look-alike file: no look-alike picture
 
+
+
+def test_tidy_absorbs_small_islands_and_unset_land_but_keeps_large_regions_and_the_sea(world):
+    got = node(
+        world,
+        """
+const W = 60, H = 40, code = new Uint8Array(W * H);
+for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+  const c = y * W + x;
+  code[c] = x < 30 ? 0 : 1;
+  if (x >= 10 && x < 13 && y >= 10 && y < 13) code[c] = 1;    // a 9-cell stray inside A
+  if (x >= 40 && x < 55 && y >= 15 && y < 30) code[c] = 0;    // a 225-cell island inside B
+  if (y >= 36) code[c] = LM.SEA;
+  if (x === 5 && y === 30) code[c] = 253;                       // land with no record near
+}
+code[2 * W + 2] = LM.OUTSIDE;
+LM.tidy(code, W, H, 1, 1);
+const at = (x, y) => code[y * W + x];
+console.log(JSON.stringify({stray: at(11, 11), island: at(47, 22), left: at(29, 5), right: at(30, 5),
+  sea: at(20, 38), unset: at(5, 30), outside: at(2, 2)}));""",
+    )
+    assert got["stray"] == 0  # under MIN_ISLAND cells: joins the region around it
+    assert got["island"] == 0  # a large island keeps its region
+    assert (got["left"], got["right"]) == (0, 1)  # a straight border stays where it is
+    assert got["sea"] == 255 and got["unset"] == 0 and got["outside"] == 254
 
 def test_zoom_crops_to_the_territory_and_greys_other_clades_without_dropping_them(world):
     got = node(

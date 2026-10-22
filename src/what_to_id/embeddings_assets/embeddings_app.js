@@ -261,8 +261,9 @@ function pointData(){
   return {length:P.n,attributes:{getPosition:{value:P.pos,size:2},getFilterCategory:{value:cat,size:3},
     getFillColor:{value:col,size:4,normalized:true}}};
 }
-// Over the map of life the points show, and take clicks, while the filters hold some back or once the view is
-// close enough to tell them apart; otherwise a click on the map zooms into its clade.
+// Over the map of life the points always show and take clicks; while no filter holds any back and the view is
+// too far out to tell them apart, they draw as a faint texture (one in ten above THIN_ABOVE) and the map keeps
+// its full strength. A click away from a point zooms into the clade under it.
 function filtered(){return S.shown!=null&&S.shown<S.P.n;}
 function dots(){return filtered()||S.vs.zoom>=S.zoom0+3;}
 function layers(){
@@ -272,9 +273,12 @@ function layers(){
   S.PD=S.PD||pointData();
   var groups=[0];
   if(P.grp){groups=[];passing().forEach(function(v,j){if(v)groups.push(j);});}
-  var thin=S.thin&&P.n>THIN_ABOVE,d=dots();
-  var pts=new deck.ScatterplotLayer({id:'pts',data:S.PD,radiusUnits:'pixels',getRadius:1.5,radiusMinPixels:1,radiusMaxPixels:3,
-    stroked:false,pickable:true,visible:!LV.on()||d,extensions:[EXT],updateTriggers:{getFilterCategory:S.PDV},
+  var d=dots(),far=LV.on()&&!d,thin=(S.thin||far)&&P.n>THIN_ABOVE,D=S.PD,a=D.attributes;
+  // far out the points are one ink, not their group's colour, which would fight a zoom's palette
+  if(far){if(!D.far||D.far.attributes.getFilterCategory!==a.getFilterCategory)
+    D.far={length:D.length,attributes:{getPosition:a.getPosition,getFilterCategory:a.getFilterCategory}};D=D.far;}
+  var pts=new deck.ScatterplotLayer({id:'pts',data:D,radiusUnits:'pixels',getRadius:far?1:1.5,radiusMinPixels:1,radiusMaxPixels:3,
+    getFillColor:[29,29,27,22],stroked:false,pickable:true,extensions:[EXT],updateTriggers:{getFilterCategory:S.PDV},
     filterCategories:[groups,thin?[1]:[0,1],[1]]});
   var lyr=LV.on()?LV.layers(pts,d,filtered(),groups):[pts];
   function ring(id,rows,px,rgb,w){
@@ -286,7 +290,8 @@ function layers(){
   if(S.sel>=0)lyr.push(ring('sel',[S.sel],9,[29,29,27],2.5));
   if(S.ring)lyr.push(new deck.PathLayer({id:'lasso',data:[S.ring],getPath:function(r){return r;},positionFormat:'XY',
     widthUnits:'pixels',getWidth:1.5,getColor:[29,29,27,200]}));
-  S.deck.setProps({layers:lyr});
+  // far out the faint points cover most of the map at 4 px, which would leave no region to click into
+  S.deck.setProps({layers:lyr,pickingRadius:far?0:4});
 }
 
 // Hover and click.
