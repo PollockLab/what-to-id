@@ -103,13 +103,13 @@ def test_the_view_chip_and_bar_wording_follow_a_visible_map(split):
     page.wait_for_function(
         "document.getElementById('counts').textContent.includes('in photo space, in map view')"
     )
-    page.click("[data-v='space']")  # the hidden map's view masks nothing
+    page.click("[data-p='map']")  # the hidden map's view masks nothing
     right.wait_for_function(
         f"document.getElementById('count').textContent.startsWith('{POOL_N:,}')"
     )
     assert right.locator("#selbar li").count() == 0
     assert "map view" not in page.inner_text("#counts")
-    page.click("[data-v='side']")
+    page.click("[data-p='map']")
     right.wait_for_function("document.querySelectorAll('#selbar li').length === 1")
     assert right.locator("#selbar li", has_text="Map view").count() == 1
     page.wait_for_function("document.getElementById('counts').textContent.includes('in map view')")
@@ -144,11 +144,11 @@ def test_a_removed_space_takes_its_lasso_off_the_map(browser, site):
     space.evaluate(
         "parent.postMessage({type: 'wtid-keep', ids: new Uint32Array([0, 1, 2])}, location.origin)"
     )
-    page.click("[data-v='map']")
+    page.click("[data-p='map']")
     page.wait_for_function(ok % "map")
-    page.click("[data-v='space']")
+    page.click("[data-p='space']")
     page.wait_for_function(ok % "space")
-    page.click("[data-v='map']")  # a new map must not inherit the lasso of the removed space
+    page.click("[data-p='map']")  # a new map must not inherit the lasso of the removed space
     page.wait_for_function(ok % "map")
     frame = next(f for f in page.frames if "embed=1" in f.url)
     assert all(k is None for k in frame.evaluate("__keep"))
@@ -172,7 +172,7 @@ def test_an_area_sent_before_the_frame_loads_still_arrives(browser, site):
     left = next(f for f in page.frames if "embed=1" in f.url)
     h = left.evaluate(f"MapArea.encode({RING})")
     left.evaluate("h => parent.postMessage({type: 'wtid-area', area: h}, location.origin)", h)
-    page.click("[data-v='side']")  # the second frame is created now, after the message
+    page.click("[data-p='space']")  # the second frame is created now, after the message
     page.wait_for_function(joined % "#space")
     right = next(f for f in page.frames if "embed=1" in f.url and f is not left)
     right.wait_for_function(
@@ -289,7 +289,7 @@ def test_a_hidden_photo_space_takes_its_views_cut_off_the_map(split):
         " __deck.props.onViewStateChange({viewState: {...vs, zoom: vs.zoom + 2}}); }"
     )
     page.wait_for_function("__keep.length === 1")
-    page.click("[data-v='map']")
+    page.click("[data-p='space']")
     page.wait_for_function("__keep.length === 2")
     assert page.evaluate("__keep[1]") == {"ids": None, "view": False}
     assert page.errors == []
@@ -334,7 +334,7 @@ def test_going_back_in_the_tree_keeps_its_selection_the_maps(browser, site):
     page.wait_for_function("location.hash.includes('taxa=900')")
     page.wait_for_timeout(500)
     on = tree.locator("#outline [aria-selected=true] > .row .nm")
-    assert on.inner_text() == "Genus A" and "taxa=900" in page.evaluate("location.hash")
+    assert on.inner_text().endswith("Genus A") and "taxa=900" in page.evaluate("location.hash")
     assert page.errors == []
     page.close()
 
@@ -365,15 +365,35 @@ def test_a_group_the_map_leaves_out_leaves_the_tree_and_its_counts(browser, site
     page.close()
 
 
-def _tree_page(browser, site):
+# the counts the frames send the split page, as the split page receives them
+COUNTS = (
+    "window.__counts = []; if (parent === window) addEventListener('message', e => {"
+    " if (e.data && e.data.type === 'wtid-counts') __counts.push(e.data.total); })"
+)
+
+
+def _tree_page(browser, site, query=""):
     base, *_ = site
     page = browser.new_page(viewport={"width": 1280, "height": 900})
     page.errors = []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     stub_inat(page, None)
     stub_taxa(page)
-    page.goto(f"{base}/split.html")
+    page.add_init_script(COUNTS)
+    page.goto(f"{base}/split.html{query}")
     return page, page.frame_locator("#tree")
+
+
+def _root(tree):
+    root = tree.locator("#outline .tc").first
+    root.wait_for()
+    return root
+
+
+def _post_counts(page, frame, total):
+    page.query_selector(frame).content_frame().evaluate(
+        "t => parent.postMessage({type: 'wtid-counts', own: [], total: t}, location.origin)", total
+    )
 
 
 def test_a_taxon_the_map_leaves_out_leaves_the_tree_with_everything_below_it(browser, site):
@@ -411,12 +431,40 @@ def test_a_card_leaves_its_taxon_out_of_the_tree_and_the_map(browser, site):
 
 def test_the_maps_counts_reach_the_tree_and_replace_its_own(browser, site):
     page, tree = _tree_page(browser, site)
-    root = tree.locator("#outline .tc").first
-    root.wait_for()
+    root = _root(tree)
+    page.wait_for_function("__counts.length === 1")  # the stub map's own counts are in
     before = root.inner_text().split()[0]
-    left = next(f for f in page.frames if "embeddings.html" in f.url)
-    left.evaluate("parent.postMessage({type: 'wtid-counts', own: [], total: 7}, location.origin)")
+    _post_counts(page, "#map", 7)
     tree.locator("#outline .tc", has_text="7 ·").first.wait_for()
     assert root.inner_text().split()[0] == "7" != before
+    assert page.errors == []
+    page.close()
+
+
+def test_beside_the_photo_space_alone_the_tree_counts_what_its_group_chip_keeps(browser, site):
+    page, tree = _tree_page(browser, site, "?view=space-tree")
+    space = page.frame_locator("#space")
+    root = _root(tree)
+    page.wait_for_function("__counts.length === 1")
+    before = root.inner_text().split()[0]
+    space.locator("#groups button[data-g='1']").click()  # Insecta only
+    page.wait_for_function("__counts.length === 2")
+    kept = space.locator("#count").inner_text().split()[0]
+    tree.locator("#outline .tc", has_text=f"{kept} ·").first.wait_for()
+    assert root.inner_text().split()[0] == kept != before
+    assert page.errors == []
+    page.close()
+
+
+def test_with_the_map_shown_the_tree_follows_the_maps_counts_not_the_photo_spaces(browser, site):
+    page, tree = _tree_page(browser, site, "?view=map-space-tree")
+    root = _root(tree)
+    page.wait_for_function("__counts.length === 2")  # both frames sent theirs
+    _post_counts(page, "#space", 5)
+    _post_counts(page, "#map", 7)
+    tree.locator("#outline .tc", has_text="7 ·").first.wait_for()
+    page.click("[data-p='map']")  # the map hidden, the photo space's counts take over
+    tree.locator("#outline .tc", has_text="5 ·").first.wait_for()
+    assert root.inner_text().split()[0] == "5"
     assert page.errors == []
     page.close()

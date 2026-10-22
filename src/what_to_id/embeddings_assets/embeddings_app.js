@@ -153,6 +153,7 @@ function update(){
     ' records are not placed yet)':'';
   [].forEach.call($('groups').querySelectorAll('button[data-g]'),paint);
   if(BAR)BAR.set(items());if(TR)TR.render();layers();
+  X.counts(passing);
 }
 // A pick, a left-out or a removal anywhere: the groups beside included taxa change which points are kept.
 function picked(){

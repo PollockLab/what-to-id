@@ -54,11 +54,11 @@ def test_every_page_offers_the_tree_and_only_when_built():
 
 def test_the_split_page_offers_the_tree_only_once_it_is_built(tmp_path):
     html = split_page.build(tmp_path).read_text()
-    assert 'data-v="tree"' not in html and 'href="tree.html"' not in html and "tree:null" in html
+    assert 'data-p="tree"' not in html and 'href="tree.html"' not in html and "tree:null" in html
     write_site(tmp_path)
     tree_page.build(tmp_path)
     html = split_page.build(tmp_path).read_text()
-    assert 'data-v="tree"' in html and 'href="tree.html"' in html and 'tree:"tree.html"' in html
+    assert 'data-p="tree"' in html and 'href="tree.html"' in html and 'tree:"tree.html"' in html
 
 
 def test_the_split_page_links_an_optional_page_only_once_it_is_built(tmp_path):

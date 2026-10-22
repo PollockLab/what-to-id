@@ -78,6 +78,15 @@ function send(force){
   parent.postMessage({type:'wtid-keep',ids:ids,view:!!b},location.origin);
 }
 function moved(){clearTimeout(T);T=setTimeout(send,250);}
+// The split view's tree counts what the space shows when the map is hidden: the kept points of the passing groups
+// per taxa row, as the map's counts() sends them, 150 ms after the filters settle and only when they changed.
+var CT=0,CL=null;
+function counts(passing){
+  if(parent===window||!S.TAXA||!S.P.grp)return;clearTimeout(CT);CT=setTimeout(function(){
+    var P=S.P,ok=passing(),own=new Float64Array(S.TAXA.length),t=0,r;
+    for(var i=0;i<P.n;i++)if(S.keep[i]&&ok[P.grp[i]]){t++;if((r=P.tax[i])<own.length)own[r]++;}
+    if(CL&&CL.total===t&&CL.own.every(function(v,j){return v===own[j];}))return;
+    CL={type:'wtid-counts',own:own,total:t};parent.postMessage(CL,location.origin);},150);}
 $('lclear').addEventListener('click',function(){lasso(null);});
 // The Draw button arms one lasso for pointers without a shift key (touch); it turns itself off after that drag.
 var HINT='Drag around the photos to keep. Esc cancels.';
@@ -99,5 +108,5 @@ function lassoDrag(box){
   ['pointerup','pointercancel'].forEach(function(t){box.addEventListener(t,function(){
     if(!cur)return;var r=cur;cur=null;draw(false);if(r.length>=6)lasso(r);else{S.ring=prev;layers();}});});
 }
-return {cancel:cancel,moved:moved,areaIndex:areaIndex,viewBox:viewBox,areaMask:areaMask,projMask:projMask,lasso:lasso,lassoDrag:lassoDrag,draw:draw};
+return {cancel:cancel,moved:moved,areaIndex:areaIndex,viewBox:viewBox,areaMask:areaMask,projMask:projMask,lasso:lasso,lassoDrag:lassoDrag,draw:draw,counts:counts};
 }
