@@ -319,7 +319,7 @@ function build(o){
   }
   borders(img,code,W,H,clade<0?kOf:null);
   return {ext:ext,W:W,H:H,cs:g.cs,sc:sc,sx:g.sx,sy:g.sy,clade:clade,rank:zr,fine:fine,code:code,raw:raw,levels:LH,nLand:nLand,
-    slots:slots,K:K,image:img,look:look,labels:labels(code,W,H,g,slots,T,K,clade<0?kOf:null,nLand,sc)};
+    slots:slots,K:K,image:img,look:look,labels:labels(code,raw,W,H,g,slots,T,K,clade<0?kOf:null,nLand,sc)};
 }
 // Thin lines between regions, a darker coast, thick black between kingdoms (kOf given, at life only).
 function borders(img,code,W,H,kOf){
@@ -337,9 +337,10 @@ function borders(img,code,W,H,kOf){
     for(var j=0;j<3;j++)img[p+j]=img[p+j]*(1-ink[3])+ink[j]*ink[3];
   }
 }
-// A label at the pole of inaccessibility of each region's largest island, italic repeats on the next two
-// sizeable ones, and at life each kingdom's share of the map around the edge. Sizes are in layout units.
-function labels(code,W,H,g,slots,T,K,kOf,nLand,sc){
+// A label at the pole of inaccessibility of each region's largest island, an italic repeat on the largest other
+// island holding a third of the region's records (raw, per cell), and at life each kingdom's share of the map
+// around the edge. Sizes are in layout units.
+function labels(code,raw,W,H,g,slots,T,K,kOf,nLand,sc){
   var WH=W*H,d=new Float32Array(WH),c,x,y,INF=1e9,R2=Math.SQRT2;
   for(c=0;c<WH;c++){
     if(code[c]>K){d[c]=0;continue;}
@@ -354,22 +355,23 @@ function labels(code,W,H,g,slots,T,K,kOf,nLand,sc){
   var seen=new Uint8Array(WH),stack=new Int32Array(WH),comps=slots.map(function(){return [];});
   for(c=0;c<WH;c++){
     if(seen[c]||code[c]>K)continue;
-    var cd=code[c],top=0,size=0,best=c;stack[top++]=c;seen[c]=1;
-    while(top){var q=stack[--top];size++;if(d[q]>d[best])best=q;
+    var cd=code[c],top=0,size=0,rec=0,best=c;stack[top++]=c;seen[c]=1;
+    while(top){var q=stack[--top];size++;rec+=raw[q];if(d[q]>d[best])best=q;
       var qx=q%W,nb=[qx>0?q-1:-1,qx<W-1?q+1:-1,q>=W?q-W:-1,q+W<WH?q+W:-1];
       for(var m=0;m<4;m++){var r=nb[m];if(r>=0&&!seen[r]&&code[r]===cd){seen[r]=1;stack[top++]=r;}}}
-    comps[cd].push({size:size,at:best});
+    comps[cd].push({size:size,rec:rec,at:best});
   }
   function pt(c){var x=c%W,y=(c-x)/W;return [g.ext[0]+(x+.5)/g.sx,g.ext[1]+(y+.5)/g.sy];}
   var out=[];
   comps.forEach(function(cs,s){
     var row=slots[s].row;if(row<0||!cs.length)return;
     cs.sort(function(a,b){return b.size-a.size;});
-    var area=cs.reduce(function(t,q){return t+q.size;},0),size=.2*Math.sqrt(area)*g.cs;
+    var area=cs.reduce(function(t,q){return t+q.size;},0),rec=cs.reduce(function(t,q){return t+q.rec;},0),
+      size=.2*Math.sqrt(area)*g.cs,main={text:T[row][0],pos:pt(cs[0].at),size:size,row:row,area:area,italic:false};
     if(cs[0].size<8*sc*sc)return;
-    out.push({text:T[row][0],pos:pt(cs[0].at),size:size,row:row,area:area,italic:false});
-    cs.slice(1,3).forEach(function(q){
-      if(q.size>.08*area&&q.size>40*sc*sc)out.push({text:T[row][0],pos:pt(q.at),size:size*.55,row:row,area:q.size,italic:true});});
+    out.push(main);
+    var q=cs.slice(1).find(function(q){return q.rec>=rec/3;});
+    if(q)out.push({text:T[row][0],pos:pt(q.at),size:size*.55,row:row,area:q.size,italic:true,of:main});
   });
   if(kOf){
     var kc=new Map();
@@ -386,12 +388,14 @@ function labels(code,W,H,g,slots,T,K,kOf,nLand,sc){
   return out;
 }
 // The labels that read at zoom z (2^z px a layout unit, as the text layer draws common units): kingdoms first,
-// then the largest; a label goes when it would draw under minPx or overlap one already placed.
+// then the largest; a label goes when it would draw under minPx or overlap one already placed, and a repeat
+// (d.of, its region's main label) when it would draw within REPEAT_PX of that label.
+var REPEAT_PX=60;
 function place(L,z,minPx){
   var k=Math.pow(2,z),out=[],box=[];
   function px(d){return Math.min(d.size*k,d.bold?22:30);}
   L.slice().sort(function(a,b){return (b.bold?1:0)-(a.bold?1:0)||px(b)-px(a)||b.area-a.area;}).forEach(function(d){
-    var p=px(d);if(p<minPx)return;
+    var p=px(d);if(p<minPx||d.of&&Math.hypot(d.pos[0]-d.of.pos[0],d.pos[1]-d.of.pos[1])*k<REPEAT_PX)return;
     var ln=String(d.text).split('\n'),w=p*(d.bold?.62:.55)*Math.max.apply(null,ln.map(function(t){return t.length;}))/k/2,
       h=p*1.2*ln.length/k/2,b=[d.pos[0]-w,d.pos[1]-h,d.pos[0]+w,d.pos[1]+h];
     if(box.some(function(q){return b[0]<q[2]&&q[0]<b[2]&&b[1]<q[3]&&q[1]<b[3];}))return;

@@ -185,9 +185,17 @@ const h = LM.hit(M, -4.75, 0);
 console.log(JSON.stringify({{fine: M.fine, lep: region(M, -6.5, 0), col: region(M, -3, 0),
   patch: h, patchPx: px(M, M.image, -4.75, 0), lookPx: px(M, M.look, -4.75, 0),
   plants: LM.hit(M, 0, 5), birds: LM.hit(M, 6, 0), ext: M.ext,
-  lep_px: px(M, M.image, -6.5, 0)}}));""",
+  lep_px: px(M, M.image, -6.5, 0),
+  names: [M, map(-1, null)].map((m) => m.labels.filter((l) => !l.bold)
+    .map((l) => [l.text, !!l.italic, l.of ? l.of.text : null]))}}));""",
     )
     assert got["fine"] == "order"
+    for names in got[
+        "names"
+    ]:  # a region is named once, and at most once more beside its main label
+        mains = [t for t, italic, _ in names if not italic]
+        assert len(mains) == len(set(mains)) and all(of == t for t, italic, of in names if italic)
+        assert all(sum(1 for t, it, _ in names if it and t == m) <= 1 for m in mains)
     assert got["lep_px"][3] == 255  # solid where the clade holds every record
     assert min(got["lep_px"][:3]) >= round(255 * (1 - 0.55))  # a pastel, like the life map under it
     assert (got["lep"], got["col"]) == ("Lepidoptera", "Coleoptera")
@@ -286,7 +294,9 @@ const big = {text: 'Insecta', pos: [0, 0], size: 4, area: 900},
 const at = (z, L) => LM.place(L, z, 11).map((l) => l.text);
 console.log(JSON.stringify({z2: at(2, [near, tiny, far, big]), z5: at(5, [near, tiny, far, big]),
   king: at(2, [big, king]), tie: at(5, [{text: 'Small', pos: [0, 0], size: 4, area: 10},
-    {text: 'Large', pos: [0, 0], size: 5, area: 20}])}));""",
+    {text: 'Large', pos: [0, 0], size: 5, area: 20}]),
+  rep: [4, 5].map((z) => at(z, [far,
+    {text: 'Aves', pos: [40, 2.5], size: 3, area: 50, italic: true, of: far}]))}));""",
     )
     # at zoom 2 (4 px a unit) the small label beside the big one and the 2 px one go
     assert got["z2"] == ["Insecta", "Aves"]
@@ -294,6 +304,8 @@ console.log(JSON.stringify({z2: at(2, [near, tiny, far, big]), z5: at(5, [near, 
     assert sorted(got["z5"]) == ["Ascidiacea", "Aves", "Aves", "Insecta"]
     assert got["king"] == ["ANIMALIA\n31% of map"]  # a kingdom outranks any class label
     assert got["tie"] == ["Large"]  # both capped at 30 px: the larger region keeps its name
+    # a repeat 2.5 units from its main label: 40 px at zoom 4 is too close, 80 px at zoom 5 reads
+    assert got["rep"] == [["Aves"], ["Aves", "Aves"]]
 
 
 def test_a_finer_grid_samples_the_same_zoom_at_twice_the_cells(world):
