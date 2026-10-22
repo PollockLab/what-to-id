@@ -17,7 +17,7 @@ def test_split_page_relays_the_selection_between_frames_without_reloads(browser,
     page.errors = []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     stub_inat(page, None)
-    page.goto(f"{base}/split.html?view=side#months=8")
+    page.goto(f"{base}/split.html?view=map-space#months=8")
     counts = (
         "[...document.querySelectorAll('iframe')].map(f => f.contentDocument &&"
         " f.contentDocument.getElementById('count') &&"
@@ -46,7 +46,7 @@ def test_split_page_mirrors_a_picked_record_in_the_other_frame(browser, site):
     page.errors = []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     stub_inat(page, None)
-    page.goto(f"{base}/split.html?view=side")
+    page.goto(f"{base}/split.html?view=map-space")
     page.wait_for_function(
         "[...document.querySelectorAll('iframe')].every(f =>"
         " f.contentDocument.getElementById('count').textContent.includes('shown'))"
@@ -82,7 +82,7 @@ def test_split_photo_search_narrows_both_frames_and_the_chip_clears_it(browser, 
     page.errors = []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     stub_inat(page, None)
-    page.goto(f"{base}/split.html?view=side")
+    page.goto(f"{base}/split.html?view=map-space")
     counts = (
         "[...document.querySelectorAll('iframe')].map(f => f.contentDocument &&"
         " f.contentDocument.getElementById('count') &&"
@@ -111,7 +111,7 @@ def test_split_photo_search_narrows_both_frames_and_the_chip_clears_it(browser, 
 def test_split_divider_resizes_by_keys_and_double_click_and_remembers(browser, site):
     base, *_ = site
     page = browser.new_page(viewport={"width": 1280, "height": 900})
-    page.goto(f"{base}/split.html?view=side")
+    page.goto(f"{base}/split.html?view=map-space")
     width = "document.getElementById('map').getBoundingClientRect().width"
     page.wait_for_selector("#map")
     half = page.evaluate(width)
@@ -222,7 +222,7 @@ def test_three_panes_sit_side_by_side_in_thirds_with_the_selection_in_step(brows
 
 
 def test_split_has_one_header_and_the_note_behind_an_i_button(browser, site):
-    page = _split(browser, site, 1280, 800, "?view=side")
+    page = _split(browser, site, 1280, 800, "?view=map-space")
     page.wait_for_function(f"{FRAMES}.length === 2")
     assert page.locator(".site-shell:visible").count() == 1
     for f in ("#map", "#space"):
@@ -254,7 +254,7 @@ def test_a_phone_holds_one_frame_at_a_time(browser, site):
 
 
 def test_a_phone_opens_one_pane_of_a_wider_view(browser, site):
-    page = _split(browser, site, 390, 800, "?view=side")
+    page = _split(browser, site, 390, 800, "?view=map-space")
     assert page.evaluate("[...document.querySelectorAll('iframe')].map(f => f.id)") == ["map"]
     assert page.evaluate(PRESSED) == ["map"]
     page.close()

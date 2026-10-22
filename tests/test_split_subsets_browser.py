@@ -20,7 +20,7 @@ def split(browser, site):
     page.errors = []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     stub_inat(page, None)
-    page.goto(f"{base}/split.html?view=side")
+    page.goto(f"{base}/split.html?view=map-space")
     page.wait_for_function(
         "[...document.querySelectorAll('iframe')].every(f =>"
         " f.contentDocument.getElementById('status').textContent === '')"
