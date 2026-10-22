@@ -13,7 +13,8 @@ var RANKS=['kingdom','phylum','class','order','family'];
 var FINE={life:'class',kingdom:'class',phylum:'class','class':'order',order:'family'};
 var LONG=512,SIG=0.8,SIG_LOOK=1.5,K_LIFE=28,K_ZOOM=12;
 // The coast follows a wider blur than the regions, islands under MIN_ISLAND cells join their surroundings, and
-// at life every region is drawn at LIFE_TINT of its strength, so the points over it read (all at LONG cells).
+// every region, at life and at a zoom, is drawn at LIFE_TINT of its strength, so the points over it read and a
+// zoom sits on the life map as a pastel like it (all at LONG cells).
 var SIG_COAST=5,MIN_ISLAND=150,LIFE_TINT=.55;
 var OTHER=[179,179,168],NODATA=[225,224,217];
 var RAMP=[[205,226,251],[158,197,244],[109,167,236],[57,135,229],[37,106,191],[24,79,149],[13,54,107]];
@@ -310,7 +311,7 @@ function build(o){
     if(cd===SEA||cd===OUTSIDE)continue;
     // contested cells, and cells whose records' photo neighbours mostly lie outside their clade, read paler
     var dom=den[c]>0?S[cd*WH+c]/den[c]:1,f=.35+.65*dom*(aC[c]>few?Math.min(1,aS[c]/aC[c]):1);
-    if(clade<0)f*=LIFE_TINT;
+    f*=LIFE_TINT;
     // a zoom fades out where its clade's share falls to the half it needs, so its edge blends into the life map
     var al=clade<0?255:255*Math.min(1,Math.max(0,(den[c]/tot[c]-.5)/.25));
     put(img,c,mix(slots[cd].rgb,WHITE,1-f),al);

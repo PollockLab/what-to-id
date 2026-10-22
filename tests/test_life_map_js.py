@@ -185,10 +185,11 @@ const h = LM.hit(M, -4.75, 0);
 console.log(JSON.stringify({{fine: M.fine, lep: region(M, -6.5, 0), col: region(M, -3, 0),
   patch: h, patchPx: px(M, M.image, -4.75, 0), lookPx: px(M, M.look, -4.75, 0),
   plants: LM.hit(M, 0, 5), birds: LM.hit(M, 6, 0), ext: M.ext,
-  lepA: px(M, M.image, -6.5, 0)[3]}}));""",
+  lep_px: px(M, M.image, -6.5, 0)}}));""",
     )
     assert got["fine"] == "order"
-    assert got["lepA"] == 255  # solid where the clade holds every record
+    assert got["lep_px"][3] == 255  # solid where the clade holds every record
+    assert min(got["lep_px"][:3]) >= round(255 * (1 - 0.55))  # a pastel, like the life map under it
     assert (got["lep"], got["col"]) == ("Lepidoptera", "Coleoptera")
     patch = got["patch"]
     assert patch["outside"] and patch["n"] > 0  # the birds between the orders are still counted
