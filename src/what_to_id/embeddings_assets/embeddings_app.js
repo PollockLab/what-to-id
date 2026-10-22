@@ -104,8 +104,8 @@ addEventListener('message',function(e){
   if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-view'||typeof e.data.area!=='string')return;
   VIEW_IN=e.data.area;if(S.P&&S.P.grp){S.view=VIEW_IN;picked();}
 });
-$('info').addEventListener('click',function(){
-  $('info').setAttribute('aria-expanded',document.documentElement.classList.toggle('about'));});
+var infos=document.querySelectorAll('.info'),about=function(on){document.documentElement.classList.toggle('about',on);infos.forEach(function(b){b.setAttribute('aria-expanded',on);});};
+infos.forEach(function(b){b.addEventListener('click',function(){about(!document.documentElement.classList.contains('about'));});});
 // CH.show rewrites the label, so the colour dot goes back in after it.
 function paint(b){
   var j=+b.getAttribute('data-g'),dot=el('i',{});dot.style.background='rgb('+color(j).join(',')+')';
@@ -335,7 +335,7 @@ addEventListener('message',function(e){
   remote=true;try{if(i<0)closeCard();else select(i,true);}finally{remote=false;}
 });
 // Esc cancels what is in progress, as on the map; a finished lasso goes only with its Clear button or chip.
-addEventListener('keydown',function(e){if(e.key!=='Escape')return;X.cancel();X.draw(false);if(!$('card').hidden)closeCard();});
+addEventListener('keydown',function(e){if(e.key!=='Escape')return;X.cancel();about(false);X.draw(false);if(!$('card').hidden)closeCard();});
 // The card's left edge: drag it, or use the arrow keys; a double click goes back to the default. The width is remembered.
 function cardWidth(w){
   var c=$('card');if(w==null){c.style.width='';localStorage.removeItem('wtid-card');return;}

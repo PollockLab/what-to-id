@@ -18,6 +18,8 @@ body{display:grid;grid-template-columns:260px minmax(0,1fr);grid-template-rows:a
 .embed header{display:none}
 .info{display:none;position:absolute;z-index:7;top:8px;right:8px;width:28px;height:28px;padding:0;border-radius:50%;font:italic 700 14px Georgia,serif}
 .embed .info{display:block}
+h1 .info{display:inline-block;position:static;vertical-align:3px;margin-left:6px;width:22px;height:22px;font-size:12px}
+html:not(.about) #honest{display:none}
 #lclear,#ldraw{display:none;position:absolute;z-index:7;top:8px;right:44px}
 #lclear{right:104px}
 .embed #lclear:not([hidden]),.embed #ldraw{display:block}
@@ -106,7 +108,7 @@ button[hidden]{display:none}
 </head>
 <body>
 __SITE_NAV__<header>
-<h1>Photo space</h1>
+<h1>Photo space <button type="button" class="info" id="hinfo" aria-expanded="false" aria-controls="honest" aria-label="About this picture">i</button></h1>
 <p class="sub" id="intro">Every observation that still needs an ID, placed so that photos the model finds alike sit near each other. Hover a dot for its name, click it for the photo and its closest matches. Shift+drag to keep only the dots inside a lasso.</p>
 <p class="note" id="honest">This flat picture is a lossy squeeze of a much richer image space, so some points that look close are not, and some close photos land apart. <span id="fid"></span> Nearness is not identification confidence: it says two photos look alike to the model, not what either one is. The matches in the card are computed in the full space, not read off this plot.</p>
 </header>
