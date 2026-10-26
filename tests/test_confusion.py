@@ -4,9 +4,12 @@ import pytest
 
 from what_to_id.atlas_index_io import VERSION, read_manifest, write_manifest
 from what_to_id.confusion import (
+    RECORD_COLUMNS,
     TABLE_COLUMNS,
     confused_pairs,
     confusion_scores,
+    fir_records,
+    fir_scores,
     fir_table,
     main,
     prototype_scores,
@@ -134,6 +137,14 @@ def test_confusion_scores_adds_text_columns_and_cli_reads_atlas_files(tmp_path):
 BUILT = "2026-10-15T00:00:00Z"
 
 
+def _table(pool, E, ids, taxa, T):
+    return fir_table(fir_scores(pool, E, ids, taxa, T), BUILT)
+
+
+def _records(pool, E, ids, taxa, T, **kw):
+    return fir_records(fir_scores(pool, E, ids, taxa, T), **kw)
+
+
 def _fir_inputs(species, per_species, vecs, text, ids_extra=0):
     """E rows of `vecs[i]` for `per_species[i]` photos of `species[i]`; text prototypes `text`."""
     rows, names = [], []
@@ -148,6 +159,8 @@ def _fir_inputs(species, per_species, vecs, text, ids_extra=0):
             "taxon_id": [10 + species.index(n) for n in names],
             "taxon_name": names,
             "rank": "species",
+            "iconic_taxon": "Plantae",
+            "photo_url": [f"https://x/{i}.jpg" for i in ids],
         }
     )
     taxa = pd.Series(list(text))
@@ -157,7 +170,7 @@ def _fir_inputs(species, per_species, vecs, text, ids_extra=0):
 def test_fir_table_counts_photos_closer_to_another_text_prototype():
     text = {"G a": [1, 0, 0], "G b": [0, 1, 0]}
     pool, E, ids, taxa, T = _fir_inputs(["G a", "G b"], [5, 5], [[0, 1, 0], [0, 1, 0]], text)
-    out = fir_table(pool, E, ids, taxa, T, BUILT)
+    out = _table(pool, E, ids, taxa, T)
     a = out[out.taxon_name == "G a"].iloc[0]
     assert (a.looks_like_name, a.looks_like_taxon_id) == ("G b", 11)
     assert (a.n_photos, a.n_species_photos, a.share) == (5, 5, 1.0)
@@ -169,17 +182,17 @@ def test_fir_table_counts_photos_closer_to_another_text_prototype():
 def test_fir_table_empty_pool_and_single_species_give_no_rows():
     text = {"G a": [1, 0, 0], "G b": [0, 1, 0]}
     pool, E, ids, taxa, T = _fir_inputs(["G a"], [5], [[0, 1, 0]], text)
-    empty = fir_table(pool.iloc[:0], E, ids, taxa, T, BUILT)
+    empty = _table(pool.iloc[:0], E, ids, taxa, T)
     assert empty.empty and list(empty.columns) == list(TABLE_COLUMNS)
     one = {"G a": [1, 0, 0]}
     pool, E, ids, taxa, T = _fir_inputs(["G a"], [5], [[0, 1, 0]], one)
-    assert fir_table(pool, E, ids, taxa, T, BUILT).empty
+    assert _table(pool, E, ids, taxa, T).empty
 
 
 def test_fir_table_tie_picks_the_first_prototype_in_taxa_order():
     text = {"G a": [1, 0, 0], "G b": [0, 1, 0], "G c": [0, 1, 0]}
     pool, E, ids, taxa, T = _fir_inputs(["G a"], [5], [[0, 1, 0]], text)
-    out = fir_table(pool, E, ids, taxa, T, BUILT)
+    out = _table(pool, E, ids, taxa, T)
     assert out["looks_like_name"].tolist() == ["G b"]
 
 
@@ -187,10 +200,10 @@ def test_fir_table_four_photo_floor():
     text = {"G a": [1, 0, 0], "G b": [0, 1, 0]}
     kw = dict(vecs=[[0, 1, 0], [0, 1, 0]], text=text)
     pool, E, ids, taxa, T = _fir_inputs(["G a", "G b"], [3, 5], **kw)
-    out = fir_table(pool, E, ids, taxa, T, BUILT)
+    out = _table(pool, E, ids, taxa, T)
     assert "G a" not in out["taxon_name"].tolist()
     pool, E, ids, taxa, T = _fir_inputs(["G a", "G b"], [4, 5], **kw)
-    assert "G a" in fir_table(pool, E, ids, taxa, T, BUILT)["taxon_name"].tolist()
+    assert "G a" in _table(pool, E, ids, taxa, T)["taxon_name"].tolist()
 
 
 def test_fir_table_keeps_three_pairs_per_species_with_two_photos_or_more():
@@ -202,7 +215,7 @@ def test_fir_table_keeps_three_pairs_per_species_with_two_photos_or_more():
     ids = np.arange(len(E))
     pool = pd.DataFrame({"id": ids, "taxon_id": 1, "taxon_name": "G a", "rank": "species"})
     taxa, T = pd.Series(list(text)), _unit(list(text.values()))
-    out = fir_table(pool, E, ids, taxa, T, BUILT)
+    out = _table(pool, E, ids, taxa, T)
     # b:4, c:3, d:2 and e:2 tie on count; d wins by name.
     assert out[["looks_like_name", "n_photos"]].values.tolist() == [
         ["G b", 4],
@@ -237,3 +250,73 @@ def test_fir_cli_writes_table_and_manifest_key(tmp_path):
     entry = read_manifest(atlas)["confusion"]
     assert entry["name"] == "confusion.parquet" and entry["count"] == len(table) == 1
     assert entry["built_at"] == table["built_at"].iloc[0]
+    assert table[["looks_like_name", "n_photos"]].values.tolist() == [["G b", 5]]
+    records = pd.read_parquet(atlas / "confusion-records.parquet")
+    rec = read_manifest(atlas)["confusion_records"]
+    assert rec["name"] == "confusion-records.parquet" and rec["count"] == len(records) == 5
+    assert rec["built_at"] == entry["built_at"]
+    assert list(records.columns) == list(RECORD_COLUMNS)
+
+
+def test_fir_cli_rejects_a_pool_without_photo_url(tmp_path):
+    text = {"G a": [1, 0, 0], "G b": [0, 1, 0]}
+    pool, *_ = _fir_inputs(["G a"], [5], [[0, 1, 0]], text)
+    pool.drop(columns="photo_url").to_parquet(tmp_path / "pool.parquet", index=False)
+    args = ["fir", "--emb", "e", "--ids", "i", "--pool", str(tmp_path / "pool.parquet")]
+    args += ["--taxa-names", "n", "--taxa-vectors", "v", "--atlas-dir", str(tmp_path)]
+    write_manifest(tmp_path, {"version": VERSION, "parts": []})
+    with pytest.raises(ValueError, match="photo_url"):
+        main(args)
+
+
+def test_fir_records_are_the_negative_margin_photos_with_their_look_alike():
+    text = {"G a": [1, 0, 0], "G b": [0, 1, 0]}
+    pool, E, ids, taxa, T = _fir_inputs(["G a", "G b"], [5, 4], [[1, 0, 0], [0, 1, 0]], text)
+    # The first two G a photos look like G b; the rest, and all of G b, sit on their own species.
+    E = _unit([[0, 1, 0]] * 2 + [[1, 0, 0]] * 3 + [[0, 1, 0]] * 4)
+    out = _records(pool, E, ids, taxa, T)
+    assert list(out.columns) == list(RECORD_COLUMNS)
+    assert out["id"].tolist() == [100, 101]
+    a = out.iloc[0]
+    assert (a.taxon_name, a.looks_like_name, a.looks_like_taxon_id) == ("G a", "G b", 11)
+    assert (a.iconic_taxon, a.photo_url) == ("Plantae", "https://x/100.jpg")
+    assert out["margin"].dtype == np.float32 and (out["margin"] < 0).all()
+    assert out["looks_like_taxon_id"].dtype == "Int64"
+
+
+def test_fir_records_looks_like_is_null_for_a_name_outside_the_pool():
+    text = {"G a": [1, 0, 0], "G b": [0, 1, 0]}
+    pool, E, ids, taxa, T = _fir_inputs(["G a"], [5], [[0, 1, 0]], text)
+    out = _records(pool, E, ids, taxa, T)
+    assert len(out) == 5
+    assert out["looks_like_name"].eq("G b").all() and out["looks_like_taxon_id"].isna().all()
+
+
+def test_fir_records_cap_keeps_the_most_negative_per_species_sorted():
+    text = {"G a": [1, 0, 0], "G b": [0, 1, 0]}
+    pool, E, ids, taxa, T = _fir_inputs(["G a", "G b"], [6, 4], [[0, 1, 0], [0, 1, 0]], text)
+    # G a photos drift towards G a with id, so the lowest ids are the most negative.
+    E = E.copy()
+    for k in range(6):
+        E[k] = _unit([[k * 0.1, 1, 0]])[0]
+    out = _records(pool, E, ids, taxa, T, cap=3)
+    a = out[out.taxon_name == "G a"]
+    assert a["id"].tolist() == [100, 101, 102]
+    assert a["margin"].is_monotonic_increasing
+    assert out["taxon_id"].is_monotonic_increasing
+
+
+def test_fir_records_four_photo_floor():
+    text = {"G a": [1, 0, 0], "G b": [0, 1, 0]}
+    kw = dict(vecs=[[0, 1, 0], [0, 1, 0]], text=text)
+    pool, E, ids, taxa, T = _fir_inputs(["G a", "G b"], [3, 5], **kw)
+    assert "G a" not in _records(pool, E, ids, taxa, T)["taxon_name"].tolist()
+    pool, E, ids, taxa, T = _fir_inputs(["G a", "G b"], [4, 5], **kw)
+    assert "G a" in _records(pool, E, ids, taxa, T)["taxon_name"].tolist()
+
+
+def test_fir_records_need_iconic_taxon_and_photo_url():
+    text = {"G a": [1, 0, 0], "G b": [0, 1, 0]}
+    pool, E, ids, taxa, T = _fir_inputs(["G a"], [5], [[0, 1, 0]], text)
+    with pytest.raises(ValueError, match="iconic_taxon"):
+        _records(pool.drop(columns="iconic_taxon"), E, ids, taxa, T)
