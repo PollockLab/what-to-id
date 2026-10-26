@@ -62,6 +62,24 @@ def _keys(ids: pd.Series, names: pd.Series) -> np.ndarray:
     return np.where(ids.notna(), ids.astype(object), "n:" + names.astype(str))
 
 
+def photo_columns(urls: pd.Series, who: str):
+    """(photo id u32, meta u8, hosts, exts) per photo URL; meta is `NO_PHOTO` when it has none."""
+    parts = urls.astype(str).str.extract(PHOTO)
+    ok = parts[1].notna().to_numpy()
+    hosts, exts = sorted(set(parts[0].dropna())), sorted(set(parts[2].dropna().str.lower()))
+    if len(hosts) * max(len(exts), 1) > NO_PHOTO:
+        raise ValueError(f"{len(hosts)} photo hosts by {len(exts)} extensions do not fit a byte")
+    host_ix = parts[0].map({h: k for k, h in enumerate(hosts)}).fillna(0).to_numpy(int)
+    ext_ix = parts[2].str.lower().map({e: k for k, e in enumerate(exts)}).fillna(0).to_numpy(int)
+    meta = np.where(ok, host_ix * len(exts) + ext_ix, NO_PHOTO)
+    photo = np.where(ok, pd.to_numeric(parts[1], errors="coerce").fillna(0), 0).astype(np.int64)
+    if photo.max(initial=0) > 0xFFFFFFFF:
+        raise ValueError("photo ids must fit 32 bits")
+    if (~ok).any():
+        print(f"{who}: {int((~ok).sum())} records have no medium photo URL")
+    return photo, meta, hosts, exts
+
+
 def encode(pairs: pd.DataFrame, records: pd.DataFrame | None, built_at: str = "") -> bytes:
     """The gzipped confusion-data.bin for these pairs and records (see the module docstring)."""
     recs = records if records is not None else pd.DataFrame(columns=list(RECORD_COLUMNS))
@@ -108,19 +126,7 @@ def encode(pairs: pd.DataFrame, records: pd.DataFrame | None, built_at: str = ""
     margin = recs["margin"].to_numpy(float)
     lo, hi = (float(margin.min()), float(margin.max())) if len(margin) else (0.0, 0.0)
     score = np.rint((margin - lo) / (hi - lo) * 255) if hi > lo else np.zeros(len(margin))
-    parts = recs["photo_url"].astype(str).str.extract(PHOTO)
-    ok = parts[1].notna().to_numpy()
-    hosts, exts = sorted(set(parts[0].dropna())), sorted(set(parts[2].dropna().str.lower()))
-    if len(hosts) * max(len(exts), 1) > NO_PHOTO:
-        raise ValueError(f"{len(hosts)} photo hosts by {len(exts)} extensions do not fit a byte")
-    host_ix = parts[0].map({h: k for k, h in enumerate(hosts)}).fillna(0).to_numpy(int)
-    ext_ix = parts[2].str.lower().map({e: k for k, e in enumerate(exts)}).fillna(0).to_numpy(int)
-    meta = np.where(ok, host_ix * len(exts) + ext_ix, NO_PHOTO)
-    photo = np.where(ok, pd.to_numeric(parts[1], errors="coerce").fillna(0), 0).astype(np.int64)
-    if photo.max(initial=0) > 0xFFFFFFFF:
-        raise ValueError("photo ids must fit 32 bits")
-    if (~ok).any():
-        print(f"page_confusion: {int((~ok).sum())} records have no medium photo URL")
+    photo, meta, hosts, exts = photo_columns(recs["photo_url"], "page_confusion")
     head = {
         "built_at": built_at,
         "taxa": taxa,
