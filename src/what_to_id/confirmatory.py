@@ -5,8 +5,10 @@ pins it here: the weighted count (``cell_score``) for ``gap_first`` (H1), the pl
 ``similarity`` (H2) and ``novelty`` (H3). ``confirmatory`` counts participants only (``users``
 is required), leaves out IDs the observer made on their own record, and runs on both counts the
 record-level re-randomisation test (``analysis.record_totals`` and
-``analysis.record_shuffle_p``, each record's list redrawn uniformly and independently over all
-four design lists, as ``assign.assign_keyed`` draws it). That p is each row's ``p``.
+``analysis.record_shuffle_p``, the records on the tested list or the control redrawn between
+those two lists with probability 1/2 each, the other lists left in place). Its null is that for
+every record, sitting on the tested list or the control does not change whether, when or by whom
+it is identified; other lists may have effects. That p is each row's ``p``.
 
 Only H1 and H2 (``HOLM_FAMILY``) are confirmatory: their pinned-count rows have role
 "primary", a one-sided p in the direction of the tested list ahead of the control, and Holm
