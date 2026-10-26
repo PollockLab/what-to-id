@@ -30,15 +30,14 @@ function step(l){
 // groups: {iNaturalist id: life group name}, the map's groups that have a taxon. As on the map (iNaturalist's
 // iconic taxa), each row takes the group of its nearest group ancestor, else REST. The group taxa hang from
 // the root, so its children are the map's groups; a taxon they leave keeps the rest (ex: the group taxa
-// taken out from under it). opt: order (the map's group list, the root's child order), names (the map's
+// taken out from under it). Children sort by records, most first. opt: names (the map's
 // group names) and total (all records: those with no taxon, none, count in the totals of Life, which holds REST,
 // but not in its own records; nr is the row that holds them).
 var REST='Unknown',LIFE=48460;
 function build(T,ranks,groups,opt){
   opt=opt||{};
   var n=T.length,N=n+1,par=new Int32Array(N),own=new Float64Array(N),tot=new Float64Array(N),
-    st=new Float64Array(N),deep=new Float64Array(N),sp=new Float64Array(N),kids=[],row=new Map(),grp=[],ex=[],gr={},
-    ord=opt.order||[],i,j;
+    st=new Float64Array(N),deep=new Float64Array(N),sp=new Float64Array(N),kids=[],row=new Map(),grp=[],ex=[],gr={},i,j;
   for(i=0;i<n;i++){var t=T[i];row.set(t[2],i);par[i]=t.length>4&&t[4]>=0?t[4]:n;own[i]=t[5]||0;
     st[i]=step(LEVEL[ranks[t[3]]]);}
   par[n]=-1;st[n]=0;row.set(0,n);
@@ -55,7 +54,7 @@ function build(T,ranks,groups,opt){
     for(j=i;j>=0&&grp[j]===undefined&&!(j<n&&groups[T[j][2]]);j=par[j])path.push(j);
     var g=j<0?REST:grp[j]!==undefined?grp[j]:groups[T[j][2]];if(j>=0)grp[j]=g;
     path.forEach(function(p){grp[p]=g;});}
-  kids.forEach(function(k,p){k.sort(function(a,b){return (p===n?ord.indexOf(grp[a])-ord.indexOf(grp[b]):0)||tot[b]-tot[a]||a-b;});});
+  kids.forEach(function(k,p){k.sort(function(a,b){return tot[b]-tot[a]||a-b;});});
   kids[n].forEach(function(k){if(gr[grp[k]]==null)gr[grp[k]]=k;});
   return {T:T,ranks:ranks,n:n,root:n,par:par,own:own,tot:tot,st:st,deep:deep,sp:sp,kids:kids,row:row,grp:grp,groups:groups,
     ex:ex,gr:gr,names:opt.names||{},none:none,nr:nr,opt:opt};

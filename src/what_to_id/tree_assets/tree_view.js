@@ -363,7 +363,7 @@ async function load(){
   if(!T.length||T[0].length<6)throw new Error('this site was built without the taxon tree');
   Object.keys(META.group_ids||{}).forEach(function(g){G[META.group_ids[g]]=g;});
   if(META.groups.indexOf('Animalia')>=0)G[1]=G[1]||'Animalia';  // iNaturalist's iconic Animalia: kingdom 1, less the other groups
-  D=D0=M.build(T,META.ranks,G,{order:META.groups,names:META.names,total:META.n});groupRows();
+  D=D0=M.build(T,META.ranks,G,{names:META.names,total:META.n});groupRows();
   readHash();if(SY){SEL=SEL||MapFilter.tokens(location.hash);take();if(S.sel<0)S.sel=PS=M.lead(D,D.root);}split=await has;status('');draw(false);
 }
 load().catch(function(e){status('The tree could not load: '+e.message);});
