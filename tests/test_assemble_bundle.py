@@ -148,3 +148,56 @@ def test_cli_exits_nonzero_on_failure(inputs, capsys):
         main(argv)
     assert exc.value.code != 0
     assert main([*argv, "--max-uncovered-share", "0.5"]) == 0
+
+
+def test_daily_fetch_embeddings_assembles_from_release_assets(inputs, tmp_path):
+    import os
+    import shutil
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    save(inputs["deltas"] / "raw-delta-20261003.npz", [inputs["ids"]["missing"]], [10_006])
+    state = tmp_path / "state"
+    state.mkdir()
+    shutil.copyfile(inputs["pool"], state / "pool.parquet")
+    binaries = tmp_path / "bin"
+    binaries.mkdir()
+    gh = binaries / "gh"
+    gh.write_text(
+        f"#!{sys.executable}\n"
+        "import fnmatch, os, shutil, sys\nfrom pathlib import Path\n"
+        "assert sys.argv[1:3] == ['release', 'download']\n"
+        "destination = Path(sys.argv[sys.argv.index('-D') + 1])\n"
+        "pattern = sys.argv[sys.argv.index('-p') + 1]\n"
+        "for directory in os.environ['TEST_ASSET_DIRS'].split(os.pathsep):\n"
+        "    for source in Path(directory).iterdir():\n"
+        "        if fnmatch.fnmatch(source.name, pattern):\n"
+        "            shutil.copyfile(source, destination / source.name)\n"
+    )
+    gh.chmod(0o755)
+    bundle = tmp_path / "bundle"
+    env = {
+        **os.environ,
+        "PATH": str(binaries) + os.pathsep + os.environ["PATH"],
+        "PYTHON": sys.executable,
+        "OFFLINE": "1",
+        "STATE_DIR": str(state),
+        "EMBEDDING_RELEASE": "test-release",
+        "EMBEDDING_BUNDLE": str(bundle),
+        "TEST_ASSET_DIRS": os.pathsep.join(
+            str(d) for d in (inputs["base"], inputs["deltas"], Path(inputs["reference"]).parent)
+        ),
+    }
+    env.pop("REFERENCE_EMBEDDINGS", None)
+    result = subprocess.run(
+        ["bash", "scripts/daily.sh", "fetch-embeddings"],
+        cwd=Path(__file__).resolve().parents[1],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stderr
+    candidates, _ = load_bundle(bundle)
+    assert set(candidates) == {"Aves", "Insecta"}

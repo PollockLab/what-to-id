@@ -79,6 +79,9 @@ fetch_embeddings() {
   local atlas_repo=${ATLAS_REPO:-PollockLab/what-to-id}
   [ ! -e "$EMBEDDING_BUNDLE" ] || die "embedding destination exists; use a fresh EMBEDDING_BUNDLE path"
   local downloads="${EMBEDDING_BUNDLE}.download"
+  # Not a ${REFERENCE_EMBEDDINGS:-...} default: the } of {group} would end the expansion.
+  local reference="$downloads/reference/emb_{group}_bioclip25.npz"
+  reference=${REFERENCE_EMBEDDINGS:-$reference}
   [ ! -e "$downloads" ] || die "embedding download destination exists; use a fresh path"
   mkdir -p "$STATE" "$downloads/base" "$downloads/deltas" "$downloads/reference"
   update_pool
@@ -87,7 +90,7 @@ fetch_embeddings() {
   gh release download atlas-state --repo "$atlas_repo" -D "$downloads/deltas" -p 'raw-delta-*.npz'
   $PY -m what_to_id.assemble_bundle --pool "$STATE/pool.parquet" \
     --base "$downloads/base" --deltas "$downloads/deltas" \
-    --reference-embeddings "${REFERENCE_EMBEDDINGS:-$downloads/reference/emb_{group}_bioclip25.npz}" \
+    --reference-embeddings "$reference" \
     --out "$EMBEDDING_BUNDLE"
   rm -rf "$downloads" # Keep runner disk for the build.
 }
