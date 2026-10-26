@@ -1,9 +1,12 @@
 name: labelfirst consumer integration
 
-# Base CI intentionally has no private dependencies. Run this workflow after changing
-# the LabelFirst pin or adapter. LABELFIRST_DEPLOY_KEY is a dedicated read-only deploy
-# key for traitlab/labelfirst, used only by checkout and not persisted in git config.
+# Base CI intentionally has no private dependencies. This runs the full suite with the real
+# LabelFirst on every push where LABELFIRST_DEPLOY_KEY is set, and skips where it is not
+# (fork pull requests get no secrets). The key is a dedicated read-only deploy key for
+# traitlab/labelfirst, used only by checkout and not persisted in git config.
 on:
+  push:
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -12,38 +15,16 @@ permissions:
 jobs:
   integration:
     runs-on: ubuntu-24.04
+    env:
+      HAS_KEY: ${{ secrets.LABELFIRST_DEPLOY_KEY != '' }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - if: env.HAS_KEY == 'true'
+        uses: ./.github/actions/labelfirst
         with:
-          python-version: "3.11"
-      - name: Resolve configured revision and require private repository access
-        id: dependency
-        env:
-          LABELFIRST_DEPLOY_KEY: ${{ secrets.LABELFIRST_DEPLOY_KEY }}
-        run: |
-          if [ -z "$LABELFIRST_DEPLOY_KEY" ]; then
-            echo 'Configure LABELFIRST_DEPLOY_KEY with a read-only deploy key for traitlab/labelfirst.'
-            exit 1
-          fi
-          python - <<'PY' >> "$GITHUB_OUTPUT"
-          import tomllib
-          with open("pyproject.toml", "rb") as stream:
-              config = tomllib.load(stream)
-          requirement, = config["project"]["optional-dependencies"]["similarity"]
-          print("revision=" + requirement.rsplit("@", 1)[1])
-          PY
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          repository: traitlab/labelfirst
-          ref: ${{ steps.dependency.outputs.revision }}
-          path: .integration/labelfirst
           ssh-key: ${{ secrets.LABELFIRST_DEPLOY_KEY }}
-          persist-credentials: false
-      - run: pip install --require-hashes -r requirements.lock -r requirements-similarity.lock
-      - run: pip install --no-deps -e .integration/labelfirst
-      - run: pip check
       - name: Test the consumer with the real optional dependency
+        if: env.HAS_KEY == 'true'
         env:
           PYTHONPATH: src
         run: python -m pytest -m 'not network'
