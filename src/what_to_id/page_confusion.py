@@ -38,6 +38,7 @@ import numpy as np
 import pandas as pd
 
 from what_to_id import page_nav
+from what_to_id.confusion import RECORD_COLUMNS
 from what_to_id.page_lookalike import _fetch
 
 HERE = Path(__file__).parent
@@ -45,16 +46,6 @@ ASSETS = HERE / "confusion_assets"
 PAGE_NAME = "confusion.html"
 TAXA_NAME = "confusion-taxa.json"
 DATA_NAME = "confusion-data.bin"
-RECORD_COLUMNS = (
-    "id",
-    "taxon_id",
-    "taxon_name",
-    "iconic_taxon",
-    "looks_like_taxon_id",
-    "looks_like_name",
-    "margin",
-    "photo_url",
-)
 NO_PHOTO = 255
 PHOTO = r"^(https?://.+/)(\d+)/medium\.([A-Za-z0-9]+)(?:\?.*)?$"
 SCRIPTS = {
