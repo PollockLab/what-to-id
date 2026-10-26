@@ -6,7 +6,7 @@
 The atlas manifest at ``--data-url`` may carry ``"confusion"`` and ``"confusion_records"``, each
 ``{"name", "built_at", "count"}``, naming parquets beside it. ``confusion`` is the pairs table
 (taxon_id, taxon_name, looks_like_taxon_id, looks_like_name, n_photos, n_species_photos, share);
-``confusion_records`` holds one row per record with a negative text margin, at most 50 per species
+``confusion_records`` holds one row per record with a negative text margin, at most 50 per pair
 (RECORD_COLUMNS). Without ``confusion`` nothing is written; without ``confusion_records`` the page
 lists the pairs only. ``--parquet`` and ``--records-parquet`` build from local files instead.
 

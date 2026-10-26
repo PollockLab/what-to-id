@@ -163,7 +163,7 @@ function drawRecords(){
   sub.textContent=!D.n?'Per-record rows arrive with the next build.':
     view.length.toLocaleString()+(view.length===1?' record':' records')+
     (p?' of its '+p[2].toLocaleString()+' photos':'')+', worst first'+
-    (S.l>=0||D.start[S.t]>=0?' (the page keeps the '+KEEP+' worst per species)':'')+'.';
+    (S.l>=0?' (the page keeps the '+KEEP+' worst per pair)':'')+'.';
   drawAct();drawCards();
 }
 function update(scroll){drawTabs();drawPairs(scroll);drawRecords();writeHash();}

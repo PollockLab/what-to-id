@@ -142,7 +142,8 @@ def _table(pool, E, ids, taxa, T):
 
 
 def _records(pool, E, ids, taxa, T, **kw):
-    return fir_records(fir_scores(pool, E, ids, taxa, T), **kw)
+    scores = fir_scores(pool, E, ids, taxa, T)
+    return fir_records(scores, fir_table(scores, BUILT), **kw)
 
 
 def _fir_inputs(species, per_species, vecs, text, ids_extra=0):
@@ -292,7 +293,7 @@ def test_fir_records_looks_like_is_null_for_a_name_outside_the_pool():
     assert out["looks_like_name"].eq("G b").all() and out["looks_like_taxon_id"].isna().all()
 
 
-def test_fir_records_cap_keeps_the_most_negative_per_species_sorted():
+def test_fir_records_cap_keeps_the_most_negative_per_pair_sorted():
     text = {"G a": [1, 0, 0], "G b": [0, 1, 0]}
     pool, E, ids, taxa, T = _fir_inputs(["G a", "G b"], [6, 4], [[0, 1, 0], [0, 1, 0]], text)
     # G a photos drift towards G a with id, so the lowest ids are the most negative.
@@ -304,6 +305,16 @@ def test_fir_records_cap_keeps_the_most_negative_per_species_sorted():
     assert a["id"].tolist() == [100, 101, 102]
     assert a["margin"].is_monotonic_increasing
     assert out["taxon_id"].is_monotonic_increasing
+
+
+def test_fir_records_keep_only_the_listed_pairs():
+    text = {"G a": [1, 0, 0], "G b": [0, 1, 0], "G c": [0, 0, 1]}
+    pool, E, ids, taxa, T = _fir_inputs(["G a"], [5], [[1, 0, 0]], text)
+    # Two photos look like G b, one like G c: G c is a single-photo partner and never a pair.
+    E = _unit([[0, 1, 0]] * 2 + [[0, 0, 1]] + [[1, 0, 0]] * 2)
+    out = _records(pool, E, ids, taxa, T)
+    assert out["id"].tolist() == [100, 101]
+    assert out["looks_like_name"].eq("G b").all()
 
 
 def test_fir_records_four_photo_floor():

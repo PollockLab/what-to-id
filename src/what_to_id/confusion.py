@@ -25,7 +25,7 @@ on the 466 species it covers), and trimming or filtering the proposals changes n
 `fir_table` and the `fir` subcommand are the manual Fir job: they stream the memory-mapped bulk
 embeddings in chunks, score text margins only, and write the per-species confused pairs table
 (`confusion.parquet`) next to the atlas index, registered in its manifest for the page to fetch.
-The same pass also yields `fir_records`, the worst negative-margin photos per species
+The same pass also yields `fir_records`, the worst negative-margin photos of each listed pair
 (`confusion-records.parquet`), registered under its own manifest key.
 """
 
@@ -48,7 +48,7 @@ CHUNK = 4096
 COLUMNS = ("id", "taxon_id", "n_class", "own", "other", "other_taxon_id", "margin")
 FIR_SLICE = 1 << 18  # rows of E read into memory at once on Fir (1 GB at 1024 floats)
 FIR_PAIRS_PER_SPECIES = 3
-FIR_RECORDS_PER_SPECIES = 50
+FIR_RECORDS_PER_PAIR = 50
 RECORD_COLUMNS = (
     "id",
     "taxon_id",
@@ -299,18 +299,25 @@ def _looks_like_ids(scores: pd.DataFrame, names: pd.Series):
 
 
 def fir_records(
-    scores: pd.DataFrame, min_photos: int = MIN_PER_CLASS, cap: int = FIR_RECORDS_PER_SPECIES
+    scores: pd.DataFrame,
+    pairs: pd.DataFrame,
+    min_photos: int = MIN_PER_CLASS,
+    cap: int = FIR_RECORDS_PER_PAIR,
 ) -> pd.DataFrame:
-    """The worst photos per species (`RECORD_COLUMNS`) from `fir_scores`.
+    """The worst photos of each listed pair (`RECORD_COLUMNS`) from `fir_scores`.
 
-    One row per negative-margin photo of a species with at least `min_photos` scored photos,
-    the `cap` most negative per species, sorted by (taxon_id, margin, id).
+    One row per negative-margin photo whose (species, nearest other) is a row of `pairs` (the
+    `fir_table` output), the `cap` most negative per pair, sorted by (taxon_id, margin, id). A
+    per-species cap starved the big pairs: a species' worst photos mostly name one-off partners.
     """
     for c in ("iconic_taxon", "photo_url"):
         if c not in scores.columns:
             raise ValueError(f"pool has no {c!r} column, needed for the records table")
     _, neg = _negatives(scores, min_photos)
-    neg = neg.sort_values(["taxon_id", "margin", "id"]).groupby("taxon_id").head(cap)
+    key = ["taxon_id", "other_name"]
+    listed = pairs[["taxon_id", "looks_like_name"]].set_axis(key, axis=1)
+    neg = neg.merge(listed, on=key).sort_values(["taxon_id", "margin", "id"])
+    neg = neg.groupby(key).head(cap).sort_values(["taxon_id", "margin", "id"])
     out = pd.DataFrame(
         {
             "id": neg["id"].to_numpy(),
@@ -347,7 +354,8 @@ def fir_main(argv: list[str]) -> int:
     E = np.load(args.emb, mmap_mode="r")
     built_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     scores = fir_scores(pool, E, np.load(args.ids), taxa, T)
-    out, records = fir_table(scores, built_at), fir_records(scores)
+    out = fir_table(scores, built_at)
+    records = fir_records(scores, out)
     atlas = Path(args.atlas_dir)
     out.to_parquet(atlas / "confusion.parquet", index=False)
     records.to_parquet(atlas / "confusion-records.parquet", index=False)
