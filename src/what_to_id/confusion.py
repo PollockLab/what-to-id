@@ -25,6 +25,8 @@ on the 466 species it covers), and trimming or filtering the proposals changes n
 `fir_table` and the `fir` subcommand are the manual Fir job: they stream the memory-mapped bulk
 embeddings in chunks, score text margins only, and write the per-species confused pairs table
 (`confusion.parquet`) next to the atlas index, registered in its manifest for the page to fetch.
+The same pass also yields `fir_records`, the worst negative-margin photos of each listed pair
+(`confusion-records.parquet`), registered under its own manifest key.
 """
 
 from __future__ import annotations
@@ -37,6 +39,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pyarrow.parquet as pq
 
 from what_to_id.atlas_index_io import read_manifest, write_manifest
 
@@ -45,6 +48,17 @@ CHUNK = 4096
 COLUMNS = ("id", "taxon_id", "n_class", "own", "other", "other_taxon_id", "margin")
 FIR_SLICE = 1 << 18  # rows of E read into memory at once on Fir (1 GB at 1024 floats)
 FIR_PAIRS_PER_SPECIES = 3
+FIR_RECORDS_PER_PAIR = 50
+RECORD_COLUMNS = (
+    "id",
+    "taxon_id",
+    "taxon_name",
+    "iconic_taxon",
+    "looks_like_taxon_id",
+    "looks_like_name",
+    "margin",
+    "photo_url",
+)
 TABLE_COLUMNS = (
     "taxon_id",
     "taxon_name",
@@ -193,23 +207,19 @@ def confused_pairs(
     return pairs[["taxon", "looks_like", "n", "taxon_id", other]].reset_index(drop=True)
 
 
-def fir_table(
-    pool: pd.DataFrame,
-    E: np.ndarray,
-    ids: np.ndarray,
-    taxa: pd.Series,
-    T: np.ndarray,
-    built_at: str,
-    min_photos: int = MIN_PER_CLASS,
+def fir_scores(
+    pool: pd.DataFrame, E: np.ndarray, ids: np.ndarray, taxa: pd.Series, T: np.ndarray
 ) -> pd.DataFrame:
-    """The confused pairs table (`TABLE_COLUMNS`) from text margins only.
+    """Text-margin scores per species-ranked pool row that has an embedding row in `ids`.
 
-    `E` may be a memory map: rows are read in `FIR_SLICE` slices in file order. A photo counts for
-    a pair when its text margin is below zero; its pair partner is the nearest other species text
-    prototype, the first in `taxa` order on an exact tie. Species with fewer than `min_photos`
-    scored photos are dropped, and pairs with a single photo.
+    Columns: id, taxon_id, taxon_name, margin, other_name, plus `iconic_taxon` and `photo_url`
+    when the pool has them. `E` may be a memory map: rows are read in `FIR_SLICE` slices in file
+    order. Rows with no text prototype for their name have a NaN margin.
     """
-    p = pool.loc[pool["rank"] == "species", ["id", "taxon_id", "taxon_name"]].dropna()
+    extra = [c for c in ("iconic_taxon", "photo_url") if c in pool.columns]
+    p = pool.loc[pool["rank"] == "species", ["id", "taxon_id", "taxon_name", *extra]].dropna(
+        subset=["id", "taxon_id", "taxon_name"]
+    )
     p = p.assign(
         pos=pd.Series(np.arange(len(ids)), index=ids).reindex(p["id"].to_numpy()).to_numpy()
     )
@@ -221,36 +231,53 @@ def fir_table(
             E[q["pos"].to_numpy().astype(np.int64)], q["taxon_name"], taxa, T
         )
         parts.append(
-            pd.DataFrame(
-                {
-                    "taxon_id": q["taxon_id"].to_numpy().astype(np.int64),
-                    "margin": own - other,
-                    "other_name": other_name,
-                }
+            q.drop(columns="pos")
+            .assign(
+                taxon_id=q["taxon_id"].to_numpy().astype(np.int64),
+                margin=own - other,
+                other_name=other_name,
             )
+            .reset_index(drop=True)
         )
-    scores = (
-        pd.concat(parts, ignore_index=True)
-        if parts
-        else pd.DataFrame({"taxon_id": [], "margin": [], "other_name": []})
-    )
+    if not parts:
+        return pd.DataFrame(
+            {
+                **{c: pd.Series(dtype=p[c].dtype) for c in p.columns if c != "pos"},
+                "margin": pd.Series(dtype=float),
+                "other_name": pd.Series(dtype=object),
+            }
+        ).astype({"taxon_id": np.int64})
+    return pd.concat(parts, ignore_index=True)
+
+
+def _negatives(scores: pd.DataFrame, min_photos: int):
+    """(photos per species at or above `min_photos`, the negative-margin rows of those species)."""
     scores = scores[scores["margin"].notna()]
     n_species = scores.groupby("taxon_id").size().rename("n_species_photos")
     n_species = n_species[n_species >= min_photos]
     neg = scores[(scores["margin"] < 0) & scores["taxon_id"].isin(n_species.index)]
+    return n_species, neg
+
+
+def fir_table(scores: pd.DataFrame, built_at: str, min_photos: int = MIN_PER_CLASS) -> pd.DataFrame:
+    """The confused pairs table (`TABLE_COLUMNS`) from `fir_scores`.
+
+    A photo counts for a pair when its text margin is below zero; its pair partner is the nearest
+    other species text prototype, the first in `taxa` order on an exact tie. Species with fewer
+    than `min_photos` scored photos are dropped, and pairs with a single photo.
+    """
+    n_species, neg = _negatives(scores, min_photos)
     pairs = neg.groupby(["taxon_id", "other_name"]).size().rename("n_photos").reset_index()
     # shortcut: at most 3 pairs per species, 2+ photos each; raise if the page needs a longer tail.
     pairs = pairs[pairs["n_photos"] >= 2].sort_values(
         ["taxon_id", "n_photos", "other_name"], ascending=[True, False, True]
     )
     pairs = pairs.groupby("taxon_id").head(FIR_PAIRS_PER_SPECIES)
-    sp = p.drop_duplicates("taxon_id").set_index("taxon_id")["taxon_name"]
-    by_name = p.drop_duplicates("taxon_name").set_index("taxon_name")["taxon_id"]
     out = pd.DataFrame(
         {
             "taxon_id": pairs["taxon_id"].to_numpy(),
-            "taxon_name": pairs["taxon_id"].map(sp).to_numpy(),
-            "looks_like_taxon_id": pairs["other_name"].map(by_name).astype("Int64").array,
+            "taxon_name": pairs["taxon_id"].map(_species_names(scores)).to_numpy(),
+            "looks_like_taxon_id": _looks_like_ids(scores, pairs["other_name"]),
             "looks_like_name": pairs["other_name"].to_numpy(),
             "n_photos": pairs["n_photos"].to_numpy(),
             "n_species_photos": pairs["taxon_id"].map(n_species).to_numpy(),
@@ -259,6 +286,51 @@ def fir_table(
     out["share"] = out["n_photos"] / out["n_species_photos"]
     out["built_at"] = built_at
     return out[list(TABLE_COLUMNS)].reset_index(drop=True)
+
+
+def _species_names(scores: pd.DataFrame) -> pd.Series:
+    return scores.drop_duplicates("taxon_id").set_index("taxon_id")["taxon_name"]
+
+
+def _looks_like_ids(scores: pd.DataFrame, names: pd.Series):
+    """Pool taxon id of each looks-like name when it is a pool species, else null."""
+    by_name = scores.drop_duplicates("taxon_name").set_index("taxon_name")["taxon_id"]
+    return names.map(by_name).astype("Int64").array
+
+
+def fir_records(
+    scores: pd.DataFrame,
+    pairs: pd.DataFrame,
+    min_photos: int = MIN_PER_CLASS,
+    cap: int = FIR_RECORDS_PER_PAIR,
+) -> pd.DataFrame:
+    """The worst photos of each listed pair (`RECORD_COLUMNS`) from `fir_scores`.
+
+    One row per negative-margin photo whose (species, nearest other) is a row of `pairs` (the
+    `fir_table` output), the `cap` most negative per pair, sorted by (taxon_id, margin, id). A
+    per-species cap starved the big pairs: a species' worst photos mostly name one-off partners.
+    """
+    for c in ("iconic_taxon", "photo_url"):
+        if c not in scores.columns:
+            raise ValueError(f"pool has no {c!r} column, needed for the records table")
+    _, neg = _negatives(scores, min_photos)
+    key = ["taxon_id", "other_name"]
+    listed = pairs[["taxon_id", "looks_like_name"]].set_axis(key, axis=1)
+    neg = neg.merge(listed, on=key).sort_values(["taxon_id", "margin", "id"])
+    neg = neg.groupby(key).head(cap).sort_values(["taxon_id", "margin", "id"])
+    out = pd.DataFrame(
+        {
+            "id": neg["id"].to_numpy(),
+            "taxon_id": neg["taxon_id"].to_numpy(),
+            "taxon_name": neg["taxon_name"].to_numpy(),
+            "iconic_taxon": neg["iconic_taxon"].to_numpy(),
+            "looks_like_taxon_id": _looks_like_ids(scores, neg["other_name"]),
+            "looks_like_name": neg["other_name"].to_numpy(),
+            "margin": neg["margin"].to_numpy().astype(np.float32),
+            "photo_url": neg["photo_url"].to_numpy(),
+        }
+    )
+    return out[list(RECORD_COLUMNS)].reset_index(drop=True)
 
 
 def fir_main(argv: list[str]) -> int:
@@ -273,15 +345,29 @@ def fir_main(argv: list[str]) -> int:
     ap.add_argument("--atlas-dir", required=True, help="atlas index dir holding manifest.json")
     args = ap.parse_args(argv)
     manifest = read_manifest(args.atlas_dir)
-    pool = pd.read_parquet(args.pool, columns=["id", "taxon_id", "taxon_name", "rank"])
+    cols = ["id", "taxon_id", "taxon_name", "rank", "iconic_taxon", "photo_url"]
+    missing = [c for c in cols if c not in pq.read_schema(args.pool).names]
+    if missing:
+        raise ValueError(f"pool {args.pool} has no column {missing[0]!r}")
+    pool = pd.read_parquet(args.pool, columns=cols)
     taxa, T = read_taxa_vectors(args.taxa_names, args.taxa_vectors)
     E = np.load(args.emb, mmap_mode="r")
     built_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-    out = fir_table(pool, E, np.load(args.ids), taxa, T, built_at)
-    out.to_parquet(Path(args.atlas_dir) / "confusion.parquet", index=False)
+    scores = fir_scores(pool, E, np.load(args.ids), taxa, T)
+    out = fir_table(scores, built_at)
+    records = fir_records(scores, out)
+    atlas = Path(args.atlas_dir)
+    out.to_parquet(atlas / "confusion.parquet", index=False)
+    records.to_parquet(atlas / "confusion-records.parquet", index=False)
     manifest["confusion"] = {"name": "confusion.parquet", "built_at": built_at, "count": len(out)}
+    manifest["confusion_records"] = {
+        "name": "confusion-records.parquet",
+        "built_at": built_at,
+        "count": len(records),
+    }
     write_manifest(args.atlas_dir, manifest)
     print(f"{len(out)} pairs for {out['taxon_id'].nunique()} species")
+    print(f"{len(records)} records for {records['taxon_id'].nunique()} species")
     return 0
 
 
