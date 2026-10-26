@@ -71,6 +71,13 @@ def test_flatten_keeps_map_extras():
     assert str(df["pos_acc"].dtype) == "Int64"
 
 
+def test_flatten_keeps_license_code():
+    row = inat.flatten(_obs(9, license_code="cc-by-nc"))
+    assert row["license_code"] == "cc-by-nc"
+    assert inat.flatten(_obs(10))["license_code"] is None
+    assert inat._frame([row])["license_code"].tolist() == ["cc-by-nc"]
+
+
 def test_flatten_missing_geojson_or_photos():
     assert inat.flatten(_obs(1, geojson=None)) is None
     assert inat.flatten(_obs(2, photos=[])) is None
