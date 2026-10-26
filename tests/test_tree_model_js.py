@@ -208,7 +208,8 @@ ICONIC = [
     ["Plantae", "Plants", 47126, K_, 0, 7],  # 7
     ["Bacteria", "", 67333, K_, 0, 2],  # 8
 ]
-ORDER = ["Animalia", "Aves", "Insecta", "Plantae", "Unknown"]
+# the root's children by records, most first; Animalia and Aves tie and keep table order
+ORDER = ["Unknown", "Plantae", "Insecta", "Animalia", "Aves"]
 NAMES = {"Animalia": "Other animals (Animalia)", "Aves": "Birds (Aves)", "Unknown": "Unknown"}
 ICONIC_TREE = ", ".join(
     json.dumps(x)
@@ -216,7 +217,7 @@ ICONIC_TREE = ", ".join(
         ICONIC,
         [*RANKS, "class"],
         {1: "Animalia", 3: "Aves", 47158: "Insecta", 47126: "Plantae"},
-        {"order": ORDER, "names": NAMES, "total": 26 + 5},  # five records have no taxon
+        {"names": NAMES, "total": 26 + 5},  # five records have no taxon
     )
 )
 ICONIC_GROUP = ["Unknown", "Animalia", "Animalia", "Aves", "Animalia", "Insecta", "Animalia"]
@@ -235,18 +236,18 @@ out({{top: top.map((r) => I.grp[r]), grp: I.grp.slice(0, I.n), tot: top.map((r) 
   names: [1, 0, 3].map((r) => M.common(I, r)), own: I.own[0], none: I.none, nr: I.nr}});"""
     )
     assert got["top"] == ORDER and got["grp"] == ICONIC_GROUP
-    assert got["tot"] == [1 + 2 + 1, 4, 6, 7, 3 + 2 + 5]  # the same counts as the map's group chips
+    assert got["tot"] == [3 + 2 + 5, 7, 6, 1 + 2 + 1, 4]  # the same counts as the map's group chips
     assert got["picks"] == [
+        "groups=Unknown",
+        "groups=Plantae",
+        "groups=Insecta",
         "groups=Animalia",
         "groups=Aves",
-        "groups=Insecta",
-        "groups=Plantae",
-        "groups=Unknown",
         "taxa=47120,-47158",  # the other arthropods: Insecta is its own group
         "taxa=85493",
         "taxa=67333",
     ]
-    assert got["back"] == [1, 3, 5, 7, 0, 4, 6, 8]
+    assert got["back"] == [0, 7, 5, 1, 3, 4, 6, 8]
     assert got["names"] == ["Other animals", "Unknown", "Birds"]
     assert got["map"] == [4, 5, -1]
     # the records with no taxon count in Life's total, not in its own
@@ -259,7 +260,7 @@ def test_records_with_no_taxon_keep_life_from_merging_into_its_one_child():
 const I = M.build({ICONIC_TREE});
 I.T[0][5] = 0;
 const G = {{1: 'Animalia', 3: 'Aves', 47158: 'Insecta', 47126: 'Plantae'}};
-const J = M.build(I.T, [...R, 'class'], G, {{order: {json.dumps(ORDER)}, total: 26 + 5 - 3}});
+const J = M.build(I.T, [...R, 'class'], G, {{total: 26 + 5 - 3}});
 out({{lead: M.lead(J, 0), tot: J.tot[0], own: J.own[0], pick: M.pick(J, 0)}});"""
     )
     assert got == {"lead": 0, "tot": 2 + 5, "own": 0, "pick": "groups=Unknown"}
