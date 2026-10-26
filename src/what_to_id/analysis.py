@@ -4,8 +4,11 @@ Under ``rotation`` every identifier's batches cycle through all arms in equal sh
 identifier's own count of species-level identifications in each arm is comparable across arms
 without knowing which records they opened. The primary test, fixed before the blitz, is the
 record-level re-randomisation in ``record_totals`` and ``record_shuffle_p``: it redraws the unit
-the design randomises, the record, and recomputes the summed per-identifier difference
-(treatment minus control). ``confirmatory`` runs it on each tested list's pinned count:
+the design randomises, the record, between the tested list and the control only, and recomputes
+the summed per-identifier difference (treatment minus control). Its null is that, for every
+record, sitting on the tested list or the control does not change whether, when or by whom the
+record is identified; other lists may have effects. ``confirmatory`` runs it on each tested
+list's pinned count:
 one-sided for ``gap_first`` and ``similarity`` with Holm over those two, two-sided and
 unadjusted for the exploratory ``novelty``. ``analyse`` runs the paired sign-flip permutation
 test on the same differences, one per treatment arm, and ``sign_test_p`` the exact binomial
@@ -38,10 +41,11 @@ on one count with Holm over the sign-flip p of all of them, as ``analyse`` does,
 ``p_record`` after ``p_holm``: the record-level p with the same users, weighting, window, reps
 and seed, not Holm-adjusted.
 
-Either way the record-level p redraws the split as the keyed build does (``strata`` None),
-because the served inputs carry no stratum. It is valid only when every record in a list is
-served: when a cap on batches binds, which records a list serves depends on the split, and
-holding each record's identifications fixed under a redrawn split no longer matches the design.
+Either way the record-level p redraws only the tested list's and the control's records between
+those two lists (``strata`` None), because the served inputs carry no stratum. It is valid only
+when every record in a list is served: when a cap on batches binds, which records a list
+serves depends on the split, and holding each record's identifications fixed under a redrawn
+split no longer matches the design.
 The CLI cannot check this: a batches frame or a served log holds only the served records, not
 the pool, and not the cap. Check the build record (every list and taxon group has fewer batches
 than ``max_batches``, or no cap) before reading it.
@@ -302,12 +306,14 @@ def record_shuffle_p(
 
     This is the primary test. It re-randomises the unit the design randomises, the record,
     where the sign-flip test re-randomises signs within identifiers. With ``strata`` None it
-    draws each record's arm on its own and uniformly over ``arms``, which is what
-    ``assign.assign_keyed`` does. ``arms`` is the design's lists; left None it is the lists
-    that were served, which differs from the design only when a list served nothing. With
-    ``strata`` given, one label per served id, it permutes the observed arms inside each
-    stratum, which is what ``assign.assign`` does. It asks whether the observed difference is
-    unusual when only the split of records changes, with each record's identifications held
+    redraws only the records on ``arm`` or ``control``, each to either with probability 1/2 and
+    independently, and leaves every other record on its list. With ``strata`` given, one label
+    per served id, it permutes those records' observed labels inside each stratum. ``arms`` is the
+    design's lists, used only to validate ``arm``, ``control`` and the served lists; left None it
+    is the lists that were served. The null is that, for every record, sitting on ``arm`` or on
+    ``control`` does not change whether, when or by whom it is identified; the other lists may
+    have effects, which a four-list redraw would count as noise. It asks whether the observed
+    difference is unusual when only that split changes, with each record's identifications held
     fixed. The observed split counts as one redraw, so p is never 0.
 
     ``alternative`` "two-sided" (the default) counts redraws whose absolute difference reaches
@@ -337,16 +343,23 @@ def record_shuffle_p(
         obs = abs(obs)
     rng = np.random.default_rng(seed)
     if strata is None:
-        blocks = None
+        labels = None
     else:
         labels = served["id"].map(strata)
         if labels.isna().any():
             raise ValueError("strata is missing a label for at least one served id")
-        blocks = [np.flatnonzero(labels.to_numpy() == s) for s in sorted(labels.unique())]
+    # Only the tested list's and the control's records move; the other lists stay put.
+    pair = (code == i_arm) | (code == i_ctl)
+    w, code = w[pair], code[pair]
+    if labels is None:
+        blocks = None
+    else:
+        labels = labels.to_numpy()[pair]
+        blocks = [np.flatnonzero(labels == s) for s in sorted(set(labels))]
     hits = 0
     for _ in range(reps):
         if blocks is None:
-            drawn = rng.integers(len(arms), size=w.size)
+            drawn = np.where(rng.integers(2, size=w.size) == 1, i_arm, i_ctl)
         else:
             drawn = code.copy()
             for block in blocks:

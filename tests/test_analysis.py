@@ -405,14 +405,14 @@ def test_record_shuffle_p_rejects_bad_arms_and_reps():
         analysis.record_shuffle_p(flat, SERVED, arm="t", control="c", reps=0)
 
 
-def test_record_shuffle_p_redraws_over_the_design_lists():
+def test_record_shuffle_p_redraws_only_the_tested_pair():
     served = pd.DataFrame({"id": range(40), "arm": ["c", "t"] * 20})
     totals = pd.Series([1.0 if a == "c" else 1.5 for a in served["arm"]], index=served["id"])
     kw = {"arm": "t", "control": "c", "reps": 400, "seed": 0}
     two = analysis.record_shuffle_p(totals, served, **kw)
     assert analysis.record_shuffle_p(totals, served, arms=["t", "c"], **kw) == two
-    # Four design lists, two served: each record's redraw can land on a list that served nothing.
-    assert analysis.record_shuffle_p(totals, served, arms=["c", "t", "u", "v"], **kw) != two
+    # Only the tested list and the control are redrawn, so unserved design lists change nothing.
+    assert analysis.record_shuffle_p(totals, served, arms=["c", "t", "u", "v"], **kw) == two
     extra = served.assign(arm=["c", "t", "u", "t"] * 10)
     with pytest.raises(ValueError, match="not in the design"):
         analysis.record_shuffle_p(totals, extra, arms=["c", "t"], **kw)
@@ -423,15 +423,15 @@ FOUR = pd.DataFrame({"id": range(8), "arm": [a for a in ("c", "t", "u", "v") for
 
 def _by_hand(totals, arm, control, reps, seed, one_sided):
     """(1 + #{redraws with stat >= obs}) / (reps + 1), same redraws as record_shuffle_p."""
-    arms = ["c", "t", "u", "v"]
-    w = FOUR["id"].map(totals).to_numpy()
-    code = FOUR["arm"].map(arms.index).to_numpy()
-    obs = w[code == arms.index(arm)].sum() - w[code == arms.index(control)].sum()
+    keep = FOUR["arm"].isin([arm, control]).to_numpy()
+    w = FOUR["id"].map(totals).to_numpy()[keep]
+    code = (FOUR["arm"] == arm).to_numpy()[keep]
+    obs = w[code].sum() - w[~code].sum()
     rng = np.random.default_rng(seed)
     hits = 0
     for _ in range(reps):
-        drawn = rng.integers(len(arms), size=w.size)
-        stat = w[drawn == arms.index(arm)].sum() - w[drawn == arms.index(control)].sum()
+        drawn = rng.integers(2, size=w.size) == 1
+        stat = w[drawn].sum() - w[~drawn].sum()
         hits += stat >= obs - 1e-9 if one_sided else abs(stat) >= abs(obs) - 1e-9
     return (1 + hits) / (reps + 1)
 
@@ -450,7 +450,7 @@ def test_one_sided_record_p_is_the_share_of_redraws_at_least_as_high():
     behind = ahead.rename({0: 2, 1: 3, 2: 0, 3: 1}).sort_index()
     one_behind = analysis.record_shuffle_p(behind, FOUR, alternative="greater", **kw)
     assert one_behind == pytest.approx(_by_hand(behind, "t", "c", 300, 5, one_sided=True))
-    assert one_behind > 0.9
+    assert one_behind > 0.8
     assert analysis.record_shuffle_p(behind, FOUR, **kw) < 0.5
     with pytest.raises(ValueError, match="alternative must be"):
         analysis.record_shuffle_p(ahead, FOUR, alternative="less", **kw)
