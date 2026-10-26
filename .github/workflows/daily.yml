@@ -52,7 +52,7 @@ jobs:
     steps:
       # CODE_REF (a tag such as blitz-bc-2026) pins the code for the whole blitz; unset, the
       # job runs the commit that triggered it. Either way the build record names the commit.
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ vars.CODE_REF || github.sha }}
       - uses: ./.github/actions/labelfirst
@@ -67,7 +67,7 @@ jobs:
         run: |
           sha=$(PYTHONPATH=src python -c "from what_to_id.manifest import WHERE_TO_BLITZ_REF as r; print(r.split('@')[1])")
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: PollockLab/where-to-blitz
           ref: ${{ steps.wtb.outputs.sha }}
