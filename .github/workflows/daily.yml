@@ -48,6 +48,7 @@ jobs:
       EMBEDDING_RELEASE: ${{ vars.EMBEDDING_RELEASE || 'embedding-base-2026-10-15' }}
       EMBEDDING_REPO: ${{ vars.EMBEDDING_REPO || github.repository }}
       EMBEDDING_BUNDLE: data/embedding-bundle
+      TIME: "%C took %e s, peak %M KB" # format for /usr/bin/time on each daily.sh step
     steps:
       # CODE_REF (a tag such as blitz-bc-2026) pins the code for the whole blitz; unset, the
       # job runs the commit that triggered it. Either way the build record names the commit.
@@ -81,12 +82,24 @@ jobs:
             exit 1
           fi
       # One build date for every step, even if the run crosses midnight UTC.
-      - run: echo "TODAY=$(date -u +%F)" >> "$GITHUB_ENV"
-      - run: scripts/daily.sh fetch
+      - run: |
+          echo "TODAY=$(date -u +%F)" >> "$GITHUB_ENV"
+          echo "JOB_START=$(date +%s)" >> "$GITHUB_ENV"
+      - run: /usr/bin/time scripts/daily.sh fetch
       - name: Assemble today's embedding bundle from the base release and the atlas deltas
-        run: scripts/daily.sh fetch-embeddings
+        run: /usr/bin/time scripts/daily.sh fetch-embeddings
       - name: Build, check for leaks, replay
         env:
           WHAT_TO_ID_KEY: ${{ secrets.WHAT_TO_ID_KEY }}
-        run: scripts/daily.sh build
-      - run: scripts/daily.sh save
+        run: /usr/bin/time scripts/daily.sh build
+      - run: /usr/bin/time scripts/daily.sh save
+      # The job limit is 350 minutes: warn well before the blitz's growing pool reaches it.
+      - name: Warn when the run nears the job limit
+        if: always()
+        run: |
+          [ -n "${JOB_START:-}" ] || exit 0
+          minutes=$(( ($(date +%s) - JOB_START) / 60 ))
+          echo "daily: job ran $minutes minutes"
+          if [ "$minutes" -ge 240 ]; then
+            echo "::warning::The daily job ran $minutes minutes, past the 4-hour bar; the limit is 350."
+          fi
