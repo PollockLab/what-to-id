@@ -54,7 +54,8 @@ def scores():
     return fir_scores(*bundle())
 
 
-def test_each_level_is_filled_and_its_rule_holds():
+def test_each_level_is_filled_and_its_rule_holds(monkeypatch):
+    monkeypatch.setattr(levels, "MIN_LOOKALIKE_RECORDS", 1)  # the bundle has 11 records a species
     s = scores()
     out = levels.assign(s)
     assert list(out.columns) == list(levels.LEVEL_COLUMNS)
@@ -130,3 +131,17 @@ def test_cli_writes_the_table_and_manifest_key(tmp_path, capsys):
     assert entry["name"] == "levels.parquet" and entry["count"] == len(table) > 0
     printed = capsys.readouterr().out
     assert "margin quantiles" in printed and "rows per group and level" in printed
+
+
+def test_rare_lookalikes_are_dropped_from_look_alikes(monkeypatch):
+    s = scores()  # every species has 11 records
+
+    def look_alikes():
+        out = levels.assign(s)
+        return set(out[out["level"] == "taxonomist"]["looks_like_name"])
+
+    monkeypatch.setattr(levels, "MIN_LOOKALIKE_RECORDS", 11)  # at the boundary: kept
+    assert look_alikes() == {"G a", "G b"}
+    monkeypatch.setattr(levels, "MIN_LOOKALIKE_RECORDS", 12)  # one short: dropped
+    assert look_alikes() == set()
+    assert {"easy", "weird"} <= set(levels.assign(s)["level"])

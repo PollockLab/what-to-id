@@ -6,7 +6,8 @@ Each species-ranked Needs ID record has `own` (cosine to its labelled species' t
 - easy: margin above zero and `own` in the top `EASY_TOP_SHARE` of its species, the records that
   sit squarely in their labelled species, for ticking off many quickly;
 - taxonomist: margin just below zero, down to `-TAXONOMIST_MARGIN`, where one look-alike species
-  is barely ahead of the label: believable, ambiguous between the two;
+  is barely ahead of the label: believable, ambiguous between the two, and the look-alike
+  has at least `MIN_LOOKALIKE_RECORDS` records in the pool (rarer ones are noise for identifiers);
 - weird: the lowest `WEIRD_SHARE` of max(own, other) within the iconic group, records far from
   every species (hands, eggs, extreme close-ups).
 
@@ -63,6 +64,9 @@ TAXONOMIST_MARGIN = 0.02
 # The bottom 2% per group by max(own, other) (0.42 for Aves to 0.56 for Fungi, against a median
 # of 0.64): only the small groups reach this cut, the big ones fill `CAP` farthest first.
 WEIRD_SHARE = 0.02
+# A look-alike with fewer pool records is dropped: 5x `MIN_PER_CLASS`, so the card names a species
+# an identifier can actually meet (a 2-record Ostrya "look-alike" of Betula is noise).
+MIN_LOOKALIKE_RECORDS = 20
 PER_SPECIES = 3  # records per species per level, so a common species does not fill a level
 CAP = 1500  # records per level per iconic group; keeps levels-data.bin well under 3 MB gzipped
 
@@ -90,7 +94,13 @@ def assign(
     weird_cut = s.groupby("group")["top"].transform(lambda x: x.quantile(WEIRD_SHARE))
     weird = s["top"] <= weird_cut
     easy = (s["margin"] > 0) & (n_species >= MIN_PER_CLASS) & (own_share <= EASY_TOP_SHARE) & ~weird
-    taxonomist = (s["margin"] < 0) & (s["margin"] >= -TAXONOMIST_MARGIN) & ~weird
+    n_lookalike = s["other_name"].map(s["taxon_name"].value_counts()).fillna(0)
+    taxonomist = (
+        (s["margin"] < 0)
+        & (s["margin"] >= -TAXONOMIST_MARGIN)
+        & (n_lookalike >= MIN_LOOKALIKE_RECORDS)
+        & ~weird
+    )
     rng = np.random.default_rng(seed)
     parts = []
     for key, mask, score in (
