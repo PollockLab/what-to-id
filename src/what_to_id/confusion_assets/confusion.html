@@ -1,0 +1,79 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Confused pairs</title>
+<style>
+__SITE_CSS__
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:1180px;margin:0 auto;padding:16px}
+h1{font-size:22px;margin:8px 0}
+h2{font-size:16px;margin:0 0 8px}
+a{color:var(--bar)}
+.muted{color:var(--muted)}
+.note{background:var(--warnbg);color:var(--warn);padding:8px 10px;border-radius:6px;margin:8px 0}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 8px}
+.tabs button,.more,.pair{font:inherit;color:inherit;cursor:pointer}
+.tabs button{min-height:36px;padding:0 12px;border:1px solid var(--line);border-radius:18px;
+  background:var(--chip)}
+.tabs button[aria-pressed="true"]{background:var(--on);color:var(--onink);border-color:var(--on)}
+.find{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:8px 0 12px}
+.find input{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);
+  border-radius:6px;padding:8px 10px;min-height:20px;width:min(360px,100%);box-sizing:border-box}
+.cols{display:grid;grid-template-columns:minmax(260px,360px) 1fr;gap:16px;align-items:start}
+#pairs-col{position:sticky;top:8px;max-height:calc(100vh - 16px);overflow:auto;
+  border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+#pairs{list-style:none;margin:0;padding:0}
+.pair{display:block;width:100%;text-align:left;padding:8px 10px;border:0;
+  border-bottom:1px solid var(--line);background:none}
+.pair:hover{background:var(--chip)}
+.pair[aria-pressed="true"]{background:var(--total)}
+.pair .sub{display:block;color:var(--muted);font-size:13px}
+.more{margin:10px;min-height:36px;padding:0 14px;border:1px solid var(--line);border-radius:6px;
+  background:var(--chip)}
+.act{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin:0 0 12px}
+#cards{list-style:none;margin:0;padding:0;display:grid;gap:12px;
+  grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+.card{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  padding:8px;display:flex;flex-direction:column;gap:6px}
+.card:focus{outline:3px solid var(--bar);outline-offset:2px}
+.card.seen{opacity:.55}
+.card img{width:100%;height:auto;aspect-ratio:4/3;object-fit:cover;border-radius:4px;background:var(--chip);
+  display:block}
+.card .pick{position:absolute;top:12px;left:12px;background:var(--panel);border-radius:4px;
+  padding:2px 4px;display:flex;align-items:center;gap:4px;font-size:12px}
+.card .pick input{width:18px;height:18px;margin:0}
+.bar{height:4px;background:var(--line);border-radius:2px;overflow:hidden}
+.bar span{display:block;height:100%;background:var(--share)}
+@media (max-width:760px){.cols{grid-template-columns:1fr}
+  #pairs-col{position:static;max-height:45vh}}
+</style></head><body>
+__SITE_NAV__<main id="main-content">
+<h1>Confused pairs</h1>
+<p>A photo counts as confused when the BioCLIP text vector of another species name is closer to it
+than the vector of its own species name. The proposals themselves are never the reference.</p>
+<p class="muted">Pick a group, then a pair: its records come worst first, the ones that look most
+like the other species. __BUILT__</p>
+__RECORDS_NOTE__
+<div class="tabs" id="tabs" role="group" aria-label="Group"></div>
+<p class="note" id="caveat" hidden>For fungi the score barely separates the records identifiers
+overturn (AUROC about 0.65), so treat the order as a loose guide.</p>
+<div class="find"><label for="q">Find a species</label>
+<input id="q" type="search" list="names" autocomplete="off" placeholder="Labelled or look-alike name">
+<datalist id="names"></datalist></div>
+<p id="status" class="muted" aria-live="polite">Loading…</p>
+<div class="cols">
+<section id="pairs-col" aria-label="Pairs"><ul id="pairs"></ul></section>
+<section id="records" aria-labelledby="rec-title" tabindex="-1">
+<h2 id="rec-title">Choose a pair</h2>
+<p class="muted" id="rec-sub">Its records show here, worst first. j and k move between cards,
+Enter opens the observation.</p>
+<div class="act" id="act"></div>
+<ol id="cards"></ol>
+</section>
+</div>
+</main>
+<script>var CONFIG=__CONFIG__;</script>
+<script>__EMBEDDINGS_LAYOUT__</script>
+<script>__IDENTIFY_LINKS__</script>
+<script>__CONFUSION_APP__</script>
+</body></html>
