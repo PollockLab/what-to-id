@@ -1,0 +1,132 @@
+"""Level assignment on a small synthetic bundle: every level filled, its rule held, caps kept."""
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from what_to_id import levels
+from what_to_id.atlas_index_io import VERSION, read_manifest, write_manifest
+from what_to_id.confusion import fir_scores
+
+TEXT = {"G a": [1, 0, 0, 0], "G b": [0, 1, 0, 0], "F c": [0, 0, 1, 0]}
+
+
+def _unit(v):
+    v = np.asarray(v, dtype=np.float32)
+    return v / np.linalg.norm(v, axis=1, keepdims=True)
+
+
+def bundle():
+    """Per species: 8 clean photos, 1 just past a look-alike, 1 clearly wrong, 1 of nothing."""
+    rng = np.random.default_rng(1)
+    rows, names, groups = [], [], []
+    for name, own, other, group in [
+        ("G a", 0, 1, "Plantae"),
+        ("G b", 1, 0, "Plantae"),
+        ("F c", 2, 0, "Fungi"),
+    ]:
+        clean = np.zeros((8, 4))
+        clean[:, own] = 1
+        clean[:, 3] = rng.uniform(0, 0.5, 8)
+        near, wrong, odd = np.zeros((3, 4))
+        near[[own, other, 3]] = 1, 1.02, 0.2
+        wrong[[own, other]] = 0.2, 1
+        odd[3] = 1
+        rows += [*clean, near, wrong, odd]
+        names += [name] * 11
+        groups += [group] * 11
+    E = _unit(rows)
+    ids = np.arange(100, 100 + len(E))
+    pool = pd.DataFrame(
+        {
+            "id": ids,
+            "taxon_id": [10 + list(TEXT).index(n) for n in names],
+            "taxon_name": names,
+            "rank": "species",
+            "iconic_taxon": groups,
+            "photo_url": [f"https://x/{i}.jpg" for i in ids],
+        }
+    )
+    return pool, E, ids, pd.Series(list(TEXT)), _unit(list(TEXT.values()))
+
+
+def scores():
+    return fir_scores(*bundle())
+
+
+def test_each_level_is_filled_and_its_rule_holds():
+    s = scores()
+    out = levels.assign(s)
+    assert list(out.columns) == list(levels.LEVEL_COLUMNS)
+    assert set(out["level"]) == {"easy", "taxonomist", "weird"}
+    assert out["id"].is_unique
+    m = out.merge(s[["id", "own", "other", "margin"]], on="id")
+    easy, tax, odd = (m[m["level"] == k] for k in ("easy", "taxonomist", "weird"))
+    assert (easy["margin"] > 0).all() and (easy["score"] == easy["own"].astype(np.float32)).all()
+    # the top quarter by own of 11 photos is 2 photos per species
+    assert easy.groupby("taxon_id").size().eq(2).all()
+    assert tax["margin"].between(-levels.TAXONOMIST_MARGIN, 0, inclusive="left").all()
+    # the photos just past their look-alike, one per species
+    assert (tax["id"] - 100).mod(11).eq(8).all() and len(tax) == 3
+    assert set(tax["looks_like_name"]) == {"G a", "G b"}
+    # the photo of nothing is the weird one, far from every species
+    assert (odd["id"] - 100).mod(11).eq(10).all() and len(odd) == 3
+    assert (odd["score"] < easy["score"].min()).all()
+    # the clearly wrong photos sit in no level
+    assert not ((m["id"] - 100) % 11 == 9).any()
+
+
+def test_caps_hold_per_species_and_per_group():
+    out = levels.assign(scores(), cap=1, per_species=1)
+    assert out.groupby(["level", "iconic_taxon"]).size().le(1).all()
+    assert out.groupby(["level", "taxon_id"]).size().le(1).all()
+    full = levels.assign(scores(), per_species=1)
+    assert full.groupby(["level", "taxon_id"]).size().le(1).all()
+    assert set(full["iconic_taxon"]) == {"Plantae", "Fungi"}
+
+
+def test_easy_interleaves_species_and_weird_takes_turns_by_group():
+    out = levels.assign(scores())
+    easy = out[out["level"] == "easy"]
+    assert easy["taxon_id"].head(3).nunique() == 3
+    odd = out[out["level"] == "weird"]
+    assert odd["iconic_taxon"].head(2).nunique() == 2
+
+
+def test_same_seed_same_order():
+    s = scores()
+    assert levels.assign(s, seed=3).equals(levels.assign(s, seed=3))
+
+
+def test_empty_input_gives_an_empty_table():
+    pool, E, ids, taxa, T = bundle()
+    out = levels.assign(fir_scores(pool.iloc[:0], E, ids, taxa, T))
+    assert out.empty and list(out.columns) == list(levels.LEVEL_COLUMNS)
+
+
+def test_missing_column_is_named():
+    with pytest.raises(ValueError, match="photo_url"):
+        levels.assign(scores().drop(columns="photo_url"))
+
+
+def test_cli_writes_the_table_and_manifest_key(tmp_path, capsys):
+    import gzip
+
+    pool, E, ids, taxa, T = bundle()
+    np.save(tmp_path / "E.npy", E)
+    np.save(tmp_path / "ids.npy", ids.astype(np.int64))
+    pool.to_parquet(tmp_path / "pool.parquet", index=False)
+    with gzip.open(tmp_path / "taxa.tsv.gz", "wt") as f:
+        f.write("".join(f"{n}\t\n" for n in TEXT))
+    T.astype(np.float16).tofile(tmp_path / "taxa.f16")
+    write_manifest(tmp_path, {"version": VERSION, "parts": []})
+    args = ["--emb", str(tmp_path / "E.npy"), "--ids", str(tmp_path / "ids.npy")]
+    args += ["--pool", str(tmp_path / "pool.parquet"), "--atlas-dir", str(tmp_path)]
+    args += ["--taxa-names", str(tmp_path / "taxa.tsv.gz")]
+    args += ["--taxa-vectors", str(tmp_path / "taxa.f16")]
+    assert levels.main(args) == 0
+    table = pd.read_parquet(tmp_path / "levels.parquet")
+    entry = read_manifest(tmp_path)["levels"]
+    assert entry["name"] == "levels.parquet" and entry["count"] == len(table) > 0
+    printed = capsys.readouterr().out
+    assert "margin quantiles" in printed and "rows per group and level" in printed

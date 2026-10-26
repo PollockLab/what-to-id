@@ -212,9 +212,9 @@ def fir_scores(
 ) -> pd.DataFrame:
     """Text-margin scores per species-ranked pool row that has an embedding row in `ids`.
 
-    Columns: id, taxon_id, taxon_name, margin, other_name, plus `iconic_taxon` and `photo_url`
-    when the pool has them. `E` may be a memory map: rows are read in `FIR_SLICE` slices in file
-    order. Rows with no text prototype for their name have a NaN margin.
+    Columns: id, taxon_id, taxon_name, own, other, margin, other_name, plus `iconic_taxon` and
+    `photo_url` when the pool has them. `E` may be a memory map: rows are read in `FIR_SLICE`
+    slices in file order. Rows with no text prototype for their name have a NaN margin.
     """
     extra = [c for c in ("iconic_taxon", "photo_url") if c in pool.columns]
     p = pool.loc[pool["rank"] == "species", ["id", "taxon_id", "taxon_name", *extra]].dropna(
@@ -234,6 +234,8 @@ def fir_scores(
             q.drop(columns="pos")
             .assign(
                 taxon_id=q["taxon_id"].to_numpy().astype(np.int64),
+                own=own,
+                other=other,
                 margin=own - other,
                 other_name=other_name,
             )
@@ -243,7 +245,7 @@ def fir_scores(
         return pd.DataFrame(
             {
                 **{c: pd.Series(dtype=p[c].dtype) for c in p.columns if c != "pos"},
-                "margin": pd.Series(dtype=float),
+                **{c: pd.Series(dtype=float) for c in ("own", "other", "margin")},
                 "other_name": pd.Series(dtype=object),
             }
         ).astype({"taxon_id": np.int64})
