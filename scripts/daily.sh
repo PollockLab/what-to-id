@@ -2,6 +2,8 @@
 # One daily build of the rotation page. GitHub Actions (.github/workflows/daily.yml) runs
 # exactly these steps, and so can a laptop:
 #
+#   scripts/daily.sh pull    when the release holds no pool yet (or FULL_PULL=true), pull the
+#                            whole pool and upload it; it takes hours, so it runs as its own job
 #   scripts/daily.sh fetch   download the pool and served log from the pool-state release
 #   scripts/daily.sh build   load the prepared pool, build, drop identified records, rebuild,
 #                            keep the day's pool and build record, check for leaks, replay
@@ -59,6 +61,16 @@ fetch() {
     die "the release holds earlier builds but no served log; restore served.parquet before building"
   fi
   ls -la "$STATE"
+}
+
+pull() {
+  fetch
+  if [ "${FULL_PULL:-}" != true ] && [ -s "$STATE/pool.parquet" ]; then
+    echo "the release already holds a pool; the build updates it"
+    return
+  fi
+  update_pool
+  upload_state "$STATE/pool.parquet"
 }
 
 update_pool() {
@@ -186,7 +198,6 @@ build() {
 }
 
 save() {
-  local state_repo=${STATE_REPO:-${GITHUB_REPOSITORY:-PollockLab/what-to-id}}
   local files=("$STATE/pool.parquet" "$STATE/served.parquet"
     "$STATE/days/pool-$TODAY.parquet" "$STATE/days/build-$TODAY.json")
   if [ -f "$STATE/bundle-eligibility.json" ]; then
@@ -198,6 +209,11 @@ save() {
   # The study page rides on the release too: map.yml, the only Pages deployer, fetches it.
   [ -s "$OUT/final/site/study.html" ] || die "missing $OUT/final/site/study.html; run build first"
   files+=("$OUT/final/site/study.html")
+  upload_state "${files[@]}"
+}
+
+upload_state() {
+  local state_repo=${STATE_REPO:-${GITHUB_REPOSITORY:-PollockLab/what-to-id}}
   if ! state_release_exists "$state_repo"; then
     gh release create "$STATE_TAG" --repo "$state_repo" \
       --prerelease --latest=false --title "Daily pool state" \
@@ -205,7 +221,7 @@ save() {
   fi
   local attempt
   for attempt in 1 2 3; do
-    if gh release upload "$STATE_TAG" "${files[@]}" --repo "$state_repo" --clobber; then
+    if gh release upload "$STATE_TAG" "$@" --repo "$state_repo" --clobber; then
       return
     fi
     echo "upload failed (attempt $attempt), retrying"
@@ -215,9 +231,10 @@ save() {
 }
 
 case "${1:-}" in
+  pull) pull ;;
   fetch) fetch ;;
   fetch-embeddings) fetch_embeddings ;;
   build) build ;;
   save) save ;;
-  *) die "usage: scripts/daily.sh fetch|fetch-embeddings|build|save" ;;
+  *) die "usage: scripts/daily.sh pull|fetch|fetch-embeddings|build|save" ;;
 esac

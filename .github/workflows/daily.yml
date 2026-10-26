@@ -32,17 +32,48 @@ env:
   WHAT_TO_ID_USER_AGENT: what-to-id daily build (https://github.com/PollockLab/what-to-id)
 
 jobs:
-  build:
+  # The first day's whole pool takes hours, so it gets its own job and its own time limit.
+  # On later days the release already holds the pool and this job only checks that.
+  pull:
     # The schedule stays off until the repository variable DAILY_ENABLED is "true".
     if: github.event_name == 'workflow_dispatch' || vars.DAILY_ENABLED == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 350
     permissions:
       contents: write
+    outputs:
+      today: ${{ steps.today.outputs.today }}
     env:
       GH_TOKEN: ${{ github.token }}
-      BLITZ_D1: ${{ vars.BLITZ_D1 || '2026-11-01' }}
       FULL_PULL: ${{ inputs.full_pull }}
+      TIME: "%C took %e s, peak %M KB"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ vars.CODE_REF || github.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.lock
+      - run: pip install --require-hashes -r requirements.lock
+      # One build date for both jobs, even if the pull crosses midnight UTC.
+      - id: today
+        run: |
+          echo "today=$(date -u +%F)" >> "$GITHUB_OUTPUT"
+          echo "TODAY=$(date -u +%F)" >> "$GITHUB_ENV"
+      - run: /usr/bin/time scripts/daily.sh pull
+
+  build:
+    needs: pull
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TODAY: ${{ needs.pull.outputs.today }}
+      BLITZ_D1: ${{ vars.BLITZ_D1 || '2026-11-01' }}
       WTB_DIR: wtb/cluster_results/ca
       ARMS: recency,gap_first,similarity,novelty
       EMBEDDING_RELEASE: ${{ vars.EMBEDDING_RELEASE || 'embedding-base-2026-10-15' }}
@@ -81,10 +112,7 @@ jobs:
             echo "::error::Repository secret WHAT_TO_ID_KEY is not set; run the setup wizard"
             exit 1
           fi
-      # One build date for every step, even if the run crosses midnight UTC.
-      - run: |
-          echo "TODAY=$(date -u +%F)" >> "$GITHUB_ENV"
-          echo "JOB_START=$(date +%s)" >> "$GITHUB_ENV"
+      - run: echo "JOB_START=$(date +%s)" >> "$GITHUB_ENV"
       - run: /usr/bin/time scripts/daily.sh fetch
       - name: Assemble today's embedding bundle from the base release and the atlas deltas
         run: /usr/bin/time scripts/daily.sh fetch-embeddings

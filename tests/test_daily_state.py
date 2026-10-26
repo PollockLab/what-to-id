@@ -117,3 +117,33 @@ def test_bundle_eligibility_is_fetched_and_saved(daily):
     assert result.returncode == 0, result.stderr
     downloads = [call for call in calls if call[:2] == ["release", "download"]]
     assert any(call[call.index("-p") + 1] == eligibility.name for call in downloads)
+
+
+def test_pull_skips_when_release_holds_a_pool(daily):
+    invoke, state = daily
+    result, calls = invoke("pull", "200", assets="pool.parquet")
+    assert result.returncode == 0, result.stderr
+    assert "already holds a pool" in result.stdout
+    assert not any(call[:2] in (["release", "create"], ["release", "upload"]) for call in calls)
+    assert (state / "pool.parquet").read_text() == "existing state"
+
+
+def test_first_pull_uploads_only_the_pool(daily, tmp_path, monkeypatch):
+    invoke, state = daily
+    for path in state.rglob("*"):
+        if path.is_file():
+            path.unlink()
+    python = tmp_path / "fake-python"
+    python.write_text(
+        "#!/bin/sh\n"
+        'while [ "$1" != --out ]; do shift; done\n'
+        'echo pulled > "$2"\n'
+    )
+    python.chmod(0o755)
+    monkeypatch.setenv("PYTHON", str(python))
+    result, calls = invoke("pull", "404")
+    assert result.returncode == 0, result.stderr
+    assert (state / "pool.parquet").read_text() == "pulled\n"
+    upload = next(call for call in calls if call[:2] == ["release", "upload"])
+    assert upload[3:upload.index("--repo")] == [str(state / "pool.parquet")]
+    assert [call[1] for call in calls if call[0] == "release"] == ["create", "upload"]
