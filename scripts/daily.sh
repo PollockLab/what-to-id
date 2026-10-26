@@ -61,16 +61,40 @@ fetch() {
   ls -la "$STATE"
 }
 
+update_pool() {
+  if [ "${OFFLINE:-}" = 1 ]; then
+    [ -s "$STATE/pool.parquet" ] || die "OFFLINE=1 needs a saved $STATE/pool.parquet"
+  elif [ "${FULL_PULL:-}" = true ] || [ ! -s "$STATE/pool.parquet" ]; then
+    $PY -m what_to_id.inat --d1 "$D1" --freeze "$TODAY" --out "$STATE/pool.parquet"
+  else
+    $PY -m what_to_id.pool_state update --pool "$STATE/pool.parquet" --d1 "$D1"
+  fi
+}
+
+# Today's bundle: the base release's float16 vectors plus the atlas-state raw deltas, for
+# today's pool. Records the atlas has not embedded yet wait for a later day.
 fetch_embeddings() {
-  : "${EMBEDDING_RELEASE:?set EMBEDDING_RELEASE to a versioned embedding bundle release tag}"
+  : "${EMBEDDING_RELEASE:?set EMBEDDING_RELEASE to the base embedding release tag}"
   local source_repo=${EMBEDDING_REPO:-${GITHUB_REPOSITORY:-PollockLab/what-to-id}}
+  local atlas_repo=${ATLAS_REPO:-PollockLab/what-to-id}
   [ ! -e "$EMBEDDING_BUNDLE" ] || die "embedding destination exists; use a fresh EMBEDDING_BUNDLE path"
   local downloads="${EMBEDDING_BUNDLE}.download"
   [ ! -e "$downloads" ] || die "embedding download destination exists; use a fresh path"
-  mkdir -p "$downloads"
-  gh release download "$EMBEDDING_RELEASE" --repo "$source_repo" -D "$downloads" -p '*'
-  $PY -m what_to_id.bundle_transport restore --directory "$downloads" --out "$EMBEDDING_BUNDLE"
-  rm -rf "$downloads" # Verified parts can be fetched again; keep runner disk for the build.
+  mkdir -p "$STATE" "$downloads/base" "$downloads/deltas" "$downloads/reference"
+  update_pool
+  gh release download "$EMBEDDING_RELEASE" --repo "$source_repo" -D "$downloads/base" -p 'base_*'
+  gh release download "$EMBEDDING_RELEASE" --repo "$source_repo" -D "$downloads/reference" -p 'emb_*_bioclip25.npz'
+  gh release download atlas-state --repo "$atlas_repo" -D "$downloads/deltas" -p 'raw-delta-*.npz'
+  $PY -m what_to_id.assemble_bundle --pool "$STATE/pool.parquet" \
+    --base "$downloads/base" --deltas "$downloads/deltas" \
+    --reference-embeddings "${REFERENCE_EMBEDDINGS:-$downloads/reference/emb_{group}_bioclip25.npz}" \
+    --out "$EMBEDDING_BUNDLE"
+  rm -rf "$downloads" # Keep runner disk for the build.
+}
+
+prepare_build_pool() {
+  $PY -m what_to_id.pool_state prepared --pool "$pool" \
+    --prepared-pool "$EMBEDDING_BUNDLE/pool.parquet" "${eligibility_args[@]}"
 }
 
 embedding_args() {
@@ -124,23 +148,19 @@ build() {
 
   mkdir -p "$STATE/days"
   local eligibility_args=()
+  local pool="$STATE/pool.parquet"
   if [ "${#EMBEDDING_ARGS[@]}" -gt 0 ]; then
-    [ "${FULL_PULL:-}" != true ] || die "prepare and publish a fresh bundle for a full pool pull"
     [ -s "$EMBEDDING_BUNDLE/pool.parquet" ] || die "bundle has no prepared pool; repack it"
-    # Publish a complete snapshot and its embeddings together. Adding observations here
-    # would race preparation and make their embeddings unavailable to this build.
+    # The bundle's pool is today's pool minus the records not yet embedded. Serve that from a
+    # separate build pool so the state pool keeps the uncovered records for a later day.
     eligibility_args=(--eligibility "$STATE/bundle-eligibility.json")
-    $PY -m what_to_id.pool_state prepared --pool "$STATE/pool.parquet" \
-      --prepared-pool "$EMBEDDING_BUNDLE/pool.parquet" "${eligibility_args[@]}"
-  elif [ "${OFFLINE:-}" = 1 ]; then
-    [ -s "$STATE/pool.parquet" ] || die "OFFLINE=1 needs a saved $STATE/pool.parquet"
-  elif [ "${FULL_PULL:-}" = true ] || [ ! -s "$STATE/pool.parquet" ]; then
-    $PY -m what_to_id.inat --d1 "$D1" --freeze "$TODAY" --out "$STATE/pool.parquet"
+    pool="$STATE/build-pool.parquet"
+    prepare_build_pool
   else
-    $PY -m what_to_id.pool_state update --pool "$STATE/pool.parquet" --d1 "$D1"
+    update_pool
   fi
 
-  local common=(--pool "$STATE/pool.parquet" --freeze "$TODAY" --d1 "$BLITZ_D1"
+  local common=(--pool "$pool" --freeze "$TODAY" --d1 "$BLITZ_D1"
     --arms "$ARMS" --design rotation --max-batches "$MAX_BATCHES" --key-env WHAT_TO_ID_KEY
     --webapp-dir "$WTB_DIR" "${EMBEDDING_ARGS[@]}")
   rm -rf "$OUT/draft" "$OUT/final" "$OUT/ordering-cache"
@@ -149,11 +169,12 @@ build() {
   $PY -m what_to_id.cli build "${common[@]}" --out "$OUT/draft" --ordering-cache "$OUT/ordering-cache"
   if [ "${OFFLINE:-}" != 1 ]; then
     $PY -m what_to_id.pool_state refresh --pool "$STATE/pool.parquet" --ids "$OUT/draft/batches.parquet" "${eligibility_args[@]}"
+    [ "$pool" = "$STATE/pool.parquet" ] || prepare_build_pool # drop the records just closed
   fi
   $PY -m what_to_id.cli build "${common[@]}" --out "$OUT/final" --ordering-cache "$OUT/ordering-cache" --served-log "$STATE/served.parquet"
 
   # The day's exact inputs, kept so this build can be rerun later.
-  cp "$STATE/pool.parquet" "$STATE/days/pool-$TODAY.parquet"
+  cp "$pool" "$STATE/days/pool-$TODAY.parquet"
   cp "$OUT/final/build_record.json" "$STATE/days/build-$TODAY.json"
   check_leaks
   $PY -m what_to_id.replay --pool "$STATE/days/pool-$TODAY.parquet" \

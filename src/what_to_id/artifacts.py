@@ -173,8 +173,13 @@ def pack_bundle(
     out: str | Path,
     *,
     preparation: str | Path | None = None,
+    move_embeddings: bool = False,
 ) -> Path:
-    """Copy complete prepared caches into a portable, fingerprinted release asset set."""
+    """Copy complete prepared caches into a portable, fingerprinted release asset set.
+
+    move_embeddings moves the candidate files instead (keep them on the output's filesystem), so
+    a bundle of several GB never exists twice on disk.
+    """
     import json
     import re
     import shutil
@@ -209,7 +214,8 @@ def pack_bundle(
                 if not re.fullmatch(r"[A-Za-z0-9_]+", tag):
                     raise ValueError(f"invalid taxon group filename: {tag!r}")
                 filename = f"{role}_{tag}.npz"
-                shutil.copyfile(path, stage / filename)
+                move = move_embeddings and role == "embeddings"
+                (shutil.move if move else shutil.copyfile)(path, stage / filename)
                 files[role][group] = {
                     "file": filename,
                     **describe_files({group: stage / filename}, embeddings=True)[group],
