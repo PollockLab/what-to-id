@@ -317,6 +317,17 @@ def test_fir_records_keep_only_the_listed_pairs():
     assert out["looks_like_name"].eq("G b").all()
 
 
+def test_every_listed_pair_has_records():
+    text = {"G a": [1, 0, 0, 0], "G b": [0, 1, 0, 0], "G c": [0, 0, 1, 0], "G d": [0, 0, 0, 1]}
+    pool, E, ids, taxa, T = _fir_inputs(["G a"], [60], [[1, 0, 0, 0]], text)
+    # 55 photos look like G b, 3 like G c, 2 like G d: three pairs, the first capped at 50.
+    E = _unit([[0, 1, 0, 0]] * 55 + [[0, 0, 1, 0]] * 3 + [[0, 0, 0, 1]] * 2)
+    scores = fir_scores(pool, E, ids, taxa, T)
+    pairs, recs = fir_table(scores, BUILT), fir_records(scores, fir_table(scores, BUILT))
+    per_pair = recs.groupby("looks_like_name").size()
+    assert per_pair.reindex(pairs["looks_like_name"]).tolist() == [50, 3, 2]
+
+
 def test_fir_records_four_photo_floor():
     text = {"G a": [1, 0, 0], "G b": [0, 1, 0]}
     kw = dict(vecs=[[0, 1, 0], [0, 1, 0]], text=text)
