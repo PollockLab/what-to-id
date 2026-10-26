@@ -62,7 +62,19 @@ jobs:
         run: |
           echo "today=$(date -u +%F)" >> "$GITHUB_OUTPUT"
           echo "TODAY=$(date -u +%F)" >> "$GITHUB_ENV"
+      # A pull cut short (the time limit, an iNaturalist outage) resumes on the next run.
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: state/pool.parquet.parts
+          key: daily-pull-parts-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: daily-pull-parts-
       - run: /usr/bin/time scripts/daily.sh pull
+        timeout-minutes: 330 # leaves the job time to save the checkpoints
+      - if: always() && hashFiles('state/pool.parquet.parts/params.json') != ''
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: state/pool.parquet.parts
+          key: daily-pull-parts-${{ github.run_id }}-${{ github.run_attempt }}
 
   build:
     needs: pull

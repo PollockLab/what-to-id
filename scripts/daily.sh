@@ -63,11 +63,25 @@ fetch() {
   ls -la "$STATE"
 }
 
+# A pull cut short resumes from its checkpoints in $STATE/pool.parquet.parts/, frozen on the day
+# it started; the build's incremental update then catches up from the pool's newest record.
 pull() {
-  fetch
-  if [ "${FULL_PULL:-}" != true ] && [ -s "$STATE/pool.parquet" ]; then
-    echo "the release already holds a pool; the build updates it"
-    return
+  local state_repo=${STATE_REPO:-${GITHUB_REPOSITORY:-PollockLab/what-to-id}}
+  local parts="$STATE/pool.parquet.parts"
+  if [ "${FULL_PULL:-}" = true ]; then
+    rm -rf "$parts"
+  elif state_release_exists "$state_repo"; then
+    local assets
+    assets=$(gh release view "$STATE_TAG" --repo "$state_repo" --json assets --jq '.assets[].name')
+    if grep -qx pool.parquet <<<"$assets"; then
+      echo "the release already holds a pool; the build updates it"
+      return
+    fi
+  fi
+  mkdir -p "$STATE"
+  if [ -s "$parts/params.json" ]; then
+    TODAY=$($PY -c 'import json, sys; print(json.load(open(sys.argv[1]))["freeze"])' "$parts/params.json")
+    echo "resuming the pull frozen on $TODAY"
   fi
   update_pool
   upload_state "$STATE/pool.parquet"

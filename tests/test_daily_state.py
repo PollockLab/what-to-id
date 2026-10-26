@@ -120,30 +120,62 @@ def test_bundle_eligibility_is_fetched_and_saved(daily):
 
 
 def test_pull_skips_when_release_holds_a_pool(daily):
-    invoke, state = daily
+    invoke, _ = daily
     result, calls = invoke("pull", "200", assets="pool.parquet")
     assert result.returncode == 0, result.stderr
     assert "already holds a pool" in result.stdout
-    assert not any(call[:2] in (["release", "create"], ["release", "upload"]) for call in calls)
-    assert (state / "pool.parquet").read_text() == "existing state"
+    assert [call[:2] for call in calls] == [["api", "--include"], ["release", "view"]]
 
 
-def test_first_pull_uploads_only_the_pool(daily, tmp_path, monkeypatch):
+@pytest.fixture
+def first_pull(daily, tmp_path, monkeypatch):
     invoke, state = daily
     for path in state.rglob("*"):
         if path.is_file():
             path.unlink()
+    args = tmp_path / "python-args"
     python = tmp_path / "fake-python"
     python.write_text(
         "#!/bin/sh\n"
+        f'[ "$1" = -c ] && exec {sys.executable} "$@"\n'
+        f'echo "$@" > {args}\n'
         'while [ "$1" != --out ]; do shift; done\n'
         'echo pulled > "$2"\n'
     )
     python.chmod(0o755)
     monkeypatch.setenv("PYTHON", str(python))
+    return invoke, state, args
+
+
+def test_first_pull_uploads_only_the_pool(first_pull):
+    invoke, state, args = first_pull
     result, calls = invoke("pull", "404")
     assert result.returncode == 0, result.stderr
+    assert "--freeze 2026-09-28" in args.read_text()
     assert (state / "pool.parquet").read_text() == "pulled\n"
     upload = next(call for call in calls if call[:2] == ["release", "upload"])
-    assert upload[3:upload.index("--repo")] == [str(state / "pool.parquet")]
+    assert upload[3 : upload.index("--repo")] == [str(state / "pool.parquet")]
     assert [call[1] for call in calls if call[0] == "release"] == ["create", "upload"]
+
+
+def test_cut_short_pull_resumes_on_its_freeze_date(first_pull):
+    invoke, state, args = first_pull
+    parts = state / "pool.parquet.parts"
+    parts.mkdir()
+    (parts / "params.json").write_text('{"freeze": "2026-09-20"}')
+    result, _ = invoke("pull", "200", assets="served.parquet")
+    assert result.returncode == 0, result.stderr
+    assert "--freeze 2026-09-20" in args.read_text()
+
+
+def test_full_pull_starts_over(first_pull, monkeypatch):
+    invoke, state, args = first_pull
+    parts = state / "pool.parquet.parts"
+    parts.mkdir()
+    (parts / "params.json").write_text('{"freeze": "2026-09-20"}')
+    monkeypatch.setenv("FULL_PULL", "true")
+    result, calls = invoke("pull", "200", assets="pool.parquet")
+    assert result.returncode == 0, result.stderr
+    assert not parts.exists()
+    assert "--freeze 2026-09-28" in args.read_text()
+    assert ["release", "upload"] in [call[:2] for call in calls]
