@@ -158,3 +158,5 @@ def test_bc_counts_replace_the_pool_count_of_a_lookalike(monkeypatch):
     assert look_alikes(None) == set()  # rare in the pool
     # "G a" is common over BC, "G b" is rare there, "F c" is absent
     assert look_alikes(pd.Series({"G a": 500, "G b": 3})) == {"G a"}
+    # one name over two taxa sums: 10 + 15 clears the bar
+    assert look_alikes(pd.Series([10, 15, 3], index=["G a", "G a", "G b"])) == {"G a"}

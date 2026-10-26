@@ -99,7 +99,10 @@ def assign(
     weird_cut = s.groupby("group")["top"].transform(lambda x: x.quantile(WEIRD_SHARE))
     weird = s["top"] <= weird_cut
     easy = (s["margin"] > 0) & (n_species >= MIN_PER_CLASS) & (own_share <= EASY_TOP_SHARE) & ~weird
-    counts = s["taxon_name"].value_counts() if bc_counts is None else bc_counts
+    # a name can map to two taxa (species and complex), so counts are summed by name
+    counts = (
+        s["taxon_name"].value_counts() if bc_counts is None else bc_counts.groupby(level=0).sum()
+    )
     n_lookalike = s["other_name"].map(counts).fillna(0)
     taxonomist = (
         (s["margin"] < 0)
