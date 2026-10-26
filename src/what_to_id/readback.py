@@ -46,6 +46,7 @@ OBS_COLUMNS = (
     "n_identifiers",
     "last_ident_at",
     "reviewed_by",
+    "license_code",
 )
 IDENT_COLUMNS = ("id", "user_id", "created_at", "taxon_id", "taxon_rank", "current", "observer_id")
 OUTCOME_COLUMNS = (
@@ -85,6 +86,7 @@ def summarise(obs: dict) -> dict:
         "n_identifiers": len(users),
         "last_ident_at": max(stamps) if stamps else None,
         "reviewed_by": sorted(int(u) for u in obs.get("reviewed_by") or []),
+        "license_code": obs.get("license_code"),
         "identifications": flat,
     }
 

@@ -52,6 +52,11 @@ def test_summarise():
     assert s["identifications"][1]["current"] is False
 
 
+def test_summarise_license_code():
+    assert readback.summarise({**OBS, "license_code": "cc0"})["license_code"] == "cc0"
+    assert readback.summarise(OBS)["license_code"] is None
+
+
 def test_summarise_sparse():
     s = readback.summarise({"id": 5, "quality_grade": "needs_id", "community_taxon": None})
     assert s["community_rank"] is None and s["taxon_rank"] is None

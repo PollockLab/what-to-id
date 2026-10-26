@@ -94,13 +94,14 @@ DTYPES = {
 }
 # Kept when present and not required: pools pulled before these existed lack them. They feed
 # the map's popup and filters; taxon flags are for BC because the query sets place_id.
-EXTRA_COLUMNS = ("common_name", "introduced", "threatened", "obscured", "pos_acc")
+EXTRA_COLUMNS = ("common_name", "introduced", "threatened", "obscured", "pos_acc", "license_code")
 EXTRA_DTYPES = {
     "common_name": "object",
     "introduced": "boolean",
     "threatened": "boolean",
     "obscured": "boolean",
     "pos_acc": "Int64",
+    "license_code": "object",
 }
 
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -229,6 +230,7 @@ def flatten(obs: dict) -> dict | None:
         "threatened": taxon.get("threatened"),
         "obscured": obs.get("obscured"),
         "pos_acc": obs.get("public_positional_accuracy"),
+        "license_code": obs.get("license_code"),
     }
 
 

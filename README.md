@@ -57,7 +57,7 @@ IDs are credited to iNaturalist accounts and each record's list is fixed, so a s
 ## How it works
 
 1. **Pull.** Pull the needs-ID records with a photo, observed since a start date. The daily job then adds only the records created since its last run and, before each build, drops served records that no longer need an ID. The region is BC (iNaturalist place 7085), set in `inat.py` and `batches.py`.
-2. **Assign.** Each record goes to one list by a keyed hash of its record id (`--key-env`), so it stays on that list in every daily build. The key is private. Without it, a one-off build randomises once with a seed, balanced within taxon group and observer.
+2. **Assign.** Each record goes to one list by a keyed hash of its record id (`--key-env`), so it stays on that list in every daily build. The key is private; every public build record carries its fingerprint (`key_fingerprint`), which replay checks, so opening the key after the read-back can be verified. Without it, a one-off build randomises once with a seed, balanced within taxon group and observer.
 3. **Compose.** Each arm orders its records into batches:
    - `recency`: newest first as of the build, close to what an identifier gets from iNaturalist today.
    - `gap_first`: records from data-poor places first, using the where-to-blitz cell scores.
