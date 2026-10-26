@@ -7,7 +7,8 @@ Each species-ranked Needs ID record has `own` (cosine to its labelled species' t
   sit squarely in their labelled species, for ticking off many quickly;
 - taxonomist: margin just below zero, down to `-TAXONOMIST_MARGIN`, where one look-alike species
   is barely ahead of the label: believable, ambiguous between the two, and the look-alike
-  has at least `MIN_LOOKALIKE_RECORDS` records in the pool (rarer ones are noise for identifiers);
+  has at least `MIN_LOOKALIKE_RECORDS` records (rarer ones are noise for identifiers), counted
+  over all BC verifiable observations when `--bc-counts` is given, else over the pool;
 - weird: the lowest `WEIRD_SHARE` of max(own, other) within the iconic group, records far from
   every species (hands, eggs, extreme close-ups).
 
@@ -18,7 +19,8 @@ species (one random record of each species, then a second, ...), weird runs fart
 within each group, the groups taking turns.
 
     python -m what_to_id.levels --emb E.npy --ids ids.npy --pool pool.parquet \\
-        --taxa-names taxa-<sha>.tsv.gz --taxa-vectors taxa-<sha>.f16 --atlas-dir DIR
+        --taxa-names taxa-<sha>.tsv.gz --taxa-vectors taxa-<sha>.f16 --atlas-dir DIR \\
+        [--bc-counts bc-verifiable-counts.parquet]
 
 writes `levels.parquet` (`LEVEL_COLUMNS`) next to the atlas index and registers it in its
 manifest under ``"levels"``, as `confusion fir` does for the confused pairs.
@@ -64,7 +66,7 @@ TAXONOMIST_MARGIN = 0.02
 # The bottom 2% per group by max(own, other) (0.42 for Aves to 0.56 for Fungi, against a median
 # of 0.64): only the small groups reach this cut, the big ones fill `CAP` farthest first.
 WEIRD_SHARE = 0.02
-# A look-alike with fewer pool records is dropped: 5x `MIN_PER_CLASS`, so the card names a species
+# A look-alike with fewer records is dropped: 5x `MIN_PER_CLASS`, so the card names a species
 # an identifier can actually meet (a 2-record Ostrya "look-alike" of Betula is noise).
 MIN_LOOKALIKE_RECORDS = 20
 PER_SPECIES = 3  # records per species per level, so a common species does not fill a level
@@ -76,11 +78,14 @@ def assign(
     cap: int = CAP,
     per_species: int = PER_SPECIES,
     seed: int = 0,
+    bc_counts: pd.Series | None = None,
 ) -> pd.DataFrame:
     """`LEVEL_COLUMNS` rows from `fir_scores` output, in display order (see the module docstring).
 
     `score` is the value each level is cut on: `own` for easy, `margin` for taxonomist and
-    max(own, other) for weird. Rows without a text prototype for their label are left out.
+    max(own, other) for weird. `bc_counts` (records by species name) replaces the pool as the
+    source of a look-alike's record count; a name missing from it counts 0.
+    Rows without a text prototype for their label are left out.
     """
     for c in ("own", "other", "margin", "other_name", "iconic_taxon", "photo_url"):
         if c not in scores.columns:
@@ -94,7 +99,8 @@ def assign(
     weird_cut = s.groupby("group")["top"].transform(lambda x: x.quantile(WEIRD_SHARE))
     weird = s["top"] <= weird_cut
     easy = (s["margin"] > 0) & (n_species >= MIN_PER_CLASS) & (own_share <= EASY_TOP_SHARE) & ~weird
-    n_lookalike = s["other_name"].map(s["taxon_name"].value_counts()).fillna(0)
+    counts = s["taxon_name"].value_counts() if bc_counts is None else bc_counts
+    n_lookalike = s["other_name"].map(counts).fillna(0)
     taxonomist = (
         (s["margin"] < 0)
         & (s["margin"] >= -TAXONOMIST_MARGIN)
@@ -164,6 +170,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--taxa-names", required=True, help="atlas taxa-<sha>.tsv.gz")
     ap.add_argument("--taxa-vectors", required=True, help="atlas taxa-<sha>.f16")
     ap.add_argument("--atlas-dir", required=True, help="atlas index dir holding manifest.json")
+    ap.add_argument(
+        "--bc-counts",
+        help="parquet with name, count (`python -m what_to_id.bc_counts`); look-alike records "
+        "are counted there instead of in the pool",
+    )
     args = ap.parse_args(sys.argv[1:] if argv is None else argv)
     manifest = read_manifest(args.atlas_dir)
     cols = ["id", "taxon_id", "taxon_name", "rank", "iconic_taxon", "photo_url"]
@@ -173,7 +184,10 @@ def main(argv: list[str] | None = None) -> int:
     pool = pd.read_parquet(args.pool, columns=cols)
     taxa, T = read_taxa_vectors(args.taxa_names, args.taxa_vectors)
     scores = fir_scores(pool, np.load(args.emb, mmap_mode="r"), np.load(args.ids), taxa, T)
-    out = assign(scores)
+    bc = None
+    if args.bc_counts:
+        bc = pd.read_parquet(args.bc_counts).set_index("name")["count"]
+    out = assign(scores, bc_counts=bc)
     built_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     out.to_parquet(Path(args.atlas_dir) / "levels.parquet", index=False)
     manifest["levels"] = {"name": "levels.parquet", "built_at": built_at, "count": len(out)}

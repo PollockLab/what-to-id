@@ -145,3 +145,16 @@ def test_rare_lookalikes_are_dropped_from_look_alikes(monkeypatch):
     monkeypatch.setattr(levels, "MIN_LOOKALIKE_RECORDS", 12)  # one short: dropped
     assert look_alikes() == set()
     assert {"easy", "weird"} <= set(levels.assign(s)["level"])
+
+
+def test_bc_counts_replace_the_pool_count_of_a_lookalike(monkeypatch):
+    s = scores()  # 11 pool records a species
+    monkeypatch.setattr(levels, "MIN_LOOKALIKE_RECORDS", 20)
+
+    def look_alikes(bc):
+        out = levels.assign(s, bc_counts=bc)
+        return set(out[out["level"] == "taxonomist"]["looks_like_name"])
+
+    assert look_alikes(None) == set()  # rare in the pool
+    # "G a" is common over BC, "G b" is rare there, "F c" is absent
+    assert look_alikes(pd.Series({"G a": 500, "G b": 3})) == {"G a"}
