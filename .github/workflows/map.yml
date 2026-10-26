@@ -38,7 +38,7 @@ name: map
 # then set the repository variable MAP_DAILY_ENABLED to "true".
 on:
   schedule:
-    - cron: "47 13 * * *" # 30 minutes after the daily study build's slot
+    - cron: "47 13 * * *" # morning refresh of the map; the study page follows each daily run through workflow_run below
   workflow_run:
     workflows: [daily]
     types: [completed]

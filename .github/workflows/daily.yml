@@ -1,6 +1,6 @@
 name: daily
 
-# Rebuilds the rotation page every morning from the day's BC needs-ID pool and keeps it as
+# Rebuilds the rotation page every evening (UTC), once the atlas job has embedded the day's records, from the day's BC needs-ID pool and keeps it as
 # study.html on the pool-state release. It does not deploy: map.yml runs after it and is the
 # only workflow that publishes the full site, taking study.html from the release.
 # The steps live in scripts/daily.sh so a laptop can run exactly the same build.
@@ -10,7 +10,7 @@ name: daily
 # the manifest with the map and is never uploaded.
 on:
   schedule:
-    - cron: "17 13 * * *" # 06:17 in Vancouver in summer time, 05:17 in winter
+    - cron: "17 22 * * *" # after the atlas job, which finishes by about 20:30 UTC; 15:17 in Vancouver in summer time
   workflow_dispatch:
     inputs:
       full_pull:
@@ -45,7 +45,7 @@ jobs:
       FULL_PULL: ${{ inputs.full_pull }}
       WTB_DIR: wtb/cluster_results/ca
       ARMS: recency,gap_first,similarity,novelty
-      EMBEDDING_RELEASE: ${{ vars.EMBEDDING_RELEASE }}
+      EMBEDDING_RELEASE: ${{ vars.EMBEDDING_RELEASE || 'embedding-base-2026-10-15' }}
       EMBEDDING_REPO: ${{ vars.EMBEDDING_REPO || github.repository }}
       EMBEDDING_BUNDLE: data/embedding-bundle
     steps:
@@ -68,10 +68,6 @@ jobs:
         run: |
           if [ -z "$LABELFIRST_DEPLOY_KEY" ]; then
             echo '::error::LABELFIRST_DEPLOY_KEY must be the private half of a read-only traitlab/labelfirst deploy key.'
-            exit 1
-          fi
-          if [ -z "$EMBEDDING_RELEASE" ]; then
-            echo '::error::Set EMBEDDING_RELEASE to a prepared embedding bundle release tag.'
             exit 1
           fi
           python - <<'PYTHON' >> "$GITHUB_OUTPUT"
@@ -119,7 +115,7 @@ jobs:
       # One build date for every step, even if the run crosses midnight UTC.
       - run: echo "TODAY=$(date -u +%F)" >> "$GITHUB_ENV"
       - run: scripts/daily.sh fetch
-      - name: Fetch and verify the versioned embedding bundle
+      - name: Assemble today's embedding bundle from the base release and the atlas deltas
         run: scripts/daily.sh fetch-embeddings
       - name: Build, check for leaks, replay
         env:
