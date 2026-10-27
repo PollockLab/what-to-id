@@ -2,6 +2,8 @@
 
     python -m what_to_id.level_ranges --levels LEVELS --pool POOL --cells ORM_CELLS --out-dir DIR
 
+LEVELS is levels.parquet or identify.parquet (every record, level codes; `from_identify`).
+
 Needs the optional ``geo`` extra (h3). A card is checked against the map: is the label taxon
 expected in the record's cell, and is the look-alike? A note is written only when they disagree
 or both are out. A taxon (or look-alike name) absent from ORM_CELLS is unknown and gives no note.
@@ -41,12 +43,38 @@ def note(label_in, look_in):
     return ONLY_LABEL if label_in else ONLY_LOOK
 
 
-def km_to_cells(lat, lon, centres):
-    """Great-circle km from each point (degrees) to the nearest of `centres` (n x 2, radians)."""
-    p = np.radians(np.column_stack([lat, lon]))[:, None, :]
-    dlat, dlon = centres[None, :, 0] - p[..., 0], centres[None, :, 1] - p[..., 1]
-    h = np.sin(dlat / 2) ** 2 + np.cos(p[..., 0]) * np.cos(centres[:, 0]) * np.sin(dlon / 2) ** 2
-    return (2 * 6371.0088 * np.arcsin(np.sqrt(h))).min(axis=1)
+def km_to_cells(lat, lon, centres, pairs=1 << 22):
+    """Great-circle km from each point (degrees) to the nearest of `centres` (n x 2, radians).
+
+    Works through the points in blocks of about `pairs` point-centre pairs, so a common species
+    with a wide range stays within memory.
+    """
+    pts = np.radians(np.column_stack([lat, lon]))
+    step = max(1, pairs // max(len(centres), 1))
+    out = np.empty(len(pts))
+    for i in range(0, len(pts), step):
+        p = pts[i : i + step, None, :]
+        dlat, dlon = centres[None, :, 0] - p[..., 0], centres[None, :, 1] - p[..., 1]
+        cos = np.cos(p[..., 0]) * np.cos(centres[:, 0])
+        h = np.sin(dlat / 2) ** 2 + cos * np.sin(dlon / 2) ** 2
+        out[i : i + step] = (2 * 6371.0088 * np.arcsin(np.sqrt(h))).min(axis=1)
+    return out
+
+
+def from_identify(ident: pd.DataFrame, pool: pd.DataFrame) -> pd.DataFrame:
+    """identify.parquet rows (level codes, looks_like) in the shape `build` reads."""
+    from what_to_id.identify import LEVEL_NAMES  # pulls in confusion, only needed here
+
+    names = pool.drop_duplicates("taxon_id").set_index("taxon_id")["taxon_name"]
+    return pd.DataFrame(
+        {
+            "id": ident["id"],
+            "taxon_id": ident["taxon_id"],
+            "taxon_name": ident["taxon_id"].map(names),
+            "looks_like_name": ident["looks_like"].astype(object),
+            "level": np.array(LEVEL_NAMES)[ident["level"].to_numpy()],
+        }
+    )
 
 
 def build(levels: pd.DataFrame, pool: pd.DataFrame, orm: pd.DataFrame):
@@ -95,7 +123,7 @@ def build(levels: pd.DataFrame, pool: pd.DataFrame, orm: pd.DataFrame):
     grid_ids = sorted({c for cs in orm["cells"] for c in cs} & land)
     ix = {c: i for i, c in enumerate(grid_ids)}
     lab = zip(lv["taxon_name"], lv["taxon_id"], strict=True)
-    sets = {n: cells[t] for n, t in lab if t in cells.index}  # a label is its own taxon
+    sets = {n: cells[t] for n, t in lab if t in cells.index and pd.notna(n)}  # its own taxon
     for n, s_ in look.items():
         if s_ and n not in sets:
             sets[n] = s_
@@ -115,13 +143,16 @@ def build(levels: pd.DataFrame, pool: pd.DataFrame, orm: pd.DataFrame):
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m what_to_id.level_ranges", description=__doc__)
-    ap.add_argument("--levels", required=True, help="levels.parquet")
+    ap.add_argument("--levels", required=True, help="levels.parquet or identify.parquet")
     ap.add_argument("--pool", required=True, help="pool parquet with id, lat, lon, taxon_name")
     ap.add_argument("--cells", required=True, help="ORM parquet with taxon_id, cells")
     ap.add_argument("--out-dir", required=True, type=Path)
     a = ap.parse_args(argv)
     pool = pd.read_parquet(a.pool, columns=["id", "lat", "lon", "taxon_id", "taxon_name"])
-    notes, ranges, grid = build(pd.read_parquet(a.levels), pool, pd.read_parquet(a.cells))
+    levels = pd.read_parquet(a.levels)
+    if "looks_like" in levels:
+        levels = from_identify(levels, pool)
+    notes, ranges, grid = build(levels, pool, pd.read_parquet(a.cells))
     a.out_dir.mkdir(parents=True, exist_ok=True)
     for name, df in ((NOTES, notes), (RANGES, ranges), (GRID, grid)):
         df.to_parquet(a.out_dir / name, index=False)
