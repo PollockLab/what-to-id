@@ -167,37 +167,34 @@ def pair_names(page):
     )
 
 
+def subs(page, i):
+    return [s.split(", ")[i] for s in page.locator("#pairs .sub").all_inner_texts()]
+
+
+def test_default_order_is_most_photos_first(browser, site):
+    page = open_page(browser, site)
+    assert page.locator("#sort option:checked").inner_text() == "Most photos"
+    assert page.locator("#dir").get_attribute("aria-label") == "Sort direction: descending"
+    assert [s.split(" ")[0] for s in subs(page, 0)] == ["9", "5", "3"]
+    assert "sort=" not in page.url and "dir=" not in page.url
+
+
 def test_sort_by_share_flips_and_rides_the_hash(browser, site):
     page = open_page(browser, site)
     default = pair_names(page)
-    assert page.locator("#sort").input_value() == "" and "sort=" not in page.url
     page.select_option("#sort", "pct")
-    shares = page.locator("#pairs .sub").all_inner_texts()
-    assert [s.split(", ")[1] for s in shares] == [
-        "30% of its photos",
-        "50% of its photos",
-        "75% of its photos",
-    ]
+    assert [s[:3] for s in subs(page, 1)] == ["75%", "50%", "30%"]
     assert "sort=pct" in page.url and "dir=" not in page.url
     page.click("#dir")
-    assert page.locator("#dir").get_attribute("aria-label") == "Sort direction: descending"
-    assert [s.split(", ")[1][:3] for s in page.locator("#pairs .sub").all_inner_texts()] == [
-        "75%",
-        "50%",
-        "30%",
-    ]
-    assert "sort=pct&dir=desc" in page.url
-    page.select_option("#sort", "")
-    page.click("#dir")
-    assert pair_names(page) == default and "sort=" not in page.url and "dir=" not in page.url
-    page.select_option("#sort", "lab")
-    assert pair_names(page)[0].startswith("Aus bus")
+    assert page.locator("#dir").get_attribute("aria-label") == "Sort direction: ascending"
+    assert [s[:3] for s in subs(page, 1)] == ["30%", "50%", "75%"]
+    assert "sort=pct&dir=asc" in page.url
     page.select_option("#sort", "n")
-    assert [s.split(" ")[0] for s in page.locator("#pairs .sub").all_inner_texts()] == [
-        "3",
-        "5",
-        "9",
-    ]
+    assert pair_names(page) == default and "sort=" not in page.url and "dir=" not in page.url
+    page.select_option("#sort", "lab")  # names start A to Z
+    assert pair_names(page)[0].startswith("Aus bus")
+    assert page.locator("#dir").get_attribute("aria-label") == "Sort direction: ascending"
+    assert "sort=lab" in page.url and "dir=" not in page.url
     assert page.errors == []
 
 
@@ -205,15 +202,13 @@ def test_sort_and_range_restore_from_the_hash(browser, site):
     page = open_page(browser, site, "#sort=pct&dir=desc&min=40&max=75")
     assert page.locator("#sort").input_value() == "pct"
     assert page.locator("#lo").input_value() == "40" and page.locator("#hi").input_value() == "75"
-    assert [s.split(", ")[1][:3] for s in page.locator("#pairs .sub").all_inner_texts()] == [
-        "75%",
-        "50%",
-    ]
+    assert [s[:3] for s in subs(page, 1)] == ["75%", "50%"]
 
 
 def test_range_filter_hides_pairs_outside_the_bounds(browser, site):
     page = open_page(browser, site)
     assert (page.locator("#lo").input_value(), page.locator("#hi").input_value()) == ("0", "100")
+    assert "look like the other species" in page.locator("label[for=lo]").inner_text()
     assert page.locator("#pairs .pair").count() == 3 and "min=" not in page.url
     page.fill("#lo", "50")
     page.press("#lo", "Enter")
