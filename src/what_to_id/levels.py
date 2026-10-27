@@ -40,11 +40,11 @@ import pyarrow.parquet as pq
 from what_to_id.atlas_index_io import read_manifest, write_manifest
 from what_to_id.confusion import MIN_PER_CLASS, fir_scores, read_taxa_vectors
 
-# (key, name, one line for the page). The names are placeholders until W and Laura pick them.
+# (key, name, one line for the page)
 LEVELS = (
-    ("easy", "Quick", "Photos that look just like their label. Confirm many in one go."),
-    ("taxonomist", "Look-alikes", "A close species looks a little more likely. For careful eyes."),
-    ("weird", "Odd ones", "Photos unlike any species: hands, eggs, close-ups. Feeling lucky?"),
+    ("easy", "Clear matches", "These look just like their label. Confirm many in one go."),
+    ("taxonomist", "Close calls", "Another species looks almost as likely. Take a careful look."),
+    ("weird", "Odd shots", "Hard photos: hands, eggs, close-ups. Feeling lucky?"),
 )
 LEVEL_COLUMNS = (
     "id",

@@ -40,7 +40,7 @@ function drawTabs(){
     if(!a[2]&&a[0]>=0)return;
     var b=el('button',null,a[1]+' '+a[2].toLocaleString());b.type='button';
     b.setAttribute('aria-pressed',String(S.g===a[0]));
-    b.setAttribute('aria-label',a[1]+', '+a[2].toLocaleString()+' records');
+    b.setAttribute('aria-label',a[1]+', '+a[2].toLocaleString()+(a[2]===1?' record':' records'));
     b.onclick=function(){S.g=a[0];update();};box.appendChild(b);});
 }
 function card(i){
