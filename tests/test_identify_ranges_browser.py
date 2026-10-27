@@ -223,7 +223,7 @@ def test_a_phone_popover_is_a_bottom_sheet(browser, site):
 
 
 def test_a_narrow_pane_opens_the_map_on_hover_beside_the_chip(browser, site):
-    page = opened(browser, site, "#lvl=3", (400, 800))  # Identify's width inside Explore
+    page = opened(browser, site, "#lvl=3", (400, 1400))  # Identify's width inside Explore
     chip, pop = page.locator(".rchip").first, page.locator("#rpop")
     chip.hover()
     pop.wait_for(state="visible")

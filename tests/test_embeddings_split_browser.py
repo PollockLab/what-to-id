@@ -154,7 +154,7 @@ def test_split_opens_the_map_and_the_tree_and_toggles_each_pane(browser, site):
     page = _split(browser, site, 1280, 800)
     assert page.evaluate(FRAMES) == ["map", "tree"]
     assert page.evaluate(PRESSED) == ["map", "tree"]
-    assert page.inner_text(".seg") == "Map\nPhotos\nTree"
+    assert page.inner_text(".seg") == "Map\nPhoto space\nTaxonomy"
     for click, panes, view in (
         ("space", ["map", "space", "tree"], "map-space-tree"),
         ("map", ["space", "tree"], "space-tree"),

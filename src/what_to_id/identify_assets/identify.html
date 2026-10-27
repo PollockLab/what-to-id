@@ -10,7 +10,7 @@ main{max-width:1100px;margin:0 auto;padding:0 12px 16px}
 h1{font-size:20px;margin:12px 0 4px}
 .embed h1{display:none}
 a{color:var(--bar)}
-.muted{color:var(--muted)}
+.muted,.sub{color:var(--muted)}
 .about{font-size:13px;margin:6px 0}
 .about summary{cursor:pointer;color:var(--muted)}
 .about p{margin:6px 0}
@@ -70,6 +70,7 @@ __IDENTIFY_RANGES_CSS__
 </style></head><body>
 __SITE_NAV__<main id="main-content">
 <h1>Identify</h1>
+<p class="sub">Records sorted for review by how each photo matches its label.</p>
 <details class="about" id="about"><summary>About</summary>
 <p>Each record's first photo is compared with the names of the species in the pool by BioCLIP 2.5
 (ViT-H/14), an image and text model trained on the tree of life. A match score is the cosine between

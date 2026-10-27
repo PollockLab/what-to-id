@@ -11,11 +11,11 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1
 body{display:flex;flex-direction:column}
 .site-shell{flex-wrap:wrap;position:relative}
 .site-nav{flex:0 1 auto}
-.xbar{display:flex;align-items:center;gap:8px 14px;margin-left:auto;font-size:13px;white-space:nowrap}
+.xbar{display:flex;align-items:center;gap:8px 14px;margin-left:auto;min-width:0;font-size:13px;white-space:nowrap}
 .counts{color:var(--muted)}
 .counts b{color:var(--ink);font-weight:650;font-variant-numeric:tabular-nums}
-#sf{display:inline-flex;gap:6px}
-#sq{font:inherit;font-size:13px;width:min(260px,30vw);min-height:28px;padding:0 10px;border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--ink)}
+#sf{display:inline-flex;gap:6px;flex:0 1 auto;min-width:0}
+#sq{font:inherit;font-size:13px;width:min(260px,30vw);min-width:120px;flex:0 1 auto;min-height:28px;padding:0 10px;border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--ink)}
 #sf button{font:inherit;font-size:12px;min-height:28px;padding:0 11px;border:1px solid var(--line);border-radius:14px;background:var(--chip);color:var(--ink);cursor:pointer}
 .seg{display:inline-flex}
 .seg button,.xbar .i{font:inherit;font-size:12px;min-height:28px;padding:0 11px;border:1px solid var(--line);background:var(--chip);color:var(--ink);cursor:pointer}
@@ -84,7 +84,7 @@ function visible(n){return frames[n]&&!frames[n].hidden;}
 function post(n,m){if(frames[n]&&frames[n].contentWindow)frames[n].contentWindow.postMessage(m,location.origin);}
 function sendSel(n,sel){post(n,{type:'wtid-selection',sel:sel});}
 function mk(n){
-  var f=document.createElement('iframe');f.id=n;f.title={identify:'Identify',map:'Map',space:'Photo space',tree:'Tree of life'}[n];
+  var f=document.createElement('iframe');f.id=n;f.title={identify:'Identify',map:'Map',space:'Photo space',tree:'Taxonomy'}[n];
   f.src=new URL(FILES[n],location.href).href.replace(/#.*/,'')+'?embed=1'+(n==='space'&&view.indexOf('map')>=0?'&peer=1':'')+'#'+hashFor(n);
   // what the other frame sent while this one was still loading
   f.addEventListener('load',function(){Object.keys(late).forEach(function(k){if(k!=='wtid-view'||visible('map'))post(n,late[k]);});
@@ -133,7 +133,7 @@ i.addEventListener('click',function(){note.hidden=!note.hidden;i.setAttribute('a
 addEventListener('keydown',function(e){if(e.key==='Escape'&&!note.hidden)i.click();});
 // Dividers: one between each two shown panes, to drag or move by keys (Shift for more); a double click or Enter
 // puts the two back to their defaults. A pane's share of the width is kept as a fraction, so it outlasts a resize.
-var MIN={identify:280,map:320,space:320,tree:260},NAME={identify:'Identify',map:'Map',space:'Photos',tree:'Tree'},sizes={};
+var MIN={identify:280,map:320,space:320,tree:260},NAME={identify:'Identify',map:'Map',space:'Photo space',tree:'Taxonomy'},sizes={};
 try{sizes=JSON.parse(localStorage.getItem('wtid-panes'))||{};}catch(e){}
 function vis(){return ORDER.filter(visible);}
 function room(){return box.clientWidth-7*Math.max(0,vis().length-1);}

@@ -46,7 +46,7 @@ SCRIPTS = {
 }
 # One toggle per pane; a phone holds one pane, so there a toggle picks it.
 IDENTIFY_BUTTON = '<button type="button" data-p="identify">Identify</button>'
-TREE_BUTTON = '<button type="button" data-p="tree">Tree</button>'
+TREE_BUTTON = '<button type="button" data-p="tree">Taxonomy</button>'
 BAR = (
     '<div class="xbar" id="xbar"><span class="counts" id="counts" aria-live="polite"></span>'
     '<form id="sf" role="search"><input id="sq" type="search" aria-label="Photo search" '
@@ -56,15 +56,16 @@ BAR = (
     '<span id="sm" class="counts" aria-live="polite"></span>'
     f'<span class="seg" role="group" aria-label="View">{IDENTIFY_BUTTON}'
     '<button type="button" data-p="map">Map</button>'
-    '<button type="button" data-p="space">Photos</button>'
+    '<button type="button" data-p="space">Photo space</button>'
     f"{TREE_BUTTON}</span>"
     '<button type="button" class="i" id="i" aria-expanded="false" aria-controls="note" '
     'aria-label="About this view">i</button>'
-    '<p class="note" id="note" hidden>Show Identify, the map, the photos and the tree in any mix. '
+    '<p class="note" id="note" hidden>Show Identify, the map, the photo space and the taxonomy '
+    "in any mix. "
     "The panes share one selection: change a filter in any and the others follow. Dates, months, "
     "show only, groups, taxa, the photo search and the map's area and the photo space's lasso "
-    "travel across; projects stay with the map. The tree counts what the map shows, or the photo "
-    "space's points when the map is hidden, and its Show on map sends its taxon to the map."
+    "travel across; projects stay with the map. The taxonomy counts what the map shows, or the "
+    "photo space's points when the map is hidden, and its Show on map sends its taxon to the map."
     "</p></div>"
 )
 

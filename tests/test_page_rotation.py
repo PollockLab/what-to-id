@@ -119,7 +119,7 @@ def test_render_rotation_index_explains_the_method_for_this_builds_orders():
     html = render_rotation_index(_manifest(), title="t")
     assert "How the test works" in html
     assert "Newest first." in html and "Data-poor places first." in html
-    text = html.replace(">Look-alikes</a>", "")  # the site's Look-alikes tab, not an arm name
+    text = html.replace(">Confused pairs</a>", "")  # the site's Confused pairs tab, not an arm name
     assert "Look-alike" not in text and "Unfamiliar" not in text
     _assert_blind(html)
 

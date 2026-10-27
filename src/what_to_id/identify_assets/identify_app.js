@@ -58,7 +58,7 @@ function title(i,lv){
   box.appendChild(nm);
   if(t&&t[1])box.appendChild(el('div','com',t[1]));
   if(lv===3&&lk)l.append('Probably ',el('i',null,lk));
-  else if(lv===2&&lk)l.append('Often confused with ',el('i',null,lk));
+  else if(lv===2&&lk)l.append('Looks more like ',el('i',null,lk));
   if(l.firstChild)box.appendChild(l);
   return box;
 }

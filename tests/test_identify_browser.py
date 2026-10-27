@@ -171,7 +171,7 @@ def test_cards_follow_the_chosen_level_with_a_few_per_species_and_photos_in_batc
     assert text.startswith("Probably ") and text.split()[1] in {"Bombus", "Apis"}
     tab(page, 2).click()
     page.wait_for_selector("#grid .card .look")
-    assert "Often confused with" in page.locator("#grid .card .look").first.inner_text()
+    assert "Looks more like" in page.locator("#grid .card .look").first.inner_text()
     body = page.inner_text("body").lower()
     assert not any(word in body for word in FORBIDDEN)
     assert "photo download" in page.locator(".about").text_content()
