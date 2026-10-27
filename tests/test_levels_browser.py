@@ -37,7 +37,7 @@ def map_site(tmp_path_factory):
     pd.DataFrame(
         {"lat": [np.float32([48, 48, 49, 49])] * 2, "lon": [sq(-124), sq(-122)]}
     ).to_parquet(root / "level-range-cells.parquet")
-    levels_frame().assign(lat=48.5, lon=-123.5, out_km=[0, 120, 0, 300, None]).to_parquet(
+    levels_frame().assign(lat=48.5, lon=-123.5, out_km=[0, 123, 0, 300, None]).to_parquet(
         root / "levels.parquet"
     )
     page_levels.build(root, None, root / "levels.parquet")
