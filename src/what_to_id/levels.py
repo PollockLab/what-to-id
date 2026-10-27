@@ -24,6 +24,9 @@ within each group, the groups taking turns.
 
 writes `levels.parquet` (`LEVEL_COLUMNS`) next to the atlas index and registers it in its
 manifest under ``"levels"``, as `confusion fir` does for the confused pairs.
+
+`--tree taxonomy.json --identify` instead scores every pool record with `what_to_id.identify`
+and writes `identify.parquet` under the manifest key ``"identify"``, leaving `levels` alone.
 """
 
 from __future__ import annotations
@@ -78,6 +81,29 @@ PER_SPECIES = 3  # records per species per level, so a common species does not f
 CAP = 1500  # records per level per iconic group; keeps levels-data.bin well under 3 MB gzipped
 
 
+def species_masks(s: pd.DataFrame, weird: pd.Series, bc_counts: pd.Series | None = None):
+    """(easy, taxonomist) masks over scored species rows `s`, outside the `weird` rows.
+
+    `s` has `taxon_id`, `taxon_name`, `own`, `margin`, `other_name`; `bc_counts` as in `assign`.
+    """
+    by_species = s.groupby("taxon_id")["own"]
+    n_species = by_species.transform("size")
+    own_share = by_species.rank(ascending=False, pct=True, method="first")
+    easy = (s["margin"] > 0) & (n_species >= MIN_PER_CLASS) & (own_share <= EASY_TOP_SHARE) & ~weird
+    # a name can map to two taxa (species and complex), so counts are summed by name
+    counts = (
+        s["taxon_name"].value_counts() if bc_counts is None else bc_counts.groupby(level=0).sum()
+    )
+    n_lookalike = s["other_name"].map(counts).fillna(0)
+    taxonomist = (
+        (s["margin"] < 0)
+        & (s["margin"] >= -TAXONOMIST_MARGIN)
+        & (n_lookalike >= MIN_LOOKALIKE_RECORDS)
+        & ~weird
+    )
+    return easy, taxonomist
+
+
 def assign(
     scores: pd.DataFrame,
     cap: int = CAP,
@@ -98,23 +124,8 @@ def assign(
     s = scores[scores["margin"].notna() & scores["other"].notna()].copy()
     s["group"] = s["iconic_taxon"].fillna("")
     s["top"] = np.fmax(s["own"], s["other"])
-    by_species = s.groupby("taxon_id")["own"]
-    n_species = by_species.transform("size")
-    own_share = by_species.rank(ascending=False, pct=True, method="first")
-    weird_cut = s.groupby("group")["top"].transform(lambda x: x.quantile(WEIRD_SHARE))
-    weird = s["top"] <= weird_cut
-    easy = (s["margin"] > 0) & (n_species >= MIN_PER_CLASS) & (own_share <= EASY_TOP_SHARE) & ~weird
-    # a name can map to two taxa (species and complex), so counts are summed by name
-    counts = (
-        s["taxon_name"].value_counts() if bc_counts is None else bc_counts.groupby(level=0).sum()
-    )
-    n_lookalike = s["other_name"].map(counts).fillna(0)
-    taxonomist = (
-        (s["margin"] < 0)
-        & (s["margin"] >= -TAXONOMIST_MARGIN)
-        & (n_lookalike >= MIN_LOOKALIKE_RECORDS)
-        & ~weird
-    )
+    weird = s["top"] <= s.groupby("group")["top"].transform(lambda x: x.quantile(WEIRD_SHARE))
+    easy, taxonomist = species_masks(s, weird, bc_counts)
     rng = np.random.default_rng(seed)
     parts = []
     for key, mask, score in (
@@ -186,6 +197,32 @@ def _quantiles(x: pd.Series, q: list[float]) -> str:
     return " ".join(f"{p:g}:{v:.4f}" for p, v in zip(q, x.quantile(q), strict=True))
 
 
+def _identify_main(args, manifest: dict) -> int:
+    from what_to_id import identify  # imports this module, so not at the top
+    from what_to_id.taxonomy import load_tree
+
+    tree = load_tree(args.tree)
+    if not tree:
+        raise ValueError(f"--identify needs a non-empty --tree, {args.tree!r} has no taxa")
+    cols = ["id", "taxon_id", "taxon_name", "rank", "iconic_taxon"]
+    missing = [c for c in cols if c not in pq.read_schema(args.pool).names]
+    if missing:
+        raise ValueError(f"pool {args.pool} has no column {missing[0]!r}")
+    pool = pd.read_parquet(args.pool, columns=cols)
+    taxa, T = read_taxa_vectors(args.taxa_names, args.taxa_vectors)
+    scores = identify.identify_scores(
+        pool, np.load(args.emb, mmap_mode="r"), np.load(args.ids), taxa, T, tree
+    )
+    bc = pd.read_parquet(args.bc_counts).set_index("name")["count"] if args.bc_counts else None
+    out = identify.identify_levels(scores, bc_counts=bc)
+    out.to_parquet(Path(args.atlas_dir) / "identify.parquet", index=False)
+    built_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    manifest["identify"] = {"name": "identify.parquet", "built_at": built_at, "count": len(out)}
+    write_manifest(args.atlas_dir, manifest)
+    print(identify.describe(scores, out))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m what_to_id.levels", description=__doc__)
     ap.add_argument("--emb", required=True, help="E.npy, float32 (n x d), memory-mapped")
@@ -201,6 +238,12 @@ def main(argv: list[str] | None = None) -> int:
         help="parquet with name, count (`python -m what_to_id.bc_counts`); look-alike records "
         "are counted there instead of in the pool",
     )
+    ap.add_argument("--tree", help="map-state taxonomy.json; with --identify, finds the clades")
+    ap.add_argument(
+        "--identify",
+        action="store_true",
+        help="score every pool record into identify.parquet (needs --tree), not levels.parquet",
+    )
     ap.add_argument(
         "--range-notes",
         help="`python -m what_to_id.level_ranges` range-notes.parquet (id, range_note, lat, lon): "
@@ -209,6 +252,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = ap.parse_args(sys.argv[1:] if argv is None else argv)
     manifest = read_manifest(args.atlas_dir)
+    if args.identify:
+        return _identify_main(args, manifest)
     cols = ["id", "taxon_id", "taxon_name", "rank", "iconic_taxon", "photo_url"]
     missing = [c for c in cols if c not in pq.read_schema(args.pool).names]
     if missing:
