@@ -145,7 +145,7 @@ def test_manifest_with_both_keys_fetches_records_and_shows_built_date(tmp_path, 
     monkeypatch.setattr(page_confusion, "_fetch", fetch)
     out = tmp_path / "site"
     assert page_confusion.main(["--out", str(out), "--data-url", "https://x.test/"]) == 0
-    assert "Built 2026-10-20" in (out / "confusion.html").read_text()
+    assert "<dt>Built</dt><dd>2026-10-20</dd>" in (out / "confusion.html").read_text()
     head, _ = decode((out / "confusion-data.bin").read_bytes())
     assert head["n"] == 6 and head["built_at"] == entry["built_at"]
 
