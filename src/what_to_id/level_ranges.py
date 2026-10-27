@@ -11,8 +11,9 @@ It writes into DIR, for `levels --range-notes`:
 ``range-notes.parquet`` (``id``, ``range_note`` on Close calls rows only, ``lat``, ``lon`` float32
 at 2 decimals, null when the record has no point, and ``out_km``: km from the point to the nearest
 centre of the label's cells, 0 inside them, null when unknown), ``level-ranges.parquet`` (``name``,
-``cells`` int16 indexes into the grid, one row per label or look-alike name with cells on it) and
-``level-range-cells.parquet`` (the grid in index order: the sorted ORM cells holding a pool record,
+``cells`` int16 indexes into the grid, one row per label or look-alike name with a known range,
+empty when the range misses the grid) and ``level-range-cells.parquet`` (the grid in index
+order: the sorted ORM cells holding a pool record,
 i.e. BC land; ``lat``, ``lon`` float32 boundary vertices at 3 decimals).
 """
 
@@ -99,7 +100,8 @@ def build(levels: pd.DataFrame, pool: pd.DataFrame, orm: pd.DataFrame):
         if s_ and n not in sets:
             sets[n] = s_
     sets = {n: [ix[c] for c in s_ if c in ix] for n, s_ in sets.items()}
-    rows = [(n, np.array(sorted(s_), np.int16)) for n, s_ in sets.items() if s_]
+    # a range wholly outside the grid stays, with no cells: known, and not in BC
+    rows = [(n, np.array(sorted(s_), np.int16)) for n, s_ in sets.items()]
     ranges = pd.DataFrame(rows, columns=["name", "cells"])
     bounds = [h3.cell_to_boundary(c) for c in grid_ids]
     grid = pd.DataFrame(

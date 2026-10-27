@@ -56,6 +56,8 @@ function cellAt(i){
 function tax(){return D.levels[S.l][0]==='taxonomist';}
 function hasMap(i){return D.rng&&D.rng[D.taxon[i]]&&(!tax()||D.rng[D.looks[i]]);}
 function okm(i){return D.okm?D.okm[i]:-1;}
+// a coarser step farther out, so a distance never reads more precise than the range data
+function kmText(i){var k=okm(i),s=k>=1000?100:k>=500?50:10;return(Math.round(k/s)*s).toLocaleString('en');}
 function inR(t,c){return c>=0&&has(bits(t),c);}
 var NEITHER='Outside both ranges: maybe neither.';
 // What the map says about the record's point, as words (caption and aria-label).
@@ -63,7 +65,7 @@ function mapText(i){
   var a=D.taxa[D.taxon[i]],b=D.taxa[D.looks[i]],c=cellAt(i),far=okm(i)>=OUT_KM,t=tax();
   if(c==null)return{aria:'Range map of '+a+(t?' and '+b:'')+' in British Columbia',cap:''};
   var la=inR(D.taxon[i],c),lb=t&&inR(D.looks[i],c),cap=[];
-  if(far)cap.push('About '+okm(i).toLocaleString('en')+" km outside the label's usual range.");
+  if(far)cap.push('About '+kmText(i)+" km outside the label's usual range.");
   else if(t&&!la&&!lb)cap.push(NEITHER);
   else if(!la)cap.push("Outside the label's usual range.");
   if(far&&t&&lb)cap.push("Inside the look-alike's.");
@@ -106,7 +108,7 @@ function verdict(i){
   var far=okm(i)>=OUT_KM,c=cellAt(i);
   if(tax()&&D.note&&D.note[i]>=0){var n=D.notes[D.note[i]].replace('Range: ','');
     return n.charAt(0).toUpperCase()+n.slice(1).replace('both ranges','both ranges: maybe neither');}
-  if(far)return'About '+okm(i).toLocaleString('en')+' km outside';
+  if(far)return'About '+kmText(i)+' km outside';
   return c==null?'Range map':inR(D.taxon[i],c)?'In range':'Just outside range';
 }
 function svg(tag,attrs){var e=document.createElementNS('http://www.w3.org/2000/svg',tag);
@@ -227,11 +229,12 @@ function card(i){
     nm.append(lab,'. Often confused with ',el('i',m?'nk':null,D.taxa[D.looks[i]]),'.');}
   else nm.appendChild(lab);
   li.appendChild(nm);
-  if(D.note&&D.note[i]>=0)li.appendChild(el('div','range',D.notes[D.note[i]]));
-  if(m)li.appendChild(chip(i));
+  // the photo links to the observation; beside Identify, the range chip, or why there is none
   var links=el('div','links');
-  links.append(link(IdentifyLinks.batches([id])[0].url,'Identify','identify btn'),
-    link(OBS+id,'Observation '+id,'obs'));
+  links.appendChild(link(IdentifyLinks.batches([id])[0].url,'Identify','identify btn'));
+  if(m)links.appendChild(chip(i));
+  else if(D.note&&D.note[i]>=0)links.appendChild(el('span','range',D.notes[D.note[i]]));
+  else if(D.rng)links.appendChild(el('span','range','No range map: range unknown'));
   li.appendChild(links);
   return li;
 }
