@@ -99,13 +99,14 @@ function batch(){
   var all=view[LV]||[],rows=all.slice(0,IdentifyLinks.MAX_IDS);
   LINKS=rows.length?IdentifyLinks.batches(rows.map(function(i){return P.id[i];})):[];BI=0;
   $('batch').hidden=!rows.length;
-  if(rows.length)$('go').textContent='Identify these '+nf.format(rows.length)+(rows.length<all.length?' of '+nf.format(all.length):'');
+  if(rows.length){$('go').textContent='Identify these '+nf.format(rows.length);  // the tab already holds the level's total
+    $('go').title=rows.length<all.length?'The first '+nf.format(rows.length)+' of '+nf.format(all.length)+' listed, up to '+PER_SPECIES+' per species':'Up to '+PER_SPECIES+' per species';}
   step(0);
 }
 function step(d){
   BI=Math.max(0,Math.min(LINKS.length-1,BI+d));
   if(LINKS.length)$('go').href=LINKS[BI].url;
-  $('step').textContent=LINKS.length>1?'batch '+(BI+1)+' of '+LINKS.length:'';
+  $('step').textContent=LINKS.length>1?(BI+1)+'/'+LINKS.length:'';$('step').title='Batch '+(BI+1)+' of '+LINKS.length;
   $('step').hidden=$('prev').hidden=$('next').hidden=LINKS.length<2;
   $('prev').disabled=BI===0;$('next').disabled=BI>=LINKS.length-1;
 }

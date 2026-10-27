@@ -17,13 +17,14 @@ a{color:var(--bar)}
 #status{margin:6px 0;font-size:13px}
 .tabs{position:sticky;top:0;z-index:2;display:flex;gap:4px;padding:6px 0;background:var(--bg);
   border-bottom:1px solid var(--line);overflow-x:auto}
-.tab{flex:1 0 76px;display:flex;flex-direction:column;align-items:center;gap:1px;padding:5px 6px;
+.tab{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:1px;padding:5px 6px;
   font:inherit;font-size:12px;line-height:1.2;color:var(--ink);background:var(--chip);
   border:1px solid var(--line);border-radius:8px;cursor:pointer}
 .tab b{font-size:14px}
+@media (max-width:360px){.tabs{flex-wrap:wrap}.tab{flex:1 1 40%}}  /* a narrow pane: two rows of two, nothing cut off */
 .tab[aria-selected=true]{background:var(--on);color:var(--onink);border-color:var(--on)}
 #desc{margin:6px 0 2px;font-size:12px}
-.batch{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:8px 0}
+.batch{display:flex;align-items:center;gap:6px;margin:8px 0}  /* one row: the arrows stay beside the link */
 .batch .muted{font-size:12px}
 .arrow{font:inherit;min-width:32px;min-height:32px;cursor:pointer;color:var(--ink);
   border:1px solid var(--line);border-radius:6px;background:var(--chip)}
