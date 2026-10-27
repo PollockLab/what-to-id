@@ -5,7 +5,7 @@ page by postMessage; this page relays them to the other frames, which apply them
 the four panes (Identify, map, photos, tree) has its own toggle. With no ``?view=`` it opens
 Identify and the map, or without ``identify.html`` in ``out_dir`` the map and the tree, or without
 ``tree.html`` too the map and the photo space, so build those pages first. It writes
-``explore.html``, plus ``split.html``, which forwards old links to it.
+``explore.html``, plus ``split.html`` and ``levels.html``, which forward old links to it.
 """
 
 from __future__ import annotations
@@ -24,6 +24,18 @@ FORWARD = (
     '<!doctype html><meta charset="utf-8"><title>Explore</title>'
     f"<script>location.replace('{PAGE_NAME}'+location.search+location.hash)</script>"
     f'<a href="{PAGE_NAME}">Explore</a>'
+)
+# the Identify levels page (retired) was levels.html; its #level= and #out= have no Explore
+# equivalent and drop, its #g= is Explore's groups=
+LEVELS_NAME = "levels.html"
+LEVELS_FORWARD = (
+    '<!doctype html><meta charset="utf-8"><title>Explore</title>'
+    f"<script>location.replace('{PAGE_NAME}?view=identify-map'+(function(){{"
+    "var t=location.hash.slice(1).split('&')"
+    ".filter(function(x){return x&&!/^(level|out)=/.test(x);})"
+    ".map(function(x){return x.replace(/^g=/,'groups=');});return t.length?'#'+t.join('&'):'';})())"
+    "</script>"
+    f'<a href="{PAGE_NAME}?view=identify-map">Explore</a>'
 )
 SCRIPTS = {
     "__MAP_FILTER__": HERE / "map_assets" / "map_filter.js",
@@ -65,7 +77,7 @@ def build(
     tree_url: str = "tree.html",
     identify_url: str = "identify.html",
 ) -> Path:
-    """Write ``explore.html`` and the ``split.html`` forward into ``out_dir``, return the first."""
+    """Write ``explore.html`` and the ``split.html``, ``levels.html`` forwards."""
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     html = (ASSETS / "split.html").read_text()
@@ -90,6 +102,7 @@ def build(
     target = out / PAGE_NAME
     target.write_text(html)
     (out / OLD_NAME).write_text(FORWARD)
+    (out / LEVELS_NAME).write_text(LEVELS_FORWARD)
     return target
 
 

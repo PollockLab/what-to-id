@@ -30,6 +30,11 @@ def test_the_pages_inside_explore_mark_explore(current):
     assert "Photo space<" not in html and ">Map<" not in html and ">Tree of life<" not in html
 
 
+def test_the_tabs_are_explore_look_alikes_study_and_blitz():
+    assert [label for _, label in PAGES] == ["Explore", "Look-alikes", "Study"]
+    assert "levels.html" not in nav("study.html") and ">Where to Blitz" in nav("study.html")
+
+
 def test_available_drops_pages_that_were_not_built():
     # without the split page the Explore tab opens the map
     html = nav("map.html", {"study.html", "map.html"})

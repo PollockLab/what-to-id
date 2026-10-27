@@ -2,7 +2,7 @@ name: map
 
 # Refreshes the map of records that need an ID (site/map.html and its pool*.bin files) every morning
 # and is the only workflow that publishes the full site: the landing page (index.html, a copy of
-# the levels page, else Explore), the map, the photo pages, and the study page. The study page is the committed site/study.html,
+# Explore, else the map), the map, the photo pages, and the study page. The study page is the committed site/study.html,
 # or, once the repository variable DAILY_ENABLED is "true", the study.html that daily.yml saves
 # on the pool-state release. It runs on its own schedule and again after each successful daily
 # run, so a new study page goes live without waiting. It keeps its own pool on the map-state release, apart from the study's
@@ -188,28 +188,14 @@ jobs:
           if [ -z "$ATLAS_HF_REPO" ]; then echo "no ATLAS_HF_REPO; no confused pairs page"; exit 0; fi
           python -m what_to_id.page_confusion --out _site \
             --data-url "https://huggingface.co/datasets/${ATLAS_HF_REPO}/resolve/main/"
-      # levels.html: Needs ID records at three levels, from levels.parquet beside the atlas index,
-      # less those the synced pool shows identified since.
-      # Before the photo-search page, whose Explore bar links to it once it exists.
-      - name: Add the levels page
-        continue-on-error: true
-        env:
-          ATLAS_HF_REPO: ${{ vars.ATLAS_HF_REPO }}
-        run: |
-          set -euo pipefail
-          if [ -z "$ATLAS_HF_REPO" ]; then echo "no ATLAS_HF_REPO; no levels page"; exit 0; fi
-          python -m what_to_id.page_levels --out _site \
-            --data-url "https://huggingface.co/datasets/${ATLAS_HF_REPO}/resolve/main/" \
-            --pool state/pool.parquet
       - name: Include the photo-search page
         env:
           ATLAS_HF_REPO: ${{ vars.ATLAS_HF_REPO }}
         run: scripts/atlas_page.sh _site
-      # The root opens Identify, the levels page, or else Explore, or the map when the site was built
-      # without the photo space.
+      # The root opens Explore, or the map when the site was built without the photo space.
       - name: Write the landing page
         run: |
-          for p in levels explore map; do if [ -f "_site/$p.html" ]; then cp "_site/$p.html" _site/index.html; break; fi; done
+          for p in explore map; do if [ -f "_site/$p.html" ]; then cp "_site/$p.html" _site/index.html; break; fi; done
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
       - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:
