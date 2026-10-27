@@ -116,11 +116,20 @@ function paint(){
   [].forEach.call($('tabs').children,function(t){var on=+t.dataset.lv===LV;t.setAttribute('aria-selected',on);t.tabIndex=on?0:-1;});
   $('desc').textContent=x[2];$('panel').setAttribute('aria-labelledby','tab'+LV);
   $('grid').textContent='';shown=LIMIT;drawn=0;
-  $('none').hidden=!!(view[LV]||[]).length;
+  empty();
   more();batch();scrollTo(0,0);
 }
 function counts(){
-  [].forEach.call($('tabs').children,function(t){t.lastChild.textContent=nf.format(S.total[+t.dataset.lv]||0);});
+  [].forEach.call($('tabs').children,function(t){var n=S.total[+t.dataset.lv]||0;t.lastChild.textContent=nf.format(n);t.classList.toggle('zero',!n);});
+}
+// An empty level here points at the levels that do have records, rather than a dead end.
+function empty(){
+  var box=$('none'),others=CFG.levels.filter(function(l){return l[0]!==LV&&S.total[l[0]];});
+  box.hidden=!!(view[LV]||[]).length;box.textContent='';if(box.hidden)return;
+  box.append(others.length?'None at this level here. Try ':'No records here: zoom out or widen the filters.');
+  others.forEach(function(l,k){var b=el('button',null,l[1]+' ('+nf.format(S.total[l[0]])+')');b.type='button';
+    b.onclick=function(){choose(l[0]);};box.append(k?(k===others.length-1?' or ':', '):'',b);});
+  if(others.length)box.append('.');
 }
 // The chosen level is kept in the hash (under a key the selection does not use) and in localStorage.
 function choose(lv){
