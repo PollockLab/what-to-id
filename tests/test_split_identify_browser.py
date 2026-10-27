@@ -188,3 +188,22 @@ def test_a_phone_shows_identify_first(browser, site, pts):
     assert page.evaluate("[...document.querySelectorAll('iframe')].map(f => f.id)") == ["map"]
     assert page.errors == []
     page.close()
+
+
+def test_the_old_levels_page_forwards_its_group_to_identify_and_the_map(browser, site, pts):
+    page = browser.new_page(viewport={"width": 1280, "height": 900})
+    stub_inat(page, None)
+    page.goto(f"{site[0]}/levels.html#level=weird&g=Aves&out=1")
+    page.wait_for_url("**/explore.html**")
+    assert page.evaluate("new URLSearchParams(location.search).get('view')") == "identify-map"
+    assert page.evaluate("location.hash") == "#groups=Aves"
+    assert ids(frame_of(page, "identify")) == sorted(
+        pts["id"][pts["iconic_taxon"] == "Aves"].tolist()
+    )
+    page.close()
+
+
+def test_the_levels_forward_is_written_beside_explore(tmp_path):
+    split_page.build(tmp_path)
+    html = (tmp_path / "levels.html").read_text()
+    assert "explore.html?view=identify-map" in html and "groups=" in html

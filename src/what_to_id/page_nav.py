@@ -9,20 +9,18 @@ from __future__ import annotations
 
 from html import escape
 
-# (file, label), one tab per job: Identify (levels.html, records at three levels), Explore and
-# Look-alikes (confusion.html), with the study last. Explore is explore.html, the map, the photo
-# space and the tree side by side; the pages map.html, embeddings.html, tree.html and search.html
-# keep their URLs and mark Explore as current, as Explore's panes and its search box hold them.
-# Without explore.html (a site built without the photo space) the Explore tab falls back to the
-# map. Levels and look-alikes exist only when the atlas manifest lists their tables. The brand
-# links to index.html, a copy of the landing page.
+# (file, label), one tab per job: Explore, Look-alikes (confusion.html), with the study last.
+# Explore is explore.html: Identify, the map, the photo space and the tree side by side; the pages
+# map.html, embeddings.html, tree.html and search.html keep their URLs and mark Explore as
+# current, as Explore's panes and its search box hold them. Without explore.html (a site built
+# without the photo space) the Explore tab falls back to the map. Look-alikes exists only when the
+# atlas manifest lists its table. The brand links to index.html, a copy of the landing page.
 PAGES = (
-    ("levels.html", "Identify"),
     ("explore.html", "Explore"),
     ("confusion.html", "Look-alikes"),
     ("study.html", "Study"),
 )
-OPTIONAL = {"levels.html", "confusion.html"}
+OPTIONAL = {"confusion.html"}
 EXPLORE = "explore.html"
 BLITZ = "https://pollocklab.github.io/where-to-blitz/"
 
@@ -68,8 +66,8 @@ white-space:nowrap}
 
 # Points the switcher at what is open. Reads the hash the pages already write: the map keeps
 # record= and at=zoom/lat/lon, the photo pages keep id=; the selection (groups, taxa, dates) goes
-# to the map and the photo space as written. One group (g= on Identify and Look-alikes, a lone
-# picked groups= on Explore) travels between the three. Rewrites on hover, focus, touch and click
+# to the map and the photo space as written. One group (g= on Look-alikes, a lone picked
+# groups= on Explore) travels between the two. Rewrites on hover, focus, touch and click
 # because history.replaceState fires no event.
 JS = """
 (function(){var n=document.querySelector('.site-nav');if(!n)return;
