@@ -226,3 +226,95 @@ def test_an_identify_card_click_opens_the_map_card_but_hover_does_not(browser, r
     assert int(left.locator("#card a.btn").get_attribute("href").rsplit("/", 1)[1]) == want
     assert page.errors == []
     page.close()
+
+
+def strip_box(page):
+    return page.locator("#card").bounding_box()
+
+
+def test_minimize_keeps_the_selection_docks_top_right_and_survives_picks(browser, atlas_site):
+    base, mine, want, in_pool = atlas_site
+    page = open_map(browser, f"{base}/map.html?standalone=1#record={mine}&at=9/49/-123")
+    page.wait_for_selector("#nbrs button")
+    btn = page.locator("#card .mn")
+    assert btn.get_attribute("aria-expanded") == "true"
+    assert btn.get_attribute("aria-label") == "Minimize card"
+    nbr = layer(page, "nbr")
+    btn.click()
+    assert btn.get_attribute("aria-expanded") == "false"
+    assert btn.get_attribute("aria-label") == "Show card"
+    assert page.locator("#card.min").count() == 1
+    box = strip_box(page)
+    mp = page.locator("#map").bounding_box()
+    assert 44 <= box["height"] <= 52
+    zoom = page.locator(".maplibregl-ctrl-top-right").bounding_box()
+    assert abs(box["x"] + box["width"] - (zoom["x"] - 8)) < 2  # left of the zoom buttons
+    assert box["x"] + box["width"] > mp["x"] + mp["width"] - 120
+    assert abs(box["y"] - (mp["y"] + 8)) < 2
+    assert layer(page, "sel") == 1 and layer(page, "nbr") == nbr
+    assert page.locator("#card h2").is_visible() and page.locator("#card a.btn").is_hidden()
+    page.mouse.move(600, 500)
+    page.mouse.down()
+    page.mouse.move(400, 400, steps=5)
+    page.mouse.up()
+    assert strip_box(page) == box
+    target = next(i for i in want if i in in_pool)
+    page.evaluate(  # the strip hides the thumbnails: stand in for a pick off the card
+        "t => { const b = document.querySelector(`#nbrs button[data-id='${t}']`);"
+        " b.addEventListener('click', e => e.stopPropagation()); b.click(); }",
+        target,
+    )
+    page.wait_for_function(f"document.querySelector('#card a.btn').href.endsWith('/{target}')")
+    assert page.locator("#card.min").count() == 1 and layer(page, "sel") == 1
+    page.locator("#card .mn").click()
+    assert page.locator("#card.min").count() == 0 and page.locator("#card a.btn").is_visible()
+    page.locator("#card .mn").click()
+    page.locator("#card h2").click()  # anywhere on the strip restores
+    assert page.locator("#card.min").count() == 0
+    page.locator("#card .mn").click()
+    page.locator("#card .x").click()
+    assert page.locator("#card").is_hidden() and layer(page, "sel") is None
+    assert layer(page, "nbr") is None
+    assert page.locator("#card.min").count() == 0  # the next pick opens the full card
+    assert page.locator("#card .mn").get_attribute("aria-expanded") == "true"
+    assert not any(w in page.inner_text("body").lower() for w in rb.FORBIDDEN)
+    assert page.errors == []
+    page.close()
+
+
+def test_escape_clears_a_minimized_card_and_a_phone_strip_sits_at_the_bottom(browser, range_site):
+    page = open_map(browser, f"{range_site}/map.html?standalone=1#record=3000&at=9/49/-123", 400)
+    page.locator("#card .rchip").wait_for()
+    page.locator("#card .mn").click()
+    box = strip_box(page)
+    assert 44 <= box["height"] <= 52 and abs(box["y"] + box["height"] - (900 - 8)) < 2
+    assert page.locator("#card .rchip").is_visible()
+    page.locator("#card h2").click()  # a tap toggles
+    assert page.locator("#card.min").count() == 0
+    page.locator("#card .mn").click()
+    page.mouse.move(200, 300)  # off the chip, whose hover opens the range popover
+    page.keyboard.press("Escape")
+    assert page.locator("#card").is_hidden() and layer(page, "sel") is None
+    assert page.errors == []
+    page.close()
+
+
+def test_an_identify_click_opens_the_full_card_over_a_minimized_one(browser, range_site):
+    page = open_map(browser, f"{range_site}/explore.html")
+    page.wait_for_function(
+        "() => { const d = document.getElementById('identify')?.contentDocument;"
+        " return d && d.querySelectorAll('#grid .card').length > 0; }",
+        timeout=60000,
+    )
+    ident = next(f for f in page.frames if f.url.split("?")[0].endswith("/identify.html"))
+    left = next(f for f in page.frames if f.url.split("?")[0].endswith("/map.html"))
+    left.wait_for_function("/records$|of 10/.test(document.getElementById('count').textContent)")
+    ident.locator("#grid .card .title").first.click()
+    left.locator("#card").wait_for(state="visible")
+    left.locator("#card .mn").click()
+    assert left.locator("#card.min").count() == 1
+    ident.locator("#grid .card .title").nth(1).click()
+    left.wait_for_function("!document.getElementById('card').classList.contains('min')")
+    assert left.locator("#card a.btn").is_visible()
+    assert page.errors == []
+    page.close()
