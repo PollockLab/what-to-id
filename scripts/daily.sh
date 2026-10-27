@@ -2,6 +2,8 @@
 # One daily build of the rotation page. GitHub Actions (.github/workflows/daily.yml) runs
 # exactly these steps, and so can a laptop:
 #
+#   scripts/daily.sh pull    when the release holds no pool yet (or FULL_PULL=true), pull the
+#                            whole pool and upload it; it takes hours, so it runs as its own job
 #   scripts/daily.sh fetch   download the pool and served log from the pool-state release
 #   scripts/daily.sh build   load the prepared pool, build, drop identified records, rebuild,
 #                            keep the day's pool and build record, check for leaks, replay
@@ -59,6 +61,30 @@ fetch() {
     die "the release holds earlier builds but no served log; restore served.parquet before building"
   fi
   ls -la "$STATE"
+}
+
+# A pull cut short resumes from its checkpoints in $STATE/pool.parquet.parts/, frozen on the day
+# it started; the build's incremental update then catches up from the pool's newest record.
+pull() {
+  local state_repo=${STATE_REPO:-${GITHUB_REPOSITORY:-PollockLab/what-to-id}}
+  local parts="$STATE/pool.parquet.parts"
+  if [ "${FULL_PULL:-}" = true ]; then
+    rm -rf "$parts"
+  elif state_release_exists "$state_repo"; then
+    local assets
+    assets=$(gh release view "$STATE_TAG" --repo "$state_repo" --json assets --jq '.assets[].name')
+    if grep -qx pool.parquet <<<"$assets"; then
+      echo "the release already holds a pool; the build updates it"
+      return
+    fi
+  fi
+  mkdir -p "$STATE"
+  if [ -s "$parts/params.json" ]; then
+    TODAY=$($PY -c 'import json, sys; print(json.load(open(sys.argv[1]))["freeze"])' "$parts/params.json")
+    echo "resuming the pull frozen on $TODAY"
+  fi
+  update_pool
+  upload_state "$STATE/pool.parquet"
 }
 
 update_pool() {
@@ -186,7 +212,6 @@ build() {
 }
 
 save() {
-  local state_repo=${STATE_REPO:-${GITHUB_REPOSITORY:-PollockLab/what-to-id}}
   local files=("$STATE/pool.parquet" "$STATE/served.parquet"
     "$STATE/days/pool-$TODAY.parquet" "$STATE/days/build-$TODAY.json")
   if [ -f "$STATE/bundle-eligibility.json" ]; then
@@ -198,6 +223,11 @@ save() {
   # The study page rides on the release too: map.yml, the only Pages deployer, fetches it.
   [ -s "$OUT/final/site/study.html" ] || die "missing $OUT/final/site/study.html; run build first"
   files+=("$OUT/final/site/study.html")
+  upload_state "${files[@]}"
+}
+
+upload_state() {
+  local state_repo=${STATE_REPO:-${GITHUB_REPOSITORY:-PollockLab/what-to-id}}
   if ! state_release_exists "$state_repo"; then
     gh release create "$STATE_TAG" --repo "$state_repo" \
       --prerelease --latest=false --title "Daily pool state" \
@@ -205,7 +235,7 @@ save() {
   fi
   local attempt
   for attempt in 1 2 3; do
-    if gh release upload "$STATE_TAG" "${files[@]}" --repo "$state_repo" --clobber; then
+    if gh release upload "$STATE_TAG" "$@" --repo "$state_repo" --clobber; then
       return
     fi
     echo "upload failed (attempt $attempt), retrying"
@@ -215,9 +245,10 @@ save() {
 }
 
 case "${1:-}" in
+  pull) pull ;;
   fetch) fetch ;;
   fetch-embeddings) fetch_embeddings ;;
   build) build ;;
   save) save ;;
-  *) die "usage: scripts/daily.sh fetch|fetch-embeddings|build|save" ;;
+  *) die "usage: scripts/daily.sh pull|fetch|fetch-embeddings|build|save" ;;
 esac
