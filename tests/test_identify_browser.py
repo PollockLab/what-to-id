@@ -330,4 +330,28 @@ def test_without_the_range_file_the_cards_have_no_range_chips(browser, site):
     page.wait_for_selector("#grid .card")
     assert page.evaluate("__identify.ranges()") is False
     assert page.locator(".rchip, .card .range").count() == 0 and page.locator("#rout").is_hidden()
+
+
+def test_a_cut_species_offers_its_other_records_and_picking_it_shows_them_all(browser, site):
+    base, pts = site
+    page = open_identify(browser, base, "#lvl=1")
+    taxon = dict(zip(pts["id"], pts["taxon_id"], strict=True))
+    page.wait_for_selector("#grid .card .sp")
+    shown = page.evaluate("__identify.view()")[1]
+    link = page.locator("#grid .card .sp").first
+    species = taxon[int(link.locator("xpath=..").get_attribute("data-id"))]
+    have = int(((pts["taxon_id"] == species) & (pts["level"] == 1)).sum())
+    assert have > 3 and sum(taxon[i] == species for i in shown) == 3
+    lead = f"+{have - 3} more "
+    name = link.inner_text()[len(lead) :]
+    assert link.inner_text().startswith(lead) and name
+    assert link.get_attribute("aria-label") == f"Show {have - 3} more records of {name}"
+    link.click()
+    page.wait_for_function(f"__identify.view()[1].length === {have}")
+    assert {taxon[i] for i in page.evaluate("__identify.view()[1]")} == {species}
+    assert "taxa=" in page.evaluate("location.hash") and "lvl=1" in page.evaluate("location.hash")
+    assert page.locator("#grid .sp").count() == 0
+    page.click("#unpick")
+    page.wait_for_function("__identify.view()[1].length < 30")
+    assert "taxa=" not in page.evaluate("location.hash") and page.locator("#unpick").is_hidden()
     assert page.errors == []

@@ -6,7 +6,7 @@
 'use strict';
 var CFG=IDENTIFY_CONFIG,L=EmbeddingsLayout,Meta=AtlasSearchMeta,PER_SPECIES=3,LIMIT=12,STEPS=16,NO_LOOK=65535,NOTAX=65535,LS='wtid-identify-level',IO=null,T=0;
 var MAP=new URL(CFG.mapUrl,location.href).href,nf=new Intl.NumberFormat('en-CA'),OBS='https://www.inaturalist.org/observations/';
-var META=null,TAXA=null,P=null,LEVEL=null,Q=null,LOOKS=null,R=null,MF=null,TF=null,PEND=null,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,CACHE=new Map();
+var META=null,SYNC=null,MORE=new Map(),TAXA=null,P=null,LEVEL=null,Q=null,LOOKS=null,R=null,MF=null,TF=null,PEND=null,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,CACHE=new Map();
 function $(id){return document.getElementById(id);}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 function status(t){$('status').textContent=t;}
@@ -25,7 +25,8 @@ function select(){
   var I=SpaceMask.areaIndex(AREA),V=SpaceMask.areaIndex(VIEW),m=[I&&SpaceMask.area(I,P),V&&SpaceMask.area(V,P),KEEPIDS&&SpaceMask.ids(KEEPIDS,P),SUBIDS&&SpaceMask.ids(SUBIDS,P)];
   m.forEach(function(v){if(v)for(var j=0;j<n;j++)SEL[j]&=v[j];});
 }
-// Per level the kept records best first (quantized score, a bucket each), then at most PER_SPECIES of any one taxon.
+// Per level the kept records best first (quantized score, a bucket each), then at most PER_SPECIES of any one taxon, none
+// cut when the level holds one taxon only. MORE: for the first card of a cut taxon, how many records it left out.
 // With the range file (R), a level's records also pass its outside-its-range chip.
 function on(i){return SEL[i]&&LEVEL[i]&&(!R||R.pass(i,LEVEL[i]));}
 function build(){
@@ -34,10 +35,13 @@ function build(){
   for(k=1;k<c.length;k++)c[k]+=c[k-1];
   var at=c.slice(),order=new Int32Array(c[c.length-1]);
   for(i=0;i<n;i++)if(on(i))order[at[LEVEL[i]*STEPS+Q[i]]++]=i;
-  var out=[],total=[];
+  var out=[],total=[];MORE.clear();
   for(lv=1;lv<=4;lv++){
-    var taken=new Uint8Array(65536),rows=[],a=c[lv*STEPS],b=c[(lv+1)*STEPS];
-    for(k=b-1;k>=a;k--){i=order[k];if(taken[P.tax[i]]<PER_SPECIES){taken[P.tax[i]]++;rows.push(i);}}
+    var tot=new Uint32Array(65536),taken=new Uint32Array(65536),rows=[],a=c[lv*STEPS],b=c[(lv+1)*STEPS],nd=0,cut;
+    for(k=a;k<b;k++)if(!tot[P.tax[order[k]]]++)nd++;
+    cut=nd===1?Infinity:PER_SPECIES;
+    for(k=b-1;k>=a;k--){i=order[k];
+      if(taken[P.tax[i]]<cut){rows.push(i);if(!taken[P.tax[i]]++&&tot[P.tax[i]]>cut)MORE.set(i,tot[P.tax[i]]-cut);}}
     out[lv]=rows;total[lv]=b-a;
   }
   view=out;S.total=total;
@@ -60,12 +64,26 @@ function title(i,lv){
 }
 // A card tells the map which record it is on (hover and focus) and which was picked (click); links are left alone.
 function tell(type,id){if(parent!==window)parent.postMessage({type:type,id:id},location.origin);}
+// "+N more <name>" on the first card of a cut species: picks that species in the shared selection, all its records.
+function more_(i){
+  var t=TAXA[P.tax[i]],nm=t[1]||t[0],b=el('button','sp','+'+nf.format(MORE.get(i))+' more '+nm);
+  b.type='button';b.setAttribute('aria-label','Show '+nf.format(MORE.get(i))+' more records of '+nm);
+  b.onclick=function(){pick([{id:t[2],not:false}]);};
+  return b;
+}
+function pick(picks){
+  S.picks=picks;TF=TX.filter(TAXA,picks);
+  if(parent===window)keep('taxa',TX.write(picks));  // embedded, the split page holds the address
+  refresh();SYNC.send();
+}
 function card(i,lv){
   var id=P.id[i],li=el('li','card'),ph=el('div','ph','Loading photo'),w=el('a','when','Date and place…'),a=el('a','btn','Identify');
   li.dataset.id=id;li.tabIndex=0;
   w.href=OBS+id;w.target='_blank';w.rel='noopener';
   a.href=IdentifyLinks.batches([id])[0].url;a.target='_blank';a.rel='noopener';a.setAttribute('aria-label','Identify this record on iNaturalist');
-  li.append(ph,title(i,lv),w,R?R.links(a,i,lv):a);
+  li.append(ph,title(i,lv),w);
+  if(MORE.has(i))li.appendChild(more_(i));
+  li.appendChild(R?R.links(a,i,lv):a);
   li.onmouseenter=li.onfocus=function(){tell('wtid-focus',id);};
   li.onclick=function(e){if(!e.target.closest('a,button'))tell('wtid-record',id);};
   li.onkeydown=function(e){if(e.target===li&&(e.key==='Enter'||e.key===' ')){e.preventDefault();tell('wtid-record',id);}};
@@ -136,11 +154,14 @@ function empty(){
   if(others.length)box.append('.');
 }
 // The chosen level is kept in the hash (under a key the selection does not use) and in localStorage.
+function keep(k,v){
+  var t=location.hash.slice(1).split('&').filter(function(x){return x&&x.indexOf(k+'=')!==0;});if(v)t.push(k+'='+v);
+  history.replaceState(null,'','#'+t.join('&'));  // no hashchange, so no refresh
+}
 function choose(lv){
   LV=lv;
   try{localStorage.setItem(LS,lv);}catch(e){}
-  var t=location.hash.slice(1).split('&').filter(function(x){return x&&x.indexOf('lvl=')!==0;});t.push('lvl='+lv);
-  history.replaceState(null,'','#'+t.join('&'));  // no hashchange, so no refresh
+  keep('lvl',lv);
   if(R){R.level(lv);redraw();}else paint();
 }
 function saved(){
@@ -170,6 +191,7 @@ function tabs(){
   IO=window.IntersectionObserver&&new IntersectionObserver(function(es){
     if(es.some(function(x){return x.isIntersecting;})){shown+=LIMIT;more();}},{rootMargin:'400px'});
   $('more').onclick=function(){shown+=LIMIT;more();};
+  $('unpick').onclick=function(){pick([]);};
   $('prev').onclick=function(){step(-1);};$('next').onclick=function(){step(1);};
 }
 function refresh(){
@@ -178,8 +200,8 @@ function refresh(){
   for(var i=0;i<P.n;i++)if(SEL[i])kept++;
   S.kept=kept;
   // the leading number is the in-view count, which the split view's "to identify" reads
-  status(nf.format(kept)+(VIEW?' in view':' records')+' · '+PER_SPECIES+' per species');
-  counts();
+  status(nf.format(kept)+(VIEW?' in view':' records')+(MORE.size?' · '+PER_SPECIES+' per species':''));
+  counts();$('unpick').hidden=parent!==window||!S.picks.length;
   if(!LV)LV=saved()||first();
   paint();
 }
@@ -203,7 +225,7 @@ function inbox(){
     else if(d.type==='wtid-keep'&&(d.ids===null||d.ids instanceof Uint32Array)){KEEPIDS=d.ids&&d.ids.slice().sort();if(P)refresh();}
     else if(d.type==='wtid-subset'&&(d.ids===null||Array.isArray(d.ids))){SUBIDS=d.ids&&Uint32Array.from(d.ids).sort();if(P)refresh();}  // the photo search's hits
   });
-  MapFilter.sync({key:key,apply:function(str){if(MF)take(str,false);else PEND=str;},hash:false});
+  SYNC=MapFilter.sync({key:key,apply:function(str){if(MF)take(str,false);else PEND=str;},hash:false});
   addEventListener('hashchange',function(){take(location.hash.slice(1),true);});
 }
 function looks(buf){

@@ -153,3 +153,16 @@ def test_hiding_the_map_clears_the_viewport_in_identify_and_showing_it_replays_i
     page.wait_for_function("got.length === 3")
     assert page.evaluate("got[2]") == "abc"
     page.close()
+
+
+def test_a_more_link_in_identify_sends_its_species_to_the_map(browser, pts, site):
+    page = _page(browser, site, "?view=identify-map")
+    frame = frame_of(page, "identify")
+    page.evaluate(
+        "window.got = []; document.getElementById('map').contentWindow.addEventListener("
+        "'message', e => e.data.type === 'wtid-selection' && got.push(e.data.sel))"
+    )
+    frame.wait_for_selector("#grid .card .sp")
+    frame.locator("#grid .card .sp").first.click()
+    page.wait_for_function("got.some(s => /(^|&)taxa=/.test(s))")
+    page.close()
