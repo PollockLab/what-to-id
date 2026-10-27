@@ -97,7 +97,8 @@ def test_a_taxon_or_group_from_the_split_view_asks_for_a_fit_and_nothing_else_do
     harness = """
 let SY=null,FIT=false,TAXA=null;const P={n:0},S={picks:[],groups:'',months:0};
 const MapFilter={sync:o=>{SY=o;return {send(){}};}},noop=()=>{};
-const [search,showClades,showGroups,showMonths,showOnly,refilter,render]=Array(7).fill(noop);
+const [search,refilter,render]=Array(3).fill(noop),
+  FB={showClades:noop,showGroups:noop,showMonths:noop,showOnly:noop};
 const MF={read:p=>({up:false,lo:0,hi:9,months:p.get('months')||0,groups:p.get('groups')||'',only:{},
   picks:(p.get('taxa')||'').split(',').filter(Boolean)}),
   write:s=>[s.groups&&'groups='+s.groups,s.picks.length&&'taxa='+s.picks.join(','),
