@@ -6,7 +6,7 @@
 'use strict';
 var CFG=IDENTIFY_CONFIG,L=EmbeddingsLayout,Meta=AtlasSearchMeta,PER_SPECIES=3,LIMIT=12,STEPS=16,NO_LOOK=65535,NOTAX=65535;
 var MAP=new URL(CFG.mapUrl,location.href).href,nf=new Intl.NumberFormat('en-CA'),OBS='https://www.inaturalist.org/observations/';
-var META=null,TAXA=null,P=null,LEVEL=null,Q=null,LOOKS=null,MF=null,TF=null,PEND=null,S={},KEEPIDS=null,AREA='',SEL=null,view=[],shown=[],CACHE=new Map();
+var META=null,TAXA=null,P=null,LEVEL=null,Q=null,LOOKS=null,MF=null,TF=null,PEND=null,S={},KEEPIDS=null,SUBIDS=null,AREA='',SEL=null,view=[],shown=[],CACHE=new Map();
 function $(id){return document.getElementById(id);}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 function status(t){$('status').textContent=t;}
@@ -22,7 +22,7 @@ function select(){
   var ok=CH.groupPass(S.groups,META.groups,!!TF.inc);
   for(i=0;i<n;i++)if(!ok[P.grp[i]])SEL[i]=0;
   MF.rest(S,P.obs,P.up,P.flags,n,SEL);
-  var I=SpaceMask.areaIndex(AREA),m=[I&&SpaceMask.area(I,P),KEEPIDS&&SpaceMask.ids(KEEPIDS,P)];
+  var I=SpaceMask.areaIndex(AREA),m=[I&&SpaceMask.area(I,P),KEEPIDS&&SpaceMask.ids(KEEPIDS,P),SUBIDS&&SpaceMask.ids(SUBIDS,P)];
   m.forEach(function(v){if(v)for(var j=0;j<n;j++)SEL[j]&=v[j];});
 }
 // Per level the kept records best first (quantized score, a bucket each), then at most PER_SPECIES of any one taxon.
@@ -124,6 +124,7 @@ function inbox(){
     var d=e.data;if(e.origin!==location.origin||e.source!==parent||!d)return;
     if(d.type==='wtid-area'&&typeof d.area==='string'){AREA=d.area;if(P)refresh();}
     else if(d.type==='wtid-keep'&&(d.ids===null||d.ids instanceof Uint32Array)){KEEPIDS=d.ids&&d.ids.slice().sort();if(P)refresh();}
+    else if(d.type==='wtid-subset'&&(d.ids===null||Array.isArray(d.ids))){SUBIDS=d.ids&&Uint32Array.from(d.ids).sort();if(P)refresh();}  // the photo search's hits
   });
   MapFilter.sync({key:key,apply:function(str){if(MF)take(str,false);else PEND=str;},hash:false});
   addEventListener('hashchange',function(){take(location.hash.slice(1),true);});
