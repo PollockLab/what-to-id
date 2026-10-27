@@ -174,7 +174,7 @@ def test_cards_follow_the_chosen_level_with_a_few_per_species_and_photos_in_batc
     assert "Often confused with" in page.locator("#grid .card .look").first.inner_text()
     body = page.inner_text("body").lower()
     assert not any(word in body for word in FORBIDDEN)
-    assert "also have no level" in page.locator(".about").text_content()
+    assert "photo download" in page.locator(".about").text_content()
     assert page.errors == []
 
 
@@ -191,7 +191,9 @@ def test_the_selection_changes_what_the_cards_show(browser, site):
 
 def test_the_page_names_the_narrowing_group_from_one_constant_and_has_the_header():
     html = page_identify.render()
-    assert html.count(page_identify.NARROW_LABEL) == 1  # only in the config the constant fills
+    assert html.count(page_identify.NARROW_LABEL) == 2  # the config and the About, both from it
+    template = (page_identify.ASSETS / page_identify.PAGE_NAME).read_text()
+    assert page_identify.NARROW_LABEL not in template
     assert "<nav" in html
     assert not [w for w in FORBIDDEN if w in html.lower()]
 
