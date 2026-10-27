@@ -67,3 +67,22 @@ def test_growth_matches_original(dtype, case):
     actual = arm._grow(X, picks)
     for before, after in zip(expected, actual, strict=True):
         np.testing.assert_array_equal(before, after)
+
+
+@pytest.mark.parametrize("candidates", [1, 4, 32])
+@pytest.mark.parametrize("case", ["clustered", "ties"])
+def test_growth_from_kept_candidates_matches_original(monkeypatch, candidates, case):
+    rng = np.random.default_rng(7)
+    if case == "clustered":
+        centres = rng.normal(size=(6, 8))
+        X = (centres[rng.integers(0, 6, 600)] + 0.2 * rng.normal(size=(600, 8))).astype(np.float32)
+        X /= np.linalg.norm(X, axis=1, keepdims=True)
+    else:
+        X = np.tile(np.eye(4, dtype=np.float32), (150, 1))
+    monkeypatch.setattr("what_to_id.arms._GROW_CANDIDATES", candidates)
+    arm = Similarity("unused.npz", batch_size=50)
+    picks = rng.choice(len(X), 12, replace=False)
+    expected = baseline_grow(arm, X, picks)
+    actual = arm._grow(X, picks)
+    for before, after in zip(expected, actual, strict=True):
+        np.testing.assert_array_equal(before, after)
