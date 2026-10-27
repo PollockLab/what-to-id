@@ -96,7 +96,8 @@ _ASSETS = files("what_to_id") / "map_assets"
 # Inlined in this order; map_taxa.js and map_area.js define the taxon and area filters map.js calls,
 # map_step.js the Identify button that steps through an area's batches, map_projects.js the
 # project filter, map_chips.js the click rule for the short-list chips and the selection bar, and
-# map_filter.js the filter state and the category values the GPU filter reads.
+# map_filter.js the filter state and the category values the GPU filter reads, filter_bar.js the
+# histograms, chips and selection bar.
 MAP_CSS = ("map.css", "map_select.css", "map_area.css")
 MAP_JS = (
     "identify_links.js",
@@ -106,6 +107,7 @@ MAP_JS = (
     "map_projects.js",
     "map_chips.js",
     "map_filter.js",
+    "filter_bar.js",
     "map.js",
 )
 
