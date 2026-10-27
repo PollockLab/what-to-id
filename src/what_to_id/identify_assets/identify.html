@@ -23,6 +23,9 @@ a{color:var(--bar)}
 .tab b{font-size:14px}
 @media (max-width:360px){.tabs{flex-wrap:wrap}.tab{flex:1 1 40%}}  /* a narrow pane: two rows of two, nothing cut off */
 .tab[aria-selected=true]{background:var(--on);color:var(--onink);border-color:var(--on)}
+.tab.zero:not([aria-selected=true]){opacity:.55}
+[hidden]{display:none!important}  /* .batch and the arrows set display, which would beat hidden */
+#none button{font:inherit;color:var(--ink);background:none;border:0;padding:0;text-decoration:underline;cursor:pointer}
 #desc{margin:6px 0 2px;font-size:12px}
 .batch{display:flex;align-items:center;gap:6px;margin:8px 0}  /* one row: the arrows stay beside the link */
 .batch .muted{font-size:12px}

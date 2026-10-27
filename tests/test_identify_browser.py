@@ -223,6 +223,29 @@ def test_a_viewport_narrows_the_ids_and_the_status_count_and_empty_restores_them
     assert page.errors == []
 
 
+def test_an_empty_level_hides_its_batch_link_and_points_at_the_levels_that_have_records(
+    browser, site
+):
+    base, pts = site
+    page = open_identify(browser, base)
+    k = int(np.flatnonzero(pts["level"] == 4)[0])
+    x, y, d = float(pts["lon"][k]), float(pts["lat"][k]), 1e-4
+    view = page.evaluate(
+        "r => MapArea.encode([r])", [x - d, y - d, x + d, y - d, x + d, y + d, x - d, y + d]
+    )
+    page.evaluate("a => postMessage({type: 'wtid-view', area: a}, location.origin)", view)
+    page.wait_for_function("__identify.total()[2] === 0 && __identify.total()[4] > 0")
+    assert page.evaluate("__identify.level()") == 2
+    assert page.locator("#batch").is_hidden()
+    total = page.evaluate("__identify.total()")
+    for lv in range(1, 5):
+        assert ("zero" in tab(page, lv).get_attribute("class")) == (total[lv] == 0)
+    page.locator("#none button", has_text=LABELS[3]).click()
+    assert page.evaluate("__identify.level()") == 4
+    assert page.locator("#none").is_hidden() and page.locator("#batch").is_visible()
+    assert page.errors == []
+
+
 def test_the_tabs_switch_the_cards_and_their_counts_are_the_totals(browser, site):
     base, pts = site
     page = open_identify(browser, base)
