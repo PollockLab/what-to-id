@@ -10,7 +10,7 @@ var D=null,S=fresh(),pairShown=LIMIT,cardShown=LIMIT,view=[],skip=new Set(),
   focus=-1,seen=new Set();
 try{seen=new Set(JSON.parse(localStorage.getItem(SEEN_KEY)||'[]'));}catch(e){}
 
-function fresh(){return {g:-1,q:'',t:-1,l:-1,s:'n',d:-1,lo:0,hi:100};}
+function fresh(){return {g:-1,q:'',t:-1,l:-1,s:'pct',d:-1,lo:0,hi:100};}
 // d is 1 ascending, -1 descending; numbers start high to low, names A to Z
 var SORTS={n:'Most photos',pct:'Share of its photos that look like the other species',
   lab:'Labelled name',look:'Look-alike name'};
@@ -72,7 +72,7 @@ function writeHash(){
   var h=[],e=encodeURIComponent;
   if(S.g>=0)h.push('g='+e(groupName(S.g)));
   if(S.q)h.push('q='+e(S.q));
-  if(S.s!=='n')h.push('sort='+S.s);
+  if(S.s!=='pct')h.push('sort='+S.s);
   if(S.d!==dflt(S.s))h.push('dir='+(S.d<0?'desc':'asc'));
   if(S.lo>0)h.push('min='+S.lo);
   if(S.hi<100)h.push('max='+S.hi);
