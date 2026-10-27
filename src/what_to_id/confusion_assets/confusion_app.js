@@ -6,10 +6,17 @@ var LIMIT=200,SEEN_KEY='what-to-id.confusion.seen',SEEN_MAX=5000,KEEP=50;
 var IDENTIFY='https://www.inaturalist.org/observations/identify?taxon_id=',
   IDENTIFY_TAIL='&place_id=7085&quality_grade=needs_id',
   OBS='https://www.inaturalist.org/observations/';
-var D=null,S={g:-1,q:'',t:-1,l:-1},pairShown=LIMIT,cardShown=LIMIT,view=[],skip=new Set(),
+var D=null,S=fresh(),pairShown=LIMIT,cardShown=LIMIT,view=[],skip=new Set(),
   focus=-1,seen=new Set();
 try{seen=new Set(JSON.parse(localStorage.getItem(SEEN_KEY)||'[]'));}catch(e){}
 
+function fresh(){return {g:-1,q:'',t:-1,l:-1,s:'',d:1,lo:0,hi:100};}
+// sort keys: '' keeps the data order; d is 1 ascending, -1 descending
+var SORTS={'':'Default order',pct:'Share of its photos',n:'Photos',lab:'Labelled name',
+  look:'Look-alike name'};
+Object.keys(SORTS).forEach(function(k){var o=document.createElement('option');o.value=k;
+  o.textContent=SORTS[k];document.getElementById('sort').appendChild(o);});
+function pct(p){return Math.round(100*p[2]/p[3]);}
 function $(id){return document.getElementById(id);}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;
   if(text!=null)e.textContent=text;return e;}
@@ -44,12 +51,17 @@ function groupName(g){return g!=null&&g>=0?D.head.groups[g][0]:'';}
 
 function readHash(){
   var s=decodeURIComponent(location.hash.slice(1)),m=/^t(\d+)$/.exec(s),p;
-  S={g:-1,q:'',t:-1,l:-1};
+  S=fresh();
   if(m){var t=D.byKey.get(m[1]);if(t==null)return;S.t=t;
     p=D.pairs.find(function(x){return x[0]===t;});S.l=p?p[1]:-1;return;}
   var h=new URLSearchParams(location.hash.slice(1)),g=h.get('g');
   if(g)S.g=D.head.groups.findIndex(function(x){return x[0]===g;});
   S.q=h.get('q')||'';
+  if(SORTS[h.get('sort')]&&h.get('sort'))S.s=h.get('sort');
+  if(h.get('dir')==='desc')S.d=-1;
+  var lo=parseInt(h.get('min'),10),hi=parseInt(h.get('max'),10);
+  if(lo>=0&&lo<=100)S.lo=lo;
+  if(hi>=0&&hi<=100)S.hi=hi;
   var tk=D.byKey.get(h.get('t')||''),lk=D.byKey.get(h.get('l')||'');
   if(tk!=null){S.t=tk;if(lk!=null)S.l=lk;}
 }
@@ -57,6 +69,10 @@ function writeHash(){
   var h=[],e=encodeURIComponent;
   if(S.g>=0)h.push('g='+e(groupName(S.g)));
   if(S.q)h.push('q='+e(S.q));
+  if(S.s)h.push('sort='+S.s);
+  if(S.d<0)h.push('dir=desc');
+  if(S.lo>0)h.push('min='+S.lo);
+  if(S.hi<100)h.push('max='+S.hi);
   if(S.t>=0)h.push('t='+e(key(D.taxa[S.t])));
   if(S.l>=0)h.push('l='+e(key(D.taxa[S.l])));
   history.replaceState(null,'',h.length?'#'+h.join('&'):location.pathname+location.search);
@@ -77,8 +93,14 @@ function pairsNow(){
   var q=S.q.toLowerCase(),out=[];
   D.pairs.forEach(function(p,k){
     if(S.g>=0&&D.taxa[p[0]][2]!==S.g)return;
-    if(q&&D.lower[p[0]].indexOf(q)<0&&D.lower[p[1]].indexOf(q)<0)return;out.push(k);});
-  return out;
+    if(q&&D.lower[p[0]].indexOf(q)<0&&D.lower[p[1]].indexOf(q)<0)return;
+    var c=pct(p);if(c<S.lo||c>S.hi)return;out.push(k);});
+  if(!S.s)return S.d<0?out.reverse():out;
+  var P=D.pairs,nm=function(k,i){return D.taxa[P[k][i]][1];},
+    v={pct:function(k){return pct(P[k]);},n:function(k){return P[k][2];}}[S.s];
+  return out.sort(function(a,b){
+    var c=v?v(a)-v(b):nm(a,S.s==='lab'?0:1).localeCompare(nm(b,S.s==='lab'?0:1));
+    return S.d*c||a-b;});
 }
 function drawPairs(scroll){
   var list=pairsNow(),ul=$('pairs'),sel=-1,frag=document.createDocumentFragment(),j;
@@ -97,7 +119,7 @@ function drawPairs(scroll){
     m.onclick=function(){pairShown=upto+LIMIT;drawPairs();};var li2=el('li');li2.appendChild(m);
     ul.appendChild(li2);}
   $('status').textContent=list.length.toLocaleString()+(list.length===1?' pair':' pairs')+
-    (S.g>=0?' in '+groupName(S.g):'')+(S.q?' matching “'+S.q+'”':'');
+    (S.lo>0||S.hi<100?' from '+S.lo+'% to '+S.hi+'%':'')+(S.g>=0?' in '+groupName(S.g):'')+(S.q?' matching “'+S.q+'”':'');
   if(scroll&&selBtn)selBtn.scrollIntoView({block:'nearest'});
 }
 
@@ -166,7 +188,12 @@ function drawRecords(){
     (S.l>=0?' (the page keeps the '+KEEP+' worst per pair)':'')+'.';
   drawAct();drawCards();
 }
-function update(scroll){drawTabs();drawPairs(scroll);drawRecords();writeHash();}
+function drawSort(){
+  $('sort').value=S.s;$('lo').value=S.lo;$('hi').value=S.hi;
+  var b=$('dir');b.textContent=S.d>0?'Ascending ↑':'Descending ↓';
+  b.setAttribute('aria-label','Sort direction: '+(S.d>0?'ascending':'descending'));
+}
+function update(scroll){drawSort();drawTabs();drawPairs(scroll);drawRecords();writeHash();}
 
 function markSeen(id){
   seen.delete(id);seen.add(id);
@@ -199,6 +226,12 @@ $('cards').addEventListener('focusin',function(e){
   var c=e.target.closest('.card');if(c)focus=+c.dataset.j;});
 $('q').addEventListener('input',function(e){
   S.q=e.target.value.trim();pairShown=LIMIT;suggest(S.q);drawPairs();writeHash();});
+$('sort').addEventListener('change',function(e){S.s=e.target.value;pairShown=LIMIT;update();});
+$('dir').addEventListener('click',function(){S.d=-S.d;pairShown=LIMIT;update();});
+// a blank or out-of-range box keeps the bound it had; the other box is never moved
+['lo','hi'].forEach(function(id){$(id).addEventListener('change',function(e){
+  var v=parseInt(e.target.value,10);
+  if(v>=0&&v<=100)S[id]=v;pairShown=LIMIT;update();});});
 $('q').addEventListener('change',function(e){
   var k=D.byName.get(e.target.value.trim().toLowerCase());
   if(k==null)return;S.t=k;S.l=-1;S.g=-1;cardShown=LIMIT;skip.clear();update();

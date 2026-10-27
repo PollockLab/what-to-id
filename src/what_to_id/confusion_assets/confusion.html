@@ -19,6 +19,10 @@ a{color:var(--bar)}
 .find{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:8px 0 12px}
 .find input{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);
   border-radius:6px;padding:8px 10px;min-height:20px;width:min(360px,100%);box-sizing:border-box}
+.find label{display:flex;align-items:center;gap:6px}
+.find select,.find button,.find input[type=number]{font:inherit;color:inherit;background:var(--panel);
+  border:1px solid var(--line);border-radius:6px;padding:8px 10px;min-height:20px;cursor:pointer}
+.find input[type=number]{width:5em;cursor:text}
 .cols{display:grid;grid-template-columns:minmax(260px,360px) 1fr;gap:16px;align-items:start}
 #pairs-col{position:sticky;top:8px;max-height:calc(100vh - 16px);overflow:auto;
   border:1px solid var(--line);border-radius:8px;background:var(--panel)}
@@ -60,6 +64,13 @@ overturn (AUROC about 0.65), so treat the order as a loose guide.</p>
 <div class="find"><label for="q">Find a species</label>
 <input id="q" type="search" list="names" autocomplete="off" placeholder="Labelled or look-alike name">
 <datalist id="names"></datalist></div>
+<div class="find" role="group" aria-label="Sort and filter the pairs">
+<label>Sort by <select id="sort"></select></label>
+<button type="button" id="dir" aria-label="Sort direction: ascending">Ascending ↑</button>
+<label for="lo">Confusion from</label>
+<input id="lo" type="number" min="0" max="100" step="1" value="0" inputmode="numeric">
+<label for="hi">to</label>
+<input id="hi" type="number" min="0" max="100" step="1" value="100" inputmode="numeric"> %</div>
 <p id="status" class="muted" aria-live="polite">Loading…</p>
 <div class="cols">
 <section id="pairs-col" aria-label="Pairs"><ul id="pairs"></ul></section>
