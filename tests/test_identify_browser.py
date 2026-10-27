@@ -332,6 +332,26 @@ def test_the_batch_links_cover_the_listed_ids(browser, site):
     tab(page, 2).click()
     n = len(page.evaluate("__identify.view()")[2])
     assert page.locator("#go").inner_text() == f"Identify the first 5 of {n:,}"
+    assert page.locator("#cap").is_hidden() and page.locator("#next").is_hidden()
+    # two records per batch: the arrows must change the button's words, not only its link
+    page.evaluate(
+        "() => { const f = IdentifyLinks.batches; IdentifyLinks.batches = ids => "
+        "[ids.slice(0, 2), ids.slice(2, 4), ids.slice(4)].map(b => f(b)[0]); }"
+    )
+    tab(page, 1).click()
+    tab(page, 2).click()
+    first = page.get_attribute("#go", "href")
+    assert page.locator("#go").inner_text() == "Identify 2 · batch 1 of 3"
+    assert (
+        page.locator("#cap").inner_text()
+        == f"The first 5 of {n:,} listed, newest first, 200 per batch"
+    )
+    page.click("#next")
+    assert page.locator("#go").inner_text() == "Identify 2 · batch 2 of 3"
+    assert page.get_attribute("#go", "href") != first and page.locator("#prev").is_enabled()
+    page.click("#next")
+    assert page.locator("#go").inner_text() == "Identify 1 · batch 3 of 3"
+    assert page.locator("#next").is_disabled()
     assert page.errors == []
 
 
