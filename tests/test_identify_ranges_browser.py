@@ -93,7 +93,7 @@ def site(tmp_path_factory):
 
 def opened(browser, base, hash_, size=(1000, 900), touch=False):
     page = ib.open_identify(browser, base, hash_, size, touch)
-    page.wait_for_function("__identify.ranges()")
+    page.wait_for_function("window.__identify && __identify.ranges()")
     page.wait_for_selector("#grid .card .links")
     return page
 
@@ -127,7 +127,7 @@ def test_clear_matches_start_with_far_records_left_out_and_the_chip_cycles(brows
     assert shown(page, 1) == [2] and "out=1" in page.url
     assert btn.inner_text() == "Outside its range 1" and btn.get_attribute("aria-pressed") == "true"
     page.reload()
-    page.wait_for_function("__identify.ranges()")
+    page.wait_for_function("window.__identify && __identify.ranges()")
     assert shown(page, 1) == [2]  # kept in the hash
     btn.click()
     assert shown(page, 1) == [0, 1, 3] and "out=" not in page.url
