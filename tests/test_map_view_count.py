@@ -9,10 +9,10 @@ ASSETS = files("what_to_id") / "map_assets"
 needs_node = pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
 
 
-def _counts(bounds, lo=0, hi=9, up=False):
+def _counts(bounds, lo=0, hi=9, up=False, groups=False):
     """map.js's inView() against 5 records at lon 0, 1, 5, 179 and -179 (lat 0). Kept: all but
-    #1; #3 has no day. Returns the count, or None for a view
-    360 degrees wide or more (no restriction)."""
+    #1, which only the group filter leaves out; #3 has no day. Returns the count, or None for a
+    view 360 degrees wide or more (no restriction); with groups, the per-group counts instead."""
     source = (ASSETS / "map.js").read_text()
     start = source.index("var VC=null;")
     body = source[start : source.index("function render()", start)]
@@ -22,11 +22,13 @@ const full=()=>S.lo===0&&S.hi===LAST,MapArea={{Q:1e4}};
 const map={{getBounds:()=>({{getWest:()=>B[0],getSouth:()=>B[1],
   getEast:()=>B[2],getNorth:()=>B[3]}})}};
 const P={{n:5,pos:Float32Array.of(0,0,1,0,5,0,179,0,-179,0),obs:Uint16Array.of(2,2,2,NO,2),
-  up:Uint16Array.of(8,8,8,8,8)}};
-const KEEP=Uint8Array.of(1,0,1,1,1);
+  up:Uint16Array.of(8,8,8,8,8),grp:Uint8Array.of(0,1,0,1,0)}};
+const KEEP=Uint8Array.of(1,0,1,1,1),BK=Uint8Array.of(1,1,1,1,1),META={{groups:['A','B']}};
+let VM=new Uint8Array(0);
 """
+    out = "Array.from(VC.g)" if groups else "inView()"
     run = subprocess.run(
-        ["node", "-e", harness + body + "console.log(JSON.stringify(inView()))"],
+        ["node", "-e", harness + body + f"inView();console.log(JSON.stringify({out}))"],
         capture_output=True,
         text=True,
         check=True,
@@ -62,6 +64,13 @@ def test_in_view_handles_the_antimeridian_and_the_whole_world():
     assert _counts([-185, -1, -175, 1]) == 2  # wraps to 175..-175
     assert _counts([-180, -1, -178, 1]) == 1  # -179 only
     assert _counts([-180, -90, 180, 90]) is None  # 360 degrees wide: no restriction
+
+
+@needs_node
+def test_in_view_counts_each_group_with_the_group_filter_left_out():
+    assert _counts([-1, -1, 2, 1], groups=True) == [1, 1]  # #1 counts for its group
+    assert _counts([-180, -90, 180, 90], groups=True) == [3, 2]  # the world: every dated record
+    assert _counts([-180, -90, 180, 90], lo=1, groups=True) == [3, 1]  # the dateless #3 drops
 
 
 def _node(harness, start, end, script):

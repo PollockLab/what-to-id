@@ -26,6 +26,10 @@ fetch('explore.html',{method:'HEAD'}).then(function(r){if(r.ok)location.replace(
 </header>
 <section id="side" class="side" aria-label="Filters">
 <div id="selbar" class="selbar" role="region" aria-label="Your selection" hidden><p class="lbl">Your selection <button type="button" class="link">Clear all</button></p><ul class="chips"></ul></div>
+<details class="sec" id="grpsec" open><summary>Groups <span class="n" id="ngroups"></span><span id="gbar" class="gbar" role="img" aria-label="No records in view"></span></summary>
+<p class="muted">Share of the records in view. Groups combine with each other and with the taxa. <button type="button" id="gall" class="link">All groups</button></p>
+<ul id="groups" class="gl" role="list" aria-label="Taxon groups"></ul>
+</details>
 <p class="muted">Click a chip to pick it, again to leave it out, a third time to clear it. In Your selection, click a chip to flip it.</p>
 <details class="sec" id="taxsec" open><summary>Taxa <span class="n" id="ntaxa"></span></summary>
 <div class="picker"><label for="q" class="vh">Find a taxon</label>
@@ -40,10 +44,6 @@ fetch('explore.html',{method:'HEAD'}).then(function(r){if(r.ok)location.replace(
 <p class="lbl" id="acclbl">Location accuracy <span class="muted">(pick one)</span></p>
 <div id="acc" class="chips" role="group" aria-labelledby="acclbl"></div></details>
 <details class="sec" id="projbox" hidden></details>
-<details class="sec" id="grpsec"><summary>Groups <span class="n" id="ngroups"></span></summary>
-<div id="groups" class="chips" role="group" aria-label="Taxon groups"></div>
-<p class="muted">Groups combine with each other and with the taxa. <button type="button" id="gall" class="link">All groups</button></p>
-</details>
 <details class="sec" id="monsec"><summary>Months of the year <span class="n" id="nmonths"></span></summary>
 <div id="months" class="chips months" role="group" aria-label="Months of the year"></div>
 <p class="muted">Compare the same season across years. <button type="button" id="mclear" class="link">Any month</button></p>

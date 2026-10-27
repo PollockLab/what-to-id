@@ -6,11 +6,12 @@
 // column, so make() then returns null. o: T (taxa rows), tax, grp, n (the points), ranks, nf,
 // state(id) for '', 'inc' or 'not', inside(row) for a row under an included pick, cycle(id), box,
 // pass() for the points that count (a Uint8Array, or null for all), and onOpen after a change.
+// slot(g), when given, is where group g's ranks go, in place of a section per group in box.
 var TT=(function(){
 'use strict';
 var CAP=200;
 function make(o){
-  var T=o.T,R=T.length,par=new Int32Array(R),own=null,cnt=null,gopen={},nopen={},syncs={},i;
+  var T=o.T,R=T.length,par=new Int32Array(R),own=null,cnt=null,tot=null,gopen={},nopen={},syncs={},i;
   if(!R||T[0].length<5)return null;
   for(i=0;i<R;i++)par[i]=T[i][4];
   var ch=T.map(function(){return [];});
@@ -20,10 +21,10 @@ function make(o){
   // Observations at or below each row, per group, from the points that pass.
   function build(){
     if(own)return;
-    var G=o.groups,ok=o.pass&&o.pass(),t,g,j;
-    own=[];cnt=[];for(g=0;g<G;g++){own.push(new Float64Array(R));cnt.push(new Float64Array(R));}
-    for(i=0;i<o.n;i++){t=o.tax[i];if(t<R&&(!ok||ok[i]))own[o.grp[i]][t]++;}
-    for(g=0;g<G;g++)for(i=0;i<R;i++)if(own[g][i])for(j=i;j>=0;j=par[j])cnt[g][j]+=own[g][i];
+    var G=o.groups,ok=o.pass&&o.pass(),tax=o.tax,grp=o.grp,n=o.n,t,g,j;
+    own=[];cnt=[];tot=new Float64Array(G);for(g=0;g<G;g++){own.push(new Float64Array(R));cnt.push(new Float64Array(R));}
+    for(i=0;i<n;i++){t=tax[i];if(t<R&&(!ok||ok[i]))own[grp[i]][t]++;}
+    for(g=0;g<G;g++)for(i=0;i<R;i++)if(own[g][i]){tot[g]+=own[g][i];for(j=i;j>=0;j=par[j])cnt[g][j]+=own[g][i];}
   }
   function kids(g,x){return ch[x].filter(function(k){return cnt[g][k]>0;});}
   // x, or the lowest row under it that is reached through single children without observations.
@@ -53,7 +54,8 @@ function make(o){
     lab.title=[t[1],t[0],t[3]!==255?o.ranks[t[3]]:''].filter(Boolean).join(' · ')+
       '. Click to pick, again to leave out, again to clear.';
     lab.onclick=function(){o.cycle(t[2]);};li.appendChild(lab);
-    li.appendChild(el('span','tc',o.nf.format(cnt[g][x])));
+    // --s, the share of the group, for a page that draws it as a bar
+    var c=el('span','tc',o.nf.format(cnt[g][x]));c.style.setProperty('--s',(tot[g]?cnt[g][x]/tot[g]*100:0)+'%');li.appendChild(c);
     ul.appendChild(li);
     if(isOpen){var sub=el('ul');sub.setAttribute('role','group');
       ks.slice(0,CAP).forEach(function(k){row(g,k,sub);});
@@ -61,12 +63,14 @@ function make(o){
       ul.appendChild(sub);}
   }
   function render(){
-    build();Object.keys(syncs).forEach(function(g){syncs[g]();});
+    var open=Object.keys(gopen).filter(function(g){return gopen[g];});
+    if(open.length)build();Object.keys(syncs).forEach(function(g){syncs[g]();});
     var a=document.activeElement,key=a&&o.box.contains(a)?a.getAttribute('data-k'):null;
-    o.box.textContent='';
-    Object.keys(gopen).forEach(function(g){if(!gopen[g])return;
-      var s=el('section'),ul=el('ul');s.appendChild(el('h3',null,o.label(+g)));ul.setAttribute('role','tree');
-      tops(+g).slice(0,CAP).forEach(function(x){row(+g,x,ul);});s.appendChild(ul);o.box.appendChild(s);});
+    if(o.slot)for(i=0;i<o.groups;i++)o.slot(i).textContent='';else o.box.textContent='';
+    open.forEach(function(g){
+      var s=el('section'),ul=el('ul');if(!o.slot)s.appendChild(el('h3',null,o.label(+g)));ul.setAttribute('role','tree');
+      ul.setAttribute('aria-label','Ranks under '+o.label(+g));
+      tops(+g).slice(0,CAP).forEach(function(x){row(+g,x,ul);});s.appendChild(ul);(o.slot?o.slot(+g):o.box).appendChild(s);});
     if(key){var f=o.box.querySelector('[data-k="'+key+'"]');if(f)f.focus();}
   }
   return {render:render,

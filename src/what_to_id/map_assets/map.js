@@ -61,7 +61,7 @@ function writeHash(){SYNC.send();clearTimeout(hashTimer);hashTimer=setTimeout(fu
 var P={n:0,id:new Uint32Array(0),pos:new Float32Array(0),obs:new Uint16Array(0),
   up:new Uint16Array(0),tax:new Uint16Array(0),grp:new Uint8Array(0),ids:new Uint8Array(0),
   fl:new Uint8Array(0)};
-var TAXA=null,TF=TX.filter(null,[]),GONE={},GONE_NEW=false,KEEP=new Uint8Array(0),SEL=-1,NBR=[],
+var TAXA=null,TF=TX.filter(null,[]),GONE={},GONE_NEW=false,KEEP=new Uint8Array(0),BK=KEEP,VM=KEEP,SEL=-1,NBR=[],
   CUM=new Float64Array(META.days+1),TOT=META.totals||null,TC=null,NODAY=0,PER=null,ALT=0,FIT=false;
 function cat(a,b){var c=new a.constructor(a.length+b.length);c.set(a);c.set(b,a.length);return c;}
 function unzip(buf){
@@ -143,10 +143,10 @@ function recount(){
     ch=S.up?2:1,g=CH.groupPass(S.groups,META.groups,false),m=S.months;
   c[0].forEach(function(j){gm|=1<<j;});c[ch].forEach(function(j){mm|=1<<j;});c[3].forEach(function(j){sm|=1<<j;});
   RC={gm:gm,mm:mm,sm:sm,ch:ch};KV++;
-  if(KEEP.length!==n)KEEP=new Uint8Array(n);
+  if(KEEP.length!==n){KEEP=new Uint8Array(n);BK=new Uint8Array(n);}  // BK: every filter but the groups, for the groups list
   if(!PER)PER=new Float64Array(META.days);else PER.fill(0);
   for(var i=0;i<n;i++){
-    var k=(gm>>cat[4*i]&1)&(mm>>cat[4*i+ch]&1)&(sm>>cat[4*i+3]&1);KEEP[i]=k;
+    var b=(mm>>cat[4*i+ch]&1)&(sm>>cat[4*i+3]&1),k=b&(gm>>cat[4*i]&1);KEEP[i]=k;BK[i]=b;
     if(k){var d=day[i];if(d!==NO)PER[d]++;else nd++;}
   }
   NODAY=nd;ALT=0;
@@ -178,20 +178,23 @@ function fitTo(keep){
   // the new count can rewrap the bar above the map; MapLibre sees the new size only a frame later, so a fit
   // to the old one sits off centre
   if(w<=e){map.resize();map.fitBounds([[w,s],[e,n]],{padding:40,maxZoom:14});}}
-var VC=null;  // kept records dated in S.lo..S.hi like CUM and inside the viewport; null for the world
+// kept records dated in S.lo..S.hi like CUM and inside the viewport, null for the world; g counts them per group
+// and VM marks them with the group filter left out, for the groups list
+var VC=null;
 function inView(){
   var n=P.n,b=map.getBounds(),w=b.getWest(),e=b.getEast(),s=b.getSouth(),t=b.getNorth(),key=[w,e,s,t,S.lo,S.hi,S.up,n].join();
-  if(!n||KEEP.length!==n||e-w>=360)return null;
+  if(!n||KEEP.length!==n)return null;
   if(VC&&VC.k===key)return VC.c;
   var q=function(v){return Math.round(v*MapArea.Q)/MapArea.Q;};  // the precision of the view sent to the other panes, so their counts agree
   w=q(w);e=q(e);s=q(s);t=q(t);
   w=(w+540)%360-180;e=(e+540)%360-180;  // wrap into [-180,180); w>e then means the view crosses the antimeridian
-  var day=S.up?P.up:P.obs,pos=P.pos,all=full(),c=0,i,x,y,d;
+  var day=S.up?P.up:P.obs,pos=P.pos,all=full(),wd=b.getEast()-b.getWest()>=360,c=0,i,x,y,d,g=new Float64Array(META.groups.length);
+  if(VM.length!==n)VM=new Uint8Array(n);else VM.fill(0);
   for(i=0;i<n;i++){
-    if(!KEEP[i])continue;y=pos[2*i+1];if(y<s||y>t)continue;x=pos[2*i];
-    if(w<=e?x<w||x>e:x<w&&x>e)continue;
-    d=day[i];if(d===NO?all:d>=S.lo&&d<=S.hi)c++;}
-  VC={k:key,c:c};return c;}
+    if(!BK[i])continue;y=pos[2*i+1];x=pos[2*i];
+    if(!wd&&(y<s||y>t||(w<=e?x<w||x>e:x<w&&x>e)))continue;
+    d=day[i];if(d===NO?all:d>=S.lo&&d<=S.hi){c+=KEEP[i];g[P.grp[i]]++;VM[i]=1;}}
+  VC={k:key,c:wd?null:c,g:g};return VC.c;}
 function render(){
   var shown=nShown();
   var iv=P.n&&!AREA.invalid()?inView():null;
@@ -204,7 +207,7 @@ function render(){
     '':'matching these filters ')+'still need an ID ('+
     FB.pct(shown,all)+'). All-record counts from '+TOT.on+'.':'';
   $('hint').textContent=TC?HINT_TOT:HINT;
-  PJ.note(P.n?shown:null,ALT);FB.update();layers();link();writeHash();counts();
+  PJ.note(P.n?shown:null,ALT);FB.update();FB.groups.set(VC&&VC.g);layers();link();writeHash();counts();
 }
 // The tree beside the map counts what the map shows: how many shown records carry each taxon, sent once the filters
 // have settled for 150 ms and only when they changed (KV counts the recounts of KEEP, which holds the months too).
@@ -286,6 +289,7 @@ function layers(){
 // The filter bar (filter_bar.js) draws the histograms and chips; the map hands it the records and the recount.
 var FB=FilterBar({S:S,META:META,mf:MF,nf:nf,pj:PJ,sel:sel,P:function(){return P;},taxa:function(){return TAXA;},
   area:function(){return AREA;},cum:function(){return CUM;},tc:function(){return TC;},search:search,
+  pass:function(){return VM;},inside:function(r){return !!TF.inc&&TF.inc[r]===1;},
   refilter:refilter,render:render,reset:function(){
     if(parent!==window)parent.postMessage({type:'wtid-reset'},location.origin);},  // the photo space beside it zooms out
   extra:function(){return SUB?[{label:'Photo search: "'+SUBL+'" ('+SUB.size+')',
