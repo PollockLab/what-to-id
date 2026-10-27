@@ -10,8 +10,8 @@ and a third when the range tables are found:
 ``pool-levels.bin``: gzip of one plane of n bytes. The low nibble is the level (0 none, 1 easy,
 2 taxonomist, 3 narrow, 4 weird, 5 mislabel; `identify.LEVEL_NAMES`), the high nibble the
 record's score quantized to 16 steps within its level, 15 for the record to show first (the
-highest score, the lowest for weird). A record missing from identify.parquet, or whose label
-changed since it was scored, is level 0.
+highest score, the lowest for weird and mislabel). A record missing from identify.parquet, or
+whose label changed since it was scored, is level 0.
 
 ``pool-levels-looks.bin``: the look-alike species of the taxonomist, narrow and mislabel records,
 apart so the levels load first. A uint32 LE length and that many bytes of JSON
@@ -72,7 +72,7 @@ def quantize(level: np.ndarray, score: np.ndarray) -> np.ndarray:
     for lv in np.unique(level[level != NONE]):
         rows = np.flatnonzero(level == lv)
         s = np.nan_to_num(score[rows].astype(np.float64), nan=-np.inf)
-        order = np.argsort(-s if lv == WEIRD else s, kind="stable")
+        order = np.argsort(-s if lv in (WEIRD, MISLABEL) else s, kind="stable")
         rank = np.empty(len(rows), np.int64)
         rank[order] = np.arange(len(rows))
         q[rows] = rank * STEPS // len(rows)

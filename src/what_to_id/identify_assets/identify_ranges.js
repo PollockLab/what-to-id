@@ -47,7 +47,7 @@ return function(buf,ctx){
   // Clear matches are for confirming in bulk, so records far from their label's range start left out
   function def(lv){return lv===1?-1:0;}
   function pass(i,lv){var o=lv===S.lv?S.o:def(lv);return !o||(o>0?far(i):near(i));}
-  function two(i,lv){var l=lv===2&&ctx.look(i);return l&&bits(l)?l:null;}
+  function two(i,lv){var l=(lv===2||lv===5)&&ctx.look(i);return l&&bits(l)?l:null;}
   function box(){
     if(BOX)return BOX;
     var x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;

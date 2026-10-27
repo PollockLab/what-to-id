@@ -247,3 +247,11 @@ def test_the_scoring_dates_fall_back_to_the_model_source_and_skip_what_is_not_a_
     html = page_identify.render(dates=None)
     assert "Photos downloaded" not in html and "last photo download" in html
     assert "__" not in html.split("<details", 1)[1].split("</details>", 1)[0]
+
+
+def test_mislabel_and_weird_show_their_lowest_score_first_and_the_others_their_highest():
+    level = np.array([2, 2, 4, 4, 5, 5], np.uint8)
+    score = np.array([-0.001, -0.019, 0.1, 0.3, -0.03, -0.2])
+    q = pool_levels.quantize(level, score)
+    assert q[0] > q[1]  # close calls: the margin nearest 0 first
+    assert q[2] > q[3] and q[5] > q[4]  # odd shots and likely mislabelled: lowest first
