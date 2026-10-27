@@ -26,7 +26,8 @@ def test_note_truth_table(label, look, want):
 
 def test_build_round_trips_notes_ranges_and_grid(tmp_path):
     a, b, c = (h3.latlng_to_cell(48.5 + k, -123.0, 4) for k in range(3))
-    orm = pd.DataFrame({"taxon_id": [1, 2, 3, 3], "cells": [[a, b], [b, c], [a], [c]]})
+    d = h3.latlng_to_cell(58.0, -130.0, 4)  # in a range but holds no record: not land
+    orm = pd.DataFrame({"taxon_id": [1, 2, 3, 3], "cells": [[a, b], [b, c], [a, d], [c]]})
     levels = pd.DataFrame(
         {
             "id": [10, 11, 12, 13],
@@ -49,7 +50,7 @@ def test_build_round_trips_notes_ranges_and_grid(tmp_path):
         [
             pool,
             pd.DataFrame(
-                {"id": [14], "lat": [0.0], "lon": [0.0], "taxon_id": [3], "taxon_name": ["C c"]}
+                {"id": [14], "lat": [50.5], "lon": [-123.0], "taxon_id": [3], "taxon_name": ["C c"]}
             ),
         ]
     )
@@ -92,4 +93,6 @@ def test_out_km_is_zero_inside_and_the_distance_to_the_nearest_cell_outside():
     k = notes["out_km"]
     assert k[0] == 0 and 100 <= k[1] <= 125  # one degree of latitude is about 111 km
     assert k[2] is pd.NA and k[3] is pd.NA  # no point; no known range
-    assert notes["range_note"].isna().all() and set(ranges["name"]) == {"A a", "B b"}
+    assert notes["range_note"].isna().all() and set(ranges["name"]) == {
+        "A a"
+    }  # B b lies off the land mask

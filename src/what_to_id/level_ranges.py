@@ -11,9 +11,9 @@ It writes into DIR, for `levels --range-notes`:
 ``range-notes.parquet`` (``id``, ``range_note`` on Close calls rows only, ``lat``, ``lon`` float32
 at 2 decimals, null when the record has no point, and ``out_km``: km from the point to the nearest
 centre of the label's cells, 0 inside them, null when unknown), ``level-ranges.parquet`` (``name``,
-``cells`` int16 indexes into the grid, one row per label or look-alike name that has cells) and
-``level-range-cells.parquet`` (the grid in index order, sorted cell ids:
-``lat``, ``lon`` float32 boundary vertices at 3 decimals).
+``cells`` int16 indexes into the grid, one row per label or look-alike name with cells on it) and
+``level-range-cells.parquet`` (the grid in index order: the sorted ORM cells holding a pool record,
+i.e. BC land; ``lat``, ``lon`` float32 boundary vertices at 3 decimals).
 """
 
 from __future__ import annotations
@@ -88,14 +88,18 @@ def build(levels: pd.DataFrame, pool: pd.DataFrame, orm: pd.DataFrame):
             "out_km": pd.Series(np.round(okm), dtype="float64").astype("Int32"),
         }
     )
-    grid_ids = sorted({c for cs in orm["cells"] for c in cs})
+    # the grid is the BC land mask: ORM cells that hold at least one pool record
+    pts = pool[["lat", "lon"]].dropna().round(2).drop_duplicates()
+    land = {h3.latlng_to_cell(a, b, 4) for a, b in zip(pts["lat"], pts["lon"], strict=True)}
+    grid_ids = sorted({c for cs in orm["cells"] for c in cs} & land)
     ix = {c: i for i, c in enumerate(grid_ids)}
     lab = zip(lv["taxon_name"], lv["taxon_id"], strict=True)
     sets = {n: cells[t] for n, t in lab if t in cells.index}  # a label is its own taxon
     for n, s_ in look.items():
         if s_ and n not in sets:
             sets[n] = s_
-    rows = [(n, np.array(sorted(ix[c] for c in s_), np.int16)) for n, s_ in sets.items() if s_]
+    sets = {n: [ix[c] for c in s_ if c in ix] for n, s_ in sets.items()}
+    rows = [(n, np.array(sorted(s_), np.int16)) for n, s_ in sets.items() if s_]
     ranges = pd.DataFrame(rows, columns=["name", "cells"])
     bounds = [h3.cell_to_boundary(c) for c in grid_ids]
     grid = pd.DataFrame(

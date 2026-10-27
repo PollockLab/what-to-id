@@ -115,27 +115,51 @@ def test_close_call_wording(browser, site):
     )
 
 
-def test_close_call_with_ranges_draws_a_labelled_map(browser, map_site):
+def test_close_call_chip_opens_a_labelled_map_by_click_and_keyboard(browser, map_site):
     page = open_page(browser, map_site, "#level=taxonomist")
-    cv = page.locator("#cards .card canvas")
-    assert cv.get_attribute("role") == "img"
-    assert cv.get_attribute("aria-label") == (
+    chip, pop = page.locator("#cards .rchip"), page.locator("#rpop")
+    assert page.locator("#cards canvas").count() == 0 and chip.inner_text() == "In range"
+    assert chip.get_attribute("aria-expanded") == "false" and pop.is_hidden()
+    chip.click()
+    assert (
+        chip.get_attribute("aria-expanded") == "true"
+        and chip.get_attribute("aria-controls") == "rpop"
+    )
+    assert pop.get_attribute("role") == "dialog"
+    assert pop.locator("canvas").get_attribute("aria-label") == (
         "Range map: this record is inside the range of Aus bus, outside the range of Cus dus"
     )
-    page.wait_for_function("c => c.width > 0", arg=cv.element_handle())
-    page.locator(".rbtn").click()
-    assert page.locator(".card.wide").count() == 1 and page.errors == []
+    page.keyboard.press("Escape")
+    assert pop.is_hidden() and chip.get_attribute("aria-expanded") == "false"
+    assert page.evaluate("document.activeElement.className") == "rchip"
+    page.keyboard.press("Enter")
+    assert pop.is_visible() and page.evaluate("document.activeElement.id") == "rpop"
+    pop.get_by_role("button", name="Close range map").click()
+    assert pop.is_hidden() and page.errors == []
 
+
+def test_every_level_shows_chips_for_known_ranges_only(browser, map_site):
     page = open_page(browser, map_site, "#level=easy")
-    labels = page.locator("#cards canvas").evaluate_all("cs => cs.map(c => c.ariaLabel)")
-    assert labels == [
-        "Range map: this record is inside the range of Aus bus",
+    assert page.locator("#cards .rchip").all_inner_texts() == ["In range", "About 120 km outside"]
+    page.locator("#cards .rchip").nth(1).click()
+    assert page.locator("#rpop canvas").get_attribute("aria-label") == (
         "Range map: this record is outside the range of Eus fus. "
-        "About 120 km outside the label's usual range.",
-    ]
-    assert "About 120 km outside" in page.locator("#cards .card").nth(1).inner_text()
+        "About 120 km outside the label's usual range."
+    )
     page = open_page(browser, map_site, "#level=weird")
-    assert page.locator("#cards .card canvas").count() == 1  # Hus ius has no known range
+    assert page.locator("#cards .rchip").count() == 1  # Hus ius has no known range
+
+
+def test_phone_popover_is_a_bottom_sheet(browser, map_site):
+    page = open_page(browser, map_site, "#level=taxonomist", w=390)
+    page.locator("#cards .rchip").click()
+    box = page.locator("#rpop").bounding_box()
+    assert box["x"] == 0 and box["width"] == 390 and box["y"] + box["height"] == 900
+
+
+def test_cards_without_ranges_have_no_chip(browser, site):
+    page = open_page(browser, site, "#level=taxonomist")
+    assert page.locator("#cards .rchip").count() == 0
 
 
 def test_outside_its_range_filter_counts_sorts_and_keeps_the_hash(browser, map_site):
@@ -154,8 +178,3 @@ def test_outside_its_range_filter_counts_sorts_and_keeps_the_hash(browser, map_s
     )
     page = open_page(browser, map_site, "#level=taxonomist")
     assert page.get_by_role("button", name="Outside its range").is_disabled()
-
-
-def test_cards_without_ranges_have_no_map(browser, site):
-    page = open_page(browser, site, "#level=taxonomist")
-    assert page.locator("#cards canvas").count() == 0
