@@ -100,3 +100,41 @@ def test_out_km_is_zero_inside_and_the_distance_to_the_nearest_cell_outside():
     assert notes["range_note"].isna().all()
     cells = ranges.set_index("name")["cells"]
     assert len(cells["A a"]) == 1 and len(cells["B b"]) == 0  # B b lies off the land mask
+
+
+def test_km_to_cells_in_blocks_matches_one_pass():
+    rng = np.random.default_rng(0)
+    lat, lon = rng.uniform(48, 60, 50), rng.uniform(-139, -114, 50)
+    centres = np.radians(np.column_stack([rng.uniform(48, 60, 7), rng.uniform(-139, -114, 7)]))
+    one = lr.km_to_cells(lat, lon, centres)
+    assert np.allclose(lr.km_to_cells(lat, lon, centres, pairs=10), one)
+    assert np.allclose(lr.km_to_cells(lat, lon, centres, pairs=1), one)
+
+
+def test_identify_rows_build_the_same_tables_as_level_rows():
+    a, b, c = (h3.latlng_to_cell(48.5 + k, -123.0, 4) for k in range(3))
+    orm = pd.DataFrame({"taxon_id": [1, 2, 3], "cells": [[a, b], [b, c], [a]]})
+    pool = pd.DataFrame(
+        {
+            "id": [10, 11, 12, 13],
+            "lat": [48.5, 50.5, 49.5, 48.5],
+            "lon": -123.0,
+            "taxon_id": [1, 1, 2, 3],
+            "taxon_name": ["A a", "A a", "B b", "C c"],
+        }
+    )
+    ident = pd.DataFrame(
+        {
+            "id": [10, 11, 12, 13, 99],  # 99 has a taxon the pool does not know
+            "taxon_id": [1, 1, 2, 3, 8],
+            "level": np.array([2, 2, 1, 0, 2], np.int8),
+            "looks_like": pd.Categorical(["B b", "C c", "A a", None, "A a"]),
+        }
+    )
+    levels = lr.from_identify(ident, pool)
+    assert levels["level"].tolist() == ["taxonomist", "taxonomist", "easy", "none", "taxonomist"]
+    assert levels["taxon_name"].tolist()[:4] == ["A a", "A a", "B b", "C c"]
+    notes, ranges, _ = lr.build(levels, pool, orm)
+    assert notes["range_note"].tolist() == [lr.ONLY_LABEL, lr.BOTH_OUT, None, None, None]
+    assert notes["out_km"].tolist()[:4] == [0, pytest.approx(111, abs=15), 0, 0]
+    assert sorted(ranges["name"]) == ["A a", "B b", "C c"]
