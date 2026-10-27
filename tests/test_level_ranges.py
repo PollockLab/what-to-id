@@ -65,6 +65,10 @@ def test_build_round_trips_notes_ranges_and_grid(tmp_path):
     assert r == {"A a": sorted([a, b]), "B b": sorted([b, c]), "C c": sorted([a, c])}
     assert all(cs.dtype == np.int16 for cs in ranges["cells"])
     assert "Z z" not in r
+    # a known range wholly off the grid stays, empty, so the card still gets its map
+    orm.loc[1, "cells"] = [d]
+    _, ranges, _ = lr.build(levels, pool, orm)
+    assert ranges.set_index("name")["cells"]["B b"].tolist() == []
 
 
 def test_out_km_is_zero_inside_and_the_distance_to_the_nearest_cell_outside():
@@ -93,6 +97,6 @@ def test_out_km_is_zero_inside_and_the_distance_to_the_nearest_cell_outside():
     k = notes["out_km"]
     assert k[0] == 0 and 100 <= k[1] <= 125  # one degree of latitude is about 111 km
     assert k[2] is pd.NA and k[3] is pd.NA  # no point; no known range
-    assert notes["range_note"].isna().all() and set(ranges["name"]) == {
-        "A a"
-    }  # B b lies off the land mask
+    assert notes["range_note"].isna().all()
+    cells = ranges.set_index("name")["cells"]
+    assert len(cells["A a"]) == 1 and len(cells["B b"]) == 0  # B b lies off the land mask
