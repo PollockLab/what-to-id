@@ -1,10 +1,12 @@
 """The levels page: Needs ID records at three levels, one entry from Explore.
 
-    python -m what_to_id.page_levels --out SITE_DIR (--data-url URL | --parquet FILE)
+    python -m what_to_id.page_levels --out SITE_DIR (--data-url URL | --parquet FILE) [--pool FILE]
 
 The atlas manifest at ``--data-url`` may carry ``"levels"`` (``{"name", "built_at", "count"}``)
 naming `levels.parquet` beside it (`levels.LEVEL_COLUMNS`); without it nothing is written.
-``--parquet`` builds from a local file instead.
+``--parquet`` builds from a local file instead. ``--pool`` (a pool parquet with id and taxon_id,
+the map's daily synced pool) keeps only records still Needs ID under the same label, so a record
+identified since the levels were built drops off.
 
 It writes levels.html (every script inlined) and levels-data.bin, gzipped JSON:
 ``levels`` ([key, name, line] per level), ``groups`` (names by records desc), ``taxa`` (names),
@@ -144,7 +146,9 @@ def render(data_url: str, built_at: str = "") -> str:
     return html
 
 
-def build(out: Path, data_url: str | None, parquet: Path | None = None) -> Path | None:
+def build(
+    out: Path, data_url: str | None, parquet: Path | None = None, pool: Path | None = None
+) -> Path | None:
     out.mkdir(parents=True, exist_ok=True)
     built_at = ""
     ranges = grid = None
@@ -178,6 +182,11 @@ def build(out: Path, data_url: str | None, parquet: Path | None = None) -> Path 
             if r.exists() and g.exists():
                 ranges, grid = pd.read_parquet(r), pd.read_parquet(g)
         df = pd.read_parquet(parquet)
+    if pool is not None:
+        live = pd.read_parquet(pool, columns=["id", "taxon_id"])
+        keep = pd.MultiIndex.from_frame(df[["id", "taxon_id"]]).isin(pd.MultiIndex.from_frame(live))
+        print(f"page_levels: {int((~keep).sum())} records no longer Needs ID under their label")
+        df = df[keep].reset_index(drop=True)
     blob = encode(df, built_at, ranges, grid)
     (out / DATA_NAME).write_bytes(blob)
     print(f"page_levels: {DATA_NAME} {len(blob) / 1e6:.2f} MB gzipped, {len(df)} records")
@@ -192,9 +201,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--out", type=Path, required=True, help="site directory")
     p.add_argument("--data-url", help="atlas base URL holding manifest.json")
     p.add_argument("--parquet", type=Path, help="build from this local levels.parquet")
+    p.add_argument("--pool", type=Path, help="keep only records in this pool, same label")
     a = p.parse_args(argv)
     try:
-        target = build(a.out, a.data_url, a.parquet)
+        target = build(a.out, a.data_url, a.parquet, a.pool)
     except (ValueError, OSError) as exc:
         print(f"page_levels: {exc}", file=sys.stderr)
         return 1

@@ -169,3 +169,13 @@ def test_local_parquet_picks_up_the_range_files_beside_it(tmp_path):
     grid.to_parquet(tmp_path / "level-range-cells.parquet")
     out = write(tmp_path)
     assert "grid" in decode((out / "levels-data.bin").read_bytes())
+
+
+def test_pool_drops_records_identified_or_relabelled_since(tmp_path):
+    pq, pool = tmp_path / "levels.parquet", tmp_path / "pool.parquet"
+    levels_frame().to_parquet(pq)
+    # 102 left the pool, 301 was relabelled; the rest are still Needs ID under their label
+    pd.DataFrame({"id": [101, 201, 301, 302, 999], "taxon_id": [1, 1, 8, 9, 1]}).to_parquet(pool)
+    out = tmp_path / "site"
+    assert page_levels.main(["--out", str(out), "--parquet", str(pq), "--pool", str(pool)]) == 0
+    assert decode((out / "levels-data.bin").read_bytes())["id"] == [101, 201, 302]
