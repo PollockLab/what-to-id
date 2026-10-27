@@ -42,7 +42,7 @@ def test_in_view_counts_kept_records_inside_the_box():
 
 @needs_node
 def test_in_view_rounds_the_box_as_the_view_sent_to_identify_is_rounded():
-    assert _counts([-1, -1, 4.99996, 1]) == 2  # the east edge reaches 5 at 1e-4 degrees, so #2 counts
+    assert _counts([-1, -1, 4.99996, 1]) == 2  # east edge rounds to 5: #2 counts
     assert _counts([-1, -1, 4.99994, 1]) == 1
 
 
