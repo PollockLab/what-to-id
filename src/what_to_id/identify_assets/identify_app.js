@@ -94,12 +94,12 @@ function more(){
   if(lis.length)photos(lis);
   if(IO&&!b.hidden){IO.unobserve(b);IO.observe(b);}  // observe again: a tall pane may still show it
 }
-// "Identify these": the listed records of the level, in batches of 200 as the map's button steps through them.
+// "Identify N listed": the listed records of the level, in batches of 200 as the map's button steps through them.
 function batch(){
   var all=view[LV]||[],rows=all.slice(0,IdentifyLinks.MAX_IDS);
   LINKS=rows.length?IdentifyLinks.batches(rows.map(function(i){return P.id[i];})):[];BI=0;
   $('batch').hidden=!rows.length;
-  if(rows.length){$('go').textContent='Identify these '+nf.format(rows.length);  // the tab already holds the level's total
+  if(rows.length){$('go').textContent='Identify '+nf.format(rows.length)+' listed';  // listed, not the level's total on the tab
     $('go').title=rows.length<all.length?'The first '+nf.format(rows.length)+' of '+nf.format(all.length)+' listed, up to '+PER_SPECIES+' per species':'Up to '+PER_SPECIES+' per species';}
   step(0);
 }
