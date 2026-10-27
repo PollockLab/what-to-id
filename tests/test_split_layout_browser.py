@@ -20,9 +20,9 @@ def _page(browser, site, query=VIEW, width=1500):
     return page
 
 
-def _drag(page, i, dx):
+def _drag(page, i, dx, off=0):
     box = page.locator(".sep").nth(i).bounding_box()
-    x, y = box["x"] + box["width"] / 2, box["y"] + 100
+    x, y = box["x"] + box["width"] / 2 + off, box["y"] + 100
     page.mouse.move(x, y)
     page.mouse.down()
     page.mouse.move(x + dx, y, steps=8)
@@ -56,6 +56,14 @@ def test_dragging_a_divider_moves_only_its_two_panes_and_is_remembered(browser, 
     page.reload()
     page.wait_for_function(f"{WIDTHS}.length === 3")
     assert page.evaluate(WIDTHS) == pytest.approx(after, abs=3)
+    page.close()
+
+
+def test_a_divider_can_be_grabbed_beside_its_line(browser, pts, site):
+    page = _page(browser, site)
+    before = page.evaluate(WIDTHS)
+    _drag(page, 0, 40, off=-10)  # over the pane on the left, inside the 23 px target
+    assert page.evaluate(WIDTHS)[0] == pytest.approx(before[0] + 40, abs=3)
     page.close()
 
 
