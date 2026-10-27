@@ -165,6 +165,18 @@ jobs:
       - name: Warn that the look-alike stats failed
         if: steps.lookalike.outcome == 'failure'
         run: echo "::warning::no look-alike stats; the photo-space page ships without them"
+      # pool-levels.bin and pool-levels-looks.bin: every pool record's level from identify.parquet on the
+      # index repo, and identify.html that reads them. The page is written only when the levels were.
+      - name: Add the Identify page
+        continue-on-error: true
+        env:
+          ATLAS_HF_REPO: ${{ vars.ATLAS_HF_REPO }}
+        run: |
+          set -euo pipefail
+          if [ -z "$ATLAS_HF_REPO" ]; then echo "no ATLAS_HF_REPO; no Identify page"; exit 0; fi
+          python -m what_to_id.pool_levels --out _site \
+            --data-url "https://huggingface.co/datasets/${ATLAS_HF_REPO}/resolve/main/"
+          python -m what_to_id.page_identify --out _site
       # confusion.html: per species, the species its photos most often look like, from the small parquet
       # beside the atlas index. The tree card links to it through confusion-taxa.json.
       - name: Add the confused pairs page

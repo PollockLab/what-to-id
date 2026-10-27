@@ -1,0 +1,47 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Identify: What to ID next</title>
+<style>
+__SITE_CSS__
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:560px;margin:0 auto;padding:16px}
+h1{font-size:22px;margin:8px 0}
+h2{font-size:18px;margin:0 0 2px}
+a{color:var(--bar)}
+.muted{color:var(--muted)}
+.lv{margin:24px 0 32px}
+.lv p{margin:4px 0}
+.count{font-size:13px}
+ol{list-style:none;margin:12px 0;padding:0;display:grid;gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px;
+  display:flex;flex-direction:column;gap:6px}
+.card .ph{display:flex;align-items:center;justify-content:center;aspect-ratio:4/3;
+  border-radius:4px;background:var(--chip);color:var(--muted);overflow:hidden}
+.card img{width:100%;height:100%;object-fit:cover;display:block}
+.card .links{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center}
+.card .links .muted{flex:1 1 0;min-width:0;font-size:12px}
+.btn{display:inline-flex;align-items:center;min-height:32px;padding:0 14px;border-radius:16px;
+  background:var(--on);color:var(--onink);font-size:13px;font-weight:650;text-decoration:none}
+.more{font:inherit;color:inherit;cursor:pointer;min-height:36px;padding:0 14px;
+  border:1px solid var(--line);border-radius:6px;background:var(--chip)}
+</style></head><body>
+__SITE_NAV__<main id="main-content">
+<h1>Identify</h1>
+<p>Needs ID records in four groups by how their photo compares with the species they are labelled as,
+so you spend your time where it counts. Records added since the last scoring run have no level yet,
+so they are not listed.</p>
+<p id="status" class="muted" aria-live="polite">Loading…</p>
+<div id="sections"></div>
+</main>
+<script>var IDENTIFY_CONFIG=__CONFIG__;</script>
+<script>__ATLAS_SEARCH_META__</script>
+<script>__MAP_TAXA__</script>
+<script>__MAP_CHIPS__</script>
+<script>__IDENTIFY_LINKS__</script>
+<script>__MAP_AREA__</script>
+<script>__MAP_FILTER__</script>
+<script>__EMBEDDINGS_LAYOUT__</script>
+<script>__SPACE_MASK__</script>
+<script>__IDENTIFY_APP__</script>
+</body></html>

@@ -91,6 +91,22 @@ function join(shards,parts,layoutBbox,mapBbox){
   out.start.push(o);
   return out;
 }
+// Every shard record, shards laid end to end (the order of META.shards and of the files written per shard row):
+// the table join returns, without positions. The Identify page has no layout, so it takes the pool as it is.
+function pool(shards,mapBbox){
+  var total=shards.reduce(function(t,s){return t+s.n;},0),mx=mapBbox[0],my=mapBbox[1],tx=(mapBbox[2]-mx||1)/Q,ty=(mapBbox[3]-my||1)/Q;
+  var out={n:total,id:new Uint32Array(total),lonlat:new Float32Array(2*total),grp:new Uint8Array(total),tax:new Uint16Array(total),
+    obs:new Uint16Array(total),up:new Uint16Array(total),flags:new Uint8Array(total),start:[]};
+  var o=0;
+  shards.forEach(function(s){
+    out.start.push(o);
+    out.id.set(s.id,o);out.grp.set(s.grp,o);out.tax.set(s.tax,o);out.obs.set(s.obs,o);out.up.set(s.up,o);out.flags.set(s.flags,o);
+    for(var r=0;r<s.n;r++){out.lonlat[2*(o+r)]=mx+s.qlon[r]*tx;out.lonlat[2*(o+r)+1]=my+s.qlat[r]*ty;}
+    o+=s.n;
+  });
+  out.start.push(o);
+  return out;
+}
 // Row of an observation id, or -1: ids are sorted inside each shard's rows, not across shards.
 function find(P,id){
   for(var k=0;k+1<P.start.length;k++){
@@ -114,5 +130,5 @@ function fidelity(f){
     Object.keys(f).map(function(k){return f[k];}).find(function(x){return typeof x==='number'&&x>=0&&x<=1;});
   return v===undefined?null:{value:v,k:f.k||12};
 }
-return {gunzip:gunzip,decodePart:decodePart,decodeShard:decodeShard,layoutOnly:layoutOnly,join:join,find:find,parseMapMeta:parseMapMeta,fidelity:fidelity};
+return {gunzip:gunzip,decodePart:decodePart,decodeShard:decodeShard,layoutOnly:layoutOnly,join:join,pool:pool,find:find,parseMapMeta:parseMapMeta,fidelity:fidelity};
 });
