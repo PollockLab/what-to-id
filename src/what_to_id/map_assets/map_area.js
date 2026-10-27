@@ -482,6 +482,6 @@ function MapArea(ctx){
 MapArea.encode=encode;MapArea.decode=decode;MapArea.fromGeoJSON=fromGeoJSON;MapArea.simplify=simplify;
 MapArea.index=index;MapArea.inside=inside;MapArea.order=order;MapArea.batches=batches;
 MapArea.boxed=boxed;MapArea.BOXQ=BOXQ;MapArea.fold=fold;MapArea.entry=entry;MapArea.match=match;
-MapArea.listing=listing;MapArea.n=0;
+MapArea.listing=listing;MapArea.n=0;MapArea.Q=Q;
 return MapArea;
 })();
