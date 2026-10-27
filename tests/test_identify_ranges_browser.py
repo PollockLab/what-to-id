@@ -1,5 +1,5 @@
-"""The Identify page's range maps in Chromium: the chip on each card, its popover map, the outside
-its range chip and Clear matches starting with far records left out. iNaturalist is stubbed."""
+"""The Identify page's range maps in Chromium: the chip on each card, its popover map, the far
+outside segments and Clear matches starting with far records hidden. iNaturalist is stubbed."""
 
 import functools
 import http.server
@@ -110,36 +110,72 @@ def chips(page):
     return sorted(page.locator("#grid .card .links > :not(a)").all_inner_texts())
 
 
-def test_clear_matches_start_with_far_records_left_out_and_the_chip_cycles(browser, site):
+def seg(page):
+    return page.locator("#rout .segb")
+
+
+def picked(page):
+    return page.locator("#rout .segb[aria-checked=true]").inner_text()
+
+
+def test_clear_matches_start_with_far_records_hidden_and_the_segments_filter(browser, site):
     page = opened(browser, site, "#lvl=1")
-    btn = page.locator("#out")
-    assert btn.inner_text() == "Outside its range 1" and "not" in btn.get_attribute("class")
+    assert page.locator("#rout").get_attribute("hidden") is None
+    assert page.locator("#rout [role=radiogroup]").count() == 1
+    assert seg(page).all_inner_texts() == ["All 4", "Hide far outside 3", "Only far outside 1"]
+    assert picked(page) == "Hide far outside 3"
+    assert page.locator(".segnote").inner_text() == (
+        "Far outside: 50 km or more from the labelled species' known range in BC. "
+        "Records with no range map count as in range."
+    )
     assert shown(page, 1) == [0, 1, 3] and page.evaluate("__identify.total()")[1] == 3
-    assert page.locator("#left").inner_text() == "Left out: 1 far outside their range."
     assert chips(page) == ["In range", "Just outside range", "No range map: range unknown"]
     assert "out=" not in page.url
-    btn.click()
-    assert shown(page, 1) == [0, 1, 2, 3] and "out=0" in page.url
-    assert btn.get_attribute("aria-pressed") == "false" and page.locator("#left").inner_text() == ""
+    seg(page).nth(0).click()
+    assert shown(page, 1) == [0, 1, 2, 3] and "out=0" in page.url and picked(page) == "All 4"
     assert chips(page) == [
         "About 1,200 km outside",
         "In range",
         "Just outside range",
         "No range map: range unknown",
     ]
-    btn.click()
-    assert shown(page, 1) == [2] and "out=1" in page.url
-    assert btn.inner_text() == "Outside its range 1" and btn.get_attribute("aria-pressed") == "true"
+    seg(page).nth(2).click()
+    assert shown(page, 1) == [2] and "out=1" in page.url and picked(page) == "Only far outside 1"
     page.reload()
     page.wait_for_function("window.__identify && __identify.ranges()")
-    assert shown(page, 1) == [2]  # kept in the hash
-    btn.click()
+    assert shown(page, 1) == [2] and picked(page) == "Only far outside 1"  # kept in the hash
+    seg(page).nth(1).click()
     assert shown(page, 1) == [0, 1, 3] and "out=" not in page.url
-    page.locator("#tab4").click()  # another level starts with nothing left out
-    assert shown(page, 4) == [8, 9] and btn.inner_text() == "Outside its range 1"
+    page.locator("#tab4").click()  # another level starts at All
+    assert shown(page, 4) == [8, 9] and picked(page) == "All 2"
+    assert seg(page).all_inner_texts() == ["All 2", "Hide far outside 1", "Only far outside 1"]
     assert chips(page) == ["About 80 km outside", "Range map"]
     assert not [w for w in FORBIDDEN if w in page.inner_text("body").lower()]
     assert page.errors == []
+
+
+def test_the_segments_move_with_the_arrow_keys(browser, site):
+    page = opened(browser, site, "#lvl=1")
+    page.locator("#rout .segb[aria-checked=true]").focus()
+    page.keyboard.press("ArrowRight")
+    assert picked(page) == "Only far outside 1" and "out=1" in page.url and shown(page, 1) == [2]
+    assert page.evaluate("document.activeElement.textContent") == "Only far outside 1"
+    page.keyboard.press("ArrowRight")  # wraps
+    assert picked(page) == "All 4" and "out=0" in page.url
+    page.keyboard.press("ArrowLeft")
+    assert picked(page) == "Only far outside 1"
+    page.keyboard.press("Home")
+    assert picked(page) == "All 4"
+    page.keyboard.press("End")
+    assert picked(page) == "Only far outside 1"
+    assert page.errors == []
+
+
+def test_with_nothing_far_outside_only_is_disabled(browser, site):
+    page = opened(browser, site, "#lvl=3")
+    texts = seg(page).all_inner_texts()
+    assert texts[2] == "Only far outside 0" and seg(page).nth(2).is_disabled()
+    assert texts[0].split()[-1] == texts[1].split()[-1] and picked(page).startswith("All ")
 
 
 def test_a_close_call_chip_gives_the_note_and_opens_the_map_by_click_and_keyboard(browser, site):
@@ -149,7 +185,7 @@ def test_a_close_call_chip_gives_the_note_and_opens_the_map_by_click_and_keyboar
         "Fits the look-alike, not the label",
         "No range map: range unknown",
     ]
-    assert page.locator("#out").inner_text() == "Outside its range 2"
+    assert picked(page).startswith("All ") and seg(page).nth(2).inner_text() == "Only far outside 2"
     chip, pop = page.locator(".rchip", has_text="Fits the look-alike"), page.locator("#rpop")
     assert chip.get_attribute("aria-expanded") == "false" and "bad" in chip.get_attribute("class")
     chip.click()

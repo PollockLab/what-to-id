@@ -1,8 +1,8 @@
 // Range maps on the Identify cards (pool-levels-range.bin, format in pool_levels.py). Beside Identify a chip gives the
 // verdict in a few words and opens one shared popover: BC grid cells, label-only / look-alike-only / both, the record.
-// Over the level, the outside-its-range chip as on the map; Clear matches start with records far outside left out.
+// Over the level, the far-outside control (All / Hide / Only) in #rout; Clear matches start with records far outside left out.
 // IdentifyRanges(buf,ctx), ctx {P, name(i) the label, look(i) the look-alike or null, redraw()}. The map's record card
-// takes only the chip and its popover (chip(i,lv)); it has no #out, so no toggle.
+// takes only the chip and its popover (chip(i,lv)); it has no #rout, so no segmented control.
 var IdentifyRanges=(function(){
 'use strict';
 // OUT_KM: a res-4 cell is ~22 km across, so under 50 km is cell-edge noise, not a range outlier.
@@ -28,7 +28,7 @@ return function(buf,ctx){
   if(buf.byteLength!==4+size+2*n)throw new Error('the range file holds '+buf.byteLength+' bytes, expected '+(4+size+2*n));
   var D=JSON.parse(new TextDecoder().decode(new Uint8Array(buf,4,size))),OKM=new Uint8Array(buf,4+size,n),NOTE=new Uint8Array(buf,4+size+n,n),
     RI=new Map(D.names.map(function(x,k){return [x,k];})),memo=[],BOX=null,OUTL=null,
-    S={lv:0,o:0},Q={i:-1,lv:0,chip:null,pin:false,t:0},pop=null;  // S.o: 0 off, 1 only those, -1 those left out
+    S={lv:0,o:0},Q={i:-1,lv:0,chip:null,pin:false,t:0},pop=null;  // S.o: 0 all, 1 only far outside, -1 hide far outside
   // a name's bitset over the grid cells, null when its range is unknown
   function bits(name){
     var k=name==null?undefined:RI.get(name);
@@ -184,7 +184,27 @@ return function(buf,ctx){
     if(S.o!==def(S.lv))t.push('out='+S.o);
     history.replaceState(null,'','#'+t.join('&'));
   }
-  if($('out'))$('out').onclick=function(){S.o=S.o===0?1:S.o>0?-1:0;hash();ctx.redraw();};
+  var OPTS=[[0,'All'],[-1,'Hide far outside'],[1,'Only far outside']],SEG=null;
+  function seg(){
+    var g=$('rout');
+    if(!g)return null;
+    var r=el('div','seg');r.setAttribute('role','radiogroup');r.setAttribute('aria-label','Records far outside their range');
+    OPTS.forEach(function(x){
+      var b=el('button','segb');b.type='button';b.setAttribute('role','radio');
+      b.onclick=function(){S.o=x[0];hash();ctx.redraw();};
+      r.appendChild(b);});
+    r.onkeydown=function(e){
+      var k=['ArrowLeft','ArrowUp','ArrowRight','ArrowDown','Home','End'].indexOf(e.key),
+        all=[].filter.call(r.children,function(b){return !b.disabled;}),at=all.indexOf(document.activeElement);
+      if(k<0||at<0)return;e.preventDefault();
+      var to=k===4?0:k===5?all.length-1:(at+(k%4<2?-1:1)+all.length)%all.length;
+      all[to].focus();all[to].click();
+    };
+    g.append(r,el('span','segnote','Far outside: '+OUT_KM+" km or more from the labelled species' known range in BC. "+
+      'Records with no range map count as in range.'));
+    return r;
+  }
+  SEG=seg();
   return {
     pass:pass,
     // the chip alone, or null when the label's range is unknown; close drops its popover
@@ -203,19 +223,19 @@ return function(buf,ctx){
       else row.appendChild(el('span','range','No range map: range unknown'));
       return row;
     },
-    // the toggle and what it leaves out, over the selected records of the level
+    // the control and its counts, over the selected records of the level
     draw:function(lv,sel,level){
-      var out=0,o=S.o,b=$('out');
-      for(var i=0;i<n;i++)if(sel[i]&&level[i]===lv&&far(i))out++;
+      if(!SEG)return;
+      var f=0,t=0;
+      for(var i=0;i<n;i++)if(sel[i]&&level[i]===lv){t++;if(far(i))f++;}
       closePop(false);
       $('rout').hidden=false;
-      // left out is struck through; the line beside gives what was left out
-      b.className=o<0?'out not':'out';
-      b.textContent='Outside its range '+out.toLocaleString('en');
-      b.title='Click to pick, again to leave out, again to clear.';
-      b.setAttribute('aria-pressed',String(!!o));b.disabled=!out&&!o;
-      b.setAttribute('aria-label',(o<0?'Left out: ':'')+'Outside its range, '+out.toLocaleString('en'));
-      $('left').textContent=o<0&&out?'Left out: '+out.toLocaleString('en')+' far outside their range.':'';
+      var c={0:t,'-1':t-f,1:f};
+      [].forEach.call(SEG.children,function(b,k){
+        var o=OPTS[k][0],on=o===S.o;
+        b.textContent=OPTS[k][1]+' '+c[o].toLocaleString('en');
+        b.setAttribute('aria-checked',String(on));b.tabIndex=on?0:-1;
+        b.disabled=o===1&&!f&&!on;});
     }
   };
 };

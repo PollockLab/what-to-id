@@ -55,12 +55,13 @@ ol{list-style:none;margin:8px 0;padding:0;display:grid;gap:10px;
 .more{font:inherit;color:inherit;cursor:pointer;min-height:36px;padding:0 14px;
   border:1px solid var(--line);border-radius:6px;background:var(--chip)}
 #end{text-align:center;margin:8px 0}
-.rout{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin:6px 0;font-size:12px}
-.out{font:inherit;color:var(--ink);cursor:pointer;min-height:30px;padding:0 12px;border:1px solid var(--line);
-  border-radius:15px;background:var(--chip)}
-.out[aria-pressed=true]{background:var(--on);color:var(--onink);border-color:var(--on)}
-.out.not{background:var(--warnbg);color:var(--warn);border:1px dashed var(--warn)}
-.out:disabled{opacity:.5;cursor:default}
+.rout{margin:6px 0;font-size:12px}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:15px;overflow:hidden}
+.segb{font:inherit;color:var(--ink);cursor:pointer;min-height:30px;padding:0 12px;border:0;background:var(--chip)}
+.segb+.segb{border-left:1px solid var(--line)}
+.segb[aria-checked=true]{background:var(--on);color:var(--onink)}
+.segb:disabled{opacity:.5;cursor:default}
+.segnote{display:block;margin-top:4px;color:var(--muted)}
 .card .links{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
 .card .range{flex:1 1 8em;min-width:0;font-size:12px;color:var(--muted)}
 __IDENTIFY_RANGES_CSS__
@@ -75,7 +76,7 @@ disagree with its label. Records added since the last scoring run also have no l
 <p><button type="button" id="unpick" class="more" hidden>Clear the species filter</button></p>
 <div id="tabs" class="tabs" role="tablist" aria-label="Level"></div>
 <p id="desc" class="muted"></p>
-<p id="rout" class="rout" hidden><button type="button" id="out" class="out"></button><span id="left" class="muted" aria-live="polite"></span></p>
+<div id="rout" class="rout" hidden></div>
 <div id="panel" role="tabpanel">
 <div id="batch" class="batch" hidden><a id="go" class="btn" target="_blank" rel="noopener"></a>
 <button type="button" id="prev" class="arrow" aria-label="Previous batch">‹</button>
