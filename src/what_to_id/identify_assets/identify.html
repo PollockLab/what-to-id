@@ -30,7 +30,7 @@ a{color:var(--bar)}
 #none button{font:inherit;color:var(--ink);background:none;border:0;padding:0;text-decoration:underline;cursor:pointer}
 #desc{margin:6px 0 2px;font-size:12px}
 .batch{display:flex;align-items:center;gap:6px;margin:8px 0}  /* one row: the arrows stay beside the link */
-.batch .muted{font-size:12px}
+#cap{font-size:12px;margin:-4px 0 8px}
 .arrow{font:inherit;min-width:32px;min-height:32px;cursor:pointer;color:var(--ink);
   border:1px solid var(--line);border-radius:6px;background:var(--chip)}
 .arrow:disabled{opacity:.4;cursor:default}
@@ -100,8 +100,8 @@ has fewer than 20 BC records; the pool names no species inside the label, or the
 <div id="panel" role="tabpanel">
 <div id="batch" class="batch" hidden><a id="go" class="btn" target="_blank" rel="noopener"></a>
 <button type="button" id="prev" class="arrow" aria-label="Previous batch">‹</button>
-<span id="step" class="muted"></span>
 <button type="button" id="next" class="arrow" aria-label="Next batch">›</button></div>
+<p id="cap" class="muted" hidden></p>
 <p id="none" class="muted" hidden>No records at this level here.</p>
 <ol id="grid"></ol>
 <p id="end"><button type="button" id="more" class="more" hidden></button></p>

@@ -6,7 +6,7 @@
 'use strict';
 var CFG=IDENTIFY_CONFIG,L=EmbeddingsLayout,Meta=AtlasSearchMeta,PER_SPECIES=3,LIMIT=12,STEPS=16,NO_LOOK=65535,NOTAX=65535,LS='wtid-identify-level',IO=null,T=0;
 var MAP=new URL(CFG.mapUrl,location.href).href,nf=new Intl.NumberFormat('en-CA'),OBS='https://www.inaturalist.org/observations/';
-var META=null,SYNC=null,MORE=new Map(),TAXA=null,P=null,LEVEL=null,Q=null,LOOKS=null,R=null,MF=null,TF=null,PEND=null,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,CACHE=new Map();
+var META=null,SYNC=null,MORE=new Map(),TAXA=null,P=null,LEVEL=null,Q=null,LOOKS=null,R=null,MF=null,TF=null,PEND=null,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,ONE='',CACHE=new Map();
 function $(id){return document.getElementById(id);}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 function status(t){$('status').textContent=t;}
@@ -114,20 +114,23 @@ function more(){
   if(lis.length)photos(lis);
   if(IO&&!b.hidden){IO.unobserve(b);IO.observe(b);}  // observe again: a tall pane may still show it
 }
-// "Identify N listed": the listed records of the level, in batches of 200 as the map's button steps through them.
+// "Identify N listed", or with more than one batch "Identify 200 · batch 2 of 50": the button
+// names the batch it opens, since the arrows change only its link. Batches are newest first.
 function batch(){
-  var all=view[LV]||[],rows=all.slice(0,IdentifyLinks.MAX_IDS);
+  var all=view[LV]||[],rows=all.slice(0,IdentifyLinks.MAX_IDS),capped=rows.length<all.length;
   LINKS=rows.length?IdentifyLinks.batches(rows.map(function(i){return P.id[i];})):[];BI=0;
-  $('batch').hidden=!rows.length;
-  if(rows.length){$('go').textContent=rows.length<all.length?'Identify the first '+nf.format(rows.length)+' of '+nf.format(all.length):'Identify '+nf.format(rows.length)+' listed';  // listed, not the level's total on the tab
-    $('go').title=rows.length<all.length?'The first '+nf.format(rows.length)+' of '+nf.format(all.length)+' listed, up to '+PER_SPECIES+' per species':'Up to '+PER_SPECIES+' per species';}
+  $('batch').hidden=!rows.length;$('cap').hidden=LINKS.length<2;
+  ONE=capped?'Identify the first '+nf.format(rows.length)+' of '+nf.format(all.length):'Identify '+nf.format(rows.length)+' listed';
+  $('cap').textContent=(capped?'The first '+nf.format(rows.length)+' of '+nf.format(all.length):nf.format(rows.length))+
+    ' listed, newest first, '+IdentifyLinks.BATCH+' per batch';
+  $('go').title='Up to '+PER_SPECIES+' per species';
   step(0);
 }
 function step(d){
   BI=Math.max(0,Math.min(LINKS.length-1,BI+d));
-  if(LINKS.length)$('go').href=LINKS[BI].url;
-  $('step').textContent=LINKS.length>1?(BI+1)+'/'+LINKS.length:'';$('step').title='Batch '+(BI+1)+' of '+LINKS.length;
-  $('step').hidden=$('prev').hidden=$('next').hidden=LINKS.length<2;
+  var b=LINKS[BI];
+  if(b){$('go').href=b.url;$('go').textContent=LINKS.length>1?'Identify '+nf.format(b.n)+' · batch '+(BI+1)+' of '+LINKS.length:ONE;}
+  $('prev').hidden=$('next').hidden=LINKS.length<2;
   $('prev').disabled=BI===0;$('next').disabled=BI>=LINKS.length-1;
 }
 // Draws the chosen level from its first card.
