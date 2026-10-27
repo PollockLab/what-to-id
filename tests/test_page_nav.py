@@ -27,11 +27,11 @@ def test_the_pages_inside_explore_mark_explore(current):
     html = nav(current)
     assert html.count('aria-current="page"') == 1
     assert re.search(r'href="explore.html" aria-current="page"', html)
-    assert "Photo space<" not in html and ">Map<" not in html and ">Tree of life<" not in html
+    assert "Photo space<" not in html and ">Map<" not in html and ">Taxonomy<" not in html
 
 
 def test_the_tabs_are_explore_look_alikes_study_and_blitz():
-    assert [label for _, label in PAGES] == ["Explore", "Look-alikes", "Study"]
+    assert [label for _, label in PAGES] == ["Explore", "Confused pairs", "Study"]
     assert "levels.html" not in nav("study.html") and ">Where to Blitz" in nav("study.html")
 
 

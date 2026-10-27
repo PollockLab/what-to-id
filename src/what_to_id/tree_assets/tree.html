@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Tree of life</title>
+<title>Taxonomy</title>
 <script>if(/[?&]embed=1/.test(location.search))document.documentElement.classList.add('embed');</script>
 <style>
 __SITE_CSS__
@@ -14,6 +14,8 @@ body{display:grid;grid-template-columns:340px minmax(0,1fr);grid-template-rows:a
 .embed body{grid-template-columns:300px minmax(0,1fr)}
 header{grid-area:head;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:8px 12px;border-bottom:1px solid var(--line)}
 h1{font-size:16px;margin:0}
+.sub{flex-basis:100%;color:var(--muted);font-size:12px;margin:0}
+.embed .sub{display:none}
 .embed h1{display:none}
 button,.btn{font:inherit;font-size:12px;border:1px solid var(--line);background:var(--chip);color:var(--ink);padding:4px 10px;
   border-radius:14px;cursor:pointer;text-decoration:none;display:inline-block;min-height:28px}
@@ -106,7 +108,8 @@ button[aria-pressed="true"],.btn.primary{background:var(--on);color:var(--onink)
 </head>
 <body>
 __SITE_NAV__<header>
-<h1>Tree of life</h1>
+<h1>Taxonomy</h1>
+<p class="sub">What the records are, counted on iNaturalist's tree at the taxon their community ID has reached.</p>
 <div class="picker"><label for="q" class="vh">Find a taxon</label>
 <input id="q" type="search" placeholder="Find a taxon, e.g. Carex" autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="sugg">
 <ul id="sugg" class="sugg" role="listbox" aria-label="Matching taxa" hidden></ul></div>
@@ -120,7 +123,7 @@ __SITE_NAV__<header>
 <nav id="crumbs" aria-label="Focus"></nav>
 <p id="about" hidden>Every observation in BC that still needs an ID, counted at the taxon its community ID has reached and rolled up iNaturalist's taxonomy. The rings are taxonomic ranks, not time: this is not a dated phylogeny. A filled dot means every record stops at that taxon; a part-filled one, the share that does. Branches share the circle by the square root of their records, so small clades stay in sight: an angle is not a share. The outline's percentages, and the bars under them, are each taxon's plain share of all records that need an ID. Bars outside the tips show the records below each tip, on a log scale. Click to select a taxon (the tree stays put and its branch stands out), double-click or the card's Open to open or close it, shift+click or Open more below to open further down, Focus here to make it the centre, Esc to clear.</p>
 </header>
-<section id="side" aria-label="Outline"><ul id="outline" role="tree" aria-label="Tree of life"></ul></section>
+<section id="side" aria-label="Outline"><ul id="outline" role="tree" aria-label="Taxonomy"></ul></section>
 <main id="radial" tabindex="-1"><svg id="svg" role="img" aria-label="Radial tree of the taxa that need an ID; the outline holds the same tree"></svg></main>
 <aside id="card" class="card" hidden aria-label="Selected taxon"></aside>
 <script>var CFG=__TREE_CONFIG__;</script>

@@ -109,7 +109,7 @@ button[hidden]{display:none}
 <body>
 __SITE_NAV__<header>
 <h1>Photo space <button type="button" class="info" id="hinfo" aria-expanded="false" aria-controls="honest" aria-label="About this picture">i</button></h1>
-<p class="sub" id="intro">Every observation that still needs an ID, placed so that photos the model finds alike sit near each other. Hover a dot for its name, click it for the photo and its closest matches. Shift+drag to keep only the dots inside a lasso.</p>
+<p class="sub" id="intro">Every photo placed so that photos the model finds alike sit together. Distance is not confidence. Hover a dot for its name, click it for the photo and its closest matches. Shift+drag to keep only the dots inside a lasso.</p>
 <p class="note" id="honest">This flat picture is a lossy squeeze of a much richer image space, so some points that look close are not, and some close photos land apart. <span id="fid"></span> Nearness is not identification confidence: it says two photos look alike to the model, not what either one is. The matches in the card are computed in the full space, not read off this plot.</p>
 </header>
 <section class="side" aria-label="Filters">
@@ -128,7 +128,7 @@ __SITE_NAV__<header>
 </section>
 <main id="plot" role="application" aria-label="Photo space of observations"></main>
 <div id="lifebar" class="lifebar" role="group" aria-label="How the photo space is drawn" hidden>
-<span class="seg" id="lmodes"><button type="button" id="vclade" aria-pressed="false">Clades</button><button type="button" id="vlook" aria-pressed="false">Look-alikes</button></span>
+<span class="seg" id="lmodes"><button type="button" id="vclade" aria-pressed="false">Clades</button><button type="button" id="vlook" aria-pressed="false">Nearest photos</button></span>
 <b id="lwhere"></b> <button type="button" id="lonly" hidden>Show only</button>
 <span id="llegend" class="llg" hidden></span>
 <span id="lnote" class="muted"></span>

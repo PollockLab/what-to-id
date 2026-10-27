@@ -21,11 +21,11 @@ function press(id,v){$(id).setAttribute('aria-pressed',v?'true':'false');}
 function bar(){
   press('vclade',mode==='life');press('vlook',mode==='look');
   $('vlook').disabled=look===null;
-  $('vlook').title=look===null?'This map has no look-alike file yet':'';
+  $('vlook').title=look===null?'This map has no nearest-photos file yet':'';
   $('lwhere').textContent=row>=0?name(row):'All life';
   $('lonly').hidden=row<0;
   if(row>=0)$('lonly').title='Keep only the records of '+S.TAXA[row][0];
-  $('lnote').textContent=look===null?'No look-alike file for this map.':'';
+  $('lnote').textContent=look===null?'No nearest-photos file for this map.':'';
   var lg=$('llegend');lg.hidden=mode!=='look';
   if(mode==='look'&&!lg.childNodes.length){LM.LEVELS.slice(0,4).forEach(function(t,v){
     var i=document.createElement('i'),c=LM.RAMP[Math.round(v/3*(LM.RAMP.length-1))];

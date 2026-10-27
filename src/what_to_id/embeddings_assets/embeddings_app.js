@@ -429,7 +429,7 @@ function select(i,fly){
     hits.forEach(function(h,k){score[h.id]=h.score;rank[h.id]=k+1;});
     if(res.notNeedsId)left.push(res.notNeedsId+' no longer need an ID');
     if(res.missing)left.push(res.missing+' no longer on iNaturalist');
-    nbNote.textContent=(left.length?'Left out: '+left.join(', ')+'. ':'')+'1 = most similar. Numbers match the map markers.';
+    nbNote.textContent=(left.length?'Left out: '+left.join(', ')+'. ':'')+'1 = most alike. Numbers match the map markers.';
     res.cards.forEach(function(c){
       var label=(c.common||c.name||'Unidentified'),row=L.find(S.P,c.id);
       var img=c.photo?el('img',{src:c.photo,alt:label,loading:'lazy'}):label;

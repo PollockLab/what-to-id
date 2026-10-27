@@ -9,15 +9,16 @@ from __future__ import annotations
 
 from html import escape
 
-# (file, label), one tab per job: Explore, Look-alikes (confusion.html), with the study last.
+# (file, label), one tab per job: Explore, Confused pairs (confusion.html), with the study last.
 # Explore is explore.html: Identify, the map, the photo space and the tree side by side; the pages
 # map.html, embeddings.html, tree.html and search.html keep their URLs and mark Explore as
 # current, as Explore's panes and its search box hold them. Without explore.html (a site built
-# without the photo space) the Explore tab falls back to the map. Look-alikes exists only when the
-# atlas manifest lists its table. The brand links to index.html, a copy of the landing page.
+# without the photo space) the Explore tab falls back to the map. Confused pairs exists only
+# when the atlas manifest lists its table. The brand links to index.html, a copy of the landing
+# page.
 PAGES = (
     ("explore.html", "Explore"),
-    ("confusion.html", "Look-alikes"),
+    ("confusion.html", "Confused pairs"),
     ("study.html", "Study"),
 )
 OPTIONAL = {"confusion.html"}
@@ -66,7 +67,7 @@ white-space:nowrap}
 
 # Points the switcher at what is open. Reads the hash the pages already write: the map keeps
 # record= and at=zoom/lat/lon, the photo pages keep id=; the selection (groups, taxa, dates) goes
-# to the map and the photo space as written. One group (g= on Look-alikes, a lone picked
+# to the map and the photo space as written. One group (g= on Confused pairs, a lone picked
 # groups= on Explore) travels between the two. Rewrites on hover, focus, touch and click
 # because history.replaceState fires no event.
 JS = """

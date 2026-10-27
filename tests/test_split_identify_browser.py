@@ -88,8 +88,8 @@ def test_the_default_view_is_identify_beside_the_map_and_the_switch_lists_four_p
     assert page.locator("#xbar .seg button").all_inner_texts() == [
         "Identify",
         "Map",
-        "Photos",
-        "Tree",
+        "Photo space",
+        "Taxonomy",
     ]
     assert page.locator("[data-p=identify]").get_attribute("aria-pressed") == "true"
     assert page.locator("[data-p=space]").get_attribute("aria-pressed") == "false"

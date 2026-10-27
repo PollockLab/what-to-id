@@ -276,7 +276,7 @@ def test_without_the_file_the_map_still_draws_and_look_alikes_is_off(open_page):
     page = open_page("#life=look", missing=True)
     assert "life=look" not in drawn(page)
     assert page.locator("#vlook").is_disabled()
-    assert "No look-alike file" in page.locator("#lnote").inner_text()
+    assert "No nearest-photos file" in page.locator("#lnote").inner_text()
     text = hover(page, 30, -5)
     assert text.startswith("Aves (Birds)") and "photo neighbours" not in text
 
