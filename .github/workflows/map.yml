@@ -131,6 +131,7 @@ jobs:
       - name: Build the site
         env:
           DAILY_ENABLED: ${{ vars.DAILY_ENABLED }}
+          ATLAS_HF_REPO: ${{ vars.ATLAS_HF_REPO }}
         run: |
           set -euo pipefail
           mkdir -p _site
@@ -139,9 +140,12 @@ jobs:
           if [ "$DAILY_ENABLED" = true ]; then
             gh release download pool-state -p study.html -D _site --clobber
           fi
+          # the record card's closest matches read the atlas index, when there is one
+          atlas=()
+          if [ -n "$ATLAS_HF_REPO" ]; then atlas=(--data-url "https://huggingface.co/datasets/${ATLAS_HF_REPO}/resolve/main/"); fi
           python -m what_to_id.page_map --pool state/pool.parquet --out _site --totals --freeze "$(date -u +%F)" \
             --tree state/taxonomy.json \
-            --projects state/projects.bin
+            --projects state/projects.bin "${atlas[@]}"
           # the tree of life needs the taxon tree; without it the site ships without the Tree tab
           python -m what_to_id.tree_page --out _site || echo "::warning::no tree of life page; the map was built without its taxon tree"
           if find _site -type f ! -name '*.html' ! -name 'pool*.bin' ! -name bc-parks.bin | grep -q .; then

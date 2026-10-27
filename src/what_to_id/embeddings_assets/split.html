@@ -199,7 +199,7 @@ addEventListener('message',function(e){
   var n=Object.keys(frames).filter(function(k){return frames[k].contentWindow===e.source;})[0],d=e.data;
   if(!n||e.origin!==location.origin||!d||RELAY.indexOf(d.type)<0||d.type==='wtid-view'&&!visible(n))return;
   if(d.type==='wtid-counts'){cnt[n]=d;if(n===src&&visible('tree'))post('tree',d);return;}
-  if(d.type==='wtid-record'){if(d.id===rec)return;rec=d.id;delete late['wtid-matches'];}
+  if(d.type==='wtid-record'){if(d.id===rec&&n!=='identify')return;rec=d.id;delete late['wtid-matches'];d=Object.assign({from:n},d);}  // the map opens a card only for Identify's pick
   else if(d.type!=='wtid-focus'&&d.type!=='wtid-reset')late[d.type]=d;
   Object.keys(frames).forEach(function(o){if(o!==n&&visible(o))post(o,d);});
 });

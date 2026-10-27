@@ -339,23 +339,27 @@ function place(){
   s.right='auto';s.left=Math.max(m,left)+'px';
   s.top=Math.max(m,Math.min(y-h/2,innerHeight-m-h))+'px';
 }
-function closeCard(){SEL=-1;NBR=[];card.hidden=true;if(ctl)ctl.abort();
+function closeCard(){SEL=-1;NBR=[];card.hidden=true;if(ctl)ctl.abort();MC.hide();
   if(GONE_NEW){GONE_NEW=false;refilter();}else{layers();writeHash();}
   tell(null);}
 // The split view mirrors the picked record in the photo space by id. A record picked there is ringed
 // here without a card, and the map pans to it only when it is off screen.
 function tell(id){if(parent!==window)parent.postMessage({type:'wtid-record',id:id},location.origin);}
-function mark(i){
-  SEL=i;NBR=[];card.hidden=true;if(ctl)ctl.abort();layers();
-  var c=[P.pos[2*i],P.pos[2*i+1]];if(!map.getBounds().contains(c))map.easeTo({center:c});
+function reveal(i){var c=[P.pos[2*i],P.pos[2*i+1]];if(!map.getBounds().contains(c))map.easeTo({center:c});}
+function mark(i){SEL=i;NBR=[];card.hidden=true;if(ctl)ctl.abort();MC.hide();layers();reveal(i);}
+// The closest matches of the open record, as ids best first, get their numbered dots (those on the map).
+function nbrs(ids){
+  var rank={};ids.forEach(function(d,k){rank[d]=k+1;});
+  NBR=[];for(var i=0;i<P.n;i++)if(rank[P.id[i]])NBR.push({i:i,r:rank[P.id[i]]});
+  layers();
 }
+function go(id){var i=P.id.indexOf(id);if(i<0)return false;reveal(i);openCard(i);return true;}
+var MC=MapCard({META:META,P:function(){return P;},TAXA:function(){return TAXA;},NOTAX:NOTAX,nbr:nbrs,go:go,place:place});
 // The photo space sends the closest matches of the picked record; those that are on the map get a ring.
 addEventListener('message',function(e){
   if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-matches'||SEL<0||
     e.data.id!==P.id[SEL])return;
-  var rank={};e.data.hits.forEach(function(h,k){rank[h.id]=k+1;});
-  NBR=[];for(var i=0;i<P.n;i++)if(rank[P.id[i]])NBR.push({i:i,r:rank[P.id[i]]});
-  layers();
+  nbrs(e.data.hits.map(function(h){return h.id;}));
 });
 // Hovering a tile in the photo space brings its match into view; nothing else changes.
 addEventListener('message',function(e){
@@ -378,10 +382,10 @@ addEventListener('message',function(e){
 });
 addEventListener('message',function(e){
   if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-record')return;
-  var id=e.data.id;
-  if(id==null){S.rec=S.mark=null;if(SEL>=0){SEL=-1;NBR=[];card.hidden=true;if(ctl)ctl.abort();layers();}return;}
-  for(var i=0;i<P.n;i++)if(P.id[i]===id){if(i!==SEL)mark(i);return;}
-  S.rec=id;S.fly=false;S.mark=true;  // the shards that hold it have not loaded yet
+  var id=e.data.id,i,idf=e.data.from==='identify';  // an Identify card opens the record's card; a photo space pick rings it
+  if(id==null){S.rec=S.mark=null;if(SEL>=0){SEL=-1;NBR=[];card.hidden=true;if(ctl)ctl.abort();MC.hide();layers();}return;}
+  if((i=P.id.indexOf(id))>=0){if(idf){reveal(i);if(i!==SEL||card.hidden)openCard(i);}else if(i!==SEL)mark(i);return;}
+  S.rec=id;S.fly=false;S.mark=!idf;  // the shards that hold it have not loaded yet
 });
 function openCard(i){
   SEL=i;NBR=[];tell(P.id[i]);var t=names(i),id=P.id[i],lag=P.obs[i]!==NO&&P.up[i]!==NO&&!(P.fl[i]&(FLAG.earlyObs|FLAG.earlyUp))?P.up[i]-P.obs[i]:null;
@@ -392,12 +396,12 @@ function openCard(i){
     '<dt>Group</dt><dd>'+esc(t.group)+'</dd><dt>Observed</dt><dd>'+when(P.obs[i],P.fl[i]&FLAG.earlyObs)+'</dd>'+
     '<dt>Uploaded</dt><dd>'+when(P.up[i],P.fl[i]&FLAG.earlyUp)+(lag>0?' ('+nf.format(lag)+(lag===1?' day':' days')+
     ' later)':'')+'</dd><dt>IDs</dt><dd>'+idText(i)+'</dd><dt>Place</dt><dd id="place">…</dd></dl>'+
-    '<div id="now"></div><a class="btn" target="_blank" rel="noopener" '+
+    '<div id="rng"></div><div id="now"></div><div id="nbrs" hidden></div><a class="btn" target="_blank" rel="noopener" '+
     'href="https://www.inaturalist.org/observations/'+id+'">Help identify on iNaturalist</a>'+
     '<p class="attr" id="attr"></p></div>';
   card.hidden=false;card.querySelector('.x').onclick=closeCard;card.querySelector('.x').focus();
   place();
-  layers();writeHash();
+  layers();writeHash();MC.show(i);
   if(ctl)ctl.abort();ctl=new AbortController();
   fetch('https://api.inaturalist.org/v1/observations/'+id,{signal:ctl.signal})
     .then(function(r){if(r.status===404)return {results:[]};
@@ -424,7 +428,7 @@ function openCard(i){
     }).catch(function(e){if(e.name==='AbortError')return;
       $('ph').textContent='Could not load the photo';$('place').textContent='Unknown';});
 }
-addEventListener('keydown',function(e){if(e.key==='Escape'&&!card.hidden)closeCard();});
+addEventListener('keydown',function(e){if(e.key==='Escape'&&!card.hidden&&!($('rpop')&&!$('rpop').hidden))closeCard();});  // Escape first closes a range map
 
 // Map, then data: names and the recent shard first, older shards after.
 var b=META.bbox,opts={container:'map',style:dark?BASEMAPS.dark:BASEMAPS.light,
@@ -478,6 +482,8 @@ META.shards.forEach(function(s,k){
     if(S.rec&&SEL<0){for(var i=0;i<P.n;i++)if(P.id[i]===S.rec){S.rec=null;if(S.mark){S.mark=false;mark(i);break;}openCard(i);
       if(S.fly){S.fly=false;map.flyTo({center:[P.pos[2*i],P.pos[2*i+1]],zoom:12});}break;}}
     if(k===META.shards.length-1&&S.rec){S.rec=null;writeHash();}
+    // the range chip's file is optional, and holds one record per shard record, so it waits for the last shard
+    if(k===META.shards.length-1)get('pool-levels-range.bin?'+String(META.shards[0].file).split('?')[1]).then(MC.range).catch(function(){});
   });
 });
 chain.catch(function(e){$('count').textContent='Could not load the records ('+e.message+')';});

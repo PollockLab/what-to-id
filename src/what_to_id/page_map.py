@@ -92,13 +92,22 @@ TOTAL_ONLY = {
     **{f"acc_{m}": {"acc_below": m + 1, "obscuration": "none"} for m in ACC_M},
 }
 _COLS = ("id", "lat", "lon", "observed_on", "created_at", "iconic_taxon")
-_ASSETS = files("what_to_id") / "map_assets"
+_PKG = files("what_to_id")
+_ASSETS = _PKG / "map_assets"
 # Inlined in this order; map_taxa.js and map_area.js define the taxon and area filters map.js calls,
 # map_step.js the Identify button that steps through an area's batches, map_projects.js the
 # project filter, map_chips.js the click rule for the short-list chips and the selection bar, and
 # map_filter.js the filter state and the category values the GPU filter reads, filter_bar.js the
-# histograms, chips and selection bar.
+# histograms, chips and selection bar, and map_card.js the card's matches and range chip.
 MAP_CSS = ("map.css", "map_select.css", "map_area.css")
+# The record card's closest matches (the atlas index reader and the iNaturalist photo lookup of the
+# search page) and range chip (the Identify page's range module), by path under the package.
+SHARED_JS = (
+    "atlas_search_assets/atlas_search_index.js",
+    "atlas_search_assets/atlas_search_meta.js",
+    "identify_assets/identify_ranges.js",
+)
+SHARED_CSS = ("identify_assets/identify_ranges.css",)
 MAP_JS = (
     "identify_links.js",
     "map_taxa.js",
@@ -108,6 +117,7 @@ MAP_JS = (
     "map_chips.js",
     "map_filter.js",
     "filter_bar.js",
+    "map_card.js",
     "map.js",
 )
 
@@ -406,8 +416,11 @@ def over_totals(pool: pd.DataFrame, meta: dict) -> int:
     return over
 
 
-def render_map(meta: dict, *, freeze: str | None) -> str:
-    """The map page. META goes inline; the points and names come from the files at load."""
+def render_map(meta: dict, *, freeze: str | None, data_url: str | None = None) -> str:
+    """The map page. META goes inline; the points and names come from the files at load.
+
+    ``data_url`` is the atlas index the record card's closest matches come from; without it the
+    card has none."""
     when = ""
     if freeze:
         f = escape(freeze)
@@ -420,6 +433,7 @@ def render_map(meta: dict, *, freeze: str | None) -> str:
         "place_id": BC_PLACE_ID,
         "max_url": MAX_URL_LEN,
         "parks": f"{PARKS_NAME}?v={parks_version(parks_blob())}",
+        **({"data_url": data_url} if data_url else {}),
     }
     fill = {
         "TITLE": "Records that need an ID in BC",
@@ -428,11 +442,11 @@ def render_map(meta: dict, *, freeze: str | None) -> str:
         "MAPLIBRE_CSS": MAPLIBRE_CSS,
         "MAPLIBRE_JS": MAPLIBRE_JS,
         "DECK_JS": DECK_JS,
-        "CSS": page_nav.CSS + "\n" + _assets(MAP_CSS),
+        "CSS": "\n".join((page_nav.CSS, _assets(MAP_CSS), _assets(SHARED_CSS, _PKG))),
         "NAV": page_nav.nav("map.html"),
         "META": json.dumps(page_meta, sort_keys=True, separators=(",", ":")).replace("</", "<\\/"),
         "BASEMAPS": json.dumps(BASEMAPS, sort_keys=True),
-        "JS": _assets(MAP_JS),
+        "JS": _assets(SHARED_JS, _PKG) + "\n" + _assets(MAP_JS),
     }
     html = (_ASSETS / "map.html").read_text()
     for key, value in fill.items():
@@ -440,8 +454,8 @@ def render_map(meta: dict, *, freeze: str | None) -> str:
     return html
 
 
-def _assets(names: tuple[str, ...]) -> str:
-    return "\n".join((_ASSETS / n).read_text() for n in names)
+def _assets(names: tuple[str, ...], base=_ASSETS) -> str:
+    return "\n".join((base / n).read_text() for n in names)
 
 
 def write_map(
@@ -452,6 +466,7 @@ def write_map(
     totals: dict | None = None,
     tree: dict | None = None,
     projects: Path | None = None,
+    data_url: str | None = None,
 ) -> list[Path]:
     """Write map.html and its data; totals from fetch_totals, projects from map_projects."""
     out = Path(out_dir)
@@ -465,7 +480,7 @@ def write_map(
         if over:
             _warn(f"{over} group-months hold more records than their totals; the page caps them")
     add_projects(blobs, meta, projects)
-    html = render_map(meta, freeze=freeze)
+    html = render_map(meta, freeze=freeze, data_url=data_url)
     low = html.lower()
     for w in ARM_WORDS:
         if w in low:
@@ -505,6 +520,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     ap.add_argument("--tree", type=Path, help="taxon tree cache from what_to_id.taxonomy")
     ap.add_argument("--projects", type=Path, help="pool-projects.bin, from map_projects")
+    ap.add_argument(
+        "--data-url", help="atlas index base URL, for the record card's closest matches"
+    )
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     pool = pd.read_parquet(a.pool)
@@ -520,7 +538,13 @@ def main(argv: list[str] | None = None) -> int:
         except (requests.RequestException, KeyError, ValueError) as e:
             _warn(f"could not fetch the all-record totals, building the map without them: {e}")
     for path in write_map(
-        a.out, pool, freeze=a.freeze, totals=totals, tree=tree, projects=a.projects
+        a.out,
+        pool,
+        freeze=a.freeze,
+        totals=totals,
+        tree=tree,
+        projects=a.projects,
+        data_url=a.data_url,
     ):
         logging.getLogger("what_to_id").info("wrote %s (%d bytes)", path, path.stat().st_size)
     return 0

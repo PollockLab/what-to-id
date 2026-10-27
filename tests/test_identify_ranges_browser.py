@@ -36,11 +36,9 @@ ROWS = [
 N = len(ROWS)
 
 
-@pytest.fixture(scope="module")
-def site(tmp_path_factory):
+def write_site(root):
     """Two cells, west and east of 123 W; record 4 sits in the east one."""
     pytest.importorskip("pyarrow")
-    root = tmp_path_factory.mktemp("identify-ranges-site")
     pool = pool_frame(np.arange(1, N + 1) * 1000)
     pool.loc[4, ["lat", "lon"]] = [49.0, -122.5]
     blobs, meta = encode_points(pool, TREE)
@@ -83,6 +81,12 @@ def site(tmp_path_factory):
     ).to_parquet(rd / "range-notes.parquet")
     pool_levels.build(root, parquet=root / "identify.parquet", ranges=rd)
     page_identify.build(root)
+
+
+@pytest.fixture(scope="module")
+def site(tmp_path_factory):
+    root = tmp_path_factory.mktemp("identify-ranges-site")
+    write_site(root)
     server = http.server.ThreadingHTTPServer(
         ("127.0.0.1", 0), functools.partial(ib.Quiet, directory=str(root))
     )

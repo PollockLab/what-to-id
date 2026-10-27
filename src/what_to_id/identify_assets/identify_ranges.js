@@ -1,7 +1,8 @@
 // Range maps on the Identify cards (pool-levels-range.bin, format in pool_levels.py). Beside Identify a chip gives the
 // verdict in a few words and opens one shared popover: BC grid cells, label-only / look-alike-only / both, the record.
 // Over the level, the outside-its-range chip as on the map; Clear matches start with records far outside left out.
-// IdentifyRanges(buf,ctx), ctx {P, name(i) the label, look(i) the look-alike or null, redraw()}.
+// IdentifyRanges(buf,ctx), ctx {P, name(i) the label, look(i) the look-alike or null, redraw()}. The map's record card
+// takes only the chip and its popover (chip(i,lv)); it has no #out, so no toggle.
 var IdentifyRanges=(function(){
 'use strict';
 // OUT_KM: a res-4 cell is ~22 km across, so under 50 km is cell-edge noise, not a range outlier.
@@ -183,9 +184,12 @@ return function(buf,ctx){
     if(S.o!==def(S.lv))t.push('out='+S.o);
     history.replaceState(null,'','#'+t.join('&'));
   }
-  $('out').onclick=function(){S.o=S.o===0?1:S.o>0?-1:0;hash();ctx.redraw();};
+  if($('out'))$('out').onclick=function(){S.o=S.o===0?1:S.o>0?-1:0;hash();ctx.redraw();};
   return {
     pass:pass,
+    // the chip alone, or null when the label's range is unknown; close drops its popover
+    chip:function(i,lv){return bits(ctx.name(i))?chip(i,lv):null;},
+    close:function(){closePop(false);},
     // the chosen level, with the toggle out of the hash on load and at the level's default after
     level:function(lv,fromHash){
       var m=fromHash&&/(?:^|&)out=(-1|0|1)(?:&|$)/.exec(location.hash.slice(1));
