@@ -10,10 +10,11 @@ var D=null,S=fresh(),pairShown=LIMIT,cardShown=LIMIT,view=[],skip=new Set(),
   focus=-1,seen=new Set();
 try{seen=new Set(JSON.parse(localStorage.getItem(SEEN_KEY)||'[]'));}catch(e){}
 
-function fresh(){return {g:-1,q:'',t:-1,l:-1,s:'',d:1,lo:0,hi:100};}
-// sort keys: '' keeps the data order; d is 1 ascending, -1 descending
-var SORTS={'':'Default order',pct:'Share of its photos',n:'Photos',lab:'Labelled name',
-  look:'Look-alike name'};
+function fresh(){return {g:-1,q:'',t:-1,l:-1,s:'n',d:-1,lo:0,hi:100};}
+// d is 1 ascending, -1 descending; numbers start high to low, names A to Z
+var SORTS={n:'Most photos',pct:'Share of its photos that look like the other species',
+  lab:'Labelled name',look:'Look-alike name'};
+function dflt(s){return s==='lab'||s==='look'?1:-1;}
 Object.keys(SORTS).forEach(function(k){var o=document.createElement('option');o.value=k;
   o.textContent=SORTS[k];document.getElementById('sort').appendChild(o);});
 function pct(p){return Math.round(100*p[2]/p[3]);}
@@ -57,8 +58,10 @@ function readHash(){
   var h=new URLSearchParams(location.hash.slice(1)),g=h.get('g');
   if(g)S.g=D.head.groups.findIndex(function(x){return x[0]===g;});
   S.q=h.get('q')||'';
-  if(SORTS[h.get('sort')]&&h.get('sort'))S.s=h.get('sort');
+  if(SORTS[h.get('sort')])S.s=h.get('sort');
+  S.d=dflt(S.s);
   if(h.get('dir')==='desc')S.d=-1;
+  if(h.get('dir')==='asc')S.d=1;
   var lo=parseInt(h.get('min'),10),hi=parseInt(h.get('max'),10);
   if(lo>=0&&lo<=100)S.lo=lo;
   if(hi>=0&&hi<=100)S.hi=hi;
@@ -69,8 +72,8 @@ function writeHash(){
   var h=[],e=encodeURIComponent;
   if(S.g>=0)h.push('g='+e(groupName(S.g)));
   if(S.q)h.push('q='+e(S.q));
-  if(S.s)h.push('sort='+S.s);
-  if(S.d<0)h.push('dir=desc');
+  if(S.s!=='n')h.push('sort='+S.s);
+  if(S.d!==dflt(S.s))h.push('dir='+(S.d<0?'desc':'asc'));
   if(S.lo>0)h.push('min='+S.lo);
   if(S.hi<100)h.push('max='+S.hi);
   if(S.t>=0)h.push('t='+e(key(D.taxa[S.t])));
@@ -95,7 +98,6 @@ function pairsNow(){
     if(S.g>=0&&D.taxa[p[0]][2]!==S.g)return;
     if(q&&D.lower[p[0]].indexOf(q)<0&&D.lower[p[1]].indexOf(q)<0)return;
     var c=pct(p);if(c<S.lo||c>S.hi)return;out.push(k);});
-  if(!S.s)return S.d<0?out.reverse():out;
   var P=D.pairs,nm=function(k,i){return D.taxa[P[k][i]][1];},
     v={pct:function(k){return pct(P[k]);},n:function(k){return P[k][2];}}[S.s];
   return out.sort(function(a,b){
@@ -226,7 +228,7 @@ $('cards').addEventListener('focusin',function(e){
   var c=e.target.closest('.card');if(c)focus=+c.dataset.j;});
 $('q').addEventListener('input',function(e){
   S.q=e.target.value.trim();pairShown=LIMIT;suggest(S.q);drawPairs();writeHash();});
-$('sort').addEventListener('change',function(e){S.s=e.target.value;pairShown=LIMIT;update();});
+$('sort').addEventListener('change',function(e){S.s=e.target.value;S.d=dflt(S.s);pairShown=LIMIT;update();});
 $('dir').addEventListener('click',function(){S.d=-S.d;pairShown=LIMIT;update();});
 // a blank or out-of-range box keeps the bound it had; the other box is never moved
 ['lo','hi'].forEach(function(id){$(id).addEventListener('change',function(e){

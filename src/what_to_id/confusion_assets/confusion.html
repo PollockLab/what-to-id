@@ -23,6 +23,8 @@ a{color:var(--bar)}
 .find select,.find button,.find input[type=number]{font:inherit;color:inherit;background:var(--panel);
   border:1px solid var(--line);border-radius:6px;padding:8px 10px;min-height:20px;cursor:pointer}
 .find input[type=number]{width:5em;cursor:text}
+.find label{flex-wrap:wrap;min-width:0;max-width:100%}
+.find select{min-width:0;max-width:100%}
 .cols{display:grid;grid-template-columns:minmax(260px,360px) 1fr;gap:16px;align-items:start}
 #pairs-col{position:sticky;top:8px;max-height:calc(100vh - 16px);overflow:auto;
   border:1px solid var(--line);border-radius:8px;background:var(--panel)}
@@ -66,8 +68,8 @@ overturn (AUROC about 0.65), so treat the order as a loose guide.</p>
 <datalist id="names"></datalist></div>
 <div class="find" role="group" aria-label="Sort and filter the pairs">
 <label>Sort by <select id="sort"></select></label>
-<button type="button" id="dir" aria-label="Sort direction: ascending">Ascending ↑</button>
-<label for="lo">Confusion from</label>
+<button type="button" id="dir" aria-label="Sort direction: descending">Descending ↓</button>
+<label for="lo">Share of its photos that look like the other species, from</label>
 <input id="lo" type="number" min="0" max="100" step="1" value="0" inputmode="numeric">
 <label for="hi">to</label>
 <input id="hi" type="number" min="0" max="100" step="1" value="100" inputmode="numeric"> %</div>
