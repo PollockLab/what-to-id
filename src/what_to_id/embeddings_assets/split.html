@@ -31,10 +31,11 @@ body{display:flex;flex-direction:column}
 #main-content iframe{flex:1 1 0;min-width:0;height:100%;border:0;background:var(--bg)}
 #main-content iframe[hidden]{display:none}
 #main-content.two iframe.first{flex:0 0 var(--split,50%)}
+#main-content iframe#identify{flex:0 0 clamp(300px,26%,400px)}  /* a narrow column; the divider is for the other panes */
 #sep{flex:0 0 7px;cursor:col-resize;background:var(--line);touch-action:none;outline-offset:-2px}
 #sep:hover,#sep:focus-visible,#sep.on{background:var(--on)}
 #main-content:not(.two) #sep{display:none}
-@media (max-width:800px){#sep{display:none}.xbar{flex:1 1 100%;margin:0 0 6px;justify-content:space-between}}
+@media (max-width:800px){#main-content iframe#identify{flex:1 1 0}#sep{display:none}.xbar{flex:1 1 100%;margin:0 0 6px;justify-content:space-between}}
 </style>
 </head>
 <body>
@@ -49,16 +50,17 @@ __ATLAS_SEARCH_ENCODER__
 (function(){
 var box=document.getElementById("main-content"),frames={},last=MapFilter.tokens(location.hash),
   h0=location.hash.slice(1).split('&').filter(Boolean),want=new URLSearchParams(location.search).get('view'),
-  FILES={map:__MAP_FILE__,space:__SPACE_FILE__,tree:__TREE_FILE__},view,
-  ORDER=['map','space','tree'],ALIAS={side:'map-space',tree:'map-tree'},
+  FILES={identify:__IDENTIFY_FILE__,map:__MAP_FILE__,space:__SPACE_FILE__,tree:__TREE_FILE__},view,
+  ORDER=['identify','map','space','tree'],ALIAS={side:'map-space',tree:'map-tree'},
   rest=h0.filter(function(t){return MapFilter.tokens(t)==='';});
 if(!FILES.tree)delete FILES.tree;  // a site built without the taxon tree
+if(!FILES.identify)delete FILES.identify;  // or without the Identify page
 // The view is the panes shown, left to right as in ORDER, written as their names joined by '-'. The old
 // one-word views still read; a tree alone is tree-only, since a bare tree is the old Map + tree.
 function parse(s){var p=String(ALIAS[s]||s||'').split('-');
   return ORDER.filter(function(n){return FILES[n]&&p.indexOf(n)>=0;});}
 function serialize(v){var s=v.join('-');return s==='tree'?'tree-only':s;}
-var v0=parse(want);if(!v0.length)v0=FILES.tree?['map','tree']:innerWidth>=1280?['map','space']:['map'];
+var v0=parse(want);if(!v0.length)v0=FILES.identify?['identify','map']:FILES.tree?['map','tree']:innerWidth>=1280?['map','space']:['map'];
 // Tokens the sync leaves alone (the area, parks, camera, an open photo) go to the frame they belong to, once.
 function hashFor(n){
   var own=rest.filter(function(t){var k=t.split('=')[0];
@@ -75,7 +77,7 @@ function visible(n){return frames[n]&&!frames[n].hidden;}
 function post(n,m){if(frames[n]&&frames[n].contentWindow)frames[n].contentWindow.postMessage(m,location.origin);}
 function sendSel(n,sel){post(n,{type:'wtid-selection',sel:sel});}
 function mk(n){
-  var f=document.createElement('iframe');f.id=n;f.title={map:'Map',space:'Photo space',tree:'Tree of life'}[n];
+  var f=document.createElement('iframe');f.id=n;f.title={identify:'Identify',map:'Map',space:'Photo space',tree:'Tree of life'}[n];
   f.src=new URL(FILES[n],location.href).href.replace(/#.*/,'')+'?embed=1'+(n==='space'&&view.indexOf('map')>=0?'&peer=1':'')+'#'+hashFor(n);
   // what the other frame sent while this one was still loading
   f.addEventListener('load',function(){Object.keys(late).forEach(function(k){if(k!=='wtid-view'||visible('map'))post(n,late[k]);});
@@ -84,7 +86,7 @@ function mk(n){
   box.insertBefore(f,ORDER.slice(ORDER.indexOf(n)+1).map(function(k){return frames[k];}).filter(Boolean)[0]||null);frames[n]=f;}
 // shortcut: three panes take equal thirds with no divider, add a second splitter if users ask to resize them.
 function setView(v){
-  if(innerWidth<800&&v.length>1)v=[v.indexOf('tree')>=0?'tree':v[0]];  // a phone holds one pane
+  if(innerWidth<800&&v.length>1)v=[v.indexOf('identify')>=0?'identify':v.indexOf('tree')>=0?'tree':v[0]];  // a phone holds one pane, Identify first
   view=v;
   var tree0=visible('tree');
   Object.keys(FILES).forEach(function(n){
@@ -98,7 +100,8 @@ function setView(v){
     if(frames[n])frames[n].classList.toggle('first',n===v[0]);});
   // a hidden map masks nothing; a re-shown one fires no moveend, so its last view goes again
   if(!visible('map'))post('space',{type:'wtid-view',area:''});else if(late['wtid-view'])post('space',late['wtid-view']);
-  box.classList.toggle('two',v.length===2);if(v.length===2)box.insertBefore(sep,frames[v[1]]);
+  var two=v.length===2&&v[0]!=='identify';  // Identify has its own width, so no divider
+  box.classList.toggle('two',two);if(two)box.insertBefore(sep,frames[v[1]]);
   post('space',{type:'wtid-layout',peer:visible('map')&&visible('space')});
   tally(!tree0&&visible('tree'));
   [].forEach.call(document.querySelectorAll('[data-p]'),function(b){b.setAttribute('aria-pressed',v.indexOf(b.dataset.p)>=0);});
@@ -108,7 +111,8 @@ function num(n,id){
 function count(){
   var vw=late['wtid-view'],cut=vw&&vw.area&&visible('map');  // the view narrows both counts
   var pv=late['wtid-keep'],pcut=pv&&pv.view&&visible('space');  // as does the photo space's
-  var p=[];if(visible('map'))p.push('<b>'+num('map','count')+'</b> on map'+(cut?', in view':'')+(pcut?', in photo view':''));
+  var p=[];if(visible('identify'))p.push('<b>'+num('identify','status')+'</b> to identify');  // its status line starts with the kept count
+  if(visible('map'))p.push('<b>'+num('map','count')+'</b> on map'+(cut?', in view':'')+(pcut?', in photo view':''));
   if(visible('space'))p.push('<b>'+num('space','count')+'</b> in photo space'+(cut?', in map view':''));
   var c=document.getElementById('counts'),h=p.join(' · ');if(c.innerHTML!==h)c.innerHTML=h;}
 setInterval(count,400);
@@ -171,7 +175,7 @@ var sub=null,sq=document.getElementById('sq'),sm=document.getElementById('sm'),i
 function setSub(ids,label){
   sub=ids?{type:'wtid-subset',ids:ids,label:label}:null;
   if(sub)late['wtid-subset']=sub;else delete late['wtid-subset'];  // a frame made or shown later gets it with the rest
-  ['map','space'].forEach(function(n){post(n,sub||{type:'wtid-subset',ids:null});});}
+  ['identify','map','space'].forEach(function(n){post(n,sub||{type:'wtid-subset',ids:null});});}
 async function hitsFor(st){
   idx=idx||AtlasSearchIndex.open(DATA,{whole:4<<20});idx.catch(function(){idx=null;});  // a failed open is retried next time
   if(st.kind==='id')return (await (await idx).neighbors(st.id))||[];
