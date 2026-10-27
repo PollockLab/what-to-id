@@ -74,7 +74,7 @@ def test_group_tabs_filter_and_identify_carries_the_ids(browser, site):
     page = open_page(browser, site, "#level=weird")
     assert page.locator("#tabs button").all_inner_texts() == ["All 2", "Fungi 1"]
     assert page.locator("#cards .card").nth(1).inner_text().startswith("No photo")
-    page.get_by_role("button", name="Fungi, 1 records").click()
+    page.get_by_role("button", name="Fungi, 1 record").click()
     assert obs_links(page) == [OBS + "301"]
     assert "g=Fungi" in page.url
     assert page.locator("#act a").get_attribute("href").endswith("&id=301")
