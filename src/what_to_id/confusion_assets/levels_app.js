@@ -4,6 +4,7 @@
 'use strict';
 // OUT_KM: a res-4 cell is ~22 km across, so under 50 km is cell-edge noise, not a range outlier.
 var LIMIT=60,OUT_KM=50,OBS='https://www.inaturalist.org/observations/';
+// S.o, the outside-its-range chip as on the map: 0 off, 1 only those, -1 leave them out
 var D=null,S={l:0,g:-1,o:0},shown=LIMIT,view=[];
 
 function $(id){return document.getElementById(id);}
@@ -58,6 +59,10 @@ function hasMap(i){return D.rng&&D.rng[D.taxon[i]]&&(!tax()||D.rng[D.looks[i]]);
 function okm(i){return D.okm?D.okm[i]:-1;}
 // a coarser step farther out, so a distance never reads more precise than the range data
 function kmText(i){var k=okm(i),s=k>=1000?100:k>=500?50:10;return(Math.round(k/s)*s).toLocaleString('en');}
+// Clear matches are for confirming in bulk, so records far from their label's range start left out
+function outDefault(){return D.levels[S.l][0]==='easy'?-1:0;}
+function far(i){return okm(i)>=OUT_KM;}
+function outPass(i){return !S.o||(S.o>0)===far(i);}
 function inR(t,c){return c>=0&&has(bits(t),c);}
 var NEITHER='Outside both ranges: maybe neither.';
 // What the map says about the record's point, as words (caption and aria-label).
@@ -185,12 +190,13 @@ matchMedia('(prefers-color-scheme:dark)').addEventListener('change',function(){
   if(pop&&!pop.hidden)drawMap(pop.children[1],P.i);});
 
 function readHash(){
-  var h=new URLSearchParams(location.hash.slice(1)),l=h.get('level'),g=h.get('g');S.o=h.get('out')==='1'?1:0;
+  var h=new URLSearchParams(location.hash.slice(1)),l=h.get('level'),g=h.get('g'),o=h.get('out');
   S.l=Math.max(0,D.levels.findIndex(function(x){return x[0]===l;}));
+  S.o=o==='1'?1:o==='-1'?-1:o==='0'?0:outDefault();
   S.g=g?D.groups.indexOf(g):-1;
 }
 function writeHash(){
-  var h='level='+D.levels[S.l][0]+(S.g>=0?'&g='+encodeURIComponent(D.groups[S.g]):'')+(S.o?'&out=1':'');
+  var h='level='+D.levels[S.l][0]+(S.g>=0?'&g='+encodeURIComponent(D.groups[S.g]):'')+(S.o!==outDefault()?'&out='+S.o:'');
   history.replaceState(null,'','#'+h);
 }
 function drawLevels(){
@@ -199,13 +205,13 @@ function drawLevels(){
     var b=el('button');b.type='button';b.dataset.level=x[0];
     b.setAttribute('aria-pressed',String(S.l===k));
     b.append(el('b',null,x[1]),el('span',null,x[2]));
-    b.onclick=function(){S.l=k;update();};box.appendChild(b);});
+    b.onclick=function(){S.l=k;S.o=outDefault();update();};box.appendChild(b);});
 }
 function drawTabs(){
   var n=D.groups.map(function(){return 0;}),all=0,out=0,box=$('tabs');
-  for(var i=0;i<D.id.length;i++)if(D.level[i]===S.l&&(!S.o||okm(i)>=OUT_KM)){
+  for(var i=0;i<D.id.length;i++)if(D.level[i]===S.l&&outPass(i)){
     all++;if(D.group[i]>=0)n[D.group[i]]++;}
-  for(i=0;i<D.id.length;i++)if(D.level[i]===S.l&&(S.g<0||D.group[i]===S.g)&&okm(i)>=OUT_KM)out++;
+  for(i=0;i<D.id.length;i++)if(D.level[i]===S.l&&(S.g<0||D.group[i]===S.g)&&far(i))out++;
   box.textContent='';
   [[-1,'All',all]].concat(D.groups.map(function(g,k){return [k,g,n[k]];})).forEach(function(a){
     if(!a[2]&&a[0]>=0)return;
@@ -214,9 +220,11 @@ function drawTabs(){
     b.setAttribute('aria-label',a[1]+', '+a[2].toLocaleString()+(a[2]===1?' record':' records'));
     b.onclick=function(){S.g=a[0];update();};box.appendChild(b);});
   if(!D.okm)return;
-  var o=el('button','out',"Outside its range "+out.toLocaleString());o.type='button';
+  var o=el('button',S.o<0?'out not':'out',(S.o<0?'not ':'')+'Outside its range '+out.toLocaleString());
+  o.type='button';o.title='Click to pick, again to leave out, again to clear.';
   o.setAttribute('aria-pressed',String(!!S.o));o.disabled=!out&&!S.o;
-  o.onclick=function(){S.o=S.o?0:1;update();};box.appendChild(o);
+  o.setAttribute('aria-label',(S.o<0?'Not outside':'Outside')+' its range, '+out.toLocaleString());
+  o.onclick=function(){S.o=S.o===0?1:S.o>0?-1:0;update();};box.appendChild(o);
 }
 function card(i){
   var id=D.id[i],li=el('li','card'),src=photoUrl(i),ph=link(OBS+id,null,'ph');
@@ -256,12 +264,13 @@ function drawAct(){
     (b.length>1?' (batch '+(k+1)+' of '+b.length+')':''),'all btn'));});
 }
 function update(){
-  view=[];shown=LIMIT;
-  for(var i=0;i<D.id.length;i++)if(D.level[i]===S.l&&(S.g<0||D.group[i]===S.g)&&(!S.o||okm(i)>=OUT_KM))view.push(i);
-  if(S.o)view.sort(function(a,b){return okm(b)-okm(a)||a-b;});
+  view=[];shown=LIMIT;var left=0;
+  for(var i=0;i<D.id.length;i++)if(D.level[i]===S.l&&(S.g<0||D.group[i]===S.g)){
+    if(outPass(i))view.push(i);else if(S.o<0)left++;}
+  if(S.o>0)view.sort(function(a,b){return okm(b)-okm(a)||a-b;});
   drawLevels();drawTabs();closePop(false);$('cards').textContent='';drawCards();drawAct();
   $('status').textContent=view.length.toLocaleString()+(view.length===1?' record':' records')+
-    (S.g>=0?' in '+D.groups[S.g]:'')+'.';
+    (S.g>=0?' in '+D.groups[S.g]:'')+'.'+(left?' '+left.toLocaleString()+' far outside their range left out.':'');
   writeHash();
 }
 

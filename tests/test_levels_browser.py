@@ -139,7 +139,7 @@ def test_close_call_chip_opens_a_labelled_map_by_click_and_keyboard(browser, map
 
 
 def test_every_level_shows_chips_for_known_ranges_only(browser, map_site):
-    page = open_page(browser, map_site, "#level=easy")
+    page = open_page(browser, map_site, "#level=easy&out=0")
     assert page.locator("#cards .rchip").all_inner_texts() == ["In range", "About 120 km outside"]
     page.locator("#cards .rchip").nth(1).click()
     assert page.locator("#rpop canvas").get_attribute("aria-label") == (
@@ -164,14 +164,20 @@ def test_cards_without_ranges_have_no_chip(browser, site):
 
 
 def test_outside_its_range_filter_counts_sorts_and_keeps_the_hash(browser, map_site):
+    # Clear matches start with records far from their range left out, as a map chip in "not"
     page = open_page(browser, map_site, "#level=easy")
-    btn = page.get_by_role("button", name="Outside its range")
-    assert (
-        btn.inner_text() == "Outside its range 1" and btn.get_attribute("aria-pressed") == "false"
-    )
+    btn = page.locator("#tabs button.out")
+    assert btn.inner_text() == "not Outside its range 1" and "not" in btn.get_attribute("class")
+    assert obs_links(page) == [OBS + "101"] and "out=" not in page.url
+    assert "1 far outside their range left out." in page.locator("#status").inner_text()
+    btn.click()
+    assert obs_links(page) == [OBS + "101", OBS + "102"] and "out=0" in page.url
+    assert btn.get_attribute("aria-pressed") == "false"
     btn.click()
     assert obs_links(page) == [OBS + "102"] and "out=1" in page.url
     assert page.locator("#tabs button").first.inner_text() == "All 1"
+    btn.click()
+    assert obs_links(page) == [OBS + "101"] and "out=" not in page.url
     page = open_page(browser, map_site, "#level=weird&out=1")
     assert obs_links(page) == [OBS + "301"]
     assert (
