@@ -169,6 +169,10 @@ def test_range_notes_join_by_id_on_look_alike_cards_only():
     joined = levels.add_range_notes(out, notes.iloc[: len(out) - 1])
     assert (joined.loc[joined["level"] != "taxonomist", "range_note"].isna()).all()
     assert (joined["id"] == out["id"]).all()
+    point = levels.add_range_notes(out, notes.assign(lat=1.5, lon=2.5, out_km=7))
+    assert (
+        point[["lat", "lon", "out_km"]].notna().all()
+    ).all()  # every level, not only Close calls
     full = levels.add_range_notes(out, notes)
     assert (full.loc[tax.index, "range_note"] == "Range: outside both ranges").all()
     with pytest.raises(ValueError, match="range_note"):

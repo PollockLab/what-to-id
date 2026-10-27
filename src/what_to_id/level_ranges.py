@@ -8,10 +8,12 @@ or both are out. A taxon (or look-alike name) absent from ORM_CELLS is unknown a
 A look-alike name maps to taxon ids through the pool's taxon_name, as levels.py does.
 
 It writes into DIR, for `levels --range-notes`:
-``range-notes.parquet`` (``id``, ``range_note``, ``lat``, ``lon`` float32 at 2 decimals, null when
-the record has no point), ``level-ranges.parquet`` (``name``, ``cells`` int16 indexes into the
-grid, one row per species named on a card that has cells) and ``level-range-cells.parquet`` (the
-grid in index order, sorted cell ids: ``lat``, ``lon`` float32 boundary vertices at 3 decimals).
+``range-notes.parquet`` (``id``, ``range_note`` on Close calls rows only, ``lat``, ``lon`` float32
+at 2 decimals, null when the record has no point, and ``out_km``: km from the point to the nearest
+centre of the label's cells, 0 inside them, null when unknown), ``level-ranges.parquet`` (``name``,
+``cells`` int16 indexes into the grid, one row per label or look-alike name that has cells) and
+``level-range-cells.parquet`` (the grid in index order, sorted cell ids:
+``lat``, ``lon`` float32 boundary vertices at 3 decimals).
 """
 
 from __future__ import annotations
@@ -38,11 +40,17 @@ def note(label_in, look_in):
     return ONLY_LABEL if label_in else ONLY_LOOK
 
 
+def km_to_cells(lat, lon, centres):
+    """Great-circle km from each point (degrees) to the nearest of `centres` (n x 2, radians)."""
+    p = np.radians(np.column_stack([lat, lon]))[:, None, :]
+    dlat, dlon = centres[None, :, 0] - p[..., 0], centres[None, :, 1] - p[..., 1]
+    h = np.sin(dlat / 2) ** 2 + np.cos(p[..., 0]) * np.cos(centres[:, 0]) * np.sin(dlon / 2) ** 2
+    return (2 * 6371.0088 * np.arcsin(np.sqrt(h))).min(axis=1)
+
+
 def build(levels: pd.DataFrame, pool: pd.DataFrame, orm: pd.DataFrame):
-    """(notes, ranges, grid) frames for the taxonomist rows of `levels`."""
-    lv = levels[levels["level"] == "taxonomist"][
-        ["id", "taxon_id", "taxon_name", "looks_like_name"]
-    ]
+    """(notes, ranges, grid) frames for the rows of `levels`; notes only on taxonomist rows."""
+    lv = levels[["id", "taxon_id", "taxon_name", "looks_like_name", "level"]]
     cells = orm.groupby("taxon_id")["cells"].agg(lambda x: {c for cs in x for c in cs})
     ids = pool[["taxon_name", "taxon_id"]].drop_duplicates().groupby("taxon_name")["taxon_id"]
     by_name = {n: {int(t) for t in g} for n, g in ids}
@@ -56,17 +64,28 @@ def build(levels: pd.DataFrame, pool: pd.DataFrame, orm: pd.DataFrame):
         h3.latlng_to_cell(a, b, 4) if pd.notna(a) and pd.notna(b) else None
         for a, b in zip(lv["lat"], lv["lon"], strict=True)
     ]
-    look = {n: look_cells(n) for n in lv["looks_like_name"].unique()}
-    out = []
-    for r, c in zip(lv.itertuples(), cell, strict=True):
-        lab, lk = cells.get(r.taxon_id), look[r.looks_like_name]
+    tax = lv["level"] == "taxonomist"
+    look = {n: look_cells(n) for n in lv.loc[tax, "looks_like_name"].unique()}
+    out, okm = [], np.full(len(lv), np.nan)
+    for k, (r, c) in enumerate(zip(lv.itertuples(), cell, strict=True)):
+        lab = cells.get(r.taxon_id)
+        lk = look.get(r.looks_like_name) if r.level == "taxonomist" else None
         out.append(None if c is None or lab is None or lk is None else note(c in lab, c in lk))
+        if c is not None and lab is not None and c in lab:
+            okm[k] = 0
+    for t, g in lv[np.isnan(okm) & pd.Series(cell, dtype=object).notna().to_numpy()].groupby(
+        "taxon_id"
+    ):
+        if t in cells.index:
+            ctr = np.radians([h3.cell_to_latlng(c) for c in cells[t]])
+            okm[g.index.to_numpy()] = km_to_cells(g["lat"], g["lon"], ctr)
     notes = pd.DataFrame(
         {
             "id": lv["id"].astype("int64"),
             "range_note": pd.Series(out, dtype=object),
             "lat": lv["lat"].round(2).astype("float32"),
             "lon": lv["lon"].round(2).astype("float32"),
+            "out_km": pd.Series(np.round(okm), dtype="float64").astype("Int32"),
         }
     )
     grid_ids = sorted({c for cs in orm["cells"] for c in cs})

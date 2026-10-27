@@ -54,9 +54,9 @@ def test_build_round_trips_notes_ranges_and_grid(tmp_path):
         ]
     )
     notes, ranges, grid = lr.build(levels, pool, orm)
-    assert notes["id"].tolist() == [10, 11, 12]
+    assert notes["id"].tolist() == [10, 11, 12, 13]
     # id 10 sits in cell a, id 12 in b, and the label has both but C c lacks b; 11 has no point
-    assert notes["range_note"].tolist() == [lr.ONLY_LABEL, None, lr.ONLY_LABEL]
+    assert notes["range_note"].tolist() == [lr.ONLY_LABEL, None, lr.ONLY_LABEL, None]
     assert notes["lat"].round(2).tolist()[0] == 48.5 and np.isnan(notes["lat"][1])
     ids = sorted({a, b, c})
     assert len(grid) == 3 and len(grid["lat"][0]) == 6
@@ -64,3 +64,32 @@ def test_build_round_trips_notes_ranges_and_grid(tmp_path):
     assert r == {"A a": sorted([a, b]), "B b": sorted([b, c]), "C c": sorted([a, c])}
     assert all(cs.dtype == np.int16 for cs in ranges["cells"])
     assert "Z z" not in r
+
+
+def test_out_km_is_zero_inside_and_the_distance_to_the_nearest_cell_outside():
+    a, b, c = (h3.latlng_to_cell(48.5 + k, -123.0, 4) for k in range(3))
+    orm = pd.DataFrame({"taxon_id": [1, 2], "cells": [[a, b], [b, c]]})
+    levels = pd.DataFrame(
+        {
+            "id": [1, 2, 3, 4],
+            "taxon_id": [1, 2, 2, 7],
+            "taxon_name": ["A a", "B b", "B b", "X x"],
+            "looks_like_name": ["B b"] * 4,
+            "level": ["easy", "easy", "weird", "weird"],
+        }
+    )
+    lat = [48.5, 48.5, None, 48.5]
+    pool = pd.DataFrame(
+        {
+            "id": [1, 2, 3, 4],
+            "lat": lat,
+            "lon": -123.0,
+            "taxon_id": [1, 2, 2, 7],
+            "taxon_name": ["A a", "B b", "B b", "X x"],
+        }
+    )
+    notes, ranges, _ = lr.build(levels, pool, orm)
+    k = notes["out_km"]
+    assert k[0] == 0 and 100 <= k[1] <= 125  # one degree of latitude is about 111 km
+    assert k[2] is pd.NA and k[3] is pd.NA  # no point; no known range
+    assert notes["range_note"].isna().all() and set(ranges["name"]) == {"A a", "B b"}

@@ -2,8 +2,9 @@
 // for the chosen group as cards, in the order the build wrote them.
 (function(){
 'use strict';
-var LIMIT=60,OBS='https://www.inaturalist.org/observations/';
-var D=null,S={l:0,g:-1},shown=LIMIT,view=[];
+// OUT_KM: a res-4 cell is ~22 km across, so under 50 km is cell-edge noise, not a range outlier.
+var LIMIT=60,OUT_KM=50,OBS='https://www.inaturalist.org/observations/';
+var D=null,S={l:0,g:-1,o:0},shown=LIMIT,view=[];
 
 function $(id){return document.getElementById(id);}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;
@@ -42,15 +43,24 @@ function cellAt(i){
   for(var c=0;c<D.grid.length;c++)if(inside(D.grid[c],x,y))return c;
   return-1;
 }
-function hasMap(i){return D.rng&&D.levels[S.l][0]==='taxonomist'&&D.rng[D.taxon[i]]&&D.rng[D.looks[i]];}
+function tax(){return D.levels[S.l][0]==='taxonomist';}
+function hasMap(i){return D.rng&&D.rng[D.taxon[i]]&&(!tax()||D.rng[D.looks[i]]);}
+function okm(i){return D.okm?D.okm[i]:-1;}
+function inR(t,c){return c>=0&&has(bits(t),c);}
 var NEITHER='Outside both ranges: maybe neither.';
-function neither(i){var c=cellAt(i);return c!=null&&!(c>=0&&(has(bits(D.taxon[i]),c)||has(bits(D.looks[i]),c)));}
+// What the map says about the record's point, as words (caption and aria-label).
 function mapText(i){
-  var a=D.taxa[D.taxon[i]],b=D.taxa[D.looks[i]],c=cellAt(i);
-  if(c==null)return'Range map of '+a+' and '+b+' in British Columbia';
-  function w(t){return c>=0&&has(bits(t),c)?'inside':'outside';}
-  return'Range map: this record is '+w(D.taxon[i])+' the range of '+a+', '+w(D.looks[i])+
-    ' the range of '+b+(neither(i)?'. '+NEITHER:'');
+  var a=D.taxa[D.taxon[i]],b=D.taxa[D.looks[i]],c=cellAt(i),far=okm(i)>=OUT_KM,t=tax();
+  if(c==null)return{aria:'Range map of '+a+(t?' and '+b:'')+' in British Columbia',cap:''};
+  var la=inR(D.taxon[i],c),lb=t&&inR(D.looks[i],c),cap=[];
+  if(far)cap.push('About '+okm(i).toLocaleString('en')+" km outside the label's usual range.");
+  else if(t&&!la&&!lb)cap.push(NEITHER);
+  else if(!la)cap.push("Outside the label's usual range.");
+  if(far&&t&&lb)cap.push("Inside the look-alike's.");
+  if(far&&t&&!lb)cap.push(NEITHER);
+  return{aria:'Range map: this record is '+(la?'inside':'outside')+' the range of '+a+
+    (t?', '+(lb?'inside':'outside')+' the range of '+b:'')+(cap.length?'. '+cap.join(' '):''),
+    cap:cap.join(' ')};
 }
 function drawMap(m){
   var cv=m.cv,r=cv.getBoundingClientRect(),dpr=window.devicePixelRatio||1,B=box();
@@ -59,11 +69,11 @@ function drawMap(m){
   var g=cv.getContext('2d'),st=getComputedStyle(cv),pad=2*dpr,k=(cv.width-2*pad)/B.w;
   function X(v){return pad+(v-B.x0)*KX*k;}
   function Y(v){return cv.height-pad-(v-B.y0)*k;}
-  var A=bits(D.taxon[m.i]),L=bits(D.looks[m.i]);
+  var A=bits(D.taxon[m.i]),L=m.two?bits(D.looks[m.i]):A;
   g.lineWidth=dpr*.6;g.lineJoin='round';g.strokeStyle=st.getPropertyValue('--panel');
   D.grid.forEach(function(p,c){
     var a=has(A,c),l=has(L,c);
-    g.fillStyle=st.getPropertyValue(a?(l?'--rboth':'--rlab'):l?'--rlook':'--line');
+    g.fillStyle=st.getPropertyValue(a?(m.two?(l?'--rboth':'--rlab'):'--rlab'):l?'--rlook':'--line');
     g.beginPath();
     for(var q=0;q<p.length;q+=2)g[q?'lineTo':'moveTo'](X(p[q]),Y(p[q+1]));
     g.closePath();g.fill();g.stroke();});
@@ -75,20 +85,21 @@ function drawMap(m){
 function swatch(cls){return el('span','sw '+cls);}
 function mapBox(i){
   var w=el('div','rmap'),b=el('button','rbtn'),cv=el('canvas'),B=box(),lg=el('ul','rleg'),
-    a=D.taxa[D.taxon[i]],l=D.taxa[D.looks[i]];
+    a=D.taxa[D.taxon[i]],l=D.taxa[D.looks[i]],t=mapText(i),two=tax();
   b.type='button';b.setAttribute('aria-expanded','false');b.title='Click to enlarge';
   cv.style.aspectRatio=B.w+'/'+B.h;cv.setAttribute('role','img');
-  cv.setAttribute('aria-label',mapText(i));
+  cv.setAttribute('aria-label',t.aria);
   b.appendChild(cv);
-  [['lab',a,1],['look',l,1],['both','both'],[null,'this record']].forEach(function(x){
+  (two?[['lab',a,1],['look',l,1],['both','both'],[null,'this record']]:
+    [['lab',a,1],[null,'this record']]).forEach(function(x){
     var li=el('li');li.appendChild(x[0]?swatch(x[0]):el('span','sw dot'));
     li.appendChild(x[2]?el('i',null,x[1]):document.createTextNode(x[1]));lg.appendChild(li);});
-  if(neither(i))lg.appendChild(el('li','none',NEITHER));
+  if(t.cap)lg.appendChild(el('li','none',t.cap));
   b.onclick=function(){var on=w.classList.toggle('big');b.setAttribute('aria-expanded',String(on));
     b.title=on?'Click to shrink':'Click to enlarge';
     w.closest('.card').classList.toggle('wide',on);};
   w.append(b,lg);
-  var m={cv:cv,i:i};maps.push(m);
+  var m={cv:cv,i:i,two:two};maps.push(m);
   seen=seen||new IntersectionObserver(function(es){es.forEach(function(e){
     if(!e.isIntersecting)return;seen.unobserve(e.target);
     new ResizeObserver(function(){drawMap(e.target.m);}).observe(e.target);});});
@@ -99,12 +110,12 @@ matchMedia('(prefers-color-scheme:dark)').addEventListener('change',function(){
   maps.forEach(function(m){if(m.cv.isConnected)drawMap(m);});});
 
 function readHash(){
-  var h=new URLSearchParams(location.hash.slice(1)),l=h.get('level'),g=h.get('g');
+  var h=new URLSearchParams(location.hash.slice(1)),l=h.get('level'),g=h.get('g');S.o=h.get('out')==='1'?1:0;
   S.l=Math.max(0,D.levels.findIndex(function(x){return x[0]===l;}));
   S.g=g?D.groups.indexOf(g):-1;
 }
 function writeHash(){
-  var h='level='+D.levels[S.l][0]+(S.g>=0?'&g='+encodeURIComponent(D.groups[S.g]):'');
+  var h='level='+D.levels[S.l][0]+(S.g>=0?'&g='+encodeURIComponent(D.groups[S.g]):'')+(S.o?'&out=1':'');
   history.replaceState(null,'','#'+h);
 }
 function drawLevels(){
@@ -116,8 +127,10 @@ function drawLevels(){
     b.onclick=function(){S.l=k;update();};box.appendChild(b);});
 }
 function drawTabs(){
-  var n=D.groups.map(function(){return 0;}),all=0,box=$('tabs');
-  for(var i=0;i<D.id.length;i++)if(D.level[i]===S.l){all++;if(D.group[i]>=0)n[D.group[i]]++;}
+  var n=D.groups.map(function(){return 0;}),all=0,out=0,box=$('tabs');
+  for(var i=0;i<D.id.length;i++)if(D.level[i]===S.l&&(!S.o||okm(i)>=OUT_KM)){
+    all++;if(D.group[i]>=0)n[D.group[i]]++;}
+  for(i=0;i<D.id.length;i++)if(D.level[i]===S.l&&(S.g<0||D.group[i]===S.g)&&okm(i)>=OUT_KM)out++;
   box.textContent='';
   [[-1,'All',all]].concat(D.groups.map(function(g,k){return [k,g,n[k]];})).forEach(function(a){
     if(!a[2]&&a[0]>=0)return;
@@ -125,6 +138,10 @@ function drawTabs(){
     b.setAttribute('aria-pressed',String(S.g===a[0]));
     b.setAttribute('aria-label',a[1]+', '+a[2].toLocaleString()+(a[2]===1?' record':' records'));
     b.onclick=function(){S.g=a[0];update();};box.appendChild(b);});
+  if(!D.okm)return;
+  var o=el('button','out',"Outside its range "+out.toLocaleString());o.type='button';
+  o.setAttribute('aria-pressed',String(!!S.o));o.disabled=!out&&!S.o;
+  o.onclick=function(){S.o=S.o?0:1;update();};box.appendChild(o);
 }
 function card(i){
   var id=D.id[i],li=el('li','card'),src=photoUrl(i),ph=link(OBS+id,null,'ph');
@@ -164,7 +181,8 @@ function drawAct(){
 }
 function update(){
   view=[];shown=LIMIT;
-  for(var i=0;i<D.id.length;i++)if(D.level[i]===S.l&&(S.g<0||D.group[i]===S.g))view.push(i);
+  for(var i=0;i<D.id.length;i++)if(D.level[i]===S.l&&(S.g<0||D.group[i]===S.g)&&(!S.o||okm(i)>=OUT_KM))view.push(i);
+  if(S.o)view.sort(function(a,b){return okm(b)-okm(a)||a-b;});
   drawLevels();drawTabs();$('cards').textContent='';maps=[];drawCards();drawAct();
   $('status').textContent=view.length.toLocaleString()+(view.length===1?' record':' records')+
     (S.g>=0?' in '+D.groups[S.g]:'')+'.';

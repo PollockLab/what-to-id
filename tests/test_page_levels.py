@@ -149,9 +149,12 @@ def test_range_maps_ride_along_only_with_the_files():
     d = decode(page_levels.encode(levels_frame()))
     assert not {"grid", "rng", "plat", "plon"} & d.keys()
     ranges, grid = range_files()
-    f = levels_frame().assign(lat=[None, None, 48.51, None, None], lon=-123.456)
+    f = levels_frame().assign(
+        lat=[None, None, 48.51, None, None], lon=-123.456, out_km=[0, None, 120, 5, None]
+    )
     d = decode(page_levels.encode(f, "", ranges, grid))
     assert len(d["grid"]) == 10 and d["grid"][0] == [-123000, 48000, -122500, 48500, -122000, 48500]
+    assert d["okm"] == [0, -1, 120, 5, -1]
     assert d["plat"] == [None, None, 4851, None, None] and d["plon"][2] == -12346
     by = dict(zip(d["taxa"], d["rng"], strict=True))
     assert by["Eus fus"] == "" and by["Cus dus"] == "AAI="

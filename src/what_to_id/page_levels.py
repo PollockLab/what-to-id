@@ -18,7 +18,9 @@ level-ranges.parquet and level-range-cells.parquet beside it; `level_ranges`), a
 (per H3 cell, its boundary as flat ``[lon, lat, ...]`` integer thousandths of a degree), ``rng``
 (aligned with ``taxa``: base64 bitset over the grid cells, bit i in byte i>>3 at 1<<(i&7), or ""
 when the range is unknown) and, with lat and lon columns, ``plat`` and ``plon`` (the record's
-point in integer hundredths of a degree, null when missing). Without them the page has no maps.
+point in integer hundredths of a degree, null when missing) and, with an out_km column, ``okm``
+(km from the point to the label's range, 0 inside it, -1 unknown). Without the range files the
+page has no maps.
 """
 
 from __future__ import annotations
@@ -123,6 +125,8 @@ def encode(
         head["rng"] = [bits.get(n, "") for n in taxa.tolist()]
         if {"lat", "lon"} <= set(levels.columns):
             head["plat"], head["plon"] = _scaled(levels["lat"], 100), _scaled(levels["lon"], 100)
+        if "out_km" in levels.columns:
+            head["okm"] = levels["out_km"].fillna(-1).astype(int).tolist()
     return gzip.compress(json.dumps(head, separators=(",", ":")).encode(), 9, mtime=0)
 
 

@@ -144,16 +144,19 @@ def assign(
 def add_range_notes(levels: pd.DataFrame, notes: pd.DataFrame) -> pd.DataFrame:
     """`levels` with a `range_note` column (string or null) looked up by id in `notes`.
 
-    Only look-alike cards carry a note; `notes` has `id`, `range_note` (null for no line) and
-    optionally `lat`, `lon` (the record's point), which come through the same way.
+    Only Close calls cards carry a note; `notes` has `id`, `range_note` (null for no line) and
+    optionally `lat`, `lon` (the record's point) and `out_km`, which come through for every level.
     """
     for c in ("id", "range_note"):
         if c not in notes.columns:
             raise ValueError(f"range notes have no {c!r} column")
     notes = notes.drop_duplicates("id").set_index("id")
     keep = levels["level"] == "taxonomist"
-    cols = ["range_note"] + [c for c in ("lat", "lon") if c in notes.columns]
-    return levels.assign(**{c: levels["id"].map(notes[c]).where(keep) for c in cols})
+    point = [c for c in ("lat", "lon", "out_km") if c in notes.columns]
+    return levels.assign(
+        range_note=levels["id"].map(notes["range_note"]).where(keep),
+        **{c: levels["id"].map(notes[c]) for c in point},
+    )
 
 
 def describe(scores: pd.DataFrame, levels: pd.DataFrame) -> str:

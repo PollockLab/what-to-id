@@ -31,13 +31,15 @@ def map_site(tmp_path_factory):
     """Record 201 sits at 48.5 N, 123 W: inside cell 0 (Aus bus) but outside cell 1 (Cus dus)."""
     root = tmp_path_factory.mktemp("levels-map-site")
     sq = lambda x: np.float32([x, x + 1, x + 1, x])  # noqa: E731
-    pd.DataFrame({"name": ["Aus bus", "Cus dus"], "cells": [[0], [1]]}).to_parquet(
+    pd.DataFrame({"name": ["Aus bus", "Cus dus", "Eus fus"], "cells": [[0], [1], [1]]}).to_parquet(
         root / "level-ranges.parquet"
     )
     pd.DataFrame(
         {"lat": [np.float32([48, 48, 49, 49])] * 2, "lon": [sq(-124), sq(-122)]}
     ).to_parquet(root / "level-range-cells.parquet")
-    levels_frame().assign(lat=48.5, lon=-123.5).to_parquet(root / "levels.parquet")
+    levels_frame().assign(lat=48.5, lon=-123.5, out_km=[0, 120, 0, 300, None]).to_parquet(
+        root / "levels.parquet"
+    )
     page_levels.build(root, None, root / "levels.parquet")
     server, url = serve(root)
     yield url
@@ -123,8 +125,35 @@ def test_close_call_with_ranges_draws_a_labelled_map(browser, map_site):
     page.wait_for_function("c => c.width > 0", arg=cv.element_handle())
     page.locator(".rbtn").click()
     assert page.locator(".card.wide").count() == 1 and page.errors == []
+
     page = open_page(browser, map_site, "#level=easy")
-    assert page.locator("#cards canvas").count() == 0
+    labels = page.locator("#cards canvas").evaluate_all("cs => cs.map(c => c.ariaLabel)")
+    assert labels == [
+        "Range map: this record is inside the range of Aus bus",
+        "Range map: this record is outside the range of Eus fus. "
+        "About 120 km outside the label's usual range.",
+    ]
+    assert "About 120 km outside" in page.locator("#cards .card").nth(1).inner_text()
+    page = open_page(browser, map_site, "#level=weird")
+    assert page.locator("#cards .card canvas").count() == 1  # Hus ius has no known range
+
+
+def test_outside_its_range_filter_counts_sorts_and_keeps_the_hash(browser, map_site):
+    page = open_page(browser, map_site, "#level=easy")
+    btn = page.get_by_role("button", name="Outside its range")
+    assert (
+        btn.inner_text() == "Outside its range 1" and btn.get_attribute("aria-pressed") == "false"
+    )
+    btn.click()
+    assert obs_links(page) == [OBS + "102"] and "out=1" in page.url
+    assert page.locator("#tabs button").first.inner_text() == "All 1"
+    page = open_page(browser, map_site, "#level=weird&out=1")
+    assert obs_links(page) == [OBS + "301"]
+    assert (
+        page.get_by_role("button", name="Outside its range").get_attribute("aria-pressed") == "true"
+    )
+    page = open_page(browser, map_site, "#level=taxonomist")
+    assert page.get_by_role("button", name="Outside its range").is_disabled()
 
 
 def test_cards_without_ranges_have_no_map(browser, site):
