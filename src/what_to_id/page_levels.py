@@ -10,7 +10,8 @@ It writes levels.html (every script inlined) and levels-data.bin, gzipped JSON:
 ``levels`` ([key, name, line] per level), ``groups`` (names by records desc), ``taxa`` (names),
 ``hosts``, ``exts`` and one array per record column, in display order: ``id``, ``photo``,
 ``meta``, ``taxon`` and ``looks`` (indexes into ``taxa``), ``level`` and ``group`` (indexes, -1
-for no group). A photo URL is built as in confusion-data.bin (see `page_confusion`).
+for no group); with a ``range_note`` column also ``notes`` (the lines) and ``note`` (index, -1
+for none). A photo URL is built as in confusion-data.bin (see `page_confusion`).
 """
 
 from __future__ import annotations
@@ -80,6 +81,16 @@ def encode(levels: pd.DataFrame, built_at: str = "") -> bytes:
         .astype(int)
         .tolist(),
     }
+    if "range_note" in levels.columns:
+        notes = levels["range_note"].dropna().unique()
+        head["notes"] = notes.tolist()
+        head["note"] = (
+            levels["range_note"]
+            .map({n: i for i, n in enumerate(notes)})
+            .fillna(-1)
+            .astype(int)
+            .tolist()
+        )
     return gzip.compress(json.dumps(head, separators=(",", ":")).encode(), 9, mtime=0)
 
 

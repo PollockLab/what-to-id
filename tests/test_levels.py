@@ -160,3 +160,16 @@ def test_bc_counts_replace_the_pool_count_of_a_lookalike(monkeypatch):
     assert look_alikes(pd.Series({"G a": 500, "G b": 3})) == {"G a"}
     # one name over two taxa sums: 10 + 15 clears the bar
     assert look_alikes(pd.Series([10, 15, 3], index=["G a", "G a", "G b"])) == {"G a"}
+
+
+def test_range_notes_join_by_id_on_look_alike_cards_only():
+    out = levels.assign(scores())
+    tax = out[out["level"] == "taxonomist"]
+    notes = pd.DataFrame({"id": out["id"], "range_note": "Range: outside both ranges"})
+    joined = levels.add_range_notes(out, notes.iloc[: len(out) - 1])
+    assert (joined.loc[joined["level"] != "taxonomist", "range_note"].isna()).all()
+    assert (joined["id"] == out["id"]).all()
+    full = levels.add_range_notes(out, notes)
+    assert (full.loc[tax.index, "range_note"] == "Range: outside both ranges").all()
+    with pytest.raises(ValueError, match="range_note"):
+        levels.add_range_notes(out, notes[["id"]])

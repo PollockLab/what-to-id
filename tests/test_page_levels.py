@@ -122,3 +122,12 @@ def test_explore_offers_the_levels_only_once_built(tmp_path):
     (tmp_path / "levels.html").write_text("<html></html>")
     html = split_page.build(tmp_path).read_text()
     assert html.count('href="levels.html"') == 1 and split_page.LEVELS_LINK in html
+
+
+def test_range_notes_ride_along_only_when_present(tmp_path):
+    d = decode(page_levels.encode(levels_frame()))
+    assert "note" not in d
+    f = levels_frame().assign(range_note=[None, None, "Range: outside both ranges", None, None])
+    d = decode(page_levels.encode(f))
+    assert d["notes"] == ["Range: outside both ranges"]
+    assert d["note"] == [-1, -1, 0, -1, -1]

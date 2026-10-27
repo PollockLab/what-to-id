@@ -20,7 +20,7 @@ within each group, the groups taking turns.
 
     python -m what_to_id.levels --emb E.npy --ids ids.npy --pool pool.parquet \\
         --taxa-names taxa-<sha>.tsv.gz --taxa-vectors taxa-<sha>.f16 --atlas-dir DIR \\
-        [--bc-counts bc-verifiable-counts.parquet]
+        [--bc-counts bc-verifiable-counts.parquet] [--range-notes range-notes.parquet]
 
 writes `levels.parquet` (`LEVEL_COLUMNS`) next to the atlas index and registers it in its
 manifest under ``"levels"``, as `confusion fir` does for the confused pairs.
@@ -136,6 +136,19 @@ def assign(
     return out[list(LEVEL_COLUMNS)].reset_index(drop=True)
 
 
+def add_range_notes(levels: pd.DataFrame, notes: pd.DataFrame) -> pd.DataFrame:
+    """`levels` with a `range_note` column (string or null) looked up by id in `notes`.
+
+    Only look-alike cards carry a note; `notes` has `id`, `range_note` (null for no line).
+    """
+    for c in ("id", "range_note"):
+        if c not in notes.columns:
+            raise ValueError(f"range notes have no {c!r} column")
+    note = notes.drop_duplicates("id").set_index("id")["range_note"]
+    keep = levels["level"] == "taxonomist"
+    return levels.assign(range_note=levels["id"].map(note).where(keep))
+
+
 def describe(scores: pd.DataFrame, levels: pd.DataFrame) -> str:
     """The distributions the cut-offs were read from, and the rows per level per group."""
     s = scores[scores["margin"].notna() & scores["other"].notna()]
@@ -178,6 +191,10 @@ def main(argv: list[str] | None = None) -> int:
         help="parquet with name, count (`python -m what_to_id.bc_counts`); look-alike records "
         "are counted there instead of in the pool",
     )
+    ap.add_argument(
+        "--range-notes",
+        help="parquet with id, range_note (null for no line); adds a range line to cards",
+    )
     args = ap.parse_args(sys.argv[1:] if argv is None else argv)
     manifest = read_manifest(args.atlas_dir)
     cols = ["id", "taxon_id", "taxon_name", "rank", "iconic_taxon", "photo_url"]
@@ -191,6 +208,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.bc_counts:
         bc = pd.read_parquet(args.bc_counts).set_index("name")["count"]
     out = assign(scores, bc_counts=bc)
+    if args.range_notes:
+        out = add_range_notes(out, pd.read_parquet(args.range_notes))
     built_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     out.to_parquet(Path(args.atlas_dir) / "levels.parquet", index=False)
     manifest["levels"] = {"name": "levels.parquet", "built_at": built_at, "count": len(out)}

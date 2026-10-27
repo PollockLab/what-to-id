@@ -52,6 +52,7 @@ function card(i){
   var nm=el('div');nm.appendChild(el('i',null,D.taxa[D.taxon[i]]));
   if(D.levels[S.l][0]==='taxonomist')nm.append(' or ',el('i',null,D.taxa[D.looks[i]]),'?');
   li.appendChild(nm);
+  if(D.note&&D.note[i]>=0)li.appendChild(el('div','range',D.notes[D.note[i]]));
   var links=el('div','links');
   links.append(link(OBS+id,'Observation '+id,'obs'),
     link(IdentifyLinks.batches([id])[0].url,'Identify','identify'));
