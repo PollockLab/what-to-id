@@ -19,10 +19,9 @@ def test_build_inlines_scripts_and_config(tmp_path):
         assert needle in html
 
 
-def test_links_to_map_and_search(tmp_path):
+def test_links_to_explore_not_to_search(tmp_path):
     html = build(tmp_path).read_text()
-    for href in ("split.html", "search.html"):
-        assert f'href="{href}"' in html
+    assert 'href="split.html"' in html and 'href="search.html"' not in html
 
 
 def test_empty_data_url_is_rejected(tmp_path):

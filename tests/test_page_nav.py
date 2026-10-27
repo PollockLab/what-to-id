@@ -22,12 +22,12 @@ def test_exactly_one_current_page(current):
     assert re.search(rf'href="{current}" aria-current="page"', html)
 
 
-@pytest.mark.parametrize("current", ["map.html", "embeddings.html"])
-def test_the_map_and_photo_space_pages_mark_explore(current):
+@pytest.mark.parametrize("current", ["map.html", "embeddings.html", "tree.html", "search.html"])
+def test_the_pages_inside_explore_mark_explore(current):
     html = nav(current)
     assert html.count('aria-current="page"') == 1
     assert re.search(r'href="split.html" aria-current="page"', html)
-    assert "Photo space<" not in html and ">Map<" not in html
+    assert "Photo space<" not in html and ">Map<" not in html and ">Tree of life<" not in html
 
 
 def test_available_drops_pages_that_were_not_built():
@@ -37,7 +37,7 @@ def test_available_drops_pages_that_were_not_built():
     assert hrefs == ["map.html", "study.html"]
     assert BLITZ in html
     # the page you are on stays even when the set forgets it
-    assert 'href="search.html" aria-current="page"' in nav("search.html", {"study.html"})
+    assert 'href="confusion.html" aria-current="page"' in nav("confusion.html", {"study.html"})
 
 
 def test_unknown_availability_is_probed_by_the_page():

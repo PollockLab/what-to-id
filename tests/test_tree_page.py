@@ -26,7 +26,7 @@ def test_build_inlines_everything_and_copies_the_map_meta(tmp_path):
     html = tree_page.build(tmp_path).read_text()
     assert not re.findall(r"__[A-Z_]+__", html)
     assert "<script src=" not in html
-    assert 'href="tree.html" aria-current="page"' in html
+    assert 'href="split.html" aria-current="page"' in html
     cfg = json.loads(re.search(r"var CFG=(.*?);</script>", html).group(1))
     assert cfg["meta"]["taxa"].startswith(meta["taxa"] + "?v=") and cfg["mapUrl"] == "map.html"
     assert cfg["meta"]["group_ids"] == meta["group_ids"]
@@ -46,10 +46,9 @@ def test_a_taxa_file_without_counts_is_refused(tmp_path):
         tree_page.build(tmp_path)
 
 
-def test_every_page_offers_the_tree_and_only_when_built():
-    assert 'href="tree.html"' in page_nav.nav("split.html", set(dict(page_nav.PAGES)))
-    html = page_nav.nav("map.html")
-    assert re.search(r'href="tree.html"[^>]*data-optional', html) and "data-probe" in html
+def test_the_tree_is_reached_through_explore_not_its_own_tab():
+    assert 'href="tree.html"' not in page_nav.nav("split.html", {"tree.html", "split.html"})
+    assert 'href="tree.html"' not in page_nav.nav("map.html")
 
 
 def test_the_split_page_offers_the_tree_only_once_it_is_built(tmp_path):
@@ -58,7 +57,7 @@ def test_the_split_page_offers_the_tree_only_once_it_is_built(tmp_path):
     write_site(tmp_path)
     tree_page.build(tmp_path)
     html = split_page.build(tmp_path).read_text()
-    assert 'data-p="tree"' in html and 'href="tree.html"' in html and 'tree:"tree.html"' in html
+    assert 'data-p="tree"' in html and 'tree:"tree.html"' in html
 
 
 def test_the_split_page_links_an_optional_page_only_once_it_is_built(tmp_path):

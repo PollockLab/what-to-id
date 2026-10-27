@@ -9,20 +9,20 @@ from __future__ import annotations
 
 from html import escape
 
-# (file, label). Explore is split.html, the map and the photo space side by side. The pages map.html
-# and embeddings.html keep their URLs and mark Explore as current. Without split.html (a site built
-# without the photo space) the Explore tab falls back to the map. Photo search exists only when
-# ATLAS_HF_REPO is set, the tree of life only when the map was built with its taxon tree, the
-# confused pairs only when the atlas manifest lists a confusion table. The brand links to
-# index.html, a copy of Explore.
+# (file, label), one tab per job: Identify (levels.html, records at three levels), Explore and
+# Look-alikes (confusion.html), with the study last. Explore is split.html, the map, the photo space
+# and the tree side by side; the pages map.html, embeddings.html, tree.html and search.html keep
+# their URLs and mark Explore as current, as Explore's panes and its search box hold them. Without
+# split.html (a site built without the photo space) the Explore tab falls back to the map. Levels
+# and look-alikes exist only when the atlas manifest lists their tables. The brand links to
+# index.html, a copy of the landing page.
 PAGES = (
+    ("levels.html", "Identify"),
     ("split.html", "Explore"),
-    ("search.html", "Photo search"),
-    ("tree.html", "Tree of life"),
+    ("confusion.html", "Look-alikes"),
     ("study.html", "Study"),
-    ("confusion.html", "Confused pairs"),
 )
-OPTIONAL = {"search.html", "tree.html", "confusion.html"}
+OPTIONAL = {"levels.html", "confusion.html"}
 EXPLORE = "split.html"
 BLITZ = "https://pollocklab.github.io/where-to-blitz/"
 
@@ -68,20 +68,25 @@ white-space:nowrap}
 
 # Points the switcher at what is open. Reads the hash the pages already write: the map keeps
 # record= and at=zoom/lat/lon, the photo pages keep id=; the selection (groups, taxa, dates) goes
-# to the map and the photo space as written. Rewrites on hover, focus, touch and click because
-# history.replaceState fires no event.
+# to the map and the photo space as written. One group (g= on Identify and Look-alikes, a lone
+# picked groups= on Explore) travels between the three. Rewrites on hover, focus, touch and click
+# because history.replaceState fires no event.
 JS = """
 (function(){var n=document.querySelector('.site-nav');if(!n)return;
 function ctx(){var h=new URLSearchParams(location.hash.slice(1)),
 at=(h.get('at')||'').split('/').map(Number);
-var ok=at.length===3&&at.every(isFinite);return{rec:+(h.get('record')||h.get('id'))||0,
+var ok=at.length===3&&at.every(isFinite),gs=(h.get('groups')||'').split(',');
+return{grp:h.get('g')||(gs.length===1&&/^[^-]/.test(gs[0])?gs[0]:''),rec:+(h.get('record')||h.get('id'))||0,
 lat:ok?at[1]:null,lon:ok?at[2]:null,sel:location.hash.slice(1).split('&').filter(function(t){
 return /^(by|from|to|months|groups|only|acc|taxa|area|park|bcpark|projects)=/.test(t);})};}
+function h0(sel){return sel.some(function(t){return t.indexOf('groups=')===0;});}
 function sync(){var c=ctx();n.querySelectorAll('a[data-view]').forEach(function(a){
 var b=a.dataset.base,v=a.dataset.view,u=b;
 if(a.hasAttribute('aria-current')&&v!=='explore')return;
 if(v==='explore'){var p=[];if(c.rec)p.push('id='+c.rec);p=p.concat(c.sel);
+if(c.grp&&!h0(c.sel))p.push('groups='+encodeURIComponent(c.grp));
 if(p.length)u=b+'#'+p.join('&');}
+else if(v==='group'&&c.grp)u=b+'#g='+encodeURIComponent(c.grp);
 else if(v==='blitz'&&c.lat!==null)u=b+'?at='+c.lat.toFixed(3)+','+c.lon.toFixed(3);
 a.href=u;});}
 ['mouseover','focusin','touchstart',
@@ -97,7 +102,7 @@ a.href=a.dataset.base;}else a.remove();
 }).catch(function(){});});})();
 """.strip()
 
-_EXPLORE_OF = ("map.html", "embeddings.html")
+_EXPLORE_OF = ("map.html", "embeddings.html", "tree.html", "search.html")
 _SKIP = (
     "onclick=\"event.preventDefault();var m=document.getElementById('main-content')"
     "||document.querySelector('main');m.tabIndex=-1;m.focus()\""
@@ -129,7 +134,7 @@ def nav(
         elif page == EXPLORE:
             attrs += f' data-view="explore" data-fallback="{escape(base)}map.html"'
         if page in OPTIONAL:
-            attrs += " data-optional"
+            attrs += ' data-optional data-view="group"'
         attrs += f' data-base="{escape(href)}"'
         links.append(f'<a href="{escape(href)}"{attrs}>{escape(label)}</a>')
     links.append(

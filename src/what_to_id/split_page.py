@@ -24,8 +24,6 @@ SCRIPTS = {
     "__ATLAS_SEARCH_META__": HERE / "atlas_search_assets" / "atlas_search_meta.js",
     "__ATLAS_SEARCH_ENCODER__": HERE / "atlas_search_assets" / "atlas_search_encoder.js",
 }
-# The levels page's one entry, shown once levels.html is built; the label is a placeholder.
-LEVELS_LINK = '<a class="lvl" href="levels.html">What to ID next</a>'
 # One toggle per pane; a phone holds one pane, so there a toggle picks it.
 TREE_BUTTON = '<button type="button" data-p="tree">Tree</button>'
 BAR = (
@@ -64,8 +62,6 @@ def build(
     # split.html is written last, so an optional page missing here is missing from the site
     pages = {p for p, _ in page_nav.PAGES if p not in page_nav.OPTIONAL or (out / p).exists()}
     bar = BAR if has_tree else BAR.replace(TREE_BUTTON, "")
-    if (out / "levels.html").exists():
-        bar = bar.replace('<span class="seg"', LEVELS_LINK + '<span class="seg"', 1)
     for key, value in {
         "__SITE_CSS__": page_nav.CSS,
         "__SITE_NAV__": page_nav.nav(PAGE_NAME, pages, extra=bar),
