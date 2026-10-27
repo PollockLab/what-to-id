@@ -159,3 +159,82 @@ def test_pairs_only_build_renders(browser, pairs_site):
     assert page.locator("#cards .card").count() == 0
     assert page.locator("#act a.all").inner_text() == "Identify all of Eus fus"
     assert page.errors == []
+
+
+def pair_names(page):
+    return page.locator("#pairs .pair").evaluate_all(
+        "bs => bs.map(b => b.innerText.split('\\n')[0].replace('Labelled ', ''))"
+    )
+
+
+def test_sort_by_share_flips_and_rides_the_hash(browser, site):
+    page = open_page(browser, site)
+    default = pair_names(page)
+    assert page.locator("#sort").input_value() == "" and "sort=" not in page.url
+    page.select_option("#sort", "pct")
+    shares = page.locator("#pairs .sub").all_inner_texts()
+    assert [s.split(", ")[1] for s in shares] == [
+        "30% of its photos",
+        "50% of its photos",
+        "75% of its photos",
+    ]
+    assert "sort=pct" in page.url and "dir=" not in page.url
+    page.click("#dir")
+    assert page.locator("#dir").get_attribute("aria-label") == "Sort direction: descending"
+    assert [s.split(", ")[1][:3] for s in page.locator("#pairs .sub").all_inner_texts()] == [
+        "75%",
+        "50%",
+        "30%",
+    ]
+    assert "sort=pct&dir=desc" in page.url
+    page.select_option("#sort", "")
+    page.click("#dir")
+    assert pair_names(page) == default and "sort=" not in page.url and "dir=" not in page.url
+    page.select_option("#sort", "lab")
+    assert pair_names(page)[0].startswith("Aus bus")
+    page.select_option("#sort", "n")
+    assert [s.split(" ")[0] for s in page.locator("#pairs .sub").all_inner_texts()] == [
+        "3",
+        "5",
+        "9",
+    ]
+    assert page.errors == []
+
+
+def test_sort_and_range_restore_from_the_hash(browser, site):
+    page = open_page(browser, site, "#sort=pct&dir=desc&min=40&max=75")
+    assert page.locator("#sort").input_value() == "pct"
+    assert page.locator("#lo").input_value() == "40" and page.locator("#hi").input_value() == "75"
+    assert [s.split(", ")[1][:3] for s in page.locator("#pairs .sub").all_inner_texts()] == [
+        "75%",
+        "50%",
+    ]
+
+
+def test_range_filter_hides_pairs_outside_the_bounds(browser, site):
+    page = open_page(browser, site)
+    assert (page.locator("#lo").input_value(), page.locator("#hi").input_value()) == ("0", "100")
+    assert page.locator("#pairs .pair").count() == 3 and "min=" not in page.url
+    page.fill("#lo", "50")
+    page.press("#lo", "Enter")
+    assert page.locator("#pairs .pair").count() == 2  # 50 is inclusive
+    assert page.locator("#status").inner_text() == "2 pairs from 50% to 100%"
+    assert "min=50" in page.url and "max=" not in page.url
+    page.fill("#hi", "74")
+    page.press("#hi", "Enter")
+    assert page.locator("#pairs .pair").count() == 1
+    page.fill("#hi", "75")
+    page.press("#hi", "Enter")
+    assert page.locator("#pairs .pair").count() == 2  # 75 is inclusive
+    page.fill("#lo", "76")
+    page.press("#lo", "Enter")
+    assert page.locator("#pairs .pair").count() == 0
+    assert page.locator("#status").inner_text() == "0 pairs from 76% to 75%"
+    page.fill("#lo", "0")
+    page.fill("#hi", "100")
+    page.press("#hi", "Enter")
+    assert page.locator("#pairs .pair").count() == 3
+    assert "min=" not in page.url and "max=" not in page.url and page.errors == []
+    page.fill("#hi", "250")  # out of range: the bound stays
+    page.press("#hi", "Enter")
+    assert page.locator("#hi").input_value() == "100"
