@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from datetime import date
 from pathlib import Path
 
 from what_to_id import page_nav
@@ -20,6 +21,7 @@ from what_to_id import page_nav
 HERE = Path(__file__).parent
 ASSETS = HERE / "identify_assets"
 PAGE_NAME = "identify.html"
+DATES_NAME = "pool-levels-dates.json"  # written by `pool_levels` beside the levels
 # The group of records labelled above species whose photo points to one species of the label.
 # A placeholder name: rename it here and nowhere else.
 NARROW_LABEL = "Narrow it down"
@@ -52,7 +54,19 @@ SCRIPTS = {
 }
 
 
-def render(map_url: str = "map.html") -> str:
+def _day(iso: str | None) -> str | None:
+    if not iso:
+        return None
+    d = date.fromisoformat(iso)
+    return f"{d.day} {d:%B %Y}"
+
+
+def render(map_url: str = "map.html", dates: dict | None = None) -> str:
+    """The page; `dates` is `pool_levels.scoring_dates` output, for the About."""
+    photos, scored = _day((dates or {}).get("photos")), _day((dates or {}).get("scored"))
+    when = f"Photos downloaded on {photos}" if photos else ""
+    if scored:
+        when = f"{when}, scored on {scored}" if when else f"Scored on {scored}"
     html = (ASSETS / PAGE_NAME).read_text()
     for key, value in {
         "__SITE_CSS__": page_nav.CSS,
@@ -60,6 +74,8 @@ def render(map_url: str = "map.html") -> str:
         "__IDENTIFY_RANGES_CSS__": (ASSETS / "identify_ranges.css").read_text().rstrip(),
         "__CONFIG__": json.dumps({"mapUrl": map_url, "levels": LEVELS}).replace("<", "\\u003c"),
         **{f"__LEVEL_{n}__": name for n, name, _ in LEVELS},
+        "__SCORING_DATES__": f"{when}." if when else "",
+        "__PHOTO_DOWNLOAD__": f"{photos} photo download" if photos else "last photo download",
     }.items():
         html = html.replace(key, value)
     for key, path in SCRIPTS.items():
@@ -72,7 +88,8 @@ def build(out_dir: str | Path, map_url: str = "map.html") -> Path:
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     target = out / PAGE_NAME
-    target.write_text(render(map_url))
+    dates = out / DATES_NAME
+    target.write_text(render(map_url, json.loads(dates.read_text()) if dates.exists() else None))
     return target
 
 

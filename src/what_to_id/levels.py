@@ -220,7 +220,12 @@ def _identify_main(args, manifest: dict) -> int:
     built_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     # the range tables (`level_ranges`, keyed by record id) stay registered across a rescore
     keep = {k: v for k, v in manifest.get("identify", {}).items() if k in RANGE_FILES}
-    manifest["identify"] = {"name": "identify.parquet", "built_at": built_at, "count": len(out)}
+    manifest["identify"] = {
+        "name": "identify.parquet",
+        "built_at": built_at,
+        "count": len(out),
+        "emb": str(args.emb),  # its bulk download's date goes into the Identify About
+    }
     manifest["identify"].update(keep)
     write_manifest(args.atlas_dir, manifest)
     print(identify.describe(scores, out))

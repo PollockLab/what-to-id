@@ -26,6 +26,11 @@ for a known range off the grid], "notes": [...]}``, then two planes of n bytes: 
 the record to its label's range (`okm_code`: 0 inside, 255 unknown) and ``note``, an index into
 ``notes`` (255 none); all gzipped. A name not in ``names`` has no known range. Without the tables
 the file is not written; the levels are.
+
+``pool-levels-dates.json``: with ``--data-url``,
+``{"photos": "2026-10-15", "scored": "2026-10-27"}``, the photo download the embeddings came from
+(the date in the identify entry's ``emb`` path, else in ``model.source``) and the day
+identify.parquet was built; `page_identify` writes them into the About. Either may be null.
 """
 
 from __future__ import annotations
@@ -34,6 +39,7 @@ import argparse
 import base64
 import gzip
 import json
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -42,6 +48,7 @@ import numpy as np
 import pandas as pd
 
 from what_to_id.identify import NARROW, NONE, TAXONOMIST, WEIRD
+from what_to_id.page_identify import DATES_NAME
 from what_to_id.page_lookalike import _fetch, site_records
 
 OUT_NAME = "pool-levels.bin"
@@ -203,13 +210,15 @@ def build(
     taxon_ids = np.array([r[2] for r in rows] + [-1], dtype=np.int64)
     current = taxon_ids[np.where(tax < len(rows), tax, len(rows))]
     tables, why = None, "no --ranges"
+    parquet_from_manifest = parquet is None
     with tempfile.TemporaryDirectory(prefix="pool-levels-") as work:
         if parquet is None:
             if not data_url:
                 raise ValueError("give --data-url or --parquet")
             base = data_url.rstrip("/") + "/"
             _fetch(base + "manifest.json", Path(work) / "manifest.json")
-            entry = json.loads((Path(work) / "manifest.json").read_text()).get("identify")
+            manifest = json.loads((Path(work) / "manifest.json").read_text())
+            entry = manifest.get("identify")
             if not entry:
                 raise ValueError("the manifest has no identify table")
             parquet = Path(work) / "identify.parquet"
@@ -239,6 +248,9 @@ def build(
     (site / OUT_NAME).write_bytes(pack(level, score))
     (site / LOOKS_NAME).write_bytes(pack_looks(level, looks))
     (site / RANGE_NAME).unlink(missing_ok=True)  # a stale one would no longer line up
+    (site / DATES_NAME).unlink(missing_ok=True)
+    if parquet_from_manifest:
+        (site / DATES_NAME).write_text(json.dumps(scoring_dates(manifest)))
     try:
         if tables is not None:
             (site / RANGE_NAME).write_bytes(
@@ -250,6 +262,18 @@ def build(
     if not (site / RANGE_NAME).exists():
         print(f"pool_levels: no {RANGE_NAME}, so no range maps: {why}", file=sys.stderr)
     return {int(lv): int(c) for lv, c in zip(*np.unique(level, return_counts=True), strict=True)}
+
+
+def scoring_dates(manifest: dict) -> dict:
+    """{"photos", "scored"} as YYYY-MM-DD (or None) from the atlas manifest, for the About."""
+    entry = manifest.get("identify", {})
+    source = entry.get("emb") or manifest.get("model", {}).get("source", "")
+    photos = re.search(r"\d{4}-\d{2}-\d{2}", str(source))
+    scored = str(entry.get("built_at", ""))[:10]
+    return {
+        "photos": photos.group() if photos else None,
+        "scored": scored if re.fullmatch(r"\d{4}-\d{2}-\d{2}", scored) else None,
+    }
 
 
 def range_planes(ids: np.ndarray, hit: np.ndarray, notes: pd.DataFrame) -> tuple:

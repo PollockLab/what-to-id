@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from what_to_id import pool_levels
+from what_to_id import page_identify, pool_levels
 from what_to_id.identify import IDENTIFY_COLUMNS
 from what_to_id.page_map import decode_points, encode_points, render_map
 
@@ -223,3 +223,27 @@ def test_the_manifest_names_the_range_tables_or_the_levels_go_out_alone(tmp_path
     pool_levels.build(site, data_url="https://x/")
     assert not (site / pool_levels.RANGE_NAME).exists()
     assert (site / pool_levels.OUT_NAME).exists()
+    assert json.loads((site / pool_levels.DATES_NAME).read_text()) == {
+        "photos": None,
+        "scored": None,
+    }
+    entry.update(built_at="2026-10-27T05:11:17Z", emb="/scratch/bulk-2026-10-15/completed/E.npy")
+    pool_levels.build(site, data_url="https://x/")
+    dates = json.loads((site / pool_levels.DATES_NAME).read_text())
+    assert dates == {"photos": "2026-10-15", "scored": "2026-10-27"}
+    page_identify.build(site)
+    about = (site / page_identify.PAGE_NAME).read_text()
+    assert "Photos downloaded on 15 October 2026, scored on 27 October 2026." in about
+    assert "not in the\n15 October 2026 photo download" in about
+    pool_levels.build(site, parquet=src / "identify.parquet")  # a local table has no dates
+    assert not (site / pool_levels.DATES_NAME).exists()
+
+
+def test_the_scoring_dates_fall_back_to_the_model_source_and_skip_what_is_not_a_date():
+    model = {"model": {"source": "bulk-2026-10-15/completed"}}
+    assert pool_levels.scoring_dates(model) == {"photos": "2026-10-15", "scored": None}
+    bad = {"identify": {"built_at": "soon", "emb": "E.npy"}}
+    assert pool_levels.scoring_dates(bad) == {"photos": None, "scored": None}
+    html = page_identify.render(dates=None)
+    assert "Photos downloaded" not in html and "last photo download" in html
+    assert "__" not in html.split("<details", 1)[1].split("</details>", 1)[0]

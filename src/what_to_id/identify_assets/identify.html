@@ -74,8 +74,7 @@ __SITE_NAV__<main id="main-content">
 <p>Each record's first photo is compared with the names of the species in the pool by BioCLIP 2.5
 (ViT-H/14), an image and text model trained on the tree of life. A match score is the cosine between
 the photo's embedding and the embedding of the text "a photo of &lt;species&gt;". The margin is the
-match score of the label minus the best match score of any other species. Photos downloaded on
-15 October 2026, scored on 27 October 2026.</p>
+match score of the label minus the best match score of any other species. __SCORING_DATES__</p>
 <p>A record takes the first level whose rule it meets, in this order:</p>
 <dl>
 <dt>__LEVEL_4__</dt><dd>Any rank. The photo's best match score to any species is in the lowest 2% of
@@ -89,7 +88,7 @@ label. No score cut-off.</dd>
 <dt>No level</dt><dd>All other records: the margin is above 0 but the record is outside the top 25%
 of its species, or its species has fewer than 4 records; the margin is below −0.02; the look-alike
 has fewer than 20 BC records; the pool names no species inside the label, or the label is a species that was not in the pool at scoring; the record was not in the
-15 October 2026 photo download (most were added after it); or its label changed after scoring.</dd>
+__PHOTO_DOWNLOAD__ (most were added after it); or its label changed after scoring.</dd>
 </dl>
 <p>A level sorts records for review. It does not say that a label is right or wrong.</p></details>
 <p id="status" class="muted" aria-live="polite">Loading…</p>
