@@ -254,6 +254,19 @@ def test_higher_ranks_get_narrow_with_the_probable_species():
     assert row.loc[[902, 903], "looks_like"].isna().all()
 
 
+def test_the_root_has_no_outside_so_no_narrow_score():
+    pool, E, ids, taxa, T = identify_bundle()
+    pool.loc[pool["id"] == 901, ["taxon_id", "rank"]] = [1, "kingdom"]  # holds every tree species
+    # a prototype the tree does not know is in no clade, and not outside the root either
+    taxa, T = (
+        pd.concat([taxa, pd.Series(["X y"])], ignore_index=True),
+        np.vstack([T, _unit([[0, 0, -1, 0]])]),
+    )
+    s = identify.identify_scores(pool, E, ids, taxa, T, TREE)
+    row = identify.identify_levels(s).set_index("id").loc[901]
+    assert row["level"] == 3 and row["looks_like"] == "G a" and np.isnan(row["score"])
+
+
 def test_weird_wins_at_any_rank():
     pool, E, ids, taxa, T = identify_bundle()
     E[-5:] = _unit([[0, 0, 0, 1]] * 5)  # nothing like a prototype, in group Aves

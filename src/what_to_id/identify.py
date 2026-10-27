@@ -73,6 +73,7 @@ def identify_scores(
     protos = protos[pd.Series(np.arange(len(names)), index=names.to_numpy())[order].to_numpy()]
     order = np.array(order, dtype=object)
     col = pd.Series(np.arange(len(order)), index=order)
+    in_tree = max((hi for _, hi in clades.values()), default=0)  # the rest has no clade
     p = pool[["id", "taxon_id", "taxon_name", "rank", "iconic_taxon"]].dropna(
         subset=["id", "taxon_id"]
     )
@@ -117,9 +118,11 @@ def identify_scores(
                 r["in_best"][c + i], r["in_name"][c + i] = seg[j], order[lo + j]
                 if hi - lo > 1:
                     r["in_second"][c + i] = np.partition(seg, -2)[-2]
-                out = np.concatenate([sims[i, :lo], sims[i, hi:]])
-                if len(out):
-                    r["out_best"][c + i] = out.max()
+                # outside means elsewhere in the tree: the root's clade has no outside
+                if lo > 0 or hi < in_tree:
+                    r["out_best"][c + i] = max(
+                        sims[i, :lo].max(initial=-np.inf), sims[i, hi:in_tree].max(initial=-np.inf)
+                    )
         parts.append(q.drop(columns="pos").assign(**r).reset_index(drop=True))
     if not parts:
         return p.drop(columns="pos").assign(
