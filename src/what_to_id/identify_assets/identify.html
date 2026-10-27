@@ -6,35 +6,67 @@
 __SITE_CSS__
 body{margin:0;background:var(--bg);color:var(--ink);
   font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
-main{max-width:560px;margin:0 auto;padding:16px}
-h1{font-size:22px;margin:8px 0}
+main{max-width:1100px;margin:0 auto;padding:0 12px 16px}
+h1{font-size:20px;margin:12px 0 4px}
 .embed h1{display:none}
-h2{font-size:18px;margin:0 0 2px}
 a{color:var(--bar)}
 .muted{color:var(--muted)}
-.lv{margin:24px 0 32px}
-.lv p{margin:4px 0}
-.count{font-size:13px}
-ol{list-style:none;margin:12px 0;padding:0;display:grid;gap:12px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px;
-  display:flex;flex-direction:column;gap:6px}
-.card .ph{display:flex;align-items:center;justify-content:center;aspect-ratio:4/3;
-  border-radius:4px;background:var(--chip);color:var(--muted);overflow:hidden}
+.about{font-size:13px;margin:6px 0}
+.about summary{cursor:pointer;color:var(--muted)}
+.about p{margin:6px 0}
+#status{margin:6px 0;font-size:13px}
+.tabs{position:sticky;top:0;z-index:2;display:flex;gap:4px;padding:6px 0;background:var(--bg);
+  border-bottom:1px solid var(--line);overflow-x:auto}
+.tab{flex:1 0 76px;display:flex;flex-direction:column;align-items:center;gap:1px;padding:5px 6px;
+  font:inherit;font-size:12px;line-height:1.2;color:var(--ink);background:var(--chip);
+  border:1px solid var(--line);border-radius:8px;cursor:pointer}
+.tab b{font-size:14px}
+.tab[aria-selected=true]{background:var(--on);color:var(--onink);border-color:var(--on)}
+#desc{margin:6px 0 2px;font-size:12px}
+.batch{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:8px 0}
+.batch .muted{font-size:12px}
+.arrow{font:inherit;min-width:32px;min-height:32px;cursor:pointer;color:var(--ink);
+  border:1px solid var(--line);border-radius:6px;background:var(--chip)}
+.arrow:disabled{opacity:.4;cursor:default}
+ol{list-style:none;margin:8px 0;padding:0;display:grid;gap:10px;
+  grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px;
+  display:flex;flex-direction:column;gap:4px;min-width:0;cursor:pointer}
+.card:hover{border-color:var(--muted)}
+.card .ph{display:flex;align-items:center;justify-content:center;aspect-ratio:4/3;font-size:12px;
+  border-radius:4px;background:var(--chip);color:var(--muted);overflow:hidden;text-align:center}
 .card img{width:100%;height:100%;object-fit:cover;display:block}
-.card .links{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center}
-.card .links .muted{flex:1 1 0;min-width:0;font-size:12px}
-.btn{display:inline-flex;align-items:center;min-height:32px;padding:0 14px;border-radius:16px;
+.card .name,.card .com,.card .when{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card .name{font-size:13px}
+.card .com,.card .look,.card .when{font-size:12px;color:var(--muted)}
+.card .look{overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.card .when{display:block;text-decoration:none;min-height:1.4em}
+.card .when:hover{text-decoration:underline}
+.btn{display:inline-flex;align-items:center;min-height:30px;padding:0 12px;border-radius:15px;
   background:var(--on);color:var(--onink);font-size:13px;font-weight:650;text-decoration:none}
+.card .btn{align-self:flex-start}
 .more{font:inherit;color:inherit;cursor:pointer;min-height:36px;padding:0 14px;
   border:1px solid var(--line);border-radius:6px;background:var(--chip)}
+#end{text-align:center;margin:8px 0}
 </style></head><body>
 __SITE_NAV__<main id="main-content">
 <h1>Identify</h1>
+<details class="about"><summary>About</summary>
 <p>Needs ID records in four groups by how their photo compares with the species they are labelled as,
 so you spend your time where it counts. Records added since the last scoring run have no level yet,
-so they are not listed.</p>
+so they are not listed.</p></details>
 <p id="status" class="muted" aria-live="polite">Loading…</p>
-<div id="sections"></div>
+<div id="tabs" class="tabs" role="tablist" aria-label="Level"></div>
+<p id="desc" class="muted"></p>
+<div id="panel" role="tabpanel">
+<div id="batch" class="batch" hidden><a id="go" class="btn" target="_blank" rel="noopener"></a>
+<button type="button" id="prev" class="arrow" aria-label="Previous batch">‹</button>
+<span id="step" class="muted"></span>
+<button type="button" id="next" class="arrow" aria-label="Next batch">›</button></div>
+<p id="none" class="muted" hidden>No records at this level here.</p>
+<ol id="grid"></ol>
+<p id="end"><button type="button" id="more" class="more" hidden></button></p>
+</div>
 </main>
 <script>var IDENTIFY_CONFIG=__CONFIG__;</script>
 <script>__ATLAS_SEARCH_META__</script>

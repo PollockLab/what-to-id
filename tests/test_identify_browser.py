@@ -61,8 +61,8 @@ def site(tmp_path_factory):
     server.shutdown()
 
 
-def open_identify(browser, base, hash_=""):
-    page = browser.new_page(viewport={"width": 600, "height": 900})
+def open_identify(browser, base, hash_="", size=(600, 900)):
+    page = browser.new_page(viewport={"width": size[0], "height": size[1]})
     page.errors = []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     # the header's links to the site's other pages are not in this fixture's site
@@ -134,11 +134,14 @@ def test_the_area_and_the_lasso_narrow_the_same_ids_as_the_map_keeps(browser, si
     assert page.errors == []
 
 
-def test_cards_group_by_level_with_a_few_per_species_and_photos_in_batches(browser, site):
+def tab(page, lv):
+    return page.locator(f"#tab{lv}")
+
+
+def test_cards_follow_the_chosen_level_with_a_few_per_species_and_photos_in_batches(browser, site):
     base, pts = site
-    page = open_identify(browser, base)
+    page = open_identify(browser, base, "#lvl=1", (380, 500))
     page.wait_for_function("document.querySelectorAll('.card .ph img').length > 0")
-    assert [h.inner_text() for h in page.locator("#sections h2").all()] == LABELS
     shown = page.evaluate("__identify.view()")
     level = dict(zip(pts["id"], pts["level"], strict=True))
     taxon = dict(zip(pts["id"], pts["taxon_id"], strict=True))
@@ -146,19 +149,22 @@ def test_cards_group_by_level_with_a_few_per_species_and_photos_in_batches(brows
         assert shown[lv] and all(level[i] == lv for i in shown[lv])
         counts = pd.Series([taxon[i] for i in shown[lv]]).value_counts()
         assert counts.max() <= 3 and len(counts) == 7  # a few of each of the seven species
-    assert page.locator("#lv1 .card").count() == 12
+    assert page.locator("#grid .card").count() == 12
     assert all(len(c) <= 200 for c in page.calls) and page.calls
     before = len(page.calls)
-    page.locator("#lv1 button.more").click()
-    page.wait_for_function("document.querySelectorAll('#lv1 .card').length === 21")
+    page.evaluate("scrollTo(0, document.body.scrollHeight)")
+    page.wait_for_function("document.querySelectorAll('#grid .card').length === 21")
     assert len(page.calls) == before + 1 and len(page.calls[-1]) == 9
-    text = page.locator("#lv3 .card .name").first.inner_text()
-    assert ", probably " in text and text.split(", probably ")[1].split()[0] in {"Bombus", "Apis"}
-    assert "Often confused with" in page.locator("#lv2 .card .name").first.inner_text()
-    assert page.locator("#sections").inner_text().count("Often confused with") >= 1
+    tab(page, 3).click()
+    page.wait_for_selector("#grid .card .look")
+    text = page.locator("#grid .card .look").first.inner_text()
+    assert text.startswith("Probably ") and text.split()[1] in {"Bombus", "Apis"}
+    tab(page, 2).click()
+    page.wait_for_selector("#grid .card .look")
+    assert "Often confused with" in page.locator("#grid .card .look").first.inner_text()
     body = page.inner_text("body").lower()
     assert not any(word in body for word in FORBIDDEN)
-    assert "no level yet" in body
+    assert "no level yet" in page.locator(".about").text_content()
     assert page.errors == []
 
 
@@ -178,3 +184,108 @@ def test_the_page_names_the_narrowing_group_from_one_constant_and_has_the_header
     assert html.count(page_identify.NARROW_LABEL) == 1  # only in the config the constant fills
     assert "<nav" in html
     assert not [w for w in FORBIDDEN if w in html.lower()]
+
+
+def wrapped(browser, base, hash_=""):
+    """identify.html in a parent page that records what the frame posts, as the split page does."""
+    page = browser.new_page(viewport={"width": 400, "height": 900})
+    page.errors = []
+    page.on("pageerror", lambda e: page.errors.append(str(e)))
+    page.calls = eb.stub_inat(page, None)
+    page.route(
+        f"{base}/wrap.html",
+        lambda r: r.fulfill(
+            content_type="text/html",
+            body=f"<script>var got=[];addEventListener('message',e=>got.push(e.data))</script>"
+            f'<iframe id=f src="{base}/identify.html{hash_}" width=400 height=800></iframe>',
+        ),
+    )
+    page.goto(f"{base}/wrap.html")
+    frame = page.frame_locator("#f").owner.element_handle().content_frame()
+    frame.wait_for_function("window.__identify")
+    return page, frame
+
+
+def test_a_viewport_narrows_the_ids_and_the_status_count_and_empty_restores_them(browser, site):
+    base, pts = site
+    page = open_identify(browser, base)
+    west = float(np.median(pts["lon"]))
+    view = page.evaluate("r => MapArea.encode([r])", [west, 48, -122, 48, -122, 50, west, 50])
+    page.evaluate("a => postMessage({type: 'wtid-view', area: a}, location.origin)", view)
+    page.wait_for_function("__identify.ids().length < 2100")
+    want = sorted(pts["id"][pts["lon"] > west].tolist())
+    assert ids(page) == want
+    status = page.locator("#status").inner_text()
+    assert status.startswith(f"{len(want):,} in view") and "3 per species" in status
+    page.evaluate("postMessage({type: 'wtid-view', area: ''}, location.origin)")
+    page.wait_for_function("__identify.ids().length === 2100")
+    assert page.locator("#status").inner_text().startswith("2,100 ")
+    assert page.errors == []
+
+
+def test_the_tabs_switch_the_cards_and_their_counts_are_the_totals(browser, site):
+    base, pts = site
+    page = open_identify(browser, base)
+    total = page.evaluate("__identify.total()")
+    assert page.evaluate("__identify.level()") == 2  # opens on Close calls
+    assert page.get_by_role("tab", selected=True).count() == 1
+    for lv, label in enumerate(LABELS, 1):
+        assert " ".join(tab(page, lv).inner_text().split()) == f"{label} {total[lv]:,}"
+    tab(page, 2).focus()
+    page.keyboard.press("ArrowRight")
+    assert page.evaluate("__identify.level()") == 3
+    assert tab(page, 3).get_attribute("aria-selected") == "true"
+    assert tab(page, 3).get_attribute("tabindex") == "0"
+    assert tab(page, 2).get_attribute("tabindex") == "-1"
+    page.keyboard.press("End")
+    assert page.evaluate("__identify.level()") == 4
+    page.wait_for_selector("#grid .card")
+    shown = {
+        int(i) for i in page.eval_on_selector_all("#grid .card", "l => l.map(e => e.dataset.id)")
+    }
+    level = dict(zip(pts["id"], pts["level"], strict=True))
+    assert shown and {level[i] for i in shown} == {4}
+    assert page.locator("#desc").inner_text() == page_identify.LEVELS[3][2]
+    page.reload()
+    page.wait_for_function("window.__identify")
+    assert page.evaluate("__identify.level()") == 4  # kept in the hash
+    assert page.errors == []
+
+
+def test_a_card_posts_its_record_on_click_and_focus_on_hover(browser, site):
+    base, _ = site
+    page, frame = wrapped(browser, base, "#lvl=1")
+    frame.wait_for_selector("#grid .card")
+    first = frame.locator("#grid .card").first
+    rid = int(first.get_attribute("data-id"))
+    first.hover()
+    page.wait_for_function("got.some(m => m.type === 'wtid-focus')")
+    first.locator(".ph").click()
+    page.wait_for_function("got.some(m => m.type === 'wtid-record')")
+    got = page.evaluate("got.filter(m => m.type && m.type.startsWith('wtid-'))")
+    assert {"type": "wtid-focus", "id": rid} in got and {"type": "wtid-record", "id": rid} in got
+    assert page.errors == []
+
+
+def test_scrolling_loads_more_cards(browser, site):
+    base, _ = site
+    page = open_identify(browser, base, "#lvl=1", (380, 500))
+    page.wait_for_function("document.querySelectorAll('#grid .card').length === 12")
+    assert page.locator("#more").is_visible()  # the fallback button
+    page.evaluate("scrollTo(0, document.body.scrollHeight)")
+    page.wait_for_function("document.querySelectorAll('#grid .card').length === 21")
+    assert page.locator("#more").is_hidden()
+    assert page.errors == []
+
+
+def test_the_batch_links_cover_the_listed_ids(browser, site):
+    base, _ = site
+    page = open_identify(browser, base)
+    for lv in (1, 2, 3, 4):
+        tab(page, lv).click()
+        want = sorted(page.evaluate("__identify.view()")[lv])
+        href = page.get_attribute("#go", "href")
+        assert sorted(int(i) for i in href.split("&id=")[1].split(",")) == want
+        assert page.locator("#go").inner_text() == f"Identify these {len(want)}"
+        assert page.locator("#go").get_attribute("target") == "_blank"
+    assert page.errors == []
