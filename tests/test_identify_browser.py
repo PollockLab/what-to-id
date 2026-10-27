@@ -61,14 +61,24 @@ def site(tmp_path_factory):
     server.shutdown()
 
 
-def open_identify(browser, base, hash_="", size=(600, 900)):
-    page = browser.new_page(viewport={"width": size[0], "height": size[1]})
+def open_identify(browser, base, hash_="", size=(600, 900), touch=False):
+    view = {"width": size[0], "height": size[1]}
+    page = (
+        browser.new_context(viewport=view, has_touch=True, is_mobile=True).new_page()
+        if touch
+        else browser.new_page(viewport=view)
+    )
     page.errors = []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
-    # the header's links to the site's other pages are not in this fixture's site
+    # the header's links to the site's other pages are not in this fixture's site, nor are the
+    # optional range maps
     page.on(
         "response",
-        lambda r: page.errors.append(r.url) if r.status >= 400 and ".html" not in r.url else None,
+        lambda r: (
+            page.errors.append(r.url)
+            if r.status >= 400 and ".html" not in r.url and pool_levels.RANGE_NAME not in r.url
+            else None
+        ),
     )
     page.calls = eb.stub_inat(page, None)
     page.goto(f"{base}/identify.html{hash_}")
@@ -311,4 +321,13 @@ def test_the_batch_links_cover_the_listed_ids(browser, site):
         assert sorted(int(i) for i in href.split("&id=")[1].split(",")) == want
         assert page.locator("#go").inner_text() == f"Identify {len(want)} listed"
         assert page.locator("#go").get_attribute("target") == "_blank"
+    assert page.errors == []
+
+
+def test_without_the_range_file_the_cards_have_no_range_chips(browser, site):
+    base, _ = site
+    page = open_identify(browser, base, "#lvl=1")
+    page.wait_for_selector("#grid .card")
+    assert page.evaluate("__identify.ranges()") is False
+    assert page.locator(".rchip, .card .range").count() == 0 and page.locator("#rout").is_hidden()
     assert page.errors == []

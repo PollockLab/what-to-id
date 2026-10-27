@@ -6,7 +6,7 @@
 'use strict';
 var CFG=IDENTIFY_CONFIG,L=EmbeddingsLayout,Meta=AtlasSearchMeta,PER_SPECIES=3,LIMIT=12,STEPS=16,NO_LOOK=65535,NOTAX=65535,LS='wtid-identify-level',IO=null,T=0;
 var MAP=new URL(CFG.mapUrl,location.href).href,nf=new Intl.NumberFormat('en-CA'),OBS='https://www.inaturalist.org/observations/';
-var META=null,TAXA=null,P=null,LEVEL=null,Q=null,LOOKS=null,MF=null,TF=null,PEND=null,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,CACHE=new Map();
+var META=null,TAXA=null,P=null,LEVEL=null,Q=null,LOOKS=null,R=null,MF=null,TF=null,PEND=null,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,CACHE=new Map();
 function $(id){return document.getElementById(id);}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 function status(t){$('status').textContent=t;}
@@ -26,12 +26,14 @@ function select(){
   m.forEach(function(v){if(v)for(var j=0;j<n;j++)SEL[j]&=v[j];});
 }
 // Per level the kept records best first (quantized score, a bucket each), then at most PER_SPECIES of any one taxon.
+// With the range file (R), a level's records also pass its outside-its-range chip.
+function on(i){return SEL[i]&&LEVEL[i]&&(!R||R.pass(i,LEVEL[i]));}
 function build(){
   var n=P.n,c=new Uint32Array(5*STEPS+1),i,k,lv;
-  for(i=0;i<n;i++)if(SEL[i]&&LEVEL[i])c[LEVEL[i]*STEPS+Q[i]+1]++;
+  for(i=0;i<n;i++)if(on(i))c[LEVEL[i]*STEPS+Q[i]+1]++;
   for(k=1;k<c.length;k++)c[k]+=c[k-1];
   var at=c.slice(),order=new Int32Array(c[c.length-1]);
-  for(i=0;i<n;i++)if(SEL[i]&&LEVEL[i])order[at[LEVEL[i]*STEPS+Q[i]]++]=i;
+  for(i=0;i<n;i++)if(on(i))order[at[LEVEL[i]*STEPS+Q[i]]++]=i;
   var out=[],total=[];
   for(lv=1;lv<=4;lv++){
     var taken=new Uint8Array(65536),rows=[],a=c[lv*STEPS],b=c[(lv+1)*STEPS];
@@ -63,9 +65,9 @@ function card(i,lv){
   li.dataset.id=id;li.tabIndex=0;
   w.href=OBS+id;w.target='_blank';w.rel='noopener';
   a.href=IdentifyLinks.batches([id])[0].url;a.target='_blank';a.rel='noopener';a.setAttribute('aria-label','Identify this record on iNaturalist');
-  li.append(ph,title(i,lv),w,a);
+  li.append(ph,title(i,lv),w,R?R.links(a,i,lv):a);
   li.onmouseenter=li.onfocus=function(){tell('wtid-focus',id);};
-  li.onclick=function(e){if(!e.target.closest('a'))tell('wtid-record',id);};
+  li.onclick=function(e){if(!e.target.closest('a,button'))tell('wtid-record',id);};
   li.onkeydown=function(e){if(e.target===li&&(e.key==='Enter'||e.key===' ')){e.preventDefault();tell('wtid-record',id);}};
   return li;
 }
@@ -116,9 +118,11 @@ function paint(){
   [].forEach.call($('tabs').children,function(t){var on=+t.dataset.lv===LV;t.setAttribute('aria-selected',on);t.tabIndex=on?0:-1;});
   $('desc').textContent=x[2];$('panel').setAttribute('aria-labelledby','tab'+LV);
   $('grid').textContent='';shown=LIMIT;drawn=0;
+  if(R)R.draw(LV,SEL,LEVEL);
   empty();
   more();batch();scrollTo(0,0);
 }
+function redraw(){build();counts();paint();}
 function counts(){
   [].forEach.call($('tabs').children,function(t){var n=S.total[+t.dataset.lv]||0;t.lastChild.textContent=nf.format(n);t.classList.toggle('zero',!n);});
 }
@@ -137,7 +141,7 @@ function choose(lv){
   try{localStorage.setItem(LS,lv);}catch(e){}
   var t=location.hash.slice(1).split('&').filter(function(x){return x&&x.indexOf('lvl=')!==0;});t.push('lvl='+lv);
   history.replaceState(null,'','#'+t.join('&'));  // no hashchange, so no refresh
-  paint();
+  if(R){R.level(lv);redraw();}else paint();
 }
 function saved(){
   var m=/(?:^|&)lvl=(\d)/.exec(location.hash.slice(1)),v=m?+m[1]:0;
@@ -215,7 +219,8 @@ async function load(){
   var q=String(META.shards[0].file).split('?')[1],suffix=q?'?'+q:'';
   var taxa=get(new URL(META.taxa,MAP)).then(function(b){return JSON.parse(new TextDecoder().decode(b));});
   var shards=Promise.all(META.shards.map(function(s){return get(new URL(s.file,MAP)).then(function(b){return L.decodeShard(b,s.n);});}));
-  var lev=get(new URL('pool-levels.bin'+suffix,MAP)),lk=get(new URL('pool-levels-looks.bin'+suffix,MAP)).catch(function(){return null;});
+  var lev=get(new URL('pool-levels.bin'+suffix,MAP)),lk=get(new URL('pool-levels-looks.bin'+suffix,MAP)).catch(function(){return null;}),
+    rg=get(new URL('pool-levels-range.bin'+suffix,MAP)).catch(function(){return null;});  // optional: no range maps without it
   status('Downloading the records…');
   var d=await Promise.all([shards,taxa,lev,lk]);
   P=L.pool(d[0],META.bbox);TAXA=d[1];
@@ -226,8 +231,11 @@ async function load(){
   MF=MapFilter(META);
   take(location.hash.slice(1),AREA==='');
   if(PEND!==null){take(PEND,false);PEND=null;}
+  rg.then(function(b){if(!b)return;
+    R=IdentifyRanges(b,{P:P,name:function(i){return P.tax[i]!==NOTAX&&TAXA[P.tax[i]]?TAXA[P.tax[i]][0]:null;},look:looksOf,redraw:redraw});
+    R.level(LV,true);redraw();});
   window.__identify={ids:idsOf,view:function(){return view.map(function(r){return r&&Array.from(r.map(function(i){return P.id[i];}));});},
-    total:function(){return S.total;},level:function(){return LV;},refresh:function(){var t=performance.now();select();build();return performance.now()-t;}};
+    total:function(){return S.total;},level:function(){return LV;},ranges:function(){return !!R;},refresh:function(){var t=performance.now();select();build();return performance.now()-t;}};
 }
 tabs();inbox();
 load().catch(function(e){status('Could not load the records: '+e.message);});

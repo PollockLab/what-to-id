@@ -3,9 +3,10 @@
     python -m what_to_id.page_identify --out SITE_DIR [--map-url map.html]
 
 It writes identify.html (every script inlined) and reads, at view time, the map's pool shards and
-the levels `pool_levels` wrote beside them (pool-levels.bin, pool-levels-looks.bin). The selection
-is the map's: dates, months, groups, taxa and the rest of the hash, the area (``wtid-area``) and the
-lasso's ids (``wtid-keep``), through the same MapFilter the map and the photo space use.
+the levels `pool_levels` wrote beside them (pool-levels.bin, pool-levels-looks.bin and, for the
+range maps, pool-levels-range.bin when it was written). The selection is the map's: dates, months,
+groups, taxa and the rest of the hash, the area (``wtid-area``) and the lasso's ids
+(``wtid-keep``), through the same MapFilter the map and the photo space use.
 """
 
 from __future__ import annotations
@@ -46,6 +47,7 @@ SCRIPTS = {
     "__MAP_FILTER__": HERE / "map_assets" / "map_filter.js",
     "__EMBEDDINGS_LAYOUT__": HERE / "embeddings_assets" / "embeddings_layout.js",
     "__SPACE_MASK__": HERE / "embeddings_assets" / "space_mask.js",
+    "__IDENTIFY_RANGES__": ASSETS / "identify_ranges.js",
     "__IDENTIFY_APP__": ASSETS / "identify_app.js",
 }
 

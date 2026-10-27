@@ -313,6 +313,12 @@ def test_cli_identify_registers_the_new_key_and_leaves_levels(tmp_path, capsys):
     assert manifest["levels"] == {"name": "levels.parquet"}
     assert not (tmp_path / "levels.parquet").exists()
     assert "records per group and level" in capsys.readouterr().out
+    ranges = {"ranges": "r.parquet", "range_cells": "c.parquet", "range_notes": "n.parquet"}
+    manifest["identify"].update(ranges, stale="x")
+    write_manifest(tmp_path, manifest)
+    assert levels.main(args) == 0  # a rescore keeps the range tables registered, nothing else
+    assert read_manifest(tmp_path)["identify"].items() >= ranges.items()
+    assert "stale" not in read_manifest(tmp_path)["identify"]
     with pytest.raises(ValueError, match="--tree"):
         (tmp_path / "taxonomy.json").write_text('{"taxa":{}}')
         levels.main(args)
