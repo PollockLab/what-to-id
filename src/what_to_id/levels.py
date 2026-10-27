@@ -81,6 +81,15 @@ PER_SPECIES = 3  # records per species per level, so a common species does not f
 CAP = 1500  # records per level per iconic group; keeps levels-data.bin well under 3 MB gzipped
 
 
+def lookalike_known(s: pd.DataFrame, bc_counts: pd.Series | None = None) -> pd.Series:
+    """Rows of `s` whose look-alike (`other_name`) has `MIN_LOOKALIKE_RECORDS` records."""
+    # a name can map to two taxa (species and complex), so counts are summed by name
+    counts = (
+        s["taxon_name"].value_counts() if bc_counts is None else bc_counts.groupby(level=0).sum()
+    )
+    return s["other_name"].map(counts).fillna(0) >= MIN_LOOKALIKE_RECORDS
+
+
 def species_masks(s: pd.DataFrame, weird: pd.Series, bc_counts: pd.Series | None = None):
     """(easy, taxonomist) masks over scored species rows `s`, outside the `weird` rows.
 
@@ -90,15 +99,10 @@ def species_masks(s: pd.DataFrame, weird: pd.Series, bc_counts: pd.Series | None
     n_species = by_species.transform("size")
     own_share = by_species.rank(ascending=False, pct=True, method="first")
     easy = (s["margin"] > 0) & (n_species >= MIN_PER_CLASS) & (own_share <= EASY_TOP_SHARE) & ~weird
-    # a name can map to two taxa (species and complex), so counts are summed by name
-    counts = (
-        s["taxon_name"].value_counts() if bc_counts is None else bc_counts.groupby(level=0).sum()
-    )
-    n_lookalike = s["other_name"].map(counts).fillna(0)
     taxonomist = (
         (s["margin"] < 0)
         & (s["margin"] >= -TAXONOMIST_MARGIN)
-        & (n_lookalike >= MIN_LOOKALIKE_RECORDS)
+        & lookalike_known(s, bc_counts)
         & ~weird
     )
     return easy, taxonomist

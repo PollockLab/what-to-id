@@ -8,7 +8,9 @@ outside the clade. Every row gets `top`, its best cosine to any prototype.
 
 `identify_levels` turns that into one row per record (`IDENTIFY_COLUMNS`): weird first at any
 rank, then easy / taxonomist at species rank with no per-species or per-group cap, then narrow
-for a higher rank whose clade has a prototype. Everything else is level 0.
+for a higher rank whose clade has a prototype, then mislabel: a species-ranked margin below
+`-TAXONOMIST_MARGIN` with a look-alike of `MIN_LOOKALIKE_RECORDS` records. Everything else is
+level 0.
 """
 
 from __future__ import annotations
@@ -17,11 +19,11 @@ import numpy as np
 import pandas as pd
 
 from what_to_id.confusion import CHUNK, FIR_SLICE
-from what_to_id.levels import WEIRD_SHARE, species_masks
+from what_to_id.levels import TAXONOMIST_MARGIN, WEIRD_SHARE, lookalike_known, species_masks
 
 IDENTIFY_COLUMNS = ("id", "taxon_id", "level", "score", "score2", "looks_like")
-NONE, EASY, TAXONOMIST, NARROW, WEIRD = 0, 1, 2, 3, 4
-LEVEL_NAMES = ("none", "easy", "taxonomist", "narrow", "weird")
+NONE, EASY, TAXONOMIST, NARROW, WEIRD, MISLABEL = 0, 1, 2, 3, 4, 5
+LEVEL_NAMES = ("none", "easy", "taxonomist", "narrow", "weird", "mislabel")
 
 
 def clade_columns(
@@ -137,9 +139,10 @@ def identify_scores(
 def identify_levels(scores: pd.DataFrame, bc_counts: pd.Series | None = None) -> pd.DataFrame:
     """`IDENTIFY_COLUMNS` rows from `identify_scores`, one per record, in score order of `scores`.
 
-    `score` is `own` for easy, the margin for taxonomist, in-clade best minus outside best for
-    narrow and `top` for weird; `score2` is best minus second-best in-clade (narrow only);
-    `looks_like` is the look-alike species (taxonomist) or the probable species (narrow).
+    `score` is `own` for easy, the margin for taxonomist and mislabel, in-clade best minus
+    outside best for narrow and `top` for weird; `score2` is best minus second-best in-clade
+    (narrow only); `looks_like` is the look-alike species (taxonomist, mislabel) or the probable
+    species (narrow).
     """
     s = scores.copy()
     s["group"] = s["iconic_taxon"].fillna("")
@@ -150,14 +153,25 @@ def identify_levels(scores: pd.DataFrame, bc_counts: pd.Series | None = None) ->
     easy, tax = species_masks(sp, weird.loc[sp.index], bc_counts)
     easy, tax = easy.reindex(s.index, fill_value=False), tax.reindex(s.index, fill_value=False)
     narrow = (s["rank"] != "species") & s["in_best"].notna() & ~weird
-    level = np.select([weird, easy, tax, narrow], [WEIRD, EASY, TAXONOMIST, NARROW], NONE)
+    # species rank only, so disjoint from narrow; the margin test is disjoint from easy and tax
+    mislabel = (
+        (sp["margin"] < -TAXONOMIST_MARGIN) & lookalike_known(sp, bc_counts) & ~weird.loc[sp.index]
+    ).reindex(s.index, fill_value=False)
+    conds = [weird, easy, tax, narrow, mislabel]
+    level = np.select(conds, [WEIRD, EASY, TAXONOMIST, NARROW, MISLABEL], NONE)
     score = np.select(
-        [weird, easy, tax, narrow],
-        [s["top"], s["own"], s["own"] - s["other"], s["in_best"] - s["out_best"]],
+        conds,
+        [
+            s["top"],
+            s["own"],
+            s["own"] - s["other"],
+            s["in_best"] - s["out_best"],
+            s["own"] - s["other"],
+        ],
         np.nan,
     )
     score2 = np.where(narrow & ~weird, s["in_best"] - s["in_second"], np.nan)
-    looks = np.where(tax, s["other_name"], np.where(narrow, s["in_name"], None))
+    looks = np.where(tax | mislabel, s["other_name"], np.where(narrow, s["in_name"], None))
     return pd.DataFrame(
         {
             "id": s["id"].to_numpy(np.int64),

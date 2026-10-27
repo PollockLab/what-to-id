@@ -30,13 +30,13 @@ def write_site(tmp_path):
 
 
 def scored_frame(points):
-    """Every third pool record missing, one with a new label, levels cycling over all five."""
+    """Every third pool record missing, one with a new label, levels cycling over 0 to 5."""
     rng = np.random.default_rng(6)
     df = pd.DataFrame(
         {
             "id": points["id"].to_numpy(np.int64),
             "taxon_id": points["taxon_id"].to_numpy(np.int64),
-            "level": np.arange(N) % 5,
+            "level": np.arange(N) // 3 % 6,
             "score": rng.normal(size=N).astype(np.float32),
             "score2": np.float32(0),
             "looks_like": pd.Series([LOOKS[i % 3] for i in range(N)], dtype="category"),
@@ -64,8 +64,8 @@ def test_the_pack_round_trips_identify_parquet_in_shard_order(tmp_path):
             continue
         want = int(row.at[pid, "level"])
         assert level[i] == want
-        assert looks[i] == (row.at[pid, "looks_like"] if want in (2, 3) else None)
-    assert (level == 0).sum() >= N // 3 + 1 and set(level) == {0, 1, 2, 3, 4}
+        assert looks[i] == (row.at[pid, "looks_like"] if want in (2, 3, 5) else None)
+    assert (level == 0).sum() >= N // 3 + 1 and set(level) == {0, 1, 2, 3, 4, 5}
 
 
 def test_the_score_steps_rank_within_a_level_and_weird_shows_the_lowest_first():

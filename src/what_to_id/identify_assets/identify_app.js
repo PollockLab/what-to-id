@@ -30,13 +30,13 @@ function select(){
 // With the range file (R), a level's records also pass its outside-its-range chip.
 function on(i){return SEL[i]&&LEVEL[i]&&(!R||R.pass(i,LEVEL[i]));}
 function build(){
-  var n=P.n,c=new Uint32Array(5*STEPS+1),i,k,lv;
+  var n=P.n,c=new Uint32Array(6*STEPS+1),i,k,lv;
   for(i=0;i<n;i++)if(on(i))c[LEVEL[i]*STEPS+Q[i]+1]++;
   for(k=1;k<c.length;k++)c[k]+=c[k-1];
   var at=c.slice(),order=new Int32Array(c[c.length-1]);
   for(i=0;i<n;i++)if(on(i))order[at[LEVEL[i]*STEPS+Q[i]]++]=i;
   var out=[],total=[];MORE.clear();
-  for(lv=1;lv<=4;lv++){
+  for(lv=1;lv<=5;lv++){
     var tot=new Uint32Array(65536),taken=new Uint32Array(65536),rows=[],a=c[lv*STEPS],b=c[(lv+1)*STEPS],nd=0,cut;
     for(k=a;k<b;k++)if(!tot[P.tax[order[k]]]++)nd++;
     cut=nd===1?Infinity:PER_SPECIES;
@@ -51,14 +51,14 @@ function looksOf(i){
   var v=LOOKS.lo[i]|LOOKS.hi[i]<<8;
   return v===NO_LOOK?null:LOOKS.names[v];
 }
-// Under a card's photo: its label, and for a close call or a record above species what it looks like.
+// Under a card's photo: its label, and for a close call, a likely mislabel or a record above species what it looks like.
 function title(i,lv){
   var t=P.tax[i]!==NOTAX&&TAXA[P.tax[i]],box=el('div','title'),nm=el('div','name'),lk=looksOf(i),l=el('div','look');
   nm.appendChild(el('i',null,t?t[0]:'Unidentified'));
   box.appendChild(nm);
   if(t&&t[1])box.appendChild(el('div','com',t[1]));
   if(lv===3&&lk)l.append('Probably ',el('i',null,lk));
-  else if(lv===2&&lk)l.append('Looks more like ',el('i',null,lk));
+  else if((lv===2||lv===5)&&lk)l.append('Looks more like ',el('i',null,lk));
   if(l.firstChild)box.appendChild(l);
   return box;
 }

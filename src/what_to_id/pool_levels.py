@@ -8,14 +8,15 @@ local file instead. It writes two files, records in the order of META.shards, as
 and a third when the range tables are found:
 
 ``pool-levels.bin``: gzip of one plane of n bytes. The low nibble is the level (0 none, 1 easy,
-2 taxonomist, 3 narrow, 4 weird; `identify.LEVEL_NAMES`), the high nibble the record's score
-quantized to 16 steps within its level, 15 for the record to show first (the highest score, the
-lowest for weird). A record missing from identify.parquet, or whose label changed since it was
-scored, is level 0.
+2 taxonomist, 3 narrow, 4 weird, 5 mislabel; `identify.LEVEL_NAMES`), the high nibble the
+record's score quantized to 16 steps within its level, 15 for the record to show first (the
+highest score, the lowest for weird). A record missing from identify.parquet, or whose label
+changed since it was scored, is level 0.
 
-``pool-levels-looks.bin``: the look-alike species of the taxonomist and narrow records, apart so
-the levels load first. A uint32 LE length and that many bytes of JSON ``{"names": [...]}``, then two
-planes of n bytes (low byte, high byte) of indexes into ``names``, 65535 for none; all gzipped.
+``pool-levels-looks.bin``: the look-alike species of the taxonomist, narrow and mislabel records,
+apart so the levels load first. A uint32 LE length and that many bytes of JSON
+``{"names": [...]}``, then two planes of n bytes (low byte, high byte) of indexes into
+``names``, 65535 for none; all gzipped.
 
 ``pool-levels-range.bin``: the range maps, from `level_ranges` output (range-notes.parquet,
 level-ranges.parquet, level-range-cells.parquet): the manifest's identify entry names them under
@@ -47,7 +48,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from what_to_id.identify import NARROW, NONE, TAXONOMIST, WEIRD
+from what_to_id.identify import MISLABEL, NARROW, NONE, TAXONOMIST, WEIRD
 from what_to_id.page_identify import DATES_NAME
 from what_to_id.page_lookalike import _fetch, site_records
 
@@ -90,8 +91,8 @@ def unpack(blob: bytes) -> tuple[np.ndarray, np.ndarray]:
 
 
 def pack_looks(level: np.ndarray, looks: np.ndarray) -> bytes:
-    """The gzipped look-alike file for `looks` (name or None per record), kept at levels 2 and 3."""
-    keep = np.isin(level, (TAXONOMIST, NARROW)) & pd.notna(looks)
+    """The gzipped look-alike file for `looks` (name or None per record), for levels 2, 3, 5."""
+    keep = np.isin(level, (TAXONOMIST, NARROW, MISLABEL)) & pd.notna(looks)
     names, code = np.unique(np.asarray(looks, dtype=object)[keep].astype(str), return_inverse=True)
     if len(names) >= NO_LOOK:
         raise ValueError(f"{len(names)} look-alike names do not fit 16 bits")

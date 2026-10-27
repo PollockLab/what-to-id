@@ -276,6 +276,44 @@ def test_weird_wins_at_any_rank():
     assert np.allclose(out["score"].iloc[-5:], s["top"].iloc[-5:])
 
 
+def mislabel_levels(margin, bc, top=0.9):
+    """Levels of a species row at `margin` whose look-alike has `bc` BC records, among 49 others."""
+    n = 50
+    s = pd.DataFrame(
+        {
+            "id": np.arange(n),
+            "taxon_id": 4,
+            "taxon_name": "G a",
+            "rank": "species",
+            "iconic_taxon": "Plantae",
+            "top": np.linspace(0.6, 0.9, n),
+            "own": 0.5,
+            "other": 0.5 - margin,
+            "other_name": "G b",
+            "in_best": np.nan,
+            "in_second": np.nan,
+            "out_best": np.nan,
+            "in_name": None,
+        }
+    )
+    s.loc[0, "top"] = top
+    s.loc[1:, ["own", "other"]] = [0.9, 0.1]  # the rest sit squarely in their label
+    out = identify.identify_levels(s, bc_counts=pd.Series({"G b": bc}))
+    return out.iloc[0]
+
+
+def test_a_margin_below_the_close_call_cut_with_a_known_lookalike_is_a_mislabel():
+    row = mislabel_levels(-0.05, 20)
+    assert row["level"] == identify.MISLABEL == 5 and row["looks_like"] == "G b"
+    assert row["score"] == pytest.approx(-0.05, abs=1e-6)
+    assert mislabel_levels(-0.05, 19)["level"] == 0  # look-alike too rare
+    assert mislabel_levels(-0.05, 19)["looks_like"] is None or pd.isna(
+        mislabel_levels(-0.05, 19)["looks_like"]
+    )
+    assert mislabel_levels(-0.01, 500)["level"] == 2  # a close call stays one
+    assert mislabel_levels(-0.05, 500, top=0.1)["level"] == 4  # an odd shot wins
+
+
 def test_empty_pool_gives_an_empty_table():
     pool, E, ids, taxa, T = identify_bundle()
     s = identify.identify_scores(pool.iloc[:0], E, ids, taxa, T, TREE)
