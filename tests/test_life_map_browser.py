@@ -282,7 +282,7 @@ def test_without_the_file_the_map_still_draws_and_look_alikes_is_off(open_page):
 
 
 def test_split_view_hands_the_map_tokens_to_the_photo_frame(open_page):
-    page = open_page("#life=look&clade=47158", path="split.html?view=space")
+    page = open_page("#life=look&clade=47158", path="explore.html?view=space")
     page.wait_for_function("document.querySelector('iframe#space')")
     src = page.evaluate("document.querySelector('iframe#space').src")
     assert "life=look" in src and "clade=47158" in src
@@ -299,7 +299,7 @@ def space_frame(page):
 
 
 def test_split_view_keeps_the_map_tokens_in_its_address_for_a_reload(open_page):
-    page = open_page(path="split.html?view=space")
+    page = open_page(path="explore.html?view=space")
     space = space_frame(page)
     space.click("#vlook")
     page.wait_for_function("location.hash.includes('life=look')")
@@ -335,7 +335,7 @@ def test_reset_undoes_a_clade_zoom_and_a_resize_refits_the_view(open_page):
 
 
 def test_a_subset_from_the_tree_draws_over_the_dimmed_map_and_its_points_open_records(open_page):
-    page = open_page(path="split.html?view=space")
+    page = open_page(path="explore.html?view=space")
     space = space_frame(page)
     page.evaluate(
         "window.__records = []; addEventListener('message', e => {"
@@ -389,7 +389,7 @@ def label_texts(page):
 
 
 def test_labels_outside_the_selection_fade_and_those_around_it_stay(open_page):
-    page = open_page(path="split.html?view=space")
+    page = open_page(path="explore.html?view=space")
     space = space_frame(page)
     space.wait_for_function("__deck.props.layers.some(l => l.id === 'life-lbl')")
     assert not [i for i in label_texts(space) if i.endswith("-f")]  # no filter: nothing fades

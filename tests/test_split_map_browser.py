@@ -59,7 +59,7 @@ def test_a_tiny_taxon_picked_in_the_tree_fits_the_map_pane(browser, site, name, 
     stub_taxa(page)
     page.route("https://basemaps.cartocdn.com/**", lambda r: r.fulfill(body=BLANK))
     page.add_init_script(HOOK)
-    page.goto(f"{site}/split.html")
+    page.goto(f"{site}/explore.html")
     page.wait_for_function(
         "() => { const d = document.getElementById('map')?.contentDocument;"
         " return d && /^300 of 300/.test(d.getElementById('count').textContent); }",
@@ -97,7 +97,7 @@ def test_an_accuracy_choice_sent_by_the_other_frame_reaches_the_map(browser, sit
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     stub_taxa(page)
     page.route("https://basemaps.cartocdn.com/**", lambda r: r.fulfill(body=BLANK))
-    page.goto(f"{site}/split.html")
+    page.goto(f"{site}/explore.html")
     page.wait_for_function(
         "() => { const d = document.getElementById('map')?.contentDocument;"
         " return d && /^300 of 300/.test(d.getElementById('count').textContent); }",
@@ -120,7 +120,7 @@ def test_the_tree_counts_what_the_map_keeps_as_its_dates_change(browser, site):
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     stub_taxa(page)
     page.route("https://basemaps.cartocdn.com/**", lambda r: r.fulfill(body=BLANK))
-    page.goto(f"{site}/split.html")
+    page.goto(f"{site}/explore.html")
     page.wait_for_function(
         "() => { const d = document.getElementById('map')?.contentDocument;"
         " return d && /^300 of 300/.test(d.getElementById('count').textContent); }",

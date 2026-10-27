@@ -111,8 +111,10 @@ def test_phone_width_has_no_side_scroll(browser, site):
 def test_close_call_wording(browser, site):
     page = open_page(browser, site, "#level=taxonomist")
     assert page.locator("#cards .card div").first.inner_text() == (
-        "Labelled Aus bus. Often confused with Cus dus."
+        "Labelled Aus bus. Often confused with Cus dus. All its look-alikes"
     )
+    more = page.locator("#cards .card a.more").first
+    assert more.get_attribute("href") == "confusion.html#q=Aus%20bus"
 
 
 def test_close_call_chip_opens_a_labelled_map_by_click_and_keyboard(browser, map_site):

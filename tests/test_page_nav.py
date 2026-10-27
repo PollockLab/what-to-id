@@ -22,12 +22,12 @@ def test_exactly_one_current_page(current):
     assert re.search(rf'href="{current}" aria-current="page"', html)
 
 
-@pytest.mark.parametrize("current", ["map.html", "embeddings.html"])
-def test_the_map_and_photo_space_pages_mark_explore(current):
+@pytest.mark.parametrize("current", ["map.html", "embeddings.html", "tree.html", "search.html"])
+def test_the_pages_inside_explore_mark_explore(current):
     html = nav(current)
     assert html.count('aria-current="page"') == 1
-    assert re.search(r'href="split.html" aria-current="page"', html)
-    assert "Photo space<" not in html and ">Map<" not in html
+    assert re.search(r'href="explore.html" aria-current="page"', html)
+    assert "Photo space<" not in html and ">Map<" not in html and ">Tree of life<" not in html
 
 
 def test_available_drops_pages_that_were_not_built():
@@ -37,7 +37,7 @@ def test_available_drops_pages_that_were_not_built():
     assert hrefs == ["map.html", "study.html"]
     assert BLITZ in html
     # the page you are on stays even when the set forgets it
-    assert 'href="search.html" aria-current="page"' in nav("search.html", {"study.html"})
+    assert 'href="confusion.html" aria-current="page"' in nav("confusion.html", {"study.html"})
 
 
 def test_unknown_availability_is_probed_by_the_page():
@@ -58,7 +58,7 @@ def test_skip_link_keeps_the_hash():
 
 def test_base_prefixes_the_links():
     html = nav("study.html", base="https://x.test/app/")
-    assert 'href="https://x.test/app/split.html"' in html
+    assert 'href="https://x.test/app/explore.html"' in html
     assert 'href="https://x.test/app/study.html" aria-current="page"' in html
 
 
@@ -106,26 +106,26 @@ def test_explore_tab_on_the_map_page_carries_the_record_and_the_selection(browse
     pg = _open(
         browser, "map.html", "#record=42&groups=Insecta,-Aves&acc=100&at=9.5/49.123456/-123.987654"
     )
-    assert pg.get_attribute(".site-nav [aria-current=page]", "href").startswith("split.html")
+    assert pg.get_attribute(".site-nav [aria-current=page]", "href").startswith("explore.html")
     assert pg.locator(".site-nav a").first.bounding_box()["height"] >= 44
-    assert _href(pg, "explore") == "split.html#id=42&groups=Insecta,-Aves&acc=100"
+    assert _href(pg, "explore") == "explore.html#id=42&groups=Insecta,-Aves&acc=100"
     assert _href(pg, "blitz") == BLITZ + "?at=49.123,-123.988"
     # replaceState fires no event: the next hover reads the new hash
     pg.evaluate("history.replaceState(null,'','#at=9.5/50.5/-120.25')")
-    assert _href(pg, "explore") == "split.html"
+    assert _href(pg, "explore") == "explore.html"
     assert _href(pg, "blitz") == BLITZ + "?at=50.500,-120.250"
 
 
 def test_explore_tab_carries_taxa_and_leaves_the_camera(browser):
     pg = _open(browser, "map.html", "#taxa=311249,-64615&months=6&area=abc&at=9/49/-123")
-    assert _href(pg, "explore") == "split.html#taxa=311249,-64615&months=6&area=abc"
+    assert _href(pg, "explore") == "explore.html#taxa=311249,-64615&months=6&area=abc"
     pg = _open(browser, "embeddings.html", "#groups=-Aves")
-    assert _href(pg, "explore") == "split.html#groups=-Aves"
+    assert _href(pg, "explore") == "explore.html#groups=-Aves"
 
 
 def test_photo_search_explore_tab_opens_the_chosen_record(browser):
     pg = _open(browser, "search.html", "#id=7")
-    assert _href(pg, "explore") == "split.html#id=7"
+    assert _href(pg, "explore") == "explore.html#id=7"
     pg.focus(".site-skip")
     pg.keyboard.press("Enter")
     assert pg.evaluate("location.hash") == "#id=7"
@@ -136,7 +136,7 @@ def test_explore_tab_falls_back_to_the_map_when_the_split_page_is_missing(browse
     pg = browser.new_page()
     html = PAGE % (CSS, nav("map.html"))
     pg.route("http://site.test/map.html", lambda r: r.fulfill(body=html, content_type="text/html"))
-    pg.route("http://site.test/split.html", lambda r: r.fulfill(status=404, body=""))
+    pg.route("http://site.test/explore.html", lambda r: r.fulfill(status=404, body=""))
     pg.route("http://site.test/search.html", lambda r: r.fulfill(status=404, body=""))
     pg.goto("http://site.test/map.html#groups=-Aves")
     pg.wait_for_selector('.site-nav a[href="map.html"]')

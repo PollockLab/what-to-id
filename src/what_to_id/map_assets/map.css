@@ -53,7 +53,7 @@ h1{font-size:18px;margin:0}
 /* in the header, beside Filters, so it shows while the filter drawer is shut */
 .reset{margin-left:auto;border:1px solid var(--line);background:var(--chip);color:var(--ink);font:inherit;
   font-size:13px;font-weight:600;padding:4px 12px;border-radius:14px;cursor:pointer}
-.reset+.toggle{margin-left:0}
+.reset:not([hidden])+.toggle{margin-left:0}
 #groups i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
 .prow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:6px}
 .padd{font:inherit;font-size:12px;min-height:26px;max-width:100%;padding:2px 6px;border:1px solid var(--line);

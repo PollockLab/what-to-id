@@ -4,7 +4,7 @@ Each page runs in an iframe (``?embed=1`` hides its header) and reports selectio
 page by postMessage; this page relays them to the other frames, which apply them in place. Each of
 the three panes has its own toggle. With no ``?view=`` it opens the map and the tree, or without
 ``tree.html`` in ``out_dir`` the map and the photo space, so build the tree page first. It writes
-nothing but ``split.html``.
+``explore.html``, plus ``split.html``, which forwards old links to it.
 """
 
 from __future__ import annotations
@@ -16,7 +16,14 @@ from pathlib import Path
 from what_to_id import page_nav
 from what_to_id.embeddings_page import ASSETS, HERE
 
-PAGE_NAME = "split.html"
+PAGE_NAME = "explore.html"
+# the page was split.html; old links and bookmarks forward here with their query and hash
+OLD_NAME = "split.html"
+FORWARD = (
+    '<!doctype html><meta charset="utf-8"><title>Explore</title>'
+    f"<script>location.replace('{PAGE_NAME}'+location.search+location.hash)</script>"
+    f'<a href="{PAGE_NAME}">Explore</a>'
+)
 SCRIPTS = {
     "__MAP_FILTER__": HERE / "map_assets" / "map_filter.js",
     "__CLIP_TOKENIZER__": HERE / "atlas_assets" / "clip_tokenizer.js",
@@ -24,8 +31,6 @@ SCRIPTS = {
     "__ATLAS_SEARCH_META__": HERE / "atlas_search_assets" / "atlas_search_meta.js",
     "__ATLAS_SEARCH_ENCODER__": HERE / "atlas_search_assets" / "atlas_search_encoder.js",
 }
-# The levels page's one entry, shown once levels.html is built; the label is a placeholder.
-LEVELS_LINK = '<a class="lvl" href="levels.html">What to ID next</a>'
 # One toggle per pane; a phone holds one pane, so there a toggle picks it.
 TREE_BUTTON = '<button type="button" data-p="tree">Tree</button>'
 BAR = (
@@ -56,16 +61,14 @@ def build(
     data_url: str = "atlas/",
     tree_url: str = "tree.html",
 ) -> Path:
-    """Write ``split.html`` into ``out_dir`` and return its path."""
+    """Write ``explore.html`` and the ``split.html`` forward into ``out_dir``, return the first."""
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     html = (ASSETS / "split.html").read_text()
     has_tree = (out / tree_url).exists()
-    # split.html is written last, so an optional page missing here is missing from the site
+    # explore.html is written last, so an optional page missing here is missing from the site
     pages = {p for p, _ in page_nav.PAGES if p not in page_nav.OPTIONAL or (out / p).exists()}
     bar = BAR if has_tree else BAR.replace(TREE_BUTTON, "")
-    if (out / "levels.html").exists():
-        bar = bar.replace('<span class="seg"', LEVELS_LINK + '<span class="seg"', 1)
     for key, value in {
         "__SITE_CSS__": page_nav.CSS,
         "__SITE_NAV__": page_nav.nav(PAGE_NAME, pages, extra=bar),
@@ -79,6 +82,7 @@ def build(
         html = html.replace(key, path.read_text())
     target = out / PAGE_NAME
     target.write_text(html)
+    (out / OLD_NAME).write_text(FORWARD)
     return target
 
 

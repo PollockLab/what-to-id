@@ -122,7 +122,7 @@ def test_explore_offers_the_levels_only_once_built(tmp_path):
     assert 'href="levels.html"' not in split_page.build(tmp_path).read_text()
     (tmp_path / "levels.html").write_text("<html></html>")
     html = split_page.build(tmp_path).read_text()
-    assert html.count('href="levels.html"') == 1 and split_page.LEVELS_LINK in html
+    assert html.count('href="levels.html"') == 1 and ">Identify<" in html
 
 
 def test_range_notes_ride_along_only_when_present(tmp_path):

@@ -274,18 +274,22 @@ white-space:nowrap;vertical-align:top}
 </head>
 <body>
 <a class="site-skip" href="#main-content" onclick="event.preventDefault();var m=document.getElementById('main-content')||document.querySelector('main');m.tabIndex=-1;m.focus()">Skip to content</a>
-<div class="site-shell"><a class="site-brand" href="index.html">What to ID<span class="site-bc"> · BC</span></a><nav class="site-nav" aria-label="Views" data-probe><a href="split.html" data-view="explore" data-fallback="map.html" data-base="split.html">Explore</a><a href="search.html" data-optional data-base="search.html">Photo search</a><a href="study.html" aria-current="page" data-base="study.html">Study</a><a class="ext" href="https://pollocklab.github.io/where-to-blitz/" target="_blank" rel="noopener" data-view="blitz" data-base="https://pollocklab.github.io/where-to-blitz/">Where to Blitz <span aria-hidden="true">↗</span><span class="site-vh"> (opens in a new tab)</span></a></nav></div>
+<div class="site-shell"><a class="site-brand" href="index.html">What to ID<span class="site-bc"> · BC</span></a><nav class="site-nav" aria-label="Views" data-probe><a href="levels.html" data-optional data-view="group" data-base="levels.html">Identify</a><a href="explore.html" data-view="explore" data-fallback="map.html" data-base="explore.html">Explore</a><a href="confusion.html" data-optional data-view="group" data-base="confusion.html">Look-alikes</a><a href="study.html" aria-current="page" data-base="study.html">Study</a><a class="ext" href="https://pollocklab.github.io/where-to-blitz/" target="_blank" rel="noopener" data-view="blitz" data-base="https://pollocklab.github.io/where-to-blitz/">Where to Blitz <span aria-hidden="true">↗</span><span class="site-vh"> (opens in a new tab)</span></a></nav></div>
 <script>(function(){var n=document.querySelector('.site-nav');if(!n)return;
 function ctx(){var h=new URLSearchParams(location.hash.slice(1)),
 at=(h.get('at')||'').split('/').map(Number);
-var ok=at.length===3&&at.every(isFinite);return{rec:+(h.get('record')||h.get('id'))||0,
+var ok=at.length===3&&at.every(isFinite),gs=(h.get('groups')||'').split(',');
+return{grp:h.get('g')||(gs.length===1&&/^[^-]/.test(gs[0])?gs[0]:''),rec:+(h.get('record')||h.get('id'))||0,
 lat:ok?at[1]:null,lon:ok?at[2]:null,sel:location.hash.slice(1).split('&').filter(function(t){
-return /^(by|from|to|months|groups|only|taxa|area|park|bcpark|projects)=/.test(t);})};}
+return /^(by|from|to|months|groups|only|acc|taxa|area|park|bcpark|projects)=/.test(t);})};}
+function h0(sel){return sel.some(function(t){return t.indexOf('groups=')===0;});}
 function sync(){var c=ctx();n.querySelectorAll('a[data-view]').forEach(function(a){
 var b=a.dataset.base,v=a.dataset.view,u=b;
 if(a.hasAttribute('aria-current')&&v!=='explore')return;
 if(v==='explore'){var p=[];if(c.rec)p.push('id='+c.rec);p=p.concat(c.sel);
+if(c.grp&&!h0(c.sel))p.push('groups='+encodeURIComponent(c.grp));
 if(p.length)u=b+'#'+p.join('&');}
+else if(v==='group'&&c.grp)u=b+'#g='+encodeURIComponent(c.grp);
 else if(v==='blitz'&&c.lat!==null)u=b+'?at='+c.lat.toFixed(3)+','+c.lon.toFixed(3);
 a.href=u;});}
 ['mouseover','focusin','touchstart',

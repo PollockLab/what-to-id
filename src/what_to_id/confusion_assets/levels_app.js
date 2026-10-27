@@ -237,7 +237,8 @@ function card(i){
   li.appendChild(ph);
   var nm=el('div'),m=hasMap(i),lab=el('i',m?'nl':null,D.taxa[D.taxon[i]]);
   if(tax()){nm.textContent='Labelled ';
-    nm.append(lab,'. Often confused with ',el('i',m?'nk':null,D.taxa[D.looks[i]]),'.');}
+    nm.append(lab,'. Often confused with ',el('i',m?'nk':null,D.taxa[D.looks[i]]),'. ',
+      link('confusion.html#q='+encodeURIComponent(D.taxa[D.taxon[i]]),'All its look-alikes','more'));}
   else nm.appendChild(lab);
   li.appendChild(nm);
   // the photo links to the observation; beside Identify, the range chip, or why there is none

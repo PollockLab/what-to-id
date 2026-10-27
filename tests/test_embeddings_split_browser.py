@@ -17,7 +17,7 @@ def test_split_page_relays_the_selection_between_frames_without_reloads(browser,
     page.errors = []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     stub_inat(page, None)
-    page.goto(f"{base}/split.html?view=map-space#months=8")
+    page.goto(f"{base}/explore.html?view=map-space#months=8")
     counts = (
         "[...document.querySelectorAll('iframe')].map(f => f.contentDocument &&"
         " f.contentDocument.getElementById('count') &&"
@@ -46,7 +46,7 @@ def test_split_page_mirrors_a_picked_record_in_the_other_frame(browser, site):
     page.errors = []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     stub_inat(page, None)
-    page.goto(f"{base}/split.html?view=map-space")
+    page.goto(f"{base}/explore.html?view=map-space")
     page.wait_for_function(
         "[...document.querySelectorAll('iframe')].every(f =>"
         " f.contentDocument.getElementById('count').textContent.includes('shown'))"
@@ -82,7 +82,7 @@ def test_split_photo_search_narrows_both_frames_and_the_chip_clears_it(browser, 
     page.errors = []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     stub_inat(page, None)
-    page.goto(f"{base}/split.html?view=map-space")
+    page.goto(f"{base}/explore.html?view=map-space")
     counts = (
         "[...document.querySelectorAll('iframe')].map(f => f.contentDocument &&"
         " f.contentDocument.getElementById('count') &&"
@@ -111,7 +111,7 @@ def test_split_photo_search_narrows_both_frames_and_the_chip_clears_it(browser, 
 def test_split_divider_resizes_by_keys_and_double_click_and_remembers(browser, site):
     base, *_ = site
     page = browser.new_page(viewport={"width": 1280, "height": 900})
-    page.goto(f"{base}/split.html?view=map-space")
+    page.goto(f"{base}/explore.html?view=map-space")
     width = "document.getElementById('map').getBoundingClientRect().width"
     page.wait_for_selector("#map")
     half = page.evaluate(width)
@@ -134,7 +134,7 @@ def _split(browser, site, w, h, query="", hash_=""):
     page.errors = []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     stub_inat(page, None)
-    page.goto(f"{base}/split.html{query}{hash_}")
+    page.goto(f"{base}/explore.html{query}{hash_}")
     return page
 
 
@@ -265,6 +265,6 @@ def test_old_page_urls_open_the_matching_explore_view_with_the_hash(browser, sit
     page = browser.new_page(viewport={"width": 1280, "height": 800})
     stub_inat(page, None)
     page.goto(f"{base}/embeddings.html#months=8")
-    page.wait_for_url(f"{base}/split.html?view=space#months=8")
+    page.wait_for_url(f"{base}/explore.html?view=space#months=8")
     assert page.evaluate(FRAMES) == ["space"]
     page.close()

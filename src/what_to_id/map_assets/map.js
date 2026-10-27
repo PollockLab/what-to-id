@@ -211,6 +211,7 @@ function render(){
   $('byUp').setAttribute('aria-pressed',String(S.up));
   PRESETS.forEach(function(p){var r=p.range();
     p.el.setAttribute('aria-pressed',String(r[0]===S.lo&&r[1]===S.hi));});
+  $('reset').hidden=!sel().length;  // nothing to reset until a filter is set
   PJ.note(P.n?shown:null,ALT);BAR.set(items());tally();draw();layers();link();writeHash();counts();
 }
 // The tree beside the map counts what the map shows: how many shown records carry each taxon, sent once the filters
