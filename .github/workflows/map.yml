@@ -197,7 +197,7 @@ jobs:
       # without the photo space.
       - name: Write the landing page
         run: |
-          for p in levels split map; do if [ -f "_site/$p.html" ]; then cp "_site/$p.html" _site/index.html; break; fi; done
+          for p in levels explore map; do if [ -f "_site/$p.html" ]; then cp "_site/$p.html" _site/index.html; break; fi; done
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
       - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:

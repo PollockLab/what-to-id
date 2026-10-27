@@ -200,7 +200,7 @@ function card(){
   if(id){acts.appendChild(link(TX.identifyUrl({groups:gp?[gp]:[],all:META.groups.length,months:[],only:{},acc:'',taxa:gp?[]:[id],not:gp?[]:D.ex[e]||[]},null,META).url,
     'Help identify on iNaturalist','primary'));acts.lastChild.target='_blank';
     if(!(EMBED&&SY)){acts.appendChild(link(CFG.mapUrl+'#'+pk,'Show on map'));
-      if(split)acts.appendChild(link('split.html?view=space#'+pk,'Show in photo space'));}}
+      if(split)acts.appendChild(link('explore.html?view=space#'+pk,'Show in photo space'));}}
   if(EMBED&&SY&&id&&!gp)acts.appendChild(btn('Leave out',function(){leaveOut(id);}));
   if(id&&!EMBED&&CT.has(id))acts.appendChild(link('confusion.html#t'+id,'Often confused with \u2026'));
   if(e!==f&&ks.length)acts.append(btn('Focus here',function(){focusOn(e);}),
@@ -357,7 +357,7 @@ if(SY)addEventListener('message',function(e){var d=e.data;
   CP=d;});
 async function load(){
   status('Loading the taxa…');
-  var has=fetch('split.html',{method:'HEAD'}).then(function(r){return r.ok;},function(){return false;});
+  var has=fetch('explore.html',{method:'HEAD'}).then(function(r){return r.ok;},function(){return false;});
   var r=await fetch(new URL(META.taxa,location.href));if(!r.ok)throw new Error('the taxa file answered '+r.status);
   var T=JSON.parse(new TextDecoder().decode(await L.gunzip(await r.arrayBuffer())));
   if(!T.length||T[0].length<6)throw new Error('this site was built without the taxon tree');

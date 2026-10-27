@@ -26,7 +26,7 @@ def test_build_inlines_everything_and_copies_the_map_meta(tmp_path):
     html = tree_page.build(tmp_path).read_text()
     assert not re.findall(r"__[A-Z_]+__", html)
     assert "<script src=" not in html
-    assert 'href="split.html" aria-current="page"' in html
+    assert 'href="explore.html" aria-current="page"' in html
     cfg = json.loads(re.search(r"var CFG=(.*?);</script>", html).group(1))
     assert cfg["meta"]["taxa"].startswith(meta["taxa"] + "?v=") and cfg["mapUrl"] == "map.html"
     assert cfg["meta"]["group_ids"] == meta["group_ids"]
@@ -47,7 +47,7 @@ def test_a_taxa_file_without_counts_is_refused(tmp_path):
 
 
 def test_the_tree_is_reached_through_explore_not_its_own_tab():
-    assert 'href="tree.html"' not in page_nav.nav("split.html", {"tree.html", "split.html"})
+    assert 'href="tree.html"' not in page_nav.nav("explore.html", {"tree.html", "explore.html"})
     assert 'href="tree.html"' not in page_nav.nav("map.html")
 
 
@@ -64,3 +64,9 @@ def test_the_split_page_links_an_optional_page_only_once_it_is_built(tmp_path):
     assert 'href="confusion.html"' not in split_page.build(tmp_path).read_text()
     (tmp_path / "confusion.html").write_text("<html></html>")
     assert 'href="confusion.html"' in split_page.build(tmp_path).read_text()
+
+
+def test_the_old_split_page_forwards_to_explore_with_its_hash(tmp_path):
+    split_page.build(tmp_path)
+    old = (tmp_path / "split.html").read_text()
+    assert "location.replace('explore.html'+location.search+location.hash)" in old

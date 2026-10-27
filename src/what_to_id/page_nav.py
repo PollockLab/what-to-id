@@ -10,20 +10,20 @@ from __future__ import annotations
 from html import escape
 
 # (file, label), one tab per job: Identify (levels.html, records at three levels), Explore and
-# Look-alikes (confusion.html), with the study last. Explore is split.html, the map, the photo space
-# and the tree side by side; the pages map.html, embeddings.html, tree.html and search.html keep
-# their URLs and mark Explore as current, as Explore's panes and its search box hold them. Without
-# split.html (a site built without the photo space) the Explore tab falls back to the map. Levels
-# and look-alikes exist only when the atlas manifest lists their tables. The brand links to
-# index.html, a copy of the landing page.
+# Look-alikes (confusion.html), with the study last. Explore is explore.html, the map, the photo
+# space and the tree side by side; the pages map.html, embeddings.html, tree.html and search.html
+# keep their URLs and mark Explore as current, as Explore's panes and its search box hold them.
+# Without explore.html (a site built without the photo space) the Explore tab falls back to the
+# map. Levels and look-alikes exist only when the atlas manifest lists their tables. The brand
+# links to index.html, a copy of the landing page.
 PAGES = (
     ("levels.html", "Identify"),
-    ("split.html", "Explore"),
+    ("explore.html", "Explore"),
     ("confusion.html", "Look-alikes"),
     ("study.html", "Study"),
 )
 OPTIONAL = {"levels.html", "confusion.html"}
-EXPLORE = "split.html"
+EXPLORE = "explore.html"
 BLITZ = "https://pollocklab.github.io/where-to-blitz/"
 
 CSS = """

@@ -20,7 +20,7 @@ def split(browser, site):
     page.errors = []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     stub_inat(page, None)
-    page.goto(f"{base}/split.html?view=map-space")
+    page.goto(f"{base}/explore.html?view=map-space")
     page.wait_for_function(
         "[...document.querySelectorAll('iframe')].every(f =>"
         " f.contentDocument.getElementById('status').textContent === '')"
@@ -135,7 +135,7 @@ def test_a_removed_space_takes_its_lasso_off_the_map(browser, site):
         "window.__keep = []; addEventListener('message', e => { if (e.data && e.data.type ==="
         " 'wtid-keep') __keep.push(e.data.ids && Array.from(e.data.ids)); })"
     )
-    page.goto(f"{base}/split.html?view=space")
+    page.goto(f"{base}/explore.html?view=space")
     ok = (
         "document.querySelector('#%s')?.contentDocument?.getElementById('status')?.textContent===''"
     )
@@ -162,7 +162,7 @@ def test_an_area_sent_before_the_frame_loads_still_arrives(browser, site):
     page.errors = []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     stub_inat(page, None)
-    page.goto(f"{base}/split.html?view=map")
+    page.goto(f"{base}/explore.html?view=map")
     joined = (
         "(f => f && f.contentDocument && f.contentDocument.getElementById('status') &&"
         " f.contentDocument.getElementById('status').textContent === '')"
@@ -303,7 +303,7 @@ def test_the_split_opens_on_the_tree_whose_selection_is_the_maps_and_back(browse
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     stub_inat(page, None)
     stub_taxa(page)
-    page.goto(f"{base}/split.html")
+    page.goto(f"{base}/explore.html")
     tree, left = page.frame_locator("#tree"), page.frame_locator("#map")
     tree.locator("#outline .nm", has_text="Genus A").click()
     page.wait_for_function("location.hash.includes('taxa=900')")
@@ -324,7 +324,7 @@ def test_going_back_in_the_tree_keeps_its_selection_the_maps(browser, site):
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     stub_inat(page, None)
     stub_taxa(page)
-    page.goto(f"{base}/split.html")
+    page.goto(f"{base}/explore.html")
     tree = page.frame_locator("#tree")
     tree.locator("#outline .nm", has_text="Genus A").click()
     page.wait_for_function("location.hash.includes('taxa=900')")
@@ -348,7 +348,7 @@ def test_a_group_the_map_leaves_out_leaves_the_tree_and_its_counts(browser, site
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     stub_inat(page, None)
     stub_taxa(page)
-    page.goto(f"{base}/split.html")
+    page.goto(f"{base}/explore.html")
     tree = page.frame_locator("#tree")
     root = tree.locator("#outline .tc").first
     root.wait_for()
@@ -381,7 +381,7 @@ def _tree_page(browser, site, query=""):
     stub_inat(page, None)
     stub_taxa(page)
     page.add_init_script(COUNTS)
-    page.goto(f"{base}/split.html{query}")
+    page.goto(f"{base}/explore.html{query}")
     return page, page.frame_locator("#tree")
 
 
