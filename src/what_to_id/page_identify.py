@@ -59,6 +59,7 @@ def render(map_url: str = "map.html") -> str:
         "__SITE_NAV__": page_nav.nav(PAGE_NAME),
         "__IDENTIFY_RANGES_CSS__": (ASSETS / "identify_ranges.css").read_text().rstrip(),
         "__CONFIG__": json.dumps({"mapUrl": map_url, "levels": LEVELS}).replace("<", "\\u003c"),
+        **{f"__LEVEL_{n}__": name for n, name, _ in LEVELS},
     }.items():
         html = html.replace(key, value)
     for key, path in SCRIPTS.items():

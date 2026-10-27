@@ -14,6 +14,8 @@ a{color:var(--bar)}
 .about{font-size:13px;margin:6px 0}
 .about summary{cursor:pointer;color:var(--muted)}
 .about p{margin:6px 0}
+.about dt{font-weight:600;margin-top:6px}
+.about dd{margin:0 0 0 1em}
 #status{margin:6px 0;font-size:13px}
 .tabs{position:sticky;top:0;z-index:2;display:flex;gap:4px;padding:6px 0;background:var(--bg);
   border-bottom:1px solid var(--line);overflow-x:auto}
@@ -69,9 +71,27 @@ __IDENTIFY_RANGES_CSS__
 __SITE_NAV__<main id="main-content">
 <h1>Identify</h1>
 <details class="about" id="about"><summary>About</summary>
-<p>Records go into one of four levels by how their photo compares with their label, so you spend
-your time where it counts. A record with no level was scored, but its photo did not clearly agree or
-disagree with its label. Records added since the last scoring run also have no level.</p></details>
+<p>Each record's first photo is compared with the names of the species in the pool by BioCLIP 2.5
+(ViT-H/14), an image and text model trained on the tree of life. A match score is the cosine between
+the photo's embedding and the embedding of the text "a photo of &lt;species&gt;". The margin is the
+match score of the label minus the best match score of any other species. Photos downloaded on
+15 October 2026, scored on 27 October 2026.</p>
+<p>A record takes the first level whose rule it meets, in this order:</p>
+<dl>
+<dt>__LEVEL_4__</dt><dd>Any rank. The photo's best match score to any species is in the lowest 2% of
+its group (birds, plants, fungi and so on).</dd>
+<dt>__LEVEL_1__</dt><dd>Labelled at species. The margin is above 0, and the record is in the top 25%
+of its species by match score to the label. Only species with 4 or more scored records.</dd>
+<dt>__LEVEL_2__</dt><dd>Labelled at species. One other species scores higher than the label, by 0.02
+or less, and has 20 or more verifiable iNaturalist records in BC. The card names it.</dd>
+<dt>__LEVEL_3__</dt><dd>Labelled above species, and the pool names one or more species inside the
+label. No score cut-off.</dd>
+<dt>No level</dt><dd>All other records: the margin is above 0 but the record is outside the top 25%
+of its species, or its species has fewer than 4 records; the margin is below −0.02; the look-alike
+has fewer than 20 BC records; the pool names no species inside the label, or the label is a species that was not in the pool at scoring; the record was not in the
+15 October 2026 photo download (most were added after it); or its label changed after scoring.</dd>
+</dl>
+<p>A level sorts records for review. It does not say that a label is right or wrong.</p></details>
 <p id="status" class="muted" aria-live="polite">Loading…</p>
 <p><button type="button" id="unpick" class="more" hidden>Clear the species filter</button></p>
 <div id="tabs" class="tabs" role="tablist" aria-label="Level"></div>
