@@ -11,6 +11,7 @@
 #   ATLAS_DIR=DIR TREE=taxonomy.json sbatch scripts/levels_fir.sbatch    from the repo root
 #   scripts/atlas_sync.sh pull DIR again if atlas.yml ran meanwhile, then
 #   scripts/atlas_sync.sh push DIR     uploads identify.parquet, then manifest.json last
+# BC_COUNTS=bc-verifiable-counts.parquet (optional) counts look-alike records in BC, as levels.parquet does.
 # Prints the records per level and iconic group at the end. levels.parquet is not touched.
 set -euo pipefail
 BULK=/scratch/wietze/what-to-id/bulk-2026-10-15
@@ -24,4 +25,4 @@ export PYTHONPATH=src${PYTHONPATH:+:$PYTHONPATH} OMP_NUM_THREADS=${SLURM_CPUS_PE
   --emb "$BULK/completed/E.npy" --ids "$BULK/completed/ids.npy" \
   --pool "$BULK/inputs/pool.parquet" \
   --taxa-names "$(ls "$DIR"/taxa-*.tsv.gz)" --taxa-vectors "$(ls "$DIR"/taxa-*.f16)" \
-  --atlas-dir "$DIR" --tree "$TREE" --identify 2>&1 | grep -vE "^\s+(Page|Socket|Signals|Swaps|File system|Average|Exit|Voluntary|Involuntary|Minor|Major|Percent|System|User time|Command)"
+  --atlas-dir "$DIR" --tree "$TREE" --identify ${BC_COUNTS:+--bc-counts "$BC_COUNTS"} 2>&1 | grep -vE "^\s+(Page|Socket|Signals|Swaps|File system|Average|Exit|Voluntary|Involuntary|Minor|Major|Percent|System|User time|Command)"
