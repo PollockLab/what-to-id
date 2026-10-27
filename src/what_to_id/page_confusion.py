@@ -156,7 +156,7 @@ def encode(pairs: pd.DataFrame, records: pd.DataFrame | None, built_at: str = ""
 
 def render(data_url: str, built_at: str = "", has_records: bool = True) -> str:
     html = (ASSETS / PAGE_NAME).read_text()
-    built = f"Built {escape(built_at[:10])}." if built_at else ""
+    built = escape(built_at[:10]) if built_at else "unknown"
     note = "" if has_records else f'<p class="note" id="norecords">{escape(NO_RECORDS)}</p>'
     for key, value in {
         "__SITE_CSS__": page_nav.CSS,

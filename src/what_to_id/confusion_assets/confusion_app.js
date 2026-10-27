@@ -89,8 +89,6 @@ function drawTabs(){
       b.setAttribute('aria-pressed',String(S.g===a[0]));
       if(a[2])b.setAttribute('aria-label',a[1]+', '+a[2].toLocaleString()+' records');
       b.onclick=function(){S.g=a[0];pairShown=LIMIT;update();};box.appendChild(b);});
-  var fungi=groupName(S.g)==='Fungi'||(S.t>=0&&groupName(D.taxa[S.t][2])==='Fungi');
-  $('caveat').hidden=!fungi;
 }
 function pairsNow(){
   var q=S.q.toLowerCase(),out=[];
@@ -112,8 +110,7 @@ function drawPairs(scroll){
     var k=list[j],x=D.pairs[k],li=el('li'),b=el('button','pair');b.type='button';b.dataset.k=k;
     b.setAttribute('aria-pressed',String(j===sel));
     b.append('Labelled ',name(x[0]),' → looks like ',name(x[1]));
-    b.appendChild(el('span','sub',x[2].toLocaleString()+' photos, '+
-      Math.round(100*x[2]/x[3])+'% of its photos'));
+    b.appendChild(el('span','sub',x[2].toLocaleString()+' of '+x[3].toLocaleString()+' photos ('+pct(x)+'%)'));
     if(j===sel)selBtn=b;li.appendChild(b);frag.appendChild(li);}
   ul.textContent='';ul.appendChild(frag);
   if(list.length>upto){var m=el('button','more','Show more pairs ('+

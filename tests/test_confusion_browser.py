@@ -58,12 +58,10 @@ def test_tabs_filter_the_pairs(browser, site):
     page = open_page(browser, site)
     assert page.locator("#pairs .pair").count() == 3
     assert page.locator("#tabs button").all_inner_texts() == ["All 6", "Plantae 4", "Fungi 2"]
-    assert page.locator("#caveat").is_hidden()
     page.get_by_role("button", name="Fungi, 2 records").click()
     assert page.locator("#pairs .pair").all_inner_texts() == [
-        "Labelled Eus fus → looks like Cus dus\n9 photos, 75% of its photos"
+        "Labelled Eus fus → looks like Cus dus\n9 of 12 photos (75%)"
     ]
-    assert page.locator("#caveat").is_visible()
     page.get_by_role("button", name="Plantae, 4 records").click()
     assert page.locator("#pairs .pair i").all_inner_texts() == [
         "Aus bus",
@@ -72,6 +70,14 @@ def test_tabs_filter_the_pairs(browser, site):
         "Cus dus",
     ]
     assert "g=Plantae" in page.url and page.errors == []
+
+
+def test_page_explains_how_the_list_is_made(browser, site):
+    page = open_page(browser, site)
+    assert page.locator("details.about summary").inner_text() == "How this list is made"
+    assert page.locator("details.about").get_attribute("open") is None
+    assert "AUROC" not in page.content() and page.locator("#caveat").count() == 0
+    assert "9 of 12 photos (75%)" in page.locator("#pairs").inner_text()
 
 
 def test_a_pair_shows_its_records_worst_first(browser, site):
@@ -97,7 +103,6 @@ def test_tree_link_opens_the_species_first_pair(browser, site):
         page.locator("#pairs .pair[aria-pressed=true]").inner_text().startswith("Labelled Eus fus")
     )
     assert page.url.endswith("#t=7&l=2")
-    assert page.locator("#caveat").is_visible()  # Eus fus is a fungus
 
 
 def test_identify_link_carries_the_selected_ids(browser, site):
@@ -168,7 +173,7 @@ def pair_names(page):
 
 
 def subs(page, i):
-    return [s.split(", ")[i] for s in page.locator("#pairs .sub").all_inner_texts()]
+    return [s.split(" (")[i] for s in page.locator("#pairs .sub").all_inner_texts()]
 
 
 def test_default_order_is_highest_share_first(browser, site):

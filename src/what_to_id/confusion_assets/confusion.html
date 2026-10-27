@@ -11,6 +11,10 @@ h2{font-size:16px;margin:0 0 8px}
 a{color:var(--bar)}
 .muted{color:var(--muted)}
 .note{background:var(--warnbg);color:var(--warn);padding:8px 10px;border-radius:6px;margin:8px 0}
+.about{font-size:13px;margin:6px 0}
+.about summary{cursor:pointer;color:var(--muted)}
+.about dt{font-weight:600;margin-top:6px}
+.about dd{margin:0 0 0 1em}
 .tabs{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 8px}
 .tabs button,.more,.pair{font:inherit;color:inherit;cursor:pointer}
 .tabs button{min-height:36px;padding:0 12px;border:1px solid var(--line);border-radius:18px;
@@ -55,14 +59,18 @@ a{color:var(--bar)}
 </style></head><body>
 __SITE_NAV__<main id="main-content">
 <h1>Confused pairs</h1>
-<p>A photo counts as confused when the BioCLIP text vector of another species name is closer to it
-than the vector of its own species name. The proposals themselves are never the reference.</p>
-<p class="muted">Pick a group, then a pair: its records come worst first, the ones that look most
-like the other species. __BUILT__</p>
+<p>A photo is confused when, to the model, it matches another species' name better than its own label. Pick a group, then a pair: its records come worst first, the ones that look most like the other species.</p>
+<details class="about"><summary>How this list is made</summary>
+<dl>
+<dt>Model</dt><dd>BioCLIP 2.5 (ViT-H/14). Each photo gets a match score (cosine) against the text "a photo of &lt;species&gt;" for every species name. Its margin is the score of its own label minus the best score of any other species. The reference is text only. The proposals are never the reference.</dd>
+<dt>Confused</dt><dd>Only records labelled at species are scored. A record is confused when its margin is below 0.</dd>
+<dt>Listed</dt><dd>A species needs at least 4 scored photos. A pair needs at least 2 of its photos pointing to the same other species. Each species lists at most 3 pairs.</dd>
+<dt>Share</dt><dd>Confused photos divided by that species' scored photos.</dd>
+<dt>Records</dt><dd>Up to 50 records per pair, the most negative margin first.</dd>
+<dt>Built</dt><dd>__BUILT__</dd>
+</dl></details>
 __RECORDS_NOTE__
 <div class="tabs" id="tabs" role="group" aria-label="Group"></div>
-<p class="note" id="caveat" hidden>For fungi the score barely separates the records identifiers
-overturn (AUROC about 0.65), so treat the order as a loose guide.</p>
 <div class="find"><label for="q">Find a species</label>
 <input id="q" type="search" list="names" autocomplete="off" placeholder="Labelled or look-alike name">
 <datalist id="names"></datalist></div>
