@@ -41,11 +41,11 @@ a{color:var(--bar)}
 .card i.nl{text-decoration-color:var(--rlab)}
 .card i.nk{text-decoration-color:var(--rlook)}
 .rchip{align-self:flex-start;display:inline-flex;align-items:center;gap:5px;font:inherit;
-  font-size:12px;min-height:28px;padding:3px 10px;border:1px solid var(--line);border-radius:14px;
-  background:var(--chip);color:var(--ink);cursor:pointer;max-width:100%;text-align:left}
+  font-size:12px;min-height:24px;padding:0;border:0;background:none;color:var(--muted);
+  cursor:pointer;max-width:100%;text-align:left;text-decoration:underline dotted;text-underline-offset:3px}
 .rchip svg{flex:none}
-.rchip.bad{border-color:var(--share);color:var(--share)}
-.rchip[aria-expanded="true"]{background:var(--on);color:var(--onink);border-color:var(--on)}
+.rchip.bad{color:var(--share)}
+.rchip[aria-expanded="true"]{text-decoration-style:solid}
 .rpop{position:fixed;z-index:20;width:340px;box-sizing:border-box;padding:12px;
   background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:10px;
   box-shadow:var(--shadow)}

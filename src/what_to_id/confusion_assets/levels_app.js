@@ -229,8 +229,9 @@ function card(i){
     nm.append(lab,'. Often confused with ',el('i',m?'nk':null,D.taxa[D.looks[i]]),'.');}
   else nm.appendChild(lab);
   li.appendChild(nm);
-  if(D.note&&D.note[i]>=0)li.appendChild(el('div','range',D.notes[D.note[i]]));
+  // the chip carries the range verdict; the note line only stands in where there is no map
   if(m)li.appendChild(chip(i));
+  else if(D.note&&D.note[i]>=0)li.appendChild(el('div','range',D.notes[D.note[i]]));
   var links=el('div','links');
   links.append(link(IdentifyLinks.batches([id])[0].url,'Identify','identify btn'),
     link(OBS+id,'Observation '+id,'obs'));
