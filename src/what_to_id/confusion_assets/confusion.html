@@ -63,7 +63,7 @@ __SITE_NAV__<main id="main-content">
 <details class="about"><summary>How this list is made</summary>
 <dl>
 <dt>Model</dt><dd>BioCLIP 2.5 (ViT-H/14). Each photo gets a match score (cosine) against the text "a photo of &lt;species&gt;" for every species name. Its margin is the score of its own label minus the best score of any other species. The reference is text only. The proposals are never the reference.</dd>
-<dt>Confused</dt><dd>The margin is below 0, at any rank.</dd>
+<dt>Confused</dt><dd>Only records labelled at species are scored. A record is confused when its margin is below 0.</dd>
 <dt>Listed</dt><dd>A species needs at least 4 scored photos. A pair needs at least 2 of its photos pointing to the same other species. Each species lists at most 3 pairs.</dd>
 <dt>Share</dt><dd>Confused photos divided by that species' scored photos.</dd>
 <dt>Records</dt><dd>Up to 50 records per pair, the most negative margin first.</dd>
