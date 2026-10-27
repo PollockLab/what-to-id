@@ -1,6 +1,8 @@
 """The levels page in Chromium, photo hosts stubbed: each level reaches a first photo, the group
 tabs filter, the hash keeps the choice, the Identify links carry the ids."""
 
+import numpy as np
+import pandas as pd
 import pytest
 
 from what_to_id import page_levels
@@ -18,6 +20,24 @@ OBS = "https://www.inaturalist.org/observations/"
 def site(tmp_path_factory):
     root = tmp_path_factory.mktemp("levels-site")
     levels_frame().to_parquet(root / "levels.parquet")
+    page_levels.build(root, None, root / "levels.parquet")
+    server, url = serve(root)
+    yield url
+    server.shutdown()
+
+
+@pytest.fixture(scope="module")
+def map_site(tmp_path_factory):
+    """Record 201 sits at 48.5 N, 123 W: inside cell 0 (Aus bus) but outside cell 1 (Cus dus)."""
+    root = tmp_path_factory.mktemp("levels-map-site")
+    sq = lambda x: np.float32([x, x + 1, x + 1, x])  # noqa: E731
+    pd.DataFrame({"name": ["Aus bus", "Cus dus"], "cells": [[0], [1]]}).to_parquet(
+        root / "level-ranges.parquet"
+    )
+    pd.DataFrame(
+        {"lat": [np.float32([48, 48, 49, 49])] * 2, "lon": [sq(-124), sq(-122)]}
+    ).to_parquet(root / "level-range-cells.parquet")
+    levels_frame().assign(lat=48.5, lon=-123.5).to_parquet(root / "levels.parquet")
     page_levels.build(root, None, root / "levels.parquet")
     server, url = serve(root)
     yield url
@@ -84,3 +104,29 @@ def test_group_tabs_filter_and_identify_carries_the_ids(browser, site):
 def test_phone_width_has_no_side_scroll(browser, site):
     page = open_page(browser, site, w=375)
     assert page.evaluate("document.documentElement.scrollWidth") <= 375
+
+
+def test_close_call_wording(browser, site):
+    page = open_page(browser, site, "#level=taxonomist")
+    assert page.locator("#cards .card div").first.inner_text() == (
+        "Labelled Aus bus. Often confused with Cus dus."
+    )
+
+
+def test_close_call_with_ranges_draws_a_labelled_map(browser, map_site):
+    page = open_page(browser, map_site, "#level=taxonomist")
+    cv = page.locator("#cards .card canvas")
+    assert cv.get_attribute("role") == "img"
+    assert cv.get_attribute("aria-label") == (
+        "Range map: this record is inside the range of Aus bus, outside the range of Cus dus"
+    )
+    page.wait_for_function("c => c.width > 0", arg=cv.element_handle())
+    page.locator(".rbtn").click()
+    assert page.locator(".card.wide").count() == 1 and page.errors == []
+    page = open_page(browser, map_site, "#level=easy")
+    assert page.locator("#cards canvas").count() == 0
+
+
+def test_cards_without_ranges_have_no_map(browser, site):
+    page = open_page(browser, site, "#level=taxonomist")
+    assert page.locator("#cards canvas").count() == 0

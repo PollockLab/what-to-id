@@ -29,6 +29,7 @@ manifest under ``"levels"``, as `confusion fir` does for the confused pairs.
 from __future__ import annotations
 
 import argparse
+import shutil
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -43,7 +44,11 @@ from what_to_id.confusion import MIN_PER_CLASS, fir_scores, read_taxa_vectors
 # (key, name, one line for the page)
 LEVELS = (
     ("easy", "Clear matches", "These look just like their label. Confirm many in one go."),
-    ("taxonomist", "Close calls", "Another species looks almost as likely. Take a careful look."),
+    (
+        "taxonomist",
+        "Close calls",
+        "Another species looks almost as likely, or it may be something else. Take a careful look.",
+    ),
     ("weird", "Odd shots", "Hard photos: hands, eggs, close-ups. Feeling lucky?"),
 )
 LEVEL_COLUMNS = (
@@ -139,14 +144,16 @@ def assign(
 def add_range_notes(levels: pd.DataFrame, notes: pd.DataFrame) -> pd.DataFrame:
     """`levels` with a `range_note` column (string or null) looked up by id in `notes`.
 
-    Only look-alike cards carry a note; `notes` has `id`, `range_note` (null for no line).
+    Only look-alike cards carry a note; `notes` has `id`, `range_note` (null for no line) and
+    optionally `lat`, `lon` (the record's point), which come through the same way.
     """
     for c in ("id", "range_note"):
         if c not in notes.columns:
             raise ValueError(f"range notes have no {c!r} column")
-    note = notes.drop_duplicates("id").set_index("id")["range_note"]
+    notes = notes.drop_duplicates("id").set_index("id")
     keep = levels["level"] == "taxonomist"
-    return levels.assign(range_note=levels["id"].map(note).where(keep))
+    cols = ["range_note"] + [c for c in ("lat", "lon") if c in notes.columns]
+    return levels.assign(**{c: levels["id"].map(notes[c]).where(keep) for c in cols})
 
 
 def describe(scores: pd.DataFrame, levels: pd.DataFrame) -> str:
@@ -193,7 +200,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     ap.add_argument(
         "--range-notes",
-        help="parquet with id, range_note (null for no line); adds a range line to cards",
+        help="`python -m what_to_id.level_ranges` range-notes.parquet (id, range_note, lat, lon): "
+        "adds a range line to cards; the level-ranges and level-range-cells files beside it "
+        "go to the atlas for the range maps",
     )
     args = ap.parse_args(sys.argv[1:] if argv is None else argv)
     manifest = read_manifest(args.atlas_dir)
@@ -213,6 +222,15 @@ def main(argv: list[str] | None = None) -> int:
     built_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     out.to_parquet(Path(args.atlas_dir) / "levels.parquet", index=False)
     manifest["levels"] = {"name": "levels.parquet", "built_at": built_at, "count": len(out)}
+    if args.range_notes:
+        for key, name in (
+            ("ranges", "level-ranges.parquet"),
+            ("range_cells", "level-range-cells.parquet"),
+        ):
+            src = Path(args.range_notes).parent / name
+            if src.exists():
+                shutil.copyfile(src, Path(args.atlas_dir) / name)
+                manifest["levels"][key] = name
     write_manifest(args.atlas_dir, manifest)
     print(describe(scores, out))
     print(f"{len(out)} records in {out['level'].nunique()} levels")

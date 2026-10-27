@@ -12,11 +12,19 @@ It writes levels.html (every script inlined) and levels-data.bin, gzipped JSON:
 ``meta``, ``taxon`` and ``looks`` (indexes into ``taxa``), ``level`` and ``group`` (indexes, -1
 for no group); with a ``range_note`` column also ``notes`` (the lines) and ``note`` (index, -1
 for none). A photo URL is built as in confusion-data.bin (see `page_confusion`).
+
+Range maps need ``"ranges"`` and ``"range_cells"`` in the manifest entry (or, with ``--parquet``,
+level-ranges.parquet and level-range-cells.parquet beside it; `level_ranges`), and add: ``grid``
+(per H3 cell, its boundary as flat ``[lon, lat, ...]`` integer thousandths of a degree), ``rng``
+(aligned with ``taxa``: base64 bitset over the grid cells, bit i in byte i>>3 at 1<<(i&7), or ""
+when the range is unknown) and, with lat and lon columns, ``plat`` and ``plon`` (the record's
+point in integer hundredths of a degree, null when missing). Without them the page has no maps.
 """
 
 from __future__ import annotations
 
 import argparse
+import base64
 import gzip
 import hashlib
 import json
@@ -44,7 +52,18 @@ SCRIPTS = {
 }
 
 
-def encode(levels: pd.DataFrame, built_at: str = "") -> bytes:
+def _scaled(x: pd.Series, k: int) -> list:
+    """Integers of x * k, None for missing."""
+    r = (x * k).round().astype("Int64")
+    return r.astype(object).where(r.notna(), None).tolist()
+
+
+def encode(
+    levels: pd.DataFrame,
+    built_at: str = "",
+    ranges: pd.DataFrame | None = None,
+    grid: pd.DataFrame | None = None,
+) -> bytes:
     """The gzipped levels-data.bin for these rows in their order (see the module docstring)."""
     missing = [c for c in LEVEL_COLUMNS if c not in levels.columns]
     if missing:
@@ -91,6 +110,19 @@ def encode(levels: pd.DataFrame, built_at: str = "") -> bytes:
             .astype(int)
             .tolist()
         )
+    if ranges is not None and grid is not None:
+        head["grid"] = [
+            np.column_stack([np.round(lo * 1000), np.round(la * 1000)]).astype(int).ravel().tolist()
+            for la, lo in zip(grid["lat"], grid["lon"], strict=True)
+        ]
+        bits = {}
+        for n, cs in zip(ranges["name"], ranges["cells"], strict=True):
+            b = np.zeros(len(grid), bool)
+            b[np.asarray(cs, int)] = True
+            bits[n] = base64.b64encode(np.packbits(b, bitorder="little").tobytes()).decode()
+        head["rng"] = [bits.get(n, "") for n in taxa.tolist()]
+        if {"lat", "lon"} <= set(levels.columns):
+            head["plat"], head["plon"] = _scaled(levels["lat"], 100), _scaled(levels["lon"], 100)
     return gzip.compress(json.dumps(head, separators=(",", ":")).encode(), 9, mtime=0)
 
 
@@ -111,6 +143,7 @@ def render(data_url: str, built_at: str = "") -> str:
 def build(out: Path, data_url: str | None, parquet: Path | None = None) -> Path | None:
     out.mkdir(parents=True, exist_ok=True)
     built_at = ""
+    ranges = grid = None
     with tempfile.TemporaryDirectory() as tmp:
         if parquet is None:
             if not data_url:
@@ -124,8 +157,24 @@ def build(out: Path, data_url: str | None, parquet: Path | None = None) -> Path 
             parquet = Path(tmp) / "levels.parquet"
             _fetch(base + entry["name"], parquet)
             built_at = entry.get("built_at", "")
+            if entry.get("ranges") and entry.get("range_cells"):
+                for key, path in (
+                    ("ranges", Path(tmp) / "r.parquet"),
+                    ("range_cells", Path(tmp) / "g.parquet"),
+                ):
+                    _fetch(base + entry[key], path)
+                ranges, grid = (
+                    pd.read_parquet(Path(tmp) / "r.parquet"),
+                    pd.read_parquet(Path(tmp) / "g.parquet"),
+                )
+        else:
+            r, g = (
+                parquet.parent / n for n in ("level-ranges.parquet", "level-range-cells.parquet")
+            )
+            if r.exists() and g.exists():
+                ranges, grid = pd.read_parquet(r), pd.read_parquet(g)
         df = pd.read_parquet(parquet)
-    blob = encode(df, built_at)
+    blob = encode(df, built_at, ranges, grid)
     (out / DATA_NAME).write_bytes(blob)
     print(f"page_levels: {DATA_NAME} {len(blob) / 1e6:.2f} MB gzipped, {len(df)} records")
     version = hashlib.sha256(blob).hexdigest()[:12]

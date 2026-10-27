@@ -4,6 +4,7 @@ import gzip
 import json
 import re
 
+import numpy as np
 import pandas as pd
 
 from what_to_id import page_levels, split_page
@@ -131,3 +132,37 @@ def test_range_notes_ride_along_only_when_present(tmp_path):
     d = decode(page_levels.encode(f))
     assert d["notes"] == ["Range: outside both ranges"]
     assert d["note"] == [-1, -1, 0, -1, -1]
+
+
+def range_files():
+    ranges = pd.DataFrame({"name": ["Aus bus", "Cus dus"], "cells": [[0, 9], [9]]})
+    grid = pd.DataFrame(
+        {
+            "lat": [np.float32([48.0, 48.5, 48.5])] * 10,
+            "lon": [np.float32([-123.0, -122.5, -122.0])] * 10,
+        }
+    )
+    return ranges, grid
+
+
+def test_range_maps_ride_along_only_with_the_files():
+    d = decode(page_levels.encode(levels_frame()))
+    assert not {"grid", "rng", "plat", "plon"} & d.keys()
+    ranges, grid = range_files()
+    f = levels_frame().assign(lat=[None, None, 48.51, None, None], lon=-123.456)
+    d = decode(page_levels.encode(f, "", ranges, grid))
+    assert len(d["grid"]) == 10 and d["grid"][0] == [-123000, 48000, -122500, 48500, -122000, 48500]
+    assert d["plat"] == [None, None, 4851, None, None] and d["plon"][2] == -12346
+    by = dict(zip(d["taxa"], d["rng"], strict=True))
+    assert by["Eus fus"] == "" and by["Cus dus"] == "AAI="
+    assert by["Aus bus"] == "AQI="  # bits 0 and 9, least significant first
+    d = decode(page_levels.encode(levels_frame(), "", ranges, grid))
+    assert "rng" in d and "plat" not in d
+
+
+def test_local_parquet_picks_up_the_range_files_beside_it(tmp_path):
+    ranges, grid = range_files()
+    ranges.to_parquet(tmp_path / "level-ranges.parquet")
+    grid.to_parquet(tmp_path / "level-range-cells.parquet")
+    out = write(tmp_path)
+    assert "grid" in decode((out / "levels-data.bin").read_bytes())
