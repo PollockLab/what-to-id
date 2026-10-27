@@ -35,7 +35,8 @@ body{display:flex;flex-direction:column}
 #main-content #map,#main-content #space{min-width:320px}
 #main-content #tree{min-width:260px}
 #main-content.drag iframe{pointer-events:none}
-.sep{flex:0 0 7px;cursor:col-resize;background:var(--line);touch-action:none;outline-offset:-2px}
+.sep{position:relative;z-index:1;flex:0 0 7px;cursor:col-resize;background:var(--line);touch-action:none;outline-offset:-2px}
+.sep::before{content:'';position:absolute;top:0;bottom:0;left:-8px;right:-8px}  /* a 23 px target for a finger, the line stays 7 px */
 .sep:hover,.sep:focus-visible,.sep.on{background:var(--on)}
 /* a phone: the pane switch on its own row, wide targets, then the search, then the counts */
 @media (max-width:800px){.xbar{flex:1 1 100%;margin:0 0 6px;flex-wrap:wrap;white-space:normal}
