@@ -309,6 +309,6 @@ def test_the_batch_links_cover_the_listed_ids(browser, site):
         want = sorted(page.evaluate("__identify.view()")[lv])
         href = page.get_attribute("#go", "href")
         assert sorted(int(i) for i in href.split("&id=")[1].split(",")) == want
-        assert page.locator("#go").inner_text() == f"Identify these {len(want)}"
+        assert page.locator("#go").inner_text() == f"Identify {len(want)} listed"
         assert page.locator("#go").get_attribute("target") == "_blank"
     assert page.errors == []
