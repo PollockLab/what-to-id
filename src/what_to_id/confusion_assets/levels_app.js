@@ -229,12 +229,12 @@ function card(i){
     nm.append(lab,'. Often confused with ',el('i',m?'nk':null,D.taxa[D.looks[i]]),'.');}
   else nm.appendChild(lab);
   li.appendChild(nm);
-  // the chip carries the range verdict; the note line only stands in where there is no map
-  if(m)li.appendChild(chip(i));
-  else if(D.note&&D.note[i]>=0)li.appendChild(el('div','range',D.notes[D.note[i]]));
+  // the photo links to the observation; beside Identify, the range chip, or why there is none
   var links=el('div','links');
-  links.append(link(IdentifyLinks.batches([id])[0].url,'Identify','identify btn'),
-    link(OBS+id,'Observation '+id,'obs'));
+  links.appendChild(link(IdentifyLinks.batches([id])[0].url,'Identify','identify btn'));
+  if(m)links.appendChild(chip(i));
+  else if(D.note&&D.note[i]>=0)links.appendChild(el('span','range',D.notes[D.note[i]]));
+  else if(D.rng)links.appendChild(el('span','range','No range map: range unknown'));
   li.appendChild(links);
   return li;
 }

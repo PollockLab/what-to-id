@@ -61,7 +61,7 @@ def open_page(browser, url, hash_="", w=1280):
 
 
 def obs_links(page):
-    return page.locator("#cards a.obs").evaluate_all("as => as.map(a => a.href)")
+    return page.locator("#cards a.ph").evaluate_all("as => as.map(a => a.href)")
 
 
 def first_photo_loaded(page):
@@ -148,6 +148,7 @@ def test_every_level_shows_chips_for_known_ranges_only(browser, map_site):
     )
     page = open_page(browser, map_site, "#level=weird")
     assert page.locator("#cards .rchip").count() == 1  # Hus ius has no known range
+    assert page.locator("#cards .range").all_inner_texts() == ["No range map: range unknown"]
 
 
 def test_phone_popover_is_a_bottom_sheet(browser, map_site):
