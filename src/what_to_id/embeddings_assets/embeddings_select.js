@@ -7,10 +7,7 @@ var AI=null,VI=null,DRAW=false;
 // groups; null when none is set. An area that does not read is left to the map and shows as map only.
 function areaIndex(){
   if(!S.area)return null;
-  if(!AI||AI.key!==S.area){
-    AI={key:S.area,I:null};
-    try{var r=MapArea.decode(S.area);if(r.length)AI.I=MapArea.index(r);}catch(e){}
-  }
+  if(!AI||AI.key!==S.area)AI={key:S.area,I:SpaceMask.areaIndex(S.area)};
   return AI.I;
 }
 // The view is a rectangle: its box [w,s,e,n], or null when absent or when it holds the whole data (it cuts nothing).
@@ -31,31 +28,23 @@ function viewBox(){
 function areaMask(){
   var I=areaIndex(),P=S.P;
   if(!I)return null;
-  if(!AI.M||AI.M.length!==P.n){AI.M=new Uint8Array(P.n);
-    for(var i=0;i<P.n;i++)AI.M[i]=MapArea.inside(I,P.lonlat[2*i],P.lonlat[2*i+1]);}
+  if(!AI.M||AI.M.length!==P.n)AI.M=SpaceMask.area(I,P);
   return AI.M;
 }
-// The map's projects: the sorted ids they keep (S.proj, null for none) as a verdict per point, built once per
-// list by walking each shard's sorted rows against it.
+// The map's projects: the sorted ids they keep (S.proj, null for none) as a verdict per point, built once per list.
 var PM=null;
 function projMask(){
   var P=S.P,ids=S.proj;
   if(!ids)return null;
-  if(!PM||PM.ids!==ids||PM.m.length!==P.n){var m=new Uint8Array(P.n);
-    for(var k=0;k+1<P.start.length;k++)for(var i=P.start[k],j=0;i<P.start[k+1]&&j<ids.length;i++){
-      var v=P.id[i];while(j<ids.length&&ids[j]<v)j++;if(ids[j]===v)m[i]=1;}
-    PM={ids:ids,m:m};}
+  if(!PM||PM.ids!==ids||PM.m.length!==P.n)PM={ids:ids,m:SpaceMask.ids(ids,P)};
   return PM.m;
 }
 // The lasso: a closed ring in layout coordinates, or null. Only the points inside it stay, and their ids go
 // to the map, which keeps the same records.
 function lasso(ring){
-  var P=S.P,m=null,ids=null,i,k=0;
+  var P=S.P,m=ring&&SpaceMask.ring(ring,P.pos,P.n);
   S.ring=ring&&ring.concat(ring.slice(0,2));
-  if(ring){var I=MapArea.index([ring]);m=new Uint8Array(P.n);
-    for(i=0;i<P.n;i++)if(MapArea.inside(I,P.pos[2*i],P.pos[2*i+1])){m[i]=1;k++;}
-    ids=new Uint32Array(k);k=0;for(i=0;i<P.n;i++)if(m[i])ids[k++]=P.id[i];}
-  S.lasso=m;S.lassoV++;$('lclear').hidden=!ring;picked();send(true);
+  S.lasso=m||null;S.lassoV++;$('lclear').hidden=!ring;picked();send(true);
 }
 // Beside the map, the part of the space in view: its box [x0,y0,x1,y1] in layout coordinates, or null when it
 // holds the home view's points or the map is not beside it. The map keeps its points, so each view narrows the other, never itself.
@@ -69,12 +58,12 @@ function inBox(b,i){var x=S.P.pos[2*i],y=S.P.pos[2*i+1];return x>=b[0]&&x<=b[2]&
 // The ids the lasso and the view both keep go to the map (null for all); a view that did not change sends nothing.
 var SENT='',T=0;
 function send(force){
-  var P=S.P,b=shownBox(),key=b?b.join():'',ids=null,i,k=0;
+  var P=S.P,b=shownBox(),key=b?b.join():'',ids=null,i;
   if((!force&&key===SENT)||parent===window)return;
   SENT=key;
   if(S.lasso||b){var m=new Uint8Array(P.n);
-    for(i=0;i<P.n;i++)if((!S.lasso||S.lasso[i])&&(!b||inBox(b,i))){m[i]=1;k++;}
-    ids=new Uint32Array(k);k=0;for(i=0;i<P.n;i++)if(m[i])ids[k++]=P.id[i];}
+    for(i=0;i<P.n;i++)if((!S.lasso||S.lasso[i])&&(!b||inBox(b,i)))m[i]=1;
+    ids=SpaceMask.idsOf(m,P);}
   parent.postMessage({type:'wtid-keep',ids:ids,view:!!b},location.origin);
 }
 function moved(){clearTimeout(T);T=setTimeout(send,250);}
