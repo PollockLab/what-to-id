@@ -48,6 +48,9 @@ ol{list-style:none;margin:8px 0;padding:0;display:grid;gap:10px;
 .card .when:hover{text-decoration:underline}
 .btn{display:inline-flex;align-items:center;min-height:30px;padding:0 12px;border-radius:15px;
   background:var(--on);color:var(--onink);font-size:13px;font-weight:650;text-decoration:none}
+.card .sp{font:inherit;font-size:12px;color:var(--muted);background:none;border:0;padding:0;text-align:left;cursor:pointer;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card .sp:hover{text-decoration:underline}
 .card .btn{align-self:flex-start}
 .more{font:inherit;color:inherit;cursor:pointer;min-height:36px;padding:0 14px;
   border:1px solid var(--line);border-radius:6px;background:var(--chip)}
@@ -92,6 +95,7 @@ __SITE_NAV__<main id="main-content">
 so you spend your time where it counts. Records added since the last scoring run have no level yet,
 so they are not listed.</p></details>
 <p id="status" class="muted" aria-live="polite">Loading…</p>
+<p><button type="button" id="unpick" class="more" hidden>Clear the species filter</button></p>
 <div id="tabs" class="tabs" role="tablist" aria-label="Level"></div>
 <p id="desc" class="muted"></p>
 <p id="rout" class="rout" hidden><button type="button" id="out" class="out"></button><span id="left" class="muted" aria-live="polite"></span></p>
