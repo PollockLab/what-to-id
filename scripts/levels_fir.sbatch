@@ -7,9 +7,9 @@
 #SBATCH --job-name=levels-fir
 #
 # Flow (DIR = ATLAS_DIR below, holding manifest.json and the taxa-* files; TREE = map-state taxonomy.json):
-#   scripts/atlas_sync.sh pull DIR     the full index, or just curl manifest.json from the HF repo
-#   hf download $ATLAS_HF_REPO --repo-type dataset --include 'taxa-*' --local-dir DIR
+#   scripts/atlas_sync.sh pull DIR     the full index: push deletes remote files DIR lacks
 #   ATLAS_DIR=DIR TREE=taxonomy.json sbatch scripts/levels_fir.sbatch    from the repo root
+#   scripts/atlas_sync.sh pull DIR again if atlas.yml ran meanwhile, then
 #   scripts/atlas_sync.sh push DIR     uploads identify.parquet, then manifest.json last
 # Prints the records per level and iconic group at the end. levels.parquet is not touched.
 set -euo pipefail
