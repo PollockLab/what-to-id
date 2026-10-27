@@ -115,14 +115,14 @@ def test_split_divider_resizes_by_keys_and_double_click_and_remembers(browser, s
     width = "document.getElementById('map').getBoundingClientRect().width"
     page.wait_for_selector("#map")
     half = page.evaluate(width)
-    sep = page.locator("#sep")
+    sep = page.locator(".sep")
     sep.focus()
     for _ in range(5):
         page.keyboard.press("ArrowRight")
-    assert page.evaluate(width) == pytest.approx(half + 0.1 * 1280, abs=3)
+    assert page.evaluate(width) == pytest.approx(half + 5 * 16, abs=3)
     page.reload()
     page.wait_for_selector("#map")
-    assert page.evaluate(width) > half + 100  # remembered
+    assert page.evaluate(width) > half + 50  # remembered
     sep.dblclick()
     assert page.evaluate(width) == pytest.approx(half, abs=3)
     page.close()
@@ -194,7 +194,9 @@ def test_a_view_in_the_address_opens_its_panes_old_links_included(browser, site,
     page.close()
 
 
-def test_three_panes_sit_side_by_side_in_thirds_with_the_selection_in_step(browser, site):
+def test_three_panes_sit_side_by_side_with_the_tree_at_30_percent_and_the_selection_in_step(
+    browser, site
+):
     page = _split(browser, site, 1500, 800, "?view=map-space-tree", "#months=8")
     assert page.evaluate("[...document.querySelectorAll('iframe')].map(f => f.id)") == [
         "map",
@@ -205,7 +207,10 @@ def test_three_panes_sit_side_by_side_in_thirds_with_the_selection_in_step(brows
     widths = page.evaluate(
         "[...document.querySelectorAll('iframe')].map(f => f.getBoundingClientRect().width)"
     )
-    assert max(widths) - min(widths) < 2 and page.locator("#sep").is_hidden()
+    assert abs(widths[0] - widths[1]) < 2 and widths[2] == pytest.approx(
+        0.3 * sum(widths), rel=0.02
+    )
+    assert page.locator(".sep").count() == 2
     for f in ("#map", "#space", "#tree"):
         assert "months=8" in page.evaluate(f"document.querySelector('{f}').src")
     page.frame_locator("#map").locator("#groups button[data-g='1']").click()
@@ -214,8 +219,8 @@ def test_three_panes_sit_side_by_side_in_thirds_with_the_selection_in_step(brows
     assert "groups=Insecta" in page.evaluate("location.hash")
     page.click("[data-p=map]")
     page.wait_for_function(f"{SEEN}.join() === 'space,tree'")
-    assert page.locator("#sep").is_visible()  # two panes have the divider between them
-    sep, space = (page.locator(x).bounding_box() for x in ("#sep", "#space"))
+    assert page.locator(".sep").count() == 1  # two panes have the divider between them
+    sep, space = (page.locator(x).bounding_box() for x in (".sep", "#space"))
     assert abs(sep["x"] - (space["x"] + space["width"])) < 2
     assert page.errors == []
     page.close()
