@@ -19,7 +19,7 @@ DIR=${ATLAS_DIR:?ATLAS_DIR is not set}
 TREE=${TREE:?TREE is not set (map-state taxonomy.json)}
 module purge; module load StdEnv/2023 python/3.11 arrow/17.0.0
 virtualenv --no-download "$SLURM_TMPDIR/env"; source "$SLURM_TMPDIR/env/bin/activate"
-pip install --no-index -q numpy pandas
+pip install --no-index -q numpy pandas requests  # taxonomy imports inat
 export PYTHONPATH=src${PYTHONPATH:+:$PYTHONPATH} OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK:-8} PYTHONUNBUFFERED=1
 /usr/bin/time -v python -m what_to_id.levels \
   --emb "$BULK/completed/E.npy" --ids "$BULK/completed/ids.npy" \
