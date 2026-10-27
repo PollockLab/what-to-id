@@ -1,6 +1,8 @@
 """pool-levels.bin and pool-levels-looks.bin: identify.parquet packed per pool record."""
 
+import base64
 import gzip
+import json
 
 import numpy as np
 import pandas as pd
@@ -100,3 +102,124 @@ def test_three_million_records_fit_the_levels_budget():
     weight = 1 / np.arange(1, 8001)
     lk = pool_levels.pack_looks(level, looks[rng.choice(8000, n, p=weight / weight.sum())])
     print(f"pool-levels-looks.bin {len(lk) / 1e6:.2f} MB gzipped")
+
+
+def km_text(k):
+    """The page's rounding (levels_app.js kmText): coarser farther out, half up as Math.round."""
+    s = 100 if k >= 1000 else 50 if k >= 500 else 10
+    return int(np.floor(k / s + 0.5) * s)
+
+
+def test_the_km_byte_keeps_inside_near_far_and_the_rounding_the_page_shows():
+    km = np.arange(0, 15_900, dtype=np.float64)
+    back = pool_levels.okm_km(pool_levels.okm_code(km))
+    assert (back[:50] == km[:50]).all()  # 0 inside, 1..49 just outside, as is
+    assert ((back >= 50) == (km >= 50)).all()
+    assert [km_text(b) for b in back[50:]] == [km_text(k) for k in km[50:]]
+    code = pool_levels.okm_code(np.array([np.nan, 0, 49, 50, 499, 999, 1e6]))
+    assert code.tolist() == [255, 0, 49, 50, 95, 105, 254]
+    assert np.isnan(pool_levels.okm_km(code[:1])).all()
+
+
+def range_tables():
+    """Two square cells; Bombus a in cell 0, Apis c in both, Cus off the grid."""
+    ranges = pd.DataFrame({"name": ["Bombus a", "Apis c", "Cus"], "cells": [[0], [0, 1], []]})
+    grid = pd.DataFrame(
+        {
+            "lat": [np.float32([48, 48, 49.5, 49.5])] * 2,
+            "lon": [np.float32([x, x + 1, x + 1, x]) for x in (-124, -123)],
+        }
+    )
+    return ranges, grid
+
+
+def test_the_range_file_round_trips_and_empty_and_unknown_stay_so():
+    ranges, grid = range_tables()
+    km = np.array([0, 12, 300, np.nan])
+    note = np.array([None, "Range: fits the look-alike, not the label", None, None], dtype=object)
+    head, back, notes = pool_levels.unpack_range(pool_levels.pack_range(km, note, ranges, grid), 4)
+    assert back[:3].tolist() == [0, 12, 300] and np.isnan(back[3])
+    assert notes == [None, note[1], None, None] and head["notes"] == [note[1]]
+    assert head["names"] == ["Bombus a", "Apis c", "Cus"]
+    assert head["grid"][1] == [-123000, 48000, -122000, 48000, -122000, 49500, -123000, 49500]
+    bits = [base64.b64decode(r) for r in head["rng"]]
+    assert bits == [b"\x01", b"\x03", b""]  # off the grid: known, with no cells
+    head, back, notes = pool_levels.unpack_range(
+        pool_levels.pack_range(np.zeros(0), np.zeros(0, object), ranges[:0], grid[:0]), 0
+    )
+    assert head == {"grid": [], "names": [], "rng": [], "notes": []} and len(back) == 0
+    bad = ranges.assign(cells=[[0], [2], []])
+    with pytest.raises(ValueError, match="outside the 2-cell grid"):
+        pool_levels.pack_range(km, note, bad, grid)
+
+
+def write_ranges(d, points):
+    """level_ranges output for the site's records: km by position, a note on every fifth."""
+    d.mkdir()
+    ranges, grid = range_tables()
+    ranges.to_parquet(d / "level-ranges.parquet")
+    grid.to_parquet(d / "level-range-cells.parquet")
+    n = len(points)
+    pd.DataFrame(
+        {
+            "id": points["id"].to_numpy(np.int64),
+            "range_note": [pool_levels_note(i) for i in range(n)],
+            "lat": np.float32(49),
+            "lon": np.float32(-123),
+            "out_km": pd.array([None if i % 7 == 0 else i * 10 for i in range(n)], dtype="Int32"),
+        }
+    ).to_parquet(d / "range-notes.parquet")
+
+
+def pool_levels_note(i):
+    return "Range: outside both ranges" if i % 5 == 0 else None
+
+
+def test_the_build_lines_the_ranges_up_with_the_site_and_skips_them_when_absent(tmp_path, capsys):
+    site, points = write_site(tmp_path)
+    df = scored_frame(points)
+    df.to_parquet(tmp_path / "identify.parquet")
+    args = ["--out", str(site), "--parquet", str(tmp_path / "identify.parquet")]
+    assert pool_levels.main(args) == 0
+    assert not (site / pool_levels.RANGE_NAME).exists()
+    assert "no pool-levels-range.bin, so no range maps: no --ranges" in capsys.readouterr().err
+    assert pool_levels.main([*args, "--ranges", str(tmp_path / "nowhere")]) == 0
+    assert "could not read the range tables" in capsys.readouterr().err
+    write_ranges(tmp_path / "ranges", points)
+    assert pool_levels.main([*args, "--ranges", str(tmp_path / "ranges")]) == 0
+    assert pool_levels.RANGE_NAME in capsys.readouterr().out
+    head, km, notes = pool_levels.unpack_range((site / pool_levels.RANGE_NAME).read_bytes(), N)
+    row = df.set_index("id")
+    for i, pid in enumerate(points["id"]):
+        if pid not in row.index or row.at[pid, "taxon_id"] != points["taxon_id"][i]:
+            assert np.isnan(km[i]) and notes[i] is None  # missing or relabelled
+            continue
+        assert np.isnan(km[i]) if i % 7 == 0 else km[i] == km_text(i * 10)
+        assert notes[i] == pool_levels_note(i)
+    assert head["notes"] == ["Range: outside both ranges"]
+    assert pool_levels.main(args) == 0  # a later build without ranges drops the stale file
+    assert not (site / pool_levels.RANGE_NAME).exists()
+
+
+def test_the_manifest_names_the_range_tables_or_the_levels_go_out_alone(tmp_path, monkeypatch):
+    site, points = write_site(tmp_path)
+    src = tmp_path / "atlas"
+    write_ranges(src, points)
+    scored_frame(points).to_parquet(src / "identify.parquet")
+    entry = {"name": "identify.parquet", **{k: v for k, v in pool_levels.RANGE_FILES.items()}}
+    manifest = {"identify": entry}
+    monkeypatch.setattr(
+        pool_levels,
+        "_fetch",
+        lambda url, path: path.write_bytes(
+            json.dumps(manifest).encode()
+            if url.endswith("manifest.json")
+            else (src / url.rsplit("/", 1)[1]).read_bytes()
+        ),
+    )
+    pool_levels.build(site, data_url="https://x/")
+    assert pool_levels.unpack_range((site / pool_levels.RANGE_NAME).read_bytes(), N)[0]["names"]
+    del entry["range_cells"]
+    pool_levels.build(site, data_url="https://x/")
+    assert not (site / pool_levels.RANGE_NAME).exists()
+    assert (site / pool_levels.OUT_NAME).exists()
