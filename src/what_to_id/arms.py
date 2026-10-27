@@ -256,23 +256,43 @@ class Similarity:
         n = X.shape[0]
         # Mixed-dtype matmul otherwise converts the whole matrix on every growth step.
         X64 = np.asarray(X, dtype=np.float64)
+        # x.u moves by at most |x| |u - u_ref| when the centroid direction moves from u_ref to u.
+        max_norm = float(np.linalg.norm(X64, axis=1).max()) if n else 0.0
         free = np.ones(n, dtype=bool)
+        n_free = n
         member_of = np.full(n, -1, dtype=np.int64)
         for c, p in enumerate(picks):
-            if not free.any():
+            if not n_free:
                 break
             if not free[p]:
                 cand = np.flatnonzero(free)
                 p = cand[(X[cand] @ X[p]).argmax()]
             members = [int(p)]
             free[p] = False
+            n_free -= 1
             centroid = X[p].astype(np.float64).copy()
-            while len(members) < self.batch_size and free.any():
-                sims = X64 @ (centroid / max(np.linalg.norm(centroid), 1e-12))
-                sims[~free] = -np.inf
-                q = int(sims.argmax())
+            near = X_near = u_ref = None
+            rest_best = -np.inf
+            while len(members) < self.batch_size and n_free:
+                u = centroid / max(np.linalg.norm(centroid), 1e-12)
+                q = -1
+                if near is not None:
+                    # The nearest rows of the last full scan, in row order so ties pick as before.
+                    sims = X_near @ u
+                    sims[~free[near]] = -np.inf
+                    i = int(sims.argmax())
+                    drift = max_norm * float(np.linalg.norm(u - u_ref)) + _GROW_SLACK
+                    if sims[i] > rest_best + drift:
+                        q = int(near[i])
+                if q < 0:
+                    sims = X64 @ u
+                    sims[~free] = -np.inf
+                    q = int(sims.argmax())
+                    near, rest_best = _nearest_rows(sims, _GROW_CANDIDATES)
+                    X_near, u_ref = X64[near], u
                 members.append(q)
                 free[q] = False
+                n_free -= 1
                 centroid += X[q]
             member_of[members] = c
         # Any rows left when seeds ran out join the last batch.
@@ -283,6 +303,20 @@ class Similarity:
             centroid = X[rows].mean(axis=0)
             member_sim[rows] = X[rows] @ (centroid / max(np.linalg.norm(centroid), 1e-12))
         return member_of, member_sim
+
+
+# Rows kept from each full similarity scan, and a margin over float rounding in the drift bound.
+_GROW_CANDIDATES = 1024
+_GROW_SLACK = 1e-9
+
+
+def _nearest_rows(sims: np.ndarray, k: int) -> tuple[np.ndarray, float]:
+    """The k highest-scoring rows in row order, and the best score among the rest."""
+    if sims.size <= k:
+        return np.arange(sims.size), -np.inf
+    split = sims.size - k
+    part = np.argpartition(sims, split)
+    return np.sort(part[split:]), float(sims[part[:split]].max())
 
 
 class Novelty:
