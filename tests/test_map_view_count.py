@@ -18,7 +18,7 @@ def _counts(bounds, lo=0, hi=9, up=False):
     body = source[start : source.index("function render()", start)]
     harness = f"""
 const NO=65535,LAST=9,S={{lo:{lo},hi:{hi},up:{json.dumps(up)}}},B={json.dumps(bounds)};
-const full=()=>S.lo===0&&S.hi===LAST;
+const full=()=>S.lo===0&&S.hi===LAST,MapArea={{Q:1e4}};
 const map={{getBounds:()=>({{getWest:()=>B[0],getSouth:()=>B[1],
   getEast:()=>B[2],getNorth:()=>B[3]}})}};
 const P={{n:5,pos:Float32Array.of(0,0,1,0,5,0,179,0,-179,0),obs:Uint16Array.of(2,2,2,NO,2),
@@ -38,6 +38,12 @@ const KEEP=Uint8Array.of(1,0,1,1,1);
 def test_in_view_counts_kept_records_inside_the_box():
     assert _counts([-1, -1, 2, 1]) == 1  # #0 in, #1 in but not kept, the rest outside
     assert _counts([-1, 10, 2, 11]) == 0  # nothing at that latitude
+
+
+@needs_node
+def test_in_view_rounds_the_box_as_the_view_sent_to_identify_is_rounded():
+    assert _counts([-1, -1, 4.99996, 1]) == 2  # east edge rounds to 5: #2 counts
+    assert _counts([-1, -1, 4.99994, 1]) == 1
 
 
 @needs_node

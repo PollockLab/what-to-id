@@ -187,6 +187,8 @@ function inView(){
   var n=P.n,b=map.getBounds(),w=b.getWest(),e=b.getEast(),s=b.getSouth(),t=b.getNorth(),key=[w,e,s,t,S.lo,S.hi,S.up,n].join();
   if(!n||KEEP.length!==n||e-w>=360)return null;
   if(VC&&VC.k===key)return VC.c;
+  var q=function(v){return Math.round(v*MapArea.Q)/MapArea.Q;};  // the precision of the view sent to the other panes, so their counts agree
+  w=q(w);e=q(e);s=q(s);t=q(t);
   w=(w+540)%360-180;e=(e+540)%360-180;  // wrap into [-180,180); w>e then means the view crosses the antimeridian
   var day=S.up?P.up:P.obs,pos=P.pos,all=full(),c=0,i,x,y,d;
   for(i=0;i<n;i++){
