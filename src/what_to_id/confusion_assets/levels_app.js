@@ -4,7 +4,7 @@
 'use strict';
 // OUT_KM: a res-4 cell is ~22 km across, so under 50 km is cell-edge noise, not a range outlier.
 var LIMIT=60,OUT_KM=50,OBS='https://www.inaturalist.org/observations/';
-// S.o, the outside-its-range chip as on the map: 0 off, 1 only those, -1 leave them out
+// S.o, the outside-its-range chip as on the map: 0 off, 1 only those, -1 only those known in range
 var D=null,S={l:0,g:-1,o:0},shown=LIMIT,view=[];
 
 function $(id){return document.getElementById(id);}
@@ -60,9 +60,10 @@ function okm(i){return D.okm?D.okm[i]:-1;}
 // a coarser step farther out, so a distance never reads more precise than the range data
 function kmText(i){var k=okm(i),s=k>=1000?100:k>=500?50:10;return(Math.round(k/s)*s).toLocaleString('en');}
 // Clear matches are for confirming in bulk, so records far from their label's range start left out
-function outDefault(){return D.levels[S.l][0]==='easy'?-1:0;}
+function outDefault(){return D.okm&&D.levels[S.l][0]==='easy'?-1:0;}
 function far(i){return okm(i)>=OUT_KM;}
-function outPass(i){return !S.o||(S.o>0)===far(i);}
+function near(i){var k=okm(i);return k>=0&&k<OUT_KM;}
+function outPass(i){return !S.o||!D.okm||(S.o>0?far(i):near(i));}
 function inR(t,c){return c>=0&&has(bits(t),c);}
 var NEITHER='Outside both ranges: maybe neither.';
 // What the map says about the record's point, as words (caption and aria-label).
@@ -208,10 +209,10 @@ function drawLevels(){
     b.onclick=function(){S.l=k;S.o=outDefault();update();};box.appendChild(b);});
 }
 function drawTabs(){
-  var n=D.groups.map(function(){return 0;}),all=0,out=0,box=$('tabs');
+  var n=D.groups.map(function(){return 0;}),all=0,out=0,inn=0,box=$('tabs');
   for(var i=0;i<D.id.length;i++)if(D.level[i]===S.l&&outPass(i)){
     all++;if(D.group[i]>=0)n[D.group[i]]++;}
-  for(i=0;i<D.id.length;i++)if(D.level[i]===S.l&&(S.g<0||D.group[i]===S.g)&&far(i))out++;
+  for(i=0;i<D.id.length;i++)if(D.level[i]===S.l&&(S.g<0||D.group[i]===S.g)){if(far(i))out++;else if(near(i))inn++;}
   box.textContent='';
   [[-1,'All',all]].concat(D.groups.map(function(g,k){return [k,g,n[k]];})).forEach(function(a){
     if(!a[2]&&a[0]>=0)return;
@@ -220,11 +221,11 @@ function drawTabs(){
     b.setAttribute('aria-label',a[1]+', '+a[2].toLocaleString()+(a[2]===1?' record':' records'));
     b.onclick=function(){S.g=a[0];update();};box.appendChild(b);});
   if(!D.okm)return;
-  // left out reads as its complement; the status line gives how many were left out
-  var o=el('button',S.o<0?'out not':'out',S.o<0?'In range':'Outside its range '+out.toLocaleString());
+  // left out reads as its complement, known in range only; the status line gives what was left out
+  var o=el('button',S.o<0?'out not':'out',S.o<0?'In range '+inn.toLocaleString():'Outside its range '+out.toLocaleString());
   o.type='button';o.title='Click to pick, again to leave out, again to clear.';
   o.setAttribute('aria-pressed',String(!!S.o));o.disabled=!out&&!S.o;
-  o.setAttribute('aria-label',S.o<0?'In range, '+out.toLocaleString()+' outside left out':
+  o.setAttribute('aria-label',S.o<0?'In range, '+inn.toLocaleString():
     'Outside its range, '+out.toLocaleString());
   o.onclick=function(){S.o=S.o===0?1:S.o>0?-1:0;update();};box.appendChild(o);
 }
@@ -266,13 +267,14 @@ function drawAct(){
     (b.length>1?' (batch '+(k+1)+' of '+b.length+')':''),'all btn'));});
 }
 function update(){
-  view=[];shown=LIMIT;var left=0;
+  view=[];shown=LIMIT;var left=0,unk=0;
   for(var i=0;i<D.id.length;i++)if(D.level[i]===S.l&&(S.g<0||D.group[i]===S.g)){
-    if(outPass(i))view.push(i);else if(S.o<0)left++;}
+    if(outPass(i))view.push(i);else if(S.o<0){if(far(i))left++;else unk++;}}
   if(S.o>0)view.sort(function(a,b){return okm(b)-okm(a)||a-b;});
   drawLevels();drawTabs();closePop(false);$('cards').textContent='';drawCards();drawAct();
   $('status').textContent=view.length.toLocaleString()+(view.length===1?' record':' records')+
-    (S.g>=0?' in '+D.groups[S.g]:'')+'.'+(left?' '+left.toLocaleString()+' far outside their range left out.':'');
+    (S.g>=0?' in '+D.groups[S.g]:'')+'.'+(left||unk?' Left out: '+[left?left.toLocaleString()+' far outside their range':'',
+      unk?unk.toLocaleString()+' with no known range':''].filter(Boolean).join(', ')+'.':'');
   writeHash();
 }
 

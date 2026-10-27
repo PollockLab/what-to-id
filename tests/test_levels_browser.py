@@ -167,9 +167,9 @@ def test_outside_its_range_filter_counts_sorts_and_keeps_the_hash(browser, map_s
     # Clear matches start with records far from their range left out, as a map chip in "not"
     page = open_page(browser, map_site, "#level=easy")
     btn = page.locator("#tabs button.out")
-    assert btn.inner_text() == "In range" and "not" in btn.get_attribute("class")
+    assert btn.inner_text() == "In range 1" and "not" in btn.get_attribute("class")
     assert obs_links(page) == [OBS + "101"] and "out=" not in page.url
-    assert "1 far outside their range left out." in page.locator("#status").inner_text()
+    assert "Left out: 1 far outside their range." in page.locator("#status").inner_text()
     btn.click()
     assert obs_links(page) == [OBS + "101", OBS + "102"] and "out=0" in page.url
     assert btn.get_attribute("aria-pressed") == "false"
@@ -182,6 +182,13 @@ def test_outside_its_range_filter_counts_sorts_and_keeps_the_hash(browser, map_s
     assert obs_links(page) == [OBS + "301"]
     assert (
         page.get_by_role("button", name="Outside its range").get_attribute("aria-pressed") == "true"
+    )
+    # in range means known in range: a record with no known range is left out too
+    page.evaluate("location.hash = 'level=weird&out=-1'")
+    assert obs_links(page) == [] and page.locator("#tabs button.out").inner_text() == "In range 0"
+    assert (
+        "Left out: 1 far outside their range, 1 with no known range."
+        in page.locator("#status").inner_text()
     )
     page = open_page(browser, map_site, "#level=taxonomist")
     assert page.get_by_role("button", name="Outside its range").is_disabled()
