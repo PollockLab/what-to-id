@@ -174,7 +174,7 @@ def test_cards_follow_the_chosen_level_with_a_few_per_species_and_photos_in_batc
     assert "Often confused with" in page.locator("#grid .card .look").first.inner_text()
     body = page.inner_text("body").lower()
     assert not any(word in body for word in FORBIDDEN)
-    assert "no level yet" in page.locator(".about").text_content()
+    assert "also have no level" in page.locator(".about").text_content()
     assert page.errors == []
 
 
@@ -230,6 +230,10 @@ def test_a_viewport_narrows_the_ids_and_the_status_count_and_empty_restores_them
     page.evaluate("postMessage({type: 'wtid-view', area: ''}, location.origin)")
     page.wait_for_function("__identify.ids().length === 2100")
     assert page.locator("#status").inner_text().startswith("2,100 ")
+    levelled = page.evaluate("__identify.levelled()")
+    assert f"· {levelled:,} in a level" in page.locator("#status").inner_text()
+    page.locator("#status a", has_text="in a level").click()
+    assert page.locator("#about").get_attribute("open") is not None
     assert page.errors == []
 
 
@@ -321,6 +325,11 @@ def test_the_batch_links_cover_the_listed_ids(browser, site):
         assert sorted(int(i) for i in href.split("&id=")[1].split(",")) == want
         assert page.locator("#go").inner_text() == f"Identify {len(want)} listed"
         assert page.locator("#go").get_attribute("target") == "_blank"
+    page.evaluate("IdentifyLinks.MAX_IDS = 5")  # past the cap the button names both numbers
+    tab(page, 1).click()
+    tab(page, 2).click()
+    n = len(page.evaluate("__identify.view()")[2])
+    assert page.locator("#go").inner_text() == f"Identify the first 5 of {n:,}"
     assert page.errors == []
 
 

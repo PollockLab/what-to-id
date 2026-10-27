@@ -119,7 +119,7 @@ function batch(){
   var all=view[LV]||[],rows=all.slice(0,IdentifyLinks.MAX_IDS);
   LINKS=rows.length?IdentifyLinks.batches(rows.map(function(i){return P.id[i];})):[];BI=0;
   $('batch').hidden=!rows.length;
-  if(rows.length){$('go').textContent='Identify '+nf.format(rows.length)+' listed';  // listed, not the level's total on the tab
+  if(rows.length){$('go').textContent=rows.length<all.length?'Identify the first '+nf.format(rows.length)+' of '+nf.format(all.length):'Identify '+nf.format(rows.length)+' listed';  // listed, not the level's total on the tab
     $('go').title=rows.length<all.length?'The first '+nf.format(rows.length)+' of '+nf.format(all.length)+' listed, up to '+PER_SPECIES+' per species':'Up to '+PER_SPECIES+' per species';}
   step(0);
 }
@@ -196,11 +196,13 @@ function tabs(){
 }
 function refresh(){
   select();build();
-  var kept=0;
-  for(var i=0;i<P.n;i++)if(SEL[i])kept++;
+  var kept=0,lev=0;
+  for(var i=0;i<P.n;i++)if(SEL[i]){kept++;if(LEVEL[i])lev++;}
   S.kept=kept;
   // the leading number is the in-view count, which the split view's "to identify" reads
-  status(nf.format(kept)+(VIEW?' in view':' records')+(MORE.size?' · '+PER_SPECIES+' per species':''));
+  status(nf.format(kept)+(VIEW?' in view':' records')+' · '+nf.format(lev)+' ');
+  var why=el('a',null,'in a level');why.href='#about';why.onclick=function(e){e.preventDefault();$('about').open=true;$('about').scrollIntoView({block:'nearest'});};
+  $('status').append(why,MORE.size?' · '+PER_SPECIES+' per species':'');
   counts();$('unpick').hidden=parent!==window||!S.picks.length;
   if(!LV)LV=saved()||first();
   paint();
@@ -257,7 +259,7 @@ async function load(){
     R=IdentifyRanges(b,{P:P,name:function(i){return P.tax[i]!==NOTAX&&TAXA[P.tax[i]]?TAXA[P.tax[i]][0]:null;},look:looksOf,redraw:redraw});
     R.level(LV,true);redraw();});
   window.__identify={ids:idsOf,view:function(){return view.map(function(r){return r&&Array.from(r.map(function(i){return P.id[i];}));});},
-    total:function(){return S.total;},level:function(){return LV;},ranges:function(){return !!R;},refresh:function(){var t=performance.now();select();build();return performance.now()-t;}};
+    total:function(){return S.total;},levelled:function(){var n=0;for(var i=0;i<P.n;i++)if(SEL[i]&&LEVEL[i])n++;return n;},level:function(){return LV;},ranges:function(){return !!R;},refresh:function(){var t=performance.now();select();build();return performance.now()-t;}};
 }
 tabs();inbox();
 load().catch(function(e){status('Could not load the records: '+e.message);});
