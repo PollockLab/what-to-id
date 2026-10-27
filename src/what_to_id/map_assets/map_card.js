@@ -8,7 +8,7 @@ var MapCard=(function(){
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 return function(c){
   var DATA=c.META.data_url&&new URL(c.META.data_url,location.href).href.replace(/\/*$/,'/'),
-    idx=null,R=null,RUN=0,CUR=-1,CACHE=new Map();
+    idx=null,R=null,RUN=0,CUR=-1,CACHE=new Map(),MIN=false;  // MIN: the card is a strip, kept across picks this session
   function open(){return AtlasSearchIndex.open(DATA,{whole:4<<20});}
   async function neighbors(id){
     idx=idx||open();idx.catch(function(){idx=null;});  // a failed open is tried again next time
@@ -38,7 +38,22 @@ return function(c){
     var p=el('p','mt','Closest matches · ');p.appendChild(a);
     box.replaceChildren(p,ul);box.hidden=false;c.place();
   }
+  // the card as a strip (thumbnail, name, chip, + and ×) or in full; its – / + button names what it does
+  function apply(){
+    var card=document.getElementById('card'),b=card&&card.querySelector('.mn');
+    if(!b)return;
+    card.classList.toggle('min',MIN);b.textContent=MIN?'+':'–';
+    b.setAttribute('aria-expanded',String(!MIN));b.setAttribute('aria-label',MIN?'Show card':'Minimize card');c.place();
+  }
   return {
+    // the freshly drawn card gets its – / + button, and a click on the strip restores it
+    wire:function(card){
+      var b=el('button','mn');b.type='button';card.prepend(b);
+      b.onclick=function(){MIN=!MIN;apply();};
+      card.onclick=function(e){if(MIN&&!e.target.closest('.x,.mn,.rchip')){MIN=false;apply();}};
+      apply();
+    },
+    min:function(v){if(v===undefined)return MIN;MIN=v;apply();},
     // the card of record i is drawn: its chip now, its matches when they arrive
     show:function(i){
       var id=c.P().id[i],run=++RUN;

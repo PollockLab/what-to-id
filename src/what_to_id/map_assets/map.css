@@ -94,6 +94,19 @@ button.padd{cursor:pointer;background:var(--chip)}
 .card .x{position:absolute;right:8px;top:8px;width:30px;height:30px;border-radius:15px;border:0;
   background:var(--panel);color:var(--ink);font-size:18px;line-height:1;cursor:pointer;
   box-shadow:var(--shadow)}
+.card .mn{position:absolute;right:44px;top:8px;width:30px;height:30px;border-radius:15px;border:0;
+  background:var(--panel);color:var(--ink);font-size:18px;line-height:1;cursor:pointer;box-shadow:var(--shadow)}
+.card .x:focus-visible,.card .mn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+/* minimized: a 48px strip, docked top right by place() (bottom sheet on a phone) */
+.card.min:not([hidden]){display:flex;align-items:center;gap:8px;height:48px;overflow:hidden;padding:0 8px 0 4px;cursor:pointer}
+.card.min .ph{order:0;flex:none;width:40px;height:40px;aspect-ratio:auto;border-radius:6px;font-size:0}
+.card.min .body{order:1;flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:0}
+.card.min .body>:not(h2):not(#rng){display:none}
+.card.min h2{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card.min #rng:not(:empty){flex:none;margin:0}
+.card.min .mn,.card.min .x{position:static;flex:none;box-shadow:none;background:var(--chip)}
+.card.min .mn{order:2}
+.card.min .x{order:3}
 .card .btn{display:block;text-align:center;margin:10px 0 0;padding:8px;border-radius:8px;
   background:var(--on);color:var(--onink);text-decoration:none;font-weight:600}
 .card .attr{font-size:11px;color:var(--muted);margin:8px 0 0}

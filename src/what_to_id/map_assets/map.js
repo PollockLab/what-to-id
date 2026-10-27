@@ -333,13 +333,15 @@ var NARROW=matchMedia('(max-width:760px)');
 function place(){
   if(SEL<0||card.hidden)return;var s=card.style;
   if(NARROW.matches){s.left=s.top=s.right='';return;}
+  if(MC.min()){var q=map.getContainer().getBoundingClientRect(),z=map.getContainer().querySelector('.maplibregl-ctrl-top-right');  // the strip docks top right, left of the zoom buttons
+    s.left='auto';s.top=q.top+8+'px';s.right=innerWidth-q.right+8+(z?z.offsetWidth:0)+'px';return;}
   var r=map.getContainer().getBoundingClientRect(),p=map.project([P.pos[2*SEL],P.pos[2*SEL+1]]),
     x=r.left+p.x,y=r.top+p.y,w=card.offsetWidth,h=card.offsetHeight,g=14,m=8,
     left=x+g+w<=innerWidth-m?x+g:x-g-w>=m?x-g-w:innerWidth-m-w;
   s.right='auto';s.left=Math.max(m,left)+'px';
   s.top=Math.max(m,Math.min(y-h/2,innerHeight-m-h))+'px';
 }
-function closeCard(){SEL=-1;NBR=[];card.hidden=true;if(ctl)ctl.abort();MC.hide();
+function closeCard(){SEL=-1;NBR=[];card.hidden=true;if(ctl)ctl.abort();MC.hide();MC.min(false);  // × is done with it: the next pick opens in full
   if(GONE_NEW){GONE_NEW=false;refilter();}else{layers();writeHash();}
   tell(null);}
 // The split view mirrors the picked record in the photo space by id. A record picked there is ringed
@@ -384,7 +386,7 @@ addEventListener('message',function(e){
   if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-record')return;
   var id=e.data.id,i,idf=e.data.from==='identify';  // an Identify card opens the record's card; a photo space pick rings it
   if(id==null){S.rec=S.mark=null;if(SEL>=0){SEL=-1;NBR=[];card.hidden=true;if(ctl)ctl.abort();MC.hide();layers();}return;}
-  if((i=P.id.indexOf(id))>=0){if(idf){reveal(i);if(i!==SEL||card.hidden)openCard(i);}else if(i!==SEL)mark(i);return;}
+  if((i=P.id.indexOf(id))>=0){if(idf){MC.min(false);reveal(i);if(i!==SEL||card.hidden)openCard(i);}else if(i!==SEL)mark(i);return;}
   S.rec=id;S.fly=false;S.mark=!idf;  // the shards that hold it have not loaded yet
 });
 function openCard(i){
@@ -400,7 +402,7 @@ function openCard(i){
     'href="https://www.inaturalist.org/observations/'+id+'">Help identify on iNaturalist</a>'+
     '<p class="attr" id="attr"></p></div>';
   card.hidden=false;card.querySelector('.x').onclick=closeCard;card.querySelector('.x').focus();
-  place();
+  MC.wire(card);
   layers();writeHash();MC.show(i);
   if(ctl)ctl.abort();ctl=new AbortController();
   fetch('https://api.inaturalist.org/v1/observations/'+id,{signal:ctl.signal})
