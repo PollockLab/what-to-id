@@ -220,10 +220,12 @@ function drawTabs(){
     b.setAttribute('aria-label',a[1]+', '+a[2].toLocaleString()+(a[2]===1?' record':' records'));
     b.onclick=function(){S.g=a[0];update();};box.appendChild(b);});
   if(!D.okm)return;
-  var o=el('button',S.o<0?'out not':'out',(S.o<0?'not ':'')+'Outside its range '+out.toLocaleString());
+  // left out reads as its complement; the status line gives how many were left out
+  var o=el('button',S.o<0?'out not':'out',S.o<0?'In range':'Outside its range '+out.toLocaleString());
   o.type='button';o.title='Click to pick, again to leave out, again to clear.';
   o.setAttribute('aria-pressed',String(!!S.o));o.disabled=!out&&!S.o;
-  o.setAttribute('aria-label',(S.o<0?'Not outside':'Outside')+' its range, '+out.toLocaleString());
+  o.setAttribute('aria-label',S.o<0?'In range, '+out.toLocaleString()+' outside left out':
+    'Outside its range, '+out.toLocaleString());
   o.onclick=function(){S.o=S.o===0?1:S.o>0?-1:0;update();};box.appendChild(o);
 }
 function card(i){

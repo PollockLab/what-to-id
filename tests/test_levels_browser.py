@@ -167,7 +167,7 @@ def test_outside_its_range_filter_counts_sorts_and_keeps_the_hash(browser, map_s
     # Clear matches start with records far from their range left out, as a map chip in "not"
     page = open_page(browser, map_site, "#level=easy")
     btn = page.locator("#tabs button.out")
-    assert btn.inner_text() == "not Outside its range 1" and "not" in btn.get_attribute("class")
+    assert btn.inner_text() == "In range" and "not" in btn.get_attribute("class")
     assert obs_links(page) == [OBS + "101"] and "out=" not in page.url
     assert "1 far outside their range left out." in page.locator("#status").inner_text()
     btn.click()
