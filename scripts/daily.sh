@@ -52,7 +52,7 @@ fetch() {
   fi
   local assets
   assets=$(gh release view "$STATE_TAG" --repo "$state_repo" --json assets --jq '.assets[].name')
-  for f in pool.parquet served.parquet bundle-eligibility.json; do
+  for f in pool.parquet served.parquet bundle-eligibility.json taxon_status.parquet; do
     if grep -qx "$f" <<<"$assets"; then
       gh release download "$STATE_TAG" --repo "$state_repo" -D "$STATE" -p "$f" --clobber
     fi
@@ -188,6 +188,7 @@ build() {
   else
     update_pool
   fi
+  [ "${OFFLINE:-}" = 1 ] || $PY -m what_to_id.taxon_status --pool "$STATE/pool.parquet" --out "$STATE/taxon_status.parquet"
 
   local common=(--pool "$pool" --freeze "$TODAY" --d1 "$BLITZ_D1"
     --arms "$ARMS" --design rotation --max-batches "$MAX_BATCHES" --key-env WHAT_TO_ID_KEY
@@ -217,6 +218,9 @@ save() {
   if [ -f "$STATE/bundle-eligibility.json" ]; then
     files+=("$STATE/bundle-eligibility.json")
   fi
+  if [ -f "$STATE/taxon_status.parquet" ]; then
+    files+=("$STATE/taxon_status.parquet")
+  fi
   for f in "${files[@]}"; do
     [ -s "$f" ] || die "missing $f; run build first"
   done
@@ -231,7 +235,7 @@ upload_state() {
   if ! state_release_exists "$state_repo"; then
     gh release create "$STATE_TAG" --repo "$state_repo" \
       --prerelease --latest=false --title "Daily pool state" \
-      --notes "Pool, served log (list letters only), and each day's pool and build record, kept between daily builds."
+      --notes "Pool, served log (list letters only), taxon status, and each day's pool and build record, kept between daily builds."
   fi
   local attempt
   for attempt in 1 2 3; do
