@@ -20,7 +20,13 @@ from .test_page_nav import FORBIDDEN
 browser = eb.browser
 N = 2100
 LOOKS = ["Bombus a", "Bombus b", "Apis c"]
-LABELS = ["Clear matches", "Close calls", page_identify.NARROW_LABEL, "Odd shots"]
+LABELS = [
+    "Clear matches",
+    "Close calls",
+    page_identify.NARROW_LABEL,
+    "Odd shots",
+    "Might be mislabelled",
+]
 
 
 class Quiet(http.server.SimpleHTTPRequestHandler):
@@ -49,6 +55,7 @@ def site(tmp_path_factory):
             "looks_like": pd.Series([LOOKS[k % 3] for k in i], dtype="category"),
         }
     )[list(IDENTIFY_COLUMNS)]
+    scored.loc[scored.index[scored["level"] == 4][0], "level"] = 5  # the one likely mislabel
     scored.to_parquet(root / "identify.parquet")
     pool_levels.build(root, parquet=root / "identify.parquet")
     page_identify.build(root)
@@ -172,6 +179,11 @@ def test_cards_follow_the_chosen_level_with_a_few_per_species_and_photos_in_batc
     tab(page, 2).click()
     page.wait_for_selector("#grid .card .look")
     assert "Looks more like" in page.locator("#grid .card .look").first.inner_text()
+    tab(page, 5).click()
+    page.wait_for_selector("#grid .card .look")
+    assert page.locator("#grid .card").count() == 1
+    assert page.locator("#grid .card .look").first.inner_text().startswith("Looks more like ")
+    assert "Might be mislabelled" in page.locator(".about").text_content()
     body = page.inner_text("body").lower()
     assert not any(word in body for word in FORBIDDEN)
     assert "photo download" in page.locator(".about").text_content()
@@ -276,7 +288,7 @@ def test_the_tabs_switch_the_cards_and_their_counts_are_the_totals(browser, site
     assert tab(page, 3).get_attribute("aria-selected") == "true"
     assert tab(page, 3).get_attribute("tabindex") == "0"
     assert tab(page, 2).get_attribute("tabindex") == "-1"
-    page.keyboard.press("End")
+    page.keyboard.press("ArrowRight")
     assert page.evaluate("__identify.level()") == 4
     page.wait_for_selector("#grid .card")
     shown = {

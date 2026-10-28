@@ -138,3 +138,19 @@ def test_identify_rows_build_the_same_tables_as_level_rows():
     assert notes["range_note"].tolist() == [lr.ONLY_LABEL, lr.BOTH_OUT, None, None, None]
     assert notes["out_km"].tolist()[:4] == [0, pytest.approx(111, abs=15), 0, 0]
     assert sorted(ranges["name"]) == ["A a", "B b", "C c"]
+
+
+def test_a_likely_mislabel_gets_the_range_note_a_close_call_gets():
+    a, b = (h3.latlng_to_cell(48.5 + k, -123.0, 4) for k in range(2))
+    orm = pd.DataFrame({"taxon_id": [1, 2], "cells": [[a], [b]]})
+    pool = pd.DataFrame(
+        {"id": [10, 11, 12], "lat": [48.5, 48.5, 49.5], "lon": [-123.0] * 3}
+        | {"taxon_id": [1, 1, 2], "taxon_name": ["A a", "A a", "B b"]}
+    )
+    levels = (
+        pool[["id", "taxon_id", "taxon_name"]]
+        .iloc[:2]
+        .assign(looks_like_name="B b", level=["taxonomist", "mislabel"])
+    )
+    notes, _, _ = lr.build(levels, pool, orm)
+    assert notes["range_note"].tolist() == [lr.ONLY_LABEL, lr.ONLY_LABEL]

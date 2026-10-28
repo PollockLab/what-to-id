@@ -39,6 +39,12 @@ LEVELS = (
         "Labelled above species, and the photo points to one species of it. Take it to species.",
     ),
     (4, "Odd shots", "Hard photos: hands, eggs, close-ups. Feeling lucky?"),
+    (
+        5,
+        "Might be mislabelled",
+        "The photo matches another species clearly better than its label."
+        " Check whether the label is wrong.",
+    ),
 )
 SCRIPTS = {
     "__ATLAS_SEARCH_META__": HERE / "atlas_search_assets" / "atlas_search_meta.js",
