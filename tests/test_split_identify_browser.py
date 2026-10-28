@@ -84,7 +84,7 @@ def test_the_default_view_is_identify_beside_the_map_and_the_switch_lists_four_p
     frame_of(page, "identify")
     frame_of(page, "map")
     shown = page.evaluate("[...document.querySelectorAll('iframe')].map(f => f.id)")
-    assert shown == ["identify", "map"]
+    assert shown == ["map", "identify"]  # the map first, its filter rail leftmost
     assert page.locator("#xbar .seg button").all_inner_texts() == [
         "Identify",
         "Map",
@@ -108,8 +108,8 @@ def test_old_views_still_open_their_panes_and_each_pane_toggles(browser, site, p
     page.click("[data-p=identify]")
     frame_of(page, "identify")
     assert page.evaluate("[...document.querySelectorAll('iframe')].map(f => f.id)") == [
-        "identify",
         "map",
+        "identify",
         "space",
     ]
     page.click("[data-p=identify]")

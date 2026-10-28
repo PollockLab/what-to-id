@@ -49,9 +49,9 @@ SCRIPTS = {
 IDENTIFY_BUTTON = '<button type="button" data-p="identify">Identify</button>'
 TREE_BUTTON = '<button type="button" data-p="tree">Taxonomy</button>'
 BAR = (
-    '<div class="xbar" id="xbar"><span class="counts" id="counts" aria-live="polite"></span>'
-    '<button type="button" class="gsum" id="gsum" hidden><span class="gt"></span>'
-    '<span class="gbar"></span></button>'
+    '<div class="xbar" id="xbar"><button type="button" id="fb" aria-controls="map" '
+    'aria-expanded="false">Filters</button>'
+    '<span class="counts" id="counts" aria-live="polite"></span>'
     '<form id="sf" role="search"><input id="sq" type="search" aria-label="Photo search" '
     'autocomplete="off" spellcheck="false" '
     'placeholder="a hummingbird feeding at a flower, or an observation link">'

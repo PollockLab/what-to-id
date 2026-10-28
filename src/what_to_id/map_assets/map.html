@@ -26,6 +26,7 @@ fetch('explore.html',{method:'HEAD'}).then(function(r){if(r.ok)location.replace(
 <button type="button" id="toggle" class="toggle" aria-expanded="false" aria-controls="side">Filters</button>
 </header>
 <section id="side" class="side" aria-label="Filters">
+<div class="railhd"><b>Filters</b><button type="button" id="railx" class="railx" aria-controls="side" aria-expanded="true">Hide</button></div>
 <div id="selbar" class="selbar" role="region" aria-label="Your selection" hidden><p class="lbl">Your selection <button type="button" class="link">Clear all</button></p><ul class="chips"></ul></div>
 <details class="sec" id="grpsec" open><summary>Groups <span class="n" id="ngroups"></span><span id="gbar" class="gbar" role="img" aria-label="No records in view"></span></summary>
 <p class="muted">Share of the records in view, or in all of BC with All of BC on. Groups combine with each other and with the taxa. <button type="button" id="gall" class="link">All groups</button> <button type="button" id="gkeep" class="link" hidden></button></p>

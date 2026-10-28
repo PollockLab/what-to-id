@@ -369,7 +369,9 @@ def test_a_group_the_map_leaves_out_leaves_the_tree_and_its_counts(browser, site
 # the counts the frames send the split page, as the split page receives them
 COUNTS = (
     "window.__counts = []; if (parent === window) addEventListener('message', e => {"
-    " if (e.data && e.data.type === 'wtid-counts') __counts.push(e.data.total); })"
+    " var r = document.querySelector('iframe.rail');"  # not the map's frame kept as the rail
+    " if (e.data && e.data.type === 'wtid-counts' && !(r && e.source === r.contentWindow))"
+    " __counts.push(e.data.total); })"
 )
 
 

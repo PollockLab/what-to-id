@@ -686,8 +686,8 @@ def test_area_box_link_cuts_to_view_counts_and_pages_like_the_batches():
     }
 
 
-def test_embedded_filters_are_a_drawer_over_the_map():
+def test_embedded_filters_are_a_rail_left_of_the_map():
     css = (_ASSETS / "map.css").read_text()
-    rule = re.search(r"\.embed \.side\{([^}]*)\}", css).group(1)
-    assert "grid-area:map" in rule and "display:none" in rule
-    assert ".embed .side.open{display:flex}" in css
+    rule = re.search(r"\.embed body\{([^}]*)\}", css).group(1)
+    assert "280px" in rule and '"side head"' in rule and '"side map"' in rule
+    assert ".embed .toggle{display:none}" in css  # no drawer button

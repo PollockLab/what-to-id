@@ -94,12 +94,10 @@ TOTAL_ONLY = {
 _COLS = ("id", "lat", "lon", "observed_on", "created_at", "iconic_taxon")
 _PKG = files("what_to_id")
 _ASSETS = _PKG / "map_assets"
-# Inlined in this order; map_taxa.js and map_area.js define the taxon and area filters map.js calls,
-# map_step.js the Identify button that steps through an area's batches, map_projects.js the
-# project filter, map_chips.js the click rule for the short-list chips and the selection bar, and
-# map_filter.js the filter state and the category values the GPU filter reads, group_list.js the
-# groups list, filter_bar.js the histograms, chips and selection bar, and map_card.js the card's
-# matches and range chip, level_colour.js the dots' level colours.
+# Inlined in this order: map_taxa.js, map_area.js, map_step.js, map_projects.js and map_chips.js
+# the taxon, area, Identify batch, project and chip helpers map.js calls, map_filter.js the filter
+# state and GPU filter values, group_list.js and filter_bar.js the filter panel, map_card.js and
+# level_colour.js the card and the dots' colours, map_rail.js the panel as Explore's filter rail.
 MAP_CSS = ("map.css", "map_select.css", "map_area.css")
 # The record card's closest matches (the atlas index reader and the iNaturalist photo lookup of the
 # search page) and range chip (the Identify page's range module), and the photo space's taxon tree
@@ -124,6 +122,7 @@ MAP_JS = (
     "level_colour.js",
     "map_card.js",
     "map.js",
+    "map_rail.js",
 )
 
 
