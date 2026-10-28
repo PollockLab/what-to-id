@@ -14,8 +14,15 @@ body{display:flex;flex-direction:column}
 .xbar{display:flex;align-items:center;gap:8px 14px;margin-left:auto;min-width:0;font-size:13px;white-space:nowrap}
 .counts{color:var(--muted)}
 .counts b{color:var(--ink);font-weight:650;font-variant-numeric:tabular-nums}
+.gsum{display:inline-flex;align-items:center;gap:6px;max-width:200px;min-height:28px;padding:0 8px;border:1px solid var(--line);border-radius:14px;background:var(--chip);color:var(--ink);font:inherit;font-size:12px;cursor:pointer}
+.gsum[hidden]{display:none}
+.gsum .gt{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.gsum .gt:empty{display:none}  /* all groups: the bar alone, so the bar keeps one line at 1280 px */
+.gsum .gbar{display:flex;flex:0 0 56px;height:6px;border-radius:3px;overflow:hidden;background:var(--line)}
+.gsum .gbar i{height:100%;min-width:1px}
+.gsum .gbar i.dim{opacity:.25}
 #sf{display:inline-flex;gap:6px;flex:0 1 auto;min-width:0}
-#sq{font:inherit;font-size:13px;width:min(260px,30vw);min-width:120px;flex:0 1 auto;min-height:28px;padding:0 10px;border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--ink)}
+#sq{font:inherit;font-size:13px;width:min(230px,30vw);min-width:120px;flex:0 1 auto;min-height:28px;padding:0 10px;border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--ink)}
 #sf button{font:inherit;font-size:12px;min-height:28px;padding:0 11px;border:1px solid var(--line);border-radius:14px;background:var(--chip);color:var(--ink);cursor:pointer}
 .seg{display:inline-flex}
 .seg button,.xbar .i{font:inherit;font-size:12px;min-height:28px;padding:0 11px;border:1px solid var(--line);background:var(--chip);color:var(--ink);cursor:pointer}
@@ -42,7 +49,7 @@ body{display:flex;flex-direction:column}
 @media (max-width:800px){.xbar{flex:1 1 100%;margin:0 0 6px;flex-wrap:wrap;white-space:normal}
   .seg{flex:1 1 0;order:-1;max-width:420px}.seg button{flex:1 1 0;min-height:36px;padding:0 6px}
   .xbar .i{order:-1;width:36px;min-height:36px}
-  #sf{flex:1 1 100%}#sq{flex:1 1 0;width:auto;min-height:36px}#sf button{min-height:36px}}
+  .gsum{min-height:36px}#sf{flex:1 1 100%}#sq{flex:1 1 0;width:auto;min-height:36px}#sf button{min-height:36px}}
 </style>
 </head>
 <body>
@@ -111,6 +118,7 @@ function setView(v){
   post('space',{type:'wtid-layout',peer:visible('map')&&visible('space')});
   tally(!tree0&&visible('tree'));
   colour();
+  gsum.hidden=!visible('map')||!gsum.querySelector('i');
   [].forEach.call(document.querySelectorAll('[data-p]'),function(b){b.setAttribute('aria-pressed',v.indexOf(b.dataset.p)>=0);});
   count();}
 // Beside Identify the map's dots take the Identify levels' colours, so both panes read as one task.
@@ -206,6 +214,17 @@ addEventListener('message',function(e){
   else if(d.type!=='wtid-focus'&&d.type!=='wtid-reset')late[d.type]=d;
   Object.keys(frames).forEach(function(o){if(o!==n&&visible(o))post(o,d);});
 });
+// The map's group shares in the top bar, so what the panes show reads without opening the filters; a click opens
+// the map's Groups.
+var gsum=document.getElementById('gsum');
+addEventListener('message',function(e){
+  var d=e.data,b=gsum.querySelector('.gbar');
+  if(e.origin!==location.origin||!frames.map||e.source!==frames.map.contentWindow||!d||d.type!=='wtid-groups'||!Array.isArray(d.bar))return;
+  b.textContent='';d.bar.forEach(function(x){var i=document.createElement('i');i.style.background=x[0];i.style.width=x[1]+'%';
+    if(x[2])i.className='dim';b.appendChild(i);});
+  gsum.querySelector('.gt').textContent=d.text;gsum.title=d.label;gsum.setAttribute('aria-label',d.label);gsum.hidden=!visible('map');
+});
+gsum.addEventListener('click',function(){if(!visible('map'))return;frames.map.focus();post('map',{type:'wtid-filters',open:'groups'});});
 function tally(force){var s=visible('map')?'map':visible('space')?'space':null;
   if(visible('tree')&&(force||s!==src)){src=s;post('tree',cnt[s]||{type:'wtid-counts',own:null});}}
 // Photo search: the query is resolved as search.html does, and its hits go to both frames as a subset of the points.

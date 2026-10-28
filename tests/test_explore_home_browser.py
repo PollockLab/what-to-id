@@ -114,3 +114,49 @@ def test_the_standalone_map_keeps_the_group_colours_and_never_loads_the_levels(b
     assert not any("pool-levels.bin" in s for s in served)
     assert page.errors == []
     page.close()
+
+
+# the top bar's groups button: its text, title, and per segment whether it is dimmed
+GSUM = """() => { const g = document.getElementById('gsum');
+  return {shown: !g.hidden, text: g.querySelector('.gt').textContent, title: g.title,
+    dim: [...g.querySelectorAll('.gbar i')].map(i => i.classList.contains('dim'))}; }"""
+
+
+def test_the_top_bar_shows_the_group_shares_and_opens_the_groups_filter(browser, site):
+    page = open_page(browser, f"{site[0]}/explore.html")
+    frame = map_frame(page)
+    page.wait_for_function(f"({GSUM})().dim.length === 3")
+    got = page.evaluate(GSUM)
+    assert got["shown"] and got["text"] == "" and got["dim"] == [False] * 3
+    assert (
+        got["title"].startswith("All groups.") and "57%" in got["title"]
+    )  # the largest group's share, as the map's own summary says it
+    # the smallest group alone; the list sits in the shut filter drawer
+    frame.evaluate("document.querySelectorAll('#groups > li')[2].querySelector('.gb').click()")
+    page.wait_for_function(f"({GSUM})().text !== ''")
+    got = page.evaluate(GSUM)
+    assert got["dim"] == [True, True, False]
+    assert got["text"] == frame.locator("#groups > li").nth(2).locator(".nm").text_content()
+    assert not frame.evaluate("document.getElementById('side').classList.contains('open')")
+    frame.evaluate("document.getElementById('grpsec').open = false")
+    page.click("#gsum")
+    frame.wait_for_function("document.getElementById('side').classList.contains('open')")
+    assert frame.evaluate("document.getElementById('grpsec').open")
+    page.click("[data-p=map]")  # without the map there are no shares to show
+    page.wait_for_function("document.getElementById('gsum').hidden")
+    assert page.errors == []
+    page.close()
+
+
+def test_the_header_keeps_one_line_at_1280(browser, site):
+    page = open_page(browser, f"{site[0]}/explore.html")
+    map_frame(page)
+    page.wait_for_function("!document.getElementById('gsum').hidden")
+    tops = page.evaluate(
+        "[...document.querySelectorAll('.site-nav, #xbar > *:not([hidden]):not(.note)')]"
+        ".map(e => { const r = e.getBoundingClientRect();"
+        " return Math.round(r.top + r.height / 2); })"
+    )
+    assert max(tops) - min(tops) <= 2, tops
+    assert page.evaluate("document.documentElement.scrollWidth") <= 1280
+    page.close()

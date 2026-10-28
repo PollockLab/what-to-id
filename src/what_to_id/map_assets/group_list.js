@@ -33,7 +33,7 @@ function show(){R.forEach(function(r,j){var st=S.groups[G[j]]||'',nm=r.b.querySe
   r.b.setAttribute('aria-pressed',String(st==='inc'));r.x.setAttribute('aria-pressed',String(st==='not'));
   r.li.classList.toggle('not',st==='not');r.li.classList.toggle('on',st==='inc');
   nm.textContent=(st==='not'?'not ':'')+gshort(G[j]);
-  r.x.setAttribute('aria-label',(st==='not'?'Keep ':'Leave out ')+gshort(G[j]));});}
+  r.x.setAttribute('aria-label',(st==='not'?'Keep ':'Leave out ')+gshort(G[j]));});tell();}
 // The ranks under each group, once the taxa are in; the records arrive in shards, so the tree
 // reads them through getters.
 function tree(){
@@ -61,7 +61,25 @@ function set(c){
     if(top.length<3)top.push(gshort(G[j])+' '+pct(c[j],tot));});
   o.bar.setAttribute('aria-label',top.length?'Largest groups in view: '+top.join(', '):'No records in view');
   if(TR){TR.refresh();TR.render();}
+  ORD=ord;tell();
 }
+// Explore draws the bar in its top bar (split.html), the groups left out of the pick dimmed, and asks for
+// the Groups section (wtid-filters) when it is clicked.
+var ORD=[],sent='';
+function tell(){
+  if(parent===window||!cnt)return;
+  var on=G.filter(function(g){return S.groups[g];}).map(function(g){return (S.groups[g]==='not'?'not ':'')+gshort(g);}),
+    inc=G.some(function(g){return S.groups[g]==='inc';}),text=on.join(', '),
+    m={type:'wtid-groups',text:text,label:(text||'All groups')+'. '+o.bar.getAttribute('aria-label')+'. Opens the groups filter.',
+      bar:ORD.filter(function(j){return cnt[j];}).map(function(j){var st=S.groups[G[j]];
+        return [color(j),cnt[j]/tot*100,inc?st!=='inc':st==='not'];})},k=JSON.stringify(m);
+  if(k!==sent){sent=k;parent.postMessage(m,location.origin);}}
+addEventListener('message',function(e){
+  var d=e.data,sec=o.box.closest('details'),side=o.box.closest('.side'),f;
+  if(e.origin!==location.origin||e.source!==parent||!d||d.type!=='wtid-filters')return;
+  side.classList.add('open');f=document.querySelector('[aria-controls="'+side.id+'"]');if(f)f.setAttribute('aria-expanded','true');
+  sec.open=true;sec.scrollIntoView({block:'start'});f=o.box.querySelector('.gb');if(f)f.focus();
+});
 show();
 return {show:show,set:set};
 }
