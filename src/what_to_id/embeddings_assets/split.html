@@ -67,6 +67,8 @@ var box=document.getElementById("main-content"),frames={},last=MapFilter.tokens(
   LEVELS=__LEVELS__,FILES={identify:__IDENTIFY_FILE__,map:__MAP_FILE__,space:__SPACE_FILE__,tree:__TREE_FILE__},view,
   ORDER=['identify','map','space','tree'],ALIAS={side:'map-space',tree:'map-tree'},
   rest=h0.filter(function(t){return MapFilter.tokens(t)==='';});
+// My groups (group_list.js): a link that names no groups opens every pane with the ones kept in this browser.
+try{var mine=localStorage.getItem('wtid-my-groups');if(mine&&!/(^|&)groups=/.test(last))last=(last?last+'&':'')+'groups='+mine;}catch(e){}
 if(!FILES.tree)delete FILES.tree;  // a site built without the taxon tree
 if(!FILES.identify)delete FILES.identify;  // or without the Identify page
 // The view is the panes shown, left to right as in ORDER, written as their names joined by '-'. The old

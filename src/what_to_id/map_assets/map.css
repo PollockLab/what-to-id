@@ -54,6 +54,9 @@ h1{font-size:18px;margin:0}
 .reset{margin-left:auto;border:1px solid var(--line);background:var(--chip);color:var(--ink);font:inherit;
   font-size:13px;font-weight:600;padding:4px 12px;border-radius:14px;cursor:pointer}
 .reset:not([hidden])+.toggle{margin-left:0}
+/* the saved groups applied, in the header so it shows with the drawer shut */
+.mine{margin:0;padding:2px 4px 2px 10px;border-radius:13px;background:var(--chip);font-size:12px;font-weight:600}
+.mine[hidden]{display:none}
 /* the groups list: a row per group, its count and share, the share as a bar under the row */
 .gbar{display:flex;height:5px;margin:5px 0 0;border-radius:3px;overflow:hidden;background:var(--line)}
 .gbar i{display:block;height:100%;min-width:1px}

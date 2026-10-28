@@ -160,3 +160,59 @@ def test_the_header_keeps_one_line_at_1280(browser, site):
     assert max(tops) - min(tops) <= 2, tops
     assert page.evaluate("document.documentElement.scrollWidth") <= 1280
     page.close()
+
+
+BLOCK = """Object.defineProperty(window, 'localStorage', {configurable: true,
+  get() { throw new DOMException('blocked', 'SecurityError'); }});"""
+
+
+def test_remembered_groups_apply_to_a_link_without_groups_and_show_all_clears_them(browser, site):
+    base = site[0]
+    page = open_page(browser, f"{base}/map.html?standalone=1")
+    page.wait_for_function("document.getElementById('count').textContent.startsWith('300 ')")
+    assert page.is_hidden("#gkeep") and page.is_hidden("#mine")  # nothing picked, nothing kept
+    page.locator("#groups > li").nth(2).locator(".gb").click()
+    page.click("#gkeep")
+    assert page.evaluate("localStorage.getItem('wtid-my-groups')") == "Aves"
+    assert page.text_content("#gkeep") == "Forget these groups"
+    page.goto("about:blank")  # a new load, not a hash change
+    page.goto(f"{base}/map.html?standalone=1#at=5/49/-123")  # a link that names no groups
+    page.wait_for_function("document.getElementById('count').textContent.startsWith('30 ')")
+    assert page.is_visible("#mine") and page.text_content("#mine").startswith("Your groups")
+    page.click("#mine button")  # Show all
+    page.wait_for_function("document.getElementById('count').textContent.startsWith('300 ')")
+    assert page.is_hidden("#mine")
+    page.goto("about:blank")
+    page.goto(f"{base}/map.html?standalone=1#groups=Insecta")  # a link's own groups win
+    page.wait_for_function("document.getElementById('count').textContent.startsWith('100 ')")
+    assert page.is_hidden("#mine")
+    assert page.errors == []
+    page.close()
+    # Explore hands them to every pane, so Identify and the map agree
+    page = open_page(browser, f"{base}/explore.html")
+    page.evaluate("localStorage.setItem('wtid-my-groups', 'Aves')")
+    page.goto(f"{base}/explore.html")
+    page.wait_for_function(
+        "document.getElementById('map')?.contentDocument?.getElementById('count')?.textContent"
+        ".startsWith('30 ')"
+    )
+    assert next(f for f in page.frames if "map.html" in f.url).is_visible("#mine")
+    assert "groups=Aves" in next(f for f in page.frames if "identify.html" in f.url).url
+    page.evaluate("localStorage.removeItem('wtid-my-groups')")
+    assert page.errors == []
+    page.close()
+
+
+def test_with_storage_blocked_the_map_and_explore_still_work(browser, site):
+    page = open_page(browser, "about:blank")
+    page.add_init_script(BLOCK)
+    page.goto(f"{site[0]}/map.html?standalone=1")
+    page.wait_for_function("document.getElementById('count').textContent.startsWith('300 ')")
+    page.locator("#groups > li").nth(2).locator(".gb").click()
+    page.wait_for_function("document.getElementById('count').textContent.startsWith('30 ')")
+    assert page.is_hidden("#gkeep")  # nothing can be kept, so nothing is offered
+    page.goto(f"{site[0]}/explore.html")
+    map_frame(page)
+    page.wait_for_function("!document.getElementById('gsum').hidden")
+    assert page.errors == []
+    page.close()

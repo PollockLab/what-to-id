@@ -151,7 +151,7 @@ function chip(box,label,pressed,onclick,title){var b=document.createElement('but
   b.onclick=function(){b.setAttribute('aria-pressed',String(onclick()));refilter();};
   $(box).appendChild(b);return b;}
 // Like the months: with no group picked every group shows. The list's rows pick and leave out groups.
-var GL=GroupList({box:$('groups'),bar:$('gbar'),S:S,META:META,nf:nf,changed:refilter,taxa:o.taxa,P:o.P,
+var GL=GroupList({box:$('groups'),bar:$('gbar'),keep:$('gkeep'),mine:$('mine'),S:S,META:META,nf:nf,changed:refilter,taxa:o.taxa,P:o.P,
   pass:o.pass,inside:o.inside,pk:function(){return PK;}}),showGroups=GL.show;
 $('gall').onclick=function(){S.groups={};showGroups();refilter();};
 var MB_=MON.map(function(m,i){var b=chip('months',m,!!(S.months>>i&1),
