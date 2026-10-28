@@ -9,12 +9,13 @@ ASSETS = files("what_to_id") / "map_assets"
 needs_node = pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
 
 
-def _counts(bounds, lo=0, hi=9, up=False, groups=False):
+def _counts(bounds, lo=0, hi=9, up=False, groups=False, everywhere=False):
     """map.js's inView() against 5 records at lon 0, 1, 5, 179 and -179 (lat 0). Kept: all but
     #1, which only the group filter leaves out; #3 has no day. Returns the count, or None for a
-    view 360 degrees wide or more (no restriction); with groups, the per-group counts instead."""
+    view 360 degrees wide or more or the switch on All of BC (everywhere: no restriction, so the
+    page shows nShown()); with groups, the per-group counts instead."""
     source = (ASSETS / "map.js").read_text()
-    start = source.index("var VC=null;")
+    start = source.index("var VC=null")
     body = source[start : source.index("function render()", start)]
     harness = f"""
 const NO=65535,LAST=9,S={{lo:{lo},hi:{hi},up:{json.dumps(up)}}},B={json.dumps(bounds)};
@@ -28,7 +29,11 @@ let VM=new Uint8Array(0);
 """
     out = "Array.from(VC.g)" if groups else "inView()"
     run = subprocess.run(
-        ["node", "-e", harness + body + f"inView();console.log(JSON.stringify({out}))"],
+        [
+            "node",
+            "-e",
+            f"{harness}{body}ALL={json.dumps(everywhere)};inView();console.log(JSON.stringify({out}))",
+        ],
         capture_output=True,
         text=True,
         check=True,
@@ -73,6 +78,13 @@ def test_in_view_counts_each_group_with_the_group_filter_left_out():
     assert _counts([-180, -90, 180, 90], lo=1, groups=True) == [3, 1]  # the dateless #3 drops
 
 
+@needs_node
+def test_all_of_bc_ignores_the_view_and_counts_every_group():
+    assert _counts([-1, -1, 2, 1], everywhere=True) is None  # the page then shows nShown()
+    assert _counts([-1, -1, 2, 1], groups=True, everywhere=True) == [3, 2]
+    assert _counts([-1, -1, 2, 1], lo=1, groups=True, everywhere=True) == [3, 1]
+
+
 def _node(harness, start, end, script):
     source = (ASSETS / "map.js").read_text()
     i = source.index(start)
@@ -93,7 +105,7 @@ const P={n:3,pos:Float32Array.of(-123,49,-120,50,-125,48)};
     got = _node(
         harness,
         "function full()",
-        "var VC=null;",
+        "var VC=null",
         "fitTo(i=>i!==2);fitTo(()=>false);fitTo(i=>i===1);console.log(JSON.stringify(out))",
     )
     # each fit first takes the map's new size: the count above it may have rewrapped
