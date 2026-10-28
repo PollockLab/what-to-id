@@ -18,7 +18,7 @@ fetch('explore.html',{method:'HEAD'}).then(function(r){if(r.ok)location.replace(
 <h1>{{TITLE}}</h1>
 <p class="sub">Where the records are. Draw an area or pick a park to filter every view. Each dot is one record that needed an ID and had a photo{{WHEN}}. Hover a dot for its name, click it for the photo.</p>
 </div>
-<p class="stat" aria-live="polite"><b id="count">Loading</b> <span id="more"></span><span id="share" class="share"></span></p>
+<p class="stat" aria-live="polite"><b id="count">Loading</b> <span id="scope" class="seg" role="group" aria-label="Count"><button type="button" aria-pressed="true" title="Count the records in the map view">In view</button><button type="button" aria-pressed="false" title="Count every record in BC, wherever the map is">All of BC</button></span> <span id="more"></span><span id="share" class="share"></span></p>
 <p id="mine" class="mine" role="status" hidden>Your groups <button type="button" class="link">Show all</button></p>
 <span class="idstep"><button type="button" id="idprev" class="idarrow" aria-label="Previous batch" hidden>‹</button><a id="identify" class="idlink" target="_blank" rel="noopener" href="https://www.inaturalist.org/observations/identify?quality_grade=needs_id&amp;place_id={{PLACE_ID}}">Identify these</a><button type="button" id="idnext" class="idarrow" aria-label="Next batch" hidden>›</button></span>
 <p id="idnote" class="idnote" role="status" hidden></p>
@@ -28,7 +28,7 @@ fetch('explore.html',{method:'HEAD'}).then(function(r){if(r.ok)location.replace(
 <section id="side" class="side" aria-label="Filters">
 <div id="selbar" class="selbar" role="region" aria-label="Your selection" hidden><p class="lbl">Your selection <button type="button" class="link">Clear all</button></p><ul class="chips"></ul></div>
 <details class="sec" id="grpsec" open><summary>Groups <span class="n" id="ngroups"></span><span id="gbar" class="gbar" role="img" aria-label="No records in view"></span></summary>
-<p class="muted">Share of the records in view. Groups combine with each other and with the taxa. <button type="button" id="gall" class="link">All groups</button> <button type="button" id="gkeep" class="link" hidden></button></p>
+<p class="muted">Share of the records in view, or in all of BC with All of BC on. Groups combine with each other and with the taxa. <button type="button" id="gall" class="link">All groups</button> <button type="button" id="gkeep" class="link" hidden></button></p>
 <ul id="groups" class="gl" role="list" aria-label="Taxon groups"></ul>
 </details>
 <p class="muted">Click a group to pick it, again to clear it. In Your selection, click a chip to flip it.</p>
@@ -45,10 +45,6 @@ fetch('explore.html',{method:'HEAD'}).then(function(r){if(r.ok)location.replace(
 <p class="lbl" id="acclbl">Location accuracy <span class="muted">(pick one)</span></p>
 <div id="acc" class="chips" role="group" aria-labelledby="acclbl"></div></details>
 <details class="sec" id="projbox" hidden></details>
-<details class="sec" id="monsec"><summary>Months of the year <span class="n" id="nmonths"></span></summary>
-<div id="months" class="chips months" role="group" aria-label="Months of the year"></div>
-<p class="muted">Compare the same season across years. <button type="button" id="mclear" class="link">Any month</button></p>
-</details>
 </section>
 <main id="map" role="application" aria-label="Map of records"></main>
 <section id="time" class="time" aria-label="Dates">
@@ -59,6 +55,7 @@ fetch('explore.html',{method:'HEAD'}).then(function(r){if(r.ok)location.replace(
 <span id="presets" class="chips" role="group" aria-label="Periods"></span>
 <span class="dates"><input id="from" type="date" aria-label="From"> to <input id="to" type="date" aria-label="To"></span>
 </div>
+<div class="row"><span id="months" class="chips months" role="group" aria-label="Months of the year"></span><button type="button" id="mclear" class="link">Any month</button></div>
 <div class="histwrap"><canvas id="over" role="img" aria-label="Records per year, every year, on a log scale. Click a year to zoom to it."></canvas><p id="unit" class="unit"></p><canvas id="hist" role="img"></canvas><div id="htip" class="htip" hidden></div></div>
 <p id="hint" class="hint">Top: every year, bar height on a log scale so sparse early years show. Click or drag across years to zoom in. Bottom: the period in view. Drag to pick a period, click a bar to zoom into it, double-click for all dates. Bars count records that still need an ID, so older periods look emptier: many of their records have been identified since.</p>
 </section>

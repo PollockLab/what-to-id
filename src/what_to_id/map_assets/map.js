@@ -179,17 +179,17 @@ function fitTo(keep){
   // the new count can rewrap the bar above the map; MapLibre sees the new size only a frame later, so a fit
   // to the old one sits off centre
   if(w<=e){map.resize();map.fitBounds([[w,s],[e,n]],{padding:40,maxZoom:14});}}
-// kept records dated in S.lo..S.hi like CUM and inside the viewport, null for the world; g counts them per group
-// and VM marks them with the group filter left out, for the groups list
-var VC=null;
+// kept records dated in S.lo..S.hi like CUM and inside the viewport, null for the world or with ALL (the switch on
+// All of BC); g counts them per group and VM marks them with the group filter left out, for the groups list
+var VC=null,ALL=false;
 function inView(){
-  var n=P.n,b=map.getBounds(),w=b.getWest(),e=b.getEast(),s=b.getSouth(),t=b.getNorth(),key=[w,e,s,t,S.lo,S.hi,S.up,n].join();
+  var n=P.n,b=map.getBounds(),w=b.getWest(),e=b.getEast(),s=b.getSouth(),t=b.getNorth(),key=[w,e,s,t,S.lo,S.hi,S.up,n,ALL].join();
   if(!n||KEEP.length!==n)return null;
   if(VC&&VC.k===key)return VC.c;
   var q=function(v){return Math.round(v*MapArea.Q)/MapArea.Q;};  // the precision of the view sent to the other panes, so their counts agree
   w=q(w);e=q(e);s=q(s);t=q(t);
   w=(w+540)%360-180;e=(e+540)%360-180;  // wrap into [-180,180); w>e then means the view crosses the antimeridian
-  var day=S.up?P.up:P.obs,pos=P.pos,all=full(),wd=b.getEast()-b.getWest()>=360,c=0,i,x,y,d,g=new Float64Array(META.groups.length);
+  var day=S.up?P.up:P.obs,pos=P.pos,all=full(),wd=ALL||b.getEast()-b.getWest()>=360,c=0,i,x,y,d,g=new Float64Array(META.groups.length);
   if(VM.length!==n)VM=new Uint8Array(n);else VM.fill(0);
   for(i=0;i<n;i++){
     if(!BK[i])continue;y=pos[2*i+1];x=pos[2*i];
@@ -231,7 +231,7 @@ function link(){
     all:META.groups.length,up:S.up,d1:S.lo>0?iso(S.lo):'',d2:S.hi<LAST?iso(S.hi):'',months:m,taxa:taxa,
     not:TF.not.concat(gl.not),only:S.only,acc:S.acc};
   // with an area on, the link may list the records by id instead, and then u stays null
-  var a=$('identify'),href=AREA.link({w:b.getWest(),s:b.getSouth(),e:b.getEast(),n:b.getNorth()},
+  var a=$('identify'),href=AREA.link(ALL?{w:-180,s:-90,e:180,n:90}:{w:b.getWest(),s:b.getSouth(),e:b.getEast(),n:b.getNorth()},
     function(v,p,side){var r=TX.identifyUrl(st,v,META,Object.assign({},PJ.params(),p));if(!side)u=r;return r.url;},match);
   if(AREA.invalid()){a.removeAttribute('href');a.setAttribute('aria-disabled','true');
     a.title='Wait for the selected areas to load, or explicitly clear or replace unresolved areas.';
@@ -463,8 +463,10 @@ map.on('move',place);
 function view(){if(parent===window)return;var b=map.getBounds(),w=b.getWest(),e=b.getEast(),
   c=function(v,m){return Math.max(-m,Math.min(m,v));},s=c(b.getSouth(),85),n=c(b.getNorth(),85);
   w=c(w,180);e=c(e,180);
-  parent.postMessage({type:'wtid-view',area:b.getEast()-b.getWest()>=360?'':MapArea.encode([[w,s,e,s,e,n,w,n]])},location.origin);}
+  parent.postMessage({type:'wtid-view',area:ALL||b.getEast()-b.getWest()>=360?'':MapArea.encode([[w,s,e,s,e,n,w,n]])},location.origin);}
 map.once('load',view);
+// In view or All of BC, for the count, the groups' shares and the other panes; moving the map keeps it, nothing keeps it longer.
+[].forEach.call($('scope').children,function(x,k,bs){x.onclick=function(){ALL=!!k;[].forEach.call(bs,function(y){y.setAttribute('aria-pressed',String(y===x));});view();render();};});
 map.on('moveend',function(){if(THIN){THIN=false;layers();}link();writeHash();view();if(P.n&&CUM)render();});
 map.getContainer().addEventListener('pointerleave',function(){ptip.hidden=true;});
 addEventListener('resize',function(){FB.draw();place();});
