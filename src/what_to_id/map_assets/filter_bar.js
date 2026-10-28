@@ -5,10 +5,11 @@
 //   P() (the records), taxa() (the taxa rows or null), area() (the area filter), cum() and tc() (the day
 //   and month counts behind the histograms, see recount in map.js),
 //   search() (rebuilds the taxon filter after a pick), refilter() (a filter changed, recount),
-//   render() (only the dates changed), extra() (more selection bar items), reset() (after Reset all).
+//   render() (only the dates changed), extra() (more selection bar items), reset() (after Reset all),
+//   pass() (the records in view, the group filter left out) and inside(row) for the groups list's ranks.
 // It returns what the host calls back: update() after a recount, draw() on resize, show*() after the
-// host changes S, oldQuery(), and total() and pct() for the header's share line.
-// Needs map_taxa.js (TX) and map_chips.js (CH).
+// host changes S, oldQuery(), total() and pct() for the header's share line, and groups (group_list.js).
+// Needs map_taxa.js (TX), map_chips.js (CH) and group_list.js.
 var FilterBar=(function(){
 'use strict';
 function $(id){return document.getElementById(id);}
@@ -149,18 +150,9 @@ function chip(box,label,pressed,onclick,title){var b=document.createElement('but
   b.setAttribute('aria-pressed',String(pressed));
   b.onclick=function(){b.setAttribute('aria-pressed',String(onclick()));refilter();};
   $(box).appendChild(b);return b;}
-// Like the months: with no group picked every group shows. A click picks a group, the next leaves it
-// out, the third clears it (see map_chips.js).
-function gname(g){return META.names[g]||g;}
-// a group chip shows the plain name only, "Fish" for "Fish (Actinopterygii)"; its title has both
-function gshort(g){return gname(g).replace(/ \([^)]*\)$/,'');}
-// CH.show rewrites the label, so the colour dot goes back in after it.
-function showGroups(){GB.forEach(function(b,i){var g=META.groups[i],dot=document.createElement('i');
-  dot.style.background='rgb('+MapFilter.color(g,i).join(',')+')';CH.show(b,gshort(g),S.groups[g]||'');
-  b.insertBefore(dot,b.firstChild);});}
-var GB=META.groups.map(function(g){return CH.chip($('groups'),g,gshort(g),function(){return S.groups;},true,
-  gname(g),function(){showGroups();refilter();});});
-showGroups();
+// Like the months: with no group picked every group shows. The list's rows pick and leave out groups.
+var GL=GroupList({box:$('groups'),bar:$('gbar'),S:S,META:META,nf:nf,changed:refilter,taxa:o.taxa,P:o.P,
+  pass:o.pass,inside:o.inside,pk:function(){return PK;}}),showGroups=GL.show;
 $('gall').onclick=function(){S.groups={};showGroups();refilter();};
 var MB_=MON.map(function(m,i){var b=chip('months',m,!!(S.months>>i&1),
   function(){S.months^=1<<i;return !!(S.months>>i&1);});b.setAttribute('aria-label',MONTH[i]);
@@ -215,7 +207,7 @@ function tally(){var n=function(st){var c=0;for(var k in st)if(st[k])c++;return 
   for(i=0;i<12;i++)m+=S.months>>i&1;
   [['ntaxa',S.picks.length],['nonly',n(S.only)+(S.acc?1:0)],['nproj',PJ.items().length],['ngroups',n(S.groups)],
     ['nmonths',m]].forEach(function(d){e=$(d[0]);if(e)e.textContent=d[1]?String(d[1]):'';});}
-// Taxa and Show only start open, Groups, Projects and Months folded; a section opens as the viewer
+// Groups, Taxa and Show only start open, Projects and Months folded; a section opens as the viewer
 // last left it, and one a link filters on opens regardless (projects only know theirs once loaded).
 var FOLD='wtid-map-fold';
 (function(){var saved={};try{saved=JSON.parse(localStorage.getItem(FOLD))||{};}catch(e){}
@@ -235,7 +227,7 @@ function update(){
   $('reset').hidden=!o.sel().length;  // nothing to reset until a filter is set
   BAR.set(items());tally();draw();
 }
-return {update:update,draw:draw,total:total,pct:pct,oldQuery:oldQuery,
+return {update:update,draw:draw,total:total,pct:pct,oldQuery:oldQuery,groups:GL,
   showGroups:showGroups,showMonths:showMonths,showOnly:showOnly,showClades:showClades};
 }
 return FilterBar;

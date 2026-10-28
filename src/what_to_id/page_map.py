@@ -97,15 +97,18 @@ _ASSETS = _PKG / "map_assets"
 # Inlined in this order; map_taxa.js and map_area.js define the taxon and area filters map.js calls,
 # map_step.js the Identify button that steps through an area's batches, map_projects.js the
 # project filter, map_chips.js the click rule for the short-list chips and the selection bar, and
-# map_filter.js the filter state and the category values the GPU filter reads, filter_bar.js the
-# histograms, chips and selection bar, and map_card.js the card's matches and range chip.
+# map_filter.js the filter state and the category values the GPU filter reads, group_list.js the
+# groups list, filter_bar.js the histograms, chips and selection bar, and map_card.js the card's
+# matches and range chip.
 MAP_CSS = ("map.css", "map_select.css", "map_area.css")
 # The record card's closest matches (the atlas index reader and the iNaturalist photo lookup of the
-# search page) and range chip (the Identify page's range module), by path under the package.
+# search page) and range chip (the Identify page's range module), and the photo space's taxon tree
+# for the groups list's ranks, by path under the package.
 SHARED_JS = (
     "atlas_search_assets/atlas_search_index.js",
     "atlas_search_assets/atlas_search_meta.js",
     "identify_assets/identify_ranges.js",
+    "embeddings_assets/taxon_tree.js",
 )
 SHARED_CSS = ("identify_assets/identify_ranges.css",)
 MAP_JS = (
@@ -116,6 +119,7 @@ MAP_JS = (
     "map_projects.js",
     "map_chips.js",
     "map_filter.js",
+    "group_list.js",
     "filter_bar.js",
     "map_card.js",
     "map.js",
