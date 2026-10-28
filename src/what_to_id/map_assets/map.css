@@ -98,6 +98,12 @@ h1{font-size:18px;margin:0}
 button.padd{cursor:pointer;background:var(--chip)}
 /* "Identify only": a pasted project, in the Identify link but not the map filter */
 #map{grid-area:map;position:relative;min-height:240px}
+/* the level colours' legend, bottom left over the map */
+.lvleg{position:absolute;z-index:2;left:8px;bottom:8px;display:flex;flex-wrap:wrap;gap:2px 10px;max-width:calc(100% - 120px);
+  padding:4px 8px;border-radius:8px;background:var(--panel);box-shadow:var(--shadow);font-size:12px;pointer-events:none}
+.lvleg[hidden]{display:none}
+.lvleg span{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.lvleg i{width:9px;height:9px;border-radius:50%}
 .time{grid-area:time;padding:8px 16px 10px;border-top:1px solid var(--line)}
 .row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
 .dates{font-size:12px;color:var(--muted);white-space:nowrap}

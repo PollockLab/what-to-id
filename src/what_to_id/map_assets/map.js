@@ -125,14 +125,15 @@ function pointData(){
     OUT[i]=keep?0:1;cat[4*i+3]=cat[4*i+3]&~(ST_KEEP|ST_INEXACT)|(keep&&(am===null||am[i])?ST_KEEP:0)|MF.accOut(S.acc,P.fl[i]);}
   // a new pick, area or deletion swaps only the categories, so deck.gl uploads only those
   if(same){PD.attributes.getFilterCategory={value:cat,size:4};PD_CAT++;}
-  else{var col=new Uint8Array(4*n),gc=META.groups.map(function(g,j){return MapFilter.color(g,j);});for(i=0;i<n;i++){var c=gc[P.grp[i]];
-      col[4*i]=c[0];col[4*i+1]=c[1];col[4*i+2]=c[2];col[4*i+3]=110;}
-    PD={length:n,days:days,attributes:{getPosition:{value:P.pos,size:2},
+  else PD={length:n,days:days,attributes:{getPosition:{value:P.pos,size:2},
     getFilterValue:{value:days,size:2},getFilterCategory:{value:cat,size:4},
-    getFillColor:{value:col,size:4,normalized:true}}};}
+    getFillColor:{value:LC.fill(P.grp,n),size:4,normalized:true}}};
   PD_KEY=key;PD_GONE=gone;
 }
 function categories(thin){return MF.categories(S,inc(),thin);}
+// the group or, beside Identify in Explore, level colours (level_colour.js); a switch swaps only the colours
+var LC=LevelColour({META:META,get:get,url:'pool-levels.bin'+String(META.shards[0].file).replace(/^[^?]*/,''),box:$('map'),
+  changed:function(){if(!PD)return;PD.attributes.getFillColor={value:LC.fill(P.grp,P.n),size:4,normalized:true};PD_COL++;layers();}}),PD_COL=0;
 // The counts behind the histograms, header and share run on the CPU after the map has redrawn.
 var CT=0;
 function refilter(){
@@ -270,7 +271,7 @@ function layers(){
     radiusUnits:'pixels',getRadius:1.5*k,radiusMinPixels:k,
     radiusMaxPixels:6*k,stroked:k>1,lineWidthUnits:'pixels',getLineWidth:1,
     getLineColor:dark?[255,255,255]:[29,29,27],pickable:true,
-    extensions:[EXT],updateTriggers:{getFilterCategory:PD_CAT},filterRange:[S.up?any:r,S.up?r:any],filterCategories:categories(THIN)})];
+    extensions:[EXT],updateTriggers:{getFilterCategory:PD_CAT,getFillColor:PD_COL},filterRange:[S.up?any:r,S.up?r:any],filterCategories:categories(THIN)})];
   var at=function(d){return [P.pos[2*d.i],P.pos[2*d.i+1]];};
   if(NBR.length)L.push(new deck.ScatterplotLayer({id:'nbr',data:NBR,getPosition:at,radiusUnits:'pixels',getRadius:11,
     getFillColor:[27,94,76],stroked:true,lineWidthUnits:'pixels',getLineWidth:2,getLineColor:[255,255,255]}),

@@ -57,7 +57,7 @@ __ATLAS_SEARCH_ENCODER__
 (function(){
 var box=document.getElementById("main-content"),frames={},last=MapFilter.tokens(location.hash),
   h0=location.hash.slice(1).split('&').filter(Boolean),want=new URLSearchParams(location.search).get('view'),
-  FILES={identify:__IDENTIFY_FILE__,map:__MAP_FILE__,space:__SPACE_FILE__,tree:__TREE_FILE__},view,
+  LEVELS=__LEVELS__,FILES={identify:__IDENTIFY_FILE__,map:__MAP_FILE__,space:__SPACE_FILE__,tree:__TREE_FILE__},view,
   ORDER=['identify','map','space','tree'],ALIAS={side:'map-space',tree:'map-tree'},
   rest=h0.filter(function(t){return MapFilter.tokens(t)==='';});
 if(!FILES.tree)delete FILES.tree;  // a site built without the taxon tree
@@ -88,7 +88,7 @@ function mk(n){
   f.src=new URL(FILES[n],location.href).href.replace(/#.*/,'')+'?embed=1'+(n==='space'&&view.indexOf('map')>=0?'&peer=1':'')+'#'+hashFor(n);
   // what the other frame sent while this one was still loading
   f.addEventListener('load',function(){Object.keys(late).forEach(function(k){if(k!=='wtid-view'||visible('map'))post(n,late[k]);});
-    if(n==='tree')tally(true);});
+    if(n==='tree')tally(true);if(n==='map')colour();});
   // in ORDER in the page too, so the keys move through the panes as they are seen
   box.insertBefore(f,ORDER.slice(ORDER.indexOf(n)+1).map(function(k){return frames[k];}).filter(Boolean)[0]||null);frames[n]=f;}
 function setView(v){
@@ -110,8 +110,11 @@ function setView(v){
   layout();
   post('space',{type:'wtid-layout',peer:visible('map')&&visible('space')});
   tally(!tree0&&visible('tree'));
+  colour();
   [].forEach.call(document.querySelectorAll('[data-p]'),function(b){b.setAttribute('aria-pressed',v.indexOf(b.dataset.p)>=0);});
   count();}
+// Beside Identify the map's dots take the Identify levels' colours, so both panes read as one task.
+function colour(){post('map',{type:'wtid-colour',by:visible('identify')&&visible('map')?'level':'group',names:LEVELS});}
 function num(n,id){
   try{var m=/^[\d,]+/.exec(frames[n].contentDocument.getElementById(id).textContent);return m?m[0]:'…';}catch(e){return '…';}}
 function count(){
