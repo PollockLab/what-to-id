@@ -30,7 +30,7 @@ fetch('explore.html',{method:'HEAD'}).then(function(r){if(r.ok)location.replace(
 <p class="muted">Share of the records in view. Groups combine with each other and with the taxa. <button type="button" id="gall" class="link">All groups</button></p>
 <ul id="groups" class="gl" role="list" aria-label="Taxon groups"></ul>
 </details>
-<p class="muted">Click a chip to pick it, again to leave it out, a third time to clear it. In Your selection, click a chip to flip it.</p>
+<p class="muted">Click a group to pick it, again to clear it. In Your selection, click a chip to flip it.</p>
 <details class="sec" id="taxsec" open><summary>Taxa <span class="n" id="ntaxa"></span></summary>
 <div class="picker"><label for="q" class="vh">Find a taxon</label>
 <input id="q" type="search" placeholder="Latin or common name, e.g. Carex" autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="sugg">
