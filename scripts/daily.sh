@@ -188,7 +188,11 @@ build() {
   else
     update_pool
   fi
-  [ "${OFFLINE:-}" = 1 ] || $PY -m what_to_id.taxon_status --pool "$STATE/pool.parquet" --out "$STATE/taxon_status.parquet"
+  if [ "${OFFLINE:-}" != 1 ]; then
+    # A sidecar for the read-back: a failed fill must not stop the build, and the next run resumes it.
+    $PY -m what_to_id.taxon_status --pool "$STATE/pool.parquet" --out "$STATE/taxon_status.parquet" \
+      || echo "::warning::taxon status fill failed; the next run resumes it"
+  fi
 
   local common=(--pool "$pool" --freeze "$TODAY" --d1 "$BLITZ_D1"
     --arms "$ARMS" --design rotation --max-batches "$MAX_BATCHES" --key-env WHAT_TO_ID_KEY
