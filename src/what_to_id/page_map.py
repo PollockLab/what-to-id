@@ -99,7 +99,7 @@ _ASSETS = _PKG / "map_assets"
 # project filter, map_chips.js the click rule for the short-list chips and the selection bar, and
 # map_filter.js the filter state and the category values the GPU filter reads, group_list.js the
 # groups list, filter_bar.js the histograms, chips and selection bar, and map_card.js the card's
-# matches and range chip.
+# matches and range chip, level_colour.js the dots' level colours.
 MAP_CSS = ("map.css", "map_select.css", "map_area.css")
 # The record card's closest matches (the atlas index reader and the iNaturalist photo lookup of the
 # search page) and range chip (the Identify page's range module), and the photo space's taxon tree
@@ -121,6 +121,7 @@ MAP_JS = (
     "map_filter.js",
     "group_list.js",
     "filter_bar.js",
+    "level_colour.js",
     "map_card.js",
     "map.js",
 )

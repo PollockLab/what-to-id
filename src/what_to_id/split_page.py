@@ -16,6 +16,7 @@ from pathlib import Path
 
 from what_to_id import page_nav
 from what_to_id.embeddings_page import ASSETS, HERE
+from what_to_id.page_identify import LEVELS
 
 PAGE_NAME = "explore.html"
 # the page was split.html; old links and bookmarks forward here with their query and hash
@@ -49,6 +50,8 @@ IDENTIFY_BUTTON = '<button type="button" data-p="identify">Identify</button>'
 TREE_BUTTON = '<button type="button" data-p="tree">Taxonomy</button>'
 BAR = (
     '<div class="xbar" id="xbar"><span class="counts" id="counts" aria-live="polite"></span>'
+    '<button type="button" class="gsum" id="gsum" hidden><span class="gt"></span>'
+    '<span class="gbar"></span></button>'
     '<form id="sf" role="search"><input id="sq" type="search" aria-label="Photo search" '
     'autocomplete="off" spellcheck="false" '
     'placeholder="a hummingbird feeding at a flower, or an observation link">'
@@ -96,6 +99,7 @@ def build(
         "__SPACE_FILE__": json.dumps(space_url),
         "__TREE_FILE__": json.dumps(tree_url if has_tree else None),
         "__DATA_URL__": json.dumps(data_url),
+        "__LEVELS__": json.dumps([[n, name] for n, name, _ in LEVELS]),
     }.items():
         html = html.replace(key, value)
     for key, path in SCRIPTS.items():
