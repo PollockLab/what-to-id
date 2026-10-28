@@ -187,7 +187,7 @@ function items(){return CH.items({S:S,meta:META,
   terms:TX.terms({T:T,picks:S.picks,groups:[],meta:META,n:0,split:S.split}),
   picker:{changed:function(){log.push('taxa');}},pj:pj,months:['January','February','March'],
   only:[['introduced','Introduced to BC'],['exact','Exact location']],two:['exact'],area:area,
-  redraw:function(){log.push('redraw');}});}
+  mf:{LAST:99,iso:function(d){return 'day'+d;}},redraw:function(){log.push('redraw');}});}
 var box=new El('div');box.appendChild(new El('p')).appendChild(new El('button'));
 box.appendChild(new El('ul'));
 var q=new El('input'),cleared=0,B=CH.bar({box:box,clear:function(){cleared++;},fallback:q});
@@ -295,3 +295,20 @@ def test_selection_bar_splits_a_shortcut_into_its_taxa():
     assert got["focus"] is True
     assert got["picks"] == [{"id": 3, "not": False}, {"id": 4, "not": False}]
     assert got["log"] == ["taxa"]
+
+
+def test_selection_bar_lists_the_date_range_and_its_x_clears_it():
+    body = (
+        BAR + "S={picks:[],groups:{},months:0,only:{},lo:0,hi:99,up:false};areaOn=false;"
+        "pj.items=function(){return [];};B.set(items());var none=texts().length;"
+        "S.lo=40;B.set(items());var obs=texts();S.up=true;S.hi=60;B.set(items());var up=texts();"
+        "S.lo=0;S.hi=99;B.set(items());var bare=texts();"
+        "xs()[0].onclick();B.set(items());"
+        "return {none:none,obs:obs,up:up,bare:bare,S:[S.lo,S.hi,S.up],hidden:box.hidden,log:log};"
+    )
+    got = run(body)
+    assert got["none"] == 0
+    assert got["obs"] == [["Observed day40 to now", False, "Remove Observed day40 to now"]]
+    assert got["up"] == [["Uploaded day40 to day60", False, "Remove Uploaded day40 to day60"]]
+    assert got["bare"] == [["Uploaded start to now", False, "Remove Uploaded start to now"]]
+    assert got["S"] == [0, 99, False] and got["hidden"] is True and got["log"] == ["redraw"]

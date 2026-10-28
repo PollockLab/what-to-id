@@ -130,3 +130,12 @@ def test_the_caret_opens_the_ranks_with_counts(page):
     counts = row.locator(".gs .tn .tc").all_text_contents()
     assert counts and all(c.replace(",", "").isdigit() for c in counts)
     assert sum(int(c) for c in counts) == 170  # Genus A and Genus B under Family F
+
+
+def test_a_date_preset_shows_as_a_chip_and_clear_all_clears_it(page):
+    page.get_by_role("button", name="Last 30 days").click()  # the records span 60 days
+    chip = page.locator("#selbar li").filter(has_text="Observed")
+    assert chip.count() == 1 and "to now" in chip.inner_text()
+    page.locator("#selbar .lbl button").click()
+    page.wait_for_selector("#selbar", state="hidden")
+    assert page.get_by_role("button", name="All dates").get_attribute("aria-pressed") == "true"

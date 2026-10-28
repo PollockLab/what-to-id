@@ -160,17 +160,15 @@ function picked(){
   TF=TX.filter(S.TAXA,S.picks);applyKeep();update();writeHash();$('gfit').hidden=!items().length;
 }
 var PK=null,BAR=null;
-// The map's selection bar plus a date chip (the map keeps dates in its inputs) and, marked "map only", the
+// The map's selection bar, its date chip included, plus, marked "map only", the
 // filters this page leaves to the map. The area applies here when it reads; in the split view it is the map's
 // to clear, so its chip has no ×.
 function alabel(){return parent!==window?'Map area':'Drawn area';}
 function items(){
-  var L=MF.LAST,out=CH.items({S:S,meta:S.META,terms:TX.terms({T:S.TAXA,picks:S.picks,groups:[],meta:S.META,n:0,split:S.split}),
+  var out=CH.items({S:S,meta:S.META,terms:TX.terms({T:S.TAXA,picks:S.picks,groups:[],meta:S.META,n:0,split:S.split}),
     picker:PK,pj:{items:function(){return [];}},months:MF.MONTH,only:MF.ONLYDEF,
     acc:{label:(MF.ACCDEF.filter(function(a){return a[0]===S.acc;})[0]||[])[1]||'',clear:function(){S.acc='';}},
-    area:{term:function(){return S.area?{label:alabel()}:null;},clear:parent===window&&function(){S.area='';picked();}},redraw:picked});
-  if(S.lo>0||S.hi<L)out.push({label:(S.up?'Uploaded ':'Observed ')+(S.lo>0?MF.iso(S.lo):'start')+' to '+(S.hi<L?MF.iso(S.hi):'now'),
-    remove:function(){S.lo=0;S.hi=L;S.up=false;picked();}});
+    area:{term:function(){return S.area?{label:alabel()}:null;},clear:parent===window&&function(){S.area='';picked();}},mf:MF,redraw:picked});
   if(S.area&&!areaIndex())out.forEach(function(t){if(t.label===alabel())t.tag='map only';});
   if(viewBox())out.push({label:'Map view'});
   if(S.proj)out.push({label:'Map projects',tag:'map only'});
