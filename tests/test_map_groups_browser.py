@@ -139,3 +139,10 @@ def test_a_date_preset_shows_as_a_chip_and_clear_all_clears_it(page):
     page.locator("#selbar .lbl button").click()
     page.wait_for_selector("#selbar", state="hidden")
     assert page.get_by_role("button", name="All dates").get_attribute("aria-pressed") == "true"
+
+
+def test_the_months_sit_in_the_bottom_bar_and_fit_a_phone(page):
+    assert page.locator("#time #months button").count() == 12
+    page.set_viewport_size({"width": 390, "height": 844})
+    assert page.evaluate("document.documentElement.scrollWidth") <= 390
+    assert page.evaluate("document.getElementById('time').scrollWidth") <= 390

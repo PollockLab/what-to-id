@@ -45,10 +45,6 @@ fetch('explore.html',{method:'HEAD'}).then(function(r){if(r.ok)location.replace(
 <p class="lbl" id="acclbl">Location accuracy <span class="muted">(pick one)</span></p>
 <div id="acc" class="chips" role="group" aria-labelledby="acclbl"></div></details>
 <details class="sec" id="projbox" hidden></details>
-<details class="sec" id="monsec"><summary>Months of the year <span class="n" id="nmonths"></span></summary>
-<div id="months" class="chips months" role="group" aria-label="Months of the year"></div>
-<p class="muted">Compare the same season across years. <button type="button" id="mclear" class="link">Any month</button></p>
-</details>
 </section>
 <main id="map" role="application" aria-label="Map of records"></main>
 <section id="time" class="time" aria-label="Dates">
@@ -59,6 +55,7 @@ fetch('explore.html',{method:'HEAD'}).then(function(r){if(r.ok)location.replace(
 <span id="presets" class="chips" role="group" aria-label="Periods"></span>
 <span class="dates"><input id="from" type="date" aria-label="From"> to <input id="to" type="date" aria-label="To"></span>
 </div>
+<div class="row"><span id="months" class="chips months" role="group" aria-label="Months of the year"></span><button type="button" id="mclear" class="link">Any month</button></div>
 <div class="histwrap"><canvas id="over" role="img" aria-label="Records per year, every year, on a log scale. Click a year to zoom to it."></canvas><p id="unit" class="unit"></p><canvas id="hist" role="img"></canvas><div id="htip" class="htip" hidden></div></div>
 <p id="hint" class="hint">Top: every year, bar height on a log scale so sparse early years show. Click or drag across years to zoom in. Bottom: the period in view. Drag to pick a period, click a bar to zoom into it, double-click for all dates. Bars count records that still need an ID, so older periods look emptier: many of their records have been identified since.</p>
 </section>

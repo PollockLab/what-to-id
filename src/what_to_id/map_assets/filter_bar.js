@@ -203,15 +203,13 @@ var BAR=CH.bar({box:$('selbar'),clear:clearAll,fallback:$('q')});
 function items(){return CH.items({S:S,meta:META,terms:TX.terms({T:o.taxa(),picks:S.picks,groups:[],meta:META,n:0,split:S.split}),
   picker:PK,pj:PJ,months:MONTH,only:ONLYDEF,acc:{label:accLabel(),clear:function(){S.acc='';}},area:o.area(),mf:MF,redraw:redraw}).concat(o.extra());}
 // Each folding section's summary counts its active chips, so a folded one still says what it holds.
-function tally(){var n=function(st){var c=0;for(var k in st)if(st[k])c++;return c;},m=0,i,e;
-  for(i=0;i<12;i++)m+=S.months>>i&1;
-  [['ntaxa',S.picks.length],['nonly',n(S.only)+(S.acc?1:0)],['nproj',PJ.items().length],['ngroups',n(S.groups)],
-    ['nmonths',m]].forEach(function(d){e=$(d[0]);if(e)e.textContent=d[1]?String(d[1]):'';});}
-// Groups, Taxa and Show only start open, Projects and Months folded; a section opens as the viewer
+function tally(){var n=function(st){var c=0;for(var k in st)if(st[k])c++;return c;},e;
+  [['ntaxa',S.picks.length],['nonly',n(S.only)+(S.acc?1:0)],['nproj',PJ.items().length],['ngroups',n(S.groups)]].forEach(function(d){e=$(d[0]);if(e)e.textContent=d[1]?String(d[1]):'';});}
+// Groups, Taxa and Show only start open, Projects folded; a section opens as the viewer
 // last left it, and one a link filters on opens regardless (projects only know theirs once loaded).
 var FOLD='wtid-map-fold';
 (function(){var saved={};try{saved=JSON.parse(localStorage.getItem(FOLD))||{};}catch(e){}
-  var open={grpsec:CH.any(S.groups),monsec:!!S.months,flagbox:CH.any(S.only)||!!S.acc,projbox:/(^|[#&])projects=/.test(location.hash)};
+  var open={grpsec:CH.any(S.groups),flagbox:CH.any(S.only)||!!S.acc,projbox:/(^|[#&])projects=/.test(location.hash)};
   [].forEach.call(document.querySelectorAll('details.sec'),function(d){
     if(open[d.id])d.open=true;else if(d.id in saved)d.open=saved[d.id];
     d.addEventListener('toggle',function(){saved[d.id]=d.open;
