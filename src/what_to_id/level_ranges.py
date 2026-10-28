@@ -10,12 +10,12 @@ or both are out. A taxon (or look-alike name) absent from ORM_CELLS is unknown a
 A look-alike name maps to taxon ids through the pool's taxon_name, as levels.py does.
 
 It writes into DIR, for `levels --range-notes`:
-``range-notes.parquet`` (``id``, ``range_note`` on Close calls rows only, ``lat``, ``lon`` float32
-at 2 decimals, null when the record has no point, and ``out_km``: km from the point to the nearest
-centre of the label's cells, 0 inside them, null when unknown), ``level-ranges.parquet`` (``name``,
-``cells`` int16 indexes into the grid, one row per label or look-alike name with a known range,
-empty when the range misses the grid) and ``level-range-cells.parquet`` (the grid in index
-order: the sorted ORM cells holding a pool record,
+``range-notes.parquet`` (``id``, ``range_note`` on Close calls and Might be mislabelled rows only,
+``lat``, ``lon`` float32 at 2 decimals, null when the record has no point, and ``out_km``: km from
+the point to the nearest centre of the label's cells, 0 inside them, null when unknown),
+``level-ranges.parquet`` (``name``, ``cells`` int16 indexes into the grid, one row per label or
+look-alike name with a known range, empty when the range misses the grid) and
+``level-range-cells.parquet`` (the grid in index order: the sorted ORM cells holding a pool record,
 i.e. BC land; ``lat``, ``lon`` float32 boundary vertices at 3 decimals).
 """
 
@@ -31,6 +31,7 @@ import pandas as pd
 BOTH_OUT = "Range: outside both ranges"
 ONLY_LOOK = "Range: fits the look-alike, not the label"
 ONLY_LABEL = "Range: fits the label, not the look-alike"
+LOOKALIKE_LEVELS = ("taxonomist", "mislabel")  # the levels whose cards name a look-alike
 NOTES, RANGES, GRID = "range-notes.parquet", "level-ranges.parquet", "level-range-cells.parquet"
 
 
@@ -78,7 +79,7 @@ def from_identify(ident: pd.DataFrame, pool: pd.DataFrame) -> pd.DataFrame:
 
 
 def build(levels: pd.DataFrame, pool: pd.DataFrame, orm: pd.DataFrame):
-    """(notes, ranges, grid) frames for the rows of `levels`; notes only on taxonomist rows."""
+    """(notes, ranges, grid) frames for the rows of `levels`; notes only on look-alike rows."""
     lv = levels[["id", "taxon_id", "taxon_name", "looks_like_name", "level"]]
     cells = orm.groupby("taxon_id")["cells"].agg(lambda x: {c for cs in x for c in cs})
     ids = pool[["taxon_name", "taxon_id"]].drop_duplicates().groupby("taxon_name")["taxon_id"]
@@ -93,12 +94,12 @@ def build(levels: pd.DataFrame, pool: pd.DataFrame, orm: pd.DataFrame):
         h3.latlng_to_cell(a, b, 4) if pd.notna(a) and pd.notna(b) else None
         for a, b in zip(lv["lat"], lv["lon"], strict=True)
     ]
-    tax = lv["level"] == "taxonomist"
+    tax = lv["level"].isin(LOOKALIKE_LEVELS)
     look = {n: look_cells(n) for n in lv.loc[tax, "looks_like_name"].unique()}
     out, okm = [], np.full(len(lv), np.nan)
     for k, (r, c) in enumerate(zip(lv.itertuples(), cell, strict=True)):
         lab = cells.get(r.taxon_id)
-        lk = look.get(r.looks_like_name) if r.level == "taxonomist" else None
+        lk = look.get(r.looks_like_name) if r.level in LOOKALIKE_LEVELS else None
         out.append(None if c is None or lab is None or lk is None else note(c in lab, c in lk))
         if c is not None and lab is not None and c in lab:
             okm[k] = 0

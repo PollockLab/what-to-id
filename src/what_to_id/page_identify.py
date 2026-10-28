@@ -41,7 +41,7 @@ LEVELS = (
     (4, "Odd shots", "Hard photos: hands, eggs, close-ups. Feeling lucky?"),
     (
         5,
-        "Likely mislabelled",
+        "Might be mislabelled",
         "The photo matches another species clearly better than its label."
         " Check whether the label is wrong.",
     ),

@@ -25,7 +25,7 @@ LABELS = [
     "Close calls",
     page_identify.NARROW_LABEL,
     "Odd shots",
-    "Likely mislabelled",
+    "Might be mislabelled",
 ]
 
 
@@ -183,7 +183,7 @@ def test_cards_follow_the_chosen_level_with_a_few_per_species_and_photos_in_batc
     page.wait_for_selector("#grid .card .look")
     assert page.locator("#grid .card").count() == 1
     assert page.locator("#grid .card .look").first.inner_text().startswith("Looks more like ")
-    assert "Likely mislabelled" in page.locator(".about").text_content()
+    assert "Might be mislabelled" in page.locator(".about").text_content()
     body = page.inner_text("body").lower()
     assert not any(word in body for word in FORBIDDEN)
     assert "photo download" in page.locator(".about").text_content()
