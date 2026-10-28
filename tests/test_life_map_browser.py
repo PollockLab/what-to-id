@@ -293,7 +293,7 @@ def space_frame(page):
         "document.querySelector('iframe#space')?.contentDocument?.getElementById('lifebar')"
         "?.hidden === false"
     )
-    space = next(f for f in page.frames if "embed=1" in f.url)
+    space = page.query_selector("iframe#space").content_frame()
     drawn(space)
     return space
 

@@ -35,7 +35,7 @@ def test_n_panes_have_n_minus_one_dividers_with_good_defaults(browser, pts, site
     assert seps.count() == 2
     assert [seps.nth(i).get_attribute("role") for i in range(2)] == ["separator"] * 2
     assert all(seps.nth(i).get_attribute("aria-valuenow") for i in range(2))
-    identify, map_, tree = page.evaluate(WIDTHS)
+    map_, identify, tree = page.evaluate(WIDTHS)  # the map first, its filter rail leftmost
     assert 320 <= identify <= 440 and tree == pytest.approx(0.3 * 1500, rel=0.08) and map_ > 300
     page.click("[data-p=tree]")
     assert page.locator(".sep").count() == 1
@@ -69,18 +69,18 @@ def test_a_divider_can_be_grabbed_beside_its_line(browser, pts, site):
 
 def test_the_minimum_widths_hold(browser, pts, site):
     page = _page(browser, site)
-    _drag(page, 0, -2000)
-    identify, map_, tree = page.evaluate(WIDTHS)
-    assert identify == pytest.approx(280, abs=1) and tree > 250
+    _drag(page, 0, -2000)  # the map shrinks to its floor: its open rail and 320 px of map
+    map_, identify, tree = page.evaluate(WIDTHS)
+    assert map_ == pytest.approx(600, abs=1) and tree > 250
     _drag(page, 1, 2000)  # the tree shrinks to its floor
     assert page.evaluate(WIDTHS)[2] == pytest.approx(260, abs=1)
-    _drag(page, 0, 2000)  # the map shrinks to its floor
-    assert page.evaluate(WIDTHS)[1] == pytest.approx(320, abs=1)
+    _drag(page, 0, 2000)  # Identify shrinks to its floor
+    assert page.evaluate(WIDTHS)[1] == pytest.approx(280, abs=1)
     page.close()
 
 
 def test_arrow_keys_move_a_divider_and_a_double_click_resets_it(browser, pts, site):
-    page = _page(browser, site)
+    page = _page(browser, site, width=1700)  # room for the map to give 48 px above its floor
     before = page.evaluate(WIDTHS)
     sep = page.locator(".sep").first
     sep.focus()

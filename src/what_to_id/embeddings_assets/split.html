@@ -14,13 +14,6 @@ body{display:flex;flex-direction:column}
 .xbar{display:flex;align-items:center;gap:8px 14px;margin-left:auto;min-width:0;font-size:13px;white-space:nowrap}
 .counts{color:var(--muted)}
 .counts b{color:var(--ink);font-weight:650;font-variant-numeric:tabular-nums}
-.gsum{display:inline-flex;align-items:center;gap:6px;max-width:200px;min-height:28px;padding:0 8px;border:1px solid var(--line);border-radius:14px;background:var(--chip);color:var(--ink);font:inherit;font-size:12px;cursor:pointer}
-.gsum[hidden]{display:none}
-.gsum .gt{min-width:0;overflow:hidden;text-overflow:ellipsis}
-.gsum .gt:empty{display:none}  /* all groups: the bar alone, so the bar keeps one line at 1280 px */
-.gsum .gbar{display:flex;flex:0 0 56px;height:6px;border-radius:3px;overflow:hidden;background:var(--line)}
-.gsum .gbar i{height:100%;min-width:1px}
-.gsum .gbar i.dim{opacity:.25}
 #sf{display:inline-flex;gap:6px;flex:0 1 auto;min-width:0}
 #sq{font:inherit;font-size:13px;width:min(230px,30vw);min-width:120px;flex:0 1 auto;min-height:28px;padding:0 10px;border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--ink)}
 #sf button{font:inherit;font-size:12px;min-height:28px;padding:0 11px;border:1px solid var(--line);border-radius:14px;background:var(--chip);color:var(--ink);cursor:pointer}
@@ -40,16 +33,22 @@ body{display:flex;flex-direction:column}
 #main-content iframe[hidden]{display:none}
 #main-content #identify{min-width:280px}
 #main-content #map,#main-content #space{min-width:320px}
+/* the map's frame as the filter rail alone, the map pane hidden (map_rail.js); on a phone a sheet */
+#main-content #map.rail{min-width:0;border-right:1px solid var(--line)}
+#fb{display:none;font:inherit;font-size:12px;padding:0 11px;border:1px solid var(--line);border-radius:14px;background:var(--chip);color:var(--ink);cursor:pointer}
 #main-content #tree{min-width:260px}
 #main-content.drag iframe{pointer-events:none}
 .sep{position:relative;z-index:1;flex:0 0 7px;cursor:col-resize;background:var(--line);touch-action:none;outline-offset:-2px}
 .sep::before{content:'';position:absolute;top:0;bottom:0;left:-8px;right:-8px}  /* a 23 px target for a finger, the line stays 7 px */
 .sep:hover,.sep:focus-visible,.sep.on{background:var(--on)}
+@media (max-width:760px){#fb{display:inline-block;order:-1;min-height:36px}
+  #main-content #map.rail:not(.sheet){display:none}
+  #main-content #map.sheet{position:fixed;left:0;bottom:0;width:100%;z-index:20;height:70vh;box-shadow:var(--shadow);border-top:1px solid var(--line)}}
 /* a phone: the pane switch on its own row, wide targets, then the search, then the counts */
 @media (max-width:800px){.xbar{flex:1 1 100%;margin:0 0 6px;flex-wrap:wrap;white-space:normal}
   .seg{flex:1 1 0;order:-1;max-width:420px}.seg button{flex:1 1 0;min-height:36px;padding:0 6px}
   .xbar .i{order:-1;width:36px;min-height:36px}
-  .gsum{min-height:36px}#sf{flex:1 1 100%}#sq{flex:1 1 0;width:auto;min-height:36px}#sf button{min-height:36px}}
+  #sf{flex:1 1 100%}#sq{flex:1 1 0;width:auto;min-height:36px}#sf button{min-height:36px}}
 </style>
 </head>
 <body>
@@ -65,7 +64,7 @@ __ATLAS_SEARCH_ENCODER__
 var box=document.getElementById("main-content"),frames={},last=MapFilter.tokens(location.hash),
   h0=location.hash.slice(1).split('&').filter(Boolean),want=new URLSearchParams(location.search).get('view'),
   LEVELS=__LEVELS__,FILES={identify:__IDENTIFY_FILE__,map:__MAP_FILE__,space:__SPACE_FILE__,tree:__TREE_FILE__},view,
-  ORDER=['identify','map','space','tree'],ALIAS={side:'map-space',tree:'map-tree'},
+  ORDER=['map','identify','space','tree'],ALIAS={side:'map-space',tree:'map-tree'},
   rest=h0.filter(function(t){return MapFilter.tokens(t)==='';});
 // My groups (group_list.js): a link that names no groups opens every pane with the ones kept in this browser.
 try{var mine=localStorage.getItem('wtid-my-groups');if(mine&&!/(^|&)groups=/.test(last))last=(last?last+'&':'')+'groups='+mine;}catch(e){}
@@ -88,8 +87,10 @@ function hashFor(n){
     return n==='map'&&t.indexOf('id=')===0?'record='+t.slice(3):t;})).join('&');}
 // The address: the shared selection, then the photo space's map of life view.
 function life(t){var k=t.split('=')[0];return k==='life'||k==='clade';}
-function addr(){var h=(last?[last]:[]).concat(rest.filter(life));history.replaceState(null,'',location.search+(h.length?'#'+h.join('&'):''));}
-function visible(n){return frames[n]&&!frames[n].hidden;}
+function addr(){var h=(last?[last]:[]).concat(rest.filter(life));  // with the path, so an empty selection drops the hash
+  history.replaceState(null,'',location.pathname+location.search+(h.length?'#'+h.join('&'):''));}
+function visible(n){return !!frames[n]&&view.indexOf(n)>=0;}  // a pane shown, not the map's frame as the rail
+function live(n){return visible(n)||n==='map'&&!!frames.map;}  // the rail shows the selection too
 function post(n,m){if(frames[n]&&frames[n].contentWindow)frames[n].contentWindow.postMessage(m,location.origin);}
 function sendSel(n,sel){post(n,{type:'wtid-selection',sel:sel});}
 function mk(n){
@@ -97,30 +98,28 @@ function mk(n){
   f.src=new URL(FILES[n],location.href).href.replace(/#.*/,'')+'?embed=1'+(n==='space'&&view.indexOf('map')>=0?'&peer=1':'')+'#'+hashFor(n);
   // what the other frame sent while this one was still loading
   f.addEventListener('load',function(){Object.keys(late).forEach(function(k){if(k!=='wtid-view'||visible('map'))post(n,late[k]);});
-    if(n==='tree')tally(true);if(n==='map')colour();});
+    if(n==='tree')tally(true);if(n==='map'){colour();rail();}});
   // in ORDER in the page too, so the keys move through the panes as they are seen
   box.insertBefore(f,ORDER.slice(ORDER.indexOf(n)+1).map(function(k){return frames[k];}).filter(Boolean)[0]||null);frames[n]=f;}
 function setView(v){
   if(innerWidth<800&&v.length>1)v=[v.indexOf('identify')>=0?'identify':v.indexOf('tree')>=0?'tree':v[0]];  // a phone holds one pane, Identify first
-  view=v;
-  var tree0=visible('tree');
+  var old=view||[],tree0=visible('tree');view=v;
   Object.keys(FILES).forEach(function(n){
-    var show=v.indexOf(n)>=0,f=frames[n];
-    if(show&&!f)mk(n);
-    else if(f&&!show&&innerWidth<800){f.remove();delete frames[n];
+    var show=v.indexOf(n)>=0,f=frames[n],keep=n==='map'&&innerWidth>760;  // beside a phone the map's frame stays as the rail
+    if((show||keep)&&!f)mk(n);
+    else if(f&&!show&&!keep&&innerWidth<800){f.remove();delete frames[n];
     // what a removed frame sent describes something that is gone
     if(n==='map'){delete late['wtid-view'];delete late['wtid-projects'];delete cnt.map;post('space',{type:'wtid-projects',ids:null});}else if(n==='space'){delete late['wtid-keep'];delete cnt.space;post('map',{type:'wtid-keep',ids:null});}}  // a phone holds one view at a time
-    else if(f){var was=f.hidden;f.hidden=!show;if(show&&was){sendSel(n,last);post(n,{type:'wtid-record',id:rec});
+    else if(f){f.hidden=!show&&!keep;if(show&&old.indexOf(n)<0){sendSel(n,last);post(n,{type:'wtid-record',id:rec});
       Object.keys(late).forEach(function(k){post(n,late[k]);});}}
     });
   // a hidden map masks nothing; a re-shown one fires no moveend, so its last view goes again
   ['space','identify'].forEach(function(n){
     if(!visible('map'))post(n,{type:'wtid-view',area:''});else if(late['wtid-view'])post(n,late['wtid-view']);});
-  layout();
+  rail();layout();
   post('space',{type:'wtid-layout',peer:visible('map')&&visible('space')});
   tally(!tree0&&visible('tree'));
   colour();
-  gsum.hidden=!visible('map')||!gsum.querySelector('i');
   [].forEach.call(document.querySelectorAll('[data-p]'),function(b){b.setAttribute('aria-pressed',v.indexOf(b.dataset.p)>=0);});
   count();}
 // Beside Identify the map's dots take the Identify levels' colours, so both panes read as one task.
@@ -146,10 +145,10 @@ i.addEventListener('click',function(){note.hidden=!note.hidden;i.setAttribute('a
 addEventListener('keydown',function(e){if(e.key==='Escape'&&!note.hidden)i.click();});
 // Dividers: one between each two shown panes, to drag or move by keys (Shift for more); a double click or Enter
 // puts the two back to their defaults. A pane's share of the width is kept as a fraction, so it outlasts a resize.
-var MIN={identify:280,map:320,space:320,tree:260},NAME={identify:'Identify',map:'Map',space:'Photo space',tree:'Taxonomy'},sizes={};
+var MIN={identify:280,map:600,space:320,tree:260},NAME={identify:'Identify',map:'Map',space:'Photo space',tree:'Taxonomy'},sizes={};
 try{sizes=JSON.parse(localStorage.getItem('wtid-panes'))||{};}catch(e){}
 function vis(){return ORDER.filter(visible);}
-function room(){return box.clientWidth-7*Math.max(0,vis().length-1);}
+function room(){return box.clientWidth-7*Math.max(0,vis().length-1)-(frames.map&&!visible('map')?(railOpen?280:36):0);}
 function wide(n){return frames[n].getBoundingClientRect().width;}
 function dflt(v,W){  // Identify a narrow column, the tree a third, the map and photos share the rest
   var d={},free=W,open=0;
@@ -158,7 +157,8 @@ function dflt(v,W){  // Identify a narrow column, the tree a third, the map and 
   v.forEach(function(n){if(d[n]==null)d[n]=Math.max(free,.2*W)/open;});
   return d;}
 function layout(){
-  var v=vis(),W=room(),d=dflt(v,W),f={},t=0;
+  var v=vis(),W=room(),d=dflt(v,W),f={},t=0;MIN.map=(railOpen?280:36)+320;  // the map beside its rail
+  if(frames.map&&!visible('map'))frames.map.style.flex='0 0 '+(railOpen?280:36)+'px';
   v.forEach(function(n){f[n]=sizes[n]>0&&sizes[n]<1?sizes[n]:d[n]/W;t+=f[n];});
   v.forEach(function(n){frames[n].style.flex=f[n]/t*1000+' 1 0';});
   [].forEach.call(box.querySelectorAll('.sep'),function(s){s.remove();});
@@ -192,7 +192,7 @@ addEventListener('message',function(e){
   var n=Object.keys(frames).filter(function(k){return frames[k].contentWindow===e.source;})[0];
   if(!n||e.origin!==location.origin||!e.data||e.data.type!=='wtid-selection'||typeof e.data.sel!=='string'||
     e.data.sel===last)return;
-  last=e.data.sel;Object.keys(frames).forEach(function(o){if(o!==n&&visible(o))sendSel(o,last);});
+  last=e.data.sel;Object.keys(frames).forEach(function(o){if(o!==n&&live(o))sendSel(o,last);});
   addr();
 });
 // The photo space's view tokens (life=look, clade=), kept for a reload, a shared link and a frame made later.
@@ -216,17 +216,22 @@ addEventListener('message',function(e){
   else if(d.type!=='wtid-focus'&&d.type!=='wtid-reset')late[d.type]=d;
   Object.keys(frames).forEach(function(o){if(o!==n&&visible(o))post(o,d);});
 });
-// The map's group shares in the top bar, so what the panes show reads without opening the filters; a click opens
-// the map's Groups.
-var gsum=document.getElementById('gsum');
+// The filter rail is the map's own panel (map_rail.js): its frame stays, the map pane hidden, at the rail's
+// width, which the map reports open or folded (wtid-rail); on a phone it is a sheet the Filters button opens.
+var railOpen=true,fb=document.getElementById('fb');
+function rail(){var f=frames.map;if(!f)return;var on=!visible('map');
+  f.classList.toggle('rail',on);f.title=on?'Filters':'Map';if(!on)f.classList.remove('sheet');
+  fb.setAttribute('aria-expanded',String(f.classList.contains('sheet')));
+  post('map',f.classList.contains('sheet')?{type:'wtid-rail',only:on,open:true}:{type:'wtid-rail',only:on});}
 addEventListener('message',function(e){
-  var d=e.data,b=gsum.querySelector('.gbar');
-  if(e.origin!==location.origin||!frames.map||e.source!==frames.map.contentWindow||!d||d.type!=='wtid-groups'||!Array.isArray(d.bar))return;
-  b.textContent='';d.bar.forEach(function(x){var i=document.createElement('i');i.style.background=x[0];i.style.width=x[1]+'%';
-    if(x[2])i.className='dim';b.appendChild(i);});
-  gsum.querySelector('.gt').textContent=d.text;gsum.title=d.label;gsum.setAttribute('aria-label',d.label);gsum.hidden=!visible('map');
+  var d=e.data;
+  if(e.origin!==location.origin||!frames.map||e.source!==frames.map.contentWindow||!d||d.type!=='wtid-rail'||typeof d.open!=='boolean')return;
+  railOpen=d.open;if(d.shut&&frames.map.classList.contains('sheet')){frames.map.classList.remove('sheet');fb.setAttribute('aria-expanded','false');}
+  layout();
 });
-gsum.addEventListener('click',function(){if(!visible('map'))return;frames.map.focus();post('map',{type:'wtid-filters',open:'groups'});});
+fb.addEventListener('click',function(){
+  if(!frames.map)mk('map');frames.map.hidden=false;if(!visible('map'))frames.map.classList.add('sheet');rail();
+  if(visible('map'))post('map',{type:'wtid-rail',open:true});});
 function tally(force){var s=visible('map')?'map':visible('space')?'space':null;
   if(visible('tree')&&(force||s!==src)){src=s;post('tree',cnt[s]||{type:'wtid-counts',own:null});}}
 // Photo search: the query is resolved as search.html does, and its hits go to both frames as a subset of the points.
@@ -277,7 +282,7 @@ addEventListener('message',function(e){
 });
 // Back and forward: the new selection goes to both.
 addEventListener('hashchange',function(){var s=MapFilter.tokens(location.hash);
-  if(s!==last){last=s;Object.keys(frames).forEach(function(n){if(visible(n))sendSel(n,s);});}});
+  if(s!==last){last=s;Object.keys(frames).forEach(function(n){if(live(n))sendSel(n,s);});}});
 setView(v0);
 })();
 </script>

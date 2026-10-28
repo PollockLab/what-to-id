@@ -138,10 +138,11 @@ def _split(browser, site, w, h, query="", hash_=""):
     return page
 
 
-FRAMES = "[...document.querySelectorAll('iframe')].filter(f => !f.hidden).map(f => f.id)"
+# the shown panes, not the map's frame kept as the filter rail
+FRAMES = "[...document.querySelectorAll('iframe:not(.rail)')].filter(f => !f.hidden).map(f => f.id)"
 # the shown frames left to right, as the user sees them
 SEEN = (
-    "[...document.querySelectorAll('iframe')].filter(f => !f.hidden).sort((a, b) =>"
+    "[...document.querySelectorAll('iframe:not(.rail)')].filter(f => !f.hidden).sort((a, b) =>"
     " a.getBoundingClientRect().left - b.getBoundingClientRect().left).map(f => f.id)"
 )
 PRESSED = (

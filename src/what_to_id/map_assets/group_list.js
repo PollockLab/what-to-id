@@ -77,8 +77,7 @@ function set(c){
   if(TR){TR.refresh();TR.render();}
   ORD=ord;tell();
 }
-// Explore draws the bar in its top bar (split.html), the groups left out of the pick dimmed, and asks for
-// the Groups section (wtid-filters) when it is clicked.
+// The shares go to Explore (wtid-groups), the groups left out of the pick dimmed.
 var ORD=[],sent='';
 function tell(){
   if(parent===window||!cnt)return;
@@ -88,12 +87,6 @@ function tell(){
       bar:ORD.filter(function(j){return cnt[j];}).map(function(j){var st=S.groups[G[j]];
         return [color(j),cnt[j]/tot*100,inc?st!=='inc':st==='not'];})},k=JSON.stringify(m);
   if(k!==sent){sent=k;parent.postMessage(m,location.origin);}}
-addEventListener('message',function(e){
-  var d=e.data,sec=o.box.closest('details'),side=o.box.closest('.side'),f;
-  if(e.origin!==location.origin||e.source!==parent||!d||d.type!=='wtid-filters')return;
-  side.classList.add('open');f=document.querySelector('[aria-controls="'+side.id+'"]');if(f)f.setAttribute('aria-expanded','true');
-  sec.open=true;sec.scrollIntoView({block:'start'});f=o.box.querySelector('.gb');if(f)f.focus();
-});
 show();
 return {show:show,set:set};
 }
