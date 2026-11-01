@@ -1,10 +1,11 @@
 """Usage: python -m what_to_id.blind_report --consensus consensus.parquet --obs obs.parquet
---idents idents.parquet [--public pool.parquet] [--threshold 0.9]
+--idents idents.parquet [--public pool.parquet] [--levels levels.parquet] [--threshold 0.9]
 
 The first table is the error of CV-accepted versus typed first identifications, measured against
 a blind consensus, which a public record cannot give because later identifiers see the suggestion.
 With ``--public`` a second table divides the public overturn rate by that error: the community's
-detection rate per source, the size of the agreement bias.
+detection rate per source, the size of the agreement bias. With ``--levels`` a third table checks
+the Identify levels: settled share and abstain share per level.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ import pandas as pd
 
 REPORT_COLUMNS = ["group", "source", "n", "wrong", "error", "lo", "hi"]
 DETECT_COLUMNS = ["group", "source", "n", "error", "overturn", "detection", "lo", "hi"]
+LEVEL_COLUMNS = ["level", "n", "settled", "posterior", "abstain"]
 FIRST_COLUMNS = ["record_id", "group", "taxon_id", "vision"]
 Z = 1.959964
 
@@ -88,12 +90,33 @@ def detection_rate(
     return pd.DataFrame(rows, columns=DETECT_COLUMNS)
 
 
+def level_table(consensus, levels, threshold: float = 0.9) -> pd.DataFrame:
+    """Per Identify level: records, share settled at ``threshold``, mean posterior, abstain share.
+
+    The levels claim an ordering of difficulty; settled share should fall and abstain share rise
+    from easy to weird. ``levels`` is the ``levels.parquet`` that ``blind_sample`` writes.
+    """
+    j = consensus.merge(levels[["record_id", "level"]], on="record_id")
+    if j.empty:
+        return pd.DataFrame(columns=LEVEL_COLUMNS)
+    j["settled"] = (j["posterior"] >= threshold) & j["taxon_id"].notna()
+    j["abstain"] = j["n_abstain"] / (j["n_answers"] + j["n_abstain"])
+    out = j.groupby("level").agg(
+        n=("record_id", "size"),
+        settled=("settled", "mean"),
+        posterior=("posterior", "mean"),
+        abstain=("abstain", "mean"),
+    )
+    return out.reset_index()[LEVEL_COLUMNS]
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="CV versus typed first-ID error vs blind consensus")
     ap.add_argument("--consensus", required=True)
     ap.add_argument("--obs", required=True)
     ap.add_argument("--idents", required=True)
     ap.add_argument("--public", help="pool parquet with id and the current public taxon_id")
+    ap.add_argument("--levels", help="levels.parquet from blind_sample")
     ap.add_argument("--threshold", type=float, default=0.9)
     a = ap.parse_args(argv)
     idents = pd.read_parquet(a.idents)
@@ -106,6 +129,9 @@ def main(argv=None) -> int:
         public = public[public["id"].isin(others)].rename(columns={"id": "record_id"})
         print()
         print(detection_rate(consensus, firsts, public, a.threshold).to_string(index=False))
+    if a.levels:
+        print()
+        print(level_table(consensus, pd.read_parquet(a.levels), a.threshold).to_string(index=False))
     return 0
 
 

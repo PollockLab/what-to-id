@@ -117,3 +117,5 @@ def test_blind_track_round_trip(tmp_path, monkeypatch):
     assert list(det.columns) == blind_report.DETECT_COLUMNS
     # below 1 only because the student consensus itself is wrong on a few records
     assert det.loc[det["group"] == "all", "detection"].between(0.5, 1.0).all()
+    lv = blind_report.level_table(consensus, pd.read_parquet(tmp_path / "site" / "levels.parquet"))
+    assert lv["level"].tolist() == [0] and lv["n"].item() == 30  # no --levels: one stratum

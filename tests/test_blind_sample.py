@@ -61,5 +61,7 @@ def test_main_writes_records_and_planted(tmp_path):
     assert len(recs) == 10 and "taxon_id" not in out.read_text()
     truth = pd.read_parquet(tmp_path / "site" / "planted.parquet")
     assert truth.to_dict("records") == [{"record_id": 999, "taxon_id": 48715}]
+    lv = pd.read_parquet(tmp_path / "site" / "levels.parquet")
+    assert list(lv.columns) == ["record_id", "level"] and len(lv) == 9 and "level" not in recs[0]
     page_blind.build(tmp_path / "site", recs)
     assert (tmp_path / "site" / "blind.html").exists()

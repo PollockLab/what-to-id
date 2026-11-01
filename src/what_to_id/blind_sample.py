@@ -89,6 +89,9 @@ def main(argv: list[str] | None = None) -> int:
         }
     )
     truth.to_parquet(a.out.with_name("planted.parquet"), index=False)
+    # the level stays out of records.json so the page cannot hint at difficulty
+    lv = sampled[["id", "level"]].rename(columns={"id": "record_id"})
+    lv.to_parquet(a.out.with_name("levels.parquet"), index=False)
     print(strata(sampled).to_string(index=False))
     print(f"blind_sample: {len(sampled)} sampled + {len(planted)} planted -> {a.out}")
     return 0
