@@ -120,7 +120,8 @@ def test_main_consensus_error_from_held_out_planted(tmp_path, capsys):
     pd.DataFrame(ans, columns=["login", "group", "record_id", "taxon_id"]).to_parquet(
         tmp_path / "a.parquet"
     )
-    pd.DataFrame({"record_id": [1, 2], "taxon_id": [20, 31]}).to_parquet(tmp_path / "p.parquet")
+    plant = {"record_id": [1, 2], "taxon_id": [20, 31], "kind": ["cv_hold", "cv_fail"]}
+    pd.DataFrame(plant).to_parquet(tmp_path / "p.parquet")
     argv = []
     for flag, name in [
         ("consensus", "c"),
@@ -133,6 +134,8 @@ def test_main_consensus_error_from_held_out_planted(tmp_path, capsys):
     assert main(argv) == 0
     out = capsys.readouterr().out
     assert "consensus error c = 0.5000 on 2 held-out" in out
+    # record 2: students agree with the observer's first name 30, the expert says 31
+    assert "cv_fail" in out and "confirmed_first" in out
 
 
 def test_cv_error_removes_consensus_error():

@@ -88,6 +88,8 @@ def main(argv: list[str] | None = None) -> int:
             "taxon_id": [int(x["taxon_id"]) for x in planted],
         }
     )
+    if planted and all("kind" in x for x in planted):
+        truth["kind"] = [x["kind"] for x in planted]  # blind_planted's cv_fail etc., for the report
     truth.to_parquet(a.out.with_name("planted.parquet"), index=False)
     # the level stays out of records.json so the page cannot hint at difficulty
     lv = sampled[["id", "level"]].rename(columns={"id": "record_id"})
