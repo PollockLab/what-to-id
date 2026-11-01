@@ -112,3 +112,8 @@ def test_blind_track_round_trip(tmp_path, monkeypatch):
     allrows = report[report["group"] == "all"].set_index("source")
     assert set(allrows.index) == {"cv", "typed"}
     assert (allrows["lo"] <= allrows["error"]).all() and (allrows["error"] <= allrows["hi"]).all()
+    public = pd.DataFrame({"record_id": ids, "taxon_id": [truth[i] for i in ids]})  # all caught
+    det = blind_report.detection_rate(consensus, firsts, public, boot=100)
+    assert list(det.columns) == blind_report.DETECT_COLUMNS
+    # below 1 only because the student consensus itself is wrong on a few records
+    assert det.loc[det["group"] == "all", "detection"].between(0.5, 1.0).all()

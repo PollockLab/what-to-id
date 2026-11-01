@@ -1,7 +1,14 @@
 import pandas as pd
 import pytest
 
-from what_to_id.blind_report import REPORT_COLUMNS, cv_error, first_own_ids, main
+from what_to_id.blind_report import (
+    DETECT_COLUMNS,
+    REPORT_COLUMNS,
+    cv_error,
+    detection_rate,
+    first_own_ids,
+    main,
+)
 
 
 def _obs(rows):
@@ -97,3 +104,25 @@ def test_main(tmp_path, capsys):
     assert main(argv) == 0
     out = capsys.readouterr().out
     assert "Aves" in out and "cv" in out and "all" in out
+
+
+def test_detection_rate_is_overturn_over_error():
+    # 10 cv records: 4 wrong by consensus, the public caught 2 of them -> d = 0.5
+    cons = _cons([(i, 1, 0.99) for i in range(1, 11)])
+    firsts = _firsts([(i, "Aves", 2 if i <= 4 else 1, True) for i in range(1, 11)])
+    public = pd.DataFrame({"record_id": range(1, 11), "taxon_id": [1, 1] + [2] * 2 + [1] * 6})
+    out = detection_rate(cons, firsts, public, boot=200).set_index(["group", "source"])
+    assert list(out.columns) == DETECT_COLUMNS[2:]
+    row = out.loc[("all", "cv")]
+    assert row["n"] == 10 and row["error"] == 0.4 and row["overturn"] == 0.2
+    assert row["detection"] == 0.5 and row["lo"] <= 0.5 <= row["hi"]
+    assert out.loc[("Aves", "cv"), "detection"] == 0.5
+
+
+def test_detection_rate_handles_no_error_and_no_overlap():
+    cons = _cons([(1, 1, 0.99), (2, 1, 0.99)])
+    firsts = _firsts([(1, "Aves", 1, False), (2, "Aves", 1, False)])
+    public = pd.DataFrame({"record_id": [1, 2], "taxon_id": [1, 1]})
+    out = detection_rate(cons, firsts, public, boot=50)
+    assert out["detection"].isna().all()  # 0/0: no errors to detect
+    assert detection_rate(cons, firsts, public.iloc[:0]).empty
