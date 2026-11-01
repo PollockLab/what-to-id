@@ -41,10 +41,12 @@ def simulate(n=3000, taxa=200, students=60, per_record=5, planted=150, seed=0):
     return answers, firsts, pub, plant, pd.Series(src)
 
 
-def _recover(answers, firsts, public, planted, c):
+def _recover(answers, firsts, public, planted, c, n=0):
     _, consensus = fit(answers, planted)
     err = blind_report.cv_error(consensus, firsts, consensus_error=c)
-    det = blind_report.detection_rate(consensus, firsts, public, boot=400, consensus_error=c)
+    det = blind_report.detection_rate(
+        consensus, firsts, public, boot=400, consensus_error=c, consensus_n=n
+    )
     err = err[err["group"] == "all"].set_index("source")
     det = det[det["group"] == "all"].set_index("source")
     return consensus, err, det
@@ -55,7 +57,7 @@ def test_chain_recovers_e_and_d_after_consensus_error_correction():
     answers, firsts, public, planted, _ = simulate(planted=600)
     c, n = blind_report.consensus_error(answers, planted)
     assert n > 400 and 0 < c < 0.02, (c, n)
-    consensus, err, det = _recover(answers, firsts, public, planted, c)
+    consensus, err, det = _recover(answers, firsts, public, planted, c, n)
     assert (consensus["posterior"] >= 0.9).mean() > 0.8
     for s in ("cv", "typed"):
         assert err.loc[s, "lo"] <= E[s] <= err.loc[s, "hi"], (s, err.loc[s].to_dict())

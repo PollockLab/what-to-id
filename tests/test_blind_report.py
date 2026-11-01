@@ -163,6 +163,20 @@ def test_detection_rate_is_overturn_over_error():
     assert out.loc[("Aves", "cv"), "detection"] == 0.5
 
 
+def test_detection_interval_widens_with_consensus_uncertainty():
+    # 200 cv records, 20 wrong, 10 caught; c = 1% measured on 300 planted vs taken as exact
+    cons = _cons([(i, 1, 0.99) for i in range(200)])
+    firsts = _firsts([(i, "Aves", 2 if i < 20 else 1, True) for i in range(200)])
+    public = pd.DataFrame({"record_id": range(200), "taxon_id": [1] * 10 + [2] * 10 + [1] * 180})
+    kw = dict(boot=2000, consensus_error=0.01)
+    fixed, drawn = (
+        detection_rate(cons, firsts, public, **kw, consensus_n=n).iloc[0] for n in (0, 300)
+    )
+    assert fixed["detection"] == drawn["detection"] == pytest.approx(0.05 / ((0.1 - 0.01) / 0.98))
+    assert drawn["hi"] - drawn["lo"] > fixed["hi"] - fixed["lo"]
+    assert drawn["lo"] < drawn["detection"] < drawn["hi"]
+
+
 def test_detection_rate_handles_no_error_and_no_overlap():
     cons = _cons([(1, 1, 0.99), (2, 1, 0.99)])
     firsts = _firsts([(1, "Aves", 1, False), (2, "Aves", 1, False)])
