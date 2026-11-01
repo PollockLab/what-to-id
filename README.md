@@ -180,6 +180,21 @@ A one-off build is published instead by copying `out/build/site/*.html` over `si
 
 The current page is a rotation preview of all four lists, built from a 10,000-record sample frozen on 2026-09-11 (`--max-batches 20`), not the blitz build. Its lists are assigned with a private key, like the daily build, so the public code and pool do not show which list is which.
 
+## Blind track (proposed, not yet run)
+
+A second study for a class or a group of new identifiers. Proposed for the Monday 2 Nov 2026 meeting; it runs only after ethics review and the course agrees.
+
+- Most BC records already carry a species name that the observer accepted from the computer-vision suggestion. On 40,000 BC records, later identifiers overturned 6% of those names and 9% of typed names. The public record cannot tell a correct suggestion from a name people agreed with.
+- The blind page shows a student only the photos and the taxon group. No name, no location, no suggestion. The student types a name and a confidence, or abstains. The link to the record appears only after the answer is saved.
+- Three to five students see each record. A one-coin Dawid-Skene model gives each student an accuracy per group and each record a consensus name with a posterior. Records with an expert-settled name are planted among the rest and anchor the model.
+- What comes out: the error rate of CV-accepted names measured without the agreement bias, a test of the Identify levels against human consensus, and a labelled set of hard cases for training.
+
+```bash
+python -m what_to_id.page_blind --records records.json --out site/            # build blind.html
+python -m what_to_id.blind_answers --records records.json --names names.json --out answers.parquet blind-answers-*.jsonl
+python -c "import pandas as pd; from what_to_id.blind_skill import fit; s, c = fit(pd.read_parquet('answers.parquet')); print(s); print(c)"
+```
+
 ## Tests
 
 ```bash
@@ -192,3 +207,4 @@ pytest -m network   # hits the live iNaturalist API
 - Chapelle O, Joachims T, Radlinski F, Yue Y (2012). Large-scale validation and analysis of interleaved search evaluation. ACM Transactions on Information Systems 30(1):6. [doi:10.1145/2094072.2094078](https://doi.org/10.1145/2094072.2094078).
 - Mesaglio T, Shepherd KA, Wege JA, Barrett RL, Sauquet H, Cornwell WK (2025). Expert identification blitz: a rapid high value approach for assessing and improving iNaturalist identification accuracy and data precision and confidence. Plants, People, Planet. [doi:10.1002/ppp3.70005](https://doi.org/10.1002/ppp3.70005).
 - Hortal J, de Bello F, Diniz-Filho JAF, Lewinsohn TM, Lobo JM, Ladle RJ (2015). Seven shortfalls that beset large-scale knowledge of biodiversity. Annual Review of Ecology, Evolution, and Systematics 46:523-549. [doi:10.1146/annurev-ecolsys-112414-054400](https://doi.org/10.1146/annurev-ecolsys-112414-054400).
+- Dawid AP, Skene AM (1979). Maximum likelihood estimation of observer error-rates using the EM algorithm. Journal of the Royal Statistical Society Series C 28(1):20-28. [doi:10.2307/2346806](https://doi.org/10.2307/2346806).
