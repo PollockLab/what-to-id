@@ -59,6 +59,13 @@ def _correct(wrong_share, c):
         return np.clip((wrong_share - c) / (1 - 2 * c), 0, 1)
 
 
+def _c_draws(rng, c, n, boot):
+    """c per bootstrap replicate from its Jeffreys posterior when the held-out count n is given."""
+    if not n or not np.isfinite(c):
+        return c
+    return rng.beta(c * n + 0.5, (1 - c) * n + 0.5, boot)
+
+
 def held_out_consensus(answers, planted, threshold=0.9, folds=2, seed=0) -> pd.DataFrame:
     """Settled consensus of planted records fitted with their truth withheld, fold by fold.
 
@@ -124,7 +131,7 @@ def _scored(consensus, firsts, threshold):
 
 
 def detection_rate(
-    consensus, firsts, public, threshold=0.9, boot=1000, seed=0, consensus_error=0.0
+    consensus, firsts, public, threshold=0.9, boot=1000, seed=0, consensus_error=0.0, consensus_n=0
 ) -> pd.DataFrame:
     """Public overturn rate over blind error rate, by group and source, with a bootstrap 95% CI.
 
@@ -132,7 +139,8 @@ def detection_rate(
     carry at least one identification besides the observer's, or detection is biased down.
     The ratio is d in overturn = e x d. Above 1 means the public caught errors the consensus
     missed, which is a check on the consensus, not a detection rate. ``consensus_error`` is c
-    from :func:`consensus_error`, removed from e before the division.
+    from :func:`consensus_error`, removed from e before the division; with ``consensus_n`` (its
+    held-out count) each resample draws its own c, so the interval carries c's uncertainty.
     """
     j = _scored(consensus, firsts, threshold)
     j = j.merge(public[["record_id", "taxon_id"]].rename(columns={"taxon_id": "taxon_id_p"}))
@@ -141,6 +149,7 @@ def detection_rate(
     # shortcut: taxon_id equality, so a public refinement to a descendant counts as overturned
     j["over"] = (j["taxon_id"] != j["taxon_id_p"]).astype(int)
     rng = np.random.default_rng(seed)
+    cs = _c_draws(rng, consensus_error, consensus_n, boot)
     rows = []
     for (group, source), g in j.groupby(["group", "source"]):
         w, o = g["wrong"].to_numpy(), g["over"].to_numpy()
@@ -148,7 +157,7 @@ def detection_rate(
         with np.errstate(divide="ignore", invalid="ignore"):
             e = _correct(w.mean(), consensus_error)
             d = o.mean() / e
-            ds = o[idx].mean(1) / _correct(w[idx].mean(1), consensus_error)
+            ds = o[idx].mean(1) / _correct(w[idx].mean(1), cs)
         lo, hi = np.nanpercentile(ds, [2.5, 97.5]) if np.isfinite(ds).any() else (np.nan, np.nan)
         rows.append((group, source, len(g), e, o.mean(), d, lo, hi))
     return pd.DataFrame(rows, columns=DETECT_COLUMNS)
@@ -175,7 +184,15 @@ def level_table(consensus, levels, threshold: float = 0.9) -> pd.DataFrame:
 
 
 def hypothesis_tests(
-    consensus, firsts, public, levels, threshold=0.9, boot=4000, seed=0, consensus_error=0.0
+    consensus,
+    firsts,
+    public,
+    levels,
+    threshold=0.9,
+    boot=4000,
+    seed=0,
+    consensus_error=0.0,
+    consensus_n=0,
 ):
     """The three pre-registered tests of the blind student track, one row each.
 
@@ -183,8 +200,9 @@ def hypothesis_tests(
     H2 detection: one-sided bootstrap over records of d_cv - d_typed, H1 is d_cv < d_typed
     (statistic: difference, p: share of resamples at or above zero).
     H3 levels: Spearman correlation between level order and the settled indicator, one-sided,
-    H1 is negative (settled share falls from easy to weird). ``consensus_error`` enters H2 only;
-    H1 compares disagreement shares, which c shifts equally in both arms.
+    H1 is negative (settled share falls from easy to weird). ``consensus_error`` and
+    ``consensus_n`` enter H2 only, as in :func:`detection_rate`, one c draw shared by both arms
+    per resample; H1 compares disagreement shares, which c shifts equally in both arms.
     """
     from scipy import stats
 
@@ -201,15 +219,16 @@ def hypothesis_tests(
     cvj, tyj = j[j["source"] == "cv"], j[j["source"] == "typed"]
     if cvj["wrong"].sum() and tyj["wrong"].sum():
         rng = np.random.default_rng(seed)
+        cs = _c_draws(rng, consensus_error, consensus_n, boot)
 
-        def d(g, idx):
+        def d(g, idx, c):
             w, o = g["wrong"].to_numpy()[idx], g["over"].to_numpy()[idx]
             with np.errstate(divide="ignore", invalid="ignore"):
-                return o.mean(-1) / _correct(w.mean(-1), consensus_error)
+                return o.mean(-1) / _correct(w.mean(-1), c)
 
-        diff = d(cvj, slice(None)) - d(tyj, slice(None))
-        bs = d(cvj, rng.integers(0, len(cvj), (boot, len(cvj)))) - d(
-            tyj, rng.integers(0, len(tyj), (boot, len(tyj)))
+        diff = d(cvj, slice(None), consensus_error) - d(tyj, slice(None), consensus_error)
+        bs = d(cvj, rng.integers(0, len(cvj), (boot, len(cvj))), cs) - d(
+            tyj, rng.integers(0, len(tyj), (boot, len(tyj))), cs
         )
         rows.append(("H2 detection cv < typed", diff, np.nanmean(bs >= 0), len(j)))
     lv = consensus.merge(levels[["record_id", "level"]], on="record_id")
@@ -234,13 +253,13 @@ def main(argv=None) -> int:
     idents = pd.read_parquet(a.idents)
     firsts = first_own_ids(pd.read_parquet(a.obs), idents)
     consensus = pd.read_parquet(a.consensus)
-    c = 0.0
+    c, n_c = 0.0, 0
     if a.answers and a.planted:
         held = held_out_consensus(
             pd.read_parquet(a.answers), pd.read_parquet(a.planted), a.threshold
         )
-        c = held["wrong"].mean() if len(held) else 0.0
-        print(f"consensus error c = {c:.4f} on {len(held)} held-out settled planted records")
+        c, n_c = (held["wrong"].mean() if len(held) else 0.0), len(held)
+        print(f"consensus error c = {c:.4f} on {n_c} held-out settled planted records")
         if "kind" in held.columns:
             print(kind_table(held, firsts).to_string(index=False))
         print()
@@ -250,7 +269,9 @@ def main(argv=None) -> int:
         public = pd.read_parquet(a.public, columns=["id", "taxon_id"])
         public = public[public["id"].isin(others)].rename(columns={"id": "record_id"})
         print()
-        det = detection_rate(consensus, firsts, public, a.threshold, consensus_error=c)
+        det = detection_rate(
+            consensus, firsts, public, a.threshold, consensus_error=c, consensus_n=n_c
+        )
         print(det.to_string(index=False))
     if a.levels:
         levels = pd.read_parquet(a.levels)
@@ -258,7 +279,9 @@ def main(argv=None) -> int:
         print(level_table(consensus, levels, a.threshold).to_string(index=False))
     if a.public and a.levels:
         print()
-        tests = hypothesis_tests(consensus, firsts, public, levels, a.threshold, consensus_error=c)
+        tests = hypothesis_tests(
+            consensus, firsts, public, levels, a.threshold, consensus_error=c, consensus_n=n_c
+        )
         print(tests.to_string(index=False))
     return 0
 
