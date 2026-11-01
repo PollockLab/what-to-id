@@ -35,7 +35,15 @@ def test_sample_caps_each_stratum_and_is_seeded():
 
 def test_to_records_mixes_planted_without_truth_and_rejects_overlap():
     sampled = bs.sample(_pool(), 2, 3)
-    planted = [{"id": 999, "group": "Fungi", "photos": ["https://x/p.jpg"], "taxon_id": 48715}]
+    planted = [
+        {
+            "id": 999,
+            "group": "Fungi",
+            "photos": ["https://x/p.jpg"],
+            "taxon_id": 48715,
+            "kind": "cv_hold",
+        }
+    ]
     recs = bs.to_records(sampled, planted, 3)
     assert len(recs) == len(sampled) + 1
     assert all(set(r) == {"id", "group", "photos", "planted"} for r in recs)
@@ -52,7 +60,15 @@ def test_to_records_mixes_planted_without_truth_and_rejects_overlap():
 
 def test_main_writes_records_and_planted(tmp_path):
     _pool().to_parquet(tmp_path / "pool.parquet", index=False)
-    planted = [{"id": 999, "group": "Fungi", "photos": ["https://x/p.jpg"], "taxon_id": 48715}]
+    planted = [
+        {
+            "id": 999,
+            "group": "Fungi",
+            "photos": ["https://x/p.jpg"],
+            "taxon_id": 48715,
+            "kind": "cv_hold",
+        }
+    ]
     (tmp_path / "planted.json").write_text(json.dumps(planted))
     out = tmp_path / "site" / "records.json"
     args = ["--pool", str(tmp_path / "pool.parquet"), "--planted", str(tmp_path / "planted.json")]
@@ -60,7 +76,7 @@ def test_main_writes_records_and_planted(tmp_path):
     recs = json.loads(out.read_text())
     assert len(recs) == 10 and "taxon_id" not in out.read_text()
     truth = pd.read_parquet(tmp_path / "site" / "planted.parquet")
-    assert truth.to_dict("records") == [{"record_id": 999, "taxon_id": 48715}]
+    assert truth.to_dict("records") == [{"record_id": 999, "taxon_id": 48715, "kind": "cv_hold"}]
     lv = pd.read_parquet(tmp_path / "site" / "levels.parquet")
     assert list(lv.columns) == ["record_id", "level"] and len(lv) == 9 and "level" not in recs[0]
     page_blind.build(tmp_path / "site", recs)

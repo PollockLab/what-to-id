@@ -59,24 +59,43 @@ def _correct(wrong_share, c):
         return np.clip((wrong_share - c) / (1 - 2 * c), 0, 1)
 
 
-def consensus_error(answers, planted, threshold: float = 0.9, folds: int = 2, seed: int = 0):
-    """Share of settled consensus taxa that are wrong, measured on held-out planted records.
+def held_out_consensus(answers, planted, threshold=0.9, folds=2, seed=0) -> pd.DataFrame:
+    """Settled consensus of planted records fitted with their truth withheld, fold by fold.
 
-    Each fold of planted records is fitted as if unknown, and its settled consensus is checked
-    against the expert truth. Returns ``(c, n_settled)``; c is NaN when nothing settles.
+    Columns: record_id, taxon_id (the consensus), truth, wrong, and kind when ``planted`` has it
+    (``blind_planted``'s cv_fail, cv_hold, typed_fail, typed_hold).
     """
-    ids = planted["record_id"].drop_duplicates().to_numpy().copy()
-    rng = np.random.default_rng(seed)
-    rng.shuffle(ids)
-    truth = planted.drop_duplicates("record_id").set_index("record_id")["taxon_id"]
-    wrong = n = 0
+    planted = planted.drop_duplicates("record_id")
+    ids = planted["record_id"].to_numpy().copy()
+    np.random.default_rng(seed).shuffle(ids)
+    parts = []
     for held in np.array_split(ids, folds):
         _, cons = fit(answers, planted[~planted["record_id"].isin(held)])
         got = cons[cons["record_id"].isin(held) & (cons["posterior"] >= threshold)]
-        got = got[got["taxon_id"].notna()]
-        wrong += int((got["taxon_id"] != got["record_id"].map(truth)).sum())
-        n += len(got)
-    return (wrong / n if n else np.nan), n
+        parts.append(got[got["taxon_id"].notna()][["record_id", "taxon_id"]])
+    keep = ["record_id", "taxon_id"] + (["kind"] if "kind" in planted.columns else [])
+    out = pd.concat(parts).merge(planted[keep].rename(columns={"taxon_id": "truth"}))
+    out["wrong"] = (out["taxon_id"] != out["truth"]).astype(int)
+    return out.reset_index(drop=True)
+
+
+def consensus_error(answers, planted, threshold: float = 0.9, folds: int = 2, seed: int = 0):
+    """Share of settled consensus taxa that are wrong, measured on held-out planted records.
+
+    Returns ``(c, n_settled)``; c is NaN when nothing settles.
+    """
+    held = held_out_consensus(answers, planted, threshold, folds, seed)
+    return (held["wrong"].mean() if len(held) else np.nan), len(held)
+
+
+def kind_table(held: pd.DataFrame, firsts: pd.DataFrame) -> pd.DataFrame:
+    """Per planted kind: held-out settled records, consensus error, and the share of those whose
+    consensus is the observer's own wrong first name (students confirming the CV's mistake)."""
+    j = held.merge(firsts[["record_id", "taxon_id"]], on="record_id", suffixes=("", "_first"))
+    j["confirmed_first"] = (j["taxon_id"] == j["taxon_id_first"]) & (j["truth"] != j["taxon_id"])
+    out = j.groupby("kind").agg(n=("wrong", "size"), c=("wrong", "mean"))
+    out["confirmed_first"] = j.groupby("kind")["confirmed_first"].mean()
+    return out.reset_index()
 
 
 def cv_error(consensus, firsts, threshold: float = 0.9, consensus_error: float = 0.0):
@@ -217,9 +236,14 @@ def main(argv=None) -> int:
     consensus = pd.read_parquet(a.consensus)
     c = 0.0
     if a.answers and a.planted:
-        c, n = consensus_error(pd.read_parquet(a.answers), pd.read_parquet(a.planted), a.threshold)
-        print(f"consensus error c = {c:.4f} on {n} held-out settled planted records\n")
-        c = 0.0 if np.isnan(c) else c
+        held = held_out_consensus(
+            pd.read_parquet(a.answers), pd.read_parquet(a.planted), a.threshold
+        )
+        c = held["wrong"].mean() if len(held) else 0.0
+        print(f"consensus error c = {c:.4f} on {len(held)} held-out settled planted records")
+        if "kind" in held.columns:
+            print(kind_table(held, firsts).to_string(index=False))
+        print()
     print(cv_error(consensus, firsts, a.threshold, c).to_string(index=False))
     if a.public:
         others = idents.loc[idents["user_id"] != idents["observer_id"], "id"].unique()
