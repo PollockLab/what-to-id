@@ -3,12 +3,14 @@ import pytest
 
 from what_to_id.blind_report import (
     DETECT_COLUMNS,
+    HARD_COLUMNS,
     LEVEL_COLUMNS,
     REPORT_COLUMNS,
     TEST_COLUMNS,
     cv_error,
     detection_rate,
     first_own_ids,
+    hard_cases,
     hypothesis_tests,
     level_table,
     main,
@@ -99,15 +101,16 @@ def test_empty_inputs():
 
 
 def test_main(tmp_path, capsys):
-    _cons([(1, 20, 0.99)]).to_parquet(tmp_path / "c.parquet")
+    _cons([(1, 20, 0.99)]).assign(n_answers=4).to_parquet(tmp_path / "c.parquet")
     _obs([(1, 7, "Aves")]).to_parquet(tmp_path / "o.parquet")
     _idents([(1, 7, "2024-01-01", 20, True, 7)]).to_parquet(tmp_path / "i.parquet")
-    argv = ["--threshold", "0.9"]
+    argv = ["--threshold", "0.9", "--hard-cases", str(tmp_path / "hard.parquet")]
     for flag, name in [("consensus", "c"), ("obs", "o"), ("idents", "i")]:
         argv += [f"--{flag}", str(tmp_path / f"{name}.parquet")]
     assert main(argv) == 0
     out = capsys.readouterr().out
-    assert "Aves" in out and "cv" in out and "all" in out
+    assert "Aves" in out and "cv" in out and "all" in out and "0 hard cases" in out
+    assert list(pd.read_parquet(tmp_path / "hard.parquet").columns) == HARD_COLUMNS
 
 
 def test_main_consensus_error_from_held_out_planted(tmp_path, capsys):
@@ -184,6 +187,26 @@ def test_detection_rate_handles_no_error_and_no_overlap():
     out = detection_rate(cons, firsts, public, boot=50)
     assert out["detection"].isna().all()  # 0/0: no errors to detect
     assert detection_rate(cons, firsts, public.iloc[:0]).empty
+
+
+def test_hard_cases_overturned_and_unsettled_without_planted():
+    cons = pd.DataFrame(
+        {
+            "record_id": [1, 2, 3, 4, 5],
+            "taxon_id": pd.array([2, 1, None, 2, 1], dtype="Int64"),
+            "posterior": [0.99, 0.99, 0.0, 0.6, 0.99],
+            "n_answers": [4, 4, 0, 3, 4],
+            "n_abstain": [0, 0, 4, 1, 0],
+            "planted": [False, False, False, False, True],
+        }
+    )
+    firsts = _firsts([(i, "Aves", 1, i % 2 == 1) for i in range(1, 6)])
+    out = hard_cases(cons, firsts)
+    assert list(out.columns) == HARD_COLUMNS
+    assert out[["record_id", "why"]].values.tolist() == [[1, "overturned"], [4, "unsettled"]]
+    assert out.loc[0, ["source", "first", "consensus"]].tolist() == ["cv", 1, 2]
+    assert pd.isna(out.loc[1, "consensus"]) and out.loc[1, "n_answers"] == 3
+    assert hard_cases(cons.iloc[:0], firsts).empty
 
 
 def test_level_table_settled_and_abstain_per_level():
