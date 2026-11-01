@@ -5,9 +5,11 @@ from what_to_id.blind_report import (
     DETECT_COLUMNS,
     LEVEL_COLUMNS,
     REPORT_COLUMNS,
+    TEST_COLUMNS,
     cv_error,
     detection_rate,
     first_own_ids,
+    hypothesis_tests,
     level_table,
     main,
 )
@@ -146,3 +148,30 @@ def test_level_table_settled_and_abstain_per_level():
     assert out.loc[1, ["n", "settled", "abstain"]].tolist() == [2, 1.0, 0.0]
     assert out.loc[4, ["n", "settled", "abstain"]].tolist() == [2, 0.0, 0.625]
     assert level_table(cons, levels.iloc[:0]).empty
+
+
+def test_hypothesis_tests_directions():
+    # 40 cv records, 20 wrong, public caught 4; 40 typed, 4 wrong, public caught all 4
+    n = 80
+    cons = _cons([(i, 1, 0.99) for i in range(n)])
+    first = [2 if i < 20 else 1 for i in range(40)] + [2 if i < 44 else 1 for i in range(40, n)]
+    firsts = _firsts([(i, "Aves", first[i], i < 40) for i in range(n)])
+    pub = [2 if 4 <= i < 20 else 1 for i in range(n)]  # cv misses 16 of 20 stay uncaught
+    public = pd.DataFrame({"record_id": range(n), "taxon_id": pub})
+    cons.loc[cons["record_id"] >= 40, "posterior"] = [0.95] * 20 + [0.5] * 20
+    levels = pd.DataFrame({"record_id": range(n), "level": [1] * 40 + [2] * 20 + [4] * 20})
+    out = hypothesis_tests(cons, firsts, public, levels, boot=500).set_index("hypothesis")
+    assert list(out.columns) == TEST_COLUMNS[1:] and len(out) == 3
+    h1, h2, h3 = out["p"].tolist()
+    assert out["statistic"].iloc[0] == pytest.approx(0.3) and h1 < 0.05  # typed: 4 of 20 settled
+    assert out["statistic"].iloc[1] == 0.2 - 1.0 and h2 < 0.01
+    assert out["statistic"].iloc[2] < 0 and h3 < 0.01
+
+
+def test_hypothesis_tests_skip_untestable():
+    cons = _cons([(1, 1, 0.99), (2, 1, 0.99)])
+    firsts = _firsts([(1, "Aves", 1, True), (2, "Aves", 1, False)])
+    public = pd.DataFrame({"record_id": [1, 2], "taxon_id": [1, 1]})
+    levels = pd.DataFrame({"record_id": [1, 2], "level": [1, 1]})
+    out = hypothesis_tests(cons, firsts, public, levels, boot=10)
+    assert out["hypothesis"].tolist() == ["H1 error cv != typed"] and out["p"].item() == 1.0

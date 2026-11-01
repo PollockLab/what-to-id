@@ -5,7 +5,8 @@ The first table is the error of CV-accepted versus typed first identifications, 
 a blind consensus, which a public record cannot give because later identifiers see the suggestion.
 With ``--public`` a second table divides the public overturn rate by that error: the community's
 detection rate per source, the size of the agreement bias. With ``--levels`` a third table checks
-the Identify levels: settled share and abstain share per level.
+the Identify levels: settled share and abstain share per level. With both, the three
+pre-registered tests (H1 error, H2 detection, H3 levels) follow.
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ import pandas as pd
 REPORT_COLUMNS = ["group", "source", "n", "wrong", "error", "lo", "hi"]
 DETECT_COLUMNS = ["group", "source", "n", "error", "overturn", "detection", "lo", "hi"]
 LEVEL_COLUMNS = ["level", "n", "settled", "posterior", "abstain"]
+TEST_COLUMNS = ["hypothesis", "statistic", "p", "n"]
 FIRST_COLUMNS = ["record_id", "group", "taxon_id", "vision"]
 Z = 1.959964
 
@@ -110,6 +112,49 @@ def level_table(consensus, levels, threshold: float = 0.9) -> pd.DataFrame:
     return out.reset_index()[LEVEL_COLUMNS]
 
 
+def hypothesis_tests(consensus, firsts, public, levels, threshold=0.9, boot=4000, seed=0):
+    """The three pre-registered tests of the blind student track, one row each.
+
+    H1 error: two-sided z test of e_cv against e_typed on settled records (statistic: difference).
+    H2 detection: one-sided bootstrap over records of d_cv - d_typed, H1 is d_cv < d_typed
+    (statistic: difference, p: share of resamples at or above zero).
+    H3 levels: Spearman correlation between level order and the settled indicator, one-sided,
+    H1 is negative (settled share falls from easy to weird).
+    """
+    from scipy import stats
+
+    j = _scored(consensus, firsts, threshold)
+    j = j[j["group"] == "all"]
+    rows = []
+    cv, ty = j.loc[j["source"] == "cv", "wrong"], j.loc[j["source"] == "typed", "wrong"]
+    if len(cv) and len(ty):
+        p = stats.ttest_ind(cv, ty, equal_var=False).pvalue
+        p = 1.0 if np.isnan(p) else p  # no variance in either arm: no evidence either way
+        rows.append(("H1 error cv != typed", cv.mean() - ty.mean(), p, len(j)))
+    j = j.merge(public[["record_id", "taxon_id"]].rename(columns={"taxon_id": "taxon_id_p"}))
+    j["over"] = (j["taxon_id"] != j["taxon_id_p"]).astype(int)
+    cvj, tyj = j[j["source"] == "cv"], j[j["source"] == "typed"]
+    if cvj["wrong"].sum() and tyj["wrong"].sum():
+        rng = np.random.default_rng(seed)
+
+        def d(g, idx):
+            w, o = g["wrong"].to_numpy()[idx], g["over"].to_numpy()[idx]
+            with np.errstate(divide="ignore", invalid="ignore"):
+                return o.sum(-1) / w.sum(-1)
+
+        diff = d(cvj, slice(None)) - d(tyj, slice(None))
+        bs = d(cvj, rng.integers(0, len(cvj), (boot, len(cvj)))) - d(
+            tyj, rng.integers(0, len(tyj), (boot, len(tyj)))
+        )
+        rows.append(("H2 detection cv < typed", diff, np.nanmean(bs >= 0), len(j)))
+    lv = consensus.merge(levels[["record_id", "level"]], on="record_id")
+    if lv["level"].nunique() > 1:
+        settled = ((lv["posterior"] >= threshold) & lv["taxon_id"].notna()).astype(int)
+        r = stats.spearmanr(lv["level"], settled, alternative="less")
+        rows.append(("H3 settled falls with level", r.statistic, r.pvalue, len(lv)))
+    return pd.DataFrame(rows, columns=TEST_COLUMNS)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="CV versus typed first-ID error vs blind consensus")
     ap.add_argument("--consensus", required=True)
@@ -130,8 +175,13 @@ def main(argv=None) -> int:
         print()
         print(detection_rate(consensus, firsts, public, a.threshold).to_string(index=False))
     if a.levels:
+        levels = pd.read_parquet(a.levels)
         print()
-        print(level_table(consensus, pd.read_parquet(a.levels), a.threshold).to_string(index=False))
+        print(level_table(consensus, levels, a.threshold).to_string(index=False))
+    if a.public and a.levels:
+        print()
+        tests = hypothesis_tests(consensus, firsts, public, levels, a.threshold)
+        print(tests.to_string(index=False))
     return 0
 
 
