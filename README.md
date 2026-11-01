@@ -198,7 +198,7 @@ python -c "import pandas as pd; from what_to_id.blind_skill import fit; s, c = f
 python -m what_to_id.blind_report --consensus consensus.parquet --obs obs.parquet --idents idents.parquet --public pool.parquet --levels site/levels.parquet
 ```
 
-The report prints three tables: the error of CV-accepted versus typed first IDs against the consensus, the community's detection rate (public overturn over that error, the part of the agreement bias the public record hides), and settled and abstain shares per Identify level. `tests/test_blind_pipeline.py` runs the whole chain on synthetic data.
+The report prints three tables: the error of CV-accepted versus typed first IDs against the consensus, the community's detection rate (public overturn over that error, the part of the agreement bias the public record hides), and settled and abstain shares per Identify level. `tests/test_blind_pipeline.py` runs the whole chain on synthetic data. `python -m what_to_id.blind_power` prints the sample-size table behind the protocol: error-rate interval widths and power per source, and the simulated interval and power of the detection rate.
 
 ## Tests
 
