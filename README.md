@@ -77,7 +77,7 @@ IDs are credited to iNaturalist accounts and each record's list is fixed, so a s
 
 ## First deployment: British Columbia
 
-The first run is a BC identification blitz in autumn 2026, with Blitz the Gap. The protocol and the outcomes fixed before the blitz are in [docs/protocol.md](docs/protocol.md), a draft for co-design with the BC team. The set-up is four lists, `recency`, `gap_first`, `similarity` and `novelty`, over four weeks. An earlier draft of the protocol proposed two lists, `recency` and `gap_first`, and left the other two to a later round.
+The first run is a BC identification blitz in autumn 2026, with Blitz the Gap. Identification blitzes themselves have precedent: 52 experts added IDs to about 11,000 Western Australian plant records in three weeks ([Mesaglio et al. 2025](https://doi.org/10.1002/ppp3.70005)). What is new here is the randomised queue order inside such a blitz, so the blitz also answers which order to serve. The protocol and the outcomes fixed before the blitz are in [docs/protocol.md](docs/protocol.md), a draft for co-design with the BC team. The set-up is four lists, `recency`, `gap_first`, `similarity` and `novelty`, over four weeks. An earlier draft of the protocol proposed two lists, `recency` and `gap_first`, and left the other two to a later round.
 
 ## Install
 
@@ -184,4 +184,5 @@ pytest -m network   # hits the live iNaturalist API
 ## References
 
 - Chapelle O, Joachims T, Radlinski F, Yue Y (2012). Large-scale validation and analysis of interleaved search evaluation. ACM Transactions on Information Systems 30(1):6. [doi:10.1145/2094072.2094078](https://doi.org/10.1145/2094072.2094078).
+- Mesaglio T, Shepherd KA, Wege JA, Barrett RL, Sauquet H, Cornwell WK (2025). Expert identification blitz: a rapid high value approach for assessing and improving iNaturalist identification accuracy and data precision and confidence. Plants, People, Planet. [doi:10.1002/ppp3.70005](https://doi.org/10.1002/ppp3.70005).
 - Hortal J, de Bello F, Diniz-Filho JAF, Lewinsohn TM, Lobo JM, Ladle RJ (2015). Seven shortfalls that beset large-scale knowledge of biodiversity. Annual Review of Ecology, Evolution, and Systematics 46:523-549. [doi:10.1146/annurev-ecolsys-112414-054400](https://doi.org/10.1146/annurev-ecolsys-112414-054400).
