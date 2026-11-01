@@ -51,9 +51,10 @@ def inat_lookup(name: str, session=None) -> int | None:
 
 
 def resolve(
-    names: list[str], known: dict[str, int], lookup: Callable[[str], int | None] = inat_lookup
+    names: list[str], known: dict[str, int], lookup: Callable[[str], int | None] | None = None
 ) -> tuple[dict[str, int], list[str]]:
     """``known`` extended with ``lookup`` for new names, and the names that stayed unresolved."""
+    lookup = lookup or inat_lookup  # bound at call time so tests can replace the iNat call
     out, missing = dict(known), []
     for n in sorted({n for n in names if n}):
         if n not in out:
