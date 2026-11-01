@@ -27,6 +27,16 @@ DETECT_COLUMNS = ["group", "source", "n", "error", "overturn", "detection", "lo"
 LEVEL_COLUMNS = ["level", "n", "settled", "posterior", "abstain"]
 TEST_COLUMNS = ["hypothesis", "statistic", "p", "n"]
 FIRST_COLUMNS = ["record_id", "group", "taxon_id", "vision"]
+HARD_COLUMNS = [
+    "record_id",
+    "group",
+    "source",
+    "first",
+    "consensus",
+    "posterior",
+    "n_answers",
+    "why",
+]
 Z = 1.959964
 
 
@@ -163,6 +173,23 @@ def detection_rate(
     return pd.DataFrame(rows, columns=DETECT_COLUMNS)
 
 
+def hard_cases(consensus, firsts, threshold: float = 0.9) -> pd.DataFrame:
+    """Records a model should learn from: a settled consensus that overturns the first own ID
+    (``why`` = overturned, labelled with the consensus) or no consensus at ``threshold`` after at
+    least one answer (``why`` = unsettled, ``consensus`` empty). Planted records are left out."""
+    cons = consensus[
+        ~consensus.get("planted", pd.Series(False, index=consensus.index)).astype(bool)
+    ]
+    j = cons.merge(firsts, on="record_id", suffixes=("", "_first"))
+    settled = (j["posterior"] >= threshold) & j["taxon_id"].notna()
+    keep = j[(settled & (j["taxon_id"] != j["taxon_id_first"])) | (~settled & (j["n_answers"] > 0))]
+    out = keep.rename(columns={"taxon_id_first": "first", "taxon_id": "consensus"})
+    out["source"] = np.where(out["vision"].fillna(False).astype(bool), "cv", "typed")
+    out["why"] = np.where(settled[keep.index], "overturned", "unsettled")
+    out.loc[out["why"] == "unsettled", "consensus"] = pd.NA
+    return out[HARD_COLUMNS].sort_values(["why", "record_id"], ignore_index=True)
+
+
 def level_table(consensus, levels, threshold: float = 0.9) -> pd.DataFrame:
     """Per Identify level: records, share settled at ``threshold``, mean posterior, abstain share.
 
@@ -249,6 +276,7 @@ def main(argv=None) -> int:
     ap.add_argument("--threshold", type=float, default=0.9)
     ap.add_argument("--answers", help="answers.parquet from blind_answers, for consensus error")
     ap.add_argument("--planted", help="planted.parquet from blind_sample, for consensus error")
+    ap.add_argument("--hard-cases", help="write overturned and unsettled records to this parquet")
     a = ap.parse_args(argv)
     idents = pd.read_parquet(a.idents)
     firsts = first_own_ids(pd.read_parquet(a.obs), idents)
@@ -277,6 +305,11 @@ def main(argv=None) -> int:
         levels = pd.read_parquet(a.levels)
         print()
         print(level_table(consensus, levels, a.threshold).to_string(index=False))
+    if a.hard_cases:
+        hard = hard_cases(consensus, firsts, a.threshold)
+        hard.to_parquet(a.hard_cases, index=False)
+        over = (hard["why"] == "overturned").sum()
+        print(f"\n{len(hard)} hard cases ({over} overturned) -> {a.hard_cases}")
     if a.public and a.levels:
         print()
         tests = hypothesis_tests(
