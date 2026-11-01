@@ -190,14 +190,15 @@ A second study for a class or a group of new identifiers. Proposed for the Monda
 - What comes out: the error rate of CV-accepted names measured without the agreement bias, a test of the Identify levels against human consensus, and a labelled set of hard cases for training.
 
 ```bash
-python -m what_to_id.blind_sample --pool pool.parquet --planted planted.json --per-stratum 4 --out site/records.json  # writes planted.parquet beside it
+python -m what_to_id.blind_planted --obs obs.parquet --idents idents.parquet --pool pool.parquet --out planted.json  # candidates, an expert confirms the names
+python -m what_to_id.blind_sample --pool pool.parquet --levels identify.parquet --planted planted.json --per-stratum 4 --out site/records.json  # writes planted.parquet and levels.parquet beside it
 python -m what_to_id.page_blind --records site/records.json --out site/            # build blind.html
 python -m what_to_id.blind_answers --records site/records.json --names names.json --out answers.parquet blind-answers-*.jsonl
 python -c "import pandas as pd; from what_to_id.blind_skill import fit; s, c = fit(pd.read_parquet('answers.parquet'), pd.read_parquet('site/planted.parquet')); s.to_csv('skill.csv'); c.to_parquet('consensus.parquet')"
-python -m what_to_id.blind_report --consensus consensus.parquet --obs obs.parquet --idents idents.parquet  # CV-accepted vs typed error
+python -m what_to_id.blind_report --consensus consensus.parquet --obs obs.parquet --idents idents.parquet --public pool.parquet --levels site/levels.parquet
 ```
 
-`tests/test_blind_pipeline.py` runs these five steps on synthetic data.
+The report prints three tables: the error of CV-accepted versus typed first IDs against the consensus, the community's detection rate (public overturn over that error, the part of the agreement bias the public record hides), and settled and abstain shares per Identify level. `tests/test_blind_pipeline.py` runs the whole chain on synthetic data.
 
 ## Tests
 

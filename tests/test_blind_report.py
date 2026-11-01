@@ -3,10 +3,12 @@ import pytest
 
 from what_to_id.blind_report import (
     DETECT_COLUMNS,
+    LEVEL_COLUMNS,
     REPORT_COLUMNS,
     cv_error,
     detection_rate,
     first_own_ids,
+    level_table,
     main,
 )
 
@@ -126,3 +128,21 @@ def test_detection_rate_handles_no_error_and_no_overlap():
     out = detection_rate(cons, firsts, public, boot=50)
     assert out["detection"].isna().all()  # 0/0: no errors to detect
     assert detection_rate(cons, firsts, public.iloc[:0]).empty
+
+
+def test_level_table_settled_and_abstain_per_level():
+    cons = pd.DataFrame(
+        {
+            "record_id": [1, 2, 3, 4],
+            "taxon_id": pd.array([1, 1, None, 1], dtype="Int64"),
+            "posterior": [0.99, 0.95, 0.0, 0.6],
+            "n_answers": [4, 4, 0, 3],
+            "n_abstain": [0, 0, 4, 1],
+        }
+    )
+    levels = pd.DataFrame({"record_id": [1, 2, 3, 4, 5], "level": [1, 1, 4, 4, 2]})
+    out = level_table(cons, levels).set_index("level")
+    assert list(out.columns) == LEVEL_COLUMNS[1:] and list(out.index) == [1, 4]  # 5: no answers
+    assert out.loc[1, ["n", "settled", "abstain"]].tolist() == [2, 1.0, 0.0]
+    assert out.loc[4, ["n", "settled", "abstain"]].tolist() == [2, 0.0, 0.625]
+    assert level_table(cons, levels.iloc[:0]).empty
