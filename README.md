@@ -195,10 +195,10 @@ python -m what_to_id.blind_sample --pool pool.parquet --levels identify.parquet 
 python -m what_to_id.page_blind --records site/records.json --out site/            # build blind.html
 python -m what_to_id.blind_answers --records site/records.json --names names.json --out answers.parquet blind-answers-*.jsonl
 python -c "import pandas as pd; from what_to_id.blind_skill import fit; s, c = fit(pd.read_parquet('answers.parquet'), pd.read_parquet('site/planted.parquet')); s.to_csv('skill.csv'); c.to_parquet('consensus.parquet')"
-python -m what_to_id.blind_report --consensus consensus.parquet --obs obs.parquet --idents idents.parquet --public pool.parquet --levels site/levels.parquet
+python -m what_to_id.blind_report --consensus consensus.parquet --obs obs.parquet --idents idents.parquet --public pool.parquet --levels site/levels.parquet --answers answers.parquet --planted site/planted.parquet
 ```
 
-The report prints three tables: the error of CV-accepted versus typed first IDs against the consensus, the community's detection rate (public overturn over that error, the part of the agreement bias the public record hides), and settled and abstain shares per Identify level. `tests/test_blind_pipeline.py` runs the whole chain on synthetic data. `python -m what_to_id.blind_power` prints the sample-size table behind the protocol: error-rate interval widths and power per source, and the simulated interval and power of the detection rate.
+The report prints three tables: the error of CV-accepted versus typed first IDs against the consensus, the community's detection rate (public overturn over that error, the part of the agreement bias the public record hides), and settled and abstain shares per Identify level. With `--answers` and `--planted` it first measures the consensus error c on held-out planted records and removes it from e and d, since a settled consensus that is itself wrong inflates e and deflates d; `tests/test_blind_recovery.py` simulates the whole model and checks that e and d come back inside their intervals. `tests/test_blind_pipeline.py` runs the whole chain on synthetic data. `python -m what_to_id.blind_power` prints the sample-size table behind the protocol: error-rate interval widths and power per source, and the simulated interval and power of the detection rate.
 
 ## Tests
 

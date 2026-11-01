@@ -1,12 +1,16 @@
 """Usage: python -m what_to_id.blind_report --consensus consensus.parquet --obs obs.parquet
 --idents idents.parquet [--public pool.parquet] [--levels levels.parquet] [--threshold 0.9]
+[--answers answers.parquet --planted planted.parquet]
 
 The first table is the error of CV-accepted versus typed first identifications, measured against
 a blind consensus, which a public record cannot give because later identifiers see the suggestion.
 With ``--public`` a second table divides the public overturn rate by that error: the community's
 detection rate per source, the size of the agreement bias. With ``--levels`` a third table checks
 the Identify levels: settled share and abstain share per level. With both, the three
-pre-registered tests (H1 error, H2 detection, H3 levels) follow.
+pre-registered tests (H1 error, H2 detection, H3 levels) follow. With ``--answers`` and
+``--planted`` the consensus error c is measured on held-out planted records and removed from
+e and d: a settled consensus that is itself wrong counts a correct first ID as wrong, which
+inflates e and deflates d = overturn / e.
 """
 
 from __future__ import annotations
@@ -15,6 +19,8 @@ import argparse
 
 import numpy as np
 import pandas as pd
+
+from .blind_skill import fit
 
 REPORT_COLUMNS = ["group", "source", "n", "wrong", "error", "lo", "hi"]
 DETECT_COLUMNS = ["group", "source", "n", "error", "overturn", "detection", "lo", "hi"]
@@ -43,15 +49,50 @@ def _wilson(wrong, n):
     return np.clip(c - h, 0, 1), np.clip(c + h, 0, 1)
 
 
-def cv_error(consensus: pd.DataFrame, firsts: pd.DataFrame, threshold: float = 0.9):
-    """Error of first own IDs against the blind consensus, by group and CV/typed source."""
+def _correct(wrong_share, c):
+    """First-ID error from the disagreement share, with consensus error c removed.
+
+    Disagreement happens when exactly one of the two is wrong, so w = e + c - 2ec when the two
+    errors are independent; this inverts that and floors at zero.
+    """
+    with np.errstate(invalid="ignore", divide="ignore"):
+        return np.clip((wrong_share - c) / (1 - 2 * c), 0, 1)
+
+
+def consensus_error(answers, planted, threshold: float = 0.9, folds: int = 2, seed: int = 0):
+    """Share of settled consensus taxa that are wrong, measured on held-out planted records.
+
+    Each fold of planted records is fitted as if unknown, and its settled consensus is checked
+    against the expert truth. Returns ``(c, n_settled)``; c is NaN when nothing settles.
+    """
+    ids = planted["record_id"].drop_duplicates().to_numpy().copy()
+    rng = np.random.default_rng(seed)
+    rng.shuffle(ids)
+    truth = planted.drop_duplicates("record_id").set_index("record_id")["taxon_id"]
+    wrong = n = 0
+    for held in np.array_split(ids, folds):
+        _, cons = fit(answers, planted[~planted["record_id"].isin(held)])
+        got = cons[cons["record_id"].isin(held) & (cons["posterior"] >= threshold)]
+        got = got[got["taxon_id"].notna()]
+        wrong += int((got["taxon_id"] != got["record_id"].map(truth)).sum())
+        n += len(got)
+    return (wrong / n if n else np.nan), n
+
+
+def cv_error(consensus, firsts, threshold: float = 0.9, consensus_error: float = 0.0):
+    """Error of first own IDs against the blind consensus, by group and CV/typed source.
+
+    ``consensus_error`` is c from :func:`consensus_error`; the interval is shifted with the point
+    estimate and does not carry c's own uncertainty.
+    """
     j = _scored(consensus, firsts, threshold)
     if j.empty:
         return pd.DataFrame(columns=REPORT_COLUMNS)
     out = j.groupby(["group", "source"]).agg(n=("wrong", "size"), wrong=("wrong", "sum"))
     out = out.reset_index()
-    out["error"] = out["wrong"] / out["n"]
-    out["lo"], out["hi"] = _wilson(out["wrong"].to_numpy(float), out["n"].to_numpy(float))
+    lo, hi = _wilson(out["wrong"].to_numpy(float), out["n"].to_numpy(float))
+    out["error"] = _correct(out["wrong"] / out["n"], consensus_error)
+    out["lo"], out["hi"] = _correct(lo, consensus_error), _correct(hi, consensus_error)
     return out.sort_values(["group", "source"], ignore_index=True)[REPORT_COLUMNS]
 
 
@@ -64,14 +105,15 @@ def _scored(consensus, firsts, threshold):
 
 
 def detection_rate(
-    consensus, firsts, public, threshold: float = 0.9, boot: int = 1000, seed: int = 0
+    consensus, firsts, public, threshold=0.9, boot=1000, seed=0, consensus_error=0.0
 ) -> pd.DataFrame:
     """Public overturn rate over blind error rate, by group and source, with a bootstrap 95% CI.
 
     ``public`` has ``record_id`` and the current public ``taxon_id``; give it only records that
     carry at least one identification besides the observer's, or detection is biased down.
     The ratio is d in overturn = e x d. Above 1 means the public caught errors the consensus
-    missed, which is a check on the consensus, not a detection rate.
+    missed, which is a check on the consensus, not a detection rate. ``consensus_error`` is c
+    from :func:`consensus_error`, removed from e before the division.
     """
     j = _scored(consensus, firsts, threshold)
     j = j.merge(public[["record_id", "taxon_id"]].rename(columns={"taxon_id": "taxon_id_p"}))
@@ -85,10 +127,11 @@ def detection_rate(
         w, o = g["wrong"].to_numpy(), g["over"].to_numpy()
         idx = rng.integers(0, len(g), (boot, len(g)))
         with np.errstate(divide="ignore", invalid="ignore"):
-            d = o.mean() / w.mean()
-            ds = o[idx].mean(1) / w[idx].mean(1)
+            e = _correct(w.mean(), consensus_error)
+            d = o.mean() / e
+            ds = o[idx].mean(1) / _correct(w[idx].mean(1), consensus_error)
         lo, hi = np.nanpercentile(ds, [2.5, 97.5]) if np.isfinite(ds).any() else (np.nan, np.nan)
-        rows.append((group, source, len(g), w.mean(), o.mean(), d, lo, hi))
+        rows.append((group, source, len(g), e, o.mean(), d, lo, hi))
     return pd.DataFrame(rows, columns=DETECT_COLUMNS)
 
 
@@ -112,14 +155,17 @@ def level_table(consensus, levels, threshold: float = 0.9) -> pd.DataFrame:
     return out.reset_index()[LEVEL_COLUMNS]
 
 
-def hypothesis_tests(consensus, firsts, public, levels, threshold=0.9, boot=4000, seed=0):
+def hypothesis_tests(
+    consensus, firsts, public, levels, threshold=0.9, boot=4000, seed=0, consensus_error=0.0
+):
     """The three pre-registered tests of the blind student track, one row each.
 
     H1 error: two-sided z test of e_cv against e_typed on settled records (statistic: difference).
     H2 detection: one-sided bootstrap over records of d_cv - d_typed, H1 is d_cv < d_typed
     (statistic: difference, p: share of resamples at or above zero).
     H3 levels: Spearman correlation between level order and the settled indicator, one-sided,
-    H1 is negative (settled share falls from easy to weird).
+    H1 is negative (settled share falls from easy to weird). ``consensus_error`` enters H2 only;
+    H1 compares disagreement shares, which c shifts equally in both arms.
     """
     from scipy import stats
 
@@ -140,7 +186,7 @@ def hypothesis_tests(consensus, firsts, public, levels, threshold=0.9, boot=4000
         def d(g, idx):
             w, o = g["wrong"].to_numpy()[idx], g["over"].to_numpy()[idx]
             with np.errstate(divide="ignore", invalid="ignore"):
-                return o.sum(-1) / w.sum(-1)
+                return o.mean(-1) / _correct(w.mean(-1), consensus_error)
 
         diff = d(cvj, slice(None)) - d(tyj, slice(None))
         bs = d(cvj, rng.integers(0, len(cvj), (boot, len(cvj)))) - d(
@@ -163,24 +209,32 @@ def main(argv=None) -> int:
     ap.add_argument("--public", help="pool parquet with id and the current public taxon_id")
     ap.add_argument("--levels", help="levels.parquet from blind_sample")
     ap.add_argument("--threshold", type=float, default=0.9)
+    ap.add_argument("--answers", help="answers.parquet from blind_answers, for consensus error")
+    ap.add_argument("--planted", help="planted.parquet from blind_sample, for consensus error")
     a = ap.parse_args(argv)
     idents = pd.read_parquet(a.idents)
     firsts = first_own_ids(pd.read_parquet(a.obs), idents)
     consensus = pd.read_parquet(a.consensus)
-    print(cv_error(consensus, firsts, a.threshold).to_string(index=False))
+    c = 0.0
+    if a.answers and a.planted:
+        c, n = consensus_error(pd.read_parquet(a.answers), pd.read_parquet(a.planted), a.threshold)
+        print(f"consensus error c = {c:.4f} on {n} held-out settled planted records\n")
+        c = 0.0 if np.isnan(c) else c
+    print(cv_error(consensus, firsts, a.threshold, c).to_string(index=False))
     if a.public:
         others = idents.loc[idents["user_id"] != idents["observer_id"], "id"].unique()
         public = pd.read_parquet(a.public, columns=["id", "taxon_id"])
         public = public[public["id"].isin(others)].rename(columns={"id": "record_id"})
         print()
-        print(detection_rate(consensus, firsts, public, a.threshold).to_string(index=False))
+        det = detection_rate(consensus, firsts, public, a.threshold, consensus_error=c)
+        print(det.to_string(index=False))
     if a.levels:
         levels = pd.read_parquet(a.levels)
         print()
         print(level_table(consensus, levels, a.threshold).to_string(index=False))
     if a.public and a.levels:
         print()
-        tests = hypothesis_tests(consensus, firsts, public, levels, a.threshold)
+        tests = hypothesis_tests(consensus, firsts, public, levels, a.threshold, consensus_error=c)
         print(tests.to_string(index=False))
     return 0
 
