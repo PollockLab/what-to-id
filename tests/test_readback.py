@@ -20,7 +20,7 @@ OBS = {
     "community_taxon": {"id": 1, "rank": "species"},
     "taxon": {"id": 1, "rank": "species"},
     "identifications_count": 3,
-    "user": {"id": 1},
+    "user": {"id": 1, "identifications_count": 120},
     "reviewed_by": [3, 1, 2],
     "identifications": [
         _ident(1, "2026-09-12T00:00:00Z", 1, vision=True),
@@ -75,6 +75,7 @@ def test_readback_missing_ids_get_none_row():
     assert list(obs_df.columns) == list(readback.OBS_COLUMNS)
     assert obs_df["id"].tolist() == [11, 99]
     assert obs_df.loc[0, "user_id"] == 1 and pd.isna(obs_df.loc[1, "user_id"])
+    assert obs_df.loc[0, "observer_idents"] == 120 and pd.isna(obs_df.loc[1, "observer_idents"])
     assert pd.isna(obs_df.loc[1, "quality_grade"])
     assert pd.isna(obs_df.loc[1, "ident_count"])
     assert obs_df.loc[0, "n_identifiers"] == 2
