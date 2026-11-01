@@ -1,8 +1,10 @@
 """Usage: python -m what_to_id.blind_report --consensus consensus.parquet --obs obs.parquet
---idents idents.parquet [--threshold 0.9]
+--idents idents.parquet [--public pool.parquet] [--threshold 0.9]
 
-The table is the error of CV-accepted versus typed first identifications, measured against a
-blind consensus, which a public record cannot give because later identifiers see the suggestion.
+The first table is the error of CV-accepted versus typed first identifications, measured against
+a blind consensus, which a public record cannot give because later identifiers see the suggestion.
+With ``--public`` a second table divides the public overturn rate by that error: the community's
+detection rate per source, the size of the agreement bias.
 """
 
 from __future__ import annotations
@@ -13,6 +15,7 @@ import numpy as np
 import pandas as pd
 
 REPORT_COLUMNS = ["group", "source", "n", "wrong", "error", "lo", "hi"]
+DETECT_COLUMNS = ["group", "source", "n", "error", "overturn", "detection", "lo", "hi"]
 FIRST_COLUMNS = ["record_id", "group", "taxon_id", "vision"]
 Z = 1.959964
 
@@ -38,13 +41,9 @@ def _wilson(wrong, n):
 
 def cv_error(consensus: pd.DataFrame, firsts: pd.DataFrame, threshold: float = 0.9):
     """Error of first own IDs against the blind consensus, by group and CV/typed source."""
-    keep = consensus[(consensus["posterior"] >= threshold) & consensus["taxon_id"].notna()]
-    j = keep[["record_id", "taxon_id"]].merge(firsts, on="record_id", suffixes=("_c", ""))
+    j = _scored(consensus, firsts, threshold)
     if j.empty:
         return pd.DataFrame(columns=REPORT_COLUMNS)
-    j["source"] = np.where(j["vision"].fillna(False).astype(bool), "cv", "typed")
-    j["wrong"] = (j["taxon_id"] != j["taxon_id_c"]).astype(int)
-    j = pd.concat([j, j.assign(group="all")])
     out = j.groupby(["group", "source"]).agg(n=("wrong", "size"), wrong=("wrong", "sum"))
     out = out.reset_index()
     out["error"] = out["wrong"] / out["n"]
@@ -52,16 +51,61 @@ def cv_error(consensus: pd.DataFrame, firsts: pd.DataFrame, threshold: float = 0
     return out.sort_values(["group", "source"], ignore_index=True)[REPORT_COLUMNS]
 
 
+def _scored(consensus, firsts, threshold):
+    keep = consensus[(consensus["posterior"] >= threshold) & consensus["taxon_id"].notna()]
+    j = keep[["record_id", "taxon_id"]].merge(firsts, on="record_id", suffixes=("_c", ""))
+    j["source"] = np.where(j["vision"].fillna(False).astype(bool), "cv", "typed")
+    j["wrong"] = (j["taxon_id"] != j["taxon_id_c"]).astype(int)
+    return pd.concat([j, j.assign(group="all")])
+
+
+def detection_rate(
+    consensus, firsts, public, threshold: float = 0.9, boot: int = 1000, seed: int = 0
+) -> pd.DataFrame:
+    """Public overturn rate over blind error rate, by group and source, with a bootstrap 95% CI.
+
+    ``public`` has ``record_id`` and the current public ``taxon_id``; give it only records that
+    carry at least one identification besides the observer's, or detection is biased down.
+    The ratio is d in overturn = e x d. Above 1 means the public caught errors the consensus
+    missed, which is a check on the consensus, not a detection rate.
+    """
+    j = _scored(consensus, firsts, threshold)
+    j = j.merge(public[["record_id", "taxon_id"]].rename(columns={"taxon_id": "taxon_id_p"}))
+    if j.empty:
+        return pd.DataFrame(columns=DETECT_COLUMNS)
+    # shortcut: taxon_id equality, so a public refinement to a descendant counts as overturned
+    j["over"] = (j["taxon_id"] != j["taxon_id_p"]).astype(int)
+    rng = np.random.default_rng(seed)
+    rows = []
+    for (group, source), g in j.groupby(["group", "source"]):
+        w, o = g["wrong"].to_numpy(), g["over"].to_numpy()
+        idx = rng.integers(0, len(g), (boot, len(g)))
+        with np.errstate(divide="ignore", invalid="ignore"):
+            d = o.mean() / w.mean()
+            ds = o[idx].mean(1) / w[idx].mean(1)
+        lo, hi = np.nanpercentile(ds, [2.5, 97.5]) if np.isfinite(ds).any() else (np.nan, np.nan)
+        rows.append((group, source, len(g), w.mean(), o.mean(), d, lo, hi))
+    return pd.DataFrame(rows, columns=DETECT_COLUMNS)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="CV versus typed first-ID error vs blind consensus")
     ap.add_argument("--consensus", required=True)
     ap.add_argument("--obs", required=True)
     ap.add_argument("--idents", required=True)
+    ap.add_argument("--public", help="pool parquet with id and the current public taxon_id")
     ap.add_argument("--threshold", type=float, default=0.9)
     a = ap.parse_args(argv)
-    firsts = first_own_ids(pd.read_parquet(a.obs), pd.read_parquet(a.idents))
-    table = cv_error(pd.read_parquet(a.consensus), firsts, a.threshold)
-    print(table.to_string(index=False))
+    idents = pd.read_parquet(a.idents)
+    firsts = first_own_ids(pd.read_parquet(a.obs), idents)
+    consensus = pd.read_parquet(a.consensus)
+    print(cv_error(consensus, firsts, a.threshold).to_string(index=False))
+    if a.public:
+        others = idents.loc[idents["user_id"] != idents["observer_id"], "id"].unique()
+        public = pd.read_parquet(a.public, columns=["id", "taxon_id"])
+        public = public[public["id"].isin(others)].rename(columns={"id": "record_id"})
+        print()
+        print(detection_rate(consensus, firsts, public, a.threshold).to_string(index=False))
     return 0
 
 
