@@ -190,10 +190,14 @@ A second study for a class or a group of new identifiers. Proposed for the Monda
 - What comes out: the error rate of CV-accepted names measured without the agreement bias, a test of the Identify levels against human consensus, and a labelled set of hard cases for training.
 
 ```bash
-python -m what_to_id.page_blind --records records.json --out site/            # build blind.html
-python -m what_to_id.blind_answers --records records.json --names names.json --out answers.parquet blind-answers-*.jsonl
-python -c "import pandas as pd; from what_to_id.blind_skill import fit; s, c = fit(pd.read_parquet('answers.parquet')); print(s); print(c)"
+python -m what_to_id.blind_sample --pool pool.parquet --planted planted.json --per-stratum 4 --out site/records.json  # writes planted.parquet beside it
+python -m what_to_id.page_blind --records site/records.json --out site/            # build blind.html
+python -m what_to_id.blind_answers --records site/records.json --names names.json --out answers.parquet blind-answers-*.jsonl
+python -c "import pandas as pd; from what_to_id.blind_skill import fit; s, c = fit(pd.read_parquet('answers.parquet'), pd.read_parquet('site/planted.parquet')); s.to_csv('skill.csv'); c.to_parquet('consensus.parquet')"
+python -m what_to_id.blind_report --consensus consensus.parquet --obs obs.parquet --idents idents.parquet  # CV-accepted vs typed error
 ```
+
+`tests/test_blind_pipeline.py` runs these five steps on synthetic data.
 
 ## Tests
 
