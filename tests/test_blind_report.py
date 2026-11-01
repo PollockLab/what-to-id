@@ -51,6 +51,25 @@ def test_first_own_id_picks_earliest_own():
     ]
 
 
+def test_first_own_ids_bins_observer_experience():
+    obs = pd.DataFrame(
+        [(1, 7, "Aves", 0), (2, 8, "Aves", 50), (3, 9, "Aves", 100)],
+        columns=["id", "user_id", "iconic_taxon", "observer_idents"],
+    )
+    idents = _idents(
+        [(1, 7, "2024-01-01", 20, True, 7), (2, 8, "2024-01-01", 20, False, 8)]
+        + [(3, 9, "2024-01-01", 20, False, 9)]
+    )
+    firsts = first_own_ids(obs, idents)
+    assert firsts["experience"].tolist() == ["<10 ids", "10-99 ids", "100+ ids"]
+    cons = _cons([(1, 20, 0.99), (2, 21, 0.99), (3, 20, 0.99)])
+    out = cv_error(cons, firsts, by="experience").set_index(["experience", "source"])
+    assert out.loc[("<10 ids", "cv"), ["n", "wrong"]].tolist() == [1, 0]
+    assert out.loc[("10-99 ids", "typed"), ["n", "wrong"]].tolist() == [1, 1]
+    assert out.loc[("all", "typed"), ["n", "wrong"]].tolist() == [2, 1]
+    assert "group" not in out.columns
+
+
 def test_first_own_ids_needs_group_column():
     with pytest.raises(ValueError, match="iconic_taxon"):
         first_own_ids(pd.DataFrame({"id": [1]}), _idents([]))

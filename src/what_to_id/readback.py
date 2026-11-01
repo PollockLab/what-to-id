@@ -39,6 +39,7 @@ from what_to_id.analysis import _users, _utc, served_arms
 OBS_COLUMNS = (
     "id",
     "user_id",
+    "observer_idents",
     "quality_grade",
     "community_rank",
     "taxon_rank",
@@ -89,6 +90,7 @@ def summarise(obs: dict) -> dict:
     return {
         "id": int(obs["id"]),
         "user_id": (obs.get("user") or {}).get("id"),
+        "observer_idents": (obs.get("user") or {}).get("identifications_count"),
         "quality_grade": obs.get("quality_grade"),
         "community_rank": community.get("rank") or None,
         "taxon_rank": taxon.get("rank") if taxon else None,
@@ -119,7 +121,7 @@ def readback(
         obs_rows.append({c: s[c] for c in OBS_COLUMNS})
         ident_rows.extend({"id": i, **f, "observer_id": s["user_id"]} for f in s["identifications"])
     obs_df = pd.DataFrame(obs_rows, columns=list(OBS_COLUMNS))
-    for c in ("user_id", "ident_count", "n_identifiers"):
+    for c in ("user_id", "observer_idents", "ident_count", "n_identifiers"):
         obs_df[c] = obs_df[c].astype("Int64")
     idents_df = pd.DataFrame(ident_rows, columns=list(IDENT_COLUMNS))
     idents_df["observer_id"] = idents_df["observer_id"].astype("Int64")

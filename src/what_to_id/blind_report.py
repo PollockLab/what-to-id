@@ -27,6 +27,7 @@ DETECT_COLUMNS = ["group", "source", "n", "error", "overturn", "detection", "lo"
 LEVEL_COLUMNS = ["level", "n", "settled", "posterior", "abstain"]
 TEST_COLUMNS = ["hypothesis", "statistic", "p", "n"]
 FIRST_COLUMNS = ["record_id", "group", "taxon_id", "vision"]
+EXPERIENCE = ["<10 ids", "10-99 ids", "100+ ids"]
 HARD_COLUMNS = [
     "record_id",
     "group",
@@ -41,14 +42,23 @@ Z = 1.959964
 
 
 def first_own_ids(obs: pd.DataFrame, idents: pd.DataFrame) -> pd.DataFrame:
-    """Earliest identification by each observation's own observer. Needs ``iconic_taxon`` in obs."""
+    """Earliest identification by each observation's own observer. Needs ``iconic_taxon`` in obs.
+
+    When obs carries ``observer_idents`` (the observer's lifetime identification count at
+    read-back, as :mod:`readback` writes it) an ``experience`` column bins it by ``EXPERIENCE``.
+    """
     if "iconic_taxon" not in obs.columns:
         raise ValueError("obs needs an iconic_taxon column (readback obs frames do not carry it)")
+    extra = ["observer_idents"] if "observer_idents" in obs.columns else []
     own = idents[idents["user_id"] == idents["observer_id"]]
     first = own.sort_values("created_at", kind="stable").drop_duplicates("id")
-    out = first.merge(obs[["id", "iconic_taxon"]].drop_duplicates("id"), on="id")
+    out = first.merge(obs[["id", "iconic_taxon", *extra]].drop_duplicates("id"), on="id")
     out = out.rename(columns={"id": "record_id", "iconic_taxon": "group"})
-    return out[FIRST_COLUMNS].reset_index(drop=True)
+    out = out[FIRST_COLUMNS + extra].reset_index(drop=True)
+    if extra:
+        cuts = [-np.inf, 9, 99, np.inf]
+        out["experience"] = pd.cut(out.pop("observer_idents"), cuts, labels=EXPERIENCE).astype(str)
+    return out
 
 
 def _wilson(wrong, n):
@@ -115,29 +125,32 @@ def kind_table(held: pd.DataFrame, firsts: pd.DataFrame) -> pd.DataFrame:
     return out.reset_index()
 
 
-def cv_error(consensus, firsts, threshold: float = 0.9, consensus_error: float = 0.0):
+def cv_error(consensus, firsts, threshold=0.9, consensus_error=0.0, by="group"):
     """Error of first own IDs against the blind consensus, by group and CV/typed source.
 
     ``consensus_error`` is c from :func:`consensus_error`; the interval is shifted with the point
-    estimate and does not carry c's own uncertainty.
+    estimate and does not carry c's own uncertainty. ``by`` names another firsts column to split
+    on instead of group, such as ``experience`` from :func:`first_own_ids`; the public record
+    shows the CV-typed gap closing with observer experience, so the split is reported as a
+    descriptive check, not a test.
     """
-    j = _scored(consensus, firsts, threshold)
+    j = _scored(consensus, firsts, threshold, by)
     if j.empty:
-        return pd.DataFrame(columns=REPORT_COLUMNS)
-    out = j.groupby(["group", "source"]).agg(n=("wrong", "size"), wrong=("wrong", "sum"))
+        return pd.DataFrame(columns=[by, *REPORT_COLUMNS[1:]])
+    out = j.groupby([by, "source"]).agg(n=("wrong", "size"), wrong=("wrong", "sum"))
     out = out.reset_index()
     lo, hi = _wilson(out["wrong"].to_numpy(float), out["n"].to_numpy(float))
     out["error"] = _correct(out["wrong"] / out["n"], consensus_error)
     out["lo"], out["hi"] = _correct(lo, consensus_error), _correct(hi, consensus_error)
-    return out.sort_values(["group", "source"], ignore_index=True)[REPORT_COLUMNS]
+    return out.sort_values([by, "source"], ignore_index=True)[[by, *REPORT_COLUMNS[1:]]]
 
 
-def _scored(consensus, firsts, threshold):
+def _scored(consensus, firsts, threshold, by="group"):
     keep = consensus[(consensus["posterior"] >= threshold) & consensus["taxon_id"].notna()]
     j = keep[["record_id", "taxon_id"]].merge(firsts, on="record_id", suffixes=("_c", ""))
     j["source"] = np.where(j["vision"].fillna(False).astype(bool), "cv", "typed")
     j["wrong"] = (j["taxon_id"] != j["taxon_id_c"]).astype(int)
-    return pd.concat([j, j.assign(group="all")])
+    return pd.concat([j, j.assign(**{by: "all"})])
 
 
 def detection_rate(
@@ -292,6 +305,9 @@ def main(argv=None) -> int:
             print(kind_table(held, firsts).to_string(index=False))
         print()
     print(cv_error(consensus, firsts, a.threshold, c).to_string(index=False))
+    if "experience" in firsts.columns:
+        print()
+        print(cv_error(consensus, firsts, a.threshold, c, by="experience").to_string(index=False))
     if a.public:
         others = idents.loc[idents["user_id"] != idents["observer_id"], "id"].unique()
         public = pd.read_parquet(a.public, columns=["id", "taxon_id"])
