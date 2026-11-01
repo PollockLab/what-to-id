@@ -4,6 +4,14 @@ Does the order of the iNaturalist identification queue change how much gets iden
 
 It is a method, tested first in BC. A result from one blitz holds for that blitz's region and identifiers; other regions have to run it to know.
 
+## Why
+
+About 2.5 million BC records on iNaturalist wait for an identification. Identifier hours are the limit, not records. The queue order decides which records those hours reach. iNaturalist shows newest first. We found no test of whether another order gives more identifications, or more useful ones.
+
+what-to-id changes only the order. Each record goes to one of four lists at random. One page serves the lists in turn, so each identifier works each list. The identifier works in iNaturalist as usual. After the blitz, the tool reads back what each identifier did on each list and compares each identifier with themself. This is the within-person comparison of interleaved search evaluation ([Chapelle et al. 2012](https://doi.org/10.1145/2094072.2094078)), applied to a citizen-science queue.
+
+The design is pre-registered, the list assignment is keyed and replayable, and the page shows no list names. The same build runs for any region with a place id and a cell-score layer.
+
 Companion to [where-to-blitz](https://github.com/PollockLab/where-to-blitz), which answers where to go and record. Both serve Blitz the Gap.
 
 ## What the lists test
@@ -175,4 +183,5 @@ pytest -m network   # hits the live iNaturalist API
 
 ## References
 
+- Chapelle O, Joachims T, Radlinski F, Yue Y (2012). Large-scale validation and analysis of interleaved search evaluation. ACM Transactions on Information Systems 30(1):6. [doi:10.1145/2094072.2094078](https://doi.org/10.1145/2094072.2094078).
 - Hortal J, de Bello F, Diniz-Filho JAF, Lewinsohn TM, Lobo JM, Ladle RJ (2015). Seven shortfalls that beset large-scale knowledge of biodiversity. Annual Review of Ecology, Evolution, and Systematics 46:523-549. [doi:10.1146/annurev-ecolsys-112414-054400](https://doi.org/10.1146/annurev-ecolsys-112414-054400).
