@@ -10,6 +10,16 @@ def test_table_shape_and_monotone():
     assert ((t["d_hi_cv"] - t["d_lo_cv"]) < (t["d_hi_typed"] - t["d_lo_typed"])).all()
 
 
+def test_consensus_error_widens_d_and_keeps_it_centred():
+    exact = table([2000], c=0.0, draws=3000, seed=2)
+    noisy = table([2000], c=0.005, planted=600, draws=3000, seed=2)
+    few = table([2000], c=0.005, planted=150, draws=3000, seed=2)
+    width = lambda t: (t["d_hi_cv"] - t["d_lo_cv"]).item()  # noqa: E731
+    assert width(exact) < width(noisy) < width(few)
+    assert noisy["d_lo_cv"].item() < 0.75 < noisy["d_hi_cv"].item()
+    assert noisy["power_d"].item() < exact["power_d"].item()
+
+
 def test_power_two_prop_limits():
     assert abs(power_two_prop(0.06, 0.06, 1000, 1000) - 0.05) < 1e-6
     assert power_two_prop(0.06, 0.12, 1200, 400) > power_two_prop(0.06, 0.09, 1200, 400)
