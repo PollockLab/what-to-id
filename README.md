@@ -4,13 +4,19 @@ Does the order of the iNaturalist identification queue change how much gets iden
 
 It is a method, tested first in BC. A result from one blitz holds for that blitz's region and identifiers; other regions have to run it to know.
 
-## Why
+## Wait, what is this?
 
-About 2.5 million BC records on iNaturalist wait for an identification. Identifier hours are the limit, not records. The queue order decides which records those hours reach. iNaturalist shows newest first. We found no test of whether another order gives more identifications, or more useful ones.
+Short version, in plain terms.
 
-what-to-id changes only the order. Each record goes to one of four lists at random. One page serves the lists in turn, so each identifier works each list. The identifier works in iNaturalist as usual. After the blitz, the tool reads back what each identifier did on each list and compares each identifier with themself. This is the within-person comparison of interleaved search evaluation ([Chapelle et al. 2012](https://doi.org/10.1145/2094072.2094078)), applied to a citizen-science queue.
+- About 2.5 million BC records on iNaturalist wait for an identification. Identifier hours are the limit, not records.
+- The queue order decides which records those hours reach. iNaturalist shows newest first. We found no test of whether another order gives more identifications, or more useful ones.
+- what-to-id changes only the order. Each record goes to one of four lists by a keyed hash. The page does not name the lists.
+- One page serves the lists in turn. Each press of Next batch gives the next list. So each identifier works each list, in equal measure.
+- The identifier works in iNaturalist as usual. The page adds no step.
+- After the blitz, the tool reads each identifier's IDs back from iNaturalist and compares each identifier with themself, list against list. Skill cancels out. This is the within-person comparison of interleaved search evaluation ([Chapelle et al. 2012](https://doi.org/10.1145/2094072.2094078)), applied to a citizen-science queue.
+- The design is pre-registered. The list assignment is keyed and replayable. The same build runs for any region with a place id and a cell-score layer.
 
-The design is pre-registered, the list assignment is keyed and replayable, and the page shows no list names. The same build runs for any region with a place id and a cell-score layer.
+If one order gives more species-level IDs per identifier hour, or fills more data gaps, that order can become the default queue, for BC first and for any region after.
 
 Companion to [where-to-blitz](https://github.com/PollockLab/where-to-blitz), which answers where to go and record. Both serve Blitz the Gap.
 
