@@ -110,6 +110,43 @@ def test_main(tmp_path, capsys):
     assert "Aves" in out and "cv" in out and "all" in out
 
 
+def test_main_consensus_error_from_held_out_planted(tmp_path, capsys):
+    _cons([(1, 20, 0.99), (2, 30, 0.99)]).to_parquet(tmp_path / "c.parquet")
+    _obs([(1, 7, "Aves"), (2, 7, "Aves")]).to_parquet(tmp_path / "o.parquet")
+    _idents([(1, 7, "2024-01-01", 20, True, 7), (2, 7, "2024-01-01", 30, True, 7)]).to_parquet(
+        tmp_path / "i.parquet"
+    )
+    ans = [(f"s{k}", "Aves", r, t) for k in range(4) for r, t in [(1, 20), (2, 30)]]
+    pd.DataFrame(ans, columns=["login", "group", "record_id", "taxon_id"]).to_parquet(
+        tmp_path / "a.parquet"
+    )
+    pd.DataFrame({"record_id": [1, 2], "taxon_id": [20, 31]}).to_parquet(tmp_path / "p.parquet")
+    argv = []
+    for flag, name in [
+        ("consensus", "c"),
+        ("obs", "o"),
+        ("idents", "i"),
+        ("answers", "a"),
+        ("planted", "p"),
+    ]:
+        argv += [f"--{flag}", str(tmp_path / f"{name}.parquet")]
+    assert main(argv) == 0
+    out = capsys.readouterr().out
+    assert "consensus error c = 0.5000 on 2 held-out" in out
+
+
+def test_cv_error_removes_consensus_error():
+    cons = _cons([(i, 20 if i < 90 else 21, 0.99) for i in range(100)])
+    firsts = _firsts([(i, "Aves", 20, True) for i in range(100)])
+    raw, fixed = (
+        t[t["group"] == "all"].set_index("source").loc["cv"]
+        for t in (cv_error(cons, firsts), cv_error(cons, firsts, consensus_error=0.05))
+    )
+    assert raw["error"] == pytest.approx(0.10)
+    assert fixed["error"] == pytest.approx((0.10 - 0.05) / 0.9)
+    assert fixed["lo"] <= fixed["error"] <= fixed["hi"] and fixed["lo"] < raw["lo"]
+
+
 def test_detection_rate_is_overturn_over_error():
     # 10 cv records: 4 wrong by consensus, the public caught 2 of them -> d = 0.5
     cons = _cons([(i, 1, 0.99) for i in range(1, 11)])
