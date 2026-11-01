@@ -4,12 +4,13 @@ import pytest
 from what_to_id import analysis, readback
 
 
-def _ident(user, ts, taxon, rank="species", current=True):
+def _ident(user, ts, taxon, rank="species", current=True, vision=None):
     return {
         "user": {"id": user},
         "created_at": ts,
         "taxon": {"id": taxon, "rank": rank},
         "current": current,
+        **({"vision": vision} if vision is not None else {}),
     }
 
 
@@ -22,7 +23,7 @@ OBS = {
     "user": {"id": 1},
     "reviewed_by": [3, 1, 2],
     "identifications": [
-        _ident(1, "2026-09-12T00:00:00Z", 1),
+        _ident(1, "2026-09-12T00:00:00Z", 1, vision=True),
         _ident(2, "2026-09-20T00:00:00Z", 2, rank="genus", current=False),
         _ident(2, "2026-09-25T00:00:00Z", 1),
     ],
@@ -47,7 +48,9 @@ def test_summarise():
         "taxon_id": 1,
         "taxon_rank": "species",
         "current": True,
+        "vision": True,
     }
+    assert s["identifications"][1]["vision"] is None
     assert s["identifications"][1]["taxon_rank"] == "genus"
     assert s["identifications"][1]["current"] is False
 

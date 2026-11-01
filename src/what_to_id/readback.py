@@ -48,7 +48,16 @@ OBS_COLUMNS = (
     "reviewed_by",
     "license_code",
 )
-IDENT_COLUMNS = ("id", "user_id", "created_at", "taxon_id", "taxon_rank", "current", "observer_id")
+IDENT_COLUMNS = (
+    "id",
+    "user_id",
+    "created_at",
+    "taxon_id",
+    "taxon_rank",
+    "current",
+    "vision",
+    "observer_id",
+)
 OUTCOME_COLUMNS = (
     "arm",
     "n_served",
@@ -71,6 +80,7 @@ def summarise(obs: dict) -> dict:
             "taxon_id": (i.get("taxon") or {}).get("id"),
             "taxon_rank": (i.get("taxon") or {}).get("rank"),
             "current": i.get("current"),
+            "vision": i.get("vision"),
         }
         for i in idents
     ]
