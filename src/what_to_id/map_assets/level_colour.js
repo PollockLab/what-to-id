@@ -1,7 +1,8 @@
 // The dot colours: each record's group, or, while Explore shows Identify beside the map, its Identify
 // level. split.html says which ({type:'wtid-colour',by:'level'|'group',names:[[level,name],...]}); the
 // levels (pool-levels.bin, the low nibble per record, format in pool_levels.py) load on the first ask.
-// The legend toggles Levels or Groups (kept in localStorage) and each level row hides its dots.
+// The legend toggles Levels or Groups (kept in localStorage). Level rows pick as the filter chips do: none picked
+// shows every level, a click picks a level so only the picked ones show, a second click unpicks it.
 // Records without a level stay as faint grey dots. The level colours are Okabe and Ito's, told apart
 // with colour-blind sight too.
 // In group colours a selection of one group or one taxon breaks its dots down by its children (clade_colour.js,
@@ -19,7 +20,7 @@ var NONE=[150,150,150,60],C=[NONE,[0,158,115,170],[230,159,0,170],[0,114,178,170
   TOP=8,OUT=-1,OTHER=TOP;
 function LevelColour(o){
 var G=o.META.groups,gc=G.map(function(g,j){return MapFilter.color(g,j).concat(110);}),lv=null,ask=null,want=false,on=false,
-  mode='levels',names=[],off={},KEY='wtid-colour-by',HID=[0,0,0,0],  // off: the levels the viewer switched off
+  mode='levels',names=[],sel={},KEY='wtid-colour-by',HID=[0,0,0,0],  // sel: the levels the viewer picked
   leg=document.createElement('div'),seg=document.createElement('div'),rows=document.createElement('div'),bs,
   T=null,CC=null,row=null,cnt=null,cn=-1,inc=[],top=-1,show=[],sc=[],slot=null,key='';
 leg.className='lvleg';leg.hidden=true;leg.setAttribute('role','group');leg.setAttribute('aria-label','Dot colours');
@@ -64,6 +65,7 @@ function sync(){
     show=t<0?[]:held(t).slice(0,TOP);var F=CC.at(t);sc=show.map(function(c){return F[c].concat(110);});
     if(t>=0){var c=F[t];sc[OTHER]=c.map(function(v){return Math.round(v*0.4+150*0.6);}).concat(110);slot=slots();}}
   apply();}
+function picked(){for(var k in sel)return true;return false;}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 // A legend row: swatch and name, cut to one line with the full name in its title; go() makes it a button.
 function line(c,text,go){var s=el('span');s.title=text;s.append(dot(c),el('em',null,text));
@@ -77,14 +79,15 @@ function pick(r){var S=o.st(),g=r>=0?gof(r):null,id=r>=0&&!g?T[r][2]:null,k=S.pi
   o.picked();var f=rows.querySelector('[role=button],button');if(f)f.focus();}
 // The breakdown's row and those above it to its group's, top first.
 function path(){for(var p=[],r=top;r>=0;r=CC.par[r])p.unshift(r);return p;}
-// Levels mode: a button a level (click hides or shows its dots); Groups mode: the group swatches, as the rail has
+// Levels mode: a button a level (click picks or unpicks it); Groups mode: the group swatches, as the rail has
 // them, or the breakdown with its trail.
 function draw(){
   rows.textContent='';
+  rows.classList.toggle('pick',on&&picked());
   if(on)return names.concat([[0,'No level']]).forEach(function(r){var b=document.createElement('button');
-    b.type='button';b.className='lr';b.title='Show or hide: '+r[1];b.setAttribute('aria-pressed',String(!off[r[0]]));
-    b.append(dot(C[r[0]]||NONE,!r[0]),r[1]);
-    b.onclick=function(){off[r[0]]=!off[r[0]];b.setAttribute('aria-pressed',String(!off[r[0]]));o.changed();};
+    b.type='button';b.className='lr';b.title='Show only '+r[1]+'; click again to show all';
+    b.setAttribute('aria-pressed',String(!!sel[r[0]]));b.append(dot(C[r[0]]||NONE,!r[0]),r[1]);
+    b.onclick=function(){if(sel[r[0]])delete sel[r[0]];else sel[r[0]]=1;draw();o.changed();};
     rows.appendChild(b);});
   if(top<0)return (inc.length?inc:G).forEach(function(g){var j=G.indexOf(g),r=CC?CC.gr[g]:null;
     rows.appendChild(line(gc[j],gname(g),r!=null&&deep(r)?function(){pick(r);}:null));});
@@ -113,8 +116,8 @@ addEventListener('keydown',function(e){if(e.key!=='Escape'||on||top<0||leg.hidde
   var p=path();pick(p.length>1?p[p.length-2]:-1);});  // Esc in the legend steps the pick up a level
 // The colours of records 0..n-1, as deck.gl reads them: 4 bytes a record.
 function fill(grp,n){
-  var col=new Uint8Array(4*n),tax=o.P().tax,cut=top>=0&&!on,i,c,s;
-  for(i=0;i<n;i++){if(on)c=off[lv[i]&15]?HID:C[lv[i]&15]||NONE;
+  var col=new Uint8Array(4*n),tax=o.P().tax,cut=top>=0&&!on,any=picked(),i,c,s;
+  for(i=0;i<n;i++){if(on)c=any&&!sel[lv[i]&15]?HID:C[lv[i]&15]||NONE;
     else if(cut&&(s=tax[i]<slot.length?slot[tax[i]]:OUT)!==OUT)c=sc[s];
     else c=gc[grp[i]];
     col[4*i]=c[0];col[4*i+1]=c[1];col[4*i+2]=c[2];col[4*i+3]=c[3];}

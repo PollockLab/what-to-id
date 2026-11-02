@@ -120,7 +120,8 @@ button.padd{cursor:pointer;background:var(--chip)}
 .lvleg .seg button{min-height:22px;padding:1px 9px}
 .lvleg .lt{color:var(--muted)}
 .lvleg .lr{border:0;background:none;color:inherit;font:inherit;padding:0;cursor:pointer}
-.lvleg .lr[aria-pressed="false"]{opacity:.45;text-decoration:line-through}
+.lvleg .pick .lr[aria-pressed="false"]{opacity:.45;text-decoration:line-through}
+.lvleg .lr[aria-pressed="true"]{font-weight:600}
 .lvleg button:focus-visible{outline:2px solid var(--ink);outline-offset:-2px}
 .lvleg span,.lvleg .lr{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
 .lvleg i{width:9px;height:9px;border-radius:50%;flex:none}

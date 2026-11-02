@@ -104,7 +104,7 @@ def test_beside_identify_the_dots_take_the_level_colours_and_go_back_without_it(
     page.close()
 
 
-def test_the_legend_toggles_between_level_and_group_colours_and_hides_a_level(browser, site):
+def test_the_legend_toggles_between_level_and_group_colours_and_picks_levels(browser, site):
     page = open_page(browser, f"{site[0]}/explore.html")
     frame = map_frame(page)
     frame.wait_for_function(f"({COLOURS})().legend")
@@ -118,10 +118,20 @@ def test_the_legend_toggles_between_level_and_group_colours_and_hides_a_level(br
     frame.click(".lvleg .seg button:first-child")  # Levels
     frame.wait_for_function(f"({COLOURS})().c1[3] === 170")
     assert frame.evaluate(COLOURS)["c1"] == GREEN
-    frame.locator(".lvleg .lr").nth(0).click()  # hide level 1
-    frame.wait_for_function(f"({COLOURS})().c1[3] === 0")
-    frame.locator(".lvleg .lr").nth(0).click()
-    frame.wait_for_function(f"({COLOURS})().c1[3] === 170")
+    rows = frame.locator(".lvleg .lr")
+    rows.nth(0).click()  # pick level 1: only its dots stay, as a filter chip picks
+    frame.wait_for_function(f"({COLOURS})().c5[3] === 0")
+    got = frame.evaluate(COLOURS)
+    assert got["c1"] == GREEN and got["c0"][3] == 0
+    assert rows.nth(0).get_attribute("aria-pressed") == "true"
+    assert rows.nth(4).get_attribute("aria-pressed") == "false"
+    rows.last.click()  # and No level: two picks show both
+    frame.wait_for_function(f"({COLOURS})().c0[3] > 0")
+    assert frame.evaluate(COLOURS)["c5"][3] == 0
+    rows.nth(0).click()
+    rows.last.click()  # nothing picked: every level shows again
+    frame.wait_for_function(f"({COLOURS})().c5[3] > 0")
+    assert frame.evaluate(COLOURS)["c1"] == GREEN
     assert page.errors == []
     page.close()
 
