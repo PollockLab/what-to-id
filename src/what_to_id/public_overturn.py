@@ -97,7 +97,7 @@ def pull(blocks: int, seed: int, session=None, sleep: float = 1.0, place: int = 
 
 def _first_own(r: dict) -> dict | None:
     own = [i for i in r["idents"] if i["own"] and i["created"]]
-    return min(own, key=lambda i: i["created"]) if own else None
+    return min(own, key=lambda i: pd.Timestamp(i["created"])) if own else None
 
 
 def _on_lineage(i: dict, ref: dict) -> bool:
