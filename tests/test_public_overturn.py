@@ -113,15 +113,16 @@ def test_matched_table_per_stratum():
 
 def test_identifier_cv_table():
     out = po.identifier_cv_table(ROWS, po.scored(ROWS)).set_index("source")
-    assert out.loc["cv", ["same", "other"]].tolist() == [1, 3]  # record 1; records 3, 4, 6
-    assert out.loc["cv", "same_cv"] == 0 and out.loc["cv", "other_cv"] == pytest.approx(1 / 3)
+    # records 1 and 3 (a refinement is on the lineage); records 4 and 6
+    assert out.loc["cv", ["same", "other"]].tolist() == [2, 2]
+    assert out.loc["cv", "same_cv"] == 0.5 and out.loc["cv", "other_cv"] == 0
     assert out.loc["typed", ["same", "other"]].tolist() == [0, 1]  # record 2
     assert np.isnan(out.loc["typed", "same_cv"])
 
 
 def test_corrector_table_by_identifier_experience():
     out = po.corrector_table(ROWS, po.scored(ROWS)).set_index(["source", "experience"])
-    assert out.loc[("cv", "<10 ids"), ["ids", "other"]].tolist() == [3, 2]  # 1 same; 3 and 4
+    assert out.loc[("cv", "<10 ids"), ["ids", "other"]].tolist() == [3, 1]  # 1, 3 same; 4
     assert out.loc[("cv", "1000+ ids"), ["ids", "other"]].tolist() == [1, 1]  # record 6
     assert out.loc[("typed", "<10 ids"), "other_share"] == 1.0
 
@@ -131,15 +132,18 @@ def test_latency_table_hours_to_first_other_look():
         9,
         14,
         [
+            _ident(4, False, 10, created="2024-12-31T00:00:00Z"),  # before the first own ID
             _ident(1, True, 10, vision=True, created="2025-01-01T00:00:00Z"),
-            _ident(2, False, 14, created="2025-01-04T00:00:00Z"),
+            _ident(2, False, 10, current=False, created="2025-01-04T00:00:00Z"),  # withdrawn
+            _ident(2, False, 14, created="2025-01-06T00:00:00Z"),
             _ident(3, False, 14, created="2025-01-05T00:00:00Z"),
         ],
     )
     out = po.latency_table(ROWS + [po.summarise(late)], po.scored(ROWS + [po.summarise(late)]))
     out = out.set_index(["source", "overturned"])
     assert out.loc[("cv", False), ["n", "median_hours", "within_day"]].tolist() == [3, 0.0, 1.0]
-    # record 6 waits a day for its first other ID, record 9 three days: median 48, one within a day
+    # record 6 waits a day for its first other ID, record 9 three days (its withdrawn ID counts, the
+    # one before its first own ID does not): median 48, one within a day
     assert out.loc[("cv", True), ["n", "median_hours", "within_day"]].tolist() == [2, 48.0, 0.5]
     assert out.loc[("typed", True), "n"] == 1
 
@@ -150,6 +154,13 @@ def test_level_table():
     assert out.loc["easy", ["n", "has_other"]].tolist() == [2, 1.0]
     assert out.loc["easy", "contradicted"] == 0.5  # record 4's order-rank ID is not the label
     assert out.loc["mislabel", "contradicted"] == 0.0 and out.loc["taxonomist", "n"] == 1
+
+
+def test_level_table_reads_names_and_spares_ancestors():
+    raw = _obs(9, 10, [_ident(1, True, 10, anc=[3, 9]), _ident(2, False, 9, rank="genus", anc=[3])])
+    levels = pd.DataFrame({"id": [9, 9], "taxon_id": [10, 10], "level": ["weird", "weird"]})
+    out = po.level_table([po.summarise(raw)], levels).set_index("level")
+    assert out.loc["weird", ["n", "contradicted"]].tolist() == [1, 0.0]
 
 
 def test_main_tables(tmp_path, capsys):

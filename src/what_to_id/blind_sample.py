@@ -21,6 +21,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from .public_overturn import level_number
+
 POOL_COLUMNS = ["id", "iconic_taxon", "photo_url"]
 STRATA_COLUMNS = ["group", "level", "n"]
 
@@ -34,6 +36,7 @@ def sample(
     if levels is not None:
         keep = levels["level"].notna() & ~levels["level"].isin([0, "none"])
         lv = levels.loc[keep, ["id", "level"]].drop_duplicates("id")
+        lv = lv.assign(level=lv["level"].map(level_number))  # names would rank alphabetically
         df = df.merge(lv, on="id")
     else:
         df = df.assign(level=0)

@@ -323,7 +323,8 @@ def hypothesis_tests(
         bs = d(cvj, rng.integers(0, len(cvj), (boot, len(cvj))), cs) - d(
             tyj, rng.integers(0, len(tyj), (boot, len(tyj))), cs
         )
-        rows.append(("H2 detection cv < typed", diff, np.nanmean(bs >= 0), len(j)))
+        bs = bs[~np.isnan(bs)]  # an undefined resample is no evidence either way
+        rows.append(("H2 detection cv < typed", diff, (bs >= 0).mean(), len(j)))
     lv = consensus.merge(levels[["record_id", "level"]], on="record_id")
     if lv["level"].nunique() > 1:
         settled = ((lv["posterior"] >= threshold) & lv["taxon_id"].notna()).astype(int)
