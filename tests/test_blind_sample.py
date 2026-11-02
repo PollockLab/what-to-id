@@ -81,3 +81,11 @@ def test_main_writes_records_and_planted(tmp_path):
     assert list(lv.columns) == ["record_id", "level"] and len(lv) == 9 and "level" not in recs[0]
     page_blind.build(tmp_path / "site", recs)
     assert (tmp_path / "site" / "blind.html").exists()
+    # with --levels the planted truth carries the record's level, for c per level in the report
+    levels = pd.DataFrame({"id": [*range(1, 61), 999], "level": [1] * 60 + [5]})
+    levels.to_parquet(tmp_path / "levels.parquet", index=False)
+    args += ["--levels", str(tmp_path / "levels.parquet"), "--per-stratum", "3", "--seed", "1"]
+    args += ["--out", str(out)]
+    assert bs.main(args) == 0
+    truth = pd.read_parquet(tmp_path / "site" / "planted.parquet")
+    assert truth["level"].tolist() == [5]
