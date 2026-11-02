@@ -210,7 +210,7 @@ def detection_rate(
     j = j.merge(public[["record_id", "taxon_id"]].rename(columns={"taxon_id": "taxon_id_p"}))
     if j.empty:
         return pd.DataFrame(columns=[by, *DETECT_COLUMNS[1:]])
-    # shortcut: taxon_id equality, so a public refinement to a descendant counts as overturned
+    # exact taxon match; collapse_refinements first so a refinement counts as upheld
     j["over"] = (j["taxon_id"] != j["taxon_id_p"]).astype(int)
     rng = np.random.default_rng(seed)
     cs = _c_draws(rng, consensus_error, consensus_n, boot)
@@ -218,15 +218,35 @@ def detection_rate(
     for (group, source), g in j.groupby([by, "source"]):
         w, o = g["wrong"].to_numpy(), g["over"].to_numpy()
         f = g["complete"].to_numpy(float) if nowcast else np.ones(len(g))
-        idx = rng.integers(0, len(g), (boot, len(g)))
+        w, o, f = w[np.isfinite(f)], o[np.isfinite(f)], f[np.isfinite(f)]
+        idx = rng.integers(0, len(w), (boot, len(w)))
         with np.errstate(divide="ignore", invalid="ignore"):
             e = _correct(w.mean(), consensus_error)
             over = o.sum() / f.sum()
-            d = over / e
-            ds = o[idx].sum(1) / f[idx].sum(1) / _correct(w[idx].mean(1), cs)
+            # e weighted by F too, or d is biased wherever error rate changes with record age
+            d = over / _correct((f * w).sum() / f.sum(), consensus_error)
+            fi = f[idx]
+            ds = o[idx].sum(1) / fi.sum(1) / _correct((fi * w[idx]).sum(1) / fi.sum(1), cs)
         lo, hi = np.nanpercentile(ds, [2.5, 97.5]) if np.isfinite(ds).any() else (np.nan, np.nan)
         rows.append((group, source, len(g), e, over, d, lo, hi))
     return pd.DataFrame(rows, columns=[by, *DETECT_COLUMNS[1:]])
+
+
+def collapse_refinements(public, firsts, taxa) -> pd.DataFrame:
+    """``public`` with a current taxon that descends from the first own ID's taxon replaced by
+    that taxon, so a refinement counts as upheld, as :func:`public_overturn._upheld` counts it.
+    ``taxa`` has ``taxon_id`` and ``ancestry`` (slash-separated ids, the iNaturalist export form).
+    On the 40,000-record BC pull 190 of 1,337 exact mismatches are refinements."""
+    anc = dict(zip(taxa["taxon_id"], taxa["ancestry"].fillna(""), strict=True))
+    first = dict(zip(firsts["record_id"], firsts["taxon_id"], strict=True))
+    out = public.copy()
+
+    def keep(rid, t):
+        f = first.get(rid)
+        return f if f is not None and str(f) in str(anc.get(t, "")).split("/") else t
+
+    out["taxon_id"] = [keep(r, t) for r, t in zip(out["record_id"], out["taxon_id"], strict=True)]
+    return out
 
 
 def matched_error(consensus, firsts, threshold: float = 0.9) -> tuple[float, int]:
@@ -356,6 +376,7 @@ def main(argv=None) -> int:
     ap.add_argument("--answers", help="answers.parquet from blind_answers, for consensus error")
     ap.add_argument("--planted", help="planted.parquet from blind_sample, for consensus error")
     ap.add_argument("--delays", help="correction delays parquet (public_overturn), for nowcast d")
+    ap.add_argument("--taxa", help="taxa table with taxon_id and ancestry: refinements upheld")
     ap.add_argument("--hard-cases", help="write overturned and unsettled records to this parquet")
     a = ap.parse_args(argv)
     idents = pd.read_parquet(a.idents)
@@ -382,6 +403,11 @@ def main(argv=None) -> int:
         others = idents.loc[idents["user_id"] != idents["observer_id"], "id"].unique()
         public = pd.read_parquet(a.public, columns=["id", "taxon_id"])
         public = public[public["id"].isin(others)].rename(columns={"id": "record_id"})
+        if a.taxa:
+            taxa = pd.read_csv(a.taxa, sep=None, engine="python", usecols=["taxon_id", "ancestry"])
+            public = collapse_refinements(public, firsts, taxa)
+        else:
+            print("\nno --taxa: a public refinement of the first ID counts as an overturn")
         print()
         det = detection_rate(
             consensus, firsts, public, a.threshold, consensus_error=c, consensus_n=n_c
