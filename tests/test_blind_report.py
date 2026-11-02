@@ -14,6 +14,7 @@ from what_to_id.blind_report import (
     hypothesis_tests,
     level_table,
     main,
+    matched_error,
 )
 
 
@@ -184,6 +185,17 @@ def test_cv_error_interval_carries_consensus_uncertainty():
     # no disagreement at all still leaves an upper bound, as the Wilson interval does
     none = cv_error(cons, _firsts([(i, "Aves", 1, True) for i in range(200)]), consensus_n=50)
     assert none["error"].eq(0).all() and none["hi"].gt(0).all()
+
+
+def test_matched_error_within_species():
+    # first-ID species 7: typed wrong 2 of 2, cv wrong 1 of 2; species 2 and 8: cv only, no weight
+    cons = _cons([(0, 7, 0.99)] + [(i, 1, 0.99) for i in (1, 2, 3)] + [(4, 2, 0.99), (5, 2, 0.99)])
+    firsts = _firsts(
+        [(0, "Aves", 7, True), (1, "Aves", 7, True), (2, "Aves", 7, False), (3, "Aves", 7, False)]
+        + [(4, "Aves", 2, True), (5, "Aves", 8, True)]
+    )
+    assert matched_error(cons, firsts) == (2.0, 1)
+    assert matched_error(_cons([]), _firsts([]))[1] == 0
 
 
 def test_detection_rate_is_overturn_over_error():
