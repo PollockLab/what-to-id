@@ -449,3 +449,19 @@ def test_held_out_consensus_rolls_up_at_the_report_threshold():
     planted = pd.DataFrame({"record_id": [0], "taxon_id": [1]})
     held = held_out_consensus(answers, planted, threshold=0.6, folds=1, ancestry=anc)
     assert held["taxon_id"].tolist() == [1] and held["wrong"].tolist() == [0]
+
+
+def test_main_fits_the_consensus_from_answers(tmp_path, capsys):
+    _obs([(1, 7, "Aves")]).to_parquet(tmp_path / "o.parquet")
+    _idents([(1, 7, "2024-01-01", 20, True, 7)]).to_parquet(tmp_path / "i.parquet")
+    ans = [(f"s{k}", "Aves", 1, 21) for k in range(4)]
+    pd.DataFrame(ans, columns=["login", "group", "record_id", "taxon_id"]).to_parquet(
+        tmp_path / "a.parquet"
+    )
+    argv = ["--hard-cases", str(tmp_path / "h.parquet")]
+    for flag, name in [("obs", "o"), ("idents", "i"), ("answers", "a")]:
+        argv += [f"--{flag}", str(tmp_path / f"{name}.parquet")]
+    assert main(argv) == 0
+    assert "1 hard cases (1 overturned)" in capsys.readouterr().out
+    with pytest.raises(SystemExit):
+        main(argv[2:4] + argv[4:6])

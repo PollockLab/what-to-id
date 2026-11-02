@@ -124,8 +124,7 @@ python -m what_to_id.blind_planted --obs obs.parquet --idents idents.parquet --p
 python -m what_to_id.blind_sample --pool pool.parquet --levels identify.parquet --planted planted.json --per-stratum 4 --out site/records.json
 python -m what_to_id.page_blind --records site/records.json --out site/                                             # blind.html
 python -m what_to_id.blind_answers --records site/records.json --names names.json --out answers.parquet blind-answers-*.jsonl
-python -c "import pandas as pd; from what_to_id.blind_skill import fit, ancestry_from_taxa; s, c = fit(pd.read_parquet('answers.parquet'), pd.read_parquet('site/planted.parquet'), ancestry=ancestry_from_taxa(pd.read_csv('taxa.csv'))); s.to_csv('skill.csv'); c.to_parquet('consensus.parquet')"
-python -m what_to_id.blind_report --consensus consensus.parquet --obs obs.parquet --idents idents.parquet --public pool.parquet --levels site/levels.parquet --answers answers.parquet --planted site/planted.parquet --taxa taxa.csv
+python -m what_to_id.blind_report --obs obs.parquet --idents idents.parquet --public pool.parquet --levels site/levels.parquet --answers answers.parquet --planted site/planted.parquet --taxa taxa.csv
 python -m what_to_id.blind_power          # sample-size table behind the protocol
 python -m what_to_id.public_overturn pull --out pull.jsonl && python -m what_to_id.public_overturn tables pull.jsonl   # the public pre-test
 ```
