@@ -282,6 +282,42 @@ def latency_table(rows, df: pd.DataFrame) -> pd.DataFrame:
     return out.reset_index()
 
 
+def delay_table(rows, df: pd.DataFrame, horizons=(1, 7, 30, 90, 365), min_age=365):
+    """Per first-ID source: overturned tested records at least ``min_age`` days old, and the share
+    whose first correction (another identifier's current ID off the first taxon's lineage) came
+    within each horizon in days, as columns ``d1``, ``d7`` and so on.
+
+    Age runs to the latest identification in ``rows``, which stands in for the pull date. Younger
+    records are left out because they cannot show a late correction yet: their delays are cut short.
+    One minus a column is the share of public detection a read-back that many days after the first
+    ID has not seen yet.
+    """
+    src = df.drop_duplicates("id").set_index("id")
+    stamps = [i["created"] for r in rows for i in r["idents"] if i["created"]]
+    ref = max(map(pd.Timestamp, stamps)) if stamps else None
+    out, seen = [], set()
+    for r in rows:
+        if r["id"] in seen or r["id"] not in src.index or not src.at[r["id"], "overturned"]:
+            continue
+        seen.add(r["id"])
+        first = _first_own(r)
+        t0 = pd.Timestamp(first["created"])
+        days = [
+            (pd.Timestamp(i["created"]) - t0).total_seconds() / 86400
+            for i in r["idents"]
+            if not i["own"] and i["current"] and i["created"] and not _on_lineage(i, first)
+        ]
+        days = [x for x in days if x >= 0]
+        if days and (ref - t0).days >= min_age:
+            out.append((src.at[r["id"], "source"], min(days)))
+    o = pd.DataFrame(out, columns=["source", "days"])
+    g = o.groupby("source")["days"]
+    res = g.size().rename("n").to_frame()
+    for h in horizons:
+        res[f"d{h}"] = g.apply(lambda s, h=h: (s <= h).mean())
+    return res.reset_index()
+
+
 def level_table(rows, levels: pd.DataFrame) -> pd.DataFrame:
     """Per Identify level: records, share with another current ID, share of those contradicting
     the label the level was scored on (an ID off the label's lineage: not the label, a refinement
@@ -346,6 +382,8 @@ def main(argv=None) -> int:
     print(corrector_table(rows, df).to_string(index=False, float_format="{:.3f}".format))
     print()
     print(latency_table(rows, df).to_string(index=False, float_format="{:.2f}".format))
+    print()
+    print(delay_table(rows, df).to_string(index=False, float_format="{:.3f}".format))
     if a.levels:
         print()
         lv = level_table(rows, pd.read_parquet(a.levels, columns=["id", "taxon_id", "level"]))
