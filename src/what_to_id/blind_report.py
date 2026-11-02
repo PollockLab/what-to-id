@@ -216,6 +216,17 @@ def detection_rate(
     return pd.DataFrame(rows, columns=[by, *DETECT_COLUMNS[1:]])
 
 
+def matched_error(consensus, firsts, threshold: float = 0.9) -> tuple[float, int]:
+    """Mantel-Haenszel ratio of typed to CV disagreement with the consensus within first-ID
+    species, and the number of species with both sources. Descriptive companion to H1: the
+    pooled test can be moved by which species each source names, this ratio cannot."""
+    from what_to_id.public_overturn import within_species
+
+    j = _scored(consensus, firsts, threshold)
+    j = j[j["group"] != "all"].rename(columns={"taxon_id": "first_taxon", "wrong": "overturned"})
+    return within_species(j.assign(tested=True))
+
+
 def hard_cases(consensus, firsts, threshold: float = 0.9) -> pd.DataFrame:
     """Records a model should learn from: a settled consensus that overturns the first own ID
     (``why`` = overturned, labelled with the consensus) or no consensus at ``threshold`` after at
@@ -335,6 +346,8 @@ def main(argv=None) -> int:
             print(kind_table(held, firsts).to_string(index=False))
         print()
     print(cv_error(consensus, firsts, a.threshold, c, consensus_n=n_c).to_string(index=False))
+    rr, k = matched_error(consensus, firsts, a.threshold)
+    print(f"within-species Mantel-Haenszel ratio typed/cv = {rr:.2f} over {k} species")
     if "experience" in firsts.columns:
         print()
         exp = cv_error(consensus, firsts, a.threshold, c, "experience", n_c)
