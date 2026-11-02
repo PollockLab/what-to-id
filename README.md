@@ -130,7 +130,7 @@ python -m what_to_id.blind_power          # sample-size table behind the protoco
 python -m what_to_id.public_overturn pull --out pull.jsonl && python -m what_to_id.public_overturn tables pull.jsonl   # the public pre-test
 ```
 
-`blind_report` prints error e of CV-accepted versus typed first IDs against the consensus, detection d (public overturn over e), both corrected for the consensus error c measured on held-out planted records and split by observer experience, species-matched ratios, and settled and abstain shares per Identify level. `public_overturn` is the public pre-test that sized this track: overturn by group, observer experience, quarter, within species and per Identify level, plus who corrects, whether the correction was itself a CV suggestion, and how long a first ID waits for its first other look. `--hard-cases` writes the training set. `tests/test_blind_recovery.py` and `tests/test_blind_pipeline.py` simulate the model and the whole chain.
+`blind_report` prints error e of CV-accepted versus typed first IDs against the consensus, detection d (public overturn over e), both corrected for the consensus error c measured on held-out planted records and split by observer experience and by record age, species-matched ratios, and settled and abstain shares per Identify level. `public_overturn` is the public pre-test that sized this track: overturn by group, observer experience, quarter, within species and per Identify level, plus who corrects, whether the correction was itself a CV suggestion, and how long a first ID waits for its first other look. `--hard-cases` writes the training set. `tests/test_blind_recovery.py` and `tests/test_blind_pipeline.py` simulate the model and the whole chain.
 
 ## References
 

@@ -29,6 +29,7 @@ LEVEL_COLUMNS = ["level", "n", "settled", "posterior", "abstain"]
 TEST_COLUMNS = ["hypothesis", "statistic", "p", "n"]
 FIRST_COLUMNS = ["record_id", "group", "taxon_id", "vision"]
 EXPERIENCE = ["<10 ids", "10-99 ids", "100+ ids"]
+AGE = ["<30 d", "30-364 d", "365+ d"]
 HARD_COLUMNS = [
     "record_id",
     "group",
@@ -47,6 +48,9 @@ def first_own_ids(obs: pd.DataFrame, idents: pd.DataFrame) -> pd.DataFrame:
 
     When obs carries ``observer_idents`` (the observer's lifetime identification count at
     read-back, as :mod:`readback` writes it) an ``experience`` column bins it by ``EXPERIENCE``.
+    An ``age`` column bins the days from the first own ID to the latest identification in
+    ``idents``, which stands in for the read-back date: corrections keep arriving for months, so
+    young records understate public overturn and with it d.
     """
     if "iconic_taxon" not in obs.columns:
         raise ValueError("obs needs an iconic_taxon column (readback obs frames do not carry it)")
@@ -55,7 +59,10 @@ def first_own_ids(obs: pd.DataFrame, idents: pd.DataFrame) -> pd.DataFrame:
     first = own.sort_values("created_at", kind="stable").drop_duplicates("id")
     out = first.merge(obs[["id", "iconic_taxon", *extra]].drop_duplicates("id"), on="id")
     out = out.rename(columns={"id": "record_id", "iconic_taxon": "group"})
-    out = out[FIRST_COLUMNS + extra].reset_index(drop=True)
+    out = out[FIRST_COLUMNS + extra + ["created_at"]].reset_index(drop=True)
+    stamp = pd.to_datetime(out.pop("created_at"), utc=True)
+    days = (pd.to_datetime(idents["created_at"], utc=True).max() - stamp).dt.days
+    out["age"] = pd.cut(days, [-np.inf, 29, 364, np.inf], labels=AGE).astype(str)
     if extra:
         cuts = [-np.inf, 9, 99, np.inf]
         out["experience"] = pd.cut(out.pop("observer_idents"), cuts, labels=EXPERIENCE).astype(str)
@@ -360,10 +367,10 @@ def main(argv=None) -> int:
     print(cv_error(consensus, firsts, a.threshold, c, consensus_n=n_c).to_string(index=False))
     rr, k = matched_error(consensus, firsts, a.threshold)
     print(f"within-species Mantel-Haenszel ratio typed/cv = {rr:.2f} over {k} species")
-    if "experience" in firsts.columns:
+    splits = [b for b in ("experience", "age") if b in firsts.columns]
+    for b in splits:
         print()
-        exp = cv_error(consensus, firsts, a.threshold, c, "experience", n_c)
-        print(exp.to_string(index=False))
+        print(cv_error(consensus, firsts, a.threshold, c, b, n_c).to_string(index=False))
     if a.public:
         others = idents.loc[idents["user_id"] != idents["observer_id"], "id"].unique()
         public = pd.read_parquet(a.public, columns=["id", "taxon_id"])
@@ -373,9 +380,9 @@ def main(argv=None) -> int:
             consensus, firsts, public, a.threshold, consensus_error=c, consensus_n=n_c
         )
         print(det.to_string(index=False))
-        if "experience" in firsts.columns:
+        for b in splits:
             print()
-            kw = dict(consensus_error=c, consensus_n=n_c, by="experience")
+            kw = dict(consensus_error=c, consensus_n=n_c, by=b)
             print(
                 detection_rate(consensus, firsts, public, a.threshold, **kw).to_string(index=False)
             )

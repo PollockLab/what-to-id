@@ -49,7 +49,7 @@ def test_first_own_id_picks_earliest_own():
     )
     out = first_own_ids(obs, idents)
     assert out.to_dict("records") == [
-        {"record_id": 1, "group": "Aves", "taxon_id": 20, "vision": True}
+        {"record_id": 1, "group": "Aves", "taxon_id": 20, "vision": True, "age": "<30 d"}
     ]
 
 
@@ -70,6 +70,15 @@ def test_first_own_ids_bins_observer_experience():
     assert out.loc[("10-99 ids", "typed"), ["n", "wrong"]].tolist() == [1, 1]
     assert out.loc[("all", "typed"), ["n", "wrong"]].tolist() == [2, 1]
     assert "group" not in out.columns
+
+
+def test_first_own_ids_bins_age_against_the_latest_identification():
+    obs = _obs([(1, 7, "Aves"), (2, 8, "Aves"), (3, 9, "Aves")])
+    idents = _idents(
+        [(1, 7, "2023-01-01", 20, True, 7), (2, 8, "2024-01-01", 20, False, 8)]
+        + [(3, 9, "2024-06-01", 20, False, 9), (3, 5, "2024-06-20", 20, False, 9)]
+    )
+    assert first_own_ids(obs, idents)["age"].tolist() == ["365+ d", "30-364 d", "<30 d"]
 
 
 def test_first_own_ids_needs_group_column():
