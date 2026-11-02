@@ -49,6 +49,10 @@ def test_main_prints_table(capsys):
     main(["--records", "500", "--draws", "50"])
     out = capsys.readouterr().out
     assert "power_d" in out and "500" in out
+    main(["--records", "500", "--draws", "50", "--settled", "0.5"])
+    assert "187.5" in capsys.readouterr().out  # 500 records x 0.5 settled x 0.75 CV
+    with pytest.raises(SystemExit):
+        main(["--settled", "0"])
 
 
 def test_late_corrections_widen_d_and_cost_power_but_keep_it_centred():

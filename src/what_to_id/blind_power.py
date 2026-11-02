@@ -133,10 +133,23 @@ def main(argv=None):
     ap.add_argument(
         "--complete", type=float, default=1.0, help="share of eventual overturns in at read-back"
     )
+    ap.add_argument(
+        "--settled", type=float, default=0.8, help="share of records settled at the scored rank"
+    )
     a = ap.parse_args(argv)
     if not 0 < a.complete <= 1:
         ap.error("--complete must be in (0, 1]")
-    t = table(a.records, c=a.c, planted=a.planted, draws=a.draws, seed=a.seed, complete=a.complete)
+    if not 0 < a.settled <= 1:
+        ap.error("--settled must be in (0, 1]")
+    t = table(
+        a.records,
+        settled=a.settled,
+        c=a.c,
+        planted=a.planted,
+        draws=a.draws,
+        seed=a.seed,
+        complete=a.complete,
+    )
     print(t.round(3).to_string(index=False))
 
 
