@@ -140,24 +140,12 @@ function expandBelow(M,S,es,budget){
     ks.slice(0,pages*K).forEach(function(k){q.push([lead(M,k),deep]);});}
   return false;
 }
-// Colours: each life group's sub-clades (the children of the group taxon) take alternating shades of the
-// group colour, kept at 2:1 or more against both page backgrounds (#fbfbf9 light, #1a1a19 dark).
-var TONES=[0,0.45,-0.35,0.25,-0.2,0.6,-0.5,0.12,-0.1];
+// Page contrast: the clade colours (clade_colour.js) keep 2:1 or more against both page backgrounds (#fbfbf9 light,
+// #1a1a19 dark).
 function lum(c){return c.reduce(function(s,v,i){v/=255;v=v<=0.04045?v/12.92:Math.pow((v+0.055)/1.055,2.4);
   return s+v*[0.2126,0.7152,0.0722][i];},0);}
 function contrast(a,b){var x=lum(a)+0.05,y=lum(b)+0.05;return Math.max(x,y)/Math.min(x,y);}
 var BG=[[251,251,249],[26,26,25]];
-// rgb mixed toward white (t>0) or black (t<0) by |t|, backed off until it reads on both pages.
-function shade(rgb,t){
-  for(var k=0;k<8&&t;k++,t/=2){var to=t>0?255:0,c=rgb.map(function(v){return Math.round(v+(to-v)*Math.abs(t));});
-    if(BG.every(function(b){return contrast(c,b)>=2;}))return c;}
-  return rgb.slice();
-}
-// Which tone row r takes: its sub-clade's index under its group's node, else 0.
-function tone(M,r){
-  for(var c=r,p=M.par[r];p>=0;c=p,p=M.par[p])if(p<M.n&&M.par[p]===M.n)return TONES[M.kids[p].indexOf(c)%TONES.length]||0;
-  return 0;
-}
 // Opens the way from the focus to row t, paging through "more" as needed; a t outside the focus moves
 // the focus to the root. Returns the shown node that holds t.
 function reveal(M,S,t){
@@ -209,7 +197,7 @@ function read(M,hash,gs){
   var s=rowOf(q.sel);if(s>=0){S.sel=s;if(q.open==null)reveal(M,S,s);}
   return S;
 }
-return {K:K,REST:REST,LEVEL:LEVEL,RINGS:RINGS,DEPTH:DEPTH,TONES:TONES,BG:BG,cap:cap,shade:shade,tone:tone,contrast:contrast,step:step,build:build,without:without,recount:recount,id:id,name:name,common:common,rank:rank,lead:lead,pick:pick,find:find,
+return {K:K,REST:REST,LEVEL:LEVEL,RINGS:RINGS,DEPTH:DEPTH,BG:BG,cap:cap,contrast:contrast,step:step,build:build,without:without,recount:recount,id:id,name:name,common:common,rank:rank,lead:lead,pick:pick,find:find,
   chain:chain,crumbs:crumbs,within:within,view:view,toggle:toggle,more:more,expandBelow:expandBelow,reveal:reveal,
   home:home,layout:layout,write:write,read:read};
 });

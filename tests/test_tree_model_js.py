@@ -149,26 +149,6 @@ out({{home, below: Array.from(S.open.keys()).sort(), caps: [M.cap(I, 7), M.cap(I
     assert got["caps"] == [got["order"], got["family"], got["family"]]
 
 
-def test_sub_clades_take_shades_of_their_group_colour_that_read_on_both_pages():
-    # map_filter.js is a plain script of this repo, not a module: eval loads it
-    filt = ASSET.parents[1] / "map_assets/map_filter.js"
-    got = node(
-        f"""
-eval(require('fs').readFileSync({str(filt)!r}, 'utf8'));
-const I = M.build({INSECT_TREE});
-const two = (c) => M.BG.every((b) => M.contrast(c, b) >= 2);
-const all = Object.values(MapFilter.BY).concat(MapFilter.PAL).filter(two);
-const worst = Math.min(...all.flatMap((c) => M.TONES.flatMap((t) =>
-  M.BG.map((b) => M.contrast(M.shade(c, t), b)))));
-const ins = MapFilter.BY.Insecta, kinds = new Set(M.TONES.map((t) => M.shade(ins, t).join()));
-const tones = [6, 7, 2].map((r) => M.tone(I, r));
-out({{worst, n: all.length, kinds: kinds.size, same: M.shade(ins, 0), tones}});"""
-    )
-    assert got["n"] >= 25 and got["worst"] >= 2
-    assert got["kinds"] >= 4 and got["same"] == [240, 130, 0]
-    assert got["tones"] == [0, 0.45, 0]  # Bombus under Hymenoptera (first), Diptera second
-
-
 def test_hash_round_trips_and_ignores_unknown_ids():
     got = node(
         """
