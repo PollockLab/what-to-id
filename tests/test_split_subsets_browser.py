@@ -25,6 +25,8 @@ def split(browser, site):
         "[...document.querySelectorAll('iframe')].every(f =>"
         " f.contentDocument.getElementById('status').textContent === '')"
     )
+    # the first count can rewrap the header and move the frames; a drag measured before it misses
+    page.wait_for_function("!document.getElementById('counts').textContent.includes('…')")
     frames = [f for f in page.frames if "embed=1" in f.url]
     assert len(frames) == 2
     yield page, frames
