@@ -83,7 +83,7 @@ def map_frame(page):
 COLOURS = """() => { const c = window.__layers[0].props.data.attributes.getFillColor.value,
   at = i => Array.from(c.slice(4 * i, 4 * i + 4)), l = document.querySelector('.lvleg');
   return {c0: at(0), c1: at(1), c5: at(5), legend: !!l && !l.hidden,
-    names: l ? [...l.querySelectorAll('span')].map(s => s.textContent) : []}; }"""
+    names: l ? [...l.querySelectorAll('.lr')].map(s => s.textContent) : []}; }"""
 
 
 def test_beside_identify_the_dots_take_the_level_colours_and_go_back_without_it(browser, site):
@@ -100,6 +100,27 @@ def test_beside_identify_the_dots_take_the_level_colours_and_go_back_without_it(
     assert got["c1"][3] == 110 and got["c1"] != GREEN
     page.click("[data-p=identify]")
     frame.wait_for_function(f"({COLOURS})().legend")
+    assert page.errors == []
+    page.close()
+
+
+def test_the_legend_toggles_between_level_and_group_colours_and_hides_a_level(browser, site):
+    page = open_page(browser, f"{site[0]}/explore.html")
+    frame = map_frame(page)
+    frame.wait_for_function(f"({COLOURS})().legend")
+    assert frame.get_attribute(".lvleg .seg button:first-child", "aria-pressed") == "true"
+    frame.click(".lvleg .seg button:last-child")  # Groups
+    frame.wait_for_function(f"({COLOURS})().c1[3] === 110")
+    got = frame.evaluate(COLOURS)
+    assert got["legend"] and got["names"] == [] and got["c1"] != GREEN  # the rows go
+    assert frame.locator(".lvleg .lrows span").count() == len(mg.SIZES)  # one swatch a group
+    frame.click(".lvleg .seg button:first-child")  # Levels
+    frame.wait_for_function(f"({COLOURS})().c1[3] === 170")
+    assert frame.evaluate(COLOURS)["c1"] == GREEN
+    frame.locator(".lvleg .lr").nth(0).click()  # hide level 1
+    frame.wait_for_function(f"({COLOURS})().c1[3] === 0")
+    frame.locator(".lvleg .lr").nth(0).click()
+    frame.wait_for_function(f"({COLOURS})().c1[3] === 170")
     assert page.errors == []
     page.close()
 
