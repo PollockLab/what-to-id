@@ -90,8 +90,8 @@ def _c_draws(rng, c, n, boot):
 def held_out_consensus(answers, planted, threshold=0.9, folds=2, seed=0) -> pd.DataFrame:
     """Settled consensus of planted records fitted with their truth withheld, fold by fold.
 
-    Columns: record_id, taxon_id (the consensus), truth, wrong, and kind when ``planted`` has it
-    (``blind_planted``'s cv_fail, cv_hold, typed_fail, typed_hold).
+    Columns: record_id, taxon_id (the consensus), truth, wrong, and kind and level when ``planted``
+    has them (``blind_planted``'s cv_fail, cv_hold, typed_fail, typed_hold; the Identify level).
     """
     planted = planted.drop_duplicates("record_id")
     ids = planted["record_id"].to_numpy().copy()
@@ -101,7 +101,7 @@ def held_out_consensus(answers, planted, threshold=0.9, folds=2, seed=0) -> pd.D
         _, cons = fit(answers, planted[~planted["record_id"].isin(held)])
         got = cons[cons["record_id"].isin(held) & (cons["posterior"] >= threshold)]
         parts.append(got[got["taxon_id"].notna()][["record_id", "taxon_id"]])
-    keep = ["record_id", "taxon_id"] + (["kind"] if "kind" in planted.columns else [])
+    keep = ["record_id", "taxon_id", *[c for c in ("kind", "level") if c in planted.columns]]
     out = pd.concat(parts).merge(planted[keep].rename(columns={"taxon_id": "truth"}))
     out["wrong"] = (out["taxon_id"] != out["truth"]).astype(int)
     return out.reset_index(drop=True)
@@ -265,13 +265,14 @@ def level_table(consensus, levels, threshold: float = 0.9) -> pd.DataFrame:
     return out.reset_index()[LEVEL_COLUMNS]
 
 
-def level_error(held: pd.DataFrame, levels: pd.DataFrame) -> pd.DataFrame:
+def level_error(held: pd.DataFrame) -> pd.DataFrame:
     """Per Identify level: held-out settled planted records and the consensus error c among them.
 
     H3 reads settling as difficulty, but a consensus can settle on a wrong name, so this is the
-    check that the levels order error and not only confidence. ``held`` is ``held_out_consensus``.
+    check that the levels order error and not only confidence. ``held`` is ``held_out_consensus``
+    with the ``level`` that ``blind_sample`` writes into ``planted.parquet``.
     """
-    j = held.merge(levels[["record_id", "level"]], on="record_id")
+    j = held.dropna(subset=["level"])
     return j.groupby("level").agg(n=("wrong", "size"), c=("wrong", "mean")).reset_index()
 
 
@@ -382,8 +383,8 @@ def main(argv=None) -> int:
         levels = pd.read_parquet(a.levels)
         print()
         print(level_table(consensus, levels, a.threshold).to_string(index=False))
-        if held is not None:
-            print(level_error(held, levels).to_string(index=False))
+        if held is not None and "level" in held.columns:
+            print(level_error(held).to_string(index=False))
     if a.hard_cases:
         hard = hard_cases(consensus, firsts, a.threshold)
         hard.to_parquet(a.hard_cases, index=False)

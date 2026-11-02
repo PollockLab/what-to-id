@@ -90,15 +90,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     if planted and all("kind" in x for x in planted):
         truth["kind"] = [x["kind"] for x in planted]  # blind_planted's cv_fail etc., for the report
+    if levels is not None:  # the planted record's level, so the report can give c per level
+        lv = levels.drop_duplicates("id").set_index("id")["level"]
+        truth["level"] = truth["record_id"].map(lv).to_numpy()
     truth.to_parquet(a.out.with_name("planted.parquet"), index=False)
     # the level stays out of records.json so the page cannot hint at difficulty
-    ids = [int(x["id"]) for x in planted]
-    if levels is None:
-        pl = pd.DataFrame({"id": ids, "level": 0})
-    else:  # planted records keep their level so the report can give c per level
-        pl = levels[levels["id"].isin(ids)].drop_duplicates("id")
-    lv = pd.concat([sampled[["id", "level"]], pl[["id", "level"]]])
-    lv = lv.rename(columns={"id": "record_id"}).reset_index(drop=True)
+    lv = sampled[["id", "level"]].rename(columns={"id": "record_id"})
     lv.to_parquet(a.out.with_name("levels.parquet"), index=False)
     print(strata(sampled).to_string(index=False))
     print(f"blind_sample: {len(sampled)} sampled + {len(planted)} planted -> {a.out}")

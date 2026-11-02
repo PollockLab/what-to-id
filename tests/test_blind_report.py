@@ -290,9 +290,9 @@ def test_level_table_settled_and_abstain_per_level():
 
 
 def test_level_error_per_level():
-    held = pd.DataFrame({"record_id": [1, 2, 3, 4], "wrong": [0, 1, 1, 1]})
-    levels = pd.DataFrame({"record_id": [1, 2, 3, 4, 5], "level": [1, 1, 5, 5, 2]})
-    out = level_error(held, levels).set_index("level")
+    held = pd.DataFrame({"record_id": [1, 2, 3, 4, 5], "wrong": [0, 1, 1, 1, 0]})
+    held["level"] = [1, 1, 5, 5, None]  # a planted record outside the levels file is skipped
+    out = level_error(held).set_index("level")
     assert list(out.index) == [1, 5] and out["n"].tolist() == [2, 2]
     assert out["c"].tolist() == [0.5, 1.0]
 
