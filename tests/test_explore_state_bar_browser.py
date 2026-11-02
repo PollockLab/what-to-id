@@ -74,11 +74,16 @@ def shot(page, name):
 def test_the_bar_shows_the_same_chips_in_every_view(browser, site):
     seen = {}
     for view in ("map", "identify-tree", "map-identify-tree"):
-        page, _ = open_page(browser, f"{site}/explore.html?view={view}{HASH}")
+        page, frame = open_page(browser, f"{site}/explore.html?view={view}{HASH}")
         seen[view] = chips(page, 2)
         assert page.text_content("#sbn")[0].isdigit()  # the map's count
         assert page.get_attribute("#sbl", "aria-expanded") == "false"
         assert page.is_hidden("#fb")  # the old Filters button is gone
+        # one name a control: the rail is What and the bar's button the rest, or every filter when
+        # a map pane under 760 px puts What in the sheet too (map_sheet.js)
+        label = "Filters" if view == "map-identify-tree" else "When & where"
+        assert page.text_content("#sbf") == label
+        assert frame.text_content("#side .railhd b") == "What"
         assert page.errors == []
         page.close()
     assert seen["map"] == seen["identify-tree"] == seen["map-identify-tree"]
@@ -185,6 +190,7 @@ def test_at_400_px_the_bar_fits_and_the_sheet_stays_within_60vh(browser, site, v
     assert page.evaluate(width) <= 400
     bar = page.locator("#sbar").bounding_box()
     assert bar["x"] >= 0 and bar["x"] + bar["width"] <= 400
+    assert page.text_content("#sbf") == "Filters"  # no room for the rail: every filter in the sheet
     page.click("#sbf")
     page.wait_for_function(f"/^\\d/.test({COUNT} || '')")
     frame = next(f for f in page.frames if "map.html" in f.url)

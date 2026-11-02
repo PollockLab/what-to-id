@@ -87,7 +87,7 @@ def test_the_rail_folds_to_a_strip_and_stays_folded(browser, site):
     frame = map_frame(page)
     frame.click("#railx")
     frame.wait_for_function("document.documentElement.classList.contains('rail-off')")
-    assert rail(page) == [0, 36] and frame.text_content("#railx") == "Filters"
+    assert rail(page) == [0, 36] and frame.text_content("#railx") == "What"
     assert frame.evaluate("localStorage.getItem('wtid-rail')") == "0"
     page.reload()
     frame = map_frame(page)
