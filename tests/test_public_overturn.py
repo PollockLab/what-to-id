@@ -39,7 +39,7 @@ RAW = [
     # typed first ID overturned
     _obs(2, 11, [_ident(1, True, 10, vision=False), _ident(2, False, 11)], user_idents=5),
     # CV first ID at species, community taxon is a descendant of it: upheld
-    _obs(3, 12, [_ident(1, True, 10, vision=True), _ident(2, False, 12, anc=[10])]),
+    _obs(3, 12, [_ident(1, True, 10, vision=True), _ident(2, False, 12, anc=[10], vision=True)]),
     # no community taxon: tested, not overturned
     _obs(4, None, [_ident(1, True, 10, vision=True), _ident(2, False, 13, rank="order")]),
     # genus-rank first ID: not tested
@@ -109,6 +109,14 @@ def test_matched_table_per_stratum():
     )
     assert np.isnan(out.loc["b", "crude"]) and np.isnan(out.loc["b", "matched"])  # no cv overturn
     assert po.matched_table(df.iloc[:0], "experience").empty
+
+
+def test_identifier_cv_table():
+    out = po.identifier_cv_table(ROWS, po.scored(ROWS)).set_index("source")
+    assert out.loc["cv", ["same", "other"]].tolist() == [1, 3]  # record 1; records 3, 4, 6
+    assert out.loc["cv", "same_cv"] == 0 and out.loc["cv", "other_cv"] == pytest.approx(1 / 3)
+    assert out.loc["typed", ["same", "other"]].tolist() == [0, 1]  # record 2
+    assert np.isnan(out.loc["typed", "same_cv"])
 
 
 def test_level_table():

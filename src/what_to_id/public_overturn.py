@@ -176,6 +176,33 @@ def matched_table(df: pd.DataFrame, by: str) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=["stratum", "tested", "crude", "matched", "species"])
 
 
+def identifier_cv_table(rows, df: pd.DataFrame) -> pd.DataFrame:
+    """Per first-ID source: other identifiers' current IDs on tested records, split by whether they
+    name the first taxon or another, and the share of each that was itself a CV suggestion.
+
+    Public corrections are not all human: an identifier can accept a suggestion too. The blind
+    page offers none, so this is the part of public detection d a blind consensus cannot carry.
+    """
+    src = df.drop_duplicates("id").set_index("id")
+    acc: dict[str, list[int]] = defaultdict(lambda: [0, 0, 0, 0])
+    seen = set()
+    for r in rows:
+        if r["id"] in seen or r["id"] not in src.index or not src.at[r["id"], "tested"]:
+            continue
+        seen.add(r["id"])
+        first, c = _first_own(r), acc[src.at[r["id"], "source"]]
+        for i in r["idents"]:
+            if not i["own"] and i["current"]:
+                k = 0 if i["taxon"] == first["taxon"] else 2
+                c[k] += 1
+                c[k + 1] += bool(i["vision"])
+    out = [
+        (s, a, a_cv / a if a else np.nan, d, d_cv / d if d else np.nan)
+        for s, (a, a_cv, d, d_cv) in sorted(acc.items())
+    ]
+    return pd.DataFrame(out, columns=["source", "same", "same_cv", "other", "other_cv"])
+
+
 def level_table(rows, levels: pd.DataFrame) -> pd.DataFrame:
     """Per Identify level: records, share with another current ID, share of those contradicting
     the label the level was scored on (an ID that is neither the label nor one of its ancestors)."""
@@ -232,6 +259,8 @@ def main(argv=None) -> int:
     rr, k = within_species(df)
     print(f"within-species Mantel-Haenszel ratio typed/cv = {rr:.2f} over {k} species")
     print(matched_table(df, "experience").to_string(index=False, float_format="{:.2f}".format))
+    print()
+    print(identifier_cv_table(rows, df).to_string(index=False, float_format="{:.3f}".format))
     if a.levels:
         print()
         lv = level_table(rows, pd.read_parquet(a.levels, columns=["id", "taxon_id", "level"]))
