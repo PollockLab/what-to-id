@@ -162,6 +162,11 @@ def test_delay_table_reads_year_old_records_only():
     assert out.loc["cv"].tolist() == [2, 0.5, 0.5, 1.0]
 
 
+def test_completeness_is_the_delay_distribution_at_age():
+    f = po.completeness([0, 5, 30, 400], [1.0, 10.0, 30.0, 100.0])
+    assert f.tolist() == [0.0, 0.25, 0.75, 1.0]
+
+
 def test_level_table():
     levels = pd.DataFrame({"id": [1, 2, 4, 5], "taxon_id": [10, 11, 10, 10], "level": [1, 5, 1, 2]})
     out = po.level_table(ROWS, levels).set_index("level")

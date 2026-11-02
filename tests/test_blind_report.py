@@ -49,7 +49,14 @@ def test_first_own_id_picks_earliest_own():
     )
     out = first_own_ids(obs, idents)
     assert out.to_dict("records") == [
-        {"record_id": 1, "group": "Aves", "taxon_id": 20, "vision": True, "age": "<30 d"}
+        {
+            "record_id": 1,
+            "group": "Aves",
+            "taxon_id": 20,
+            "vision": True,
+            "age_days": 1,
+            "age": "<30 d",
+        }
     ]
 
 
@@ -141,6 +148,22 @@ def test_main(tmp_path, capsys):
     out = capsys.readouterr().out
     assert "Aves" in out and "cv" in out and "all" in out and "0 hard cases" in out
     assert list(pd.read_parquet(tmp_path / "hard.parquet").columns) == HARD_COLUMNS
+
+
+def test_main_nowcast_d_from_correction_delays(tmp_path, capsys):
+    _cons([(1, 21, 0.99), (2, 30, 0.99)]).to_parquet(tmp_path / "c.parquet")
+    _obs([(1, 7, "Aves"), (2, 7, "Aves")]).to_parquet(tmp_path / "o.parquet")
+    own = [(1, 7, "2024-01-01", 20, True, 7), (2, 7, "2024-01-01", 30, True, 7)]
+    other = [(1, 9, "2024-01-11", 22, False, 7), (2, 9, "2024-01-11", 30, False, 7)]
+    _idents(own + other).to_parquet(tmp_path / "i.parquet")
+    pd.DataFrame({"id": [1, 2], "taxon_id": [22, 30]}).to_parquet(tmp_path / "p.parquet")
+    pd.DataFrame({"source": "cv", "days": [5.0, 100.0]}).to_parquet(tmp_path / "d.parquet")
+    argv = []
+    for flag, name in [("consensus", "c"), ("obs", "o"), ("idents", "i"), ("public", "p")]:
+        argv += [f"--{flag}", str(tmp_path / f"{name}.parquet")]
+    assert main([*argv, "--delays", str(tmp_path / "d.parquet")]) == 0
+    out = capsys.readouterr().out
+    assert "nowcast d, overturn over completeness at age (2 delays)" in out
 
 
 def test_main_consensus_error_from_held_out_planted(tmp_path, capsys):
@@ -249,6 +272,19 @@ def test_detection_rate_splits_by_experience():
         and d[("100+ ids", "cv")] == 1.0
         and d[("all", "cv")] == pytest.approx(0.75)
     )
+
+
+def test_detection_rate_nowcast_divides_by_completeness():
+    # 4 of 10 wrong, 2 overturned so far; at every age half the corrections are in
+    cons = _cons([(i, 1, 0.99) for i in range(10)])
+    firsts = _firsts([(i, "Aves", 2 if i < 4 else 1, True) for i in range(10)])
+    firsts["complete"] = 0.5
+    public = pd.DataFrame({"record_id": range(10), "taxon_id": [1, 1] + [2, 2] + [1] * 6})
+    kw = dict(boot=100, by="group")
+    raw = detection_rate(cons, firsts, public, **kw).set_index(["group", "source"])
+    now = detection_rate(cons, firsts, public, nowcast=True, **kw).set_index(["group", "source"])
+    assert raw.loc[("all", "cv"), "detection"] == pytest.approx(0.5)
+    assert now.loc[("all", "cv"), ["overturn", "detection"]].tolist() == pytest.approx([0.4, 1.0])
 
 
 def test_detection_rate_handles_no_error_and_no_overlap():
