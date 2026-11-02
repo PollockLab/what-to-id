@@ -1,6 +1,8 @@
+import numpy as np
 import pandas as pd
 import pytest
 
+from tests.test_blind_skill import _hier
 from what_to_id.blind_report import (
     DETECT_COLUMNS,
     HARD_COLUMNS,
@@ -19,6 +21,7 @@ from what_to_id.blind_report import (
     main,
     matched_error,
 )
+from what_to_id.blind_skill import fit
 
 
 def _obs(rows):
@@ -417,3 +420,21 @@ def test_align_consensus_judges_the_reference_only_at_its_rank():
     out = align_consensus(cons, ref, anc)
     assert out["taxon_id"].tolist() == [1, 10, 2, 1]  # a subspecies consensus upholds the species
     assert out["posterior"].tolist() == [0.95, 0.0, 0.95, 0.95]  # a genus consensus settles nothing
+
+
+def test_lineage_consensus_recovers_first_id_error_when_students_stop_at_genus():
+    answers, truth, anc = _hier(seed=0)
+    n = len(truth)
+    right = np.random.default_rng(9).random(n) < 0.8
+    other = 4 * np.arange(n) + (truth.to_numpy() % 4 + 1) % 4
+    firsts = pd.DataFrame({"record_id": range(n), "taxon_id": np.where(right, truth, other)})
+
+    def e(cons):
+        k = cons[cons["posterior"] >= 0.9].merge(firsts, on="record_id", suffixes=("_c", ""))
+        return (k["taxon_id"] != k["taxon_id_c"]).mean()
+
+    true_e = 1 - right.mean()
+    assert e(align_consensus(fit(answers, ancestry=anc)[1], firsts, anc)) == pytest.approx(
+        true_e, abs=0.03
+    )
+    assert e(fit(answers)[1]) > 2 * true_e  # a genus consensus scores a right first ID as wrong
