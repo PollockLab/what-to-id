@@ -1,6 +1,6 @@
 # what-to-id
 
-Does the order of the iNaturalist identification queue change how much gets identified, and what? what-to-id tests this with unlabelled, randomised lists and reads the answer back from iNaturalist. First deployment: British Columbia, autumn 2026, with Blitz the Gap. A result from one blitz holds for that blitz's region and identifiers; other regions run the same build to know.
+Does the order of the iNaturalist identification queue change how much gets identified, and what? what-to-id tests this with unlabelled, randomised lists and reads the answer back from iNaturalist. First deployment: British Columbia, with Blitz the Gap. A result from one blitz holds for that blitz's region and identifiers; other regions run the same build to know.
 
 Companion to [where-to-blitz](https://github.com/PollockLab/where-to-blitz), which answers where to go and record.
 
@@ -77,6 +77,14 @@ uv pip install -e ".[dev]"      # add ,embed for image embeddings, ,similarity f
 pytest                          # network tests skipped; pytest -m network hits the live API
 ```
 
+Try it in two minutes: a small sample, two lists, one page.
+
+```bash
+python -m what_to_id.inat --d1 2025-01-01 --freeze 2026-11-01 --groups Aves --cap-pages 2 --out data/sample.parquet
+what-to-id build --pool data/sample.parquet --freeze 2026-11-01 --d1 2026-11-01 --seed 0 --arms recency,gap_first --design rotation --out out/sample
+open out/sample/site/study.html
+```
+
 ## Use
 
 ```bash
@@ -104,7 +112,7 @@ The analysis holds each list to its pinned count, one-sided with Holm over `gap_
 
 ## Blind track (proposed, not yet run)
 
-A second study for a class or a group of new identifiers. Proposed for the Monday 2 Nov 2026 meeting; it runs only after ethics review and the course agrees.
+A second study for a class or a group of new identifiers. Proposed; it runs only after ethics review and the course agrees.
 
 - Most BC records carry a species name the observer accepted from the computer-vision suggestion. On 40,000 BC records, later identifiers overturned 6% of those names and 9% of typed names. The public record cannot tell a correct suggestion from a name people agreed with.
 - The blind page shows only the photos and the taxon group. No name, no location, no suggestion. The student types a name and a confidence, or abstains.
