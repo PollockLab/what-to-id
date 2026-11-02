@@ -24,8 +24,18 @@ KIDS = {
                 "Pelecaniformes"),
     "Fungi": (47170, "Basidiomycota Ascomycota Mucoromycota Chytridiomycota"),
     "Mollusca": (47115, "Gastropoda Bivalvia Polyplacophora Cephalopoda"),
+    "Amphibia": (20978, "Anura Caudata"),
 }  # fmt: skip
 META = {"groups": list(KIDS), "group_ids": {g: v[0] for g, v in KIDS.items()}, "names": {}}
+# The children of depth-2 taxa: Tracheophyta's classes, Passeriformes' and Anura's families.
+DEEP = {
+    "Tracheophyta": "Magnoliopsida Liliopsida Polypodiopsida Pinopsida Lycopodiopsida "
+                    "Equisetopsida Gnetopsida Ginkgoopsida Cycadopsida",
+    "Passeriformes": "Corvidae Paridae Turdidae Fringillidae Passerellidae Parulidae Icteridae "
+                     "Sittidae Troglodytidae",
+    "Anura": "Ranidae Hylidae Bufonidae Ascaphidae Scaphiopodidae Pipidae Microhylidae "
+             "Leptodactylidae Dendrobatidae",
+}  # fmt: skip
 
 
 def table():
@@ -35,8 +45,11 @@ def table():
         top = len(t) - 1
         for k, name in enumerate(kids.split()):
             t.append([name, "", 100000 + len(t), 0, top, 1000 - k])
-            for q in range(3):  # three children below each, so deeper rows get their own colours
-                t.append([f"{name} {q}", "", 100000 + len(t), 0, top + 1 + 4 * k, 50 - q])
+            me = len(t) - 1
+            # three children below each, so deeper rows get their own colours; more below DEEP's
+            subs = DEEP[name].split() if name in DEEP else [f"{name} {q}" for q in range(3)]
+            for q, sub in enumerate(subs):
+                t.append([sub, "", 100000 + len(t), 0, me, 50 - q])
     return t
 
 
@@ -45,6 +58,7 @@ def node(script):
     for f in (ASSETS / "map_filter.js", ASSETS / "clade_colour.js", HELPER):
         pre += f"eval(fs.readFileSync({str(f)!r}, 'utf8'));\n"  # plain scripts of this repo
     pre += f"const T = {json.dumps(table())}, META = {json.dumps(META)};\n"
+    pre += f"const DEEP = {json.dumps(DEEP)};\n"
     pre += "const out = (x) => console.log(JSON.stringify(x));\n"
     done = subprocess.run([NODE], input=pre + script, capture_output=True, text=True, timeout=60)
     assert done.returncode == 0, done.stderr
@@ -107,3 +121,23 @@ out({same: JSON.stringify(a.col) === JSON.stringify(b.col), life: a.col[0] === u
     assert got["empty"] == 0
     assert got["bare"] == 8  # without record counts every child still takes a colour
     assert got["cut"] == -1  # a group's taxon stands alone, as on the tree
+
+
+def test_a_focus_spreads_its_children_over_a_wedge_of_their_own():
+    got = node(
+        """
+const P = CladeColour.build(T, META), res = {};
+Object.keys(DEEP).forEach((t) => {
+  const f = T.findIndex((x) => x[0] === t), k = P.kids[f].slice(0, 8), F = P.at(f);
+  const cs = k.map((r) => F[r]);
+  res[t] = {was: least(k.map((r) => P.col[r])), now: least(cs), self: F[f], own: P.col[f],
+    worst: Math.min(...cs.flatMap((c) => BG.map((b) => contrast(c, b))))};});
+res.same = P.at(P.gr.Plantae) === P.col && P.at(-1) === P.col;  // the overview has no focus
+out(res);"""
+    )
+    assert got.pop("same")
+    for t, r in got.items():
+        print(f"{t}: least CIEDE2000 of 8 kids, overview {r['was']:.1f}, focused {r['now']:.1f}")
+        assert r["now"] >= 12, t
+        assert r["worst"] >= 2, t
+        assert r["self"] == r["own"], t  # the focus keeps its own colour

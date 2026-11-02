@@ -39,9 +39,9 @@ var ORD={};
 function order(m){if(ORD[m])return ORD[m];var b=1,o=[],i,r,k;while(b<m)b*=2;
   for(i=0;i<b;i++){for(r=0,k=1;k<b;k*=2)r=r*2+(i&k?1:0);if(r<m)o.push((r+(m>>1))%m);}
   return ORD[m]=o;}
-// The palette for taxa table T: col[row] is [r,g,b] for each row at or below a group taxon, else undefined; kids
-// the children in palette order, par the parents with each group taxon cut loose (as the tree has them), gr the
-// row of each group's taxon by group name.
+// The palette for taxa table T: col[row] is [r,g,b] for each row at or below a group taxon, else undefined; at(f)
+// the same focused on row f; kids the children in palette order, par the parents with each group taxon cut loose
+// (as the tree has them), gr the row of each group's taxon by group name.
 function build(T,META){
   var n=T.length,par=new Int32Array(n),tot=new Float64Array(n),kids=[],col=new Array(n),gr={},G={},i,j,has=n&&T[0].length>5;
   Object.keys(META.group_ids||{}).forEach(function(g){G[META.group_ids[g]]=g;});
@@ -54,12 +54,19 @@ function build(T,META){
     var o=order(m);k.forEach(function(c,i){var p=o[i],h=lo+(p+0.5)*w,
       l=d?Math.min(HI,Math.max(LO,(L+L1)/2+0.02+DL[p%3]*0.8)):L1+DL[p%3];
       col[c]=make(l,C,h);paint(c,h-F*w/2,h+F*w/2,l,C*0.88,d+1);});}
-  for(i=0;i<n;i++)if(G[T[i][2]]){var g=G[T[i][2]],c0=MapFilter.color(g,META.groups.indexOf(g)),o=lab(c0),
-    C=Math.hypot(o[1],o[2]),h=Math.atan2(o[2],o[1])*180/Math.PI,w=Math.min(CAP,PER*kids[i].length);
-    gr[g]=i;col[i]=c0.slice();
+  // a wedge root: a group's taxon in colour c0, or a focus in its own colour
+  function root(i,c0){var o=lab(c0),C=Math.hypot(o[1],o[2]),h=Math.atan2(o[2],o[1])*180/Math.PI,
+    w=Math.min(CAP,PER*kids[i].length);col[i]=c0.slice();
     // a grey group (Animalia) has no hue to keep: its clades take soft hues round the whole circle
     if(C<0.03)paint(i,0,360,L1,0.08,0);else paint(i,h-w/2,h+w/2,L1,Math.max(C,0.13),0);}
-  return {col:col,kids:kids,par:par,gr:gr,tot:tot};
+  for(i=0;i<n;i++)if(G[T[i][2]]){var g=G[T[i][2]];gr[g]=i;root(i,MapFilter.color(g,META.groups.indexOf(g)));}
+  // The palette focused on row f below a group: f keeps its colour and its clades take a whole group's wedge
+  // around it, so deep siblings sit as far apart as a group's children. The overview (col) for any other f.
+  var fc=[-1,col];
+  function at(f){if(f===fc[0])return fc[1];var all=col;
+    if(f>=0&&f<n&&all[f]&&par[f]>=0){col=all.slice();root(f,all[f]);}
+    fc=[f,col];col=all;return fc[1];}
+  return {col:col,kids:kids,par:par,gr:gr,tot:tot,at:at};
 }
 return {build:build,lab:lab,make:make,reads:reads};
 })();

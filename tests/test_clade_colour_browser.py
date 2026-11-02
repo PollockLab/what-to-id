@@ -177,3 +177,35 @@ def test_the_legend_lists_the_clades_the_filters_leave_and_keeps_their_colours(b
     assert got["dots"][0] == was["dots"][0]
     assert page.errors == []
     page.close()
+
+
+def swatch(browser, site, hash_, name):
+    tree = browser.new_page(viewport={"width": 1280, "height": 900})
+    stub_taxa(tree)
+    tree.goto(f"{site}/tree.html{hash_}")
+    tree.wait_for_selector("#outline li[data-k]")
+    got = tree.evaluate(
+        """(n) => [...document.querySelectorAll('#outline li')]
+      .find(e => e.querySelector('.nm').textContent === n).querySelector('i').style.background""",
+        name,
+    )
+    tree.close()
+    return got
+
+
+def test_a_drilled_sub_clade_and_the_tree_focused_on_it_share_the_focused_colours(browser, site):
+    page = open_map(browser, site)
+    pick(page, "Plants")
+    page.wait_for_function(f"({STATE})().names.length === 3")
+    page.locator(".lvleg [role=button]", has_text="Vascular Plants").click()
+    page.wait_for_function(f"({STATE})().head.endsWith('/ Vascular Plants')")
+    got = page.evaluate(STATE)
+    assert got["names"] == ["Acer macrophyllum", "Thuja plicata"]
+    assert got["swatch"][0] == rgb(got["dots"][0])
+    maple = "Acer macrophyllum"
+    assert swatch(browser, site, "#focus=211194", maple) == got["swatch"][0]
+    assert (
+        swatch(browser, site, "#sel=5001", maple) != got["swatch"][0]
+    )  # the overview colours it otherwise
+    assert page.errors == []
+    page.close()

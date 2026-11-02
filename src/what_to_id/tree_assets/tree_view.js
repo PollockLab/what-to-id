@@ -10,9 +10,11 @@ var CT=new Set(),M=TreeModel,L=EmbeddingsLayout,META=CFG.meta,nf=new Intl.Number
 function $(i){return document.getElementById(i);}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 function status(t){$('status').textContent=t||'';}
+// The clade colours, focused on the shown root as the map's legend focuses on a sub-clade (clade_colour.js).
 function col(r){
+  if(COL.f!==S.focus){COL=new Map();COL.f=S.focus;}
   if(COL.has(r))return COL.get(r);
-  var g=D.grp[r],k=r<D.n&&CC.col[r]||g&&MapFilter.color(g,META.groups.indexOf(g)),c=k?'rgb('+k.join(',')+')':'var(--muted)';
+  var g=D.grp[r],k=r<D.n&&CC.at(M.lead(D,S.focus))[r]||g&&MapFilter.color(g,META.groups.indexOf(g)),c=k?'rgb('+k.join(',')+')':'var(--muted)';
   COL.set(r,c);return c;}
 function rowOf(n){return n.row<0?n.parent.row:n.row;}
 function cmn(r){var c=M.common(D,r);return c.toLowerCase()===M.name(D,r).toLowerCase()?'':c;}

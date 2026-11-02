@@ -60,8 +60,9 @@ function sync(){
   if(lens.length&&base<0&&inc.length&&inc.indexOf(lens.g)<0)lens=[];  // the drilled group left the selection
   var t=lens.length?lens[lens.length-1]:deep(base)?base:-1;
   if(t!==top||t>=0&&held(t).slice(0,TOP).join()!==show.join()){top=t;
-    show=t<0?[]:held(t).slice(0,TOP);sc=show.map(function(c){return CC.col[c].concat(110);});
-    if(t>=0){var c=CC.col[t];sc[OTHER]=c.map(function(v){return Math.round(v*0.4+150*0.6);}).concat(110);slot=slots();}}
+    // below a group (a drilled sub-clade, a picked taxon) the palette focuses on the breakdown, as the tree's focus does
+    show=t<0?[]:held(t).slice(0,TOP);var F=CC.at(t);sc=show.map(function(c){return F[c].concat(110);});
+    if(t>=0){var c=F[t];sc[OTHER]=c.map(function(v){return Math.round(v*0.4+150*0.6);}).concat(110);slot=slots();}}
   apply();}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 // A legend row: swatch and name, cut to one line with the full name in its title; go() makes it a button.
