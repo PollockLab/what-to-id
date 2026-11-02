@@ -32,6 +32,8 @@ button{cursor:pointer}
 button:disabled{opacity:.5;cursor:default}
 input[type=text]{width:100%;box-sizing:border-box}
 .link{border:0;background:none;color:var(--bar);text-decoration:underline;min-width:44px}
+.hint{color:var(--muted);font-size:14px;margin:4px 0}
+legend{width:100%}
 fieldset{border:0;padding:0;margin:12px 0;display:flex;flex-wrap:wrap;gap:4px 16px}
 fieldset label{min-height:44px;display:inline-flex;align-items:center;gap:6px}
 #main-photo{width:100%;max-height:70vh;object-fit:contain;background:var(--chip);border-radius:6px}
@@ -50,27 +52,38 @@ BODY = """
 <main id="main-content">
 __NOTHING__
 <section id="login-view" hidden><form id="login-form">
+<p>You see the photos of one iNaturalist record at a time. Name what you see. The page shows no
+suggestion and no other person's ID, on purpose: we want your own judgement.</p>
+<ol><li>Look at all the photos. Tap a small photo to see it large.</li>
+<li>Type the most precise name you are sure of: species, genus or family. A common or a
+scientific name is fine.</li>
+<li>Pick how sure you are. If you have no idea, press I cannot say.</li>
+<li>After you answer, you can open the record and see what other people said.</li></ol>
+<p>Your answers stay in this browser until you press Export answers.</p>
 <label for="login">Your iNaturalist login</label>
 <input type="text" id="login" autocomplete="off" autocapitalize="none" required>
 <p><button type="submit">Start</button></p></form></section>
 <section id="record-view" hidden>
 <img id="main-photo" alt=""><div id="thumbs"></div>
+<p id="photo-hint" class="hint"></p>
 <p>Group: <b id="group"></b></p>
-<form id="answer"><label for="taxon">Taxon name</label>
-<input type="text" id="taxon" autocomplete="off">
-<fieldset><legend class="site-vh">Confidence</legend>
+<form id="answer"><label for="taxon">What is it? The most precise name you are sure of</label>
+<input type="text" id="taxon" autocomplete="off" placeholder="species, genus or family">
+<fieldset><legend>How sure are you?</legend>
 <label><input type="radio" name="conf" value="sure" required> sure</label>
 <label><input type="radio" name="conf" value="likely"> likely</label>
 <label><input type="radio" name="conf" value="guess"> guess</label></fieldset>
-<div class="row"><button type="submit">Save</button>
-<button type="button" id="abstain">Cannot say</button></div></form>
-<div id="reveal" hidden>
-<a id="link" target="_blank" rel="noopener">Open on iNaturalist (new tab)</a><br>
-<button type="button" id="next">Next</button></div></section>
-<section id="done-view" hidden><p>All done. Thank you.</p></section>
+<div class="row"><button type="submit">Save answer</button>
+<button type="button" id="abstain">I cannot say</button></div></form>
+<div id="reveal" hidden><p>Your answer: <b id="mine"></b></p>
+<p><a id="link" target="_blank" rel="noopener">
+See what other people said on iNaturalist (new tab)</a></p>
+<button type="button" id="next">Next record</button></div></section>
+<section id="done-view" hidden><p>All done. Thank you. Press Export answers to download your
+answers as a file.</p></section>
 </main>
 <footer><span id="count" aria-live="polite"></span>
-<button type="button" id="export">Export</button>
+<button type="button" id="export">Export answers</button>
 <button type="button" id="clear" class="link">Clear my answers</button></footer>
 """
 
