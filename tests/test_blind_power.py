@@ -1,4 +1,7 @@
-from what_to_id.blind_power import COLUMNS, main, power_two_prop, table
+import numpy as np
+from scipy import stats
+
+from what_to_id.blind_power import COLUMNS, level_power, main, power_two_prop, table
 
 
 def test_table_shape_and_monotone():
@@ -25,6 +28,20 @@ def test_power_two_prop_limits():
     assert power_two_prop(0.06, 0.12, 1200, 400) > power_two_prop(0.06, 0.09, 1200, 400)
     two = power_two_prop(0.06, 0.09, 1200, 400)
     assert power_two_prop(0.06, 0.09, 1200, 400, one_sided=True) > two
+
+
+def test_level_power_matches_spearman_and_orders():
+    rng = np.random.default_rng(0)
+    assert abs(level_power(1000, 0.8, 0.0, 4000, rng) - 0.05) < 0.02  # size under no gradient
+    small, large = (level_power(2000, 0.8, s, 2000, rng) for s in (0.02, 0.05))
+    assert small < large and large > 0.95
+    # the closed form agrees with scipy on one draw
+    x = np.repeat(np.arange(5), 40)
+    y = (rng.random(x.size) < 0.8 - 0.05 * (np.arange(5).repeat(40) - 2)).astype(int)
+    p = stats.spearmanr(x, y, alternative="less").pvalue
+    r = stats.pearsonr(stats.rankdata(x), stats.rankdata(y))[0]
+    t = r * np.sqrt((x.size - 2) / (1 - r * r))
+    assert abs(stats.t.cdf(t, x.size - 2) - p) < 1e-9
 
 
 def test_main_prints_table(capsys):

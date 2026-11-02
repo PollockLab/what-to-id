@@ -8,6 +8,9 @@ rows simulate the chain the estimator sees: erroneous records are a binomial dra
 records, overturns a binomial draw from those, disagreements with the consensus add a consensus
 error c that the estimator removes using a c measured on the settled share of the planted records,
 and the test is the one-sided z test on the difference, a stand-in for the registered bootstrap.
+The H3 columns are the power of the one-sided Spearman test of settled against level order when
+the settled share falls by a small or a large step per level around the assumed share, records
+split evenly over the five levels as ``blind_sample`` does.
 """
 
 from __future__ import annotations
@@ -16,13 +19,14 @@ import argparse
 
 import numpy as np
 import pandas as pd
+from scipy import stats
 from scipy.stats import norm
 
 from .blind_report import Z, _correct, _wilson
 
 COLUMNS = [
     "records", "n_cv", "n_typed", "half_cv", "half_typed", "power_e_small", "power_e_large",
-    "d_lo_cv", "d_hi_cv", "d_lo_typed", "d_hi_typed", "power_d",
+    "d_lo_cv", "d_hi_cv", "d_lo_typed", "d_hi_typed", "power_d", "power_h3_small", "power_h3_large",
 ]  # fmt: skip
 Z_ONE_SIDED = 1.644854
 
@@ -54,6 +58,22 @@ def _draw_d(n: int, e: float, d: float, draws: int, rng, c: float = 0.0, n_c: in
         return hits / errs, errs
 
 
+def level_power(n: int, settled: float, step: float, draws: int, rng, levels: int = 5) -> float:
+    """Power of the one-sided Spearman test between level order and the settled indicator when
+    the settled share falls by ``step`` per level around ``settled``, ``n`` records split evenly."""
+    per = n // levels
+    x = np.repeat(np.arange(levels), per)
+    p = settled - step * (np.arange(levels) - (levels - 1) / 2)
+    y = rng.random((draws, x.size)) < np.repeat(p, per)
+    n1 = y.sum(1, keepdims=True)
+    ry = np.where(y, x.size - n1 + (n1 + 1) / 2, (x.size - n1 + 1) / 2)  # ranks of a binary y
+    rx = stats.rankdata(x)
+    r = ((ry - ry.mean(1, keepdims=True)) * (rx - rx.mean())).sum(1)
+    r /= np.sqrt(((ry - ry.mean(1, keepdims=True)) ** 2).sum(1) * ((rx - rx.mean()) ** 2).sum())
+    t = r * np.sqrt((x.size - 2) / np.maximum(1 - r * r, 1e-12))
+    return float(np.mean(stats.t.cdf(t, x.size - 2) < 0.05))
+
+
 def table(
     records: list[int],
     settled: float = 0.8,
@@ -68,6 +88,8 @@ def table(
     planted: int = 600,
     draws: int = 4000,
     seed: int = 0,
+    h3_step_small: float = 0.02,
+    h3_step_large: float = 0.05,
 ) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
     rows = []
@@ -89,6 +111,8 @@ def table(
             *np.nanpercentile(d_cv_hat, [2.5, 97.5]),
             *np.nanpercentile(d_typed_hat, [2.5, 97.5]),
             float(np.nanmean(z > Z_ONE_SIDED)),
+            level_power(n, settled, h3_step_small, draws, rng),
+            level_power(n, settled, h3_step_large, draws, rng),
         ])  # fmt: skip
     return pd.DataFrame(rows, columns=COLUMNS)
 
