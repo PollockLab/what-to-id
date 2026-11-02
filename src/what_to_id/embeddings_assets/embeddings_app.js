@@ -152,14 +152,14 @@ function update(){
   $('more').textContent=P.grp&&P.n<total?'('+nf.format(total-P.n)+' of the map’s '+nf.format(total)+
     ' records are not placed yet)':'';
   [].forEach.call($('groups').querySelectorAll('button[data-g]'),paint);
-  if(BAR)BAR.set(items());if(TR)TR.render();layers();
+  if(GB)GB.set(S.count);if(BAR)BAR.set(items());if(TR)TR.render();layers();
   X.counts(passing);
 }
 // A pick, a left-out or a removal anywhere: the groups beside included taxa change which points are kept.
 function picked(){
   TF=TX.filter(S.TAXA,S.picks);applyKeep();update();writeHash();$('gfit').hidden=!items().length;
 }
-var PK=null,BAR=null;
+var PK=null,BAR=null,GB=null;
 // The map's selection bar, its date chip included, plus, marked "map only", the
 // filters this page leaves to the map. The area applies here when it reads; in the split view it is the map's
 // to clear, so its chip has no ×.
@@ -215,7 +215,7 @@ $('gfit').addEventListener('click',fit);
 function chips(){
   var P=S.P,count=new Array(S.META.groups.length).fill(0);
   for(var i=0;i<P.n;i++)count[P.grp[i]]++;
-  var box=$('groups');box.textContent='';
+  var box=$('groups');box.textContent='';GB=GB||GroupBar({det:$('gdet'),bar:$('gbar'),G:S.META.groups,S:S,nf:nf,name:gname,color:function(j){return 'rgb('+color(j).join(',')+')';}});
   MF=MF||MapFilter(S.META);
   Object.assign(S,MF.read(new URLSearchParams(location.hash.slice(1))));
   if(AREA_IN!==null)S.area=AREA_IN;
@@ -235,7 +235,7 @@ function chips(){
     taxa:function(){return S.TAXA;},counts:function(){return TX.counts(S.TAXA,S.P.tax,S.P.n);},onChange:picked,
     onPick:function(r){if(TR)TR.reveal(r);}});
   BAR=CH.bar({box:$('selbar'),clear:clearAll,fallback:$('q')});
-  applyKeep();$('gfit').hidden=!items().length;$('ldraw').disabled=false;
+  applyKeep();GB.set(S.count);$('gfit').hidden=!items().length;$('ldraw').disabled=false;
   if(TR)TR.render();
 }
 $('gall').addEventListener('click',function(){S.groups={};picked();});

@@ -30,11 +30,12 @@ html:not(.about) #honest{display:none}
 .embed.about .note{margin:0;background:var(--panel);color:var(--muted);border:1px solid var(--line);box-shadow:var(--shadow)}
 .peer body{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);grid-template-areas:"nav" "head" "plot"}
 .peer .side{grid-area:plot;border-bottom:1px solid var(--line);max-height:none;position:relative;z-index:5;align-self:start;justify-self:start;margin:8px;padding:4px 10px;overflow:visible;border:1px solid var(--line);border-radius:8px;background:var(--panel);pointer-events:none;gap:0}
-.peer .side{max-width:calc(100% - 16px)}
+.peer .side{max-width:calc(100% - 124px)}  /* clear of Draw and the info button */
 .peer .side>:not(.stat):not(#status):not(.lg){display:none}
-.peer .lg>:not(#groups){display:none}
-.peer #groups{pointer-events:auto;margin-top:4px}
-.peer #groups button{pointer-events:auto}
+.peer .lg>:not(#gdet){display:none}
+.peer #gdet{pointer-events:auto;min-width:200px}
+.peer #gdet .muted,.peer #gdet #tree{display:none}
+.peer #groups{margin-top:4px}
 .peer #status:empty{display:none}
 .embed .card{top:12px;max-height:calc(100vh - 24px)}
 header{grid-area:head;padding:10px 16px;border-bottom:1px solid var(--line)}
@@ -48,6 +49,13 @@ h1{font-size:18px;margin:0}
 button,.btn{font:inherit;font-size:12px;border:1px solid var(--line);background:var(--chip);color:var(--ink);padding:4px 10px;
   border-radius:14px;cursor:pointer;text-decoration:none;display:inline-block}
 .chips button[aria-pressed="true"]{background:var(--on);color:var(--onink);border-color:var(--on)}
+#gdet>summary{cursor:pointer;font-size:12px;color:var(--muted);list-style:none}
+#gdet>summary::-webkit-details-marker{display:none}
+#gdet>summary::before{content:"\25B8 ";display:inline-block;width:1em}
+#gdet[open]>summary::before{content:"\25BE "}
+.gbar{display:flex;height:10px;margin:4px 0 6px;border-radius:3px;overflow:hidden;background:var(--line)}
+.gbar i{display:block;height:100%;min-width:1px}
+.gbar i.dim{opacity:.3}
 .chips i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
 button[hidden]{display:none}
 .link{border:0;background:none;text-decoration:underline;padding:0;color:var(--muted)}
@@ -121,9 +129,10 @@ __SITE_NAV__<header>
 <input id="q" type="search" placeholder="Latin or common name, e.g. Carex" autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="sugg">
 <ul id="sugg" class="sugg" role="listbox" aria-label="Matching taxa" hidden></ul></div>
 <p id="qn" class="muted" aria-live="polite"></p></div>
-<div class="lg"><p class="muted">Life groups. Click a chip to pick it, again to leave it out, a third time to clear it.</p>
+<div class="lg"><details id="gdet"><summary>Life groups<span id="gbar" class="gbar" role="img" aria-label="No points in view"></span></summary>
+<p class="muted">Click a chip to pick it, again to leave it out, a third time to clear it.</p>
 <div id="groups" class="chips" role="group" aria-label="Life groups"></div>
-<div id="tree" class="tree" aria-label="Ranks under the groups"></div>
+<div id="tree" class="tree" aria-label="Ranks under the groups"></div></details>
 <p class="muted"><button type="button" class="link" id="gall">All groups</button> <button type="button" class="link" id="gfit" hidden>Fit to selection</button></p></div>
 </section>
 <main id="plot" role="application" aria-label="Photo space of observations"></main>
@@ -148,6 +157,7 @@ __SITE_NAV__<header>
 <script>__TAXON_TREE__</script>
 <script>__EMBEDDINGS_LAYOUT__</script>
 <script>__SPACE_MASK__</script>
+<script>__GROUP_BAR__</script>
 <script>__EMBEDDINGS_SELECT__</script>
 <script>__LIFE_MAP__</script>
 <script>__LIFE_VIEW__</script>
