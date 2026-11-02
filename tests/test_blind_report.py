@@ -7,6 +7,7 @@ from what_to_id.blind_report import (
     LEVEL_COLUMNS,
     REPORT_COLUMNS,
     TEST_COLUMNS,
+    align_consensus,
     collapse_refinements,
     cv_error,
     detection_rate,
@@ -405,3 +406,14 @@ def test_hypothesis_tests_skip_untestable():
     levels = pd.DataFrame({"record_id": [1, 2], "level": [1, 1]})
     out = hypothesis_tests(cons, firsts, public, levels, boot=10)
     assert out["hypothesis"].tolist() == ["H1 error cv != typed"] and out["p"].item() == 1.0
+
+
+def test_align_consensus_judges_the_reference_only_at_its_rank():
+    anc = {1: frozenset({10}), 11: frozenset({1, 10})}
+    cons = pd.DataFrame({"record_id": [0, 1, 2, 3], "taxon_id": [11, 10, 2, 1]}).assign(
+        posterior=0.95
+    )
+    ref = pd.DataFrame({"record_id": [0, 1, 2, 3], "taxon_id": [1, 1, 1, 1]})
+    out = align_consensus(cons, ref, anc)
+    assert out["taxon_id"].tolist() == [1, 10, 2, 1]  # a subspecies consensus upholds the species
+    assert out["posterior"].tolist() == [0.95, 0.0, 0.95, 0.95]  # a genus consensus settles nothing
