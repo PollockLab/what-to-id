@@ -15,6 +15,7 @@ from what_to_id.blind_report import (
     detection_rate,
     first_own_ids,
     hard_cases,
+    held_out_consensus,
     hypothesis_tests,
     level_error,
     level_table,
@@ -438,3 +439,13 @@ def test_lineage_consensus_recovers_first_id_error_when_students_stop_at_genus()
         true_e, abs=0.03
     )
     assert e(fit(answers)[1]) > 2 * true_e  # a genus consensus scores a right first ID as wrong
+
+
+def test_held_out_consensus_rolls_up_at_the_report_threshold():
+    anc = {11: frozenset({1, 10}), 12: frozenset({1, 10}), 1: frozenset({10}), 2: frozenset({10})}
+    answers = pd.DataFrame(
+        {"record_id": 0, "login": list("abcd"), "taxon_id": [11, 11, 12, 2], "group": "g"}
+    )
+    planted = pd.DataFrame({"record_id": [0], "taxon_id": [1]})
+    held = held_out_consensus(answers, planted, threshold=0.6, folds=1, ancestry=anc)
+    assert held["taxon_id"].tolist() == [1] and held["wrong"].tolist() == [0]

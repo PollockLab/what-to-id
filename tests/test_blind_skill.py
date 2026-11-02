@@ -122,15 +122,37 @@ def test_rollup_settles_more_records_without_losing_accuracy():
 
 def test_rollup_picks_the_finest_taxon_that_passes():
     anc = {1: frozenset({10}), 2: frozenset({10}), 3: frozenset({20})}
-    cand = pd.DataFrame({"record_id": [0, 0, 1, 1, 2, 2], "taxon_id": [1, 2, 1, 2, 1, 3]}).assign(
-        posterior=[0.93, 0.07, 0.5, 0.5, 0.6, 0.4]
-    )
+    cand = pd.DataFrame(
+        {"record_id": [0, 0, 1, 1, 1, 2, 2], "taxon_id": [1, 2, 1, 2, 10, 1, 3]}
+    ).assign(posterior=[0.93, 0.07, 0.45, 0.45, 0.1, 0.6, 0.4])
     out = _roll_up(cand, anc, 0.9).set_index("record_id")
     assert out.loc[0, "taxon_id"] == 1  # species passes
-    assert out.loc[1, "taxon_id"] == 10 and out.loc[1, "posterior"] == pytest.approx(1.0)
+    assert out.loc[1, "taxon_id"] == 10 and out.loc[1, "posterior"] == pytest.approx(
+        1.0
+    )  # named genus
     assert len(out.loc[2]) == 2  # no shared taxon passes: candidates unchanged
 
 
 def test_ancestry_from_taxa():
     taxa = pd.DataFrame({"taxon_id": [1, 5], "ancestry": [None, "48460/1/3"]})
     assert ancestry_from_taxa(taxa) == {1: frozenset(), 5: frozenset({48460, 1, 3})}
+
+
+def test_a_finer_answer_agrees_with_a_planted_truth():
+    anc = {1: frozenset({10}), 100: frozenset({1, 10})}
+    answers = pd.DataFrame(
+        [(r, u, 100 if u == "x" else 1) for r in range(20) for u in ("x", "y")],
+        columns=["record_id", "login", "taxon_id"],
+    ).assign(group="g")
+    planted = pd.DataFrame({"record_id": range(20), "taxon_id": 1})
+    skill = fit(answers, planted, ancestry=anc)[0].set_index("login")["accuracy"]
+    assert skill["x"] == pytest.approx(skill["y"]) and skill["x"] > 0.9
+
+
+def test_rollup_never_settles_on_an_unnamed_shared_ancestor():
+    anc = {1: frozenset({48460}), 2: frozenset({48460})}  # two kingdoms meet only at Life
+    answers = pd.DataFrame(
+        {"record_id": 0, "login": list("abcd"), "taxon_id": [1, 1, 2, 2], "group": "g"}
+    )
+    cons = fit(answers, ancestry=anc)[1]
+    assert cons["taxon_id"].item() in (1, 2) and consensus_at(cons).empty

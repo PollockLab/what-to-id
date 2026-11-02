@@ -109,7 +109,12 @@ def held_out_consensus(
     np.random.default_rng(seed).shuffle(ids)
     parts = []
     for held in np.array_split(ids, folds):
-        _, cons = fit(answers, planted[~planted["record_id"].isin(held)], ancestry=ancestry)
+        _, cons = fit(
+            answers,
+            planted[~planted["record_id"].isin(held)],
+            ancestry=ancestry,
+            threshold=threshold,
+        )
         if ancestry is not None:
             cons = align_consensus(cons, planted, ancestry)
         got = cons[cons["record_id"].isin(held) & (cons["posterior"] >= threshold)]
