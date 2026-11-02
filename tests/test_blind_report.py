@@ -213,6 +213,22 @@ def test_detection_interval_widens_with_consensus_uncertainty():
     assert drawn["lo"] < drawn["detection"] < drawn["hi"]
 
 
+def test_detection_rate_splits_by_experience():
+    # novices: 4 wrong, 2 caught (d 0.5); experts: 4 wrong, 4 caught (d 1.0); same e in both
+    cons = _cons([(i, 1, 0.99) for i in range(20)])
+    firsts = _firsts([(i, "Aves", 2 if i % 10 < 4 else 1, True) for i in range(20)])
+    firsts["experience"] = ["<10 ids"] * 10 + ["100+ ids"] * 10
+    public = pd.DataFrame({"record_id": range(20), "taxon_id": [2, 2, 1, 1] + [1] * 16})
+    out = detection_rate(cons, firsts, public, boot=100, by="experience")
+    assert list(out.columns) == ["experience", *DETECT_COLUMNS[1:]]
+    d = out.set_index(["experience", "source"])["detection"]
+    assert (
+        d[("<10 ids", "cv")] == 0.5
+        and d[("100+ ids", "cv")] == 1.0
+        and d[("all", "cv")] == pytest.approx(0.75)
+    )
+
+
 def test_detection_rate_handles_no_error_and_no_overlap():
     cons = _cons([(1, 1, 0.99), (2, 1, 0.99)])
     firsts = _firsts([(1, "Aves", 1, False), (2, "Aves", 1, False)])
