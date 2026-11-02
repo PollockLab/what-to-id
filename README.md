@@ -67,7 +67,7 @@ Each identifier is then compared with themself, their IDs on List 2 against thei
 4. **Serve** one static page: lists A to D, each a stack of Identify links; the arm behind each letter lives only in the build's `manifest.json`. Each daily build appends what it served to a served log.
 5. **Read back** every served record. Identifications keep their timestamps, so the per-identifier comparison is read within a week of the blitz and record outcomes at 30 days.
 
-The BC run is four lists over four weeks; the protocol and pre-fixed outcomes are in [docs/protocol.md](docs/protocol.md). Identification blitzes have precedent ([Mesaglio et al. 2025](https://doi.org/10.1002/ppp3.70005)); the randomised order inside one is new.
+The BC run is four lists over four weeks; the protocol and pre-fixed outcomes are in [docs/protocol.md](docs/protocol.md). Identification blitzes have precedent ([Mesaglio et al. 2025](https://doi.org/10.1002/ppp3.70005)); we found no published blitz that randomises the order of its records.
 
 ## Install
 
