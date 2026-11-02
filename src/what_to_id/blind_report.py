@@ -61,8 +61,8 @@ def first_own_ids(obs: pd.DataFrame, idents: pd.DataFrame) -> pd.DataFrame:
     out = out.rename(columns={"id": "record_id", "iconic_taxon": "group"})
     out = out[FIRST_COLUMNS + extra + ["created_at"]].reset_index(drop=True)
     stamp = pd.to_datetime(out.pop("created_at"), utc=True)
-    days = (pd.to_datetime(idents["created_at"], utc=True).max() - stamp).dt.days
-    out["age"] = pd.cut(days, [-np.inf, 29, 364, np.inf], labels=AGE).astype(str)
+    out["age_days"] = (pd.to_datetime(idents["created_at"], utc=True).max() - stamp).dt.days
+    out["age"] = pd.cut(out["age_days"], [-np.inf, 29, 364, np.inf], labels=AGE).astype(str)
     if extra:
         cuts = [-np.inf, 9, 99, np.inf]
         out["experience"] = pd.cut(out.pop("observer_idents"), cuts, labels=EXPERIENCE).astype(str)
@@ -190,6 +190,7 @@ def detection_rate(
     consensus_error=0.0,
     consensus_n=0,
     by="group",
+    nowcast=False,
 ) -> pd.DataFrame:
     """Public overturn rate over blind error rate, by group and source, with a bootstrap 95% CI.
 
@@ -201,7 +202,9 @@ def detection_rate(
     held-out count) each resample draws its own c, so the interval carries c's uncertainty.
     ``by`` splits on another firsts column instead of group, such as ``experience``: the public
     gap between sources can close with experience through e or through d, and only this split
-    on blind data tells which.
+    on blind data tells which. With ``nowcast`` the overturn rate is overturned over the sum of the
+    firsts ``complete`` column (:func:`public_overturn.completeness` at each record's age), so
+    corrections a young record has not had time to get yet are counted in expectation.
     """
     j = _scored(consensus, firsts, threshold, by)
     j = j.merge(public[["record_id", "taxon_id"]].rename(columns={"taxon_id": "taxon_id_p"}))
@@ -214,13 +217,15 @@ def detection_rate(
     rows = []
     for (group, source), g in j.groupby([by, "source"]):
         w, o = g["wrong"].to_numpy(), g["over"].to_numpy()
+        f = g["complete"].to_numpy(float) if nowcast else np.ones(len(g))
         idx = rng.integers(0, len(g), (boot, len(g)))
         with np.errstate(divide="ignore", invalid="ignore"):
             e = _correct(w.mean(), consensus_error)
-            d = o.mean() / e
-            ds = o[idx].mean(1) / _correct(w[idx].mean(1), cs)
+            over = o.sum() / f.sum()
+            d = over / e
+            ds = o[idx].sum(1) / f[idx].sum(1) / _correct(w[idx].mean(1), cs)
         lo, hi = np.nanpercentile(ds, [2.5, 97.5]) if np.isfinite(ds).any() else (np.nan, np.nan)
-        rows.append((group, source, len(g), e, o.mean(), d, lo, hi))
+        rows.append((group, source, len(g), e, over, d, lo, hi))
     return pd.DataFrame(rows, columns=[by, *DETECT_COLUMNS[1:]])
 
 
@@ -350,6 +355,7 @@ def main(argv=None) -> int:
     ap.add_argument("--threshold", type=float, default=0.9)
     ap.add_argument("--answers", help="answers.parquet from blind_answers, for consensus error")
     ap.add_argument("--planted", help="planted.parquet from blind_sample, for consensus error")
+    ap.add_argument("--delays", help="correction delays parquet (public_overturn), for nowcast d")
     ap.add_argument("--hard-cases", help="write overturned and unsettled records to this parquet")
     a = ap.parse_args(argv)
     idents = pd.read_parquet(a.idents)
@@ -381,6 +387,16 @@ def main(argv=None) -> int:
             consensus, firsts, public, a.threshold, consensus_error=c, consensus_n=n_c
         )
         print(det.to_string(index=False))
+        if a.delays:
+            from what_to_id.public_overturn import completeness
+
+            delays = pd.read_parquet(a.delays)["days"]
+            firsts["complete"] = completeness(firsts["age_days"], delays)
+            kw = dict(consensus_error=c, consensus_n=n_c, nowcast=True)
+            print(f"\nnowcast d, overturn over completeness at age ({len(delays)} delays)")
+            print(
+                detection_rate(consensus, firsts, public, a.threshold, **kw).to_string(index=False)
+            )
         for b in splits:
             print()
             kw = dict(consensus_error=c, consensus_n=n_c, by=b)
