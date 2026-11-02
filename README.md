@@ -141,7 +141,7 @@ The public pattern holds outside BC. Overturn of species-level first IDs that an
 | Netherlands | 5.4% | 8.4% | 1.33 |
 | United Kingdom | 5.1% | 7.9% | 1.31 |
 
-A lower overturn is either a lower error or a lower detection: identifiers can agree with a name that the suggestion made look right. The public record cannot split the two. The blind track does.
+Pooled over the five regions the within-species ratio is 1.39 (95% CI 1.30 to 1.49, species bootstrap), with no detectable spread between regions (I² = 0%). Plants and birds carry it in every region (1.3 to 2.3); insects sit near 1 in all five (0.95 to 1.15). A lower overturn is either a lower error or a lower detection: identifiers can agree with a name that the suggestion made look right. The public record cannot split the two. The blind track does.
 
 ## References
 

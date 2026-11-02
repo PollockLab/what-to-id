@@ -397,8 +397,9 @@ def main(argv=None) -> int:
         print()
     rr, k = within_species(df)
     print(f"within-species Mantel-Haenszel ratio typed/cv = {rr:.2f} over {k} species")
-    print(matched_table(df, "experience").to_string(index=False, float_format="{:.2f}".format))
-    print()
+    for by in ("experience", "group"):
+        print(matched_table(df, by).to_string(index=False, float_format="{:.2f}".format))
+        print()
     print(identifier_cv_table(rows, df).to_string(index=False, float_format="{:.3f}".format))
     print()
     print(corrector_table(rows, df).to_string(index=False, float_format="{:.3f}".format))
