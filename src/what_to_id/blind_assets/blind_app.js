@@ -5,6 +5,9 @@
   var get = function (k, d) { try { var v = localStorage.getItem(K + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } };
   var put = function (k, v) { localStorage.setItem(K + k, JSON.stringify(v)); };
   var login = get("login", ""), shown = 0, answered = null;
+  var PLAIN = { Aves: "birds", Plantae: "plants", Fungi: "fungi", Insecta: "insects", Mammalia: "mammals",
+    Reptilia: "reptiles", Amphibia: "amphibians", Actinopterygii: "ray-finned fishes", Mollusca: "molluscs",
+    Arachnida: "spiders and kin", Animalia: "other animals" };
 
   // seeded Fisher-Yates: FNV-1a of the login seeds mulberry32, so a login always gets the same order
   function permutation(n, seed) {
@@ -43,7 +46,8 @@
     if (pos >= recs.length) { show("done-view"); return; }
     var r = recs[order()[pos]];
     show("record-view");
-    $("group").textContent = r.group;
+    $("group").textContent = r.group + (PLAIN[r.group] ? " (" + PLAIN[r.group] + ")" : "");
+    $("photo-hint").textContent = r.photos.length > 1 ? r.photos.length + " photos. Tap a small photo to see it large." : "";
     var main = $("main-photo");
     main.src = r.photos[0] || ""; main.alt = "Photo 1 of " + r.photos.length;
     $("thumbs").textContent = "";
@@ -58,6 +62,7 @@
     $("answer").reset();
     answered = mine().filter(function (a) { return a.record_id === r.id; })[0] || null;
     $("answer").hidden = !!answered; $("reveal").hidden = !answered;
+    if (answered) $("mine").textContent = answered.taxon ? answered.taxon + " (" + answered.confidence + ")" : "I cannot say";
     $("link").href = cfg.obs + r.id;
     shown = Date.now();
     (answered ? $("next") : $("taxon")).focus();
