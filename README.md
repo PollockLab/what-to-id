@@ -140,8 +140,9 @@ The public pattern holds outside BC. Overturn of species-level first IDs that an
 | California | 5.8% | 9.0% | 1.39 |
 | Netherlands | 5.4% | 8.4% | 1.33 |
 | United Kingdom | 5.1% | 7.9% | 1.31 |
+| New Zealand | 7.0% | 10.1% | 1.19 |
 
-Pooled over the five regions the within-species ratio is 1.40 (95% CI 1.28 to 1.52, bootstrap over observers), with no detectable spread between regions (I² = 0%), and each region alone excludes 1. Plants and birds carry it in every region (1.3 to 2.3); insects sit near 1 in all five (0.95 to 1.15). A lower overturn is either a lower error or a lower detection: identifiers can agree with a name that the suggestion made look right. Across 39 region-by-group cells, the ratio rises with how often CV first IDs reach species (Spearman ρ 0.62, 0.58 within region) and falls, against the agreement-bias prediction, with how often other identifiers use CV themselves (ρ −0.38). That leans towards lower error, but taxon groups differ in more than CV strength. The public record cannot split the two. The blind track does, by group.
+New Zealand was added last, with its prediction written before the pull: a ratio above 1, at least 1.2. It came in at 1.19 (1.05 to 1.39), so the direction held and the size fell just short. Pooled over the six regions the within-species ratio is 1.34 (95% CI 1.24 to 1.45, bootstrap over observers), with little spread between regions (I² = 13%), and each region alone excludes 1. Plants and birds are above 1 in every region (1.2 to 2.3). Insects sit near 1 in the first five (0.95 to 1.15) but reach 1.32 in New Zealand. A lower overturn is either a lower error or a lower detection: identifiers can agree with a name that the suggestion made look right. Across 39 region-by-group cells of the first five regions, the ratio rises with how often CV first IDs reach species (Spearman ρ 0.62, 0.58 within region) and falls, against the agreement-bias prediction, with how often other identifiers use CV themselves (ρ −0.38). That leans towards lower error, but taxon groups differ in more than CV strength. The public record cannot split the two. The blind track does, by group.
 
 ## References
 
