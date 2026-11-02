@@ -167,6 +167,12 @@ def test_completeness_is_the_delay_distribution_at_age():
     assert f.tolist() == [0.0, 0.25, 0.75, 1.0]
 
 
+def test_completeness_rejects_no_delays_and_keeps_unknown_age_unknown():
+    with pytest.raises(ValueError):
+        po.completeness([1.0], [])
+    assert np.isnan(po.completeness([np.nan, 5], [1.0, 10.0])[0])
+
+
 def test_level_table():
     levels = pd.DataFrame({"id": [1, 2, 4, 5], "taxon_id": [10, 11, 10, 10], "level": [1, 5, 1, 2]})
     out = po.level_table(ROWS, levels).set_index("level")

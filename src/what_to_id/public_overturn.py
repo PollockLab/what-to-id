@@ -319,7 +319,10 @@ def completeness(ages, delays) -> np.ndarray:
     with read-back ages drawn from 7 to 60 days this removes a 35% under-count to within 2%.
     """
     d = np.sort(np.asarray(delays, dtype=float))
-    return np.searchsorted(d, np.asarray(ages, dtype=float), side="right") / len(d)
+    if not len(d):
+        raise ValueError("no correction delays: rerun tables --delays-out on older records")
+    a = np.asarray(ages, dtype=float)
+    return np.where(np.isnan(a), np.nan, np.searchsorted(d, a, side="right") / len(d))
 
 
 def delay_table(rows, df: pd.DataFrame, horizons=(1, 7, 30, 90, 365), min_age=365):

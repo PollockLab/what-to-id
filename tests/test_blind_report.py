@@ -7,6 +7,7 @@ from what_to_id.blind_report import (
     LEVEL_COLUMNS,
     REPORT_COLUMNS,
     TEST_COLUMNS,
+    collapse_refinements,
     cv_error,
     detection_rate,
     first_own_ids,
@@ -285,6 +286,32 @@ def test_detection_rate_nowcast_divides_by_completeness():
     now = detection_rate(cons, firsts, public, nowcast=True, **kw).set_index(["group", "source"])
     assert raw.loc[("all", "cv"), "detection"] == pytest.approx(0.5)
     assert now.loc[("all", "cv"), ["overturn", "detection"]].tolist() == pytest.approx([0.4, 1.0])
+
+
+def test_nowcast_weights_error_by_completeness_when_error_changes_with_age():
+    # young: 20 records at F 0.5, 8 wrong, 2 overturned; old: 20 at F 1, 2 wrong, 1 overturned;
+    # true d 0.5 in both, but the young records hold most of the error
+    young = [(i, "Aves", 2 if i < 8 else 1, True) for i in range(20)]
+    old = [(i, "Aves", 2 if i < 22 else 1, True) for i in range(20, 40)]
+    firsts = _firsts(young + old)
+    firsts["complete"] = [0.5] * 20 + [1.0] * 20
+    cons = _cons([(i, 1, 0.99) for i in range(40)])
+    over = {0, 1, 20}
+    public = pd.DataFrame(
+        {
+            "record_id": range(40),
+            "taxon_id": [1 if i in over else 2 if i < 8 or 20 <= i < 22 else 1 for i in range(40)],
+        }
+    )
+    out = detection_rate(cons, firsts, public, boot=50, nowcast=True).set_index(["group", "source"])
+    assert out.loc[("all", "cv"), "detection"] == pytest.approx(0.5)
+
+
+def test_collapse_refinements_keeps_the_first_taxon_for_descendants_only():
+    firsts = _firsts([(1, "Aves", 10, True), (2, "Aves", 10, True), (3, "Aves", 10, True)])
+    public = pd.DataFrame({"record_id": [1, 2, 3], "taxon_id": [11, 12, 1]})
+    taxa = pd.DataFrame({"taxon_id": [11, 12, 1], "ancestry": ["1/10", "1/5", None]})
+    assert collapse_refinements(public, firsts, taxa)["taxon_id"].tolist() == [10, 12, 1]
 
 
 def test_detection_rate_handles_no_error_and_no_overlap():
