@@ -30,22 +30,34 @@ body{display:flex;flex-direction:column}
 .note{position:absolute;z-index:30;top:100%;right:16px;width:min(380px,calc(100vw - 24px));margin:6px 0 0;padding:10px 12px;
   background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);font-size:12px;color:var(--muted);white-space:normal}
 .note[hidden]{display:none}
-#main-content{flex:1 1 0;min-height:0;display:flex;overflow-x:auto}
+#main-content{flex:1 1 0;min-height:0;display:flex;overflow-x:auto;margin-bottom:calc(56px + env(safe-area-inset-bottom,0px))}  /* the state bar's band: it covers no pane's controls */
 #main-content iframe{flex:1 1 0;min-width:0;height:100%;border:0;background:var(--bg)}
 #main-content iframe[hidden]{display:none}
 #main-content #identify{min-width:280px}
 #main-content #map,#main-content #space{min-width:320px}
 /* the map's frame as the filter rail alone, the map pane hidden (map_rail.js); on a phone a sheet */
 #main-content #map.rail{min-width:0;border-right:1px solid var(--line)}
-#fb{display:none;font:inherit;font-size:12px;padding:0 11px;border:1px solid var(--line);border-radius:14px;background:var(--chip);color:var(--ink);cursor:pointer}
+/* with the map pane hidden, the map's frame as the state bar's sheet (state_bar.js), above the bar */
+#main-content #map.sheet{position:fixed;left:0;bottom:calc(56px + env(safe-area-inset-bottom,0px));width:100%;z-index:20;max-height:60vh;box-shadow:var(--shadow);border-top:1px solid var(--line)}
+/* the state bar: the count, the selection's chips and the Legend and Filters buttons, over every pane */
+.sbar{position:fixed;z-index:40;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom,0px));
+  display:flex;align-items:center;gap:6px;max-width:92vw;padding:4px;background:var(--panel);border:1px solid var(--line);
+  border-radius:20px;box-shadow:var(--shadow);font-size:12px;white-space:nowrap}
+.sbn{padding:0 4px 0 8px;color:var(--muted);font-variant-numeric:tabular-nums;flex:none}
+.sbn:empty{display:none}
+.sbc{display:flex;gap:4px;margin:0;padding:0;list-style:none;min-width:0;overflow-x:auto;scrollbar-width:none}
+.sbc:empty{display:none}
+.sbc li{display:inline-flex;align-items:center;flex:none;min-height:28px;padding:0 2px 0 10px;border-radius:14px;background:var(--chip);color:var(--ink)}
+.sbc button{width:24px;height:24px;padding:0;border:0;border-radius:50%;background:none;color:var(--muted);font:inherit;font-size:14px;cursor:pointer}
+.sbc button:hover{color:var(--ink);background:var(--line)}
+.sbar>button{flex:none;font:inherit;font-size:12px;min-height:28px;padding:0 12px;border:1px solid var(--line);border-radius:14px;background:var(--chip);color:var(--ink);cursor:pointer}
+.sbar>button[aria-expanded="true"]{background:var(--on);color:var(--onink);border-color:var(--on);font-weight:650}
 #main-content #tree{min-width:260px}
 #main-content.drag iframe{pointer-events:none}
 .sep{position:relative;z-index:1;flex:0 0 7px;cursor:col-resize;background:var(--line);touch-action:none;outline-offset:-2px}
 .sep::before{content:'';position:absolute;top:0;bottom:0;left:-8px;right:-8px}  /* a 23 px target for a finger, the line stays 7 px */
 .sep:hover,.sep:focus-visible,.sep.on{background:var(--on)}
-@media (max-width:760px){#fb{display:inline-block;order:-1;min-height:36px}
-  #main-content #map.rail:not(.sheet){display:none}
-  #main-content #map.sheet{position:fixed;left:0;bottom:0;width:100%;z-index:20;height:70vh;box-shadow:var(--shadow);border-top:1px solid var(--line)}}
+@media (max-width:760px){#main-content #map.rail:not(.sheet){display:none}}
 /* a phone: the pane switch on its own row, wide targets, then the search, then the counts */
 @media (max-width:800px){.xbar{flex:1 1 100%;margin:0 0 6px;flex-wrap:wrap;white-space:normal}
   .seg{flex:1 1 0;order:-1;max-width:420px}.seg button{flex:1 1 0;min-height:36px;padding:0 6px}
@@ -56,8 +68,10 @@ body{display:flex;flex-direction:column}
 <body>
 __SITE_NAV__
 <div id="main-content" tabindex="-1"></div>
+<div class="sbar" id="sbar" role="region" aria-label="Your selection"><span class="sbn" id="sbn" aria-live="polite"></span><ul class="sbc" id="sbc" aria-label="Active filters"></ul><button type="button" id="sbl" aria-expanded="false" aria-controls="map">Legend</button><button type="button" id="sbf" aria-expanded="false" aria-controls="map">Filters</button></div>
 <script>
 __MAP_FILTER__
+__STATE_BAR__
 __CLIP_TOKENIZER__
 __ATLAS_SEARCH_INDEX__
 __ATLAS_SEARCH_META__
@@ -118,7 +132,7 @@ function setView(v){
     if((show||keep)&&!f)mk(n);
     else if(f&&!show&&!keep&&innerWidth<800){f.remove();delete frames[n];
     // what a removed frame sent describes something that is gone
-    if(n==='map'){delete late['wtid-view'];delete late['wtid-projects'];delete cnt.map;post('space',{type:'wtid-projects',ids:null});}else if(n==='space'){delete late['wtid-keep'];delete cnt.space;post('map',{type:'wtid-keep',ids:null});}}  // a phone holds one view at a time
+    if(n==='map'){SB.close();delete late['wtid-view'];delete late['wtid-projects'];delete cnt.map;post('space',{type:'wtid-projects',ids:null});}else if(n==='space'){delete late['wtid-keep'];delete cnt.space;post('map',{type:'wtid-keep',ids:null});}}  // a phone holds one view at a time
     else if(f){f.hidden=!show&&!keep;if(show&&old.indexOf(n)<0){sendSel(n,last);post(n,{type:'wtid-record',id:rec});
       Object.keys(late).forEach(function(k){post(n,late[k]);});}}
     });
@@ -254,21 +268,18 @@ addEventListener('message',function(e){
   Object.keys(frames).forEach(function(o){if(o!==n&&visible(o))post(o,d);});
 });
 // The filter rail is the map's own panel (map_rail.js): its frame stays, the map pane hidden, at the rail's
-// width, which the map reports open or folded (wtid-rail); on a phone it is a sheet the Filters button opens.
-var railOpen=true,fb=document.getElementById('fb');
+// width, which the map reports open or folded (wtid-rail); with the map pane hidden the state bar's sheet is
+// that frame too (state_bar.js), its rail open.
+var railOpen=true,SB=StateBar({frames:frames,visible:visible,post:post,make:function(){mk('map');},rail:function(){rail();}});
 function rail(){var f=frames.map;if(!f)return;var on=!visible('map');
-  f.classList.toggle('rail',on);f.title=on?'Filters':'Map';if(!on)f.classList.remove('sheet');
-  fb.setAttribute('aria-expanded',String(f.classList.contains('sheet')));
+  f.classList.toggle('rail',on);f.title=on?'Filters':'Map';if(!on)f.classList.remove('sheet');SB.send();
   post('map',f.classList.contains('sheet')?{type:'wtid-rail',only:on,open:true}:{type:'wtid-rail',only:on});}
 addEventListener('message',function(e){
   var d=e.data;
   if(e.origin!==location.origin||!frames.map||e.source!==frames.map.contentWindow||!d||d.type!=='wtid-rail'||typeof d.open!=='boolean')return;
-  railOpen=d.open;if(d.shut&&frames.map.classList.contains('sheet')){frames.map.classList.remove('sheet');fb.setAttribute('aria-expanded','false');}
+  railOpen=d.open;if(d.shut&&frames.map.classList.contains('sheet'))SB.close();
   layout();
 });
-fb.addEventListener('click',function(){
-  if(!frames.map)mk('map');frames.map.hidden=false;if(!visible('map'))frames.map.classList.add('sheet');rail();
-  if(visible('map'))post('map',{type:'wtid-rail',open:true});});
 function tally(force){var s=visible('map')?'map':visible('space')?'space':null;
   if(visible('tree')&&(force||s!==src)){src=s;post('tree',cnt[s]||{type:'wtid-counts',own:null});}}
 // Photo search: the query is resolved as search.html does, and its hits go to both frames as a subset of the points.

@@ -1,6 +1,7 @@
 """Explore's filter rail in Chromium: the map's own filter panel as a column left of every pane,
-open at 1280 px, folded and remembered, kept as the rail alone while the map pane is hidden, and a
-sheet on a phone. Runs offline on the site and stand-ins of test_explore_home_browser.py."""
+open at 1280 px, folded and remembered, kept as the rail alone while the map pane is hidden, and on
+a phone a sheet from the state bar's Filters. Runs offline on the site and stand-ins of
+test_explore_home_browser.py."""
 
 from . import test_explore_home_browser as eh
 
@@ -61,6 +62,8 @@ def test_the_space_controls_stay_clickable_beside_the_open_rail_with_a_filter_on
     frame = map_frame(page)
     frame.locator("#groups > li").nth(2).locator(".gb").click()
     frame.wait_for_function(f"{COUNT}.startsWith('30 ')")
+    page.click("#sbf")  # the area control is in the state bar's Filters sheet, open a message later
+    frame.wait_for_selector("#xsheet .maplibregl-ctrl.area", state="visible")
     card = frame.locator(".maplibregl-ctrl.area").bounding_box()
     assert card["x"] >= 280  # beside the rail, not under it
     frame.get_by_role(
@@ -72,6 +75,7 @@ def test_the_space_controls_stay_clickable_beside_the_open_rail_with_a_filter_on
     # a phone with the map pane and its filters sheet shut
     page = open_page(browser, f"{site[0]}/explore.html?view=map", width=390)
     frame = map_frame(page)
+    page.click("#sbf")
     frame.get_by_role("button", name="Draw area", exact=True).click()
     assert frame.is_visible("[data-a=cancel]")
     assert page.errors == []
@@ -116,19 +120,19 @@ def test_with_the_map_hidden_the_rail_stays_and_counts_all_of_bc(browser, site):
     page.close()
 
 
-def test_on_a_phone_the_rail_is_a_sheet_from_the_filters_button(browser, site):
+def test_on_a_phone_the_rail_is_a_sheet_from_the_state_bars_filters(browser, site):
     page = open_page(browser, f"{site[0]}/explore.html", width=390)
     page.wait_for_function("document.getElementById('identify')")
     assert page.evaluate("!document.getElementById('map')")  # a phone holds one pane, Identify
-    page.click("#fb")
+    page.click("#sbf")
     frame = map_frame(page)
     page.wait_for_function("document.getElementById('map').classList.contains('sheet')")
     x, w = page.evaluate(f"({BOX})('map')")
-    assert x == 0 and w == 390 and page.get_attribute("#fb", "aria-expanded") == "true"
+    assert x == 0 and w == 390 and page.get_attribute("#sbf", "aria-expanded") == "true"
     assert frame.is_visible("#grpsec")
     frame.click("#railx")  # Hide
     page.wait_for_function("!document.getElementById('map').classList.contains('sheet')")
-    assert page.is_hidden("#map") and page.get_attribute("#fb", "aria-expanded") == "false"
+    assert page.is_hidden("#map") and page.get_attribute("#sbf", "aria-expanded") == "false"
     assert frame.evaluate("localStorage.getItem('wtid-rail')") is None  # a phone keeps nothing
     assert page.errors == []
     page.close()
