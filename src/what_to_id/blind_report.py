@@ -6,7 +6,8 @@ The first table is the error of CV-accepted versus typed first identifications, 
 a blind consensus, which a public record cannot give because later identifiers see the suggestion.
 With ``--public`` a second table divides the public overturn rate by that error: the community's
 detection rate per source, the size of the agreement bias. With ``--levels`` a third table checks
-the Identify levels: settled share and abstain share per level. With both, the three
+the Identify levels: settled share and abstain share per level, and with planted records the
+consensus error per level. With both, the three
 pre-registered tests (H1 error, H2 detection, H3 levels) follow. With ``--answers`` and
 ``--planted`` the consensus error c is measured on held-out planted records and removed from
 e and d: a settled consensus that is itself wrong counts a correct first ID as wrong, which
@@ -264,6 +265,16 @@ def level_table(consensus, levels, threshold: float = 0.9) -> pd.DataFrame:
     return out.reset_index()[LEVEL_COLUMNS]
 
 
+def level_error(held: pd.DataFrame, levels: pd.DataFrame) -> pd.DataFrame:
+    """Per Identify level: held-out settled planted records and the consensus error c among them.
+
+    H3 reads settling as difficulty, but a consensus can settle on a wrong name, so this is the
+    check that the levels order error and not only confidence. ``held`` is ``held_out_consensus``.
+    """
+    j = held.merge(levels[["record_id", "level"]], on="record_id")
+    return j.groupby("level").agg(n=("wrong", "size"), c=("wrong", "mean")).reset_index()
+
+
 def hypothesis_tests(
     consensus,
     firsts,
@@ -335,7 +346,7 @@ def main(argv=None) -> int:
     idents = pd.read_parquet(a.idents)
     firsts = first_own_ids(pd.read_parquet(a.obs), idents)
     consensus = pd.read_parquet(a.consensus)
-    c, n_c = 0.0, 0
+    c, n_c, held = 0.0, 0, None
     if a.answers and a.planted:
         held = held_out_consensus(
             pd.read_parquet(a.answers), pd.read_parquet(a.planted), a.threshold
@@ -371,6 +382,8 @@ def main(argv=None) -> int:
         levels = pd.read_parquet(a.levels)
         print()
         print(level_table(consensus, levels, a.threshold).to_string(index=False))
+        if held is not None:
+            print(level_error(held, levels).to_string(index=False))
     if a.hard_cases:
         hard = hard_cases(consensus, firsts, a.threshold)
         hard.to_parquet(a.hard_cases, index=False)

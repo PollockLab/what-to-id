@@ -12,6 +12,7 @@ from what_to_id.blind_report import (
     first_own_ids,
     hard_cases,
     hypothesis_tests,
+    level_error,
     level_table,
     main,
     matched_error,
@@ -286,6 +287,14 @@ def test_level_table_settled_and_abstain_per_level():
     assert out.loc[1, ["n", "settled", "abstain"]].tolist() == [2, 1.0, 0.0]
     assert out.loc[4, ["n", "settled", "abstain"]].tolist() == [2, 0.0, 0.625]
     assert level_table(cons, levels.iloc[:0]).empty
+
+
+def test_level_error_per_level():
+    held = pd.DataFrame({"record_id": [1, 2, 3, 4], "wrong": [0, 1, 1, 1]})
+    levels = pd.DataFrame({"record_id": [1, 2, 3, 4, 5], "level": [1, 1, 5, 5, 2]})
+    out = level_error(held, levels).set_index("level")
+    assert list(out.index) == [1, 5] and out["n"].tolist() == [2, 2]
+    assert out["c"].tolist() == [0.5, 1.0]
 
 
 def test_hypothesis_tests_directions():
