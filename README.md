@@ -126,10 +126,22 @@ python -m what_to_id.page_blind --records site/records.json --out site/         
 python -m what_to_id.blind_answers --records site/records.json --names names.json --out answers.parquet blind-answers-*.jsonl
 python -m what_to_id.blind_report --obs obs.parquet --idents idents.parquet --public pool.parquet --levels site/levels.parquet --answers answers.parquet --planted site/planted.parquet --taxa taxa.csv
 python -m what_to_id.blind_power          # sample-size table behind the protocol
-python -m what_to_id.public_overturn pull --out pull.jsonl && python -m what_to_id.public_overturn tables pull.jsonl   # the public pre-test
+python -m what_to_id.public_overturn pull --out pull.jsonl [--place 7085] && python -m what_to_id.public_overturn tables pull.jsonl   # the public pre-test
 ```
 
 `blind_report` prints error e of CV-accepted versus typed first IDs against the consensus, detection d (public overturn over e), both corrected for the consensus error c measured on held-out planted records and split by observer experience and by record age, a nowcast d that corrects young read-backs for corrections not yet made (`--delays`, from `public_overturn tables --delays-out`; `--taxa`, the iNaturalist taxa table, counts a refinement as upheld and judges the consensus by lineage, so a genus consensus leaves a species first ID unsettled instead of wrong), species-matched ratios, and settled and abstain shares per Identify level. `public_overturn` is the public pre-test that sized this track: overturn by group, observer experience, quarter, within species and per Identify level, plus who corrects, whether the correction was itself a CV suggestion, how long a first ID waits for its first other look, and how many days its correction takes on records a year old. `--hard-cases` writes the training set. `tests/test_blind_recovery.py` and `tests/test_blind_pipeline.py` simulate the model and the whole chain.
+
+The public pattern holds outside BC. Overturn of species-level first IDs that another identifier has looked at, 40,000 verifiable records with photos from 2025 on per region (`pull --place`):
+
+| Region | CV first IDs | Typed first IDs | Typed/CV within species |
+|---|---|---|---|
+| British Columbia | 5.7% | 8.7% | 1.50 |
+| Québec | 5.5% | 9.0% | 1.52 |
+| California | 5.8% | 9.0% | 1.39 |
+| Netherlands | 5.4% | 8.4% | 1.33 |
+| United Kingdom | 5.1% | 7.9% | 1.31 |
+
+A lower overturn is either a lower error or a lower detection: identifiers can agree with a name that the suggestion made look right. The public record cannot split the two. The blind track does.
 
 ## References
 
