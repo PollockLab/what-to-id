@@ -71,10 +71,11 @@ def fit(
     pairs = ans[["rec", "taxon_id"]].reset_index(drop=True).reset_index(names="pa")
     pairs = pairs.merge(cand[["rec", "cid", "taxon_id"]], on="rec", suffixes=("", "_c"))
     pa, pc = pairs["pa"].to_numpy(), pairs["cid"].to_numpy()
+    # a known truth also accepts finer answers (a subspecies of a planted species)
     agree = np.fromiter(
         (
-            t == c or t in anc.get(c, ())
-            for t, c in zip(pairs["taxon_id"], pairs["taxon_id_c"], strict=True)
+            t == c or t in anc.get(c, ()) or (f and c in anc.get(t, ()))
+            for t, c, f in zip(pairs["taxon_id"], pairs["taxon_id_c"], fixed[pc], strict=True)
         ),
         bool,
         len(pairs),
@@ -107,15 +108,17 @@ def fit(
 
 
 def _roll_up(cand: pd.DataFrame, anc: dict, threshold: float) -> pd.DataFrame:
-    """Per record, the finest taxon (candidate or ancestor) whose summed candidate posterior
-    passes ``threshold``, with that sum as its posterior; else the candidates unchanged."""
+    """Per record, the finest candidate taxon whose summed candidate posterior (its own plus its
+    descendants') passes ``threshold``, with that sum as its posterior; else the candidates
+    unchanged. Only named taxa qualify: every lineage meets at Life, which would always pass."""
     out = []
     for rid, g in cand.groupby("record_id", sort=False):
         support: dict = {}
         for t, q in zip(g["taxon_id"], g["posterior"], strict=True):
             for x in {t, *anc.get(t, ())}:
                 support[x] = support.get(x, 0.0) + q
-        ok = [x for x, q in support.items() if q >= threshold - 1e-12]
+        named = set(g["taxon_id"])
+        ok = [x for x, q in support.items() if x in named and q >= threshold - 1e-12]
         if ok:
             t = max(ok, key=lambda x: (len(anc.get(x, ())), support[x]))
             out.append(
