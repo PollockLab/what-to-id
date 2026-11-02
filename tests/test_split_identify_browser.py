@@ -86,8 +86,8 @@ def test_the_default_view_is_identify_beside_the_map_and_the_switch_lists_four_p
     shown = page.evaluate("[...document.querySelectorAll('iframe')].map(f => f.id)")
     assert shown == ["map", "identify"]  # the map first, its filter rail leftmost
     assert page.locator("#xbar .seg button").all_inner_texts() == [
-        "Identify",
         "Map",
+        "Identify",
         "Photo space",
         "Taxonomy",
     ]
@@ -122,6 +122,7 @@ def test_a_group_picked_on_the_map_narrows_identify_to_the_map_filters_ids(brows
     page = explore(browser, site[0])
     ident = frame_of(page, "identify")
     assert len(ids(ident)) == POOL_N
+    page.frame_locator("#map").locator("#gbar").click()  # groups start folded
     page.frame_locator("#map").locator("#groups button[data-g='0']").click()  # Aves
     ident.wait_for_function(f"__identify.ids().length < {POOL_N}")
     assert ids(ident) == sorted(pts["id"][pts["iconic_taxon"] == "Aves"].tolist())
