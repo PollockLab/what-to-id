@@ -450,6 +450,7 @@ def test_beside_the_photo_space_alone_the_tree_counts_what_its_group_chip_keeps(
     root = _root(tree)
     page.wait_for_function("__counts.length === 1")
     before = root.inner_text().split()[0]
+    space.locator("#gbar").click()  # the groups start folded beside other panes
     space.locator("#groups button[data-g='1']").click()  # Insecta only
     page.wait_for_function("__counts.length === 2")
     kept = space.locator("#count").inner_text().split()[0]

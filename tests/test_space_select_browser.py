@@ -18,6 +18,7 @@ LISTEN = (
 def test_the_split_views_group_chips_are_visible_and_narrow_the_photo_space(split):
     page, (left, right) = split
     page.evaluate(LISTEN)
+    right.locator("#gbar").click()  # the groups start folded beside other panes
     chip = right.locator("#groups button[data-g='0']")
     assert chip.is_visible() and "Aves" in chip.inner_text()
     assert right.locator("#q").is_hidden() and right.locator("#tree").is_hidden()
@@ -26,7 +27,7 @@ def test_the_split_views_group_chips_are_visible_and_narrow_the_photo_space(spli
         f"!document.getElementById('count').textContent.startsWith('{POOL_N:,}')"
     )
     assert 0 < shown(right) < POOL_N
-    assert "wtid-selection" in page.evaluate("__msgs")
+    page.wait_for_function("__msgs.includes('wtid-selection')")
     assert page.errors == []
 
 

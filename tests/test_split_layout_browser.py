@@ -8,7 +8,9 @@ from . import test_split_identify_browser as si
 browser, site, pts = si.browser, si.site, si.pts
 explore, frame_of = si.explore, si.frame_of
 
-VIEW = "?view=identify-map-tree"
+VIEW = (
+    "?view=map-identify-tree"  # the default order, so the DOM order of the frames is the seen one
+)
 PANES = "[...document.querySelectorAll('#main-content iframe')]"
 WIDTHS = PANES + ".map(f => f.getBoundingClientRect().width)"
 
@@ -118,8 +120,8 @@ def test_the_header_fits_the_viewport_with_tappable_toggles(browser, pts, site, 
         " return [e.id || e.dataset.p, r.left, r.right, r.height]; })"
     )
     assert [b[0] for b in boxes if b[0] != "sq" and b[0] != "counts"] == [
-        "identify",
         "map",
+        "identify",
         "space",
         "tree",
     ]
