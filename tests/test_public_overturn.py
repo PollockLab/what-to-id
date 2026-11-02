@@ -194,3 +194,17 @@ def test_main_tables(tmp_path, capsys):
     assert po.main(["tables", str(p)]) == 0
     out = capsys.readouterr().out
     assert "Mantel-Haenszel" in out and "<10 ids" in out
+
+
+def test_pull_queries_the_given_place(monkeypatch):
+    seen = []
+
+    def fake(session, params):
+        seen.append(params["place_id"])
+        if params.get("per_page") == 1:
+            return [{"id": 9 if params.get("order") == "desc" else 5}]
+        return []
+
+    monkeypatch.setattr(po.inat, "_results", fake)
+    assert list(po.pull(2, 0, session=object(), sleep=0, place=6857)) == []
+    assert set(seen) == {6857}

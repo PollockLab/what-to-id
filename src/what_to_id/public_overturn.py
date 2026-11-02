@@ -1,13 +1,13 @@
 """Public-record pre-test of the blind track: overturn of first own species IDs, CV or typed.
 
-    python -m what_to_id.public_overturn pull --out records.jsonl [--blocks 200] [--seed 0]
+    python -m what_to_id.public_overturn pull --out records.jsonl [--blocks 200] [--place ID]
     python -m what_to_id.public_overturn tables records.jsonl [--levels identify.parquet]
 
-``pull`` samples ``blocks`` runs of 200 consecutive ids from BC verifiable observations with photos
-observed 2025 or later and writes one JSON line per record with its identifications and the
-observer's lifetime counts. ``tables`` prints overturn by iconic group, by observer experience and
-by creation quarter, the within-species Mantel-Haenszel ratio, and with ``--levels`` the public
-contradiction share per Identify level.
+``pull`` samples ``blocks`` runs of 200 consecutive ids from verifiable observations with photos
+observed 2025 or later in ``--place`` (an iNaturalist place id, BC by default) and writes one JSON
+line per record with its identifications and the observer's lifetime counts. ``tables`` prints
+overturn by iconic group, by observer experience and by creation quarter, the within-species
+Mantel-Haenszel ratio, and with ``--levels`` the public contradiction share per Identify level.
 
 Unit: the observer's earliest identification on their own non-casual record, at species rank,
 with at least one other current identification. Overturned: the community taxon exists and is
@@ -82,14 +82,15 @@ def summarise(o: dict) -> dict:
     }
 
 
-def pull(blocks: int, seed: int, session=None, sleep: float = 1.0):
+def pull(blocks: int, seed: int, session=None, sleep: float = 1.0, place: int = 7085):
     """Yield summarised records from ``blocks`` uniform id blocks; one request per block."""
     session = session or inat.make_session()
-    lo = inat._results(session, {**PARAMS, "per_page": 1})[0]["id"]
-    hi = inat._results(session, {**PARAMS, "per_page": 1, "order": "desc"})[0]["id"]
+    params = {**PARAMS, "place_id": place}
+    lo = inat._results(session, {**params, "per_page": 1})[0]["id"]
+    hi = inat._results(session, {**params, "per_page": 1, "order": "desc"})[0]["id"]
     rng = random.Random(seed)
     for start in sorted(rng.randrange(lo, hi) for _ in range(blocks)):
-        for o in inat._results(session, {**PARAMS, "id_above": start}):
+        for o in inat._results(session, {**params, "id_above": start}):
             yield summarise(o)
         time.sleep(sleep)
 
@@ -375,6 +376,7 @@ def main(argv=None) -> int:
     p.add_argument("--out", required=True)
     p.add_argument("--blocks", type=int, default=200)
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--place", type=int, default=7085, help="iNaturalist place id, BC by default")
     t = sub.add_parser("tables")
     t.add_argument("records")
     t.add_argument("--levels", help="identify.parquet from the atlas manifest")
@@ -383,7 +385,7 @@ def main(argv=None) -> int:
     if a.cmd == "pull":
         n = 0
         with open(a.out, "w") as f:
-            for r in pull(a.blocks, a.seed):
+            for r in pull(a.blocks, a.seed, place=a.place):
                 f.write(json.dumps(r) + "\n")
                 n += 1
         print(f"{n} records -> {a.out}")
