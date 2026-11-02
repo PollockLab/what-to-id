@@ -162,3 +162,18 @@ def test_on_a_phone_the_legend_keeps_to_a_corner(browser, site):
     assert share <= 0.34
     assert page.errors == []
     page.close()
+
+
+def test_the_legend_lists_the_clades_the_filters_leave_and_keeps_their_colours(browser, site):
+    page = open_map(browser, site, hash_="#groups=Plantae", n=170)
+    page.wait_for_function(f"({STATE})().names.length === 3")
+    was = page.evaluate(STATE)
+    assert was["names"] == ["Vascular Plants", "Mosses", "Liverworts"]
+    page.evaluate("location.hash = 'groups=Plantae&taxa=-64615'")  # leaves out every liverwort
+    page.wait_for_function(f"({STATE})().names.length === 2")
+    got = page.evaluate(STATE)
+    assert got["names"] == ["Vascular Plants", "Mosses"]
+    assert got["swatch"] == was["swatch"][:2]  # the clades left keep their colours
+    assert got["dots"][0] == was["dots"][0]
+    assert page.errors == []
+    page.close()

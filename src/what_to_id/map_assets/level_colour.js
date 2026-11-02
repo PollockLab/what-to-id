@@ -10,7 +10,8 @@
 // as a lens on the legend alone: the selection stays, the dots outside the lens turn grey, and a trail at the
 // top (or Esc) steps back out.
 // o: META, get(url) (the map's fetch), url (the levels file), box (holds the legend), changed() after a switch,
-// taxa() the taxa table, P() the records, st() the map's selection.
+// taxa() the taxa table, P() the records, st() the map's selection, shown() the records the filters show as
+// {k: a key that changes with them, f(i)}, or null before they are counted (then every record counts).
 var LevelColour=(function(){
 'use strict';
 var NONE=[150,150,150,60],C=[NONE,[0,158,115,170],[230,159,0,170],[0,114,178,170],[204,121,167,170],[213,94,0,170]],
@@ -28,12 +29,12 @@ function dot(c,faint){var i=document.createElement('i');i.style.background=rgb(c
 function gname(g){return (o.META.names&&o.META.names[g]||g).replace(/ \([^)]*\)$/,'');}
 // A clade's name: its group's for a group taxon, else its common name, else its latin one.
 function cname(r){for(var g in CC.gr)if(CC.gr[g]===r)return gname(g);return T[r][1]||T[r][0];}
-// The palette and the records at or below each row (group taxa cut loose, as the tree has them), kept until
-// the taxa or the records change.
-function prep(){var t=o.taxa(),P=o.P();if(!t)return false;
+// The palette and the shown records at or below each row (group taxa cut loose, as the tree has them), kept until
+// the taxa or the shown records change. The counts pick the legend's clades; the colours stay the palette's.
+function prep(){var t=o.taxa(),P=o.P(),v=o.shown&&o.shown(),k=v?v.k:P.n;if(!t)return false;
   if(t!==T){T=t;CC=CladeColour.build(T,o.META);row=new Map();T.forEach(function(x,i){row.set(x[2],i);});cn=-1;}
-  if(cn!==P.n){cn=P.n;var own=new Float64Array(T.length),i,j;cnt=new Float64Array(T.length);
-    for(i=0;i<P.n;i++)if(P.tax[i]<T.length)own[P.tax[i]]++;
+  if(cn!==k){cn=k;var own=new Float64Array(T.length),i,j;cnt=new Float64Array(T.length);
+    for(i=0;i<P.n;i++)if(P.tax[i]<T.length&&(!v||v.f(i)))own[P.tax[i]]++;
     for(i=0;i<T.length;i++)if(own[i])for(j=i;j>=0;j=CC.par[j])cnt[j]+=own[i];}
   return true;}
 // The children of r that hold records, most first.
