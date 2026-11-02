@@ -132,7 +132,7 @@ function pointData(){
 }
 function categories(thin){return MF.categories(S,inc(),thin);}
 // the group, clade or, beside Identify in Explore, level colours (level_colour.js); a switch swaps only the colours
-var LC=LevelColour({META:META,get:get,taxa:function(){return TAXA;},P:function(){return P;},st:function(){return S;},shown:function(){return KEEP.length===P.n&&!CT?{k:[KV,S.lo,S.hi,S.up].join(),f:shows()}:null;},url:'pool-levels.bin'+String(META.shards[0].file).replace(/^[^?]*/,''),box:$('map'),
+var LC=LevelColour({META:META,get:get,taxa:function(){return TAXA;},P:function(){return P;},st:function(){return S;},picked:function(){search();FB.showClades();FB.showGroups();refilter();},shown:function(){return KEEP.length===P.n&&!CT?{k:[KV,S.lo,S.hi,S.up].join(),f:shows()}:null;},url:'pool-levels.bin'+String(META.shards[0].file).replace(/^[^?]*/,''),box:$('map'),
   changed:function(){if(!PD)return;PD.attributes.getFillColor={value:LC.fill(P.grp,P.n),size:4,normalized:true};PD_COL++;layers();}}),PD_COL=0;
 // The counts behind the histograms, header and share run on the CPU after the map has redrawn.
 var CT=0;
