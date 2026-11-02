@@ -148,6 +148,20 @@ def test_latency_table_hours_to_first_other_look():
     assert out.loc[("typed", True), "n"] == 1
 
 
+def test_delay_table_reads_year_old_records_only():
+    def overturned(id, first, fix):
+        own = _ident(1, True, 10, vision=True, created=first)
+        return po.summarise(_obs(id, 14, [own, _ident(2, False, 14, created=fix)]))
+
+    rows = [
+        overturned(9, "2024-01-01T00:00:00Z", "2024-01-01T12:00:00Z"),  # half a day
+        overturned(10, "2024-01-01T00:00:00Z", "2024-03-01T00:00:00Z"),  # 60 days
+        overturned(11, "2025-06-01T00:00:00Z", "2025-06-01T01:00:00Z"),  # too young: left out
+    ]
+    out = po.delay_table(rows, po.scored(rows), horizons=(1, 30, 90)).set_index("source")
+    assert out.loc["cv"].tolist() == [2, 0.5, 0.5, 1.0]
+
+
 def test_level_table():
     levels = pd.DataFrame({"id": [1, 2, 4, 5], "taxon_id": [10, 11, 10, 10], "level": [1, 5, 1, 2]})
     out = po.level_table(ROWS, levels).set_index("level")
