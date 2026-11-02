@@ -172,6 +172,20 @@ def test_cv_error_removes_consensus_error():
     assert fixed["lo"] <= fixed["error"] <= fixed["hi"] and fixed["lo"] < raw["lo"]
 
 
+def test_cv_error_interval_carries_consensus_uncertainty():
+    # 200 cv records, 20 disagree; c = 1% measured on 300 planted vs on 10**7 (as good as exact)
+    cons = _cons([(i, 1, 0.99) for i in range(200)])
+    firsts = _firsts([(i, "Aves", 2 if i < 20 else 1, True) for i in range(200)])
+    few, many = (
+        cv_error(cons, firsts, consensus_error=0.01, consensus_n=n).iloc[0] for n in (300, 10**7)
+    )
+    assert few["error"] == many["error"] == pytest.approx((0.1 - 0.01) / 0.98)
+    assert few["lo"] < few["error"] < few["hi"] and few["hi"] - few["lo"] > many["hi"] - many["lo"]
+    # no disagreement at all still leaves an upper bound, as the Wilson interval does
+    none = cv_error(cons, _firsts([(i, "Aves", 1, True) for i in range(200)]), consensus_n=50)
+    assert none["error"].eq(0).all() and none["hi"].gt(0).all()
+
+
 def test_detection_rate_is_overturn_over_error():
     # 10 cv records: 4 wrong by consensus, the public caught 2 of them -> d = 0.5
     cons = _cons([(i, 1, 0.99) for i in range(1, 11)])

@@ -125,11 +125,23 @@ def kind_table(held: pd.DataFrame, firsts: pd.DataFrame) -> pd.DataFrame:
     return out.reset_index()
 
 
-def cv_error(consensus, firsts, threshold=0.9, consensus_error=0.0, by="group"):
+def cv_error(
+    consensus,
+    firsts,
+    threshold=0.9,
+    consensus_error=0.0,
+    by="group",
+    consensus_n=0,
+    boot=4000,
+    seed=0,
+):
     """Error of first own IDs against the blind consensus, by group and CV/typed source.
 
-    ``consensus_error`` is c from :func:`consensus_error`; the interval is shifted with the point
-    estimate and does not carry c's own uncertainty. ``by`` names another firsts column to split
+    ``consensus_error`` is c from :func:`consensus_error`. Without ``consensus_n`` the interval
+    is the Wilson interval of the disagreement share shifted with the point estimate; with it
+    (the held-out count) the interval is the 2.5 and 97.5 percentiles of e over ``boot`` draws of
+    the share and of c from their Jeffreys posteriors, so it carries c's uncertainty the way
+    :func:`detection_rate` does. ``by`` names another firsts column to split
     on instead of group, such as ``experience`` from :func:`first_own_ids`; the public record
     shows the CV-typed gap closing with observer experience, so the split is reported as a
     descriptive check, not a test.
@@ -139,9 +151,16 @@ def cv_error(consensus, firsts, threshold=0.9, consensus_error=0.0, by="group"):
         return pd.DataFrame(columns=[by, *REPORT_COLUMNS[1:]])
     out = j.groupby([by, "source"]).agg(n=("wrong", "size"), wrong=("wrong", "sum"))
     out = out.reset_index()
-    lo, hi = _wilson(out["wrong"].to_numpy(float), out["n"].to_numpy(float))
-    out["error"] = _correct(out["wrong"] / out["n"], consensus_error)
-    out["lo"], out["hi"] = _correct(lo, consensus_error), _correct(hi, consensus_error)
+    w, n = out["wrong"].to_numpy(float), out["n"].to_numpy(float)
+    out["error"] = _correct(w / n, consensus_error)
+    if consensus_n:
+        rng = np.random.default_rng(seed)
+        cs = _c_draws(rng, consensus_error, consensus_n, boot)
+        ps = rng.beta(w[:, None] + 0.5, n[:, None] - w[:, None] + 0.5, (len(w), boot))
+        out["lo"], out["hi"] = np.percentile(_correct(ps, cs), [2.5, 97.5], axis=1)
+    else:
+        lo, hi = _wilson(w, n)
+        out["lo"], out["hi"] = _correct(lo, consensus_error), _correct(hi, consensus_error)
     return out.sort_values([by, "source"], ignore_index=True)[[by, *REPORT_COLUMNS[1:]]]
 
 
@@ -304,10 +323,11 @@ def main(argv=None) -> int:
         if "kind" in held.columns:
             print(kind_table(held, firsts).to_string(index=False))
         print()
-    print(cv_error(consensus, firsts, a.threshold, c).to_string(index=False))
+    print(cv_error(consensus, firsts, a.threshold, c, consensus_n=n_c).to_string(index=False))
     if "experience" in firsts.columns:
         print()
-        print(cv_error(consensus, firsts, a.threshold, c, by="experience").to_string(index=False))
+        exp = cv_error(consensus, firsts, a.threshold, c, "experience", n_c)
+        print(exp.to_string(index=False))
     if a.public:
         others = idents.loc[idents["user_id"] != idents["observer_id"], "id"].unique()
         public = pd.read_parquet(a.public, columns=["id", "taxon_id"])
