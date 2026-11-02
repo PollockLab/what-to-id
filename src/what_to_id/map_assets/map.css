@@ -130,6 +130,10 @@ button.padd{cursor:pointer;background:var(--chip)}
 .lvleg span{max-width:16em}
 .lvleg em{font-style:normal;overflow:hidden;text-overflow:ellipsis}
 .lvleg .lb{border:0;background:none;color:inherit;font:inherit;padding:0;cursor:pointer;text-decoration:underline;min-height:0}
+/* the trail takes a line of its own above the rows; its last step cuts to the line with an ellipsis */
+.lvleg .lrows>.lt{flex-basis:100%;max-width:100%;min-width:0;overflow:hidden}
+.lvleg .lrows>.lt b{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.lvleg .lb{flex:none}
 @media (max-width:600px){.lvleg{max-height:33%}}
 .time{grid-area:time;padding:8px 16px 10px;border-top:1px solid var(--line)}
 .row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}

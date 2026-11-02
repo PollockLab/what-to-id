@@ -132,14 +132,14 @@ function pointData(){
 }
 function categories(thin){return MF.categories(S,inc(),thin);}
 // the group, clade or, beside Identify in Explore, level colours (level_colour.js); a switch swaps only the colours
-var LC=LevelColour({META:META,get:get,taxa:function(){return TAXA;},P:function(){return P;},st:function(){return S;},url:'pool-levels.bin'+String(META.shards[0].file).replace(/^[^?]*/,''),box:$('map'),
+var LC=LevelColour({META:META,get:get,taxa:function(){return TAXA;},P:function(){return P;},st:function(){return S;},picked:function(){search();FB.showClades();FB.showGroups();refilter();},shown:function(){return KEEP.length===P.n&&!CT?{k:[KV,S.lo,S.hi,S.up].join(),f:shows()}:null;},url:'pool-levels.bin'+String(META.shards[0].file).replace(/^[^?]*/,''),box:$('map'),
   changed:function(){if(!PD)return;PD.attributes.getFillColor={value:LC.fill(P.grp,P.n),size:4,normalized:true};PD_COL++;layers();}}),PD_COL=0;
 // The counts behind the histograms, header and share run on the CPU after the map has redrawn.
 var CT=0;
 function refilter(){
-  LC.sync();pointData();layers();clearTimeout(CT);CT=setTimeout(recount,0);
+  clearTimeout(CT);CT=setTimeout(recount,0);LC.sync();pointData();layers();
 }
-function recount(){
+function recount(){CT=0;
   var n=P.n,day=S.up?P.up:P.obs,c=categories(),gm=0,mm=0,sm=0,nd=0,cat=PD.attributes.getFilterCategory.value,
     ch=S.up?2:1,g=CH.groupPass(S.groups,META.groups,false),m=S.months;
   c[0].forEach(function(j){gm|=1<<j;});c[ch].forEach(function(j){mm|=1<<j;});c[3].forEach(function(j){sm|=1<<j;});
@@ -167,11 +167,12 @@ function recount(){
   // the photo space beside the map keeps the records the projects keep; it has no project file of its own
   if(parent!==window&&PJP!==PJ.key()+':'+n){PJP=PJ.key()+':'+n;parent.postMessage({type:'wtid-projects',ids:PJ.ids(P)},location.origin);}
   render();
-  if(FIT){FIT=false;fitTo(function(i){var d=day[i];return KEEP[i]&&(d===NO?full():d>=S.lo&&d<=S.hi);});}
+  if(FIT){FIT=false;fitTo(shows());}
 }
 function full(){return S.lo===0&&S.hi===LAST;}
 // records without a date show only over all dates, as the GPU filter does
 function nShown(){return CUM[S.hi+1]-CUM[S.lo]+(full()?NODAY:0);}
+function shows(){var day=S.up?P.up:P.obs,all=full();return function(i){var d=day[i];return KEEP[i]&&(d===NO?all:d>=S.lo&&d<=S.hi);};}
 function fitTo(keep){
   var w=Infinity,s=Infinity,e=-Infinity,n=-Infinity,x,y;
   if(map)for(var i=0;i<P.n;i++)if(keep(i)){x=P.pos[2*i];y=P.pos[2*i+1];
@@ -197,7 +198,7 @@ function inView(){
     d=day[i];if(d===NO?all:d>=S.lo&&d<=S.hi){c+=KEEP[i];g[P.grp[i]]++;VM[i]=1;}}
   VC={k:key,c:wd?null:c,g:g};return VC.c;}
 function render(){
-  var shown=nShown();
+  var shown=nShown();LC.sync();  // the legend's clades follow the dates too
   var iv=P.n&&!AREA.invalid()?inView():null;
   $('count').textContent=AREA.invalid()?'Area unresolved · '+nf.format(shown)+' records available to browse':
     P.n?iv!==null&&iv<shown?nf.format(iv)+' in view of '+nf.format(shown)+' records':
@@ -215,8 +216,8 @@ function render(){
 function counts(){
   if(parent===window||!TAXA)return;clearTimeout(CNT);CNT=setTimeout(function(){
     var k=[KV,S.lo,S.hi,S.up].join();if(k===CNP)return;CNP=k;
-    var own=new Float64Array(TAXA.length),day=S.up?P.up:P.obs,all=full(),t=0,d;
-    for(var i=0;i<P.n;i++)if(KEEP[i]&&((d=day[i])===NO?all:d>=S.lo&&d<=S.hi)){t++;if(P.tax[i]<own.length)own[P.tax[i]]++;}
+    var own=new Float64Array(TAXA.length),f=shows(),t=0;
+    for(var i=0;i<P.n;i++)if(f(i)){t++;if(P.tax[i]<own.length)own[P.tax[i]]++;}
     parent.postMessage({type:'wtid-counts',own:own,total:t},location.origin);},150);}
 // Whether record i matches the filters with the area left out, as recount() reads them
 function match(i){if(!RC||i>=OUT.length)return 0;var c=PD.attributes.getFilterCategory.value,s=c[4*i+3]&~ST_KEEP|(OUT[i]?0:ST_KEEP);

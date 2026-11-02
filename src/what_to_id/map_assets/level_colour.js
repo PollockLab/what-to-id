@@ -6,34 +6,38 @@
 // with colour-blind sight too.
 // In group colours a selection of one group or one taxon breaks its dots down by its children (clade_colour.js,
 // the tree's colours): the TOP children with the most records, the rest as one muted Other. With two or more
-// groups picked the legend lists them, and a click on a group (or on a clade with clades below it) drills in
-// as a lens on the legend alone: the selection stays, the dots outside the lens turn grey, and a trail at the
-// top (or Esc) steps back out.
+// groups picked the legend lists them. A click on a group (or on a clade with clades below it) picks it in
+// place of the selection's picked groups and taxa, as the rail's pick would, so the data narrows a level; the
+// trail above (All groups / Plants / Tracheophyta) and Esc in the legend step the pick back up.
 // o: META, get(url) (the map's fetch), url (the levels file), box (holds the legend), changed() after a switch,
-// taxa() the taxa table, P() the records, st() the map's selection.
+// taxa() the taxa table, P() the records, st() the map's selection, shown() the records the filters show as
+// {k: a key that changes with them, f(i)}, or null before they are counted (then every record counts),
+// picked() after the legend changed the selection's groups or picks.
 var LevelColour=(function(){
 'use strict';
 var NONE=[150,150,150,60],C=[NONE,[0,158,115,170],[230,159,0,170],[0,114,178,170],[204,121,167,170],[213,94,0,170]],
-  FADE=[150,150,150,40],TOP=8,OUT=-1,OTHER=TOP;
+  TOP=8,OUT=-1,OTHER=TOP;
 function LevelColour(o){
 var G=o.META.groups,gc=G.map(function(g,j){return MapFilter.color(g,j).concat(110);}),lv=null,ask=null,want=false,on=false,
   mode='levels',names=[],off={},KEY='wtid-colour-by',HID=[0,0,0,0],  // off: the levels the viewer switched off
   leg=document.createElement('div'),seg=document.createElement('div'),rows=document.createElement('div'),bs,
-  T=null,CC=null,row=null,cnt=null,cn=-1,base=-1,lens=[],inc=[],top=-1,show=[],sc=[],slot=null,key='';
+  T=null,CC=null,row=null,cnt=null,cn=-1,inc=[],top=-1,show=[],sc=[],slot=null,key='';
 leg.className='lvleg';leg.hidden=true;leg.setAttribute('role','group');leg.setAttribute('aria-label','Dot colours');
 seg.className='seg';seg.setAttribute('role','group');seg.setAttribute('aria-label','Colour dots by');rows.className='lrows';
 try{if(localStorage.getItem(KEY)==='groups')mode='groups';}catch(e){}  // the choice is kept per browser
 function rgb(c){return 'rgb('+c.slice(0,3).join(',')+')';}
 function dot(c,faint){var i=document.createElement('i');i.style.background=rgb(c);if(faint)i.style.opacity=.5;return i;}
 function gname(g){return (o.META.names&&o.META.names[g]||g).replace(/ \([^)]*\)$/,'');}
+// The group whose taxon row r is, else undefined.
+function gof(r){for(var g in CC.gr)if(CC.gr[g]===r)return g;}
 // A clade's name: its group's for a group taxon, else its common name, else its latin one.
-function cname(r){for(var g in CC.gr)if(CC.gr[g]===r)return gname(g);return T[r][1]||T[r][0];}
-// The palette and the records at or below each row (group taxa cut loose, as the tree has them), kept until
-// the taxa or the records change.
-function prep(){var t=o.taxa(),P=o.P();if(!t)return false;
+function cname(r){var g=gof(r);return g?gname(g):T[r][1]||T[r][0];}
+// The palette and the shown records at or below each row (group taxa cut loose, as the tree has them), kept until
+// the taxa or the shown records change. The counts pick the legend's clades; the colours stay the palette's.
+function prep(){var t=o.taxa(),P=o.P(),v=o.shown&&o.shown(),k=v?v.k:P.n;if(!t)return false;
   if(t!==T){T=t;CC=CladeColour.build(T,o.META);row=new Map();T.forEach(function(x,i){row.set(x[2],i);});cn=-1;}
-  if(cn!==P.n){cn=P.n;var own=new Float64Array(T.length),i,j;cnt=new Float64Array(T.length);
-    for(i=0;i<P.n;i++)if(P.tax[i]<T.length)own[P.tax[i]]++;
+  if(cn!==k){cn=k;var own=new Float64Array(T.length),i,j;cnt=new Float64Array(T.length);
+    for(i=0;i<P.n;i++)if(P.tax[i]<T.length&&(!v||v.f(i)))own[P.tax[i]]++;
     for(i=0;i<T.length;i++)if(own[i])for(j=i;j>=0;j=CC.par[j])cnt[j]+=own[i];}
   return true;}
 // The children of r that hold records, most first.
@@ -54,13 +58,11 @@ function slots(){var n=T.length,s=new Int8Array(n).fill(-2),path=[],i,j,v;s[top]
 // Works out the breakdown; a change of it recolours the dots.
 function sync(){
   if(!prep())return;
-  var S=o.st(),b=focus(S);
-  if(b!==base)lens=[];base=b;
-  if(lens.length&&base<0&&inc.length&&inc.indexOf(lens.g)<0)lens=[];  // the drilled group left the selection
-  var t=lens.length?lens[lens.length-1]:deep(base)?base:-1;
+  var t=focus(o.st());t=deep(t)?t:-1;
   if(t!==top||t>=0&&held(t).slice(0,TOP).join()!==show.join()){top=t;
-    show=t<0?[]:held(t).slice(0,TOP);sc=show.map(function(c){return CC.col[c].concat(110);});
-    if(t>=0){var c=CC.col[t];sc[OTHER]=c.map(function(v){return Math.round(v*0.4+150*0.6);}).concat(110);slot=slots();}}
+    // below a group (a picked sub-clade) the palette focuses on the breakdown, as the tree's focus does
+    show=t<0?[]:held(t).slice(0,TOP);var F=CC.at(t);sc=show.map(function(c){return F[c].concat(110);});
+    if(t>=0){var c=F[t];sc[OTHER]=c.map(function(v){return Math.round(v*0.4+150*0.6);}).concat(110);slot=slots();}}
   apply();}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 // A legend row: swatch and name, cut to one line with the full name in its title; go() makes it a button.
@@ -68,8 +70,13 @@ function line(c,text,go){var s=el('span');s.title=text;s.append(dot(c),el('em',n
   if(go){s.setAttribute('role','button');s.tabIndex=0;s.setAttribute('aria-pressed','false');s.onclick=go;
     s.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();go();}};}
   return s;}
-function drill(r,g){if(g!=null)lens.g=g;lens.push(r);sync();var f=rows.querySelector('[role=button],button');if(f)f.focus();}
-function out(k){lens.length=k;sync();}
+// Picks row r (-1: no group or taxon) in place of the picked groups and taxa; the left-out ones stay.
+function pick(r){var S=o.st(),g=r>=0?gof(r):null,id=r>=0&&!g?T[r][2]:null,k=S.picks.filter(function(p){return p.not&&p.id!==id;});
+  G.forEach(function(x){if(S.groups[x]==='inc')delete S.groups[x];});if(g)S.groups[g]='inc';
+  S.picks.length=0;k.forEach(function(p){S.picks.push(p);});if(id!=null)S.picks.push({id:id,not:false});
+  o.picked();var f=rows.querySelector('[role=button],button');if(f)f.focus();}
+// The breakdown's row and those above it to its group's, top first.
+function path(){for(var p=[],r=top;r>=0;r=CC.par[r])p.unshift(r);return p;}
 // Levels mode: a button a level (click hides or shows its dots); Groups mode: the group swatches, as the rail has
 // them, or the breakdown with its trail.
 function draw(){
@@ -80,16 +87,14 @@ function draw(){
     b.onclick=function(){off[r[0]]=!off[r[0]];b.setAttribute('aria-pressed',String(!off[r[0]]));o.changed();};
     rows.appendChild(b);});
   if(top<0)return (inc.length?inc:G).forEach(function(g){var j=G.indexOf(g),r=CC?CC.gr[g]:null;
-    rows.appendChild(line(gc[j],gname(g),r!=null&&deep(r)?function(){drill(r,g);}:null));});
-  var tr=el('span','lt');
-  if(lens.length){var ns=[base>=0?cname(base):'All groups'].concat(lens.map(cname));
-    ns.forEach(function(n,k){if(k)tr.append(' / ');
-      if(k===ns.length-1)return tr.append(el('b',null,n));
-      var b=el('button','lb',n);b.type='button';b.onclick=function(){out(k);};tr.append(b);});
-    tr.setAttribute('role','navigation');tr.setAttribute('aria-label','Legend trail');}
-  else tr.textContent=cname(top)+' by clade';
+    rows.appendChild(line(gc[j],gname(g),r!=null&&deep(r)?function(){pick(r);}:null));});
+  var tr=el('span','lt'),ps=[-1].concat(path());
+  ps.forEach(function(r,k){var n=r<0?'All groups':cname(r);if(k)tr.append(' / ');
+    if(k===ps.length-1){var e=el('b',null,n);e.title=n;return tr.append(e);}
+    var b=el('button','lb',n);b.type='button';b.onclick=function(){pick(r);};tr.append(b);});
+  tr.setAttribute('role','navigation');tr.setAttribute('aria-label','Legend trail');
   rows.appendChild(tr);
-  show.forEach(function(c,k){rows.appendChild(line(sc[k],cname(c),deep(c)?function(){drill(c);}:null));});
+  show.forEach(function(c,k){rows.appendChild(line(sc[k],cname(c),deep(c)?function(){pick(c);}:null));});
   if(cnt[top]>show.reduce(function(s,c){return s+cnt[c];},0)){var n=cname(top);
     rows.appendChild(line(sc[OTHER],/^other /i.test(n)?n:'Other '+(T[top][1]?n.toLowerCase():n)));}}
 bs=[['levels','Levels'],['groups','Groups']].map(function(m){var b=document.createElement('button');
@@ -99,15 +104,19 @@ bs=[['levels','Levels'],['groups','Groups']].map(function(m){var b=document.crea
 function apply(){var lvl=want&&!!lv,a=lvl||top>=0||inc.length>=2,k;on=lvl&&mode==='levels';
   leg.hidden=!a;seg.hidden=!lvl;leg.firstChild.hidden=!lvl;
   bs.forEach(function(m){m[1].setAttribute('aria-pressed',String(m[0]===mode));});
-  if(a)draw();k=on?'L':top+':'+show.join()+':'+lens.length;if(k!==key){key=k;o.changed();}}
+  // a redraw keeps the focus on the control of the same name, so a recount does not drop it
+  var f=rows.contains(document.activeElement)&&document.activeElement.textContent;
+  if(a)draw();if(f)[].some.call(rows.querySelectorAll('button,[role=button]'),function(e){if(e.textContent===f){e.focus();return true;}});
+  k=on?'L':top+':'+show.join();if(k!==key){key=k;o.changed();}}
 leg.append(el('span','lt','Colour by'),seg,rows);o.box.appendChild(leg);
-addEventListener('keydown',function(e){if(e.key==='Escape'&&lens.length&&!leg.hidden)out(0);});
+addEventListener('keydown',function(e){if(e.key!=='Escape'||on||top<0||leg.hidden||!leg.contains(document.activeElement))return;
+  var p=path();pick(p.length>1?p[p.length-2]:-1);});  // Esc in the legend steps the pick up a level
 // The colours of records 0..n-1, as deck.gl reads them: 4 bytes a record.
 function fill(grp,n){
   var col=new Uint8Array(4*n),tax=o.P().tax,cut=top>=0&&!on,i,c,s;
   for(i=0;i<n;i++){if(on)c=off[lv[i]&15]?HID:C[lv[i]&15]||NONE;
     else if(cut&&(s=tax[i]<slot.length?slot[tax[i]]:OUT)!==OUT)c=sc[s];
-    else c=cut&&lens.length?FADE:gc[grp[i]];
+    else c=gc[grp[i]];
     col[4*i]=c[0];col[4*i+1]=c[1];col[4*i+2]=c[2];col[4*i+3]=c[3];}
   return col;}
 addEventListener('message',function(e){
