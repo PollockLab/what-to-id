@@ -184,7 +184,7 @@ def test_split_opens_the_map_and_the_tree_and_toggles_each_pane(browser, site):
         ("map", ["map"]),
         ("space", ["space"]),
         ("tree-only", ["tree"]),
-        ("tree-map", ["map", "tree"]),
+        ("tree-map", ["tree", "map"]),  # a link keeps its written order
         ("map-bogus-space", ["map", "space"]),
         ("bogus", ["map", "tree"]),
     ],
