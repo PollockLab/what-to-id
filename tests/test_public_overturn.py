@@ -126,6 +126,24 @@ def test_corrector_table_by_identifier_experience():
     assert out.loc[("typed", "<10 ids"), "other_share"] == 1.0
 
 
+def test_latency_table_hours_to_first_other_look():
+    late = _obs(
+        9,
+        14,
+        [
+            _ident(1, True, 10, vision=True, created="2025-01-01T00:00:00Z"),
+            _ident(2, False, 14, created="2025-01-04T00:00:00Z"),
+            _ident(3, False, 14, created="2025-01-05T00:00:00Z"),
+        ],
+    )
+    out = po.latency_table(ROWS + [po.summarise(late)], po.scored(ROWS + [po.summarise(late)]))
+    out = out.set_index(["source", "overturned"])
+    assert out.loc[("cv", False), ["n", "median_hours", "within_day"]].tolist() == [3, 0.0, 1.0]
+    # record 6 waits a day for its first other ID, record 9 three days: median 48, one within a day
+    assert out.loc[("cv", True), ["n", "median_hours", "within_day"]].tolist() == [2, 48.0, 0.5]
+    assert out.loc[("typed", True), "n"] == 1
+
+
 def test_level_table():
     levels = pd.DataFrame({"id": [1, 2, 4, 5], "taxon_id": [10, 11, 10, 10], "level": [1, 5, 1, 2]})
     out = po.level_table(ROWS, levels).set_index("level")

@@ -242,6 +242,34 @@ def corrector_table(rows, df: pd.DataFrame) -> pd.DataFrame:
     return out.reset_index(drop=True)
 
 
+def latency_table(rows, df: pd.DataFrame) -> pd.DataFrame:
+    """Per first-ID source and outcome: hours from the first own ID to the first other identifier's
+    current ID on tested records, as median and the share that arrived within a day.
+
+    Public overturn is error times detection, and detection takes time: a first ID that ends up
+    overturned waits far longer for its first other look than one that is upheld, so a pull of
+    young records reads as fewer errors than there are. ``PARAMS`` keeps records months old.
+    """
+    src = df.drop_duplicates("id").set_index("id")
+    out, seen = [], set()
+    for r in rows:
+        if r["id"] in seen or r["id"] not in src.index or not src.at[r["id"], "tested"]:
+            continue
+        seen.add(r["id"])
+        t0 = pd.Timestamp(_first_own(r)["created"])
+        hours = [
+            (pd.Timestamp(i["created"]) - t0).total_seconds() / 3600
+            for i in r["idents"]
+            if not i["own"] and i["current"] and i["created"]
+        ]
+        if hours:
+            out.append((src.at[r["id"], "source"], src.at[r["id"], "overturned"], min(hours)))
+    o = pd.DataFrame(out, columns=["source", "overturned", "hours"])
+    g = o.groupby(["source", "overturned"])["hours"]
+    out = g.agg(n="size", median_hours="median", within_day=lambda s: (s <= 24).mean())
+    return out.reset_index()
+
+
 def level_table(rows, levels: pd.DataFrame) -> pd.DataFrame:
     """Per Identify level: records, share with another current ID, share of those contradicting
     the label the level was scored on (an ID that is neither the label nor one of its ancestors)."""
@@ -302,6 +330,8 @@ def main(argv=None) -> int:
     print(identifier_cv_table(rows, df).to_string(index=False, float_format="{:.3f}".format))
     print()
     print(corrector_table(rows, df).to_string(index=False, float_format="{:.3f}".format))
+    print()
+    print(latency_table(rows, df).to_string(index=False, float_format="{:.2f}".format))
     if a.levels:
         print()
         lv = level_table(rows, pd.read_parquet(a.levels, columns=["id", "taxon_id", "level"]))
