@@ -173,7 +173,15 @@ def _scored(consensus, firsts, threshold, by="group"):
 
 
 def detection_rate(
-    consensus, firsts, public, threshold=0.9, boot=1000, seed=0, consensus_error=0.0, consensus_n=0
+    consensus,
+    firsts,
+    public,
+    threshold=0.9,
+    boot=1000,
+    seed=0,
+    consensus_error=0.0,
+    consensus_n=0,
+    by="group",
 ) -> pd.DataFrame:
     """Public overturn rate over blind error rate, by group and source, with a bootstrap 95% CI.
 
@@ -183,17 +191,20 @@ def detection_rate(
     missed, which is a check on the consensus, not a detection rate. ``consensus_error`` is c
     from :func:`consensus_error`, removed from e before the division; with ``consensus_n`` (its
     held-out count) each resample draws its own c, so the interval carries c's uncertainty.
+    ``by`` splits on another firsts column instead of group, such as ``experience``: the public
+    gap between sources can close with experience through e or through d, and only this split
+    on blind data tells which.
     """
-    j = _scored(consensus, firsts, threshold)
+    j = _scored(consensus, firsts, threshold, by)
     j = j.merge(public[["record_id", "taxon_id"]].rename(columns={"taxon_id": "taxon_id_p"}))
     if j.empty:
-        return pd.DataFrame(columns=DETECT_COLUMNS)
+        return pd.DataFrame(columns=[by, *DETECT_COLUMNS[1:]])
     # shortcut: taxon_id equality, so a public refinement to a descendant counts as overturned
     j["over"] = (j["taxon_id"] != j["taxon_id_p"]).astype(int)
     rng = np.random.default_rng(seed)
     cs = _c_draws(rng, consensus_error, consensus_n, boot)
     rows = []
-    for (group, source), g in j.groupby(["group", "source"]):
+    for (group, source), g in j.groupby([by, "source"]):
         w, o = g["wrong"].to_numpy(), g["over"].to_numpy()
         idx = rng.integers(0, len(g), (boot, len(g)))
         with np.errstate(divide="ignore", invalid="ignore"):
@@ -202,7 +213,7 @@ def detection_rate(
             ds = o[idx].mean(1) / _correct(w[idx].mean(1), cs)
         lo, hi = np.nanpercentile(ds, [2.5, 97.5]) if np.isfinite(ds).any() else (np.nan, np.nan)
         rows.append((group, source, len(g), e, o.mean(), d, lo, hi))
-    return pd.DataFrame(rows, columns=DETECT_COLUMNS)
+    return pd.DataFrame(rows, columns=[by, *DETECT_COLUMNS[1:]])
 
 
 def hard_cases(consensus, firsts, threshold: float = 0.9) -> pd.DataFrame:
@@ -337,6 +348,12 @@ def main(argv=None) -> int:
             consensus, firsts, public, a.threshold, consensus_error=c, consensus_n=n_c
         )
         print(det.to_string(index=False))
+        if "experience" in firsts.columns:
+            print()
+            kw = dict(consensus_error=c, consensus_n=n_c, by="experience")
+            print(
+                detection_rate(consensus, firsts, public, a.threshold, **kw).to_string(index=False)
+            )
     if a.levels:
         levels = pd.read_parquet(a.levels)
         print()
