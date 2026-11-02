@@ -29,6 +29,7 @@ def test_split_page_relays_the_selection_between_frames_without_reloads(browser,
     assert before == right.locator("#count").inner_text()
     for f in ("#map", "#space"):
         page.evaluate(f"document.querySelector('{f}').contentWindow.marker = 1")
+    left.locator("#gbar").click()  # the groups start folded beside other panes
     left.locator("#groups button[data-g='1']").click()  # pick Insecta in the left frame
     page.wait_for_function(f"{counts}.every(c => c !== {before!r}) && new Set({counts}).size === 1")
     assert "groups=Insecta" in page.evaluate("location.hash")
@@ -183,7 +184,7 @@ def test_split_opens_the_map_and_the_tree_and_toggles_each_pane(browser, site):
         ("map", ["map"]),
         ("space", ["space"]),
         ("tree-only", ["tree"]),
-        ("tree-map", ["map", "tree"]),
+        ("tree-map", ["tree", "map"]),  # a link keeps its written order
         ("map-bogus-space", ["map", "space"]),
         ("bogus", ["map", "tree"]),
     ],
@@ -214,6 +215,7 @@ def test_three_panes_sit_side_by_side_with_the_tree_at_30_percent_and_the_select
     assert page.locator(".sep").count() == 2
     for f in ("#map", "#space", "#tree"):
         assert "months=8" in page.evaluate(f"document.querySelector('{f}').src")
+    page.frame_locator("#map").locator("#gbar").click()
     page.frame_locator("#map").locator("#groups button[data-g='1']").click()
     chip = page.frame_locator("#space").locator("#selbar li", has_text="Insecta")
     chip.wait_for(state="attached")  # the peer folds its panel

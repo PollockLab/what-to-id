@@ -133,7 +133,7 @@ def open_page(browser, site):
     base, ref, _, _ = site
     pages = []
 
-    def opener(hash_="", drop=None, width=1280):
+    def opener(hash_="", drop=None, width=1280, query="standalone=1"):
         page = browser.new_page(viewport={"width": width, "height": 900})
         pages.append(page)
         page.errors = []
@@ -141,7 +141,7 @@ def open_page(browser, site):
         page.on("console", lambda m: page.errors.append(m.text) if m.type == "error" else None)
         page.on("requestfailed", lambda r: page.errors.append(f"failed {r.url}"))
         page.calls = stub_inat(page, drop)
-        page.goto(f"{base}/embeddings.html?standalone=1{hash_}")
+        page.goto(f"{base}/embeddings.html?{query}{hash_}")
         return page
 
     yield opener
@@ -242,6 +242,37 @@ def test_group_chip_steps_pick_leave_out_clear_and_all_groups_resets(open_page):
     assert layer(page, "pts")["cats"][0] == [0, 1, 2]
     assert page.evaluate("location.hash") == ""
     assert page.errors == []
+
+
+def test_groups_fold_into_a_share_bar_open_when_standalone_and_folded_when_embedded(open_page):
+    wide = open_page()
+    ready(wide)
+    assert wide.locator("#gdet").evaluate("d => d.open")  # standalone and wide
+    embedded = open_page(query="embed=1&standalone=1")
+    ready(embedded)
+    assert not embedded.locator("#gdet").evaluate("d => d.open")
+    assert not embedded.locator("#groups button[data-g='0']").is_visible()
+    segs = embedded.locator("#gbar i")
+    assert segs.count() == 3  # one per group with points
+    widths = segs.evaluate_all("els => els.map(e => e.getBoundingClientRect().width)")
+    titles = segs.evaluate_all("els => els.map(e => e.title)")
+    counts = [int(t.split(", ")[1].split(" ")[0].replace(",", "")) for t in titles]
+    assert sum(counts) == POOL_N
+    total = sum(widths)
+    for w, c in zip(sorted(widths), sorted(counts), strict=True):
+        assert abs(w / total - c / sum(counts)) < 0.01
+    assert "Largest groups in view" in embedded.locator("#gbar").get_attribute("aria-label")
+    assert f"{max(counts):,}" in segs.first.get_attribute("title")
+    embedded.locator("#gbar").click()  # the bar opens the section
+    chip = embedded.locator("#groups button[data-g='0']")
+    assert chip.is_visible()
+    chip.click()  # picking still filters, and the other segments dim
+    assert embedded.locator("#count").inner_text() == f"{POOL_N // 3:,} shown of {POOL_N:,}"
+    assert embedded.locator("#gbar i.dim").count() == 2
+    embedded.reload()  # the choice is remembered
+    ready(embedded)
+    assert embedded.locator("#gdet").evaluate("d => d.open")
+    assert embedded.errors == [] and wide.errors == []
 
 
 def test_groups_in_the_hash_open_filtered_and_survive_a_selection(open_page):
