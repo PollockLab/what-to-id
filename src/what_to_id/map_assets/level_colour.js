@@ -86,7 +86,7 @@ function draw(){
   var tr=el('span','lt');
   if(lens.length){var ns=[base>=0?cname(base):'All groups'].concat(lens.map(cname));
     ns.forEach(function(n,k){if(k)tr.append(' / ');
-      if(k===ns.length-1)return tr.append(el('b',null,n));
+      if(k===ns.length-1){var e=el('b',null,n);e.title=n;return tr.append(e);}
       var b=el('button','lb',n);b.type='button';b.onclick=function(){out(k);};tr.append(b);});
     tr.setAttribute('role','navigation');tr.setAttribute('aria-label','Legend trail');}
   else tr.textContent=cname(top)+' by clade';

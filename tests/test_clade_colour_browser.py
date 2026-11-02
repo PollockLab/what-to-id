@@ -164,6 +164,25 @@ def test_on_a_phone_the_legend_keeps_to_a_corner(browser, site):
     page.close()
 
 
+@pytest.mark.parametrize("width", [1280, 400])
+def test_the_trail_has_a_line_of_its_own_above_the_rows(browser, site, width):
+    page = open_map(browser, site, width=width, hash_="#groups=Plantae,Insecta", n=270)
+    page.wait_for_function(f"({STATE})().names.length === 2")
+    page.locator(".lvleg [role=button]", has_text="Plants").click()
+    page.locator(".lvleg [role=button]", has_text="Vascular Plants").click()
+    page.wait_for_function(f"({STATE})().head === 'All groups / Plants / Vascular Plants'")
+    got = page.evaluate(
+        """() => { const tr = document.querySelector('.lrows > .lt'), leaf = tr.querySelector('b'),
+      ts = [tr, ...tr.children].map(e => e.getBoundingClientRect());  // the trail and its steps
+      return {leaf: leaf.title, hits: [...document.querySelectorAll('.lrows > span:not(.lt)')]
+        .map(s => s.getBoundingClientRect()).filter(r => ts.some(t => r.left < t.right &&
+          t.left < r.right && r.top < t.bottom && t.top < r.bottom)).length}; }"""
+    )
+    assert got == {"leaf": "Vascular Plants", "hits": 0}
+    assert page.errors == []
+    page.close()
+
+
 def test_the_legend_lists_the_clades_the_filters_leave_and_keeps_their_colours(browser, site):
     page = open_map(browser, site, hash_="#groups=Plantae", n=170)
     page.wait_for_function(f"({STATE})().names.length === 3")
