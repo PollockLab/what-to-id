@@ -12,8 +12,8 @@ try{saved=localStorage.getItem(KEY);}catch(e){}
 function wide(){try{return parent.innerWidth>=1280;}catch(e){return innerWidth>=1280;}}
 function set(v,keep){
   H.classList.toggle('rail-off',!v);side.classList.toggle('open',v);
-  btn.setAttribute('aria-expanded',String(v));btn.textContent=v?'Hide':'Filters';
-  btn.setAttribute('aria-label',v?'Hide the filters':'Show the filters');
+  btn.setAttribute('aria-expanded',String(v));btn.textContent=v?'Hide':'What';
+  btn.setAttribute('aria-label',v?'Hide What':'Show What: groups, taxa and flags');
   if(keep&&!NARROW.matches)try{localStorage.setItem(KEY,v?'1':'0');}catch(e){}
   if(parent!==window)parent.postMessage({type:'wtid-rail',open:v,shut:!!keep&&!v},location.origin);  // shut: the viewer closed it
   dispatchEvent(new Event('resize'));}  // the map and the histograms take the new width

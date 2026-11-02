@@ -22,7 +22,7 @@ function flip(){document.getElementById('railx').click();}
 NARROW.addEventListener('change',place);new MutationObserver(place).observe(H,{attributes:true,attributeFilter:['class']});  // rail-only
 function set(k,tell){open=k;place();p.hidden=!k;f.hidden=k!=='filters';l.hidden=k!=='legend';
   H.classList.toggle('sheet-f',k==='filters');H.classList.toggle('sheet-l',k==='legend');
-  p.setAttribute('aria-label',k==='legend'?'Legend':'Filters');
+  p.setAttribute('aria-label',k==='legend'?'Legend':side.parentNode===p?'Filters':'When and where');
   if(tell&&parent!==window)parent.postMessage({type:'wtid-sheet',open:k},location.origin);
   dispatchEvent(new Event('resize'));}  // the histograms take the panel's width
 addEventListener('message',function(e){

@@ -30,6 +30,9 @@ function tick(){
   if(x&&(!ro||ro.x!==x)){ro=new d.defaultView.ResizeObserver(fit);ro.x=x;ro.observe(x);ro.observe(d.getElementById('side'));}
   var c=d&&d.getElementById('count'),t=c&&/\d/.test(c.textContent)?c.textContent.replace(/ records?$/,''):'';
   if(num.textContent!==t)num.textContent=t;
+  // a frame too narrow for its rail (map_sheet.js) puts What in the sheet too, so the button holds every filter
+  var w=d&&d.defaultView.matchMedia('(max-width:760px)').matches&&!d.documentElement.classList.contains('rail-only'),
+    lb=!d||w?'Filters':'When & where';if(bs.filters.textContent!==lb)bs.filters.textContent=lb;
   var li=d?[].slice.call(d.querySelectorAll('#selbar li')):[],
     s=li.map(function(x){return x.firstChild.textContent+(x.querySelector('.x')?'×':'');}).join('\n');
   if(s===sig)return;sig=s;ul.textContent='';
