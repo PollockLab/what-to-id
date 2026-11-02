@@ -9,7 +9,9 @@ cast to float32 and renormalised, and packed with the frozen reference by `artif
 Pool rows with no vector anywhere are uncovered. They are listed in `uncovered.json` beside the
 bundle and left out of its pool, but they are not excluded from the study: they enter on a later
 day, once the atlas has embedded them. If a group's uncovered share exceeds --max-uncovered-share
-the atlas is behind and the build fails; re-preparing on the cluster is the fallback.
+the atlas is behind and the build fails; re-preparing on the cluster is the fallback. Rows created
+within --grace-hours of the pool's newest row do not count: the pool is pulled after the atlas's
+last run, so its newest records can not have a vector yet.
 
     python -m what_to_id.assemble_bundle --pool POOL.parquet --base DIR --deltas DIR \
       --reference-embeddings 'data/ref_sample_2026-09-11/emb_{group}_bioclip25.npz' --out BUNDLE
@@ -80,6 +82,7 @@ def assemble(
     reference: str,
     out: Path,
     max_uncovered_share: float = 0.01,
+    grace_hours: float = 48,
 ) -> dict[str, int]:
     """Pack the bundle at `out`; return the uncovered count per group."""
     pool = pd.read_parquet(pool_path)
@@ -133,12 +136,15 @@ def assemble(
         }
         (out.parent / "uncovered.json").write_text(json.dumps(report) + "\n")
         sizes = pool.groupby("iconic_taxon").size()
+        created = pd.to_datetime(pool.set_index("id")["created_at"], utc=True)
+        old = created < created.max() - pd.Timedelta(hours=grace_hours)
         for group, ids in uncovered.items():
-            if len(ids) / sizes[group] > max_uncovered_share:
+            late = int(old.reindex(ids).sum())
+            if late / sizes[group] > max_uncovered_share:
                 raise SystemExit(
-                    f"assemble_bundle: {group} has {len(ids)} of {sizes[group]} pool rows without "
-                    f"an embedding ({len(ids) / sizes[group]:.2%} > {max_uncovered_share:.2%}); "
-                    "the atlas is behind, re-prepare on the cluster"
+                    f"assemble_bundle: {group} has {late} of {sizes[group]} pool rows older than "
+                    f"{grace_hours:g} h without an embedding ({late / sizes[group]:.2%} > "
+                    f"{max_uncovered_share:.2%}); the atlas is behind, re-prepare on the cluster"
                 )
         covered = Path(tmp) / "pool.parquet"
         pool[~pool["id"].isin(gone)].to_parquet(covered, index=False)
@@ -171,6 +177,7 @@ def main(argv: list[str] | None = None) -> int:
     for flag in ("pool", "base", "deltas", "reference-embeddings", "out"):
         ap.add_argument("--" + flag, required=True)
     ap.add_argument("--max-uncovered-share", type=float, default=0.01)
+    ap.add_argument("--grace-hours", type=float, default=48)
     a = ap.parse_args(argv)
     try:
         assemble(
@@ -180,6 +187,7 @@ def main(argv: list[str] | None = None) -> int:
             a.reference_embeddings,
             Path(a.out),
             a.max_uncovered_share,
+            a.grace_hours,
         )
     except (OSError, ValueError, KeyError) as exc:
         ap.exit(1, f"assemble_bundle: {exc}\n")

@@ -3,6 +3,7 @@
 import json
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from what_to_id.arms import load_embeddings
@@ -116,9 +117,17 @@ def test_uncovered_ids_are_reported_and_left_out_of_the_pool(inputs):
 
 def test_too_many_uncovered_fails_naming_the_group(inputs):
     with pytest.raises(SystemExit, match=r"Aves has 1 of \d+ .*atlas is behind"):
-        run(inputs)
+        run(inputs, grace_hours=0)
     assert not inputs["out"].exists()
     assert (inputs["out"].parent / "uncovered.json").exists()
+
+
+def test_records_newer_than_the_atlas_can_have_seen_do_not_fail_the_build(inputs):
+    pool = pd.read_parquet(inputs["pool"])
+    newest = pd.to_datetime(pool["created_at"], utc=True).max()
+    pool.loc[pool["id"] == inputs["ids"]["missing"], "created_at"] = newest.isoformat()
+    pool.to_parquet(inputs["pool"], index=False)
+    assert run(inputs)["Aves"] == 1  # still left out of today's pool, enters a later day
 
 
 def test_zero_vector_is_rejected(inputs):
@@ -145,7 +154,7 @@ def test_cli_exits_nonzero_on_failure(inputs, capsys):
         str(inputs["out"]),
     ]
     with pytest.raises(SystemExit) as exc:
-        main(argv)
+        main([*argv, "--grace-hours", "0"])
     assert exc.value.code != 0
     assert main([*argv, "--max-uncovered-share", "0.5"]) == 0
 
