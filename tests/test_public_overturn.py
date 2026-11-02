@@ -194,6 +194,7 @@ def test_main_tables(tmp_path, capsys):
     assert po.main(["tables", str(p)]) == 0
     out = capsys.readouterr().out
     assert "Mantel-Haenszel" in out and "<10 ids" in out
+    assert out.count(" crude ") == 2  # matched ratios by experience and by group
 
 
 def test_pull_queries_the_given_place(monkeypatch):
