@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 from scipy import stats
 
 from what_to_id.blind_power import COLUMNS, level_power, main, power_two_prop, table
@@ -48,3 +49,11 @@ def test_main_prints_table(capsys):
     main(["--records", "500", "--draws", "50"])
     out = capsys.readouterr().out
     assert "power_d" in out and "500" in out
+
+
+def test_late_corrections_widen_d_and_cost_power_but_keep_it_centred():
+    full = table([2000], draws=4000, seed=1).iloc[0]
+    young = table([2000], draws=4000, seed=1, complete=0.6).iloc[0]
+    assert young.d_hi_cv - young.d_lo_cv > full.d_hi_cv - full.d_lo_cv
+    assert young.power_d < full.power_d
+    assert (young.d_lo_cv + young.d_hi_cv) / 2 == pytest.approx(0.75, abs=0.03)
