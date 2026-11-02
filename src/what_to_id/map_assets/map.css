@@ -135,6 +135,26 @@ button.padd{cursor:pointer;background:var(--chip)}
 .lvleg .lrows>.lt b{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .lvleg .lb{flex:none}
 @media (max-width:600px){.lvleg{max-height:33%}}
+/* Explore's sheet (map_sheet.js): over the foot of the map; a narrow frame has it as wide as the map */
+.embed{--rw:280px}.embed.rail-off{--rw:36px}.embed:has(.xsheet>#side){--rw:0px}  /* the rail's width: the sheet keeps to the map beside it */
+.xsheet{position:fixed;z-index:6;left:calc(var(--rw) + (100% - var(--rw))/2);transform:translateX(-50%);bottom:8px;
+  width:min(600px,calc(100% - var(--rw) - 24px));max-height:min(60vh,calc(100% - 24px));overflow:auto;padding:10px 12px;
+  background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow)}
+.xsheet[hidden],.xsheet>[hidden]{display:none}
+.xsheet .time{padding:0;border:0}
+.xsheet .area{max-width:none;margin:8px 0 0;border:0;box-shadow:none;padding:0;float:none}
+.xsheet .lvleg{position:static;max-width:none;max-height:none;padding:0;box-shadow:none;background:none;pointer-events:auto}
+.xsheet .lvleg:not([hidden])~.xnone{display:none}
+html .xsheet>#side{position:static;display:flex;max-height:none;padding:0 0 8px;border:0;box-shadow:none;background:none}
+html .xsheet>#side>.railhd{display:none}
+@media (max-width:599px){.xsheet{left:var(--rw);right:0;width:auto;bottom:0;transform:none;border-radius:10px 10px 0 0;border-width:1px 0 0}}
+/* the map pane hidden: the frame is the shell's sheet, the panel fills it, after the rail for Filters */
+html.rail-only.sheet-f body,html.rail-only.sheet-l body{display:block;overflow:auto}
+html.rail-only.sheet-f .side{overflow:visible;border:0}
+html.rail-only.sheet-l .side{display:none}
+html.rail-only .xsheet{position:static;transform:none;width:auto;max-height:none;border:0;border-radius:0;box-shadow:none}
+html.rail-only.sheet-f .xsheet .time{display:block!important}
+html.rail-only .xsheet [data-a=draw]{display:none}  /* no map to draw on */
 .time{grid-area:time;padding:8px 16px 10px;border-top:1px solid var(--line)}
 .row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
 .dates{font-size:12px;color:var(--muted);white-space:nowrap}

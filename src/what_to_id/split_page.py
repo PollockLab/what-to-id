@@ -40,6 +40,7 @@ LEVELS_FORWARD = (
 )
 SCRIPTS = {
     "__MAP_FILTER__": HERE / "map_assets" / "map_filter.js",
+    "__STATE_BAR__": ASSETS / "state_bar.js",
     "__CLIP_TOKENIZER__": HERE / "atlas_assets" / "clip_tokenizer.js",
     "__ATLAS_SEARCH_INDEX__": HERE / "atlas_search_assets" / "atlas_search_index.js",
     "__ATLAS_SEARCH_META__": HERE / "atlas_search_assets" / "atlas_search_meta.js",
@@ -49,9 +50,7 @@ SCRIPTS = {
 IDENTIFY_BUTTON = '<button type="button" data-p="identify">Identify</button>'
 TREE_BUTTON = '<button type="button" data-p="tree">Taxonomy</button>'
 BAR = (
-    '<div class="xbar" id="xbar"><button type="button" id="fb" aria-controls="map" '
-    'aria-expanded="false">Filters</button>'
-    '<span class="counts" id="counts" aria-live="polite"></span>'
+    '<div class="xbar" id="xbar"><span class="counts" id="counts" aria-live="polite"></span>'
     '<form id="sf" role="search"><input id="sq" type="search" aria-label="Photo search" '
     'autocomplete="off" spellcheck="false" '
     'placeholder="a hummingbird feeding at a flower, or an observation link">'

@@ -108,6 +108,7 @@ def test_the_legend_toggles_between_level_and_group_colours_and_hides_a_level(br
     page = open_page(browser, f"{site[0]}/explore.html")
     frame = map_frame(page)
     frame.wait_for_function(f"({COLOURS})().legend")
+    page.click("#sbl")  # the legend is in the state bar's Legend sheet
     assert frame.get_attribute(".lvleg .seg button:first-child", "aria-pressed") == "true"
     frame.click(".lvleg .seg button:last-child")  # Groups
     frame.wait_for_function(f"({COLOURS})().c1[3] === 110")

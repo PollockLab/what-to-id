@@ -98,7 +98,7 @@ _ASSETS = _PKG / "map_assets"
 # the taxon, area, Identify batch, project and chip helpers map.js calls, map_filter.js the filter
 # state and GPU filter values, group_list.js and filter_bar.js the filter panel, map_card.js the
 # card, clade_colour.js and level_colour.js the dots' colours, map_rail.js the panel as Explore's
-# filter rail.
+# filter rail, map_sheet.js the dates, area and legend as Explore's sheet.
 MAP_CSS = ("map.css", "map_select.css", "map_area.css")
 # The record card's closest matches (the atlas index reader and the iNaturalist photo lookup of the
 # search page) and range chip (the Identify page's range module), and the photo space's taxon tree
@@ -125,6 +125,7 @@ MAP_JS = (
     "map_card.js",
     "map.js",
     "map_rail.js",
+    "map_sheet.js",
 )
 
 
