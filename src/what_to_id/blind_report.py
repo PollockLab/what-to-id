@@ -21,7 +21,7 @@ import argparse
 import numpy as np
 import pandas as pd
 
-from .blind_skill import fit
+from .blind_skill import ancestry_from_taxa, fit
 
 REPORT_COLUMNS = ["group", "source", "n", "wrong", "error", "lo", "hi"]
 DETECT_COLUMNS = ["group", "source", "n", "error", "overturn", "detection", "lo", "hi"]
@@ -94,18 +94,24 @@ def _c_draws(rng, c, n, boot):
     return rng.beta(c * n + 0.5, (1 - c) * n + 0.5, boot)
 
 
-def held_out_consensus(answers, planted, threshold=0.9, folds=2, seed=0) -> pd.DataFrame:
+def held_out_consensus(
+    answers, planted, threshold=0.9, folds=2, seed=0, ancestry=None
+) -> pd.DataFrame:
     """Settled consensus of planted records fitted with their truth withheld, fold by fold.
 
     Columns: record_id, taxon_id (the consensus), truth, wrong, and kind and level when ``planted``
     has them (``blind_planted``'s cv_fail, cv_hold, typed_fail, typed_hold; the Identify level).
+    With ``ancestry`` the fit rolls up the tree and the consensus is lined up with the truth as
+    :func:`align_consensus` lines it up with the first ID.
     """
     planted = planted.drop_duplicates("record_id")
     ids = planted["record_id"].to_numpy().copy()
     np.random.default_rng(seed).shuffle(ids)
     parts = []
     for held in np.array_split(ids, folds):
-        _, cons = fit(answers, planted[~planted["record_id"].isin(held)])
+        _, cons = fit(answers, planted[~planted["record_id"].isin(held)], ancestry=ancestry)
+        if ancestry is not None:
+            cons = align_consensus(cons, planted, ancestry)
         got = cons[cons["record_id"].isin(held) & (cons["posterior"] >= threshold)]
         parts.append(got[got["taxon_id"].notna()][["record_id", "taxon_id"]])
     keep = ["record_id", "taxon_id", *[c for c in ("kind", "level") if c in planted.columns]]
@@ -237,15 +243,35 @@ def collapse_refinements(public, firsts, taxa) -> pd.DataFrame:
     that taxon, so a refinement counts as upheld, as :func:`public_overturn._upheld` counts it.
     ``taxa`` has ``taxon_id`` and ``ancestry`` (slash-separated ids, the iNaturalist export form).
     On the 40,000-record BC pull 190 of 1,337 exact mismatches are refinements."""
-    anc = dict(zip(taxa["taxon_id"], taxa["ancestry"].fillna(""), strict=True))
+    anc = ancestry_from_taxa(taxa)
     first = dict(zip(firsts["record_id"], firsts["taxon_id"], strict=True))
     out = public.copy()
 
     def keep(rid, t):
         f = first.get(rid)
-        return f if f is not None and str(f) in str(anc.get(t, "")).split("/") else t
+        return f if f is not None and f in anc.get(t, ()) else t
 
     out["taxon_id"] = [keep(r, t) for r, t in zip(out["record_id"], out["taxon_id"], strict=True)]
+    return out
+
+
+def align_consensus(consensus, ref, ancestry) -> pd.DataFrame:
+    """``consensus`` lined up by lineage with the reference taxon per record (``ref``: record_id,
+    taxon_id; the first own ID, or the planted truth). A consensus below the reference becomes the
+    reference, so the reference counts as right at its rank. A consensus above it gets posterior
+    0, because it does not settle the reference's rank: a genus consensus can not judge a species.
+    """
+    r = dict(zip(ref["record_id"], ref["taxon_id"], strict=False))
+    out = consensus.copy()
+    t, rf = out["taxon_id"].to_numpy(object), out["record_id"].map(r).to_numpy(object)
+    below = [
+        pd.notna(x) and pd.notna(f) and f in ancestry.get(x, ()) for x, f in zip(t, rf, strict=True)
+    ]
+    above = [
+        pd.notna(x) and pd.notna(f) and x in ancestry.get(f, ()) for x, f in zip(t, rf, strict=True)
+    ]
+    out.loc[below, "taxon_id"] = out.loc[below, "record_id"].map(r)
+    out.loc[above, "posterior"] = 0.0
     return out
 
 
@@ -376,16 +402,24 @@ def main(argv=None) -> int:
     ap.add_argument("--answers", help="answers.parquet from blind_answers, for consensus error")
     ap.add_argument("--planted", help="planted.parquet from blind_sample, for consensus error")
     ap.add_argument("--delays", help="correction delays parquet (public_overturn), for nowcast d")
-    ap.add_argument("--taxa", help="taxa table with taxon_id and ancestry: refinements upheld")
+    ap.add_argument(
+        "--taxa",
+        help="taxa table with taxon_id and ancestry: refinements upheld, consensus by lineage",
+    )
     ap.add_argument("--hard-cases", help="write overturned and unsettled records to this parquet")
     a = ap.parse_args(argv)
     idents = pd.read_parquet(a.idents)
     firsts = first_own_ids(pd.read_parquet(a.obs), idents)
     consensus = pd.read_parquet(a.consensus)
+    taxa = anc = None
+    if a.taxa:
+        taxa = pd.read_csv(a.taxa, sep=None, engine="python", usecols=["taxon_id", "ancestry"])
+        anc = ancestry_from_taxa(taxa)
+        consensus = align_consensus(consensus, firsts, anc)
     c, n_c, held = 0.0, 0, None
     if a.answers and a.planted:
         held = held_out_consensus(
-            pd.read_parquet(a.answers), pd.read_parquet(a.planted), a.threshold
+            pd.read_parquet(a.answers), pd.read_parquet(a.planted), a.threshold, ancestry=anc
         )
         c, n_c = (held["wrong"].mean() if len(held) else 0.0), len(held)
         print(f"consensus error c = {c:.4f} on {n_c} held-out settled planted records")
@@ -404,7 +438,6 @@ def main(argv=None) -> int:
         public = pd.read_parquet(a.public, columns=["id", "taxon_id"])
         public = public[public["id"].isin(others)].rename(columns={"id": "record_id"})
         if a.taxa:
-            taxa = pd.read_csv(a.taxa, sep=None, engine="python", usecols=["taxon_id", "ancestry"])
             public = collapse_refinements(public, firsts, taxa)
         else:
             print("\nno --taxa: a public refinement of the first ID counts as an overturn")
