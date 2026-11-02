@@ -141,7 +141,7 @@ The public pattern holds outside BC. Overturn of species-level first IDs that an
 | Netherlands | 5.4% | 8.4% | 1.33 |
 | United Kingdom | 5.1% | 7.9% | 1.31 |
 
-Pooled over the five regions the within-species ratio is 1.40 (95% CI 1.28 to 1.52, bootstrap over observers), with no detectable spread between regions (I² = 0%), and each region alone excludes 1. Plants and birds carry it in every region (1.3 to 2.3); insects sit near 1 in all five (0.95 to 1.15). A lower overturn is either a lower error or a lower detection: identifiers can agree with a name that the suggestion made look right. The public record cannot split the two. The blind track does.
+Pooled over the five regions the within-species ratio is 1.40 (95% CI 1.28 to 1.52, bootstrap over observers), with no detectable spread between regions (I² = 0%), and each region alone excludes 1. Plants and birds carry it in every region (1.3 to 2.3); insects sit near 1 in all five (0.95 to 1.15). A lower overturn is either a lower error or a lower detection: identifiers can agree with a name that the suggestion made look right. Across 39 region-by-group cells, the ratio rises with how often CV first IDs reach species (Spearman ρ 0.62, 0.58 within region) and falls, against the agreement-bias prediction, with how often other identifiers use CV themselves (ρ −0.38). That leans towards lower error, but taxon groups differ in more than CV strength. The public record cannot split the two. The blind track does, by group.
 
 ## References
 
