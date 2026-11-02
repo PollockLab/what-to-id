@@ -6,13 +6,13 @@
 var CT=new Set(),M=TreeModel,L=EmbeddingsLayout,META=CFG.meta,nf=new Intl.NumberFormat('en'),
   nc=new Intl.NumberFormat('en',{notation:'compact',maximumFractionDigits:1}),EMBED=/[?&]embed=1/.test(location.search),
   BUDGET=400,BAR=26,TH=24,MINF=9,MINR=420,reduce=matchMedia('(prefers-reduced-motion: reduce)'),
-  D=null,S=null,V=null,G={},GS=[],COL=new Map(),prev=null,anim=0,SEL='',SY=null,PS=-1,PH={},Q=[],qt=0,qlast=0,lt=0,split=false,OL=null;
+  D=null,S=null,V=null,G={},GS=[],COL=new Map(),CC=null,prev=null,anim=0,SEL='',SY=null,PS=-1,PH={},Q=[],qt=0,qlast=0,lt=0,split=false,OL=null;
 function $(i){return document.getElementById(i);}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 function status(t){$('status').textContent=t||'';}
 function col(r){
   if(COL.has(r))return COL.get(r);
-  var g=D.grp[r],c=g?'rgb('+M.shade(MapFilter.color(g,META.groups.indexOf(g)),M.tone(D,r)).join(',')+')':'var(--muted)';
+  var g=D.grp[r],k=r<D.n&&CC.col[r]||g&&MapFilter.color(g,META.groups.indexOf(g)),c=k?'rgb('+k.join(',')+')':'var(--muted)';
   COL.set(r,c);return c;}
 function rowOf(n){return n.row<0?n.parent.row:n.row;}
 function cmn(r){var c=M.common(D,r);return c.toLowerCase()===M.name(D,r).toLowerCase()?'':c;}
@@ -363,7 +363,7 @@ async function load(){
   if(!T.length||T[0].length<6)throw new Error('this site was built without the taxon tree');
   Object.keys(META.group_ids||{}).forEach(function(g){G[META.group_ids[g]]=g;});
   if(META.groups.indexOf('Animalia')>=0)G[1]=G[1]||'Animalia';  // iNaturalist's iconic Animalia: kingdom 1, less the other groups
-  D=D0=M.build(T,META.ranks,G,{names:META.names,total:META.n});groupRows();
+  CC=CladeColour.build(T,META);D=D0=M.build(T,META.ranks,G,{names:META.names,total:META.n});groupRows();
   readHash();if(SY){SEL=SEL||MapFilter.tokens(location.hash);take();if(S.sel<0)S.sel=PS=M.lead(D,D.root);}split=await has;status('');draw(false);
 }
 load().catch(function(e){status('The tree could not load: '+e.message);});
