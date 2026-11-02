@@ -319,6 +319,10 @@ def test_a_deep_outline_keeps_one_line_per_row_at_any_width(browser, deep_site, 
     page = open_tree(browser, deep_site, hash_="#sel=1009")
     page.add_style_tag(content=f"body{{grid-template-columns:{col}px minmax(0,1fr)!important}}")
     page.wait_for_selector('#outline [aria-level="10"][aria-selected="true"]')
+    # CI once read every name as 0 before layout; a real squeeze still times out here
+    page.wait_for_function(
+        "[...document.querySelectorAll('#outline .nm')].every(e => e.offsetWidth > 0)"
+    )
     assert abs(page.locator("#side").bounding_box()["width"] - col) <= 2
     rows = page.eval_on_selector_all("#outline .row", "r => r.map(e => e.offsetHeight)")
     assert max(rows) <= 44, rows
