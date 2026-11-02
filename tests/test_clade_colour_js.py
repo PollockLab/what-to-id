@@ -123,7 +123,7 @@ out({same: JSON.stringify(a.col) === JSON.stringify(b.col), life: a.col[0] === u
     assert got["cut"] == -1  # a group's taxon stands alone, as on the tree
 
 
-def test_a_focus_spreads_its_children_over_a_wedge_of_their_own():
+def test_a_focus_spreads_its_children_round_the_hue_circle():
     got = node(
         """
 const P = CladeColour.build(T, META), res = {};
@@ -138,6 +138,39 @@ out(res);"""
     assert got.pop("same")
     for t, r in got.items():
         print(f"{t}: least CIEDE2000 of 8 kids, overview {r['was']:.1f}, focused {r['now']:.1f}")
-        assert r["now"] >= 12, t
+        assert r["now"] >= 18, t
         assert r["worst"] >= 2, t
         assert r["self"] == r["own"], t  # the focus keeps its own colour
+
+
+FLOOR = 7  # least CIEDE2000 of a focus's first 8 children under any of the four, rounded down
+
+
+def test_siblings_under_colour_vision_deficiency():
+    # Machado 2009 at full severity: a focus picks the arrangement of its children that keeps
+    # them furthest apart under all four, so the focused sets have a floor under each; groups
+    # print theirs.
+    got = node(
+        """
+const P = CladeColour.build(T, META), res = {};
+const sets = Object.keys(P.gr).map((g) => [g, P.kids[P.gr[g]].slice(0, 8).map((r) => P.col[r])]);
+Object.keys(DEEP).forEach((t) => {
+  const f = T.findIndex((x) => x[0] === t), F = P.at(f), ms = [];
+  for (let i = 0; i < 20; i++) {
+    const Q = CladeColour.build(T, META), t0 = performance.now();
+    Q.at(f); ms.push(performance.now() - t0); }
+  res[t + ' ms'] = ms.sort((a, b) => a - b)[10];
+  sets.push([t + ' focused', P.kids[f].slice(0, 8).map((r) => F[r])]);});
+sets.forEach(([n, cs]) => { res[n] = {normal: least(cs)};
+  Object.keys(CVD).forEach((k) => { res[n][k] = least(cs.map((c) => sim(c, k))); }); });
+out(res);"""
+    )
+    for n in [n for n in got if n.endswith(" ms")]:
+        ms = got.pop(n)
+        # printed, not asserted: a time bound flakes on a busy CI runner
+        print(f"{n[:-3]}: focusing takes {ms:.2f} ms (median of 20)")
+    for n, r in got.items():
+        print(n, ", ".join(f"{k} {v:.1f}" for k, v in r.items()))
+        assert r["normal"] >= 12, n
+        if n.endswith("focused"):
+            assert min(r.values()) >= FLOOR, n
