@@ -72,7 +72,7 @@ def test_scored_unit_and_overturn():
 
 
 def test_first_own_id_orders_by_time_not_string():
-    # across a DST change 01:30+11:00 (14:30 UTC) precedes 01:00+10:00 (15:00 UTC); strings sort the other way
+    # across DST, 01:30+11:00 (14:30 UTC) precedes 01:00+10:00 (15:00 UTC); strings say otherwise
     early = _ident(1, True, 11, vision=True, created="2025-04-06T01:30:00+11:00")
     late = _ident(1, True, 10, vision=False, created="2025-04-06T01:00:00+10:00")
     df = po.scored([po.summarise(_obs(9, 10, [late, early, _ident(2, False, 10)]))])
