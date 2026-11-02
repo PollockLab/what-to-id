@@ -51,7 +51,7 @@ RAW = [
         [
             _ident(1, True, 10, vision=False, created="2025-01-03"),
             _ident(1, True, 11, vision=True, created="2025-01-01"),
-            _ident(2, False, 10),
+            {**_ident(2, False, 10), "user": {"id": 2, "identifications_count": 5000}},
         ],
         user_idents=2000,
     ),
@@ -117,6 +117,13 @@ def test_identifier_cv_table():
     assert out.loc["cv", "same_cv"] == 0 and out.loc["cv", "other_cv"] == pytest.approx(1 / 3)
     assert out.loc["typed", ["same", "other"]].tolist() == [0, 1]  # record 2
     assert np.isnan(out.loc["typed", "same_cv"])
+
+
+def test_corrector_table_by_identifier_experience():
+    out = po.corrector_table(ROWS, po.scored(ROWS)).set_index(["source", "experience"])
+    assert out.loc[("cv", "<10 ids"), ["ids", "other"]].tolist() == [3, 2]  # 1 same; 3 and 4
+    assert out.loc[("cv", "1000+ ids"), ["ids", "other"]].tolist() == [1, 1]  # record 6
+    assert out.loc[("typed", "<10 ids"), "other_share"] == 1.0
 
 
 def test_level_table():

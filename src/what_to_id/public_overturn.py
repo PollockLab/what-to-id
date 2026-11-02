@@ -61,6 +61,7 @@ def summarise(o: dict) -> dict:
         "idents": [
             {
                 "user": (i.get("user") or {}).get("id"),
+                "user_idents": (i.get("user") or {}).get("identifications_count"),
                 "own": i.get("own_observation"),
                 "vision": i.get("vision"),
                 "current": i.get("current"),
@@ -176,6 +177,30 @@ def matched_table(df: pd.DataFrame, by: str) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=["stratum", "tested", "crude", "matched", "species"])
 
 
+def other_ids(rows, df: pd.DataFrame) -> pd.DataFrame:
+    """Other identifiers' current IDs on tested records: ``source`` of the first ID, ``same`` when
+    the ID names the first taxon, ``vision`` of that ID, and the identifier's ``experience`` bin."""
+    src = df.drop_duplicates("id").set_index("id")
+    out, seen = [], set()
+    for r in rows:
+        if r["id"] in seen or r["id"] not in src.index or not src.at[r["id"], "tested"]:
+            continue
+        seen.add(r["id"])
+        first = _first_own(r)
+        for i in r["idents"]:
+            if not i["own"] and i["current"]:
+                n = i.get("user_idents")
+                out.append(
+                    (src.at[r["id"], "source"], i["taxon"] == first["taxon"], i["vision"], n)
+                )
+    o = pd.DataFrame(out, columns=["source", "same", "vision", "user_idents"])
+    o["vision"] = o["vision"].fillna(False).astype(bool)
+    bins = [-np.inf, *[c - 0.5 for c in EXPERIENCE_CUTS], np.inf]
+    idents = pd.to_numeric(o["user_idents"], errors="coerce").fillna(0)
+    o["experience"] = pd.cut(idents, bins, labels=EXPERIENCE).astype(str)
+    return o
+
+
 def identifier_cv_table(rows, df: pd.DataFrame) -> pd.DataFrame:
     """Per first-ID source: other identifiers' current IDs on tested records, split by whether they
     name the first taxon or another, and the share of each that was itself a CV suggestion.
@@ -183,24 +208,38 @@ def identifier_cv_table(rows, df: pd.DataFrame) -> pd.DataFrame:
     Public corrections are not all human: an identifier can accept a suggestion too. The blind
     page offers none, so this is the part of public detection d a blind consensus cannot carry.
     """
-    src = df.drop_duplicates("id").set_index("id")
-    acc: dict[str, list[int]] = defaultdict(lambda: [0, 0, 0, 0])
-    seen = set()
-    for r in rows:
-        if r["id"] in seen or r["id"] not in src.index or not src.at[r["id"], "tested"]:
-            continue
-        seen.add(r["id"])
-        first, c = _first_own(r), acc[src.at[r["id"], "source"]]
-        for i in r["idents"]:
-            if not i["own"] and i["current"]:
-                k = 0 if i["taxon"] == first["taxon"] else 2
-                c[k] += 1
-                c[k + 1] += bool(i["vision"])
-    out = [
-        (s, a, a_cv / a if a else np.nan, d, d_cv / d if d else np.nan)
-        for s, (a, a_cv, d, d_cv) in sorted(acc.items())
-    ]
-    return pd.DataFrame(out, columns=["source", "same", "same_cv", "other", "other_cv"])
+    o = other_ids(rows, df)
+    g = o.groupby(["source", "same"])["vision"].agg(["size", "mean"]).unstack("same")
+    g = g.reindex(columns=pd.MultiIndex.from_product([["size", "mean"], [True, False]]))
+    out = pd.DataFrame(
+        {
+            "source": g.index,
+            "same": g[("size", True)].fillna(0).astype(int).to_numpy(),
+            "same_cv": g[("mean", True)].to_numpy(),
+            "other": g[("size", False)].fillna(0).astype(int).to_numpy(),
+            "other_cv": g[("mean", False)].to_numpy(),
+        }
+    )
+    return out.reset_index(drop=True)
+
+
+def corrector_table(rows, df: pd.DataFrame) -> pd.DataFrame:
+    """Per first-ID source and identifier experience bin: other identifiers' current IDs on tested
+    records and the share of them that name another taxon than the first ID.
+
+    Who does the correcting: if disagreement with CV-accepted names comes from the most experienced
+    identifiers, a blitz that wants CV errors caught has to recruit them. Identifiers whose count
+    the read-back does not carry fall in the lowest bin.
+    """
+    o = other_ids(rows, df)
+    g = o.groupby(["source", "experience"], observed=True)["same"]
+    out = g.agg(ids="size", other=lambda s: int((~s).sum())).reset_index()
+    out["other_share"] = out["other"] / out["ids"]
+    order = {e: k for k, e in enumerate(EXPERIENCE)}
+    out = out.sort_values(
+        ["source", "experience"], key=lambda c: c.map(order) if c.name == "experience" else c
+    )
+    return out.reset_index(drop=True)
 
 
 def level_table(rows, levels: pd.DataFrame) -> pd.DataFrame:
@@ -261,6 +300,8 @@ def main(argv=None) -> int:
     print(matched_table(df, "experience").to_string(index=False, float_format="{:.2f}".format))
     print()
     print(identifier_cv_table(rows, df).to_string(index=False, float_format="{:.3f}".format))
+    print()
+    print(corrector_table(rows, df).to_string(index=False, float_format="{:.3f}".format))
     if a.levels:
         print()
         lv = level_table(rows, pd.read_parquet(a.levels, columns=["id", "taxon_id", "level"]))
