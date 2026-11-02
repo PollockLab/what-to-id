@@ -104,6 +104,7 @@ jobs:
       - name: Drop records iNaturalist no longer holds
         id: reconcile
         continue-on-error: true
+        timeout-minutes: 30  # the site build still fits in the job's hour
         run: |
           set -euo pipefail
           python -m what_to_id.pool_state reconcile --pool state/pool.parquet --state state/sync.json \

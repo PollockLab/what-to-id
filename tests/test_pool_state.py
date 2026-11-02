@@ -324,8 +324,8 @@ def test_cmd_reconcile_drops_gone_adds_missing_and_keeps_other_keys(tmp_path, mo
     state_path.write_text(json.dumps({"since": "2026-09-30T01:00:00+00:00", "added": 3}))
     asked = {}
 
-    def fake_reconcile(ids, *, d1, max_requests):
-        asked.update(ids=sorted(ids), d1=d1, max_requests=max_requests)
+    def fake_reconcile(ids, *, d1, max_requests, partial):
+        asked.update(ids=sorted(ids), d1=d1, max_requests=max_requests, partial=partial)
         return {2}, {8, 9}, 17
 
     def fake_fetch(ids):
@@ -339,7 +339,7 @@ def test_cmd_reconcile_drops_gone_adds_missing_and_keeps_other_keys(tmp_path, mo
     monkeypatch.setattr(pool_state, "total_results", lambda params: 4)
     argv = ["reconcile", "--pool", str(pool_path), "--state", str(state_path), "--d1", "1900-01-01"]
     assert pool_state.main([*argv, "--max-requests", "50"]) == 0
-    assert asked["ids"] == [1, 2, 3, 4] and asked["max_requests"] == 50
+    assert asked["ids"] == [1, 2, 3, 4] and asked["max_requests"] == 50 and asked["partial"]
     assert asked["d1"] == "1900-01-01" and asked["fetched"] == [8, 9]
     assert pd.read_parquet(pool_path)["id"].tolist() == [1, 3, 4, 8]
     state = json.loads(state_path.read_text())

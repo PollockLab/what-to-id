@@ -78,6 +78,10 @@ def changed_since(
             time.sleep(sleep)
 
 
+class _Cap(Exception):
+    """The request cap, hit by a reconcile that may stop there."""
+
+
 def reconcile_ids(
     pool_ids: Iterable[int],
     *,
@@ -86,6 +90,7 @@ def reconcile_ids(
     sleep: float = SLEEP,
     max_requests: int = 2000,
     extra: dict | None = None,
+    partial: bool = False,
 ) -> tuple[set[int], set[int], int]:
     """Find pool ids iNaturalist no longer holds and ids it holds that the pool lacks.
 
@@ -96,7 +101,9 @@ def reconcile_ids(
     pool. Costs about one request per differing record times the log of the pool size, instead of
     a walk of every page. A range where one record went missing and another was never added keeps
     equal counts and is not inspected; running daily after the sync keeps that rare. Raises
-    ``RuntimeError`` past ``max_requests``. ``extra`` narrows the query, e.g. to one project.
+    ``RuntimeError`` past ``max_requests``, or with ``partial`` stops there and returns what the
+    fully listed ranges found, which is exact for them; the next run picks up the rest. ``extra``
+    narrows the query, e.g. to one project.
     """
     ids = np.unique(np.asarray(list(pool_ids), dtype=np.int64))
     tomorrow = (pd.Timestamp.now(tz="UTC") + pd.Timedelta(days=1)).date().isoformat()
@@ -107,6 +114,8 @@ def reconcile_ids(
     def ask(lo: int, hi: int, *, only_id: bool) -> int | list[dict]:
         nonlocal used
         if used >= max_requests:
+            if partial:
+                raise _Cap
             raise RuntimeError(f"reconcile needs more than {max_requests} requests; raise the cap")
         if used and sleep:
             time.sleep(sleep)
@@ -124,11 +133,15 @@ def reconcile_ids(
         lo, hi = ranges.pop()
         i = int(np.searchsorted(ids, lo, side="right"))
         j = int(np.searchsorted(ids, hi, side="left"))
-        api = ask(lo, hi, only_id=False)
+        try:
+            api = ask(lo, hi, only_id=False)
+            listing = ask(lo, hi, only_id=True) if api and api != j - i and api <= PER_PAGE else []
+        except _Cap:
+            break
         if api == j - i:
             continue
         if api <= PER_PAGE:
-            listed = {int(o["id"]) for o in ask(lo, hi, only_id=True)} if api else set()
+            listed = {int(o["id"]) for o in listing}
             if len(listed) < PER_PAGE:
                 local = set(ids[i:j].tolist())
                 gone |= local - listed

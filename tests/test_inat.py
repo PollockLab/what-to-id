@@ -620,3 +620,13 @@ def test_reconcile_full_listing_after_a_stale_count_does_not_call_ids_gone():
     gone, missing, _ = reconcile_ids(pool, d1="1900-01-01", session=session, sleep=0)
     assert gone == set()
     assert missing == set(api) - set(pool)
+
+
+def test_reconcile_partial_keeps_what_it_found_at_the_cap():
+    # two far apart misses: the cap stops the walk after the first, which is still reported
+    ids = list(range(1000, 51000))
+    api = [i for i in ids if i not in (1500, 50500)]
+    gone, missing, used, _ = _reconcile(ids, api, max_requests=20, partial=True)
+    assert (gone, missing, used) == ({50500}, set(), 20)
+    full, _, _, _ = _reconcile(ids, api, partial=True)
+    assert full == {1500, 50500}
