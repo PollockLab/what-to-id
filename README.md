@@ -1,35 +1,33 @@
 # what-to-id
 
-Does the order of the iNaturalist identification queue change how much gets identified, and what? what-to-id tests this with unlabelled, randomised lists and reads the answer back from iNaturalist. First deployment: British Columbia, autumn 2026, with Blitz the Gap.
+Does the order of the iNaturalist identification queue change how much gets identified, and what? what-to-id tests this with unlabelled, randomised lists and reads the answer back from iNaturalist. First deployment: British Columbia, autumn 2026, with Blitz the Gap. A result from one blitz holds for that blitz's region and identifiers; other regions run the same build to know.
 
-It is a method, tested first in BC. A result from one blitz holds for that blitz's region and identifiers; other regions have to run it to know.
+Companion to [where-to-blitz](https://github.com/PollockLab/where-to-blitz), which answers where to go and record.
 
 ## Wait, what is this?
-
-Short version, in plain terms.
 
 - About 2.5 million BC records on iNaturalist wait for an identification. Identifier hours are the limit, not records.
 - The queue order decides which records those hours reach. iNaturalist shows newest first. We found no test of whether another order gives more identifications, or more useful ones.
 - what-to-id changes only the order. Each record goes to one of four lists by a keyed hash. The page does not name the lists.
-- One page serves the lists in turn. Each press of Next batch gives the next list. So each identifier works each list, in equal measure.
-- The identifier works in iNaturalist as usual. The page adds no step.
-- After the blitz, the tool reads each identifier's IDs back from iNaturalist and compares each identifier with themself, list against list. Skill cancels out. This is the within-person comparison of interleaved search evaluation ([Chapelle et al. 2012](https://doi.org/10.1145/2094072.2094078)), applied to a citizen-science queue.
+- One page serves the lists in turn. Each press of Next batch gives the next list, so each identifier works each list in equal measure. The identifier works in iNaturalist as usual.
+- After the blitz, the tool reads each identifier's IDs back and compares each identifier with themself, list against list. Skill cancels out. This is the within-person comparison of interleaved search evaluation ([Chapelle et al. 2012](https://doi.org/10.1145/2094072.2094078)), applied to a citizen-science queue.
 - The design is pre-registered. The list assignment is keyed and replayable. The same build runs for any region with a place id and a cell-score layer.
 - A second, proposed study turns the same records on their head. Students name photos blind, with no suggestion shown. Their consensus gives the error rate of names the observer accepted from the computer-vision suggestion, and the public record's overturn rate divided by that error gives how much of the error the community catches. Planted expert-named records measure how often the consensus itself is wrong, and that error is removed. The split is general: any crowd-labelled dataset that records whether a label came from a suggestion gives error times detection from its public record, and blind re-labelling of a sample separates the two. See [Blind track](#blind-track-proposed-not-yet-run).
 
 If one order gives more species-level IDs per identifier hour, or fills more data gaps, that order can become the default queue, for BC first and for any region after.
 
-Companion to [where-to-blitz](https://github.com/PollockLab/where-to-blitz), which answers where to go and record. Both serve Blitz the Gap.
-
 ## What the lists test
 
-Every list holds the same kind of records and differs only in order. The orders fall into two families, each with its own question:
+Every list holds the same kind of records and differs only in order.
 
-- **Speed** lists change how many IDs an hour of identifier effort gives. `similarity` puts look-alike photos together, on the hypothesis that fewer context switches make identifying faster.
-- **Value** lists change which gaps the IDs fill. `gap_first` puts records from data-poor places first, aimed at the gap in where species are known to occur (the Wallacean shortfall, [Hortal et al. 2015](https://doi.org/10.1146/annurev-ecolsys-112414-054400)) and in how recent the records are, which the score weights by record age. Blitz the Gap calls these spatial and temporal gaps ([Hébert et al. 2026](https://doi.org/10.32942/X2T09G)). `novelty` puts the photos least like any verified photo of their group first, aimed at the gap in what verified photos cover.
-- `recency`, newest first, is the control for both.
+| List | Order | Family | Measured on |
+|---|---|---|---|
+| `recency` | newest first | control | species-level IDs per identifier |
+| `similarity` | look-alike photos together (BioCLIP 2.5 embeddings) | speed: fewer context switches | species-level IDs per identifier |
+| `gap_first` | data-poor places first (where-to-blitz cell scores, weighted by record age) | value: the Wallacean shortfall ([Hortal et al. 2015](https://doi.org/10.1146/annurev-ecolsys-112414-054400)) and Blitz the Gap's spatial and temporal gaps ([Hébert et al. 2026](https://doi.org/10.32942/X2T09G)) | the same count weighted by how data-poor the place is |
+| `novelty` | photos least like any verified photo of their group first | value: the gap in what verified photos cover | new species per grid cell |
 
-Each family is judged on its own measure: speed lists on species-level IDs per identifier, value lists on the same count weighted by how data-poor the record's place is (`gap_first`) or on new species per grid cell (`novelty`).
+`surprise` (opt-in, `--surprise-scores`) orders by how unexpected the proposed species is where, or in what climate, it was seen.
 
 ## Experiment diagram
 
@@ -50,163 +48,81 @@ flowchart TB
   count --> cmp["<b>Compare</b> each list with List 1<br/>within each identifier"]
 ```
 
-Each record sits on exactly one list and keeps it in every daily build. Because the list comes from a keyed hash of the record id, every list gets a like mix of taxon groups and of the observers who posted the records on average, so the lists differ only in the order they show their records. That order is the one thing under test.
+The keyed hash gives every list a like mix of taxon groups and observers, so order is the one thing under test. The lists are unlabelled rather than blind: the page never names them, but a batch of look-alikes shows which list it is.
 
-The lists are unlabelled rather than blind: the page never names them, but a batch of look-alike photos shows which list it came from.
-
-**Every identifier works every list.** A few identifiers make most of the IDs. If each identifier kept one list, the list that drew the busiest identifier would win whatever its order. So each browser draws its own random cycle of the four lists once, and every press of Next batch takes the next list in that cycle:
+**Every identifier works every list.** A few identifiers make most of the IDs. If each kept one list, the list that drew the busiest identifier would win whatever its order. So each browser draws one random cycle of the four lists and every Next batch press takes the next list in it:
 
 | | Their cycle | Press 1 | Press 2 | Press 3 | Press 4 | Press 5 | Press 6 | Over the blitz |
 |---|---|---|---|---|---|---|---|---|
 | Identifier who does 40 batches | 3 → 1 → 4 → 2 | 3 | 1 | 4 | 2 | 3 | 1 | 10 batches from each list |
 | Identifier who does 4 batches | 2 → 4 → 1 → 3 | 2 | 4 | 1 | 3 | | | 1 batch from each list |
 
-IDs are credited to iNaturalist accounts and each record's list is fixed, so a second device only adds a second balanced cycle. Each identifier is then compared with themself: their IDs on List 2 against their IDs on List 1, and so on. A busy identifier adds the same effort to every list, so their skill cancels out. `python -m what_to_id.power` simulates both designs.
-
-| | One list per identifier | Every identifier works every list |
-|---|---|---|
-| A busy identifier's effort goes to | one list | all lists, equally |
-| A list scores high because of | who landed on it | its order |
-| Compared unit | list totals | each identifier with themself |
+Each identifier is then compared with themself, their IDs on List 2 against their IDs on List 1, and so on. `python -m what_to_id.power` simulates this against one list per identifier.
 
 ## How it works
 
-1. **Pull.** Pull the needs-ID records with a photo, observed since a start date. The daily job then adds only the records created since its last run and, before each build, drops served records that no longer need an ID. The region is BC (iNaturalist place 7085), set in `inat.py` and `batches.py`.
-2. **Assign.** Each record goes to one list by a keyed hash of its record id (`--key-env`), so it stays on that list in every daily build. The key is private; every public build record carries its fingerprint (`key_fingerprint`), which replay checks, so opening the key after the read-back can be verified. Without it, a one-off build randomises once with a seed, balanced within taxon group and observer.
-3. **Compose.** Each arm orders its records into batches:
-   - `recency`: newest first as of the build, close to what an identifier gets from iNaturalist today.
-   - `gap_first`: records from data-poor places first, using the where-to-blitz cell scores.
-   - `similarity`: look-alike photos together, from BioCLIP 2.5 image embeddings.
-   - `novelty`: photos least like any Research Grade photo of the same group and region first.
-   - `surprise` (opt-in, not in the default build): records whose proposed species is least expected where, or in what climate, it was seen, from a per-species tail probability against Research Grade records (`surprise.py`). Pass the scores with `--surprise-scores`.
-4. **Serve.** A static page shows lists labelled A to D, each a stack of Identify links. The arm behind each letter is recorded only in the build's `manifest.json`, never on the page. By default each identifier takes one list; `--design rotation` serves the one-page rotation pictured above. Each daily build appends its served records, by letter, to a served log (`--served-log`).
-5. **Read back.** Every served record, from every daily build, is fetched again. Identifications keep their own timestamps, so the per-identifier comparison is fixed when the blitz ends and is read back within a week of it; the record-level outcomes are read back 30 days after.
+1. **Pull** the needs-ID records with a photo since a start date (BC, iNaturalist place 7085, set in `inat.py` and `batches.py`). The daily job adds new records and drops served ones that no longer need an ID.
+2. **Assign** each record to one list by a keyed hash of its id (`--key-env`). The key is private; every build record carries its fingerprint, which replay checks, so opening the key after the read-back can be verified.
+3. **Compose** each list into batches in its order.
+4. **Serve** one static page: lists A to D, each a stack of Identify links; the arm behind each letter lives only in the build's `manifest.json`. Each daily build appends what it served to a served log.
+5. **Read back** every served record. Identifications keep their timestamps, so the per-identifier comparison is read within a week of the blitz and record outcomes at 30 days.
 
-## First deployment: British Columbia
-
-The first run is a BC identification blitz in autumn 2026, with Blitz the Gap. Identification blitzes themselves have precedent: 52 experts added IDs to about 11,000 Western Australian plant records in three weeks ([Mesaglio et al. 2025](https://doi.org/10.1002/ppp3.70005)). What is new here is the randomised queue order inside such a blitz, so the blitz also answers which order to serve. The protocol and the outcomes fixed before the blitz are in [docs/protocol.md](docs/protocol.md), a draft for co-design with the BC team. The set-up is four lists, `recency`, `gap_first`, `similarity` and `novelty`, over four weeks. An earlier draft of the protocol proposed two lists, `recency` and `gap_first`, and left the other two to a later round.
+The BC run is four lists over four weeks; the protocol and pre-fixed outcomes are in [docs/protocol.md](docs/protocol.md). Identification blitzes have precedent ([Mesaglio et al. 2025](https://doi.org/10.1002/ppp3.70005)); the randomised order inside one is new.
 
 ## Install
 
 ```bash
 uv venv && source .venv/bin/activate
-uv pip install -e ".[dev]"      # add ,embed for the image-embedding step, ,similarity for look-alike batches
+uv pip install -e ".[dev]"      # add ,embed for image embeddings, ,similarity for look-alike batches (private labelfirst)
+pytest                          # network tests skipped; pytest -m network hits the live API
 ```
-
-The `similarity` extra installs `labelfirst`, a private repository pinned by commit in `pyproject.toml`, so it needs access to that repository. Only the look-alike list's seed picker and the separability report use it. The four-list daily build needs this extra; an explicit `recency,gap_first` build still runs without it. CI uses the `LABELFIRST_DEPLOY_KEY` secret, the private half of a dedicated read-only deploy key on `traitlab/labelfirst`, to check out the pinned library and test the integration.
-
-The base CI job installs exact, hash-pinned versions from `requirements.lock` (`pip install --require-hashes -r requirements.lock`, then run with `PYTHONPATH=src`). After changing the dependencies in `pyproject.toml`, regenerate it with `uv pip compile pyproject.toml --extra dev --universal --python-version 3.11 --generate-hashes -o requirements.lock`.
 
 ## Use
 
 ```bash
-# Freeze the needs-ID pool (hours for all groups; --groups and --cap-pages for a sample).
-# An interrupted pull resumes from the groups already saved.
+# 1. Freeze the needs-ID pool (hours for all groups; --groups and --cap-pages for a sample)
 python -m what_to_id.inat --d1 2025-01-01 --freeze YYYY-MM-DD --out data/pool_YYYY-MM-DD.parquet
 
-# Research Grade reference pool for the novelty arm
-python -m what_to_id.inat --d1 2025-01-01 --freeze YYYY-MM-DD --quality research --out data/ref_YYYY-MM-DD.parquet
+# 2. Build lists, batches, manifest and site. --max-batches fixes the read-back denominator before the blitz
+what-to-id build --pool data/pool_YYYY-MM-DD.parquet --freeze YYYY-MM-DD --d1 YYYY-MM-DD --seed <private-seed> --max-batches N --design rotation --out out/build
 
-# Build assignment, batches, manifest and site. --max-batches serves only the first N
-# batches per arm and taxon group, so the read-back denominator is fixed before the blitz.
-# --design rotation (opt-in) writes one page where each "Next batch" press takes the identifier
-# to the next list, so every identifier's work splits evenly across lists.
-what-to-id build --pool data/pool_YYYY-MM-DD.parquet --freeze YYYY-MM-DD --d1 YYYY-MM-DD --seed <private-seed> --max-batches N --out out/build
+# 3. Daily build, as .github/workflows/daily.yml runs it (OFFLINE=1 rehearses on a saved pool)
+export WTB_DIR=../where-to-blitz/cluster_results/ca BLITZ_D1=<blitz-start> EMBEDDING_RELEASE=<bundle-tag>
+scripts/daily.sh fetch && scripts/daily.sh fetch-embeddings && scripts/daily.sh build
 
-# Daily build, the same script .github/workflows/daily.yml runs: fetch state and a prepared pool,
-# build with the private key, drop served records that no longer need an ID, rebuild, log what was served,
-# keep the day's pool and build record, check for leaks and replay the build. WTB_DIR is a where-to-blitz
-# checkout at the commit in what_to_id.manifest.WHERE_TO_BLITZ_REF. OFFLINE=1 rehearses on a saved pool.
-export WTB_DIR=../where-to-blitz/cluster_results/ca BLITZ_D1=<blitz-start>
-export EMBEDDING_RELEASE=<versioned-bundle-tag>
-scripts/daily.sh fetch
-scripts/daily.sh fetch-embeddings
-scripts/daily.sh build     # scripts/daily.sh save uploads the state
-
-# Rerun any past day from its snapshot; exits 1 unless it serves exactly what the served log says
+# 4. Rerun any past day from its snapshot; exits 1 unless it serves exactly what the served log says
 python -m what_to_id.replay --pool state/days/pool-YYYY-MM-DD.parquet --record state/days/build-YYYY-MM-DD.json --served-log state/served.parquet --webapp-dir "$WTB_DIR" --key-env WHAT_TO_ID_KEY --embedding-bundle data/embedding-bundle
 
-# After the blitz, open the key: letter -> list map for the read-back and the analysis
+# 5. After the blitz: open the key, read back, list participants, analyse
 python -c "import json; from what_to_id.manifest import blind_labels_keyed as b, key_from_env as k; print(json.dumps({v: a for a, v in b(['recency', 'gap_first', 'similarity', 'novelty'], k()).items()}))" > labels.json
-
-# Read back outcomes after the blitz: within a week for the per-identifier comparison, again at 30 days
 python -m what_to_id.readback --pool state/pool.parquet --assign state/served.parquet --label-map labels.json --out out/outcomes.parquet
-
-# Build the participants file --users reads below, from project members or a sign-up form's logins
-python -m what_to_id.participants --project ID_OR_SLUG --out participants.txt
-python -m what_to_id.participants --logins signups.txt --out participants.txt
-
-# Pre-registered per-identifier comparison for the rotation design: participants only, plus a pre-blitz placebo.
-# The default --weight primary holds each list to its pinned count (weighted for gap_first, plain for similarity and novelty), one-sided with Holm over gap_first and similarity, novelty exploratory (two-sided, unadjusted), the other count as secondary; each run also reports a sign test (p_sign)
+python -m what_to_id.participants --project ID_OR_SLUG --out participants.txt      # or --logins signups.txt
 python -m what_to_id.analysis --idents out/outcomes_idents.parquet --served state/served.parquet --label-map labels.json --control recency --start <blitz-start> --cutoff <read-back-cutoff> --users participants.txt --placebo-start <placebo-start> --obs out/outcomes_obs.parquet
 ```
 
-The read-back denominator is the served records only: `assign.parquet` covers the whole pool, but `batches.parquet` (one build) and the served log (every daily build) hold just the records placed in a served batch. Both work as `--assign` and `--served`; the served log needs `--label-map`.
-
-Prepare embeddings separately from daily serving. `slurm/stage_mila.sbatch` downloads photos on CPU into resumable group archives; `slurm/prepare_mila.sbatch` then regenerates the frozen 10,000-row Research Grade reference and candidate embeddings on GPU using the verified BioCLIP 2.5 checkpoint. Each group archive is bound to the IDs and photo URLs of its own rows, so archives copied from a run whose pool differed only in other groups are resumed without re-downloading. Candidate records whose photo cannot be fetched from either iNaturalist host are excluded before assignment and listed in `RUN/excluded.json`, and the bundle's pool omits them; staging stops instead if more than 0.1% of a group fails or any reference photo fails. Ten minutes before either job's time limit, staging archives the group in progress without marking it complete and preparation stops its current step and persists completed vectors, so resubmitting resumes. The scripts take explicit input paths and never publish. The daily runner does not embed: each day `python -m what_to_id.assemble_bundle` builds the bundle for that day's pool from a base release of float16 `base_{group}.npz` vectors and the frozen reference `emb_{group}_bioclip25.npz` files, plus the atlas job's `raw-delta-*.npz` files on the `atlas-state` release (a later delta wins over an earlier one and over the base), so a new record enters the study about a day after the atlas embeds it. Records with no vector yet are listed in `uncovered.json`, left out of that day's bundle and picked up on a later day; if more than 1% of a group is uncovered (`--max-uncovered-share`) the build fails and the cluster preparation is the fallback.
-
-For subsequent pool snapshots, reuse only an attested prior preparation. The command retains observations whose ID, taxon group and photo URL match, embeds new or changed rows, drops removed IDs and keeps the supplied reference files unchanged. `slurm/prepare_mila.sbatch` passes the same three inputs when `PREVIOUS_POOL`, `CANDIDATE_CACHE` and `PREVIOUS_PREPARATION` are all exported at submission; the earlier bundle is only read:
-
-```bash
-python -m what_to_id.prepare_embeddings --pool data/pool-next.parquet \
-  --previous-pool data/previous-bundle/pool.parquet \
-  --candidate-cache 'data/previous-bundle/embeddings_{group}.npz' \
-  --previous-preparation data/previous-bundle/preparation.json \
-  --reference-embeddings 'data/frozen-reference/emb_{group}_bioclip25.npz' \
-  --reference-pool data/frozen-reference.parquet --model-snapshot data/frozen-model \
-  --work-dir data/preparation-next --out data/bundle-next
-```
-
-`--model-snapshot` must contain the exact config and safetensors weights for revision `6e3d04e3d6522012c88181085c5ae666e14c45cd`; hashes are checked before encoding. Cache reuse verifies the previous pool, model and vector file hashes. Legacy caches without that record require regeneration. URL identity does not detect image bytes changed at the same URL. A work directory resumes only the same inputs, and packing requires complete candidate coverage. Publish the resulting pool, provenance and embeddings together as a new immutable bundle.
-
-To package already verified caches directly:
-
-```bash
-python -m what_to_id.artifacts pack --pool data/pool_YYYY-MM-DD.parquet --embeddings 'data/candidates/emb_{group}.npz' --reference-embeddings 'data/reference/emb_{group}.npz' --out data/embedding-bundle
-python -m what_to_id.artifacts verify data/embedding-bundle
-what-to-id build --pool data/pool_YYYY-MM-DD.parquet --freeze YYYY-MM-DD --d1 YYYY-MM-DD --seed 0 --key-env WHAT_TO_ID_KEY --arms recency,gap_first,similarity,novelty --design rotation --embedding-bundle data/embedding-bundle --out out/build
-```
-
-Run `python -m what_to_id.bundle_transport stage-release --bundle data/embedding-bundle --out data/release-assets`, then publish all files in `data/release-assets` together as assets of a versioned release. The transport uses hashed parts below GitHub's per-file size limit. `EMBEDDING_RELEASE` names the release that holds the base vectors (default `embedding-base-2026-10-15`; set `EMBEDDING_REPO` if hosted elsewhere), and the daily job assembles its bundle into `EMBEDDING_BUNDLE`, which defaults to `data/embedding-bundle` and must not exist yet. The operator must provide release access where needed. Production rollout still requires embedding preparation, release upload, secret configuration and deployment.
-
-A build records each candidate/reference file's content hash, dimensions, row count and backbone by taxon group. Replay accepts the original bundle or matching `--embeddings` and `--reference-embeddings` inputs; it refuses changed files. Builds using score files also require the original `--surprise-scores` or `--sinr-scores`. Older image-list build records without complete per-file fingerprints must be rebuilt before this replay path can verify them. Production bundles require candidate embeddings for every pool ID and nonempty references for each group. The daily job refreshes the pool, assembles the bundle for it, uses that bundle's pool, and removes served observations that no longer need identification. It never serves an observation ahead of its embedding. Exploratory builds with individual cache inputs retain the arm's recency fallback for missing candidates.
-
-The `gap_first` arm reads where-to-blitz's `cluster_results/ca`; point `--webapp-dir` or the `WHERE_TO_BLITZ_CA` environment variable at a checkout of it.
-
-## Publish
-
-The live page is served at https://pollocklab.github.io/what-to-id/. The daily workflow (`.github/workflows/daily.yml`) rebuilds it every evening (UTC) once the repository variable `DAILY_ENABLED` is `true` (and on demand from the Actions tab), and saves it as `study.html` on the `pool-state` release. It does not deploy. The map workflow (`map.yml`) runs after each successful daily run and is the only workflow that publishes the full site: the Explore page at the root, and the study page, taken from that release while `DAILY_ENABLED` is `true` and from the committed `site/study.html` otherwise. It reads the key from the `WHAT_TO_ID_KEY` secret and the blitz start from the `BLITZ_D1` variable, and runs `scripts/daily.sh`. The script defaults to four lists with rotation and requires a prepared embedding bundle. Configure its versioned release and LabelFirst repository access before enabling this workflow. It refuses to keep a page that names a list, and reruns the day's build from its snapshot and stops unless that matches the served log exactly. The `pool-state` release keeps the pool, the served log (letters only), and each day's pool snapshot and public build record. Set the repository variable `CODE_REF` to a tag to run the same code for the whole blitz; each build record names the commit that ran. Actions are pinned by commit SHA. GitHub turns a schedule off after 60 days without a push to the repository, so push at least once in that window while it runs.
-
-A one-off build is published instead by copying `out/build/site/*.html` over `site/`, which `map.yml` publishes (the Pages workflow only starts it when `site/` changes on main); a rotation build writes only `study.html`, so delete the old `arm_*.html` pages when switching. Both the daily and map workflows refuse any file that is not HTML and any page that names an arm. Keep the key, and a real build's manifest and seed, out of the repo: with the public code and the same pool, any of them recovers which list is which.
-
-The current page is a rotation preview of all four lists, built from a 10,000-record sample frozen on 2026-09-11 (`--max-batches 20`), not the blitz build. Its lists are assigned with a private key, like the daily build, so the public code and pool do not show which list is which.
+The analysis holds each list to its pinned count, one-sided with Holm over `gap_first` and `similarity`, `novelty` exploratory, with a sign test beside each. Embedding preparation, bundle releases, replay guarantees and publishing are in [docs/operations.md](docs/operations.md).
 
 ## Blind track (proposed, not yet run)
 
 A second study for a class or a group of new identifiers. Proposed for the Monday 2 Nov 2026 meeting; it runs only after ethics review and the course agrees.
 
-- Most BC records already carry a species name that the observer accepted from the computer-vision suggestion. On 40,000 BC records, later identifiers overturned 6% of those names and 9% of typed names. The public record cannot tell a correct suggestion from a name people agreed with.
-- The blind page shows a student only the photos and the taxon group. No name, no location, no suggestion. The student types a name and a confidence, or abstains. The link to the record appears only after the answer is saved.
-- Three to five students see each record. A one-coin Dawid-Skene model gives each student an accuracy per group and each record a consensus name with a posterior. Records with an expert-settled name are planted among the rest and anchor the model.
-- What comes out: the error rate of CV-accepted names measured without the agreement bias, a test of the Identify levels against human consensus, and a labelled set of hard cases for training.
+- Most BC records carry a species name the observer accepted from the computer-vision suggestion. On 40,000 BC records, later identifiers overturned 6% of those names and 9% of typed names. The public record cannot tell a correct suggestion from a name people agreed with.
+- The blind page shows only the photos and the taxon group. No name, no location, no suggestion. The student types a name and a confidence, or abstains.
+- Three to five students see each record. A one-coin Dawid-Skene model ([Dawid and Skene 1979](https://doi.org/10.2307/2346806)) gives each student an accuracy per group and each record a consensus name with a posterior. Planted expert-named records anchor the model and measure the consensus's own error, which is removed.
+- Out come the error rate of CV-accepted names without the agreement bias, how much of it the community catches, a test of the Identify levels against human consensus, and a labelled set of hard cases for training.
 
 ```bash
-python -m what_to_id.blind_planted --obs obs.parquet --idents idents.parquet --pool pool.parquet --out planted.json  # candidates, an expert confirms the names
-python -m what_to_id.blind_sample --pool pool.parquet --levels identify.parquet --planted planted.json --per-stratum 4 --out site/records.json  # writes planted.parquet and levels.parquet beside it
-python -m what_to_id.page_blind --records site/records.json --out site/            # build blind.html
+python -m what_to_id.blind_planted --obs obs.parquet --idents idents.parquet --pool pool.parquet --out planted.json   # candidates; an expert confirms the names
+python -m what_to_id.blind_sample --pool pool.parquet --levels identify.parquet --planted planted.json --per-stratum 4 --out site/records.json
+python -m what_to_id.page_blind --records site/records.json --out site/                                             # blind.html
 python -m what_to_id.blind_answers --records site/records.json --names names.json --out answers.parquet blind-answers-*.jsonl
 python -c "import pandas as pd; from what_to_id.blind_skill import fit; s, c = fit(pd.read_parquet('answers.parquet'), pd.read_parquet('site/planted.parquet')); s.to_csv('skill.csv'); c.to_parquet('consensus.parquet')"
 python -m what_to_id.blind_report --consensus consensus.parquet --obs obs.parquet --idents idents.parquet --public pool.parquet --levels site/levels.parquet --answers answers.parquet --planted site/planted.parquet
+python -m what_to_id.blind_power          # sample-size table behind the protocol
+python -m what_to_id.public_overturn pull --out pull.jsonl && python -m what_to_id.public_overturn tables pull.jsonl   # the public pre-test
 ```
 
-The report prints three tables: the error of CV-accepted versus typed first IDs against the consensus, the community's detection rate (public overturn over that error, the part of the agreement bias the public record hides), and settled and abstain shares per Identify level. With `--answers` and `--planted` it first measures the consensus error c on held-out planted records and removes it from e and d, since a settled consensus that is itself wrong inflates e and deflates d, and splits c by planted kind with the share of CV-failure plants whose consensus is the vision model's own wrong name; when the read-back carries the observer's identification count the error and detection tables are repeated by observer experience, because on the public record the gap between CV-accepted and typed first IDs closes as the observer's experience grows and only blind data say whether that is error or detection; the e intervals draw c from its posterior like the d intervals, so a c measured on few planted records widens both; `tests/test_blind_recovery.py` simulates the whole model and checks that e and d come back inside their intervals. `python -m what_to_id.public_overturn` pulls a uniform id sample of BC records and prints the public overturn of CV-suggested against typed first IDs by group, observer experience and quarter, within species and per Identify level; it is the pre-test that sized and stratified this track, and it carries the agreement bias the track removes. `--hard-cases out.parquet` writes the labelled set for training: records whose settled consensus overturns the first own ID, with the consensus as label, and records that never settled. `tests/test_blind_pipeline.py` runs the whole chain on synthetic data. `python -m what_to_id.blind_power` prints the sample-size table behind the protocol: error-rate interval widths and power per source, and the simulated interval and power of the detection rate.
-
-## Tests
-
-```bash
-pytest              # network tests are skipped by default
-pytest -m network   # hits the live iNaturalist API
-```
+`blind_report` prints error e of CV-accepted versus typed first IDs against the consensus, detection d (public overturn over e), both corrected for the consensus error c measured on held-out planted records and split by observer experience, species-matched ratios, and settled and abstain shares per Identify level. `public_overturn` is the public pre-test that sized this track: overturn by group, observer experience, quarter, within species and per Identify level, plus who corrects and whether the correction was itself a CV suggestion. `--hard-cases` writes the training set. `tests/test_blind_recovery.py` and `tests/test_blind_pipeline.py` simulate the model and the whole chain.
 
 ## References
 
