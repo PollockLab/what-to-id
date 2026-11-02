@@ -31,6 +31,8 @@ def test_sample_caps_each_stratum_and_is_seeded():
     s = bs.strata(c)
     assert set(s["level"]) == {1, 2} and s["n"].max() <= 2
     assert len(c) == 12  # 3 groups x 2 levels x 2
+    named = levels.assign(level=levels["level"].map({0: "none", 1: "easy", 2: "taxonomist"}))
+    assert bs.sample(pool, 2, 1, named).equals(c)  # names become numbers, ranked by difficulty
 
 
 def test_to_records_mixes_planted_without_truth_and_rejects_overlap():

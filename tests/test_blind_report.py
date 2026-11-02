@@ -324,6 +324,17 @@ def test_hypothesis_tests_directions():
     assert out["statistic"].iloc[2] < 0 and h3 < 0.01
 
 
+def test_hypothesis_tests_h2_drops_undefined_resamples():
+    # cv: 20 of 40 wrong, all caught (d 1); typed: 1 of 4 wrong, uncaught (d 0), and about a third
+    # of typed resamples hold no wrong record, so d_typed is 0/0 there and must not count
+    cons = _cons([(i, 1, 0.99) for i in range(44)])
+    firsts = _firsts([(i, "Aves", 2 if i < 20 or i == 40 else 1, i < 40) for i in range(44)])
+    public = pd.DataFrame({"record_id": range(44), "taxon_id": [1] * 40 + [2, 1, 1, 1]})
+    levels = pd.DataFrame({"record_id": range(44), "level": [1] * 44})
+    out = hypothesis_tests(cons, firsts, public, levels, boot=200).set_index("hypothesis")
+    assert out.loc["H2 detection cv < typed", "p"] == 1.0
+
+
 def test_hypothesis_tests_skip_untestable():
     cons = _cons([(1, 1, 0.99), (2, 1, 0.99)])
     firsts = _firsts([(1, "Aves", 1, True), (2, "Aves", 1, False)])

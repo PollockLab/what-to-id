@@ -42,6 +42,13 @@ PARAMS = {
 EXPERIENCE_CUTS = (10, 100, 1000)
 EXPERIENCE = ("<10 ids", "10-99 ids", "100-999 ids", "1000+ ids")
 LEVEL_NAMES = ("none", "easy", "taxonomist", "narrow", "weird", "mislabel")
+
+
+def level_number(v) -> int:
+    """Identify level as its number; ``identify_levels`` writes numbers or ``LEVEL_NAMES``."""
+    return LEVEL_NAMES.index(v) if isinstance(v, str) else int(v)
+
+
 TABLE_COLUMNS = ["stratum", "source", "n", "species", "tested", "overturned", "overturn"]
 
 
@@ -90,6 +97,11 @@ def pull(blocks: int, seed: int, session=None, sleep: float = 1.0):
 def _first_own(r: dict) -> dict | None:
     own = [i for i in r["idents"] if i["own"] and i["created"]]
     return min(own, key=lambda i: i["created"]) if own else None
+
+
+def _on_lineage(i: dict, ref: dict) -> bool:
+    """Whether ID ``i`` names ``ref``'s taxon, a descendant of it or one of its ancestors."""
+    return i["taxon"] == ref["taxon"] or ref["taxon"] in i["anc"] or i["taxon"] in ref["anc"]
 
 
 def _upheld(first: dict, others: list[dict], ct) -> bool:
@@ -179,7 +191,8 @@ def matched_table(df: pd.DataFrame, by: str) -> pd.DataFrame:
 
 def other_ids(rows, df: pd.DataFrame) -> pd.DataFrame:
     """Other identifiers' current IDs on tested records: ``source`` of the first ID, ``same`` when
-    the ID names the first taxon, ``vision`` of that ID, and the identifier's ``experience`` bin."""
+    the ID sits on the first taxon's lineage (the taxon, a refinement of it or an ancestor), as
+    ``_upheld`` counts agreement, ``vision`` of that ID, and the identifier's ``experience`` bin."""
     src = df.drop_duplicates("id").set_index("id")
     out, seen = [], set()
     for r in rows:
@@ -190,9 +203,8 @@ def other_ids(rows, df: pd.DataFrame) -> pd.DataFrame:
         for i in r["idents"]:
             if not i["own"] and i["current"]:
                 n = i.get("user_idents")
-                out.append(
-                    (src.at[r["id"], "source"], i["taxon"] == first["taxon"], i["vision"], n)
-                )
+                same = _on_lineage(i, first)
+                out.append((src.at[r["id"], "source"], same, i["vision"], n))
     o = pd.DataFrame(out, columns=["source", "same", "vision", "user_idents"])
     o["vision"] = o["vision"].fillna(False).astype(bool)
     bins = [-np.inf, *[c - 0.5 for c in EXPERIENCE_CUTS], np.inf]
@@ -244,7 +256,7 @@ def corrector_table(rows, df: pd.DataFrame) -> pd.DataFrame:
 
 def latency_table(rows, df: pd.DataFrame) -> pd.DataFrame:
     """Per first-ID source and outcome: hours from the first own ID to the first other identifier's
-    current ID on tested records, as median and the share that arrived within a day.
+    ID after it on tested records, withdrawn or not, as median and the share within a day.
 
     Public overturn is error times detection, and detection takes time: a first ID that ends up
     overturned waits far longer for its first other look than one that is upheld, so a pull of
@@ -260,7 +272,7 @@ def latency_table(rows, df: pd.DataFrame) -> pd.DataFrame:
         hours = [
             (pd.Timestamp(i["created"]) - t0).total_seconds() / 3600
             for i in r["idents"]
-            if not i["own"] and i["current"] and i["created"]
+            if not i["own"] and i["created"] and pd.Timestamp(i["created"]) >= t0
         ]
         if hours:
             out.append((src.at[r["id"], "source"], src.at[r["id"], "overturned"], min(hours)))
@@ -272,21 +284,23 @@ def latency_table(rows, df: pd.DataFrame) -> pd.DataFrame:
 
 def level_table(rows, levels: pd.DataFrame) -> pd.DataFrame:
     """Per Identify level: records, share with another current ID, share of those contradicting
-    the label the level was scored on (an ID that is neither the label nor one of its ancestors)."""
-    lab = levels.set_index("id")
+    the label the level was scored on (an ID off the label's lineage: not the label, a refinement
+    of it or one of its ancestors)."""
+    lab = levels.drop_duplicates("id").set_index("id")
     acc: dict[str, list[int]] = defaultdict(lambda: [0, 0, 0])
     seen = set()
     for r in rows:
         if r["id"] in seen or r["id"] not in lab.index:
             continue
         seen.add(r["id"])
-        c = acc[LEVEL_NAMES[int(lab.at[r["id"], "level"])]]
+        c = acc[LEVEL_NAMES[level_number(lab.at[r["id"], "level"])]]
         others = [i for i in r["idents"] if not i["own"] and i["current"]]
         c[0] += 1
         if others:
             c[1] += 1
-            label = lab.at[r["id"], "taxon_id"]
-            c[2] += any(i["taxon"] != label and label not in i["anc"] for i in others)
+            ref = {"taxon": lab.at[r["id"], "taxon_id"], "anc": []}
+            ref["anc"] = next((i["anc"] for i in r["idents"] if i["taxon"] == ref["taxon"]), [])
+            c[2] += any(not _on_lineage(i, ref) for i in others)
     out = pd.DataFrame(
         [(k, n, o / n if n else np.nan, d / o if o else np.nan) for k, (n, o, d) in acc.items()],
         columns=["level", "n", "has_other", "contradicted"],
