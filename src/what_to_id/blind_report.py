@@ -398,7 +398,7 @@ def hypothesis_tests(
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="CV versus typed first-ID error vs blind consensus")
-    ap.add_argument("--consensus", required=True)
+    ap.add_argument("--consensus", help="omit to fit it from --answers, as c is")
     ap.add_argument("--obs", required=True)
     ap.add_argument("--idents", required=True)
     ap.add_argument("--public", help="pool parquet with id and the current public taxon_id")
@@ -413,13 +413,20 @@ def main(argv=None) -> int:
     )
     ap.add_argument("--hard-cases", help="write overturned and unsettled records to this parquet")
     a = ap.parse_args(argv)
+    if not (a.consensus or a.answers):
+        ap.error("give --consensus or --answers")
     idents = pd.read_parquet(a.idents)
     firsts = first_own_ids(pd.read_parquet(a.obs), idents)
-    consensus = pd.read_parquet(a.consensus)
     taxa = anc = None
     if a.taxa:
         taxa = pd.read_csv(a.taxa, sep=None, engine="python", usecols=["taxon_id", "ancestry"])
         anc = ancestry_from_taxa(taxa)
+    if a.consensus:
+        consensus = pd.read_parquet(a.consensus)
+    else:
+        planted = pd.read_parquet(a.planted) if a.planted else None
+        consensus = fit(pd.read_parquet(a.answers), planted, ancestry=anc, threshold=a.threshold)[1]
+    if anc is not None:
         consensus = align_consensus(consensus, firsts, anc)
     c, n_c, held = 0.0, 0, None
     if a.answers and a.planted:
