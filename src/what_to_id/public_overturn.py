@@ -150,7 +150,7 @@ def table(df: pd.DataFrame, by: str) -> pd.DataFrame:
 
 def within_species(df: pd.DataFrame) -> tuple[float, int]:
     """Mantel-Haenszel risk ratio of typed to CV overturn within first-ID species, and strata."""
-    t = df[df["tested"]]
+    t = df[df["tested"]] if "tested" in df.columns else df
     num = den = 0.0
     strata = 0
     for _, s in t.groupby("first_taxon"):
@@ -161,6 +161,19 @@ def within_species(df: pd.DataFrame) -> tuple[float, int]:
         num += ty["overturned"].sum() * len(cv) / len(s)
         den += cv["overturned"].sum() * len(ty) / len(s)
     return (num / den if den else float("nan")), strata
+
+
+def matched_table(df: pd.DataFrame, by: str) -> pd.DataFrame:
+    """Per stratum of ``by``: crude and species-matched (Mantel-Haenszel) typed/CV overturn
+    ratios over tested records. The absolute gap can close across strata while the matched
+    ratio does not, which says the closing is species composition, not a change in the gap."""
+    rows = []
+    for stratum, s in df[df["tested"]].groupby(by):
+        rate = s.groupby("source")["overturned"].mean()
+        if {"cv", "typed"} <= set(rate.index):
+            crude = rate["typed"] / rate["cv"] if rate["cv"] else np.nan
+            rows.append((stratum, len(s), crude, *within_species(s)))
+    return pd.DataFrame(rows, columns=["stratum", "tested", "crude", "matched", "species"])
 
 
 def level_table(rows, levels: pd.DataFrame) -> pd.DataFrame:
@@ -218,6 +231,7 @@ def main(argv=None) -> int:
         print()
     rr, k = within_species(df)
     print(f"within-species Mantel-Haenszel ratio typed/cv = {rr:.2f} over {k} species")
+    print(matched_table(df, "experience").to_string(index=False, float_format="{:.2f}".format))
     if a.levels:
         print()
         lv = level_table(rows, pd.read_parquet(a.levels, columns=["id", "taxon_id", "level"]))

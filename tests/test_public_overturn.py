@@ -1,6 +1,8 @@
 import json
 
+import numpy as np
 import pandas as pd
+import pytest
 
 from what_to_id import public_overturn as po
 
@@ -88,6 +90,25 @@ def test_within_species_ratio():
     )
     rr, k = po.within_species(df)
     assert k == 2 and rr == 2.0  # species 1: typed 2 of 2 against cv 1 of 2; species 2 adds nothing
+
+
+def test_matched_table_per_stratum():
+    df = pd.DataFrame(
+        {
+            "tested": True,
+            "experience": ["a"] * 6 + ["b"] * 4,
+            "first_taxon": [1, 1, 1, 1, 2, 2, 3, 3, 3, 3],
+            "source": ["cv", "cv", "typed", "typed", "cv", "typed", "cv", "typed", "cv", "cv"],
+            "overturned": [True, False, True, True, False, False, False, True, False, False],
+        }
+    )
+    out = po.matched_table(df, "experience").set_index("stratum")
+    assert out.loc["a", ["tested", "species"]].tolist() == [6, 2]
+    assert (
+        out.loc["a", "crude"] == pytest.approx((2 / 3) / (1 / 3)) and out.loc["a", "matched"] == 2.0
+    )
+    assert np.isnan(out.loc["b", "crude"]) and np.isnan(out.loc["b", "matched"])  # no cv overturn
+    assert po.matched_table(df.iloc[:0], "experience").empty
 
 
 def test_level_table():
