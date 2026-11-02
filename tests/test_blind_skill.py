@@ -89,8 +89,11 @@ def test_all_abstain_record():
     assert 1 not in consensus_at(cons, 0.0)["record_id"].to_numpy()
 
 
+G = 10**6  # genus ids, clear of the species ids 4r..4r+3
+
+
 def _hier(seed=0, n_logins=30, n_records=300, per_record=5, coarse=0.35):
-    """Records in genus 1000 + r with species 4r..4r+3; a correct student names the species, or
+    """Records in genus G + r with species 4r..4r+3; a correct student names the species, or
     the genus with probability ``coarse``; a wrong one names another species of the genus."""
     rng = np.random.default_rng(seed)
     acc = rng.uniform(0.6, 0.95, n_logins)
@@ -99,12 +102,12 @@ def _hier(seed=0, n_logins=30, n_records=300, per_record=5, coarse=0.35):
     for r in range(n_records):
         for u in rng.choice(n_logins, per_record, replace=False):
             if rng.random() < acc[u]:
-                pick = 1000 + r if rng.random() < coarse else 4 * r + truth[r]
+                pick = G + r if rng.random() < coarse else 4 * r + truth[r]
             else:
                 pick = 4 * r + rng.choice([c for c in range(4) if c != truth[r]])
             rows.append((r, f"u{u}", int(pick), "g"))
     answers = pd.DataFrame(rows, columns=["record_id", "login", "taxon_id", "group"])
-    anc = {4 * r + c: frozenset({1000 + r}) for r in range(n_records) for c in range(4)}
+    anc = {4 * r + c: frozenset({G + r}) for r in range(n_records) for c in range(4)}
     return answers, pd.Series(4 * np.arange(n_records) + truth), anc
 
 
@@ -114,7 +117,7 @@ def test_rollup_settles_more_records_without_losing_accuracy():
     tree = consensus_at(fit(answers, ancestry=anc)[1])
     right = lambda c: (c["taxon_id"].to_numpy() == truth[c["record_id"]].to_numpy()).mean()  # noqa: E731
     assert len(tree) > len(flat)
-    assert right(tree[tree["taxon_id"] < 1000]) >= right(flat[flat["taxon_id"] < 1000]) - 0.01
+    assert right(tree[tree["taxon_id"] < G]) >= right(flat[flat["taxon_id"] < G]) - 0.01
 
 
 def test_rollup_picks_the_finest_taxon_that_passes():
