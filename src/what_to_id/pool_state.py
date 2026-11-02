@@ -231,7 +231,12 @@ def _cmd_reconcile(a: argparse.Namespace) -> int:
     saved = json.loads(a.state.read_text()) if a.state.exists() else {}
     d1 = a.d1 or DEFAULT_D1
     pool = load_pool(a.pool)
-    gone, missing, requests_used = reconcile_ids(pool["id"], d1=d1, max_requests=a.max_requests)
+    # at the cap it keeps what it found, so the site still deploys and the next run goes on
+    gone, missing, requests_used = reconcile_ids(
+        pool["id"], d1=d1, max_requests=a.max_requests, partial=True
+    )
+    if requests_used >= a.max_requests:
+        print(f"::warning::reconcile stopped at {a.max_requests:,} requests; the next run goes on")
     rows = []
     for obs in fetch_by_ids(sorted(missing)):
         row = flatten(obs) if obs.get("quality_grade") == "needs_id" else None
@@ -285,7 +290,7 @@ def main(argv: list[str] | None = None) -> int:
     p_rec.add_argument("--state", required=True, type=Path, help="JSON written by sync")
     p_rec.add_argument("--d1", default=None, help="earliest observed_on, YYYY-MM-DD")
     p_rec.add_argument("--max-drift", type=int, default=MAX_DRIFT)
-    p_rec.add_argument("--max-requests", type=int, default=2000)
+    p_rec.add_argument("--max-requests", type=int, default=800)  # about 22 min at the API's pace
     p_rec.set_defaults(func=_cmd_reconcile)
 
     prepared = sub.add_parser("prepared", help="load a prepared snapshot retaining known closures")
