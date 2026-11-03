@@ -440,7 +440,7 @@ addEventListener('keydown',function(e){if(e.key==='Escape'&&!card.hidden&&!($('r
 
 // Map, then data: names and the recent shard first, older shards after.
 var b=META.bbox,opts={container:'map',style:dark?BASEMAPS.dark:BASEMAPS.light,
-  attributionControl:{compact:true}};
+  attributionControl:{compact:true},locale:{'GeolocateControl.LocationNotAvailable':'Location is blocked for this site. Allow it in your browser and system settings, then reload.'}};
 if(S.at){opts.center=[S.at[2],S.at[1]];opts.zoom=S.at[0];}
 else{opts.bounds=[[b[0],b[1]],[b[2],b[3]]];opts.fitBoundsOptions={padding:20};}
 var map=new maplibregl.Map(opts);document.body.appendChild(ptip);
