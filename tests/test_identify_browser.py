@@ -11,6 +11,7 @@ import pytest
 
 from what_to_id import page_identify, pool_levels
 from what_to_id.identify import IDENTIFY_COLUMNS
+from what_to_id.page_lookalike import site_records
 from what_to_id.page_map import decode_points, encode_points, render_map
 
 from . import test_embeddings_browser as eb
@@ -34,23 +35,20 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
         pass
 
 
-@pytest.fixture(scope="module")
-def site(tmp_path_factory):
-    pytest.importorskip("pyarrow")
-    root = tmp_path_factory.mktemp("identify-site")
-    ids = np.random.default_rng(1).choice(2**32 - 2, N, replace=False) + 1
-    blobs, meta = encode_points(pool_frame(ids), TREE)
+def serve(root, frame, score):
+    """Writes the map, levels and Identify pages for these pool rows and scores, and serves them."""
+    blobs, meta = encode_points(frame, TREE)
     for name, blob in blobs.items():
         (root / name).write_bytes(blob)
     (root / "map.html").write_text(render_map(meta, freeze=None))
     pts = decode_points(blobs, meta)
-    i = np.arange(N)
+    i = np.arange(len(frame))
     scored = pd.DataFrame(
         {
             "id": pts["id"].to_numpy(np.int64),
             "taxon_id": pts["taxon_id"].to_numpy(np.int64),
             "level": np.where(i % 6 == 0, 0, 1 + (i * 7) % 4).astype("int8"),
-            "score": np.random.default_rng(2).normal(size=N).astype("float32"),
+            "score": score,
             "score2": np.float32(0),
             "looks_like": pd.Series([LOOKS[k % 3] for k in i], dtype="category"),
         }
@@ -63,7 +61,15 @@ def site(tmp_path_factory):
         ("127.0.0.1", 0), functools.partial(Quiet, directory=str(root))
     )
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    pts = pts.assign(level=scored["level"].to_numpy())
+    return server, pts.assign(level=scored["level"].to_numpy())
+
+
+@pytest.fixture(scope="module")
+def site(tmp_path_factory):
+    pytest.importorskip("pyarrow")
+    ids = np.random.default_rng(1).choice(2**32 - 2, N, replace=False) + 1
+    score = np.random.default_rng(2).normal(size=N).astype("float32")
+    server, pts = serve(tmp_path_factory.mktemp("identify-site"), pool_frame(ids), score)
     yield f"http://127.0.0.1:{server.server_port}", pts
     server.shutdown()
 
@@ -417,3 +423,25 @@ def test_cards_show_before_the_look_alike_file_and_fill_it_in_where_they_stand(b
     assert page.locator("#grid .card .look").first.inner_text().startswith("Probably ")
     assert page.evaluate("scrollY") == 40  # filled in place, not redrawn from the top
     assert page.errors == []
+
+
+def test_a_level_lists_the_newest_records_first_within_a_score_bucket_across_shards(
+    browser, tmp_path
+):
+    pytest.importorskip("pyarrow")
+    ids = np.random.default_rng(4).choice(2**32 - 2, N, replace=False) + 1
+    frame = pool_frame(ids)
+    frame.loc[frame.index % 2 == 0, "observed_on"] = "2026-01-15"  # before the recent 90 days
+    score = np.random.default_rng(5).normal(size=N).astype("float32")
+    server, _ = serve(tmp_path, frame, score)
+    try:
+        assert (tmp_path / "pool-1.bin").exists()  # the older shard
+        _, q = pool_levels.unpack((tmp_path / "pool-levels.bin").read_bytes())
+        bucket = dict(zip(site_records(tmp_path)[0].tolist(), q.tolist(), strict=True))
+        page = open_identify(browser, f"http://127.0.0.1:{server.server_port}", "#lvl=1")
+        for rows in page.evaluate("__identify.view()"):
+            for a, b in zip(rows or [], (rows or [])[1:], strict=False):
+                assert bucket[a] > bucket[b] or a > b, (a, b)
+        assert page.errors == []
+    finally:
+        server.shutdown()
