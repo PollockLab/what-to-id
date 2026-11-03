@@ -10,6 +10,7 @@ var FLAG={introduced:1,threatened:2,obscured:4,imprecise:8,earlyObs:16,earlyUp:3
 // Each record's status value: bit 1 introduced, 2 threatened, 4 outside the chosen location accuracy
 // (set by accOut, so it follows the choice and not the data), 8 kept by the taxon picks, the area and
 // the projects and not deleted, 16 one record in ten.
+var UMINS=[5,20,100];  // My taxa's other thresholds (map_user.js); the default, 50, is not written
 var UMODES=['observer','taxa','unid'];  // the user filter's modes (map_user.js); the default, Observer (My taxa without an observer file), is not written
 var ST_INTRO=1,ST_THREAT=2,ST_INEXACT=4,ST_KEEP=8,ST_SAMPLE=16;
 // The location accuracy choices, [key, label, hint]; the key is also the hash value of acc and, but for
@@ -52,6 +53,7 @@ function read(h){
   S.area=h.get('area')||'';S.park=h.get('park')||'';S.bcpark=h.get('bcpark')||'';
   // the iNaturalist user (login or id) and what to do with it, from map_user.js; '' for the default mode
   S.user=(h.get('user')||'').trim().slice(0,100);S.umode=UMODES.indexOf(h.get('umode'))>=0&&h.get('umode')!==(META.observer?'observer':'taxa')?h.get('umode'):'';
+  S.umin=UMINS.indexOf(+h.get('umin'))>=0?+h.get('umin'):0;
   return S;
 }
 // The hash parts for the dates, months, groups, show only and taxa; the area and projects write their own.
@@ -63,7 +65,8 @@ function write(S){
   if(CH.any(S.only))h.push('only='+CH.write(S.only,ONLYKEYS));
   if(S.acc)h.push('acc='+S.acc);
   if(S.picks.length)h.push('taxa='+TX.write(S.picks));
-  if(S.user){h.push('user='+encodeURIComponent(S.user));if(S.umode)h.push('umode='+S.umode);}
+  if(S.user){h.push('user='+encodeURIComponent(S.user));if(S.umode)h.push('umode='+S.umode);
+    if(S.umin&&(S.umode?S.umode==='taxa':!META.observer))h.push('umin='+S.umin);}
   return h;
 }
 // Record i's filter values into days (observed, uploaded; -1 for none) and cat (four bytes: group,
@@ -134,7 +137,7 @@ MapFilter.BY={Actinopterygii:[0,150,200],Amphibia:[0,190,150],Animalia:[120,120,
 MapFilter.color=function(name,i){return MapFilter.BY[name]||MapFilter.PAL[i%MapFilter.PAL.length];};
 // The hash tokens a selection is made of, as one string.
 MapFilter.tokens=function(hash){return hash.replace(/^#/,'').split('&').filter(function(t){
-  return /^(by|from|to|months|groups|only|acc|taxa|user|umode)=/.test(t);}).join('&');};
+  return /^(by|from|to|months|groups|only|acc|taxa|user|umode|umin)=/.test(t);}).join('&');};
 // Live selection sync for a page inside the split view. key() is the selection the page holds, apply(str) puts
 // one in place. A change goes to the parent at most once a frame; one that comes from outside (the parent's
 // message, a hash change unless o.hash is false) is applied and not sent back.

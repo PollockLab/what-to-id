@@ -37,15 +37,22 @@ def run(body: str):
     return json.loads(out.stdout)
 
 
-def kept(ancestors, own=101):
-    """Rows the My taxa rule keeps when the user identified taxon ``own`` under ``ancestors``."""
+def genera(results, min_=50):
+    """The [genus id, count] pairs the My taxa rule keeps for species_counts ``results``."""
+    return run(f"return usrGenera(T,RANKS,{json.dumps(results)},{min_});")
+
+
+def rows(ids):
+    """The pool rows the mask keeps for genera ``ids``."""
     body = (
-        f"var r=[{{taxon:{{id:{own},ancestor_ids:{json.dumps(ancestors)}}}}}];"
-        "var ids=usrRanked(T,RANKS,r),m=usrMask(T,ids);"
-        "return [ids,Array.from(m).map(function(v,i){return v?i:-1;})"
-        ".filter(function(i){return i>=0;})];"
+        f"var m=usrMask(T,{json.dumps(ids)});"
+        "return Array.from(m).map((v,i)=>v?i:-1).filter(i=>i>=0);"
     )
     return run(body)
+
+
+def res(taxon, count, ancestors):
+    return {"count": count, "taxon": {"id": taxon, "ancestor_ids": ancestors}}
 
 
 def test_parse_takes_a_number_or_a_login_and_nothing_else():
@@ -65,29 +72,65 @@ def test_parse_takes_a_number_or_a_login_and_nothing_else():
     ]
 
 
-def test_a_species_identified_keeps_its_genus_and_not_the_family_or_siblings_genera():
-    ids, rows = kept([5, 11, 101])  # the order is neither genus nor family
-    assert ids == [11, 101]
-    assert rows == [0, 1, 3]  # both Aus species and the genus-level record, not Dus or the family
+def test_counts_are_summed_per_genus_and_kept_at_the_threshold():
+    r = [
+        res(101, 30, [5, 1, 11, 101]),
+        res(102, 25, [5, 1, 11, 102]),  # Aus: 55
+        res(201, 49, [5, 1, 12, 201]),  # Dus: 49, one short
+        res(301, 50, [7, 13, 301]),  # Gus: exactly 50
+    ]
+    assert genera(r) == [[11, 55], [13, 50]]
+    assert genera(r, 20) == [[11, 55], [12, 49], [13, 50]]
+    assert genera(r, 100) == []
 
 
-def test_a_family_in_the_ancestors_keeps_family_level_records_and_every_genus_below():
-    ids, rows = kept([5, 1, 11, 101])
-    assert ids == [1, 11, 101]
-    assert rows == [0, 1, 2, 3, 4, 5]  # Aus and Dus species, both genera and the family record
-    assert 6 not in rows and 8 not in rows  # the other family's rows stay out
+def test_a_genus_level_record_counts_for_its_genus():
+    assert genera([res(11, 50, [5, 1, 11])]) == [[11, 50]]
 
 
-def test_a_taxon_without_ancestor_ids_still_keeps_itself_and_a_missing_one_keeps_nothing():
-    assert kept([], own=201)[1] == [2]
-    assert run("return Array.from(usrMask(T,usrRanked(T,RANKS,[]))).some(Boolean);") is False
-    assert run("return usrRanked(T,RANKS,[{taxon:{}}]);") == []
+def test_there_is_no_family_rollup_and_the_taxon_itself_is_not_kept():
+    # a family-level record, an order-level one, and a species whose genus the pool lacks
+    r = [res(1, 500, [5, 1]), res(5, 500, [5]), res(555, 500, [5, 1, 999, 555])]
+    assert genera(r) == []
+    assert rows([11]) == [0, 1, 3]  # both Aus species and the genus row, not Dus, the family or Gus
 
 
-def test_ranks_the_pool_lacks_are_not_matched():
-    # genus 999 is not a pool row, so only the species itself and the pool's family count
-    ids, _ = kept([1, 999, 101])
-    assert ids == [1, 101]
+def test_missing_taxa_and_counts_keep_nothing():
+    assert genera([]) == [] and genera([{"taxon": {}}]) == [] and genera([{"count": 99}]) == []
+    assert run("return Array.from(usrMask(T,[])).some(Boolean);") is False
+
+
+def keep(results, min_):
+    return run(f"return usrKeep(T,RANKS,{json.dumps(results)},{min_});")
+
+
+def test_a_threshold_that_keeps_nothing_falls_back_to_the_highest_lower_one_that_keeps_a_genus():
+    r = [res(101, 30, [5, 1, 11, 101]), res(201, 6, [5, 1, 12, 201])]  # Aus 30, Dus 6
+    assert keep(r, 50) == {"genera": [[11, 30]], "used": 20}
+    assert keep(r, 100) == {"genera": [[11, 30]], "used": 20}
+    assert keep(r, 20) == {"genera": [[11, 30]], "used": 20}  # kept as chosen, no fallback
+    assert keep([res(201, 6, [5, 1, 12, 201])], 100) == {"genera": [[12, 6]], "used": 5}
+
+
+def test_when_even_five_keeps_nothing_nothing_is_kept():
+    assert keep([res(201, 4, [5, 1, 12, 201])], 50) == {"genera": [], "used": 0}
+    assert keep([], 5) == {"genera": [], "used": 0}
+
+
+def fit(ids, tax, budget):
+    return run(f"return usrFit(T,RANKS,{json.dumps(ids)},{json.dumps(tax)},{budget});")
+
+
+def test_every_genus_goes_to_identify_when_the_ids_fit():
+    assert fit([11, 12, 13], [], 8) == {"ids": [11, 12, 13], "cut": 0}  # "11,12,13" is 8 characters
+    assert fit([], [], 8) == {"ids": [], "cut": 0}
+
+
+def test_over_the_budget_the_genera_with_the_most_records_to_identify_stay():
+    tax = [0, 1, 3, 2, 6, 6, 6, 8, 7, 99]  # Aus x3, Dus x1, Gus x4, then an order row and a bad one
+    got = fit([11, 12, 13], tax, 5)
+    assert got["cut"] == 1 and sorted(got["ids"]) == [11, 13] and 12 not in got["ids"]
+    assert fit([11, 12, 13], tax, 1) == {"ids": [], "cut": 3}
 
 
 def pages(total, per, cap):
