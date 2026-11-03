@@ -196,7 +196,7 @@ function oldQuery(){if(!S.oldq)return;
   showClades();}
 // The selection bar lists every chip, the dates too; its Clear all clears them, and Reset also the map view.
 function redraw(){showGroups();showMonths();showOnly();refilter();}
-function clearAll(){S.lo=0;S.hi=LAST;S.up=false;S.months=0;S.groups={};S.only={};S.acc='';S.picks.length=0;S.split=[];$('q').value='';showClades();
+function clearAll(){S.lo=0;S.hi=LAST;S.up=false;S.months=0;S.groups={};S.only={};S.acc='';S.user=S.umode='';S.picks.length=0;S.split=[];$('q').value='';showClades();
   o.search();o.area().clear();PJ.reset();redraw();}
 $('reset').onclick=function(){clearAll();o.reset();};
 var BAR=CH.bar({box:$('selbar'),clear:clearAll,fallback:$('q')});
@@ -209,7 +209,7 @@ function tally(){var n=function(st){var c=0;for(var k in st)if(st[k])c++;return 
 // last left it, and one a link filters on opens regardless (projects only know theirs once loaded).
 var FOLD='wtid-map-fold';
 (function(){var saved={};try{saved=JSON.parse(localStorage.getItem(FOLD))||{};}catch(e){}
-  var open={grpsec:CH.any(S.groups),flagbox:CH.any(S.only)||!!S.acc,projbox:/(^|[#&])projects=/.test(location.hash)};
+  var open={grpsec:CH.any(S.groups),flagbox:CH.any(S.only)||!!S.acc,projbox:/(^|[#&])projects=/.test(location.hash),usrbox:!!S.user};
   [].forEach.call(document.querySelectorAll('details.sec'),function(d){
     if(open[d.id])d.open=true;else if(d.id in saved)d.open=saved[d.id];
     d.addEventListener('toggle',function(){saved[d.id]=d.open;

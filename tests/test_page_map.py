@@ -11,6 +11,7 @@ import pytest
 
 from what_to_id.batches import MAX_URL_LEN
 from what_to_id.inat import BC_PLACE_ID
+from what_to_id.map_observer import OBSERVER_NAME
 from what_to_id.page import ARM_WORDS
 from what_to_id.page_map import (
     _ASSETS,
@@ -143,7 +144,7 @@ def test_pool_with_no_recent_records_starts_with_older_ones():
     pool["observed_on"] = "2019-05-01"
     blobs, meta = encode_points(pool)
     assert meta["shards"] == [{"file": shard_name(0), "n": 5}]
-    assert sorted(blobs) == [shard_name(0), TAXA_NAME]
+    assert sorted(blobs) == sorted([shard_name(0), TAXA_NAME, OBSERVER_NAME])
     assert decode_points(blobs, meta)["id"].tolist() == pool["id"].tolist()
 
 
@@ -233,7 +234,7 @@ def test_meta_cannot_close_the_script():
 def test_write_map_and_cli(tmp_path):
     pool = make_pool(40)
     paths = write_map(tmp_path / "a", pool)
-    names = [MAP_NAME, shard_name(0), TAXA_NAME, PARKS_NAME]
+    names = [MAP_NAME, shard_name(0), TAXA_NAME, PARKS_NAME, OBSERVER_NAME]
     assert sorted(p.name for p in paths) == sorted(names)
     pool.to_parquet(tmp_path / "pool.parquet", index=False)
     assert main(["--pool", str(tmp_path / "pool.parquet"), "--out", str(tmp_path / "b")]) == 0

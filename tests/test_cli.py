@@ -124,6 +124,7 @@ def test_build_design_rotation_writes_only_index(tmp_path, webapp_dir):
         "bc-parks.bin",
         "map.html",
         "pool-0.bin",
+        "pool-observer.bin",
         "pool-taxa.bin",
         "study.html",
     ]
