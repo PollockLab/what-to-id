@@ -21,6 +21,9 @@ PAGE_NAME = "tree.html"
 SCRIPTS = {
     "__MAP_FILTER__": HERE / "map_assets" / "map_filter.js",
     "__CLADE_COLOUR__": HERE / "map_assets" / "clade_colour.js",
+    "__MAP_USER__": HERE
+    / "map_assets"
+    / "map_user.js",  # inatGate, the throttled iNaturalist reader
     "__MAP_TAXA__": HERE / "map_assets" / "map_taxa.js",
     "__EMBEDDINGS_LAYOUT__": HERE / "embeddings_assets" / "embeddings_layout.js",
     "__TREE_MODEL__": ASSETS / "tree_model.js",

@@ -188,6 +188,14 @@ function photos(){[].forEach.call(document.querySelectorAll('[data-ph]'),functio
 // ---- the card of the selected taxon
 function el(tag,attrs,kids){var e=document.createElement(tag);for(var k in attrs||{})e.setAttribute(k,attrs[k]);
   (kids||[]).forEach(function(c){if(c!=null)e.appendChild(typeof c==='string'?document.createTextNode(c):c);});return e;}
+// ---- identifiers: how many people identify the card's taxon in BC (total_results only, never who) and the backlog each carries
+var API=inatGate({say:function(t){IDB=t;if(IDL)IDL.textContent=t;}}),IDL=null,IDB='';
+function idents(p,id,tot){
+  IDL=p;p.textContent=IDB||'Counting identifiers in BC…';
+  API('observations/identifiers?place_id='+META.place_id+'&taxon_id='+id+'&per_page=0',function(){return !!$('card').querySelector('[data-idents="'+id+'"]');}).then(function(j){
+    IDB='';var n=+j.total_results||0;if(!p.isConnected)return;
+    p.textContent=n?nf.format(n)+(n===1?' identifier':' identifiers')+' in BC · '+nf.format(Math.round(tot/n))+' needs-ID per identifier':'no identifiers in BC yet';})
+  .catch(function(e){IDB='';if(e!==0&&p.isConnected)p.textContent='Identifier count unavailable.';});}
 function card(){
   var c=$('card');c.textContent='';if(S.sel<0){c.hidden=true;return;}c.hidden=false;
   var e=M.lead(D,S.sel),id=M.id(D,e),tot=D.tot[e],own=D.own[e],k=rk(e),cm=cmn(e),ks=D.kids[e],f=M.lead(D,S.focus),
@@ -228,8 +236,9 @@ function card(){
       el('dt',{},['Identified only to this rank']),el('dd',{},[nf.format(own)+(tot?' ('+pct(own,tot)+')':'')]),
       e===D.nr&&D.none?el('dt',{},['No taxon']):null,e===D.nr&&D.none?el('dd',{},[nf.format(D.none)]):null,
       el('dt',{},['Species below']),el('dd',{},[nf.format(D.sp[e])])]),
-    acts,up.length?el('p',{'class':'muted'},['Part of']):null,up.length?el('ul',{'class':'kids up','aria-label':'Part of'},[row(up[up.length-1],1)]):null,
+    id&&!gp?el('p',{'class':'muted','data-idents':id}):null,acts,up.length?el('p',{'class':'muted'},['Part of']):null,up.length?el('ul',{'class':'kids up','aria-label':'Part of'},[row(up[up.length-1],1)]):null,
     ks.length?el('p',{'class':'muted'},[shown(e)]):null,ks.length?el('p',{'class':'muted'},[e===D.root?'Groups, as on the map':'Biggest below']):null,ks.length?kids:null])].forEach(function(n){if(n)c.appendChild(n);});
+  var ip=c.querySelector('[data-idents]');if(ip)idents(ip,id,tot);
   photos();
 }
 // How much below e the circle shows. Open more below stops at family (order for insects) and at BUDGET tips.
