@@ -1,0 +1,103 @@
+"""The map's One ID from Research Grade choice in Chromium: the real map page over the stand-ins of
+test_map_groups_browser.py."""
+
+import functools
+import http.server
+import threading
+from urllib.parse import parse_qs, urlparse
+
+import pytest
+
+from what_to_id.page_map import encode_points, render_map
+
+from . import test_embeddings_browser as eb
+from .embeddings_fixture import TREE, pool_frame
+from .test_map_groups_browser import STUB
+
+browser = eb.browser
+# (IDs by others, agreements, taxon): the boundary cases of the rule, five of eight qualify
+CASES = [
+    (0, 0, 1000),
+    (1, 1, 1001),
+    (2, 1, 1002),
+    (3, 2, 1003),
+    (2, 2, 1004),
+    (1, 0, 1005),
+    (3, 1, 1006),
+    (0, 0, 900),  # a genus
+]
+N = 80
+WANT = sum(1 for i in range(N) if i % 8 < 5)
+
+
+@pytest.fixture(scope="module")
+def site(tmp_path_factory):
+    root = tmp_path_factory.mktemp("map-oneid")
+    pool = pool_frame(range(1, N + 1))
+    pool["ident_count"] = [CASES[i % 8][0] for i in range(N)]
+    pool["agree"] = [CASES[i % 8][1] for i in range(N)]
+    pool["taxon_id"] = [CASES[i % 8][2] for i in range(N)]
+    pool["taxon_name"] = [f"Taxon {c % 1000}" if c >= 1000 else "Genus A" for c in pool["taxon_id"]]
+    pool["rank"] = ["species" if c >= 1000 else "genus" for c in pool["taxon_id"]]
+    blobs, meta = encode_points(pool, TREE)
+    assert meta["flags"] == ["oneid"]
+    for name, blob in blobs.items():
+        (root / name).write_bytes(blob)
+    (root / "map.html").write_text(render_map(meta, freeze=None))
+
+    class Quiet(http.server.SimpleHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+    server = http.server.ThreadingHTTPServer(
+        ("127.0.0.1", 0), functools.partial(Quiet, directory=str(root))
+    )
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    yield f"http://127.0.0.1:{server.server_port}/map.html?standalone=1"
+    server.shutdown()
+
+
+def open_map(browser, url, hash_):
+    p = browser.new_page(viewport={"width": 1280, "height": 900})
+    p.errors = []
+    p.on("pageerror", lambda e: p.errors.append(str(e)))
+    p.route(
+        "https://unpkg.com/**",
+        lambda r: r.fulfill(
+            body=STUB if r.request.url.endswith(".js") else "", content_type="text/javascript"
+        ),
+    )
+    p.goto(url + hash_)
+    return p
+
+
+def shown(page, n):
+    page.wait_for_function(
+        "n => (document.getElementById('count').textContent || '').startsWith(n + ' ')", arg=str(n)
+    )
+
+
+def test_the_hash_keeps_the_records_one_id_from_research_grade(browser, site):
+    page = open_map(browser, site, "")
+    shown(page, N)
+    page.click("#flags button:has-text('One ID from Research Grade')")
+    shown(page, WANT)
+    page.wait_for_function("location.hash.includes('only=oneid')")
+    page.close()
+    page = open_map(browser, site, "#only=oneid")
+    shown(page, WANT)
+    page.close()
+    page = open_map(browser, site, "#only=-oneid")
+    shown(page, N - WANT)
+    assert page.errors == []
+    page.close()
+
+
+def test_identify_cannot_filter_it_and_says_so(browser, site):
+    page = open_map(browser, site, "#only=oneid")
+    shown(page, WANT)
+    page.wait_for_function("document.getElementById('idnote').textContent.includes('Identify')")
+    assert "cannot filter records one ID from Research Grade" in page.inner_text("#idnote")
+    q = parse_qs(urlparse(page.get_attribute("#identify", "href")).query)
+    assert "rank" not in q and "introduced" not in q
+    page.close()

@@ -79,7 +79,9 @@ def site(tmp_path_factory):
         },
         manifest,
     )
-    pool = pool_frame(ids[:POOL_N])
+    # even rows have no other ID, so one agreeing ID makes them Research Grade; odd rows have one
+    # ID that disagrees
+    pool = pool_frame(ids[:POOL_N]).assign(ident_count=np.arange(POOL_N) % 2, agree=0)
     blobs, meta = encode_points(pool, TREE)
     for name, blob in blobs.items():
         (root / name).write_bytes(blob)
@@ -406,6 +408,16 @@ def test_months_and_dates_in_the_hash_filter_the_page_and_show_in_the_bar(open_p
     assert shown(late) == POOL_N
     assert "from=" not in late.evaluate("location.hash")
     assert aug.errors == [] and late.errors == []
+
+
+def test_one_id_from_research_grade_filters_the_photo_space_as_on_the_map(open_page):
+    near = open_page("#only=oneid")
+    ready(near)
+    far = open_page("#only=-oneid")
+    ready(far)
+    assert shown(near) == shown(far) == POOL_N // 2
+    assert any("One ID from Research Grade" in t for t in bar_labels(near)), bar_labels(near)
+    assert near.errors == [] and far.errors == []
 
 
 def test_area_in_the_hash_filters_by_position_and_chips_count_what_is_left(open_page):

@@ -117,7 +117,7 @@ function applyBase(){
   if(S.baseKey===key&&S.base&&S.base.length===P.n)return;
   S.baseKey=key;S.base=new Uint8Array(P.n).fill(1);
   if(P.grp){
-    MF.rest(S,P.obs,P.up,P.flags,P.n,S.base);
+    MF.rest(S,P.obs,P.up,P.flags,P.n,S.base);var oo=S.only.oneid&&S.TAXA?MF.oneIds(P.ids,P.tax,S.TAXA,P.n):null,nv=S.only.oneid==='not'?1:0;if(oo)for(var j=0;j<P.n;j++)if(oo[j]===nv)S.base[j]=0;
     var M=areaMask();
     if(M)for(var i=0;i<P.n;i++)S.base[i]&=M[i];
     var V=viewBox();

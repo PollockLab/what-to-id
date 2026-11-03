@@ -106,7 +106,7 @@ function fmask(n){
 function inc(){return !!TF.inc;}
 function pointData(){
   PJ.sync(P);UF.sync(P);
-  var n=P.n,gone=Object.keys(GONE).length,i,key=[TF,inc()?CH.picked(S.groups,META.groups,'inc').join():'',AREA.ver(),PJ.key(),UF.key(),SUBV,FKV,S.acc];
+  var n=P.n,gone=Object.keys(GONE).length,i,key=[TF,inc()?CH.picked(S.groups,META.groups,'inc').join():'',AREA.ver(),PJ.key(),UF.key(),SUBV,FKV,S.acc,S.only.oneid&&TAXA?S.only.oneid:''];
   if(PD&&PD.length===n&&PD_KEY&&PD_KEY.every(function(k,j){return k===key[j];})&&PD_GONE===gone)return;
   var same=PD&&PD.length===n,days=same?PD.days:new Float32Array(2*n),
     cat=same?PD.attributes.getFilterCategory.value.slice():new Uint8Array(4*n);
@@ -116,12 +116,12 @@ function pointData(){
   // OUT keeps the records out for any reason but the area, for the Identify box count; PJW marks
   // the records Identify opens when it cannot say the projects exactly (see map_projects.js)
   var kb=MF.keep(TF,MF.groupSet(S,TF),P.tax,P.grp,n,new Uint8Array(n)),id=P.id,am=AREA.mask(n),wide=PJ.wide(),
-    fm=FK&&fmask(n);
+    fm=FK&&fmask(n),oo=S.only.oneid&&TAXA?MF.oneIds(P.ids,P.tax,TAXA,n):null,nv=S.only.oneid==='not'?1:0;
   if(OUT.length!==n)OUT=new Uint8Array(n);PJW=wide?new Uint8Array(n):null;
   for(i=0;i<n;i++){var keep=kb[i]===1;
     if(gone>0&&GONE[id[i]]===1)keep=false;
     if(SUB&&!SUB.has(id[i]))keep=false;
-    if(wide&&keep&&(am===null||am[i]))PJW[i]=wide(i)?1:0;if(keep&&(PJ.drop(i)||UF.drop(i)||(fm&&!fm[i])))keep=false;
+    if(wide&&keep&&(am===null||am[i]))PJW[i]=wide(i)?1:0;if(keep&&(PJ.drop(i)||UF.drop(i)||(fm&&!fm[i])||(oo&&oo[i]===nv)))keep=false;
     OUT[i]=keep?0:1;cat[4*i+3]=cat[4*i+3]&~(ST_KEEP|ST_INEXACT)|(keep&&(am===null||am[i])?ST_KEEP:0)|MF.accOut(S.acc,P.fl[i]);}
   // a new pick, area or deletion swaps only the categories, so deck.gl uploads only those
   if(same){PD.attributes.getFilterCategory={value:cat,size:4};PD_CAT++;}
@@ -247,7 +247,7 @@ function link(){
   if(u&&gl.out.length)why.push('Identify cannot leave out the '+gn(gl.out)+' group beside picked taxa, so it keeps it');
   if(lost.indexOf('taxa')>=0)why.push('too many taxa for one link, so it opens every taxon');
   if(lost.indexOf('not')>=0)why.push('too many taxa left out for one link, so it keeps them');
-  if(u&&PJ.inexact())why.push(PJ.inexact());
+  if(u&&PJ.inexact())why.push(PJ.inexact());if(u&&S.only.oneid)why.push('Identify cannot filter records one ID from Research Grade');
   var nt=$('idnote'),pf=u?[PJ.uncounted(),UF.note()].filter(Boolean).join(' '):'';nt.hidden=!why.length&&!pf;nt.textContent=(why.length?'Identify shows '+
     'more records than the map: '+why.join('; ')+'. ':'')+pf;
 }

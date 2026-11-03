@@ -23,10 +23,9 @@ taxonomy.py); META.presets, the shortcut chips, is set only when every record ta
 line of ancestors. META.group_ids holds the iNaturalist taxon of each group that has one, for the
 Identify link.
 ids holds min(IDs, 15) in the low nibble and min(agreements, 15) in the high nibble. flags sets
-FLAG_BITS for the flags META.flags names; a pool pulled before those columns existed has none.
-Dates before DAY_FLOOR (1900-01-01) are stored at that day, so day0 is never earlier, and the
-flags byte then also sets EARLY_OBS (16) or EARLY_UP (32) to say the stored day is a floor, not
-the real date; the page shows "before 1900" for it.
+FLAG_BITS for the flags META.flags names. "oneid" has no bit (map_oneid.py). Dates before DAY_FLOOR
+(1900-01-01) are stored at that day, so day0 is never earlier; the flags byte then also sets
+EARLY_OBS (16) or EARLY_UP (32) to say the stored day is a floor, shown as "before 1900".
 Shard 0 holds records observed in the last RECENT_DAYS days of the map (and any without a date), so
 the page draws them first; older records follow, newest first, in shards of at most SHARD_MAX.
 
@@ -60,6 +59,7 @@ from what_to_id import page_nav
 from what_to_id.batches import MAX_URL_LEN
 from what_to_id.inat import BC_PLACE_ID, INAT, SLEEP, TIMEOUT, make_session
 from what_to_id.map_observer import OBSERVER_NAME, observer_users
+from what_to_id.map_oneid import with_one_id
 from what_to_id.map_parks import PARKS_NAME, parks_blob, parks_version
 from what_to_id.map_projects import add_projects
 from what_to_id.page import ARM_WORDS, group_name
@@ -215,7 +215,7 @@ def encode_points(pool: pd.DataFrame, tree: dict | None = None) -> tuple[dict[st
         "names": {g: group_name(g) for g in groups},
         "group_ids": {g: GROUP_TAXA[g] for g in groups if g in GROUP_TAXA},
         "ranks": ranks,
-        "flags": known,
+        "flags": with_one_id(df, known),
         "shards": shards,
         "taxa": TAXA_NAME,
         "taxa_n": int(np.unique(tidx[tidx != NO_TAXON]).size),
@@ -267,7 +267,7 @@ def decode_points(blobs: dict[str, bytes], meta: dict) -> pd.DataFrame:
     out["observed_before_1900"] = (raw["flags"] & EARLY_OBS) > 0
     out["uploaded_before_1900"] = (raw["flags"] & EARLY_UP) > 0
     for name in meta["flags"]:
-        if name != "accuracy":
+        if name in FLAG_BITS:
             out[name] = (raw["flags"] & FLAG_BITS[name]) > 0
     if "accuracy" in meta["flags"]:
         out["acc_class"] = np.select(

@@ -187,3 +187,46 @@ def test_tokens_keep_umin_for_explore_to_forward():
     assert run("return MapFilter.tokens('#user=1&umode=taxa&umin=20&at=5/49/-123');") == (
         "user=1&umode=taxa&umin=20"
     )
+
+
+@pytest.mark.parametrize(
+    "n,a,species,want",
+    [
+        (0, 0, True, True),  # the observer's ID plus one more is 2 of 2
+        (1, 1, True, True),
+        (2, 1, True, True),  # 3 of 4 once one more agrees
+        (3, 2, True, True),
+        (2, 2, True, True),
+        (1, 0, True, False),  # 2 of 3 is not more than 2/3
+        (3, 1, True, False),
+        (0, 0, False, False),  # genus and above never reach Research Grade
+        (2, 2, False, False),
+    ],
+)
+def test_one_id_from_research_grade_follows_the_two_thirds_rule(n, a, species, want):
+    got = run(f"return MF.oneId({n},{a},{json.dumps(species)});")
+    assert got is want
+
+
+def test_one_ids_read_ids_nibbles_and_the_rank_of_each_taxon():
+    meta = {**META, "flags": ["oneid"], "ranks": ["genus", "species", "subspecies"]}
+    taxa = [["Genus", "", 1, 0], ["Sp", "", 2, 1], ["Ssp", "", 3, 2], ["Unranked", "", 4, 255]]
+    # (ids by others, agreements, taxon row): the last row is the NOTAX sentinel
+    rec = [(0, 0, 1), (0, 0, 0), (1, 1, 2), (3, 1, 1), (2, 2, 3), (0, 0, 65535)]
+    ids = [n | a << 4 for n, a, _ in rec]
+    got = run(
+        f"return Array.from(MF.oneIds({ids},{[t for _, _, t in rec]},{json.dumps(taxa)},6));", meta
+    )
+    assert got == [1, 0, 1, 0, 0, 0]
+
+
+def test_oneid_chip_needs_the_flag_and_round_trips_in_the_hash():
+    meta = {**META, "flags": ["oneid"], "ranks": []}
+    got = run(
+        "var S=MF.read(new URLSearchParams('only=oneid'));"
+        "return [MF.write(S).join('&'),MF.ONLYDEF.map(function(d){return d[0];})];",
+        meta,
+    )
+    assert got == ["only=oneid", ["oneid"]]
+    got = run("var S=MF.read(new URLSearchParams('only=oneid'));return [MF.write(S),S.only];")
+    assert got == [[], {}]
