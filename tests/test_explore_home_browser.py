@@ -79,10 +79,11 @@ def map_frame(page):
     return next(f for f in page.frames if "map.html" in f.url)
 
 
-# the fill colours of records 0, 1 and 5, and whether the legend shows
+# the fill colours of records 0, 1 and 5, and whether the legend has its Levels | Groups switch
 COLOURS = """() => { const c = window.__layers[0].props.data.attributes.getFillColor.value,
   at = i => Array.from(c.slice(4 * i, 4 * i + 4)), l = document.querySelector('.lvleg');
-  return {c0: at(0), c1: at(1), c5: at(5), legend: !!l && !l.hidden,
+  return {c0: at(0), c1: at(1), c5: at(5),
+    legend: !!l && !l.hidden && !l.querySelector('.seg').hidden,
     names: l ? [...l.querySelectorAll('.lr')].map(s => s.textContent) : []}; }"""
 
 
