@@ -78,7 +78,8 @@ def test_encode_round_trips_within_quantization(monkeypatch):
     assert back["taxon_id"].tolist() == want["taxon_id"].tolist()
     assert back["ident_count"].tolist() == np.minimum(want["ident_count"], 15).tolist()
     assert back["agree"].tolist() == want["agree"].tolist()
-    assert meta["flags"] == ["introduced", "threatened", "obscured", "imprecise", "accuracy"]
+    flags = ["introduced", "threatened", "obscured", "imprecise", "accuracy", "oneid"]
+    assert meta["flags"] == flags
     assert back["introduced"].tolist() == want["introduced"].tolist()
     assert back["threatened"].tolist() == want["threatened"].fillna(False).tolist()
     assert back["obscured"].tolist() == want["obscured"].tolist()
@@ -106,9 +107,11 @@ def test_common_names_follow_the_taxon():
 
 
 def test_old_pool_without_extras_has_no_flags():
-    blobs, meta = encode_points(make_pool(10))
+    pool = make_pool(10)
+    blobs, meta = encode_points(pool.drop(columns=["ident_count", "agree"]))
     assert meta["flags"] == []
     assert "introduced" not in decode_points(blobs, meta)
+    assert encode_points(pool)[1]["flags"] == ["oneid"]
 
 
 def test_recent_records_come_first_and_old_ones_after():
@@ -294,7 +297,7 @@ def test_accuracy_class_bits_cover_every_class_and_unknown_is_not_zero_metres():
     pool = make_pool(7)
     pool["pos_acc"] = pd.array([None, 5000, 1000, 101, 100, 10, 0], dtype="Int64")
     blobs, meta = encode_points(pool)
-    assert meta["flags"] == ["imprecise", "accuracy"]
+    assert meta["flags"] == ["imprecise", "accuracy", "oneid"]
     back = decode_points(blobs, meta).set_index("id").loc[pool["id"]]
     assert back["acc_class"].tolist() == [0, 1, 2, 2, 3, 4, 4]
     assert back["imprecise"].tolist() == [False, True, False, False, False, False, False]
