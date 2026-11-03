@@ -28,6 +28,14 @@ the record to its label's range (`okm_code`: 0 inside, 255 unknown) and ``note``
 ``notes`` (255 none); all gzipped. A name not in ``names`` has no known range. Without the tables
 the file is not written; the levels are.
 
+``pool-levels-first.bin``: the first cards Identify draws while the pool shards load, the lists
+`identify_app.js` builds for no filter (``""``) and for each one group (``"groups=Aves"``, as
+MapFilter writes it), with no area, view or taxa and the range file's default (Clear matches leave
+out records far outside). Gzipped JSON ``{"bbox": META.bbox, "taxa": [[latin, common, taxon id],
+...], "looks": [...], "s": {state: {"total": [...], "n": [...], "rows": [...]}}}``, per level 0..5:
+the records in it, the cards after the per-species cut, and the first FIRST_ROWS cards as ``[id,
+taxa index (65535 none), looks index (65535 none), how many more of its taxon the cut left out]``.
+
 ``pool-levels-dates.json``: with ``--data-url``,
 ``{"photos": "2026-10-15", "scored": "2026-10-27"}``, the photo download the embeddings came from
 (the date in the identify entry's ``emb`` path, else in ``model.source``) and the day
@@ -44,13 +52,16 @@ import re
 import sys
 import tempfile
 from pathlib import Path
+from urllib.parse import quote
 
 import numpy as np
 import pandas as pd
 
 from what_to_id.identify import MISLABEL, NARROW, NONE, TAXONOMIST, WEIRD
-from what_to_id.page_identify import DATES_NAME
+from what_to_id.page_identify import DATES_NAME, FIRST_NAME
 from what_to_id.page_lookalike import _fetch, site_records
+from what_to_id.page_map import _decode_shard
+from what_to_id.tree_page import map_meta
 
 OUT_NAME = "pool-levels.bin"
 LOOKS_NAME = "pool-levels-looks.bin"
@@ -58,6 +69,10 @@ STEPS = 16
 NO_LOOK = 0xFFFF
 RANGE_NAME = "pool-levels-range.bin"
 NO_BYTE = 0xFF
+NOTAX = 0xFFFF
+FIRST_ROWS = 200  # one iNaturalist batch, IdentifyLinks.MAX_IDS
+PER_SPECIES = 3  # identify_app.js
+FAR_CODE = 50  # identify_ranges.js OUT_KM: an okm_code of 50 and up is 50 km or more
 # manifest key -> file name, as level_ranges writes them (not imported: it needs h3)
 RANGE_FILES = {
     "range_notes": "range-notes.parquet",
@@ -249,20 +264,75 @@ def build(
     (site / OUT_NAME).write_bytes(pack(level, score))
     (site / LOOKS_NAME).write_bytes(pack_looks(level, looks))
     (site / RANGE_NAME).unlink(missing_ok=True)  # a stale one would no longer line up
+    far = None
     (site / DATES_NAME).unlink(missing_ok=True)
     if parquet_from_manifest:
         (site / DATES_NAME).write_text(json.dumps(scoring_dates(manifest)))
     try:
         if tables is not None:
-            (site / RANGE_NAME).write_bytes(
-                pack_range(*range_planes(ids, hit, tables[0]), *tables[1:])
-            )
+            km, note = range_planes(ids, hit, tables[0])
+            (site / RANGE_NAME).write_bytes(pack_range(km, note, *tables[1:]))
+            code = okm_code(km)
+            far = (code >= FAR_CODE) & (code != NO_BYTE)
     except (KeyError, ValueError) as exc:
         why = f"the range tables do not fit: {exc}"
+        far = None
         (site / RANGE_NAME).unlink(missing_ok=True)
+    first = pack_first(site, ids, tax, rows, level, quantize(level, score), looks, far)
+    (site / FIRST_NAME).write_bytes(first)
     if not (site / RANGE_NAME).exists():
         print(f"pool_levels: no {RANGE_NAME}, so no range maps: {why}", file=sys.stderr)
     return {int(lv): int(c) for lv, c in zip(*np.unique(level, return_counts=True), strict=True)}
+
+
+def pack_first(site, ids, tax, taxa, level, q, looks, far) -> bytes:
+    """The gzipped first lists (see the module doc), as `build()` in identify_app.js orders them:
+    best score bucket first, newest id first within one, PER_SPECIES of a taxon unless the level
+    holds one taxon only. `far` per record is far outside its label's range, None without ranges."""
+    meta = map_meta(site, keys=("shards", "groups", "bbox"))
+    grp = np.concatenate(
+        [
+            _decode_shard(gzip.decompress((site / s["file"].split("?")[0]).read_bytes()), s["n"])[
+                "group"
+            ]
+            for s in meta["shards"]
+        ]
+    )
+    on = (level > 0) & (grp < len(meta["groups"]))  # no group fails every group chip
+    if far is not None:
+        on &= (level != 1) | ~far
+    shows = np.isin(level, (TAXONOMIST, NARROW, MISLABEL)) & pd.notna(looks)
+    tx, nm, out = {}, {}, {}
+    states = {"": on} | {
+        "groups=" + quote(g, safe="!*'()"): on & (grp == k) for k, g in enumerate(meta["groups"])
+    }
+    for key, keep in states.items():
+        st = out[key] = {"total": [0], "n": [0], "rows": [[]]}
+        for lv in range(1, 6):
+            i = np.flatnonzero(keep & (level == lv))
+            i = i[np.lexsort((-ids[i], -q[i].astype(np.int64)))]
+            _, inv, cnt = np.unique(tax[i], return_inverse=True, return_counts=True)
+            cut = len(i) if len(cnt) == 1 else PER_SPECIES
+            by = np.argsort(inv, kind="stable")
+            rank = np.empty(len(i), np.int64)
+            rank[by] = np.arange(len(i)) - np.r_[0, np.cumsum(cnt)[:-1]][inv[by]]
+            left = np.maximum(np.where(rank == 0, cnt[inv] - cut, 0), 0)
+            i, left = i[rank < cut], left[rank < cut]
+            st["total"].append(len(rank))
+            st["n"].append(len(i))
+            st["rows"].append(
+                [
+                    [
+                        int(ids[r]),
+                        NOTAX if tax[r] == NOTAX else tx.setdefault(int(tax[r]), len(tx)),
+                        nm.setdefault(str(looks[r]), len(nm)) if shows[r] else NO_LOOK,
+                        int(m),
+                    ]
+                    for r, m in zip(i[:FIRST_ROWS], left[:FIRST_ROWS], strict=True)
+                ]
+            )
+    head = {"bbox": meta["bbox"], "taxa": [taxa[t][:3] for t in tx], "looks": list(nm), "s": out}
+    return gzip.compress(json.dumps(head, separators=(",", ":")).encode(), mtime=0)
 
 
 def scoring_dates(manifest: dict) -> dict:
@@ -303,7 +373,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     sizes = ", ".join(
         f"{n} {(a.out / n).stat().st_size / 1e6:.2f} MB"
-        for n in (OUT_NAME, LOOKS_NAME, RANGE_NAME)
+        for n in (OUT_NAME, LOOKS_NAME, RANGE_NAME, FIRST_NAME)
         if (a.out / n).exists()
     )
     print(f"pool_levels: records per level {counts}; {sizes} gzipped")
