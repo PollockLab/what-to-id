@@ -305,11 +305,11 @@ $('toggle').onclick=function(){var o=$('side').classList.toggle('open');
 function names(i){var t=TAXA&&P.tax[i]!==NOTAX?TAXA[P.tax[i]]:null,g=META.groups[P.grp[i]];
   return {common:t&&t[1]||'',latin:t&&t[0]||META.names[g]||g,group:META.names[g]||g,
     rank:t&&t[3]!==255?META.ranks[t[3]]:''};}
-function badges(i){var f=P.fl[i],out=[];
-  if(f&FLAG.introduced)out.push(['Introduced','']);if(f&FLAG.threatened)out.push(['Threatened','']);
-  if(f&FLAG.obscured)out.push(['Location hidden','warn']);
-  else if(MF.accClass(f)===1)out.push(['Location over 1 km uncertain','warn']);
-  return out.map(function(b){return '<span class="badge '+b[1]+'">'+b[0]+'</span>';}).join('');}
+function badges(i,ex){var f=P.fl[i],out=[];
+  if(f&FLAG.introduced)out.push(['Introduced','','introduced']);if(f&FLAG.threatened)out.push(['Threatened','','threatened']);
+  if(f&FLAG.obscured)out.push(['Location hidden','warn','location-hidden']);
+  else if(MF.accClass(f)===1)out.push(['Location over 1 km uncertain','warn','location-uncertain']);
+  return out.map(function(b){return '<span class="badge '+b[1]+'"'+(ex?' data-explain="'+b[2]+'"':'')+'>'+b[0]+'</span>';}).join('');}
 function idText(i){var n=P.ids[i]&15,a=P.ids[i]>>4;
   return n?(n>=15?'15+':n)+(n===1?' ID':' IDs')+(a?', '+(a>=15?'15+':a)+' agreeing':''):'No IDs yet';}
 function when(v,early){return v===NO?'unknown':early?'before 1900':iso(v);}
@@ -400,7 +400,7 @@ function openCard(i){
   card.innerHTML='<button type="button" class="x" aria-label="Close">×</button>'+
     '<div class="ph" id="ph">Loading photo</div><div class="body">'+
     '<h2>'+esc(t.common||t.latin)+'</h2><p class="latin"><i>'+esc(t.latin)+'</i>'+
-    (t.rank?' ('+esc(t.rank)+')':'')+'</p><div class="badges">'+badges(i)+'</div><dl>'+
+    (t.rank?' ('+esc(t.rank)+')':'')+'</p><div class="badges">'+badges(i,1)+'</div><dl>'+
     '<dt>Group</dt><dd>'+esc(t.group)+'</dd><dt>Observed</dt><dd>'+when(P.obs[i],P.fl[i]&FLAG.earlyObs)+'</dd>'+
     '<dt>Uploaded</dt><dd>'+when(P.up[i],P.fl[i]&FLAG.earlyUp)+(lag>0?' ('+nf.format(lag)+(lag===1?' day':' days')+
     ' later)':'')+'</dd><dt>IDs</dt><dd>'+idText(i)+'</dd><dt>Place</dt><dd id="place">…</dd></dl>'+
@@ -431,7 +431,8 @@ function openCard(i){
         (ot.preferred_common_name?ot.preferred_common_name+' (':'')+ot.name+
         (ot.preferred_common_name?')':'')+'.');
       if(now.length){var p=document.createElement('p');p.className='now';p.textContent=
-        'Since this map was built: '+now.join(' ');$('now').appendChild(p);}
+        'Since this map was built: '+now.join(' ');$('now').appendChild(p);
+        p.innerHTML=p.innerHTML.replace('Research Grade','<span data-explain="research-grade">Research Grade</span>');}
       place();
     }).catch(function(e){if(e.name==='AbortError')return;
       $('ph').textContent='Could not load the photo';$('place').textContent='Unknown';});

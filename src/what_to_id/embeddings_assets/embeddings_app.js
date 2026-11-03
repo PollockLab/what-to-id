@@ -387,7 +387,7 @@ function select(i,fly){
   if(P.grp)actions.appendChild(onlyGroup(P.grp[i]));
   var title=el('h2',{},[t.common||t.latin||t.group||'Observation '+id]);
   card.textContent='';
-  [resizer(),x,ph,el('div',{'class':'body'},[title,sub,place,actions,el('p',{'class':'muted'},['Closest matches, from the full image space']),nbNote,nb])]
+  [resizer(),x,ph,el('div',{'class':'body'},[title,sub,place,actions,el('p',{'class':'muted','data-explain':'closest-matches'},['Closest matches, from the full image space']),nbNote,nb])]
     .forEach(function(c){card.appendChild(c);});
   card.hidden=false;x.focus();
   // the shards arrived after this card opened: fill in what they know, unless iNaturalist's answer already did
@@ -433,7 +433,7 @@ function select(i,fly){
       var img=c.photo?el('img',{src:c.photo,alt:label,loading:'lazy'}):label;
       var b=el('button',{type:'button','aria-label':'Jump to '+label+(row<0?' (not in the plot)':''),'data-id':c.id},[img]);
       b.addEventListener('click',function(){row=L.find(S.P,c.id);if(row>=0)select(row,true);else window.open('https://www.inaturalist.ca/observations/'+c.id,'_blank','noopener');});
-      var sc=el('span',{'class':'score'},['Cosine '+score[c.id].toFixed(3)]);
+      var sc=el('span',{'class':'score','data-explain':nb.children.length?null:'cosine'},['Cosine '+score[c.id].toFixed(3)]);  // the first score explains the term
       sc.title='cosine similarity '+score[c.id];
       b.addEventListener('mouseenter',function(){
         if(parent!==window)parent.postMessage({type:'wtid-focus',id:c.id},location.origin);});

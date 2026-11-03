@@ -246,11 +246,11 @@ function card(){
   [x,id?el('div',{'class':'ph big','data-ph':id},['']):null,el('div',{'class':'body'},[
     pp.length?path:null,el('h2',{},[hd]),sub===hd?null:el('p',{'class':'muted'},[sub]),
     el('dl',{},[el('dt',{},[el('span',{'data-explain':'needs-id'},['Need an ID'])]),el('dd',{},[nf.format(tot)]),
-      el('dt',{},['Share of all needing ID']),el('dd',{},[pct(tot)]),
-      el('dt',{},['Identified only to this rank']),el('dd',{},[nf.format(own)+(tot?' ('+pct(own,tot)+')':'')]),
+      el('dt',{},[el('span',{'data-explain':'share-needing-id'},['Share of all needing ID'])]),el('dd',{},[pct(tot)]),
+      el('dt',{},[el('span',{'data-explain':'identified-to-rank'},['Identified only to this rank'])]),el('dd',{},[nf.format(own)+(tot?' ('+pct(own,tot)+')':'')]),
       e===D.nr&&D.none?el('dt',{},['No taxon']):null,e===D.nr&&D.none?el('dd',{},[nf.format(D.none)]):null,
       el('dt',{},['Species below']),el('dd',{},[nf.format(D.sp[e])])]),
-    id&&!gp?el('p',{'class':'muted','data-idents':id}):null,id&&!gp&&REACH[M.rank(D,e)]?el('p',{'class':'muted','data-reach':id}):null,acts,up.length?el('p',{'class':'muted'},['Part of']):null,up.length?el('ul',{'class':'kids up','aria-label':'Part of'},[row(up[up.length-1],1)]):null,
+    id&&!gp?el('p',{'class':'muted','data-idents':id,'data-explain':'backlog-per-identifier'}):null,id&&!gp&&REACH[M.rank(D,e)]?el('p',{'class':'muted','data-reach':id}):null,acts,up.length?el('p',{'class':'muted'},['Part of']):null,up.length?el('ul',{'class':'kids up','aria-label':'Part of'},[row(up[up.length-1],1)]):null,
     ks.length?el('p',{'class':'muted'},[shown(e)]):null,ks.length?el('p',{'class':'muted'},[e===D.root?'Groups, as on the map':'Biggest below']):null,ks.length?kids:null])].forEach(function(n){if(n)c.appendChild(n);});
   var ip=c.querySelector('[data-idents]');if(ip)idents(ip,id,tot);
   var rp=c.querySelector('[data-reach]');if(rp)reach(rp,id,M.name(D,e));

@@ -35,7 +35,7 @@ return function(c){
     });
     if(!cards.length||!box)return;
     a.href='search.html#id='+id;a.target='_blank';a.rel='noopener';
-    var p=el('p','mt','Closest matches · ');p.appendChild(a);
+    var p=el('p','mt'),h=el('span','','Closest matches');h.dataset.explain='closest-matches';p.append(h,' · ',a);
     box.replaceChildren(p,ul);box.hidden=false;c.place();
   }
   // the card as a strip (thumbnail, name, chip, + and ×) or in full; its – / + button names what it does

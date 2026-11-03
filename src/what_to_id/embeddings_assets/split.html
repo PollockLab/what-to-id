@@ -155,7 +155,7 @@ function count(){
   var pv=late['wtid-keep'],pcut=pv&&pv.view&&visible('space');  // as does the photo space's
   var p=[];if(visible('identify'))p.push('<b>'+num('identify','status')+'</b> to identify');  // its status line starts with the kept count
   if(visible('map'))p.push('<b>'+num('map','count')+'</b> on map'+(cut?visible('identify')?', both in view':', in view':'')+(pcut?', in photo view':''));
-  if(visible('space'))p.push('<b>'+num('space','count')+'</b> in photo space'+(cut?', in map view':''));
+  if(visible('space'))p.push('<b>'+num('space','count')+'</b> <span data-explain="photo-space">in photo space</span>'+(cut?', in map view':''));
   var c=document.getElementById('counts'),h=p.join(' · ');if(c.innerHTML!==h)c.innerHTML=h;}
 setInterval(count,400);
 document.getElementById('xbar').addEventListener('click',function(e){
