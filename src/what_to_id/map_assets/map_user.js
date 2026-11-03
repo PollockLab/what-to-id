@@ -29,23 +29,25 @@ function usrPages(get,cap,per){var out=[];
     if(r.length<per||(j.total_results&&out.length>=j.total_results))return {items:out,capped:false};
     return p>=cap?{items:out,capped:true}:next(p+1);});}
   return next(1);}
-function userFilter(o){
-  var S=o.S,META=o.meta,nf=new Intl.NumberFormat('en-CA'),box=document.getElementById('usrbox'),cache={},
-    q=Promise.resolve(),last=0,gap=o.gap==null?1000:o.gap,fetcher=o.fetch||function(u){return fetch(u);},
-    cur='',run=0,id=0,mask=null,ob=null,hide=null,capped=false,key=0,Pn=null,input,mode,msg,again;
-  function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;
-    if(text!=null)e.textContent=text;return e;}
-  function say(t){if(msg)msg.textContent=t;}
-  // one request at a time, the next no sooner than gap ms after the last began; a throttled reply
-  // (429 comes without CORS headers, so it reads as a TypeError) or a 5xx is tried again after 5 and 15 gaps
-  function api(path){var url='https://api.inaturalist.org/v1/'+path;if(cache[url])return Promise.resolve(cache[url]);
+// api.inaturalist.org/v1 from the browser (the map's user filter, the tree's identifier counts): one request at a time,
+// the next no sooner than gap ms after the last began, each answer (and each request in flight) kept for the session. A throttled reply (429 comes
+// without CORS headers, so it reads as a TypeError) or a 5xx is tried again after 5 and 15 gaps, saying so through
+// say; live() false on a queued request drops it unsent. api(path[, live]) gives the parsed JSON.
+function inatGate(o){var cache={},q=Promise.resolve(),last=0,gap=o.gap==null?1000:o.gap,fetcher=o.fetch||function(u){return fetch(u);};
+  return function(path,live){var url='https://api.inaturalist.org/v1/'+path;if(cache[url])return cache[url];
     function wait(ms){return new Promise(function(r){setTimeout(r,Math.max(0,ms));});}
     function go(n){return wait(last+gap-Date.now()).then(function(){last=Date.now();return fetcher(url);})
       .then(function(r){if(r.status===429||r.status>=500)throw new TypeError('busy');if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
-      .catch(function(e){if(!(e instanceof TypeError)||n>=2)throw e;say('iNaturalist is busy, trying again…');
+      .catch(function(e){if(!(e instanceof TypeError)||n>=2)throw e;if(o.say)o.say('iNaturalist is busy, trying again…');
         return wait([5,15][n]*gap).then(function(){return go(n+1);});});}
-    var p=q.then(function(){return go(0);}).then(function(j){return cache[url]=j;});
-    q=p.catch(function(){});return p;}
+    var p=cache[url]=q.then(function(){if(live&&!live())throw 0;return go(0);});  // kept while in flight, so a repeat asks nothing
+    q=p.catch(function(){delete cache[url];});return p;};}
+function userFilter(o){
+  var S=o.S,META=o.meta,nf=new Intl.NumberFormat('en-CA'),box=document.getElementById('usrbox'),
+    api=inatGate({gap:o.gap,fetch:o.fetch,say:function(t){say(t);}}),cur='',run=0,id=0,mask=null,ob=null,hide=null,capped=false,key=0,Pn=null,input,mode,msg,again;
+  function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;
+    if(text!=null)e.textContent=text;return e;}
+  function say(t){if(msg)msg.textContent=t;}
   function load(m,p){
     var place='&place_id='+META.place_id;
     if(m==='observer'){if(!META.observer)throw new Error('This map has no observer file');
