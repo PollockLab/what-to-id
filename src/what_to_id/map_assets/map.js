@@ -447,8 +447,8 @@ var map=new maplibregl.Map(opts);document.body.appendChild(ptip);
 map.addControl(new maplibregl.NavigationControl({showCompass:false}));
 var overlay=new deck.MapboxOverlay({interleaved:false,pickingRadius:8,layers:[]});map.addControl(overlay);
 var AREA=MapArea({map:map,S:S,LAST:LAST,hash:S.area,park:S.park,bcpark:S.bcpark,fit:!S.at,
-  place:META.place_id,parks:META.parks,get:get,P:function(){return P;},keep:function(){return KEEP;},
-  change:refilter,sel:function(){return sel().join('&');},
+  place:META.place_id,parks:META.parks,get:get,P:function(){return P;},keep:function(){return KEEP;},change:refilter,
+  sel:function(){return sel().join('&');},extra:function(){var u=UF.params();return Object.keys(u).map(function(k){return '&'+k+'='+encodeURIComponent(u[k]);}).join('');},
   step:IdStep({a:$('identify'),prev:$('idprev'),next:$('idnext'),build:iso(LAST)})});
 // Guard activation before IdStep's handlers, including a stale batch or keyboard activation.
 function stopInvalidIdentify(e){if(AREA.invalid()){e.preventDefault();e.stopImmediatePropagation();}}

@@ -64,6 +64,8 @@ def open_map(browser, url, hash_):
                 "total_results": 1,
                 "results": [{"count": 3, "taxon": {"id": 1000, "ancestor_ids": [1, 900, 1000]}}],
             }
+        elif u.path.endswith("/observations"):  # the user identified records 1 to 3 in the view
+            body = {"total_results": 3, "results": [{"id": i} for i in (1, 2, 3)]}
         else:
             body = {"results": []}
         route.fulfill(json=body)
@@ -139,4 +141,43 @@ def test_a_throttled_reply_is_tried_again(browser, site):
     page.wait_for_function("document.querySelector('#usrbox p').textContent.includes('busy')")
     shown(page, IN_GENUS_A)
     assert len(hits) == 2 and hits[0] == hits[1]
+    page.close()
+
+
+def test_an_area_listed_by_id_keeps_the_user_out_of_every_batch(browser, site):
+    page = open_map(browser, site, "")
+    shown(page, N)
+    ring = [-124, 48, -122, 48, -122, 50, -124, 50]  # every record, so the area opens by id
+    area = page.evaluate("r => MapArea.encode([r])", ring)
+    page.close()
+    page = open_map(browser, site, f"#user=42&area={area}")
+    shown(page, IN_GENUS_A)
+    link = urlparse(page.get_attribute("#identify", "href"))
+    q = parse_qs(link.query)
+    assert q["id"] and q["without_ident_user_id"] == ["42"]
+    assert len(q["id"][0].split(",")) == IN_GENUS_A
+    assert page.errors == []
+    page.close()
+
+
+def test_observer_keeps_the_users_own_records(browser, site):
+    page = open_map(browser, site, "#user=10&umode=observer")
+    shown(page, N // 2)  # the fixture's observers alternate between users 10 and 11
+    assert page.calls == [] and "observed by" in page.inner_text("#usrbox p")
+    assert parse_qs(urlparse(page.get_attribute("#identify", "href")).query)[
+        "without_ident_user_id"
+    ] == ["10"]
+    assert page.errors == []
+    page.close()
+
+
+def test_not_yet_identified_hides_the_records_the_user_identified_in_the_view(browser, site):
+    page = open_map(browser, site, "#user=42&umode=unid")
+    shown(page, N - 3)
+    q = page.calls[-1][1]
+    assert page.calls[-1][0].endswith("/observations")
+    assert q["ident_user_id"] == ["42"] and q["quality_grade"] == ["needs_id"]
+    assert {"swlat", "swlng", "nelat", "nelng"} <= q.keys()
+    assert page.is_visible("#usrbox button") and "approximate" in page.inner_text("#idnote")
+    assert page.errors == []
     page.close()
