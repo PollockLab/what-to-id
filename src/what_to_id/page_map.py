@@ -95,11 +95,10 @@ TOTAL_ONLY = {
 _COLS = ("id", "lat", "lon", "observed_on", "created_at", "iconic_taxon")
 _PKG = files("what_to_id")
 _ASSETS = _PKG / "map_assets"
-# Inlined in this order: map_taxa.js, map_area.js, map_step.js, map_projects.js, map_user.js and
-# map_chips.js the taxon, area, Identify batch, project, user and chip helpers map.js calls,
-# map_filter.js the filter state and GPU filter values, group_list.js and filter_bar.js the filter
-# panel, map_card.js the card, clade_colour.js and level_colour.js the dots' colours, map_rail.js
-# the panel as Explore's filter rail, map_sheet.js the dates, area and legend as Explore's sheet.
+# Inlined in this order: map_taxa.js, map_area.js, map_step.js, map_projects.js, map_user.js,
+# map_resolved.js (records that left needs-ID), map_chips.js, map_filter.js the helpers and filter
+# state map.js calls, group_list.js and filter_bar.js the filter panel, map_card.js the card,
+# clade_colour.js and level_colour.js the colours, map_rail.js and map_sheet.js Explore's panels.
 MAP_CSS = ("map.css", "map_select.css", "map_area.css")
 # The record card's closest matches (the atlas index reader and the iNaturalist photo lookup of the
 # search page) and range chip (the Identify page's range module), and the photo space's taxon tree
@@ -118,6 +117,7 @@ MAP_JS = (
     "map_area.js",
     "map_projects.js",
     "map_user.js",
+    "map_resolved.js",
     "map_chips.js",
     "map_filter.js",
     "clade_colour.js",

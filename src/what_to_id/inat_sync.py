@@ -33,15 +33,15 @@ def changed_since(
     d1: str,
     session: requests.Session | None = None,
     sleep: float = SLEEP,
-) -> tuple[pd.DataFrame, set[int], str | None]:
+) -> tuple[pd.DataFrame, dict[int, str], str | None]:
     """Every BC record observed from ``d1`` that iNaturalist updated since ``since``.
 
     Asks for all quality grades and does not filter on photos, so one query sees every way a
     record enters or leaves the pool: a new upload, a record reaching or dropping back from
     Research Grade, a casual record reopened, a changed ID, a removed photo. Returns the rows
-    now in the pool (needs-ID with a photo and coordinates), the ids of the others, and the
-    newest ``updated_at`` seen, which is the next run's ``since``. A record deleted from
-    iNaturalist, moved out of BC or redated before ``d1`` is not returned.
+    now in the pool (needs-ID with a photo and coordinates), the others as ``{id: quality
+    grade}``, and the newest ``updated_at`` seen, which is the next run's ``since``. A record
+    deleted from iNaturalist, moved out of BC or redated before ``d1`` is not returned.
     """
     params = {
         "place_id": BC_PLACE_ID,
@@ -54,7 +54,7 @@ def changed_since(
     }
     session = session or make_session()
     rows: list[dict] = []
-    gone: set[int] = set()
+    gone: dict[int, str] = {}
     newest: pd.Timestamp | None = None
     id_below = None
     while True:
@@ -65,7 +65,7 @@ def changed_since(
         for obs in res:
             row = flatten(obs) if obs.get("quality_grade") == "needs_id" else None
             if row is None:
-                gone.add(int(obs["id"]))
+                gone[int(obs["id"])] = obs.get("quality_grade") or ""
             else:
                 rows.append(row)
             if obs.get("updated_at"):

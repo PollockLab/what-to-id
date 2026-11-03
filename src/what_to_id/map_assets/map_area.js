@@ -436,6 +436,7 @@ function MapArea(ctx){
     // true while drawing and briefly after, so the closing tap opens no record's tip
     busy:function(){return mode||performance.now()-ended<500;},
     ver:function(){return VER;},
+    idx:function(){return loaded().map(function(a){return a.idx;});},
     hash:hash,
     term:term,
     clear:function(){if(mode)stop();close();if(AREAS.length||NOTE||INVALID)set(null);},

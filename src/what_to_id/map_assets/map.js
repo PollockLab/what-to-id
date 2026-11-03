@@ -34,7 +34,7 @@ var S=Object.assign({split:[],rec:null,at:null,fly:false},MF.read(new URLSearchP
   S.fly=!!S.rec&&!S.at;
 })();
 var PJ=projectFilter({meta:META,hash:new URLSearchParams(location.hash.slice(1)),changed:function(){refilter();}});
-var hashTimer=0,UF=userFilter({S:S,meta:META,get:get,taxa:function(){return TAXA;},changed:function(){refilter();},bounds:function(){var b=map.getBounds();return {w:b.getWest(),s:b.getSouth(),e:b.getEast(),n:b.getNorth()};}});
+var hashTimer=0,UF=userFilter({S:S,meta:META,get:get,taxa:function(){return TAXA;},changed:function(){refilter();},bounds:function(){var b=map.getBounds();return {w:b.getWest(),s:b.getSouth(),e:b.getEast(),n:b.getNorth()};}}),RS=leftFilter({S:S,MF:MF,meta:META,get:get,tf:function(){return TF;},area:function(){return AREA;},all:function(){return ALL;},map:function(){return map;},off:function(){return !!(PJ.active()||UF.active()||SUB||FK);},changed:function(){render();}});
 // The split view hands the selection over live; the area and projects are not part of it yet.
 var SYNC=MapFilter.sync({key:function(){return MF.write(S).join('&');},apply:function(str){
   var r=MF.read(new URLSearchParams(str)),was=taxaKey();
@@ -51,7 +51,7 @@ function sel(){
   if(AREA.hash())h.push(AREA.hash());if(PJ.hash())h.push(PJ.hash());
   return h;}
 function writeHash(){SYNC.send();clearTimeout(hashTimer);hashTimer=setTimeout(function(){
-  var h=sel();
+  var h=sel().concat(RS.hash());
   if(P.n&&SEL>=0)h.push('record='+P.id[SEL]);else if(S.rec)h.push('record='+S.rec);
   var c=map.getCenter();h.push('at='+map.getZoom().toFixed(1)+'/'+c.lat.toFixed(3)+'/'+
     c.lng.toFixed(3));
@@ -209,7 +209,7 @@ function render(){
     '':'matching these filters ')+'still need an ID ('+
     FB.pct(shown,all)+'). All-record counts from '+TOT.on+'.':'';
   $('hint').textContent=TC?HINT_TOT:HINT;
-  PJ.note(P.n?shown:null,ALT);FB.update();FB.groups.set(VC&&VC.g);layers();link();writeHash();counts();
+  PJ.note(P.n?shown:null,ALT);FB.update();FB.groups.set(VC&&VC.g);layers();link();writeHash();counts();RS.render();
 }
 // The tree beside the map counts what the map shows: how many shown records carry each taxon, sent once the filters
 // have settled for 150 ms and only when they changed (KV counts the recounts of KEEP, which holds the months too).
@@ -285,7 +285,7 @@ function layers(){
     getPosition:function(i){return [P.pos[2*i],P.pos[2*i+1]];},radiusUnits:'pixels',getRadius:8,
     filled:false,stroked:true,lineWidthUnits:'pixels',getLineWidth:2.5,
     getLineColor:dark?[255,255,255]:[29,29,27]}));
-  overlay.setProps({layers:L,onHover:tip,onClick:pick});
+  overlay.setProps({layers:L.concat(RS.layers()),onHover:tip,onClick:pick});
 }
 
 // The filter bar (filter_bar.js) draws the histograms and chips; the map hands it the records and the recount.
