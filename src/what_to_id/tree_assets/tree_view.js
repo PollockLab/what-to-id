@@ -189,13 +189,23 @@ function photos(){[].forEach.call(document.querySelectorAll('[data-ph]'),functio
 function el(tag,attrs,kids){var e=document.createElement(tag);for(var k in attrs||{})e.setAttribute(k,attrs[k]);
   (kids||[]).forEach(function(c){if(c!=null)e.appendChild(typeof c==='string'?document.createTextNode(c):c);});return e;}
 // ---- identifiers: how many people identify the card's taxon in BC (total_results only, never who) and the backlog each carries
-var API=inatGate({say:function(t){IDB=t;if(IDL)IDL.textContent=t;}}),IDL=null,IDB='';
+var API=inatGate({say:function(t){IDB=t;if(IDL)IDL.textContent=t;}}),IDL=null,IDB='',REACH={genus:1,family:1};
 function idents(p,id,tot){
   IDL=p;p.textContent=IDB||'Counting identifiers in BC…';
   API('observations/identifiers?place_id='+META.place_id+'&taxon_id='+id+'&per_page=0',function(){return !!$('card').querySelector('[data-idents="'+id+'"]');}).then(function(j){
     IDB='';var n=+j.total_results||0;if(!p.isConnected)return;
     p.textContent=n?nf.format(n)+(n===1?' identifier':' identifiers')+' in BC · '+nf.format(Math.round(tot/n))+' needs-ID per identifier':'no identifiers in BC yet';})
   .catch(function(e){IDB='';if(e!==0&&p.isConnected)p.textContent='Identifier count unavailable.';});}
+// ---- reach: how often a genus or family's BC records get to species Research Grade, over records old enough to have resolved
+function reach(p,id,name){
+  var d=new Date();d.setFullYear(d.getFullYear()-2);d=d.toISOString().slice(0,10);p.textContent='\u2026';
+  var base='observations?place_id='+META.place_id+'&taxon_id='+id+'&photos=true&captive=false&verifiable=true&created_d2='+d+'&per_page=0',
+    live=function(){return !!$('card').querySelector('[data-reach="'+id+'"]');};
+  API(base,live).then(function(a){var den=+a.total_results||0;if(den<50)throw 0;  // hrank=species is species and below
+    return API(base+'&quality_grade=research&hrank=species',live).then(function(b){return [+b.total_results||0,den];});})
+  .then(function(r){if(!p.isConnected)return;p.hidden=false;p.textContent='In BC, '+Math.round(100*r[0]/r[1])+'% of '+name+' records reach species';
+    p.title=nf.format(r[0])+' of '+nf.format(r[1])+' records with photos, wild and verifiable, added before '+d+', are Research Grade at species or below';})
+  .catch(function(){p.hidden=true;p.textContent='';});}
 function card(){
   var c=$('card');c.textContent='';if(S.sel<0){c.hidden=true;return;}c.hidden=false;
   var e=M.lead(D,S.sel),id=M.id(D,e),tot=D.tot[e],own=D.own[e],k=rk(e),cm=cmn(e),ks=D.kids[e],f=M.lead(D,S.focus),
@@ -236,9 +246,10 @@ function card(){
       el('dt',{},['Identified only to this rank']),el('dd',{},[nf.format(own)+(tot?' ('+pct(own,tot)+')':'')]),
       e===D.nr&&D.none?el('dt',{},['No taxon']):null,e===D.nr&&D.none?el('dd',{},[nf.format(D.none)]):null,
       el('dt',{},['Species below']),el('dd',{},[nf.format(D.sp[e])])]),
-    id&&!gp?el('p',{'class':'muted','data-idents':id}):null,acts,up.length?el('p',{'class':'muted'},['Part of']):null,up.length?el('ul',{'class':'kids up','aria-label':'Part of'},[row(up[up.length-1],1)]):null,
+    id&&!gp?el('p',{'class':'muted','data-idents':id}):null,id&&!gp&&REACH[M.rank(D,e)]?el('p',{'class':'muted','data-reach':id}):null,acts,up.length?el('p',{'class':'muted'},['Part of']):null,up.length?el('ul',{'class':'kids up','aria-label':'Part of'},[row(up[up.length-1],1)]):null,
     ks.length?el('p',{'class':'muted'},[shown(e)]):null,ks.length?el('p',{'class':'muted'},[e===D.root?'Groups, as on the map':'Biggest below']):null,ks.length?kids:null])].forEach(function(n){if(n)c.appendChild(n);});
   var ip=c.querySelector('[data-idents]');if(ip)idents(ip,id,tot);
+  var rp=c.querySelector('[data-reach]');if(rp)reach(rp,id,M.name(D,e));
   photos();
 }
 // How much below e the circle shows. Open more below stops at family (order for insects) and at BUDGET tips.
