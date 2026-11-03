@@ -398,3 +398,22 @@ def test_a_cut_species_offers_its_other_records_and_picking_it_shows_them_all(br
     page.wait_for_function("__identify.view()[1].length < 30")
     assert "taxa=" not in page.evaluate("location.hash") and page.locator("#unpick").is_hidden()
     assert page.errors == []
+
+
+def test_cards_show_before_the_look_alike_file_and_fill_it_in_where_they_stand(browser, site):
+    base, _ = site
+    page = browser.new_page(viewport={"width": 600, "height": 900})
+    page.errors = []
+    page.on("pageerror", lambda e: page.errors.append(str(e)))
+    eb.stub_inat(page, None)
+    held = []
+    page.route("**/pool-levels-looks.bin*", lambda r: held.append(r))
+    page.goto(f"{base}/identify.html#lvl=3")
+    page.wait_for_selector("#grid .card")
+    assert page.locator("#grid .card .look").count() == 0
+    page.evaluate("scrollTo(0, 40)")
+    held[0].continue_()
+    page.wait_for_selector("#grid .card .look")
+    assert page.locator("#grid .card .look").first.inner_text().startswith("Probably ")
+    assert page.evaluate("scrollY") == 40  # filled in place, not redrawn from the top
+    assert page.errors == []
