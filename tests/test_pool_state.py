@@ -255,7 +255,14 @@ def test_apply_changes_drops_gone_and_upserts_changed():
 
 
 def _sync(
-    tmp_path, monkeypatch, *, state=None, since=None, api=4, newest="2026-09-30T01:00:00+00:00"
+    tmp_path,
+    monkeypatch,
+    *,
+    state=None,
+    since=None,
+    api=4,
+    newest="2026-09-30T01:00:00+00:00",
+    extra=(),
 ):
     pool = make_pool(4)
     pool.loc[:, "id"] = [1, 2, 3, 4]
@@ -269,7 +276,7 @@ def _sync(
 
     def fake_changed_since(start, *, d1):
         asked.update(start=start, d1=d1)
-        return _new_rows([4, 7]), {2, 99}, newest
+        return _new_rows([4, 7]), {2: "research", 99: "casual"}, newest
 
     def fake_total(params):
         asked["params"] = params
@@ -280,7 +287,7 @@ def _sync(
     argv = ["sync", "--pool", str(pool_path), "--state", str(state_path), "--d1", "1900-01-01"]
     if since:
         argv += ["--since", since]
-    assert pool_state.main(argv) == 0
+    assert pool_state.main([*argv, *extra]) == 0
     return pd.read_parquet(pool_path), json.loads(state_path.read_text()), asked
 
 
@@ -365,3 +372,44 @@ def test_reconcile_failure_leaves_pool_and_state_untouched(tmp_path, monkeypatch
         pool_state.main(argv)
     assert (pool_path.read_bytes(), state_path.read_bytes()) == before
     assert not list(tmp_path.glob("*.tmp"))
+
+
+def test_cmd_sync_with_left_logs_the_records_that_left_with_their_grade(tmp_path, monkeypatch):
+    log_path = tmp_path / "resolved.parquet"
+    _sync(tmp_path, monkeypatch, since="2026-09-29", extra=["--left", str(log_path)])
+    log = pd.read_parquet(log_path)
+    assert log["id"].tolist() == [2] and log["reason"].tolist() == [1]  # 99 was never in the pool
+    assert log["left"].iloc[0] > pd.Timestamp.now(tz="UTC") - pd.Timedelta(minutes=5)
+
+
+def test_cmd_sync_without_left_writes_no_log(tmp_path, monkeypatch):
+    _sync(tmp_path, monkeypatch, since="2026-09-29")
+    assert not list(tmp_path.glob("*resolved*"))
+
+
+def test_cmd_reconcile_with_left_logs_reason_unknown(tmp_path, monkeypatch):
+    pool_path, state_path, log_path = (tmp_path / n for n in ("pool", "sync.json", "log"))
+    pool = make_pool(3)
+    pool.loc[:, "id"] = [1, 2, 3]
+    pool.to_parquet(pool_path, index=False)
+    state_path.write_text("{}")
+    monkeypatch.setattr(pool_state, "reconcile_ids", lambda ids, **kw: ({2}, set(), 1))
+    monkeypatch.setattr(pool_state, "fetch_by_ids", lambda ids: [])
+    monkeypatch.setattr(pool_state, "total_results", lambda params: 2)
+    argv = ["reconcile", "--pool", str(pool_path), "--state", str(state_path)]
+    assert pool_state.main([*argv, "--left", str(log_path)]) == 0
+    log = pd.read_parquet(log_path)
+    assert (log["id"].tolist(), log["reason"].tolist()) == ([2], [4])
+    # a second run adds to the log and a failed one leaves it as it was
+    monkeypatch.setattr(pool_state, "reconcile_ids", lambda ids, **kw: ({3}, set(), 1))
+    assert pool_state.main([*argv, "--left", str(log_path)]) == 0
+    assert pd.read_parquet(log_path)["id"].tolist() == [2, 3]
+    before = log_path.read_bytes()
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("raise the cap")
+
+    monkeypatch.setattr(pool_state, "reconcile_ids", boom)
+    with pytest.raises(RuntimeError):
+        pool_state.main([*argv, "--left", str(log_path)])
+    assert log_path.read_bytes() == before

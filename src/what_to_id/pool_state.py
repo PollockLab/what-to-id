@@ -34,6 +34,7 @@ from what_to_id.inat import (
 )
 from what_to_id.inat_sync import changed_since, reconcile_ids
 from what_to_id.manifest import sha256_file
+from what_to_id.map_resolved import append_log, left_rows
 
 log = logging.getLogger("what_to_id")
 
@@ -172,6 +173,14 @@ def apply_changes(pool: pd.DataFrame, changed: pd.DataFrame, gone: Iterable[int]
     return merge_new(kept, changed)
 
 
+def _log_left(path: Path | None, pool: pd.DataFrame, updated: pd.DataFrame, grades: dict) -> None:
+    """Add the records that left the pool to the log at ``path``; written before the pool is."""
+    if path is not None:
+        now = pd.Timestamp.now(tz="UTC")
+        rows = left_rows(pool, updated, grades, now)
+        _atomic_write(append_log(path, rows, updated["id"], now), path)
+
+
 def _cmd_sync(a: argparse.Namespace) -> int:
     saved = json.loads(a.state.read_text()) if a.state.exists() else {}
     since = saved.get("since") or a.since
@@ -193,9 +202,10 @@ def _cmd_sync(a: argparse.Namespace) -> int:
         "asked_from": start.isoformat(),
         "added": int((~changed["id"].isin(pool["id"])).sum()),
         "replaced": int(changed["id"].isin(pool["id"]).sum()),
-        "dropped": int(pool["id"].isin(gone).sum()),
+        "dropped": int(pool["id"].isin(list(gone)).sum()),
         **counts,
     }
+    _log_left(a.left, pool, updated, gone)
     _atomic_write(updated, a.pool)
     _write_state(a.state, state)
     log.info("sync: %s", state)
@@ -253,6 +263,7 @@ def _cmd_reconcile(a: argparse.Namespace) -> int:
         "reconcile_requests": requests_used,
         **counts,
     }
+    _log_left(a.left, pool, updated, {})
     _atomic_write(updated, a.pool)
     _write_state(a.state, state)
     log.info("reconcile: %s", state)
@@ -283,6 +294,7 @@ def main(argv: list[str] | None = None) -> int:
     p_sync.add_argument("--d1", default=None, help="earliest observed_on, YYYY-MM-DD")
     p_sync.add_argument("--overlap-hours", type=float, default=SYNC_OVERLAP_HOURS)
     p_sync.add_argument("--max-drift", type=int, default=MAX_DRIFT)
+    p_sync.add_argument("--left", type=Path, help="parquet log of records that left the pool")
     p_sync.set_defaults(func=_cmd_sync)
 
     p_rec = sub.add_parser("reconcile", help="drop and add records the sync cannot see (map pool)")
@@ -291,6 +303,7 @@ def main(argv: list[str] | None = None) -> int:
     p_rec.add_argument("--d1", default=None, help="earliest observed_on, YYYY-MM-DD")
     p_rec.add_argument("--max-drift", type=int, default=MAX_DRIFT)
     p_rec.add_argument("--max-requests", type=int, default=800)  # about 22 min at the API's pace
+    p_rec.add_argument("--left", type=Path, help="parquet log of records that left the pool")
     p_rec.set_defaults(func=_cmd_reconcile)
 
     prepared = sub.add_parser("prepared", help="load a prepared snapshot retaining known closures")

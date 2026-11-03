@@ -17,6 +17,11 @@ name: map
 # id-range counts, dropping what iNaturalist no longer holds, and warns if the pool's size still
 # drifts from iNaturalist's count.
 #
+# Each run also logs the records that left the pool, with the quality grade they left for, into
+# resolved.parquet on the release (60 days). The build turns the last 30 days of it into
+# pool-resolved.bin, which the map reads for its "Left needs-ID" control. If that step fails the map
+# ships without the file and the control says so.
+#
 # The build also fetches iNaturalist's monthly count of every BC record with a photo, needing an ID or
 # Research Grade, per group and date, and again under each status filter (about 112 requests), so the
 # map can show the share still needing an ID. If that fetch fails the map ships without it.
@@ -96,11 +101,12 @@ jobs:
             echo "::error::sync.json did not download and MAP_SINCE is empty; refusing to restart the sync from scratch"; exit 1
           fi
           gh release download "$STATE_TAG" -D state -p projects.bin --clobber || echo "no projects.bin yet; this run starts it"
+          gh release download "$STATE_TAG" -D state -p resolved.parquet --clobber || echo "no resolved.parquet yet; this run starts it"
       - name: Apply every change since the last run
         run: |
           set -euo pipefail
           python -m what_to_id.pool_state sync --pool state/pool.parquet --state state/sync.json \
-            --since "$MAP_SINCE" --d1 "$D1"
+            --since "$MAP_SINCE" --d1 "$D1" --left state/resolved.parquet
       - name: Drop records iNaturalist no longer holds
         id: reconcile
         continue-on-error: true
@@ -108,7 +114,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m what_to_id.pool_state reconcile --pool state/pool.parquet --state state/sync.json \
-            --d1 "$D1"
+            --d1 "$D1" --left state/resolved.parquet
       - name: Warn that the reconcile failed
         if: steps.reconcile.outcome == 'failure'
         run: echo "::warning::reconcile failed; deploying the synced pool without it"
@@ -155,6 +161,18 @@ jobs:
           if grep -ril -E 'recency|gap_first|gap first|similarity|novelty|surprise' _site; then
             echo "::error::a list name leaked into the site"; exit 1
           fi
+      # pool-resolved.bin: the records that left needs-ID in the last 30 days, from resolved.parquet. An
+      # empty log still writes a header-only file, so the map's control always finds one.
+      - name: Add the records that left needs-ID
+        id: resolved
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          python -m what_to_id.map_resolved build --log state/resolved.parquet --pool state/pool.parquet \
+            --tree state/taxonomy.json --out _site
+      - name: Warn that the records that left needs-ID failed
+        if: steps.resolved.outcome == 'failure'
+        run: echo "::warning::no pool-resolved.bin; the map's left needs-ID control will say it could not load"
       # pool-lookalike.bin: per-record agreement and nearest other-taxon rank from the photo-space
       # neighbours on the index repo, pairs photographed together skipped. The photo-space page works without it.
       - name: Add the look-alike stats
@@ -210,7 +228,11 @@ jobs:
       - name: Save the map pool
         run: |
           set -euo pipefail
-          # the pool first, so the cursor never moves past a pool that failed to upload
+          # the log first, so a pool that fails to upload only repeats records the log already holds; then
+          # the pool, so the cursor never moves past a pool that failed to upload
+          if [ -s state/resolved.parquet ]; then
+            gh release upload "$STATE_TAG" state/resolved.parquet --clobber || echo "::warning::could not save resolved.parquet"
+          fi
           gh release upload "$STATE_TAG" state/pool.parquet --clobber
           gh release upload "$STATE_TAG" state/sync.json --clobber
           if [ -s state/taxonomy.json ]; then

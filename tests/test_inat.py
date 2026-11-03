@@ -500,7 +500,7 @@ def test_changed_since_sorts_records_into_pool_and_gone():
         "2026-09-28T12:00:00Z", d1="1900-01-01", session=sess, sleep=0
     )
     assert sorted(rows["id"]) == [5, *range(801, 1001)]
-    assert gone == {6, 7, 8, 9}
+    assert gone == {6: "needs_id", 7: "needs_id", 8: "casual", 9: "research"}
     assert newest == "2026-09-30T01:00:00+00:00"
     first_call, second_call = sess.calls
     assert first_call["quality_grade"] == "needs_id,research,casual"
@@ -513,7 +513,7 @@ def test_changed_since_sorts_records_into_pool_and_gone():
 def test_changed_since_nothing_changed_is_one_request():
     sess = FakeSession([])
     rows, gone, newest = changed_since("2026-09-28", d1="1900-01-01", session=sess, sleep=0)
-    assert rows.empty and gone == set() and newest is None
+    assert rows.empty and gone == {} and newest is None
     assert list(rows.columns) == [*inat.COLUMNS, *inat.EXTRA_COLUMNS]
     assert len(sess.calls) == 1
 
