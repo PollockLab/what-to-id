@@ -245,7 +245,7 @@ function card(){
   var x=el('button',{type:'button','class':'x','aria-label':'Close'},['×']);x.addEventListener('click',function(){S.sel=-1;go(false,true);});
   [x,id?el('div',{'class':'ph big','data-ph':id},['']):null,el('div',{'class':'body'},[
     pp.length?path:null,el('h2',{},[hd]),sub===hd?null:el('p',{'class':'muted'},[sub]),
-    el('dl',{},[el('dt',{},['Need an ID']),el('dd',{},[nf.format(tot)]),
+    el('dl',{},[el('dt',{},[el('span',{'data-explain':'needs-id'},['Need an ID'])]),el('dd',{},[nf.format(tot)]),
       el('dt',{},['Share of all needing ID']),el('dd',{},[pct(tot)]),
       el('dt',{},['Identified only to this rank']),el('dd',{},[nf.format(own)+(tot?' ('+pct(own,tot)+')':'')]),
       e===D.nr&&D.none?el('dt',{},['No taxon']):null,e===D.nr&&D.none?el('dd',{},[nf.format(D.none)]):null,

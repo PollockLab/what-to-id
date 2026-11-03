@@ -46,7 +46,7 @@ def ok(total):
 def test_the_card_shows_identifiers_and_backlog_per_identifier(browser, site):
     page = open_tree(browser, site, ok(7))
     text = line(page, "per identifier")
-    need = int(page.locator("#card dt:text('Need an ID') + dd").inner_text().replace(",", ""))
+    need = int(page.locator("#card dt:has-text('Need an ID') + dd").inner_text().replace(",", ""))
     assert text == f"7 identifiers in BC · {round(need / 7)} needs-ID per identifier"
     call = next(c for c in page.calls if c["taxon_id"] == "900")
     assert call["place_id"] == "7085" and call["per_page"] == "0"

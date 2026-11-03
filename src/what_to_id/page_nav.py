@@ -2,12 +2,16 @@
 
 scripts/atlas_page.sh runs on a bare python3, so this must not import numpy, pandas or page_map.
 `CSS` holds the colour tokens and the shell rules; `nav` returns the skip link, the header and the
-script that points the switcher at what the viewer has open.
+script that points the switcher at what the viewer has open, then the toggletips (`explain`).
 """
 
 from __future__ import annotations
 
+import json
 from html import escape
+from pathlib import Path
+
+from what_to_id.glossary import GLOSSARY
 
 # (file, label), one tab per job: Explore, Confused pairs (confusion.html), with the study last.
 # Explore is explore.html: Identify, the map, the photo space and the tree side by side; the pages
@@ -101,6 +105,22 @@ a.href=a.dataset.base;}else a.remove();
 }).catch(function(){});});})();
 """.strip()
 
+# The toggletips (site_assets/explain.js) and the glossary go on every page nav draws but the
+# study page, frozen for the running preregistered study: its bytes must not change.
+FROZEN = {"study.html"}
+_EXPLAIN = Path(__file__).parent / "site_assets"
+
+
+def explain() -> str:
+    """The toggletips' style, the glossary as JSON and the script, for the end of the header."""
+    data = json.dumps(GLOSSARY, separators=(",", ":")).replace("<", "\\u003c")
+    return (
+        f"<style>{(_EXPLAIN / 'explain.css').read_text().strip()}</style>\n"
+        f'<script type="application/json" id="explain-data">{data}</script>\n'
+        f"<script>{(_EXPLAIN / 'explain.js').read_text().strip()}</script>\n"
+    )
+
+
 _EXPLORE_OF = ("map.html", "embeddings.html", "tree.html", "search.html")
 _SKIP = (
     "onclick=\"event.preventDefault();var m=document.getElementById('main-content')"
@@ -147,5 +167,5 @@ def nav(
         f'<div class="site-shell"><a class="site-brand" href="{escape(base)}index.html">'
         'What to ID<span class="site-bc"> · BC</span></a>'
         f'<nav class="site-nav" aria-label="Views"{flags}>{"".join(links)}</nav>{extra}</div>\n'
-        f"<script>{JS}</script>\n"
+        f"<script>{JS}</script>\n" + ("" if current in FROZEN else explain())
     )
