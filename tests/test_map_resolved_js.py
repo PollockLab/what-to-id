@@ -120,20 +120,26 @@ def test_a_file_of_the_wrong_size_is_refused():
 
 
 SAY = (
-    "var nf=new Intl.NumberFormat('en-CA'),iso=function(d){return 'D'+d;};"
-    "function say(k,rg,win,R){return leftSay(k,rg,false,win,R,iso,nf);}"
+    "var nf=new Intl.NumberFormat('en-CA'),fmt=function(d,y){return 'D'+d+(y?'Y':'');};"
+    "function say(k,rg,win,R,v){var s=leftSay(k,rg,!!v,win,R,fmt,nf);return [s.text,s.tip,s.note];}"
 )
 
 
 def test_the_line_names_the_window_only_when_the_log_reaches_back_that_far():
     got = run(
         SAY + "return [say(5,2,30,{build:100,start:71,live:71}),"
-        "say(5,2,30,{build:100,start:72,live:72}),say(5,0,7,{build:100,start:99,live:99})];"
+        "say(5,2,30,{build:100,start:72,live:72}),say(5,0,7,{build:100,start:99,live:99}),"
+        "say(5,2,30,{build:100,start:71,live:71},1)];"
     )
     assert got == [
-        "5 left needs-ID in the 30 days to D100 (2 Research Grade)",
-        "5 left needs-ID since D72 (2 Research Grade)",
-        "5 left needs-ID since D99",
+        ["5 left Needs ID in the last 30 days, 2 as Research Grade", "D71 to D100Y, UTC", ""],
+        ["5 left Needs ID since D72, 2 as Research Grade", "D72 to D100Y, UTC", ""],
+        ["5 left Needs ID since D99", "D99 to D100Y, UTC", ""],
+        [
+            "5 in view left Needs ID in the last 30 days, 2 as Research Grade",
+            "D71 to D100Y, UTC",
+            "",
+        ],
     ]
 
 
@@ -143,9 +149,7 @@ def test_research_grade_only_is_noted_while_the_window_reaches_before_the_live_l
         "say(5,5,7,{build:100,start:60,live:90}),"  # window starts day 94, after live: no note
         "say(5,5,30,{build:100,start:80,live:90})];"  # log younger than the window
     )
-    assert got == [
-        "5 left needs-ID in the 30 days to D100 (5 Research Grade)"
-        " (Research Grade only before D90)",
-        "5 left needs-ID in the 7 days to D100 (5 Research Grade)",
-        "5 left needs-ID since D80 (5 Research Grade) (Research Grade only before D90)",
-    ]
+    note = "Before D90 only Research Grade is counted."
+    assert [g[2] for g in got] == [note, "", note]
+    assert got[0][0] == "5 left Needs ID in the last 30 days, 5 as Research Grade"
+    assert got[2][0] == "5 left Needs ID since D80, 5 as Research Grade"
