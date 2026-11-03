@@ -13,6 +13,7 @@ import threading
 import numpy as np
 import pytest
 
+from what_to_id import site_files
 from what_to_id.embeddings_page import build
 from what_to_id.page_map import _decode_shard, encode_points, render_map
 from what_to_id.split_page import build as build_split
@@ -69,12 +70,11 @@ def lookalike_file(root, blobs, meta, value):
     """pool-lookalike.bin per its contract, rows in the shards' order, `value(id)` -> 4 nibbles."""
     a, b = [], []
     for s in meta["shards"]:
-        name = s["file"].split("?")[0]
-        for i in _decode_shard(gzip.decompress(blobs[name]), s["n"])["id"]:
+        for i in _decode_shard(gzip.decompress(blobs[s["file"]]), s["n"])["id"]:
             cls, order, fam, lev = value(int(i))
             a.append(cls | order << 4)
             b.append(fam | (lev + 2) << 4)
-    (root / "pool-lookalike.bin").write_bytes(gzip.compress(bytes(a + b)))
+    site_files.publish(root, "lookalike", "pool-lookalike.bin", gzip.compress(bytes(a + b)))
 
 
 @pytest.fixture(scope="module")
@@ -126,7 +126,7 @@ def open_page(browser, site):
             lambda r: r.fulfill(body=DECK_STUB, content_type="text/javascript"),
         )
         if missing:
-            page.route("**/pool-lookalike.bin*", lambda r: r.fulfill(status=404, body="no"))
+            page.route("**/pool-lookalike.*", lambda r: r.fulfill(status=404, body="no"))
         page.goto(f"{site}/{path}{hash_}")
         if path.startswith("embeddings"):
             page.wait_for_function("document.getElementById('lifebar').hidden === false")

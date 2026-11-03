@@ -1,4 +1,5 @@
 import json
+import re
 
 import numpy as np
 import pandas as pd
@@ -120,7 +121,7 @@ def test_build_design_rotation_writes_only_index(tmp_path, webapp_dir):
     validate_manifest(d)
     assert d["design"] == "rotation"
     site = out / "site"
-    assert sorted(p.name for p in site.iterdir()) == [
+    assert sorted(re.sub(r"\.[0-9a-f]{12}\.", ".", p.name) for p in site.iterdir()) == [
         "bc-parks.bin",
         "map.html",
         "pool-0.bin",

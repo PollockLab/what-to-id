@@ -132,7 +132,7 @@ function pointData(){
 }
 function categories(thin){return MF.categories(S,inc(),thin);}
 // the group, clade or, beside Identify in Explore, level colours (level_colour.js); a switch swaps only the colours
-var LC=LevelColour({META:META,get:get,taxa:function(){return TAXA;},P:function(){return P;},st:function(){return S;},picked:function(){search();FB.showClades();FB.showGroups();refilter();},shown:function(){return KEEP.length===P.n&&!CT?{k:[KV,S.lo,S.hi,S.up].join(),f:shows()}:null;},url:'pool-levels.bin'+String(META.shards[0].file).replace(/^[^?]*/,''),box:$('map'),
+var LC=LevelColour({META:META,get:get,taxa:function(){return TAXA;},P:function(){return P;},st:function(){return S;},picked:function(){search();FB.showClades();FB.showGroups();refilter();},shown:function(){return KEEP.length===P.n&&!CT?{k:[KV,S.lo,S.hi,S.up].join(),f:shows()}:null;},url:META.files.levels,box:$('map'),
   changed:function(){if(!PD)return;PD.attributes.getFillColor={value:LC.fill(P.grp,P.n),size:4,normalized:true};PD_COL++;layers();}}),PD_COL=0;
 // The counts behind the histograms, header and share run on the CPU after the map has redrawn.
 var CT=0;
@@ -493,7 +493,7 @@ META.shards.forEach(function(s,k){
       if(S.fly){S.fly=false;map.flyTo({center:[P.pos[2*i],P.pos[2*i+1]],zoom:12});}break;}}
     if(k===META.shards.length-1&&S.rec){S.rec=null;writeHash();}
     // the range chip's file is optional, and holds one record per shard record, so it waits for the last shard
-    if(k===META.shards.length-1)get('pool-levels-range.bin?'+String(META.shards[0].file).split('?')[1]).then(MC.range).catch(function(){});
+    if(k===META.shards.length-1&&META.files.range)get(META.files.range).then(MC.range).catch(function(){});
   });
 });
 chain.catch(function(e){$('count').textContent='Could not load the records ('+e.message+')';});

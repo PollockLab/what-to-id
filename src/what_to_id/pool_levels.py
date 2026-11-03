@@ -5,7 +5,8 @@
 The site directory holds the built map (map.html, its pool shards and pool-taxa.bin). The atlas
 manifest at ``--data-url`` names `identify.parquet` under ``"identify"``; ``--parquet`` reads a
 local file instead. It writes two files, records in the order of META.shards, as pool-lookalike.bin,
-and a third when the range tables are found:
+and a third when the range tables are found, each under its content-hashed name in map.html's
+META.files (`site_files.publish`):
 
 ``pool-levels.bin``: gzip of one plane of n bytes. The low nibble is the level (0 none, 1 easy,
 2 taxonomist, 3 narrow, 4 weird, 5 mislabel; `identify.LEVEL_NAMES`), the high nibble the
@@ -57,6 +58,7 @@ from urllib.parse import quote
 import numpy as np
 import pandas as pd
 
+from what_to_id import site_files
 from what_to_id.identify import MISLABEL, NARROW, NONE, TAXONOMIST, WEIRD
 from what_to_id.page_identify import DATES_NAME, FIRST_NAME
 from what_to_id.page_lookalike import _fetch, site_records
@@ -261,9 +263,9 @@ def build(
     level[hit] = scored["level"].to_numpy()[at[hit]]
     score[hit] = scored["score"].to_numpy(np.float32)[at[hit]]
     looks[hit] = scored["looks_like"].astype(object).to_numpy()[at[hit]]
-    (site / OUT_NAME).write_bytes(pack(level, score))
-    (site / LOOKS_NAME).write_bytes(pack_looks(level, looks))
-    (site / RANGE_NAME).unlink(missing_ok=True)  # a stale one would no longer line up
+    site_files.publish(site, "levels", OUT_NAME, pack(level, score))
+    site_files.publish(site, "looks", LOOKS_NAME, pack_looks(level, looks))
+    site_files.publish(site, "range", RANGE_NAME, None)  # a stale one would no longer line up
     far = None
     (site / DATES_NAME).unlink(missing_ok=True)
     if parquet_from_manifest:
@@ -271,16 +273,16 @@ def build(
     try:
         if tables is not None:
             km, note = range_planes(ids, hit, tables[0])
-            (site / RANGE_NAME).write_bytes(pack_range(km, note, *tables[1:]))
+            site_files.publish(site, "range", RANGE_NAME, pack_range(km, note, *tables[1:]))
             code = okm_code(km)
             far = (code >= FAR_CODE) & (code != NO_BYTE)
     except (KeyError, ValueError) as exc:
         why = f"the range tables do not fit: {exc}"
         far = None
-        (site / RANGE_NAME).unlink(missing_ok=True)
+        site_files.publish(site, "range", RANGE_NAME, None)
     first = pack_first(site, ids, tax, rows, level, quantize(level, score), looks, far)
-    (site / FIRST_NAME).write_bytes(first)
-    if not (site / RANGE_NAME).exists():
+    site_files.publish(site, "first", FIRST_NAME, first)
+    if site_files.path(site, "range") is None:
         print(f"pool_levels: no {RANGE_NAME}, so no range maps: {why}", file=sys.stderr)
     return {int(lv): int(c) for lv, c in zip(*np.unique(level, return_counts=True), strict=True)}
 
@@ -371,11 +373,8 @@ def main(argv: list[str] | None = None) -> int:
     except (ValueError, FileNotFoundError, OSError) as exc:
         print(f"pool_levels: {exc}", file=sys.stderr)
         return 1
-    sizes = ", ".join(
-        f"{n} {(a.out / n).stat().st_size / 1e6:.2f} MB"
-        for n in (OUT_NAME, LOOKS_NAME, RANGE_NAME, FIRST_NAME)
-        if (a.out / n).exists()
-    )
+    paths = [site_files.path(a.out, k) for k in ("levels", "looks", "range", "first")]
+    sizes = ", ".join(f"{p.name} {p.stat().st_size / 1e6:.2f} MB" for p in paths if p)
     print(f"pool_levels: records per level {counts}; {sizes} gzipped")
     return 0
 

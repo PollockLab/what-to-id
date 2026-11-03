@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from what_to_id import page_identify, pool_levels
+from what_to_id import page_identify, pool_levels, site_files
 from what_to_id.identify import IDENTIFY_COLUMNS
 from what_to_id.page_lookalike import site_records
 from what_to_id.page_map import decode_points, encode_points, render_map
@@ -83,15 +83,10 @@ def open_identify(browser, base, hash_="", size=(600, 900), touch=False):
     )
     page.errors = []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
-    # the header's links to the site's other pages are not in this fixture's site, nor are the
-    # optional range maps
+    # the header's links to the site's other pages are not in this fixture's site
     page.on(
         "response",
-        lambda r: (
-            page.errors.append(r.url)
-            if r.status >= 400 and ".html" not in r.url and pool_levels.RANGE_NAME not in r.url
-            else None
-        ),
+        lambda r: page.errors.append(r.url) if r.status >= 400 and ".html" not in r.url else None,
     )
     page.calls = eb.stub_inat(page, None)
     page.goto(f"{base}/identify.html{hash_}")
@@ -413,7 +408,7 @@ def test_cards_show_before_the_look_alike_file_and_fill_it_in_where_they_stand(b
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     eb.stub_inat(page, None)
     held = []
-    page.route("**/pool-levels-looks.bin*", lambda r: held.append(r))
+    page.route("**/pool-levels-looks.*", lambda r: held.append(r))
     page.goto(f"{base}/identify.html#lvl=3")
     page.wait_for_function("window.__identify")  # the first cards carry their look-alike
     assert page.locator("#grid .card .look").count() == 0
@@ -435,8 +430,8 @@ def test_a_level_lists_the_newest_records_first_within_a_score_bucket_across_sha
     score = np.random.default_rng(5).normal(size=N).astype("float32")
     server, _ = serve(tmp_path, frame, score)
     try:
-        assert (tmp_path / "pool-1.bin").exists()  # the older shard
-        _, q = pool_levels.unpack((tmp_path / "pool-levels.bin").read_bytes())
+        assert list(tmp_path.glob("pool-1.*.bin"))  # the older shard
+        _, q = pool_levels.unpack(site_files.path(tmp_path, "levels").read_bytes())
         bucket = dict(zip(site_records(tmp_path)[0].tolist(), q.tolist(), strict=True))
         page = open_identify(browser, f"http://127.0.0.1:{server.server_port}", "#lvl=1")
         for rows in page.evaluate("__identify.view()"):

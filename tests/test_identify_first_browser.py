@@ -8,7 +8,7 @@ import urllib.request
 
 import pytest
 
-from what_to_id import page_identify
+from what_to_id import site_files
 
 from . import test_embeddings_browser as eb
 from . import test_identify_browser as ib
@@ -19,7 +19,9 @@ open_identify = ib.open_identify
 
 
 def first_lists(base):
-    with urllib.request.urlopen(f"{base}/{page_identify.FIRST_NAME}") as r:
+    with urllib.request.urlopen(f"{base}/{site_files.MAP_NAME}") as r:
+        name = site_files.read_meta(r.read().decode())["files"]["first"]
+    with urllib.request.urlopen(f"{base}/{name}") as r:
         return json.loads(gzip.decompress(r.read()))["s"]
 
 
@@ -51,7 +53,7 @@ def test_the_first_cards_show_before_the_records_and_stay_when_they_land(browser
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     eb.stub_inat(page, None)
     held = []
-    page.route(re.compile(r"/pool-\d+\.bin"), lambda r: held.append(r))
+    page.route(re.compile(r"/pool-\d+\.\w+\.bin"), lambda r: held.append(r))
     page.goto(f"{base}/identify.html#lvl=1")
     page.wait_for_selector("#grid .card .ph img")
     early = cards(page)
@@ -88,7 +90,7 @@ def test_a_species_picked_from_a_first_card_shows_once_the_records_land(browser,
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     eb.stub_inat(page, None)
     held = []
-    page.route(re.compile(r"/pool-\d+\.bin"), lambda r: held.append(r))
+    page.route(re.compile(r"/pool-\d+\.\w+\.bin"), lambda r: held.append(r))
     page.goto(f"{base}/identify.html#lvl=1")
     link = page.locator("#grid .card .sp").first
     rid = int(link.locator("xpath=..").get_attribute("data-id"))

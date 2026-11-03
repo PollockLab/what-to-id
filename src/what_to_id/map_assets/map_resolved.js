@@ -41,7 +41,7 @@ function leftFilter(o){
   function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
   function load(){
     if(!win||R||busy)return;busy=true;
-    o.get('pool-resolved.bin'+String(META.shards[0].file).replace(/^[^?]*/,'')).then(function(b){R=leftDecode(b,shift,MF.LAST);})
+    (META.files.resolved?o.get(META.files.resolved):Promise.reject(new Error('not built'))).then(function(b){R=leftDecode(b,shift,MF.LAST);})
       .catch(function(e){err='Could not load the records that left Needs ID ('+e.message+').';})
       .then(function(){busy=false;o.changed();});}
   // the kept records and their indexes, until a filter, area or window changes

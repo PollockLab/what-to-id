@@ -4,8 +4,9 @@ Each map.yml run logs the pool rows that left (``left_rows``, ``append_log``) in
 on the map-state release: the pool's own columns plus ``left``, the run's UTC time, and ``reason``,
 a code from REASON. The log keeps KEEP_DAYS days; a record that is back in the pool is not in it.
 
-``build`` turns the log into the site's pool-resolved.bin, gzipped, little-endian, n records sorted
-by id, only those that left in the last SITE_DAYS days:
+``build`` turns the log into the site's pool-resolved.bin (hashed, in META.files.resolved;
+`site_files`), gzipped, little-endian, n records sorted by id, only those that left in the last
+SITE_DAYS days:
     uint16 start | uint16 build | uint16 live | uint16 0 | uint32 id[n]
     | float32 lon[n] | float32 lat[n]
     | uint16 obs[n] | uint16 up[n] | uint16 left[n] | uint16 taxon[n]
@@ -34,6 +35,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from what_to_id import site_files
 from what_to_id.inat import BC_PLACE_ID, PER_PAGE, SLEEP, _frame, _results, flatten, make_session
 from what_to_id.page_map import DAY_FLOOR, EARLY_OBS, EARLY_UP, NO_DAY, _dates, _flags, _gz
 from what_to_id.taxonomy import NO_TAXON, load_tree, taxa_table
@@ -340,7 +342,7 @@ def main(argv: list[str] | None = None) -> int:
     b.add_argument("--log", required=True, type=Path, help="resolved.parquet; none is an empty log")
     b.add_argument("--pool", required=True, type=Path)
     b.add_argument("--tree", type=Path, help="taxon tree cache, as page_map's")
-    b.add_argument("--out", required=True, type=Path, help="site folder")
+    b.add_argument("--out", required=True, type=Path, help="site folder holding map.html")
     c = sub.add_parser("check", help="compare the log with two pool snapshots")
     c.add_argument("--before", required=True, type=Path)
     c.add_argument("--after", required=True, type=Path)
@@ -376,8 +378,7 @@ def main(argv: list[str] | None = None) -> int:
         blob = encode_left(
             log, pd.read_parquet(a.pool), load_tree(a.tree) or None, pd.Timestamp.now("UTC")
         )
-        a.out.mkdir(parents=True, exist_ok=True)
-        (a.out / NAME).write_bytes(blob)
+        site_files.publish(a.out, "resolved", NAME, blob)
         return 0
     got = check(
         pd.read_parquet(a.before),

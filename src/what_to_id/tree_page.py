@@ -14,6 +14,7 @@ import json
 from pathlib import Path
 
 from what_to_id import page_nav
+from what_to_id.site_files import read_meta
 
 HERE = Path(__file__).parent
 ASSETS = HERE / "tree_assets"
@@ -37,11 +38,7 @@ def map_meta(out: Path, keys: tuple[str, ...] = KEYS) -> dict:
     page = out / "map.html"
     if not page.exists():
         raise FileNotFoundError(f"{page} is missing: build the map first (what_to_id.page_map)")
-    html = page.read_text()
-    start, end = html.find("var META="), html.find(";var BASEMAPS=")
-    if start < 0 or end < start:
-        raise ValueError(f"{page} holds no META: was it written by what_to_id.page_map?")
-    meta = json.loads(html[start + len("var META=") : end])
+    meta = read_meta(page.read_text())
     missing = [k for k in keys if k not in meta]
     if missing:
         raise ValueError(f"{page} META lacks {', '.join(missing)}")
@@ -52,7 +49,7 @@ def build(out_dir: str | Path, map_url: str = "map.html") -> Path:
     """Write ``tree.html`` into ``out_dir`` (which holds the built map) and return its path."""
     out = Path(out_dir)
     meta = map_meta(out)
-    taxa = out / meta["taxa"].split("?")[0]
+    taxa = out / meta["taxa"]
     rows = json.loads(gzip.decompress(taxa.read_bytes()))
     if rows and len(rows[0]) < 6:
         raise ValueError(f"{taxa} has no record counts: build the map with --tree")

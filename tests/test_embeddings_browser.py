@@ -15,7 +15,7 @@ from urllib.parse import parse_qs, urlparse
 import numpy as np
 import pytest
 
-from what_to_id import tree_page
+from what_to_id import site_files, tree_page
 from what_to_id.embeddings_page import build
 from what_to_id.page_map import encode_points, render_map
 from what_to_id.split_page import build as build_split
@@ -87,7 +87,8 @@ def site(tmp_path_factory):
         (root / name).write_bytes(blob)
     (root / "map.html").write_text(render_map(meta, freeze=None))
     # the map of life's look-alike file, every record unknown (its contract: two planes of n bytes)
-    (root / "pool-lookalike.bin").write_bytes(gzip.compress(b"\xff" * POOL_N + b"\x0f" * POOL_N))
+    look = gzip.compress(b"\xff" * POOL_N + b"\x0f" * POOL_N)
+    site_files.publish(root, "lookalike", "pool-lookalike.bin", look)
     (atlas / "big.bin").write_bytes(BIG)
     build(root, data_url="atlas/")
     # the map needs MapLibre from a CDN, so the split page here holds two photo spaces

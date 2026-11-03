@@ -11,7 +11,6 @@ import pytest
 
 from what_to_id.batches import MAX_URL_LEN
 from what_to_id.inat import BC_PLACE_ID
-from what_to_id.map_observer import OBSERVER_NAME
 from what_to_id.page import ARM_WORDS
 from what_to_id.page_map import (
     _ASSETS,
@@ -20,7 +19,6 @@ from what_to_id.page_map import (
     NO_DAY,
     PARKS_NAME,
     RECENT_DAYS,
-    TAXA_NAME,
     TOTAL_ONLY,
     _decode_shard,
     align_totals,
@@ -33,6 +31,7 @@ from what_to_id.page_map import (
     shard_name,
     write_map,
 )
+from what_to_id.site_files import hashed
 
 from .conftest import make_pool
 
@@ -87,7 +86,7 @@ def test_encode_round_trips_within_quantization(monkeypatch):
     acc = want["pos_acc"].astype(float)
     cls = np.select([acc.isna(), acc > 1000, acc > 100, acc > 10], [0, 1, 2, 3], 4)
     assert back["acc_class"].tolist() == cls.tolist() and set(cls) >= {0, 1, 2}
-    assert meta["sha256"] and meta["groups"] == sorted(pool["iconic_taxon"].unique())
+    assert meta["groups"] == sorted(pool["iconic_taxon"].unique())
 
 
 def test_common_names_follow_the_taxon():
@@ -96,7 +95,7 @@ def test_common_names_follow_the_taxon():
     pool["taxon_name"] = ["Alnus", "Acer", "Alnus", None]
     pool["common_name"] = ["alders", None, "alders", None]
     blobs, meta = encode_points(pool)
-    assert json.loads(gzip.decompress(blobs[TAXA_NAME])) == [
+    assert json.loads(gzip.decompress(blobs[meta["taxa"]])) == [
         ["Alnus", "alders", 7, 0],
         ["Acer", "", 3, 0],
     ]
@@ -121,7 +120,7 @@ def test_recent_records_come_first_and_old_ones_after():
     out = (last - pd.Timedelta(days=RECENT_DAYS)).strftime("%Y-%m-%d")
     pool["observed_on"] = ["1987-06-01", out, edge, None, "2026-09-01", "2020-01-01"]
     blobs, meta = encode_points(pool)
-    assert [s["file"] for s in meta["shards"]] == [shard_name(0), shard_name(1)]
+    assert [s["file"].split(".")[0] for s in meta["shards"]] == ["pool-0", "pool-1"]
     assert [s["n"] for s in meta["shards"]] == [3, 3]
     first = decode_points({**blobs}, {**meta, "shards": meta["shards"][:1]})
     assert first["id"].tolist() == pool["id"].iloc[2:5].tolist()
@@ -146,8 +145,9 @@ def test_pool_with_no_recent_records_starts_with_older_ones():
     pool = make_pool(5)
     pool["observed_on"] = "2019-05-01"
     blobs, meta = encode_points(pool)
-    assert meta["shards"] == [{"file": shard_name(0), "n": 5}]
-    assert sorted(blobs) == sorted([shard_name(0), TAXA_NAME, OBSERVER_NAME])
+    shard = meta["shards"][0]["file"]
+    assert meta["shards"] == [{"file": hashed(shard_name(0), blobs[shard]), "n": 5}]
+    assert sorted(blobs) == sorted([meta["shards"][0]["file"], meta["taxa"], meta["observer"]])
     assert decode_points(blobs, meta)["id"].tolist() == pool["id"].tolist()
 
 
@@ -155,7 +155,7 @@ def test_shards_store_columns_byte_by_byte_and_ids_as_steps():
     pool = make_pool(3)
     pool["id"] = [5, 300, 70000]
     blobs, meta = encode_points(pool)
-    raw = gzip.decompress(blobs[shard_name(0)])
+    raw = gzip.decompress(blobs[meta["shards"][0]["file"]])
     assert raw[:12] == bytes([5, 39, 68, 0, 1, 16, 0, 0, 1, 0, 0, 0])
     assert _decode_shard(raw, 3)["id"].tolist() == [5, 300, 70000]
     empty = _decode_shard(b"", 0)
@@ -181,7 +181,7 @@ def test_late_upload_and_missing_date():
     assert back["observed_on"].isna().tolist() == [False, True, False]
     assert back["uploaded_on"].iloc[0] == pd.Timestamp("2026-09-20")
     n = meta["shards"][0]["n"]
-    obs = _decode_shard(gzip.decompress(blobs[shard_name(0)]), n)["obs"]
+    obs = _decode_shard(gzip.decompress(blobs[meta["shards"][0]["file"]]), n)["obs"]
     assert NO_DAY in obs.tolist()
     assert meta["days"] == (pd.Timestamp("2026-09-21") - pd.Timestamp("2025-01-01")).days + 1
 
@@ -208,9 +208,9 @@ def test_encode_rejects_bad_pools(change, msg):
 
 def test_decode_rejects_wrong_size():
     blobs, meta = encode_points(make_pool(5))
-    cut = gzip.compress(gzip.decompress(blobs[shard_name(0)])[:-1])
+    cut = gzip.compress(gzip.decompress(blobs[meta["shards"][0]["file"]])[:-1])
     with pytest.raises(ValueError, match="expected"):
-        decode_points({**blobs, shard_name(0): cut}, meta)
+        decode_points({**blobs, meta["shards"][0]["file"]: cut}, meta)
 
 
 def test_page_is_blind_and_carries_meta():
@@ -221,10 +221,9 @@ def test_page_is_blind_and_carries_meta():
     assert "{{" not in html
     m = re.search(r"var META=(\{.*?\});var BASEMAPS", html)
     page_meta = json.loads(m.group(1))
-    v = meta["sha256"][:12]
-    assert page_meta["n"] == 20
-    assert page_meta["shards"] == [{"file": f"{shard_name(0)}?v={v}", "n": 20}]
-    assert page_meta["taxa"] == f"{TAXA_NAME}?v={v}"
+    assert page_meta["n"] == 20 and page_meta["files"] == {}
+    assert page_meta["shards"] == meta["shards"] and page_meta["taxa"] == meta["taxa"]
+    assert re.fullmatch(r"pool-taxa\.[0-9a-f]{12}\.bin", meta["taxa"])
     assert f"{BYTES_PER_RECORD}*n" in html and ">2026-09-28</time>" in html
 
 
@@ -237,7 +236,8 @@ def test_meta_cannot_close_the_script():
 def test_write_map_and_cli(tmp_path):
     pool = make_pool(40)
     paths = write_map(tmp_path / "a", pool)
-    names = [MAP_NAME, shard_name(0), TAXA_NAME, PARKS_NAME, OBSERVER_NAME]
+    _, meta = encode_points(pool)
+    names = [MAP_NAME, meta["shards"][0]["file"], meta["taxa"], PARKS_NAME, meta["observer"]]
     assert sorted(p.name for p in paths) == sorted(names)
     pool.to_parquet(tmp_path / "pool.parquet", index=False)
     assert main(["--pool", str(tmp_path / "pool.parquet"), "--out", str(tmp_path / "b")]) == 0
@@ -252,7 +252,7 @@ def test_taxa_file_numbers_taxa_by_frequency_and_carries_their_rank():
     pool["rank"] = ["genus", "species", "genus", "kingdom", "species", "species"]
     blobs, meta = encode_points(pool)
     assert meta["ranks"] == ["genus", "species"]
-    assert json.loads(gzip.decompress(blobs[TAXA_NAME])) == [
+    assert json.loads(gzip.decompress(blobs[meta["taxa"]])) == [
         ["Acer rubrum", "", 3, 1],
         ["Alnus", "", 1700000, 0],
     ]
@@ -264,10 +264,10 @@ def test_taxa_file_numbers_taxa_by_frequency_and_carries_their_rank():
 
 def test_pool_without_ranks_or_taxa_has_none():
     blobs, meta = encode_points(make_pool(5).drop(columns="rank"))
-    assert meta["ranks"] == [] and json.loads(gzip.decompress(blobs[TAXA_NAME]))[0][3] == 255
+    assert meta["ranks"] == [] and json.loads(gzip.decompress(blobs[meta["taxa"]]))[0][3] == 255
     assert decode_points(blobs, meta)["rank"].isna().all()
     blobs, meta = encode_points(make_pool(5).drop(columns=["taxon_id", "rank"]))
-    assert json.loads(gzip.decompress(blobs[TAXA_NAME])) == []
+    assert json.loads(gzip.decompress(blobs[meta["taxa"]])) == []
     assert decode_points(blobs, meta)["taxon_id"].isna().all()
 
 

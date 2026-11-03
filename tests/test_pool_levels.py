@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from what_to_id import page_identify, pool_levels
+from what_to_id import page_identify, pool_levels, site_files
 from what_to_id.identify import IDENTIFY_COLUMNS
 from what_to_id.page_map import decode_points, encode_points, render_map
 
@@ -54,8 +54,8 @@ def test_the_pack_round_trips_identify_parquet_in_shard_order(tmp_path):
     assert (
         pool_levels.main(["--out", str(site), "--parquet", str(tmp_path / "identify.parquet")]) == 0
     )
-    level, q = pool_levels.unpack((site / pool_levels.OUT_NAME).read_bytes())
-    looks = pool_levels.unpack_looks((site / pool_levels.LOOKS_NAME).read_bytes(), N)
+    level, q = pool_levels.unpack(site_files.path(site, "levels").read_bytes())
+    looks = pool_levels.unpack_looks(site_files.path(site, "looks").read_bytes(), N)
     assert len(level) == len(q) == len(looks) == N
     row = df.set_index("id")
     for i, pid in enumerate(points["id"]):
@@ -181,14 +181,14 @@ def test_the_build_lines_the_ranges_up_with_the_site_and_skips_them_when_absent(
     df.to_parquet(tmp_path / "identify.parquet")
     args = ["--out", str(site), "--parquet", str(tmp_path / "identify.parquet")]
     assert pool_levels.main(args) == 0
-    assert not (site / pool_levels.RANGE_NAME).exists()
+    assert site_files.path(site, "range") is None
     assert "no pool-levels-range.bin, so no range maps: no --ranges" in capsys.readouterr().err
     assert pool_levels.main([*args, "--ranges", str(tmp_path / "nowhere")]) == 0
     assert "could not read the range tables" in capsys.readouterr().err
     write_ranges(tmp_path / "ranges", points)
     assert pool_levels.main([*args, "--ranges", str(tmp_path / "ranges")]) == 0
-    assert pool_levels.RANGE_NAME in capsys.readouterr().out
-    head, km, notes = pool_levels.unpack_range((site / pool_levels.RANGE_NAME).read_bytes(), N)
+    assert "pool-levels-range." in capsys.readouterr().out
+    head, km, notes = pool_levels.unpack_range(site_files.path(site, "range").read_bytes(), N)
     row = df.set_index("id")
     for i, pid in enumerate(points["id"]):
         if pid not in row.index or row.at[pid, "taxon_id"] != points["taxon_id"][i]:
@@ -198,7 +198,7 @@ def test_the_build_lines_the_ranges_up_with_the_site_and_skips_them_when_absent(
         assert notes[i] == pool_levels_note(i)
     assert head["notes"] == ["Range: outside both ranges"]
     assert pool_levels.main(args) == 0  # a later build without ranges drops the stale file
-    assert not (site / pool_levels.RANGE_NAME).exists()
+    assert site_files.path(site, "range") is None
 
 
 def test_the_manifest_names_the_range_tables_or_the_levels_go_out_alone(tmp_path, monkeypatch):
@@ -218,11 +218,11 @@ def test_the_manifest_names_the_range_tables_or_the_levels_go_out_alone(tmp_path
         ),
     )
     pool_levels.build(site, data_url="https://x/")
-    assert pool_levels.unpack_range((site / pool_levels.RANGE_NAME).read_bytes(), N)[0]["names"]
+    assert pool_levels.unpack_range(site_files.path(site, "range").read_bytes(), N)[0]["names"]
     del entry["range_cells"]
     pool_levels.build(site, data_url="https://x/")
-    assert not (site / pool_levels.RANGE_NAME).exists()
-    assert (site / pool_levels.OUT_NAME).exists()
+    assert site_files.path(site, "range") is None
+    assert site_files.path(site, "levels")
     assert json.loads((site / pool_levels.DATES_NAME).read_text()) == {
         "photos": None,
         "scored": None,

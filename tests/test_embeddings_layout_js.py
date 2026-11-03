@@ -164,9 +164,7 @@ try {{ L.parseMapMeta('<html></html>'); }} catch (e) {{ err = e.message; }}
 console.log(JSON.stringify({{n: m.n, shards: m.shards, taxa: m.taxa, bbox: m.bbox, err}}));"""
     )
     assert got["n"] == meta["n"] and got["bbox"] == meta["bbox"]
-    assert got["shards"][0]["file"].startswith("pool-0.bin?v=") and got["taxa"].startswith(
-        "pool-taxa"
-    )
+    assert got["shards"] == meta["shards"] and got["taxa"] == meta["taxa"]
     assert "map data" in got["err"]
 
 

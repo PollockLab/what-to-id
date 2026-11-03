@@ -8,8 +8,9 @@ import pandas as pd
 import pytest
 
 from what_to_id import map_resolved as mr
+from what_to_id import site_files
 from what_to_id.inat import COLUMNS, EXTRA_COLUMNS
-from what_to_id.page_map import NO_DAY, encode_points
+from what_to_id.page_map import NO_DAY, encode_points, write_map
 from what_to_id.taxonomy import NO_TAXON
 
 from .embeddings_fixture import TREE, pool_frame
@@ -75,7 +76,7 @@ def test_encode_then_decode_gives_back_positions_days_reasons_and_the_window():
 def test_taxa_and_groups_index_the_pages_tables_with_an_ancestor_for_a_taxon_the_pool_lacks():
     pool = pool_frame(range(1, 4))  # taxa 1000-1002 (Genus A), groups Aves, Insecta, Plantae
     blobs, meta = encode_points(pool, TREE)
-    rows = json.loads(gzip.decompress(blobs["pool-taxa.bin"]))
+    rows = json.loads(gzip.decompress(blobs[meta["taxa"]]))
     row = {r[2]: i for i, r in enumerate(rows)}
     log = log_frame([10, 11, 12], [0, 0, 0], taxon_id=[1001, 1004, 77])
     log["iconic_taxon"] = ["Plantae", "Aves", "Insecta"]
@@ -128,12 +129,13 @@ def test_build_command_writes_a_file_decode_reads_back(tmp_path):
     pool, log = tmp_path / "pool.parquet", tmp_path / "resolved.parquet"
     pool_frame(range(100, 103)).to_parquet(pool, index=False)
     out = tmp_path / "site"
+    write_map(out, pool_frame(range(100, 103)))
     argv = ["build", "--log", str(log), "--pool", str(pool), "--out", str(out)]
     assert mr.main(argv) == 0  # no log yet
-    assert mr.decode_left((out / mr.NAME).read_bytes())["id"].size == 0
+    assert mr.decode_left(site_files.path(out, "resolved").read_bytes())["id"].size == 0
     log_frame([1, 2, 3], [0, 3, 8]).to_parquet(log, index=False)
     assert mr.main(argv) == 0
-    got = mr.decode_left((out / mr.NAME).read_bytes())
+    got = mr.decode_left(site_files.path(out, "resolved").read_bytes())
     assert got["id"].tolist() == [1, 2, 3] and got["reason"].tolist() == [1, 1, 1]
 
 

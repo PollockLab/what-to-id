@@ -29,7 +29,7 @@ def fixture():
     pool = pool_frame(range(100, 103))  # groups Aves, Insecta, Plantae; taxa 1000-1002
     pool["observed_on"] = pool["created_at"] = ["2026-06-01", "2026-08-01", "2026-11-03"]
     blobs, meta = encode_points(pool, TREE)
-    taxa = json.loads(gzip.decompress(blobs["pool-taxa.bin"]))
+    taxa = json.loads(gzip.decompress(blobs[meta["taxa"]]))
     # ids 1 to 6 left 0, 6, 7, 20, 29 and 31 days ago; id 3 has a taxon the pool lacks, 4 is east
     log = log_frame(
         range(1, 7), [0, 6, 7, 20, 29, 31], taxon_id=[1000, 1001, 1004, 1002, 1000, 1000]
