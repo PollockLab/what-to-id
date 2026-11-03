@@ -27,6 +27,7 @@ window.maplibregl = {
     getContainer() { return this.c; } getCanvas() { return document.createElement('canvas'); }
     project() { return { x: 0, y: 0 }; } },
   NavigationControl: class {},
+  GeolocateControl: class {},
 };
 window.deck = {
   MapboxOverlay: class { setProps() {} },

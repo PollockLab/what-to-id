@@ -118,6 +118,7 @@ function post(n,m){if(frames[n]&&frames[n].contentWindow)frames[n].contentWindow
 function sendSel(n,sel){post(n,{type:'wtid-selection',sel:sel});}
 function mk(n){
   var f=document.createElement('iframe');f.id=n;f.title={identify:'Identify',map:'Map',space:'Photo space',tree:'Taxonomy'}[n];
+  if(n==='map')f.allow='geolocation';  // the map's locate button
   f.src=new URL(FILES[n],location.href).href.replace(/#.*/,'')+'?embed=1'+(n==='space'&&view.indexOf('map')>=0?'&peer=1':'')+'#'+hashFor(n);
   // what the other frame sent while this one was still loading
   f.addEventListener('load',function(){Object.keys(late).forEach(function(k){if(k!=='wtid-view'||visible('map'))post(n,late[k]);});
