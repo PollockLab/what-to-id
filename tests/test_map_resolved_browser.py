@@ -34,7 +34,9 @@ def site(tmp_path_factory):
     ago = [0, 1, 2, 3, 4, 5, 6, 0, 1, 2] + [8 + i % 20 for i in range(30)]
     log = log_frame(range(1001, 1041), ago)
     log["iconic_taxon"] = ["Aves"] * 5 + ["Insecta"] * 5 + ["Plantae"] * 30
-    log["reason"] = [5] * 5 + [1] * 35  # backfilled Research Grade counts as Research Grade
+    log["reason"] = (
+        [1] * 25 + [5] * 5 + [1] * 10
+    )  # the 5 oldest are backfilled Research Grade, before the live log
     blobs["pool-resolved.bin"] = encode_left(log, pool, TREE, NOW)
     for name, blob in blobs.items():
         (root / name).write_bytes(blob)
@@ -78,16 +80,19 @@ def says(page, text):
 
 def test_seven_days_counts_and_draws_the_records_that_left_under_the_filters(browser, site):
     page = open_map(browser, site, "#resolved=7")
-    says(page, "10 left needs-ID in view in the 7 days to 2026-11-03 (10 Research Grade)")
+    says(page, "10 in view left Needs ID in the last 7 days, 10 as Research Grade")
+    main = page.locator("#leftbox > span:last-child > span").first
+    assert main.get_attribute("title") == "28 Oct to 3 Nov 2026, UTC"
+    assert page.locator("#leftbox .muted").last.inner_text() == ""  # the 7 days are all live
     page.wait_for_function(f"{LEFT}.join() === '10'")
     assert page.get_attribute("#leftbox button:text('7 days')", "aria-pressed") == "true"
     page.click("#scope button:text('All of BC')")
-    says(page, "10 left needs-ID in the 7 days")
+    says(page, "10 left Needs ID in the last 7 days")
     assert page.errors == []
     page.close()
     # a group chip narrows the count and the dots
     page = open_map(browser, site, "#resolved=7&groups=Aves")
-    says(page, "5 left needs-ID")
+    says(page, "5 in view left Needs ID")
     page.wait_for_function(f"{LEFT}.join() === '5'")
     assert page.errors == []
     page.close()
@@ -97,7 +102,14 @@ def test_thirty_days_and_off_change_the_hash_and_the_layer(browser, site):
     page = open_map(browser, site)
     assert page.locator("#leftbox button").all_inner_texts() == ["Off", "7 days", "30 days"]
     page.click("#leftbox button:text('30 days')")
-    says(page, "40 left needs-ID in view since")  # the log is 27 days old, not 30
+    says(
+        page, "40 in view left Needs ID since 7 Oct, 40 as Research Grade"
+    )  # the log is 27 days old
+    assert page.locator("#leftbox > span:last-child > span").first.get_attribute("title") == (
+        "7 Oct to 3 Nov 2026, UTC"
+    )
+    note = "Before 12 Oct only Research Grade is counted."
+    assert page.locator("#leftbox .muted").last.inner_text() == note
     page.wait_for_function("location.hash.includes('resolved=30')")
     page.wait_for_function(f"{LEFT}.join() === '40'")
     page.click("#leftbox button:text('Off')")
@@ -109,6 +121,6 @@ def test_thirty_days_and_off_change_the_hash_and_the_layer(browser, site):
 
 def test_a_missing_file_says_so_and_breaks_nothing(browser, site):
     page = open_map(browser, site, "#resolved=30", missing=True)
-    says(page, "Could not load the records that left needs-ID (HTTP 404)")
+    says(page, "Could not load the records that left Needs ID (HTTP 404)")
     assert page.errors == []
     page.close()
