@@ -117,3 +117,35 @@ def test_a_file_of_the_wrong_size_is_refused():
         run("try{leftDecode(new ArrayBuffer(10),0,9);}catch(e){return e.message;}")
         == "unexpected size"
     )
+
+
+SAY = (
+    "var nf=new Intl.NumberFormat('en-CA'),iso=function(d){return 'D'+d;};"
+    "function say(k,rg,win,R){return leftSay(k,rg,false,win,R,iso,nf);}"
+)
+
+
+def test_the_line_names_the_window_only_when_the_log_reaches_back_that_far():
+    got = run(
+        SAY + "return [say(5,2,30,{build:100,start:71,live:71}),"
+        "say(5,2,30,{build:100,start:72,live:72}),say(5,0,7,{build:100,start:99,live:99})];"
+    )
+    assert got == [
+        "5 left needs-ID in the 30 days to D100 (2 Research Grade)",
+        "5 left needs-ID since D72 (2 Research Grade)",
+        "5 left needs-ID since D99",
+    ]
+
+
+def test_research_grade_only_is_noted_while_the_window_reaches_before_the_live_log():
+    got = run(
+        SAY + "return [say(5,5,30,{build:100,start:60,live:90}),"  # window starts day 71, live 90
+        "say(5,5,7,{build:100,start:60,live:90}),"  # window starts day 94, after live: no note
+        "say(5,5,30,{build:100,start:80,live:90})];"  # log younger than the window
+    )
+    assert got == [
+        "5 left needs-ID in the 30 days to D100 (5 Research Grade)"
+        " (Research Grade only before D90)",
+        "5 left needs-ID in the 7 days to D100 (5 Research Grade)",
+        "5 left needs-ID since D80 (5 Research Grade) (Research Grade only before D90)",
+    ]

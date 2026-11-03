@@ -3,11 +3,11 @@
 // the areas. They are not records of the map (no filter on the GPU), so nothing else the map counts includes them.
 // Decoded days are the map's (from META.day0); the left day and the build day stay in days since 1900-01-01.
 function leftDecode(buf,shift,LAST){
-  var n=(buf.byteLength-4)/23,o=4,v=new DataView(buf);
-  if(buf.byteLength<4||n%1)throw new Error('unexpected size');
+  var n=(buf.byteLength-8)/23,o=8,v=new DataView(buf);
+  if(buf.byteLength<8||n%1)throw new Error('unexpected size');
   function col(T){var a=new T(buf,o,n);o+=n*T.BYTES_PER_ELEMENT;return a;}
   function day(a){return Uint16Array.from(a,function(x){return x===65535||x<shift||x-shift>LAST?65535:x-shift;});}
-  var R={n:n,start:v.getUint16(0,true),build:v.getUint16(2,true),id:col(Uint32Array),lon:col(Float32Array),lat:col(Float32Array)};
+  var R={n:n,start:v.getUint16(0,true),build:v.getUint16(2,true),live:v.getUint16(4,true),id:col(Uint32Array),lon:col(Float32Array),lat:col(Float32Array)};
   R.obs=day(col(Uint16Array));R.up=day(col(Uint16Array));R.left=col(Uint16Array);R.tax=col(Uint16Array);
   R.grp=col(Uint8Array);R.flags=col(Uint8Array);R.reason=col(Uint8Array);
   return R;
@@ -21,6 +21,14 @@ function leftKeep(MF,CH,groups,S,TF,R,areas,win){
   if(areas.length)for(i=0;i<n;i++)if(out[i]){out[i]=0;
     for(j=0;j<areas.length;j++)if(MapArea.inside(areas[j],R.lon[i],R.lat[i])){out[i]=1;break;}}
   return out;
+}
+// The control's line for k records (rg of them Research Grade) that left within win days of the build, from the log's own
+// days: it says "in the N days" only when the log reaches back that far, else "since" its first day, and notes the
+// Research Grade-only stretch (records backfilled before the live log began) only while the window reaches into it.
+function leftSay(k,rg,inView,win,R,iso,nf){
+  var from=Math.max(R.build-win+1,R.start),full=R.build-win+1>=R.start;
+  return nf.format(k)+' left needs-ID'+(inView?' in view':'')+(full?' in the '+win+' days to '+iso(R.build):' since '+iso(from))+
+    (rg?' ('+nf.format(rg)+' Research Grade)':'')+(from<R.live?' (Research Grade only before '+iso(R.live)+')':'');
 }
 function leftFilter(o){
   var S=o.S,MF=o.MF,META=o.meta,box=document.getElementById('leftbox'),nf=new Intl.NumberFormat('en-CA'),
@@ -65,9 +73,8 @@ function leftFilter(o){
       else if(c){
         var b=o.all()?null:o.map().getBounds(),we=b&&b.getWest(),e=b&&b.getEast(),s=b&&b.getSouth(),nn=b&&b.getNorth(),k=0,rg=0;
         c.idx.forEach(function(i){var x=R.lon[i],y=R.lat[i];
-          if(b&&(y<s||y>nn||(we<=e?x<we||x>e:x<we&&x>e)))return;k++;if(R.reason[i]===1)rg++;});
-        t=nf.format(k)+' left needs-ID'+(b?' in view':'')+' in the '+win+' days to '+MF.iso(R.build-shift)+
-          (rg?' ('+nf.format(rg)+' Research Grade)':'')+(R.build-win+1<R.start?' (log starts '+MF.iso(R.start-shift)+')':'');}
+          if(b&&(y<s||y>nn||(we<=e?x<we||x>e:x<we&&x>e)))return;k++;if(R.reason[i]===1||R.reason[i]===5)rg++;});
+        t=leftSay(k,rg,!!b,win,R,function(d){return MF.iso(d-shift);},nf);}
       msg.textContent=t;}
   };
 }
