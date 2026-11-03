@@ -87,9 +87,12 @@ def test_one_group_breaks_down_by_clade_in_the_tree_colours_and_clearing_it_goes
     browser, site
 ):
     page = open_map(browser, site)
-    assert not page.evaluate(STATE)["shown"]  # nothing picked: the group colours, no legend
+    got = page.evaluate(STATE)  # nothing picked: one swatch a group, no Colour by row
+    assert got["shown"] and got["head"] == "" and len(got["names"]) == 3
+    assert not page.locator(".lvleg .seg").is_visible()
+    assert not page.locator(".lvleg").get_by_text("Colour by").is_visible()
     pick(page, "Plants")
-    page.wait_for_function(f"({STATE})().shown")
+    page.wait_for_function(f"({STATE})().head !== ''")
     got = page.evaluate(STATE)
     assert got["head"] == "All groups / Plants"
     assert not page.locator(".lvleg .seg").is_visible()  # no levels to switch to on the bare map
@@ -109,7 +112,7 @@ def test_one_group_breaks_down_by_clade_in_the_tree_colours_and_clearing_it_goes
     assert same == got["swatch"][0]  # the tree draws the clade in the map's colour
     tree.close()
     pick(page, "Plants")  # again clears it
-    page.wait_for_function(f"!({STATE})().shown")
+    page.wait_for_function(f"({STATE})().head === ''")
     got = page.evaluate(STATE)
     assert got["dots"][0] == GREEN and got["dots"][4][3] == 110
     assert page.errors == []
@@ -147,7 +150,7 @@ def test_a_legend_row_picks_its_clade_as_the_rail_does_and_the_trail_steps_back(
     shows(page, 170)
     page.keyboard.press("Escape")
     shows(page, 300)
-    page.wait_for_function(f"!({STATE})().shown")
+    page.wait_for_function(f"({STATE})().head === ''")
     assert page.evaluate(RAIL) == {"groups": [], "taxa": ""}
     assert page.errors == []
     page.close()

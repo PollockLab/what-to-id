@@ -104,12 +104,12 @@ bs=[['levels','Levels'],['groups','Groups']].map(function(m){var b=document.crea
   b.type='button';b.textContent=m[1];b.onclick=function(){if(mode===m[0])return;mode=m[0];
     try{localStorage.setItem(KEY,mode);}catch(e){}
     apply();};seg.appendChild(b);return [m[0],b];});
-function apply(){var lvl=want&&!!lv,a=lvl||top>=0||inc.length>=2,k;on=lvl&&mode==='levels';
-  leg.hidden=!a;seg.hidden=!lvl;leg.firstChild.hidden=!lvl;
+function apply(){var lvl=want&&!!lv,k;on=lvl&&mode==='levels';
+  leg.hidden=false;seg.hidden=!lvl;leg.firstChild.hidden=!lvl;
   bs.forEach(function(m){m[1].setAttribute('aria-pressed',String(m[0]===mode));});
   // a redraw keeps the focus on the control of the same name, so a recount does not drop it
   var f=rows.contains(document.activeElement)&&document.activeElement.textContent;
-  if(a)draw();if(f)[].some.call(rows.querySelectorAll('button,[role=button]'),function(e){if(e.textContent===f){e.focus();return true;}});
+  draw();if(f)[].some.call(rows.querySelectorAll('button,[role=button]'),function(e){if(e.textContent===f){e.focus();return true;}});
   k=on?'L':top+':'+show.join();if(k!==key){key=k;o.changed();}}
 leg.append(el('span','lt','Colour by'),seg,rows);o.box.appendChild(leg);
 addEventListener('keydown',function(e){if(e.key!=='Escape'||on||top<0||leg.hidden||!leg.contains(document.activeElement))return;
