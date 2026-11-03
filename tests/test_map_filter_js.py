@@ -146,8 +146,7 @@ def user_state(h: str):
 def test_user_and_its_mode_round_trip_and_default_to_nothing():
     h = "groups=Aves&taxa=311249&user=jdoe&umode=unid"
     assert user_state(h) == [h.split("&"), "jdoe", "unid"]
-    assert user_state("user=12345") == [["user=12345"], "12345", ""]  # My taxa is not written
-    assert user_state("umode=observer&user=") == [[], "", "observer"]  # no user, nothing written
+    assert user_state("user=12345") == [["user=12345"], "12345", ""]  # the default is not written
     assert user_state("user=a%20b&umode=bogus") == [["user=a%20b"], "a b", ""]
 
 
@@ -156,3 +155,11 @@ def test_tokens_keep_user_and_its_mode_for_explore_to_forward():
     assert run(f"return MapFilter.tokens({json.dumps(h)});") == (
         "from=2024-03-01&user=jdoe&umode=observer"
     )
+
+
+def test_observer_is_the_default_with_an_observer_file_and_taxa_is_written():
+    meta = {**META, "observer": "pool-observer.bin"}
+    body = "var S=MF.read(new URLSearchParams('user=1&umode=%s'));return [MF.write(S),S.umode];"
+    assert run(body % "taxa", META) == [["user=1"], ""]
+    assert run(body % "taxa", meta) == [["user=1", "umode=taxa"], "taxa"]
+    assert run(body % "observer", meta) == [["user=1"], ""]  # old links stay valid

@@ -82,7 +82,7 @@ def shown(page, n):
 
 
 def test_my_taxa_keeps_the_users_genera_and_adds_the_user_to_the_identify_link(browser, site):
-    page = open_map(browser, site, "#user=jdoe")
+    page = open_map(browser, site, "#user=jdoe&umode=taxa")
     shown(page, IN_GENUS_A)
     assert page.input_value("#usrname") == "jdoe" and page.input_value("#usrbox select") == "taxa"
     assert "has identified" in page.inner_text("#usrbox p")
@@ -106,7 +106,7 @@ def test_my_taxa_keeps_the_users_genera_and_adds_the_user_to_the_identify_link(b
 
 
 def test_a_user_number_skips_the_lookup_and_a_bad_name_asks_for_a_login(browser, site):
-    page = open_map(browser, site, "#user=42")
+    page = open_map(browser, site, "#user=42&umode=taxa")
     shown(page, IN_GENUS_A)
     assert [c[0].rsplit("/v1/", 1)[1] for c in page.calls] == ["identifications/species_counts"]
     assert page.calls[0][1]["user_id"] == ["42"]
@@ -137,7 +137,7 @@ def test_a_throttled_reply_is_tried_again(browser, site):
             route.fulfill(json=body)
 
     page.route("https://api.inaturalist.org/**", api)
-    page.goto(site + "#user=42")
+    page.goto(site + "#user=42&umode=taxa")
     page.wait_for_function("document.querySelector('#usrbox p').textContent.includes('busy')")
     shown(page, IN_GENUS_A)
     assert len(hits) == 2 and hits[0] == hits[1]
@@ -150,7 +150,7 @@ def test_an_area_listed_by_id_keeps_the_user_out_of_every_batch(browser, site):
     ring = [-124, 48, -122, 48, -122, 50, -124, 50]  # every record, so the area opens by id
     area = page.evaluate("r => MapArea.encode([r])", ring)
     page.close()
-    page = open_map(browser, site, f"#user=42&area={area}")
+    page = open_map(browser, site, f"#user=42&umode=taxa&area={area}")
     shown(page, IN_GENUS_A)
     link = urlparse(page.get_attribute("#identify", "href"))
     q = parse_qs(link.query)
@@ -169,6 +169,20 @@ def test_observer_keeps_the_users_own_records(browser, site):
     q = parse_qs(urlparse(page.get_attribute("#identify", "href")).query)
     assert q["user_id"] == ["10"] and "without_ident_user_id" not in q
     assert page.errors == []
+    page.close()
+
+
+def test_a_login_alone_selects_observer_and_taxa_round_trips_in_the_hash(browser, site):
+    page = open_map(browser, site, "#user=10")
+    shown(page, N // 2)
+    assert page.input_value("#usrbox select") == "observer" and page.calls == []
+    assert "umode" not in page.evaluate("location.hash")
+    page.select_option("#usrbox select", "taxa")
+    page.wait_for_function("location.hash.includes('umode=taxa')")
+    page.close()
+    page = open_map(browser, site, "#user=42&umode=taxa")
+    shown(page, IN_GENUS_A)
+    assert page.input_value("#usrbox select") == "taxa"
     page.close()
 
 
