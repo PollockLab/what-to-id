@@ -272,7 +272,7 @@ def test_a_phone_shows_the_outline_and_switches_to_the_radial_tree(browser, site
 def test_the_page_names_the_missing_tree(browser, site):
     page = browser.new_page()
     old = gzip.compress(json.dumps([["x", "", 1, 0, -1]]).encode())  # no counts
-    page.route("**/pool-taxa.bin*", lambda r: r.fulfill(body=old))
+    page.route("**/pool-taxa.*", lambda r: r.fulfill(body=old))
     page.goto(f"{site}/tree.html")
     page.wait_for_function("document.getElementById('status').textContent.includes('without')")
     page.close()

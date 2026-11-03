@@ -219,7 +219,14 @@ jobs:
       - name: Write the landing page
         run: |
           for p in explore map; do if [ -f "_site/$p.html" ]; then cp "_site/$p.html" _site/index.html; break; fi; done
-      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+      - id: pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+      # Each data file is named by its bytes (site_files) and a deploy replaces the whole site, so copy in
+      # the files the live map.html names: a page cached from the last deploy still finds them, older ones drop out.
+      - name: Keep the live site's data files
+        run: |
+          python -m what_to_id.site_files keep --site _site --url "${{ steps.pages.outputs.base_url }}" ||
+            echo "::warning::could not keep the live site's data files; a page cached from the last deploy may miss them"
       - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:
           path: _site

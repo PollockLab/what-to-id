@@ -10,7 +10,7 @@ import threading
 import numpy as np
 import pytest
 
-from what_to_id import split_page
+from what_to_id import site_files, split_page
 from what_to_id.page_identify import LEVELS
 from what_to_id.page_map import encode_points, render_map
 
@@ -39,7 +39,8 @@ def site(tmp_path_factory):
         (root / name).write_bytes(blob)
     (root / "map.html").write_text(render_map(meta, freeze=None))
     # record i at level i % 6: none, the four levels, and 5 before the page names it
-    (root / "pool-levels.bin").write_bytes(gzip.compress((np.arange(N) % 6).astype("u1").tobytes()))
+    levels = gzip.compress((np.arange(N) % 6).astype("u1").tobytes())
+    site_files.publish(root, "levels", "pool-levels.bin", levels)
     (root / "identify.html").write_text(IDENTIFY)
     split_page.build(root)
     served = []
@@ -144,7 +145,7 @@ def test_the_standalone_map_keeps_the_group_colours_and_never_loads_the_levels(b
     page.wait_for_function("document.getElementById('count').textContent.startsWith('300 ')")
     got = page.evaluate(COLOURS)
     assert got["c1"][3] == 110 and not got["legend"]
-    assert not any("pool-levels.bin" in s for s in served)
+    assert not any("pool-levels" in s for s in served)
     assert page.errors == []
     page.close()
 

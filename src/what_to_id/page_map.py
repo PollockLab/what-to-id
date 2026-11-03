@@ -7,8 +7,8 @@ only the records inside a polygon they draw or load from GeoJSON, or inside a BC
 (map_area.js); that runs in the page, and the build only copies the park list (map_parks.py) next
 to it.
 
-Each shard (pool-0.bin, pool-1.bin, ...), gzipped, little-endian, n records sorted by id,
-columns back to back:
+Each shard (pool-0.<hash>.bin, pool-1.<hash>.bin, ..., see `site_files`), gzipped, little-endian,
+n records sorted by id, columns back to back:
     uint32 id step | uint16 lon | uint16 lat | uint16 obs | uint16 up | uint16 taxon
     | uint8 group | uint8 ids | uint8 flags
 Each wider column is stored byte by byte: the low byte of every value, then the next byte, and so
@@ -42,7 +42,6 @@ from __future__ import annotations
 
 import argparse
 import gzip
-import hashlib
 import json
 import logging
 import os
@@ -63,6 +62,7 @@ from what_to_id.map_oneid import with_one_id
 from what_to_id.map_parks import PARKS_NAME, parks_blob, parks_version
 from what_to_id.map_projects import add_projects
 from what_to_id.page import ARM_WORDS, group_name
+from what_to_id.site_files import dump, hashed
 from what_to_id.taxonomy import GROUP_TAXA, NO_RANK, NO_TAXON, PRESETS, load_tree, taxa_table
 
 MAP_NAME = "map.html"
@@ -195,16 +195,18 @@ def encode_points(pool: pd.DataFrame, tree: dict | None = None) -> tuple[dict[st
         if len(part):
             part = np.sort(part)
             order.append(part)
-            name = shard_name(len(shards))
-            out[name] = _gz(b"".join(_planes(_step(k, v[part])) for k, v in cols.items()))
+            blob = _gz(b"".join(_planes(_step(k, v[part])) for k, v in cols.items()))
+            name = hashed(shard_name(len(shards)), blob)
+            out[name] = blob
             shards.append({"file": name, "n": len(part)})
     users = observer_users(df, np.concatenate(order) if order else np.empty(0, dtype=np.intp))
     if users is not None:
-        out[OBSERVER_NAME] = _gz(users.tobytes())
-    out[TAXA_NAME] = _gz(json.dumps(taxa, ensure_ascii=False, separators=(",", ":")).encode())
-    h = hashlib.sha256()
-    for name in sorted(out):
-        h.update(name.encode() + out[name])
+        blob = _gz(users.tobytes())
+        observer = hashed(OBSERVER_NAME, blob)
+        out[observer] = blob
+    blob = _gz(json.dumps(taxa, ensure_ascii=False, separators=(",", ":")).encode())
+    taxa_name = hashed(TAXA_NAME, blob)
+    out[taxa_name] = blob
     meta = {
         "n": int(len(df)),
         "bbox": bbox,
@@ -217,14 +219,13 @@ def encode_points(pool: pd.DataFrame, tree: dict | None = None) -> tuple[dict[st
         "ranks": ranks,
         "flags": with_one_id(df, known),
         "shards": shards,
-        "taxa": TAXA_NAME,
+        "taxa": taxa_name,
         "taxa_n": int(np.unique(tidx[tidx != NO_TAXON]).size),
-        "sha256": h.hexdigest(),
     }
     if complete:
         meta["presets"] = PRESETS
     if users is not None:
-        meta["observer"] = OBSERVER_NAME
+        meta["observer"] = observer
     return out, meta
 
 
@@ -441,12 +442,9 @@ def render_map(meta: dict, *, freeze: str | None, data_url: str | None = None) -
     if freeze:
         f = escape(freeze)
         when = f' on <time id="updated" datetime="{f}" title="{f}">{f}</time>'
-    v = meta["sha256"][:12]
     page_meta = {
+        "files": {},  # the files written after the map, see site_files.publish
         **meta,
-        "shards": [{**s, "file": f"{s['file']}?v={v}"} for s in meta["shards"]],
-        "taxa": f"{meta['taxa']}?v={v}",
-        **({"observer": f"{meta['observer']}?v={v}"} if "observer" in meta else {}),
         "place_id": BC_PLACE_ID,
         "max_url": MAX_URL_LEN,
         "parks": f"{PARKS_NAME}?v={parks_version(parks_blob())}",
@@ -461,7 +459,7 @@ def render_map(meta: dict, *, freeze: str | None, data_url: str | None = None) -
         "DECK_JS": DECK_JS,
         "CSS": "\n".join((page_nav.CSS, _assets(MAP_CSS), _assets(SHARED_CSS, _PKG))),
         "NAV": page_nav.nav("map.html"),
-        "META": json.dumps(page_meta, sort_keys=True, separators=(",", ":")).replace("</", "<\\/"),
+        "META": dump(page_meta),
         "BASEMAPS": json.dumps(BASEMAPS, sort_keys=True),
         "JS": _assets(SHARED_JS, _PKG) + "\n" + _assets(MAP_JS),
     }

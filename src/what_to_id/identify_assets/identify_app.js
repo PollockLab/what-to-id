@@ -277,11 +277,11 @@ async function load(){
   if(CFG.first)get(new URL(CFG.first,MAP)).then(function(b){if(!MF)firstOf(JSON.parse(new TextDecoder().decode(b)));}).catch(function(){});  // optional
   var html=await fetch(MAP).then(function(r){if(!r.ok)throw new Error('Could not load the map page ('+r.status+')');return r.text();});
   META=L.parseMapMeta(html);
-  var q=String(META.shards[0].file).split('?')[1],suffix=q?'?'+q:'';
+  function file(k){var f=META.files[k];return f?get(new URL(f,MAP)):Promise.reject(new Error('the map lists no '+k+' file'));}
   var taxa=get(new URL(META.taxa,MAP)).then(function(b){return JSON.parse(new TextDecoder().decode(b));});
   var shards=Promise.all(META.shards.map(function(s){return get(new URL(s.file,MAP)).then(function(b){return L.decodeShard(b,s.n);});}));
-  var lev=get(new URL('pool-levels.bin'+suffix,MAP)),lk=get(new URL('pool-levels-looks.bin'+suffix,MAP)).catch(function(){return null;}),  // optional: cards fill in their look-alike once it lands
-    rg=get(new URL('pool-levels-range.bin'+suffix,MAP)).catch(function(){return null;});  // optional: no range maps without it
+  var lev=file('levels'),lk=file('looks').catch(function(){return null;}),  // optional: cards fill in their look-alike once it lands
+    rg=file('range').catch(function(){return null;});  // optional: no range maps without it
   if(!FIRST)status('Downloading the records…');
   var d=await Promise.all([shards,taxa,lev]);
   P=L.pool(d[0],META.bbox);BYID=byId(P);TAXA=d[1];LOOKS=null;

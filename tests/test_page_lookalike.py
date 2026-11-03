@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from what_to_id import page_lookalike
+from what_to_id import page_lookalike, site_files
 from what_to_id.atlas_index_io import VERSION
 from what_to_id.atlas_neighbors import write_neighbor_records
 from what_to_id.page_map import encode_points, render_map
@@ -100,7 +100,7 @@ def site(tmp_path):
 
 def _read(site_dir):
     """Decode pool-lookalike.bin per the contract, keyed by record id."""
-    raw = gzip.decompress((site_dir / "pool-lookalike.bin").read_bytes())
+    raw = gzip.decompress(site_files.path(site_dir, "lookalike").read_bytes())
     order = sorted(i for i in TAXON if i not in OLD) + sorted(OLD)
     n = len(order)
     assert len(raw) == 2 * n

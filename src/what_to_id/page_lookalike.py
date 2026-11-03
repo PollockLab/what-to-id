@@ -7,7 +7,8 @@ neighbours are the atlas neighbour sets in high-dimensional BioCLIP space, never
 the manifest and parts come from ``--parts`` where present there, else from ``--data-url``, and
 later sets override earlier ones per id (atlas_neighbors.merge_neighbors).
 
-It writes pool-lookalike.bin: gzip of two planes of n bytes, records in the order of META.shards.
+It writes pool-lookalike.bin (hashed, in META.files.lookalike; `site_files`): gzip of two planes of
+n bytes, records in the order of META.shards.
 Plane A holds class agreement in the low nibble and order agreement in the high one, plane B family
 agreement low and the look-alike level + 2 high. Agreement at a rank is the share of the record's
 neighbours, among those in the site with a known ancestor there, that share its ancestor, in
@@ -31,7 +32,7 @@ from typing import NamedTuple
 
 import numpy as np
 
-from what_to_id import host_pairs
+from what_to_id import host_pairs, site_files
 from what_to_id.atlas_index_io import read_manifest
 from what_to_id.atlas_neighbors import merge_neighbors, record_dtype
 from what_to_id.inat import USER_AGENT
@@ -60,7 +61,7 @@ def site_records(site: Path) -> tuple[np.ndarray, np.ndarray, list[list], list[s
     meta, rows = host_pairs.site_taxa(site)
     ids, tax = [], []
     for s in meta["shards"]:
-        cols = _decode_shard(gzip.decompress((site / s["file"].split("?")[0]).read_bytes()), s["n"])
+        cols = _decode_shard(gzip.decompress((site / s["file"]).read_bytes()), s["n"])
         ids.append(cols["id"].astype(np.int64))
         tax.append(cols["taxon"].astype(np.int64))
     return np.concatenate(ids), np.concatenate(tax), rows, meta["ranks"]
@@ -253,7 +254,7 @@ def build(
     before = lookalike(edge_lev, candidate)
     after = lookalike(edge_lev, candidate & ~flag)
     known = covered & (tax >= 0)
-    (site / OUT_NAME).write_bytes(pack(agree, after, known))
+    site_files.publish(site, "lookalike", OUT_NAME, pack(agree, after, known))
     names = [r[0] for r in rows]
     edges = Edges(nb, edge_lev, flag, cross, key)
     return summarize(names, anc, edges, covered, known, before, after, keys, pairs)
@@ -339,7 +340,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"page_lookalike: {exc}", file=sys.stderr)
         return 1
     print(json.dumps(stats, indent=1))
-    print(f"page_lookalike: wrote {a.out / OUT_NAME}")
+    print(f"page_lookalike: wrote {site_files.path(a.out, 'lookalike')}")
     return 0
 
 

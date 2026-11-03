@@ -93,7 +93,7 @@ _REFS = ("referenceDoi", "sourceCitation")
 def site_taxa(site: Path) -> tuple[dict, list[list]]:
     """The META ranks, taxa and shards of the site built in ``site``, and its pool-taxa.bin rows."""
     meta = map_meta(site, keys=("ranks", "taxa", "shards"))
-    rows = json.loads(gzip.decompress((site / meta["taxa"].split("?")[0]).read_bytes()))
+    rows = json.loads(gzip.decompress((site / meta["taxa"]).read_bytes()))
     return meta, rows
 
 

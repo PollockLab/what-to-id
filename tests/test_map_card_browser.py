@@ -196,7 +196,7 @@ def test_the_chip_moves_with_the_card_and_is_absent_without_the_range_file(brows
     page.errors = []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     stub(page)
-    page.route("**/pool-levels-range.bin*", lambda r: r.fulfill(status=404))
+    page.route("**/pool-levels-range.*", lambda r: r.fulfill(status=404))
     with page.expect_response(lambda r: "pool-levels-range" in r.url):
         page.goto(f"{range_site}/map.html?standalone=1#record=3000&at=9/49/-123")
     page.wait_for_selector("#card .ph img")

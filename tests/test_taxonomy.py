@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 from what_to_id import taxonomy
-from what_to_id.page_map import TAXA_NAME, encode_points, main
+from what_to_id.page_map import encode_points, main
 from what_to_id.taxonomy import (
     GROUP_TAXA,
     NO_RANK,
@@ -144,7 +144,7 @@ def test_encode_points_with_tree_offers_presets():
     assert "presets" not in meta and meta["taxa_n"] == 2
     blobs, meta = encode_points(pool, TREE)
     assert meta["presets"] == PRESETS and meta["taxa_n"] == 2
-    rows = json.loads(gzip.decompress(blobs[TAXA_NAME]))
+    rows = json.loads(gzip.decompress(blobs[meta["taxa"]]))
     assert len(rows) == 6 and all(len(r) == 6 for r in rows)
     assert meta["group_ids"] == {g: GROUP_TAXA[g] for g in meta["groups"] if g in GROUP_TAXA}
 

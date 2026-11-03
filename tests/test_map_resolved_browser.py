@@ -8,6 +8,7 @@ import threading
 
 import pytest
 
+from what_to_id import site_files
 from what_to_id.map_resolved import encode_left
 from what_to_id.page_map import encode_points, render_map
 
@@ -37,10 +38,10 @@ def site(tmp_path_factory):
     log["reason"] = (
         [1] * 25 + [5] * 5 + [1] * 10
     )  # the 5 oldest are backfilled Research Grade, before the live log
-    blobs["pool-resolved.bin"] = encode_left(log, pool, TREE, NOW)
     for name, blob in blobs.items():
         (root / name).write_bytes(blob)
     (root / "map.html").write_text(render_map(meta, freeze=None))
+    site_files.publish(root, "resolved", "pool-resolved.bin", encode_left(log, pool, TREE, NOW))
 
     class Quiet(http.server.SimpleHTTPRequestHandler):
         def log_message(self, *a):
@@ -67,7 +68,7 @@ def open_map(browser, url, hash_="", missing=False):
     )
     p.route("https://api.inaturalist.org/**", lambda r: r.fulfill(json={"results": []}))
     if missing:
-        p.route("**/pool-resolved.bin*", lambda r: r.fulfill(status=404))
+        p.route("**/pool-resolved.*", lambda r: r.fulfill(status=404))
     p.goto(url + hash_)
     return p
 

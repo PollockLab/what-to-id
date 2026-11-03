@@ -12,12 +12,11 @@ groups, taxa and the rest of the hash, the area (``wtid-area``) and the lasso's 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 from datetime import date
 from pathlib import Path
 
-from what_to_id import page_nav
+from what_to_id import page_nav, site_files
 
 HERE = Path(__file__).parent
 ASSETS = HERE / "identify_assets"
@@ -99,13 +98,13 @@ def build(out_dir: str | Path, map_url: str = "map.html") -> Path:
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     target = out / PAGE_NAME
-    dates, first = out / DATES_NAME, out / FIRST_NAME
-    v = first.exists() and hashlib.sha256(first.read_bytes()).hexdigest()[:12]
+    dates = out / DATES_NAME
+    first = (out / site_files.MAP_NAME).exists() and site_files.path(out, "first")
     target.write_text(
         render(
             map_url,
             json.loads(dates.read_text()) if dates.exists() else None,
-            f"{FIRST_NAME}?v={v}" if v else None,
+            first.name if first else None,
         )
     )
     return target

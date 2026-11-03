@@ -127,7 +127,7 @@ addEventListener('message',function(e){
   if(e.origin!==location.origin||e.source!==parent||!d||d.type!=='wtid-colour')return;
   want=d.by==='level';
   if(want){names=Array.isArray(d.names)?d.names:[];
-    ask=ask||o.get(o.url).then(function(b){var u=new Uint8Array(b);if(u.length===o.META.n)lv=u;})
+    ask=ask||(o.url?o.get(o.url):Promise.reject()).then(function(b){var u=new Uint8Array(b);if(u.length===o.META.n)lv=u;})
       .catch(function(){});}  // without the file the groups keep their colours
   (want?ask:Promise.resolve()).then(apply);
 });
