@@ -198,7 +198,7 @@ def encode_points(pool: pd.DataFrame, tree: dict | None = None) -> tuple[dict[st
             name = shard_name(len(shards))
             out[name] = _gz(b"".join(_planes(_step(k, v[part])) for k, v in cols.items()))
             shards.append({"file": name, "n": len(part)})
-    users = observer_users(df, np.concatenate(order))
+    users = observer_users(df, np.concatenate(order) if order else np.empty(0, dtype=np.intp))
     if users is not None:
         out[OBSERVER_NAME] = _gz(users.tobytes())
     out[TAXA_NAME] = _gz(json.dumps(taxa, ensure_ascii=False, separators=(",", ":")).encode())

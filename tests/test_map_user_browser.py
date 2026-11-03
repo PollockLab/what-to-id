@@ -114,3 +114,29 @@ def test_a_user_number_skips_the_lookup_and_a_bad_name_asks_for_a_login(browser,
     shown(page, N)
     assert page.calls == []
     page.close()
+
+
+def test_a_throttled_reply_is_tried_again(browser, site):
+    page = browser.new_page()
+    page.route(
+        "https://unpkg.com/**", lambda r: r.fulfill(body=STUB, content_type="text/javascript")
+    )
+    hits = []
+
+    def api(route):  # the first answer is iNaturalist's throttle, the second the taxa
+        hits.append(route.request.url)
+        if len(hits) == 1:
+            route.fulfill(status=429, body="")
+        else:
+            body = {
+                "total_results": 1,
+                "results": [{"count": 1, "taxon": {"id": 1000, "ancestor_ids": [1, 900, 1000]}}],
+            }
+            route.fulfill(json=body)
+
+    page.route("https://api.inaturalist.org/**", api)
+    page.goto(site + "#user=42")
+    page.wait_for_function("document.querySelector('#usrbox p').textContent.includes('busy')")
+    shown(page, IN_GENUS_A)
+    assert len(hits) == 2 and hits[0] == hits[1]
+    page.close()

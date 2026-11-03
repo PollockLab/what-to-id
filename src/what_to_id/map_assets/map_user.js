@@ -35,12 +35,15 @@ function userFilter(o){
   function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;
     if(text!=null)e.textContent=text;return e;}
   function say(t){if(msg)msg.textContent=t;}
-  // one request at a time, the next no sooner than gap ms after the last began
+  // one request at a time, the next no sooner than gap ms after the last began; a throttled reply
+  // (429 comes without CORS headers, so it reads as a TypeError) or a 5xx is tried again after 5 and 15 gaps
   function api(path){var url='https://api.inaturalist.org/v1/'+path;if(cache[url])return Promise.resolve(cache[url]);
-    var p=q.then(function(){return new Promise(function(r){setTimeout(r,Math.max(0,last+gap-Date.now()));});})
-      .then(function(){last=Date.now();return fetcher(url);})
-      .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
-      .then(function(j){return cache[url]=j;});
+    function wait(ms){return new Promise(function(r){setTimeout(r,Math.max(0,ms));});}
+    function go(n){return wait(last+gap-Date.now()).then(function(){last=Date.now();return fetcher(url);})
+      .then(function(r){if(r.status===429||r.status>=500)throw new TypeError('busy');if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+      .catch(function(e){if(!(e instanceof TypeError)||n>=2)throw e;say('iNaturalist is busy, trying again…');
+        return wait([5,15][n]*gap).then(function(){return go(n+1);});});}
+    var p=q.then(function(){return go(0);}).then(function(j){return cache[url]=j;});
     q=p.catch(function(){});return p;}
   function load(m,p){
     var place='&place_id='+META.place_id;
