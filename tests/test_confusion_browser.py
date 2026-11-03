@@ -11,7 +11,7 @@ from .test_page_confusion import pairs_frame, records_frame
 from .test_tree_browser import serve
 
 browser = eb.browser
-OBS = "https://www.inaturalist.org/observations/"
+OBS = "https://www.inaturalist.ca/observations/"
 
 
 def site_for(tmp_path_factory, records):
@@ -133,7 +133,7 @@ def test_search_picks_a_species_across_its_pairs(browser, site):
 
 def test_keys_move_between_cards_and_mark_them_seen(browser, site):
     page = open_page(browser, site, "#t=1&l=2")
-    page.context.route("https://www.inaturalist.org/**", lambda r: r.fulfill(body="ok"))
+    page.context.route("https://www.inaturalist.ca/**", lambda r: r.fulfill(body="ok"))
     page.keyboard.press("j")
     page.keyboard.press("j")
     assert page.evaluate("document.activeElement.dataset.id") == "101"

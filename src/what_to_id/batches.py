@@ -16,8 +16,8 @@ import pandas as pd
 
 from what_to_id.arms import Arm
 
-IDENTIFY_URL = "https://www.inaturalist.org/observations/identify"
-EXPLORE_URL = "https://www.inaturalist.org/observations"
+IDENTIFY_URL = "https://www.inaturalist.ca/observations/identify"
+EXPLORE_URL = "https://www.inaturalist.ca/observations"
 BC_PLACE_ID = "7085"
 MAX_URL_LEN = 8000
 UNKNOWN_GROUP = "Unknown"

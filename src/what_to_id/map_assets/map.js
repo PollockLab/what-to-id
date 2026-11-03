@@ -405,7 +405,7 @@ function openCard(i){
     '<dt>Uploaded</dt><dd>'+when(P.up[i],P.fl[i]&FLAG.earlyUp)+(lag>0?' ('+nf.format(lag)+(lag===1?' day':' days')+
     ' later)':'')+'</dd><dt>IDs</dt><dd>'+idText(i)+'</dd><dt>Place</dt><dd id="place">…</dd></dl>'+
     '<div id="rng"></div><div id="now"></div><div id="nbrs" hidden></div><a class="btn" target="_blank" rel="noopener" '+
-    'href="https://www.inaturalist.org/observations/'+id+'">Help identify on iNaturalist</a>'+
+    'href="https://www.inaturalist.ca/observations/'+id+'">Help identify on iNaturalist</a>'+
     '<p class="attr" id="attr"></p></div>';
   card.hidden=false;card.querySelector('.x').onclick=closeCard;card.querySelector('.x').focus();
   MC.wire(card);

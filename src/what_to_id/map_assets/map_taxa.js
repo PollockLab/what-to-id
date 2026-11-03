@@ -171,7 +171,7 @@ function identifyUrl(st,b,meta,extra){
   var a=st.acc;
   if(a==='unknown')q.set('acc','false');
   else if(a){q.set('obscuration','none');if(a==='known')q.set('acc','true');else q.set('acc_below',+a+1);}
-  var base='https://www.inaturalist.org/observations/identify?',u=base+q;
+  var base='https://www.inaturalist.ca/observations/identify?',u=base+q;
   function add(key,ids,what){if(!ids||!ids.length)return;
     if(ids.length<=MAX_IDS){q.set(key,ids.join(','));if((base+q).length<meta.max_url){u=base+q;return;}
       q.delete(key);}

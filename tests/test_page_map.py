@@ -279,7 +279,7 @@ def test_page_passes_the_place_and_url_limit_and_has_the_identify_link():
     assert f"place_id={BC_PLACE_ID}" in html
     assert 'id="identify"' in html and 'rel="noopener"' in html
     assert "function identifyUrl(" in html
-    assert "https://www.inaturalist.org/observations/identify?" in html
+    assert "https://www.inaturalist.ca/observations/identify?" in html
     for key in ("quality_grade", "iconic_taxa", "created_d1", "taxon_id", "month"):
         assert key in html
     assert "place_id=7085" not in re.search(r"<script>var META.*", html, re.S).group(0)
@@ -555,7 +555,7 @@ def test_area_identify_batches_open_every_id_once(n, sizes):
     got = []
     for b in out:
         u = urlparse(b["url"])
-        assert u.netloc == "www.inaturalist.org" and u.path == "/observations/identify"
+        assert u.netloc == "www.inaturalist.ca" and u.path == "/observations/identify"
         assert len(b["url"]) < MAX_URL_LEN
         q = parse_qs(u.query)
         batch = [int(i) for i in q.pop("id")[0].split(",")]

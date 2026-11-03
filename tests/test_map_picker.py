@@ -280,7 +280,7 @@ def test_unreadable_shared_area_requires_explicit_recovery_before_identify(brows
     # A stale href must not bypass the capture guard through ordinary keyboard or mouse activation.
     pages_before = len(page.context.pages)
     page.locator("#identify").evaluate(
-        "a=>{a.href='https://www.inaturalist.org/observations/identify';a.tabIndex=0;}"
+        "a=>{a.href='https://www.inaturalist.ca/observations/identify';a.tabIndex=0;}"
     )
     page.locator("#identify").focus()
     page.keyboard.press("Enter")
@@ -297,7 +297,7 @@ def test_unreadable_shared_area_requires_explicit_recovery_before_identify(brows
     assert (
         page.locator("#identify")
         .get_attribute("href")
-        .startswith("https://www.inaturalist.org/observations/identify?")
+        .startswith("https://www.inaturalist.ca/observations/identify?")
     )
     assert page.locator("#identify").get_attribute("aria-disabled") is None
     assert page.evaluate("AREA.hash()") == ""
@@ -419,9 +419,7 @@ def test_unavailable_shared_bc_park_keeps_key_and_explicit_clear(browser, list_b
     page.get_by_role("button", name="Clear unresolved areas", exact=True).click()
     assert page.evaluate("AREA.invalid()") is False
     assert page.evaluate("AREA.hash()") == ""
-    assert (
-        page.locator("#identify").get_attribute("href").startswith("https://www.inaturalist.org/")
-    )
+    assert page.locator("#identify").get_attribute("href").startswith("https://www.inaturalist.ca/")
     page.close()
 
 
@@ -452,9 +450,7 @@ def test_failed_park_replacement_preserves_prior_unreadable_shared_area(browser)
     assert page.evaluate("new URLSearchParams(location.hash.slice(1)).get('area')") == "ab!"
     page.get_by_role("button", name="Clear invalid area", exact=True).click()
     assert page.evaluate("AREA.invalid()") is False
-    assert (
-        page.locator("#identify").get_attribute("href").startswith("https://www.inaturalist.org/")
-    )
+    assert page.locator("#identify").get_attribute("href").startswith("https://www.inaturalist.ca/")
     page.close()
 
 
@@ -492,7 +488,7 @@ def test_invalid_shared_park_member_survives_reload_until_explicit_recovery(brow
     assert len(requests) == 2 and all(url.endswith("/111") for url in requests)
     pages_before = len(page.context.pages)
     page.locator("#identify").evaluate(
-        "a=>{a.href='https://www.inaturalist.org/observations/identify';a.tabIndex=0;}"
+        "a=>{a.href='https://www.inaturalist.ca/observations/identify';a.tabIndex=0;}"
     )
     page.locator("#identify").focus()
     page.keyboard.press("Enter")

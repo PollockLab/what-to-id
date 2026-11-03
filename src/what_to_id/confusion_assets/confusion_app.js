@@ -3,9 +3,9 @@
 (function(){
 'use strict';
 var LIMIT=200,SEEN_KEY='what-to-id.confusion.seen',SEEN_MAX=5000,KEEP=50;
-var IDENTIFY='https://www.inaturalist.org/observations/identify?taxon_id=',
+var IDENTIFY='https://www.inaturalist.ca/observations/identify?taxon_id=',
   IDENTIFY_TAIL='&place_id=7085&quality_grade=needs_id',
-  OBS='https://www.inaturalist.org/observations/';
+  OBS='https://www.inaturalist.ca/observations/';
 var D=null,S=fresh(),pairShown=LIMIT,cardShown=LIMIT,view=[],skip=new Set(),
   focus=-1,seen=new Set();
 try{seen=new Set(JSON.parse(localStorage.getItem(SEEN_KEY)||'[]'));}catch(e){}

@@ -65,7 +65,7 @@ def test_place_pending_failure_and_missing_geometry_keep_identity_and_block_iden
         assert parse_qs(state["hash"])["park"] == ["111"]
         assert state["mask"] is None
     assert result["cleared"]["invalid"] is False
-    assert result["cleared"]["href"].startswith("https://www.inaturalist.org/")
+    assert result["cleared"]["href"].startswith("https://www.inaturalist.ca/")
 
 
 @pytest.mark.parametrize("list_state", ["pending", "reject", "empty"])

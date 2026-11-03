@@ -67,7 +67,7 @@ function leftFilter(o){
       return [new deck.ScatterplotLayer({id:'left',data:c.idx,getPosition:function(i){return [R.lon[i],R.lat[i]];},
         radiusUnits:'pixels',getRadius:6,getFillColor:[200,0,120],stroked:true,lineWidthUnits:'pixels',getLineWidth:1.5,
         getLineColor:[255,255,255],pickable:true,
-        onClick:function(x){if(x.object!=null)window.open('https://www.inaturalist.org/observations/'+R.id[x.object],'_blank','noopener');}})];},
+        onClick:function(x){if(x.object!=null)window.open('https://www.inaturalist.ca/observations/'+R.id[x.object],'_blank','noopener');}})];},
     render:function(){
       if(!box)return;
       btns.forEach(function(b){b[0].setAttribute('aria-pressed',String(b[1]===win));});
