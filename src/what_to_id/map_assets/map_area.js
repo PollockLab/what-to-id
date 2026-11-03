@@ -463,7 +463,8 @@ function MapArea(ctx){
       'The map uses public coordinates; obscuration and location uncertainty can make the sets differ.';ui();
       return url(null,q.params);}
     if(!n){LINK='No records inside this area match these filters.';ui();return url(v);}
-    if(n<=BATCH*MAXB){LINKS=batches(ids);var k=LINKS.length;
+    if(n<=BATCH*MAXB){var q2=ctx.extra?ctx.extra():'';
+      LINKS=batches(ids).map(function(b){b.url+=q2;return b;});var k=LINKS.length;
       LINK='Exact: '+(k>1?nf.format(n)+' records in '+k+' batches of up to '+BATCH:n===1?'this record by id':
         'these '+nf.format(n)+' records by id')+(n>1?', less any identified since.':'.');
       if(k>1)BOX=boxlink(v,url,match,dated,true);ui();return LINKS[0].url;}

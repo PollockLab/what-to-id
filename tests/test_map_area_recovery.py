@@ -48,7 +48,8 @@ const map={addControl(){},on(){},getBounds:()=>({getWest:()=>0,getSouth:()=>0,
   getEast:()=>4,getNorth:()=>4})};
 const CH={groupLink:()=>({inc:[],taxa:[],not:[],groups:[],out:[]})},TF={ids:[],not:[]};
 const META={groups:['Plantae'],place_id:7085,max_url:8000};
-const PJ={params:()=>({}),inexact:()=>'',uncounted:()=>''},match=()=>true;
+const PJ={params:()=>({}),inexact:()=>'',uncounted:()=>''},
+UF={params:()=>({}),tip:()=>'',note:()=>''},match=()=>true;
 const iso=()=>'',gname=x=>x;
 const step=IdStep({a:$('identify'),prev:$('idprev'),next:$('idnext'),build:'fixture',
   store:()=>{throw Error('off');}});
@@ -136,7 +137,8 @@ const map={addControl:c=>document.body.append(c.onAdd()),on(){},fitBounds(){},
   getBounds:()=>({getWest:()=>0,getSouth:()=>0,getEast:()=>4,getNorth:()=>4})};
 const CH={groupLink:()=>({inc:[],taxa:[],not:[],groups:[],out:[]})},TF={ids:[],not:[]};
 const META={groups:['Plantae'],place_id:7085,max_url:8000};
-const PJ={params:()=>({}),inexact:()=>'',uncounted:()=>''},match=()=>true;
+const PJ={params:()=>({}),inexact:()=>'',uncounted:()=>''},
+UF={params:()=>({}),tip:()=>'',note:()=>''},match=()=>true;
 const iso=()=>'',gname=x=>x;
 var AREA=MapArea({map,S,LAST,hash:new URLSearchParams(location.hash.slice(1)).get('area')||'',
   park:new URLSearchParams(location.hash.slice(1)).get('park')||'',

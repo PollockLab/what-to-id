@@ -34,11 +34,11 @@ var S=Object.assign({split:[],rec:null,at:null,fly:false},MF.read(new URLSearchP
   S.fly=!!S.rec&&!S.at;
 })();
 var PJ=projectFilter({meta:META,hash:new URLSearchParams(location.hash.slice(1)),changed:function(){refilter();}});
-var hashTimer=0;
+var hashTimer=0,UF=userFilter({S:S,meta:META,get:get,taxa:function(){return TAXA;},changed:function(){refilter();},bounds:function(){var b=map.getBounds();return {w:b.getWest(),s:b.getSouth(),e:b.getEast(),n:b.getNorth()};}});
 // The split view hands the selection over live; the area and projects are not part of it yet.
 var SYNC=MapFilter.sync({key:function(){return MF.write(S).join('&');},apply:function(str){
   var r=MF.read(new URLSearchParams(str)),was=taxaKey();
-  ['up','lo','hi','months','groups','only','acc'].forEach(function(k){S[k]=r[k];});
+  ['up','lo','hi','months','groups','only','acc','user','umode'].forEach(function(k){S[k]=r[k];});
   S.picks.length=0;r.picks.forEach(function(p){S.picks.push(p);});S.split=[];
   // before the taxa and records are in, refilter runs once they are
   if(TAXA){search();FB.showClades();}
@@ -105,8 +105,8 @@ function fmask(n){
   return FKM.m;}
 function inc(){return !!TF.inc;}
 function pointData(){
-  PJ.sync(P);
-  var n=P.n,gone=Object.keys(GONE).length,i,key=[TF,inc()?CH.picked(S.groups,META.groups,'inc').join():'',AREA.ver(),PJ.key(),SUBV,FKV,S.acc];
+  PJ.sync(P);UF.sync(P);
+  var n=P.n,gone=Object.keys(GONE).length,i,key=[TF,inc()?CH.picked(S.groups,META.groups,'inc').join():'',AREA.ver(),PJ.key(),UF.key(),SUBV,FKV,S.acc];
   if(PD&&PD.length===n&&PD_KEY&&PD_KEY.every(function(k,j){return k===key[j];})&&PD_GONE===gone)return;
   var same=PD&&PD.length===n,days=same?PD.days:new Float32Array(2*n),
     cat=same?PD.attributes.getFilterCategory.value.slice():new Uint8Array(4*n);
@@ -121,7 +121,7 @@ function pointData(){
   for(i=0;i<n;i++){var keep=kb[i]===1;
     if(gone>0&&GONE[id[i]]===1)keep=false;
     if(SUB&&!SUB.has(id[i]))keep=false;
-    if(wide&&keep&&(am===null||am[i]))PJW[i]=wide(i)?1:0;if(keep&&(PJ.drop(i)||(fm&&!fm[i])))keep=false;
+    if(wide&&keep&&(am===null||am[i]))PJW[i]=wide(i)?1:0;if(keep&&(PJ.drop(i)||UF.drop(i)||(fm&&!fm[i])))keep=false;
     OUT[i]=keep?0:1;cat[4*i+3]=cat[4*i+3]&~(ST_KEEP|ST_INEXACT)|(keep&&(am===null||am[i])?ST_KEEP:0)|MF.accOut(S.acc,P.fl[i]);}
   // a new pick, area or deletion swaps only the categories, so deck.gl uploads only those
   if(same){PD.attributes.getFilterCategory={value:cat,size:4};PD_CAT++;}
@@ -157,7 +157,7 @@ function recount(){CT=0;
   for(var d=0;d<META.days;d++)CUM[d+1]=CUM[d]+PER[d];
   // One picked status filter reads its own totals; two together, a left-out one, an area or a lasso have none
   var on=Object.keys(S.only).concat(S.acc?'acc_'+S.acc:[]),
-    tt=!TOT||S.picks.length||AREA.on()||PJ.active()||FK||on.length>1||S.only[on[0]]==='not'?null:
+    tt=!TOT||S.picks.length||AREA.on()||PJ.active()||UF.active()||FK||on.length>1||S.only[on[0]]==='not'?null:
       on.length?TOT.only&&TOT.only[on[0]]:TOT;
   TC=null;
   if(tt){var rows=tt[S.up?'up':'obs'],nm=rows[0].length;TC=new Float64Array(nm+1);
@@ -233,14 +233,14 @@ function link(){
     not:TF.not.concat(gl.not),only:S.only,acc:S.acc};
   // with an area on, the link may list the records by id instead, and then u stays null
   var a=$('identify'),href=AREA.link(ALL?{w:-180,s:-90,e:180,n:90}:{w:b.getWest(),s:b.getSouth(),e:b.getEast(),n:b.getNorth()},
-    function(v,p,side){var r=TX.identifyUrl(st,v,META,Object.assign({},PJ.params(),p));if(!side)u=r;return r.url;},match);
+    function(v,p,side){var r=TX.identifyUrl(st,v,META,Object.assign({},PJ.params(),UF.params(),p));if(!side)u=r;return r.url;},match);
   if(AREA.invalid()){a.removeAttribute('href');a.setAttribute('aria-disabled','true');
     a.title='Wait for the selected areas to load, or explicitly clear or replace unresolved areas.';
     $('idprev').disabled=$('idnext').disabled=true;
     $('idnote').hidden=false;$('idnote').textContent='Identify is unavailable until every selected area is restored. Wait for loading, or explicitly clear or replace unresolved areas.';
     return;}
   a.removeAttribute('aria-disabled');a.href=href;
-  a.title='Opens these records in the iNaturalist Identify page.';
+  a.title='Opens these records in the iNaturalist Identify page.'+UF.tip();
   // say when Identify cannot show the same records, and what it opens instead
   var why=[],lost=u?u.lost:[];function gn(gs){return gs.map(gname).join(' and ');}
   if(u&&gl.inc.length)why.push('Identify cannot add the '+gn(gl.inc)+' group to picked taxa, so it opens every taxon');
@@ -248,7 +248,7 @@ function link(){
   if(lost.indexOf('taxa')>=0)why.push('too many taxa for one link, so it opens every taxon');
   if(lost.indexOf('not')>=0)why.push('too many taxa left out for one link, so it keeps them');
   if(u&&PJ.inexact())why.push(PJ.inexact());
-  var nt=$('idnote'),pf=u?PJ.uncounted():'';nt.hidden=!why.length&&!pf;nt.textContent=(why.length?'Identify shows '+
+  var nt=$('idnote'),pf=u?[PJ.uncounted(),UF.note()].filter(Boolean).join(' '):'';nt.hidden=!why.length&&!pf;nt.textContent=(why.length?'Identify shows '+
     'more records than the map: '+why.join('; ')+'. ':'')+pf;
 }
 // The filter extension is kept between calls, as the point data is in pointData(), so deck.gl
@@ -447,8 +447,8 @@ var map=new maplibregl.Map(opts);document.body.appendChild(ptip);
 map.addControl(new maplibregl.NavigationControl({showCompass:false}));
 var overlay=new deck.MapboxOverlay({interleaved:false,pickingRadius:8,layers:[]});map.addControl(overlay);
 var AREA=MapArea({map:map,S:S,LAST:LAST,hash:S.area,park:S.park,bcpark:S.bcpark,fit:!S.at,
-  place:META.place_id,parks:META.parks,get:get,P:function(){return P;},keep:function(){return KEEP;},
-  change:refilter,sel:function(){return sel().join('&');},
+  place:META.place_id,parks:META.parks,get:get,P:function(){return P;},keep:function(){return KEEP;},change:refilter,
+  sel:function(){return sel().join('&');},extra:function(){var u=UF.params();return Object.keys(u).map(function(k){return '&'+k+'='+encodeURIComponent(u[k]);}).join('');},
   step:IdStep({a:$('identify'),prev:$('idprev'),next:$('idnext'),build:iso(LAST)})});
 // Guard activation before IdStep's handlers, including a stale batch or keyboard activation.
 function stopInvalidIdentify(e){if(AREA.invalid()){e.preventDefault();e.stopImmediatePropagation();}}

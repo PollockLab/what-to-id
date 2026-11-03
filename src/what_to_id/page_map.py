@@ -59,6 +59,7 @@ import requests
 from what_to_id import page_nav
 from what_to_id.batches import MAX_URL_LEN
 from what_to_id.inat import BC_PLACE_ID, INAT, SLEEP, TIMEOUT, make_session
+from what_to_id.map_observer import OBSERVER_NAME, observer_users
 from what_to_id.map_parks import PARKS_NAME, parks_blob, parks_version
 from what_to_id.map_projects import add_projects
 from what_to_id.page import ARM_WORDS, group_name
@@ -94,11 +95,11 @@ TOTAL_ONLY = {
 _COLS = ("id", "lat", "lon", "observed_on", "created_at", "iconic_taxon")
 _PKG = files("what_to_id")
 _ASSETS = _PKG / "map_assets"
-# Inlined in this order: map_taxa.js, map_area.js, map_step.js, map_projects.js and map_chips.js
-# the taxon, area, Identify batch, project and chip helpers map.js calls, map_filter.js the filter
-# state and GPU filter values, group_list.js and filter_bar.js the filter panel, map_card.js the
-# card, clade_colour.js and level_colour.js the dots' colours, map_rail.js the panel as Explore's
-# filter rail, map_sheet.js the dates, area and legend as Explore's sheet.
+# Inlined in this order: map_taxa.js, map_area.js, map_step.js, map_projects.js, map_user.js and
+# map_chips.js the taxon, area, Identify batch, project, user and chip helpers map.js calls,
+# map_filter.js the filter state and GPU filter values, group_list.js and filter_bar.js the filter
+# panel, map_card.js the card, clade_colour.js and level_colour.js the dots' colours, map_rail.js
+# the panel as Explore's filter rail, map_sheet.js the dates, area and legend as Explore's sheet.
 MAP_CSS = ("map.css", "map_select.css", "map_area.css")
 # The record card's closest matches (the atlas index reader and the iNaturalist photo lookup of the
 # search page) and range chip (the Identify page's range module), and the photo space's taxon tree
@@ -116,6 +117,7 @@ MAP_JS = (
     "map_step.js",
     "map_area.js",
     "map_projects.js",
+    "map_user.js",
     "map_chips.js",
     "map_filter.js",
     "clade_colour.js",
@@ -188,12 +190,17 @@ def encode_points(pool: pd.DataFrame, tree: dict | None = None) -> tuple[dict[st
     parts = [np.flatnonzero(recent), *np.array_split(older, max(1, -(-len(older) // SHARD_MAX)))]
     out: dict[str, bytes] = {}
     shards = []
+    order = []
     for part in parts:
         if len(part):
             part = np.sort(part)
+            order.append(part)
             name = shard_name(len(shards))
             out[name] = _gz(b"".join(_planes(_step(k, v[part])) for k, v in cols.items()))
             shards.append({"file": name, "n": len(part)})
+    users = observer_users(df, np.concatenate(order) if order else np.empty(0, dtype=np.intp))
+    if users is not None:
+        out[OBSERVER_NAME] = _gz(users.tobytes())
     out[TAXA_NAME] = _gz(json.dumps(taxa, ensure_ascii=False, separators=(",", ":")).encode())
     h = hashlib.sha256()
     for name in sorted(out):
@@ -216,6 +223,8 @@ def encode_points(pool: pd.DataFrame, tree: dict | None = None) -> tuple[dict[st
     }
     if complete:
         meta["presets"] = PRESETS
+    if users is not None:
+        meta["observer"] = OBSERVER_NAME
     return out, meta
 
 
@@ -437,6 +446,7 @@ def render_map(meta: dict, *, freeze: str | None, data_url: str | None = None) -
         **meta,
         "shards": [{**s, "file": f"{s['file']}?v={v}"} for s in meta["shards"]],
         "taxa": f"{meta['taxa']}?v={v}",
+        **({"observer": f"{meta['observer']}?v={v}"} if "observer" in meta else {}),
         "place_id": BC_PLACE_ID,
         "max_url": MAX_URL_LEN,
         "parks": f"{PARKS_NAME}?v={parks_version(parks_blob())}",

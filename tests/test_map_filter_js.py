@@ -135,3 +135,24 @@ def test_unknown_acc_value_is_ignored_and_a_pool_without_accuracy_has_no_choice(
         old,
     )
     assert got == ["", ""]
+
+
+def user_state(h: str):
+    return run(
+        f"var S=MF.read(new URLSearchParams({json.dumps(h)}));return [MF.write(S),S.user,S.umode];"
+    )
+
+
+def test_user_and_its_mode_round_trip_and_default_to_nothing():
+    h = "groups=Aves&taxa=311249&user=jdoe&umode=unid"
+    assert user_state(h) == [h.split("&"), "jdoe", "unid"]
+    assert user_state("user=12345") == [["user=12345"], "12345", ""]  # My taxa is not written
+    assert user_state("umode=observer&user=") == [[], "", "observer"]  # no user, nothing written
+    assert user_state("user=a%20b&umode=bogus") == [["user=a%20b"], "a b", ""]
+
+
+def test_tokens_keep_user_and_its_mode_for_explore_to_forward():
+    h = "#from=2024-03-01&user=jdoe&at=5/49/-123&umode=observer&record=7"
+    assert run(f"return MapFilter.tokens({json.dumps(h)});") == (
+        "from=2024-03-01&user=jdoe&umode=observer"
+    )
