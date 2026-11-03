@@ -10,7 +10,7 @@ var FLAG={introduced:1,threatened:2,obscured:4,imprecise:8,earlyObs:16,earlyUp:3
 // Each record's status value: bit 1 introduced, 2 threatened, 4 outside the chosen location accuracy
 // (set by accOut, so it follows the choice and not the data), 8 kept by the taxon picks, the area and
 // the projects and not deleted, 16 one record in ten.
-var UMODES=['observer','unid'];  // the user filter's modes besides the default, My taxa (map_user.js)
+var UMODES=['observer','taxa','unid'];  // the user filter's modes (map_user.js); the default, Observer (My taxa without an observer file), is not written
 var ST_INTRO=1,ST_THREAT=2,ST_INEXACT=4,ST_KEEP=8,ST_SAMPLE=16;
 // The location accuracy choices, [key, label, hint]; the key is also the hash value of acc and, but for
 // unknown and known, the metres. A record's accuracy class sits in its flags: 0 unknown, 1 over 1 km
@@ -50,8 +50,8 @@ function read(h){
     /(^|,)exact(,|$)/.test(h.get('only')||'')?'1000':'';
   S.picks=TX.read(h.get('taxa'));S.oldq=S.picks.length?'':h.get('q')||'';
   S.area=h.get('area')||'';S.park=h.get('park')||'';S.bcpark=h.get('bcpark')||'';
-  // the iNaturalist user (login or id) and what to do with it, from map_user.js; '' for My taxa
-  S.user=(h.get('user')||'').trim().slice(0,100);S.umode=UMODES.indexOf(h.get('umode'))>=0?h.get('umode'):'';
+  // the iNaturalist user (login or id) and what to do with it, from map_user.js; '' for the default mode
+  S.user=(h.get('user')||'').trim().slice(0,100);S.umode=UMODES.indexOf(h.get('umode'))>=0&&h.get('umode')!==(META.observer?'observer':'taxa')?h.get('umode'):'';
   return S;
 }
 // The hash parts for the dates, months, groups, show only and taxa; the area and projects write their own.

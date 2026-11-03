@@ -1,9 +1,9 @@
 // The user filter. The User box takes an iNaturalist login or user number (hash: user=, and umode=
-// observer or unid; none is My taxa). Observer opens Identify on the user's records (user_id); the
-// others add without_ident_user_id, which would hide nearly all of an observer's own records. The
-// select narrows the map by one of three rules: My taxa keeps the dots inside a genus or family the
-// user has identified in BC, Observer the dots the user observed (pool-observer.bin, one uint32 per
-// record in shard order), Not yet identified by me hides the dots the user identified in the view.
+// taxa or unid; none is Observer, or My taxa on a map without an observer file). Observer opens
+// Identify on the user's records (user_id); the others add without_ident_user_id, which would hide nearly all of an observer's own records. The
+// select narrows the map by one of three rules: Observer (the default) keeps the dots the user observed
+// (pool-observer.bin, one uint32 per record in shard order), My taxa the dots inside a genus or family
+// the user has identified in BC, Not yet identified by me hides the dots the user identified in the view.
 // Everything but the observer file comes from api.inaturalist.org in the browser, one request at a
 // time and at least a second apart, and is kept for the session. Without a user nothing is filtered.
 var USR_CAP={taxa:5,unid:25},USR_PER={taxa:500,unid:200};
@@ -47,6 +47,7 @@ function userFilter(o){
     api=inatGate({gap:o.gap,fetch:o.fetch,say:function(t){say(t);}}),cur='',run=0,id=0,mask=null,ob=null,hide=null,capped=false,key=0,Pn=null,input,mode,msg,again;
   function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;
     if(text!=null)e.textContent=text;return e;}
+  function em(){return S.umode||(META.observer?'observer':'taxa');}
   function say(t){if(msg)msg.textContent=t;}
   function load(m,p){
     var place='&place_id='+META.place_id;
@@ -61,7 +62,7 @@ function userFilter(o){
       mask=usrMask(o.taxa(),usrRanked(o.taxa(),META.ranks,r.items));});}
   // Starts what S.user and S.umode ask for once, whenever the records are drawn again.
   function start(){
-    var u=S.user,m=S.umode||'taxa',p=usrParse(u),k=u?u+'|'+m:'';
+    var u=S.user,m=em(),p=usrParse(u),k=u?u+'|'+m:'';
     if(k===cur||(p&&m==='taxa'&&!o.taxa()))return;  // My taxa waits for the taxa table; the next refilter retries
     var tag=++run;cur=k;id=0;mask=ob=hide=null;capped=false;key++;
     if(!u){say('');return;}
@@ -76,14 +77,14 @@ function userFilter(o){
         'Showing taxa '+u+' has identified.');key++;o.changed();})
     .catch(function(e){if(e===0)return;mask=ob=hide=null;key++;
       say(e instanceof TypeError?'Could not reach iNaturalist.':e.message);o.changed();});}
-  function apply(){S.user=input.value.trim().slice(0,100);S.umode=mode.value==='taxa'?'':mode.value;o.changed();}
+  function apply(){S.user=input.value.trim().slice(0,100);S.umode=mode.value===(META.observer?'observer':'taxa')?'':mode.value;o.changed();}
   if(box){
     box.appendChild(el('summary',null,'User'));
     var f=box.appendChild(el('form','prow')),lab=f.appendChild(el('label','muted','iNaturalist login or user number'));
     input=f.appendChild(el('input','padd'));input.id=lab.htmlFor='usrname';input.type='text';
     input.placeholder='Login or number';input.autocomplete='off';input.spellcheck=false;
     mode=f.appendChild(el('select'));mode.setAttribute('aria-label','What to do with the user');
-    [['taxa','My taxa'],['observer','Observer'],['unid','Not yet identified by me']].forEach(function(m){
+    [['observer','Observer'],['taxa','My taxa'],['unid','Not yet identified by me']].forEach(function(m){
       var op=mode.appendChild(el('option',null,m[1]));op.value=m[0];
       if(m[0]==='observer'&&!META.observer)op.disabled=true;});
     again=f.appendChild(el('button','padd','Reload for this view'));again.type='button';again.hidden=true;
@@ -94,15 +95,15 @@ function userFilter(o){
   return {
     // brings the box in line with S and starts any load it needs; P is the records so far
     sync:function(P){Pn=P;if(input){if(document.activeElement!==input)input.value=S.user;
-      mode.value=S.umode||'taxa';again.hidden=S.umode!=='unid'||!S.user;}start();},
+      mode.value=em();again.hidden=em()!=='unid'||!S.user;}start();},
     drop:function(i){if(!id)return false;
       if(mask){var t=Pn.tax[i];return !(t<mask.length&&mask[t]===1);}
       if(ob)return i<ob.length&&ob[i]!==id;
       return hide?hide.has(Pn.id[i]):false;},
     key:function(){return key;},
     active:function(){return !!(mask||ob||hide);},
-    params:function(){return !id?{}:S.umode==='observer'?{user_id:String(id)}:{without_ident_user_id:String(id)};},
-    tip:function(){return id&&S.umode!=='observer'?' Records the user identified are left out; ones you skipped are hidden by iNaturalist when you are signed in.':'';},
+    params:function(){return !id?{}:em()==='observer'?{user_id:String(id)}:{without_ident_user_id:String(id)};},
+    tip:function(){return id&&em()!=='observer'?' Records the user identified are left out; ones you skipped are hidden by iNaturalist when you are signed in.':'';},
     // the map counts are approximate under My taxa and Not yet identified, as Identify cannot say them
     note:function(){return mask?'The map keeps only the genera and families '+S.user+' has identified'+(capped?' (first '+
       nf.format(USR_CAP.taxa*USR_PER.taxa)+' taxa only)':'')+', which Identify cannot filter, so its count differs.':
