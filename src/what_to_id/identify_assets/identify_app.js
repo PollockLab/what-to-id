@@ -78,7 +78,7 @@ function pick(picks){
 }
 function card(i,lv){
   var id=P.id[i],li=el('li','card'),ph=el('div','ph','Loading photo'),w=el('a','when','Date and place…'),a=el('a','btn','Identify');
-  li.dataset.id=id;li.tabIndex=0;
+  li.dataset.id=id;li.dataset.i=i;li.tabIndex=0;
   w.href=OBS+id;w.target='_blank';w.rel='noopener';
   a.href=IdentifyLinks.batches([id])[0].url;a.target='_blank';a.rel='noopener';a.setAttribute('aria-label','Identify this record on iNaturalist');
   li.append(ph,title(i,lv),w);
@@ -246,18 +246,19 @@ async function load(){
   var q=String(META.shards[0].file).split('?')[1],suffix=q?'?'+q:'';
   var taxa=get(new URL(META.taxa,MAP)).then(function(b){return JSON.parse(new TextDecoder().decode(b));});
   var shards=Promise.all(META.shards.map(function(s){return get(new URL(s.file,MAP)).then(function(b){return L.decodeShard(b,s.n);});}));
-  var lev=get(new URL('pool-levels.bin'+suffix,MAP)),lk=get(new URL('pool-levels-looks.bin'+suffix,MAP)).catch(function(){return null;}),
+  var lev=get(new URL('pool-levels.bin'+suffix,MAP)),lk=get(new URL('pool-levels-looks.bin'+suffix,MAP)).catch(function(){return null;}),  // optional: cards fill in their look-alike once it lands
     rg=get(new URL('pool-levels-range.bin'+suffix,MAP)).catch(function(){return null;});  // optional: no range maps without it
   status('Downloading the records…');
-  var d=await Promise.all([shards,taxa,lev,lk]);
+  var d=await Promise.all([shards,taxa,lev]);
   P=L.pool(d[0],META.bbox);TAXA=d[1];
   var raw=new Uint8Array(d[2]);
   if(raw.length!==P.n)throw new Error('the levels file holds '+raw.length+' records, the map '+P.n);
   LEVEL=raw.map(function(v){return v&15;});Q=raw.map(function(v){return v>>4;});
-  LOOKS=d[3]&&looks(d[3]);
   MF=MapFilter(META);
   take(location.hash.slice(1),AREA==='');
   if(PEND!==null){take(PEND,false);PEND=null;}
+  lk.then(function(b){if(!b)return;LOOKS=looks(b);
+    [].forEach.call($('grid').children,function(li){var t=li.querySelector('.title');if(t)t.replaceWith(title(+li.dataset.i,LV));});});
   rg.then(function(b){if(!b)return;
     R=IdentifyRanges(b,{P:P,name:function(i){return P.tax[i]!==NOTAX&&TAXA[P.tax[i]]?TAXA[P.tax[i]][0]:null;},look:looksOf,redraw:redraw});
     R.level(LV,true);redraw();});
