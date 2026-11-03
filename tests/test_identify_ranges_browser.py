@@ -15,6 +15,7 @@ from what_to_id.page_map import encode_points, render_map
 
 from . import test_identify_browser as ib
 from .embeddings_fixture import TREE, pool_frame
+from .test_identify_first_browser import first_lists
 from .test_page_nav import FORBIDDEN
 
 browser = ib.browser
@@ -152,6 +153,16 @@ def test_clear_matches_start_with_far_records_hidden_and_the_segments_filter(bro
     assert chips(page) == ["About 80 km outside", "Range map"]
     assert not [w for w in FORBIDDEN if w in page.inner_text("body").lower()]
     assert page.errors == []
+
+
+def test_the_first_lists_leave_out_far_clear_matches_as_the_page_does(browser, site):
+    first = first_lists(site)[""]
+    page = opened(browser, site, "#lvl=1")
+    view = page.evaluate("__identify.view()")
+    assert [r[0] // 1000 - 1 for r in first["rows"][1]] == [3, 1, 0]  # no 2: 1,234 km outside
+    for lv in range(1, 6):
+        assert [r[0] for r in first["rows"][lv]] == view[lv]
+    assert first["total"] == [0, *page.evaluate("__identify.total()")[1:]]
 
 
 def test_the_segments_move_with_the_arrow_keys(browser, site):

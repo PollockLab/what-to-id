@@ -6,7 +6,7 @@
 'use strict';
 var CFG=IDENTIFY_CONFIG,L=EmbeddingsLayout,Meta=AtlasSearchMeta,PER_SPECIES=3,LIMIT=12,STEPS=16,NO_LOOK=65535,NOTAX=65535,LS='wtid-identify-level',IO=null,T=0;
 var MAP=new URL(CFG.mapUrl,location.href).href,nf=new Intl.NumberFormat('en-CA'),OBS='https://www.inaturalist.org/observations/';
-var META=null,SYNC=null,MORE=new Map(),TAXA=null,P=null,BYID=null,LEVEL=null,Q=null,LOOKS=null,R=null,MF=null,TF=null,PEND=null,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,ONE='',CACHE=new Map();
+var META=null,SYNC=null,MORE=new Map(),TAXA=null,P=null,BYID=null,LEVEL=null,Q=null,LOOKS=null,R=null,MF=null,TF=null,PEND=null,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,ONE='',CACHE=new Map(),FIRST=null,SHOWN,STAY=false;
 function $(id){return document.getElementById(id);}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 function status(t){$('status').textContent=t;}
@@ -78,9 +78,10 @@ function more_(i){
   return b;
 }
 function pick(picks){
-  S.picks=picks;TF=TX.filter(TAXA,picks);
+  if(MF){S.picks=picks;TF=TX.filter(TAXA,picks);}
+  else PEND=[sel(),picks.length?'taxa='+TX.write(picks):''].filter(Boolean).join('&');  // taken once the records load
   if(parent===window)keep('taxa',TX.write(picks));  // embedded, the split page holds the address
-  refresh();SYNC.send();
+  again();SYNC.send();
 }
 function card(i,lv){
   var id=P.id[i],li=el('li','card'),ph=el('div','ph','Loading photo'),w=el('a','when','Date and place…'),a=el('a','btn','Identify');
@@ -123,11 +124,11 @@ function more(){
 // "Identify N listed", or with more than one batch "Identify 200 · batch 2 of 50": the button
 // names the batch it opens, since the arrows change only its link. Batches are newest first.
 function batch(){
-  var all=view[LV]||[],rows=all.slice(0,IdentifyLinks.MAX_IDS),capped=rows.length<all.length;
+  var all=view[LV]||[],t=all.n||all.length,rows=all.slice(0,IdentifyLinks.MAX_IDS),capped=rows.length<t;  // n: a first list's full length
   LINKS=rows.length?IdentifyLinks.batches(rows.map(function(i){return P.id[i];})):[];BI=0;
   $('batch').hidden=!rows.length;$('cap').hidden=LINKS.length<2;
-  ONE=capped?'Identify the first '+nf.format(rows.length)+' of '+nf.format(all.length):'Identify '+nf.format(rows.length)+' listed';
-  $('cap').textContent=(capped?'The first '+nf.format(rows.length)+' of '+nf.format(all.length):nf.format(rows.length))+
+  ONE=capped?'Identify the first '+nf.format(rows.length)+' of '+nf.format(t):'Identify '+nf.format(rows.length)+' listed';
+  $('cap').textContent=(capped?'The first '+nf.format(rows.length)+' of '+nf.format(t):nf.format(rows.length))+
     ' listed, newest first, '+IdentifyLinks.BATCH+' per batch';
   $('go').title='Up to '+PER_SPECIES+' per species';
   step(0);
@@ -139,15 +140,15 @@ function step(d){
   $('prev').hidden=$('next').hidden=LINKS.length<2;
   $('prev').disabled=BI===0;$('next').disabled=BI>=LINKS.length-1;
 }
-// Draws the chosen level from its first card.
+// Draws the chosen level from its first card; STAY (the records replacing the first list) keeps the cards drawn and the scroll.
 function paint(){
   var x=CFG.levels.filter(function(l){return l[0]===LV;})[0];
   [].forEach.call($('tabs').children,function(t){var on=+t.dataset.lv===LV;t.setAttribute('aria-selected',on);t.tabIndex=on?0:-1;});
   $('desc').textContent=x[2];$('panel').setAttribute('aria-labelledby','tab'+LV);
-  $('grid').textContent='';shown=LIMIT;drawn=0;
+  $('grid').textContent='';shown=STAY?Math.max(LIMIT,drawn):LIMIT;drawn=0;
   if(R)R.draw(LV,SEL,LEVEL);
   empty();
-  more();batch();scrollTo(0,0);
+  more();batch();if(!STAY)scrollTo(0,0);STAY=false;
 }
 function redraw(){build();counts();paint();}
 function counts(){
@@ -217,7 +218,33 @@ function refresh(){
   paint();
 }
 // The map's viewport moves often: one refresh once it rests for a moment, on a frame.
-function soon(){clearTimeout(T);T=setTimeout(function(){requestAnimationFrame(function(){if(P)refresh();});},100);}
+function soon(){clearTimeout(T);T=setTimeout(function(){requestAnimationFrame(again);},100);}
+function again(){if(MF)refresh();else if(FIRST)early();}
+// Until the records load: the selection so far, as MapFilter writes it.
+function sel(){return PEND!==null?PEND:MapFilter.tokens(location.hash);}
+// The first lists (pool-levels-first.bin, format in pool_levels.py) as pool-like columns, P, TAXA and LOOKS until the records load.
+function firstOf(F){
+  var id=[],tax=[],lk=[];
+  Object.keys(F.s).forEach(function(k){var s=F.s[k];s.rows=s.rows.map(function(r,lv){
+    var out=r.map(function(x){var i=id.length;id.push(x[0]);tax.push(x[1]);lk.push(x[2]);if(x[3])MORE.set(i,x[3]);return i;});
+    out.n=s.n[lv];return out;});});
+  F.P={id:id,tax:tax,n:id.length};TAXA=F.taxa;LOOKS={names:F.looks,lo:lk,hi:new Uint8Array(id.length)};  // lo holds the whole index
+  FIRST=F;early();
+}
+// The first list of the selection while the records load, when it is one built (no filter or one group) with no area, lasso,
+// photo search or range toggle, and a map view that takes in every record: the split view's map posts its view on load,
+// beside a phone it is hidden and posts ''. Any other selection waits for the records.
+function early(){
+  var h=location.hash.slice(1),b=FIRST.bbox,I=VIEW&&SpaceMask.areaIndex(VIEW),
+    s=!AREA&&!KEEPIDS&&!SUBIDS&&!/(^|&)(area|out)=/.test(h)&&(!VIEW||I&&[[0,1],[2,1],[2,3],[0,3]].every(function(c){
+      return MapArea.inside(I,b[c[0]],b[c[1]]);}))&&FIRST.s[sel()]||null;
+  if(s===SHOWN)return;SHOWN=s;P=s&&FIRST.P;
+  if(!s){view=[];$('grid').textContent='';$('none').hidden=$('more').hidden=$('batch').hidden=$('cap').hidden=true;
+    [].forEach.call($('tabs').children,function(t){t.lastChild.textContent='';});status('Loading all the records for this selection…');return;}
+  view=s.rows;S.total=s.total;counts();
+  if(!LV)LV=saved()||first();
+  status('Showing the top records, loading all of them…');paint();
+}
 // A selection: the dates, months, groups, show only, accuracy and taxa out of a hash string; the area only when asked.
 function take(str,withArea){
   var r=MF.read(new URLSearchParams(str));
@@ -226,18 +253,18 @@ function take(str,withArea){
   TF=TX.filter(TAXA,S.picks);
   if(P)refresh();
 }
-function key(){return MF?MF.write(S).join('&'):'';}
+function key(){return MF?MF.write(S).join('&'):PEND||'';}
 function idsOf(){var out=[];for(var i=0;i<P.n;i++)if(SEL[i])out.push(P.id[i]);return out;}
 function inbox(){
   addEventListener('message',function(e){
     var d=e.data;if(e.origin!==location.origin||e.source!==parent||!d)return;
-    if(d.type==='wtid-area'&&typeof d.area==='string'){AREA=d.area;if(P)refresh();}
+    if(d.type==='wtid-area'&&typeof d.area==='string'){AREA=d.area;again();}
     else if(d.type==='wtid-view'&&typeof d.area==='string'){if(d.area!==VIEW){VIEW=d.area;soon();}}  // '' is no cut
-    else if(d.type==='wtid-keep'&&(d.ids===null||d.ids instanceof Uint32Array)){KEEPIDS=d.ids&&d.ids.slice().sort();if(P)refresh();}
-    else if(d.type==='wtid-subset'&&(d.ids===null||Array.isArray(d.ids))){SUBIDS=d.ids&&Uint32Array.from(d.ids).sort();if(P)refresh();}  // the photo search's hits
+    else if(d.type==='wtid-keep'&&(d.ids===null||d.ids instanceof Uint32Array)){KEEPIDS=d.ids&&d.ids.slice().sort();again();}
+    else if(d.type==='wtid-subset'&&(d.ids===null||Array.isArray(d.ids))){SUBIDS=d.ids&&Uint32Array.from(d.ids).sort();again();}  // the photo search's hits
   });
-  SYNC=MapFilter.sync({key:key,apply:function(str){if(MF)take(str,false);else PEND=str;},hash:false});
-  addEventListener('hashchange',function(){take(location.hash.slice(1),true);});
+  SYNC=MapFilter.sync({key:key,apply:function(str){if(MF)take(str,false);else{PEND=str;again();}},hash:false});
+  addEventListener('hashchange',function(){if(MF)take(location.hash.slice(1),true);else again();});
 }
 function looks(buf){
   var dv=new DataView(buf),size=dv.getUint32(0,true),n=P.n;
@@ -247,6 +274,7 @@ function looks(buf){
 }
 async function load(){
   status('Reading the map data…');
+  if(CFG.first)get(new URL(CFG.first,MAP)).then(function(b){if(!MF)firstOf(JSON.parse(new TextDecoder().decode(b)));}).catch(function(){});  // optional
   var html=await fetch(MAP).then(function(r){if(!r.ok)throw new Error('Could not load the map page ('+r.status+')');return r.text();});
   META=L.parseMapMeta(html);
   var q=String(META.shards[0].file).split('?')[1],suffix=q?'?'+q:'';
@@ -254,14 +282,14 @@ async function load(){
   var shards=Promise.all(META.shards.map(function(s){return get(new URL(s.file,MAP)).then(function(b){return L.decodeShard(b,s.n);});}));
   var lev=get(new URL('pool-levels.bin'+suffix,MAP)),lk=get(new URL('pool-levels-looks.bin'+suffix,MAP)).catch(function(){return null;}),  // optional: cards fill in their look-alike once it lands
     rg=get(new URL('pool-levels-range.bin'+suffix,MAP)).catch(function(){return null;});  // optional: no range maps without it
-  status('Downloading the records…');
+  if(!FIRST)status('Downloading the records…');
   var d=await Promise.all([shards,taxa,lev]);
-  P=L.pool(d[0],META.bbox);BYID=byId(P);TAXA=d[1];
+  P=L.pool(d[0],META.bbox);BYID=byId(P);TAXA=d[1];LOOKS=null;
   var raw=new Uint8Array(d[2]);
   if(raw.length!==P.n)throw new Error('the levels file holds '+raw.length+' records, the map '+P.n);
   LEVEL=raw.map(function(v){return v&15;});Q=raw.map(function(v){return v>>4;});
   MF=MapFilter(META);
-  take(location.hash.slice(1),AREA==='');
+  STAY=!!SHOWN;take(location.hash.slice(1),AREA==='');
   if(PEND!==null){take(PEND,false);PEND=null;}
   lk.then(function(b){if(!b)return;LOOKS=looks(b);
     [].forEach.call($('grid').children,function(li){var t=li.querySelector('.title');if(t)t.replaceWith(title(+li.dataset.i,LV));});});

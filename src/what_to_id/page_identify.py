@@ -12,6 +12,7 @@ groups, taxa and the rest of the hash, the area (``wtid-area``) and the lasso's 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from datetime import date
 from pathlib import Path
@@ -22,6 +23,7 @@ HERE = Path(__file__).parent
 ASSETS = HERE / "identify_assets"
 PAGE_NAME = "identify.html"
 DATES_NAME = "pool-levels-dates.json"  # written by `pool_levels` beside the levels
+FIRST_NAME = "pool-levels-first.bin"  # likewise: the first cards, drawn while the pool loads
 # The group of records labelled above species whose photo points to one species of the label.
 # A placeholder name: rename it here and nowhere else.
 NARROW_LABEL = "Narrow it down"
@@ -67,8 +69,9 @@ def _day(iso: str | None) -> str | None:
     return f"{d.day} {d:%B %Y}"
 
 
-def render(map_url: str = "map.html", dates: dict | None = None) -> str:
-    """The page; `dates` is `pool_levels.scoring_dates` output, for the About."""
+def render(map_url: str = "map.html", dates: dict | None = None, first: str | None = None) -> str:
+    """The page; `dates` is `pool_levels.scoring_dates` output, for the About; `first` the URL of
+    the first cards beside the map, None without them."""
     photos, scored = _day((dates or {}).get("photos")), _day((dates or {}).get("scored"))
     when = f"Photos downloaded on {photos}" if photos else ""
     if scored:
@@ -78,7 +81,9 @@ def render(map_url: str = "map.html", dates: dict | None = None) -> str:
         "__SITE_CSS__": page_nav.CSS,
         "__SITE_NAV__": page_nav.nav(PAGE_NAME),
         "__IDENTIFY_RANGES_CSS__": (ASSETS / "identify_ranges.css").read_text().rstrip(),
-        "__CONFIG__": json.dumps({"mapUrl": map_url, "levels": LEVELS}).replace("<", "\\u003c"),
+        "__CONFIG__": json.dumps({"mapUrl": map_url, "levels": LEVELS, "first": first}).replace(
+            "<", "\\u003c"
+        ),
         **{f"__LEVEL_{n}__": name for n, name, _ in LEVELS},
         "__SCORING_DATES__": f"{when}." if when else "",
         "__PHOTO_DOWNLOAD__": f"{photos} photo download" if photos else "last photo download",
@@ -94,8 +99,15 @@ def build(out_dir: str | Path, map_url: str = "map.html") -> Path:
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     target = out / PAGE_NAME
-    dates = out / DATES_NAME
-    target.write_text(render(map_url, json.loads(dates.read_text()) if dates.exists() else None))
+    dates, first = out / DATES_NAME, out / FIRST_NAME
+    v = first.exists() and hashlib.sha256(first.read_bytes()).hexdigest()[:12]
+    target.write_text(
+        render(
+            map_url,
+            json.loads(dates.read_text()) if dates.exists() else None,
+            f"{FIRST_NAME}?v={v}" if v else None,
+        )
+    )
     return target
 
 
