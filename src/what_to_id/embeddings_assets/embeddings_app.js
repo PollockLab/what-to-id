@@ -380,7 +380,7 @@ function select(i,fly){
   var nb=el('ul',{'class':'nbrs','aria-label':'Closest matches'}),nbNote=el('p',{'class':'muted'},['Finding closest matches…']);
   var link=function(href,text,cls){return el('a',{'class':'btn '+(cls||''),href:href,target:'_blank',rel:'noopener'},[text]);};
   var actions=el('div',{'class':'actions'},[
-    link('https://www.inaturalist.org/observations/'+id,'Help identify on iNaturalist','primary'),
+    link('https://www.inaturalist.ca/observations/'+id,'Help identify on iNaturalist','primary'),
     link(CFG.searchUrl+'#id='+id,'More like this'),link(CFG.mapUrl+'#record='+id,'Show on map')]);
   var tx=S.TAXA&&P.tax&&P.tax[i]!==65535&&S.TAXA[P.tax[i]];
   if(tx&&tx.length>5)actions.appendChild(link('tree.html#sel='+tx[2],'Show in tree'));  // counts ship only with the tree page
@@ -432,7 +432,7 @@ function select(i,fly){
       var label=(c.common||c.name||'Unidentified'),row=L.find(S.P,c.id);
       var img=c.photo?el('img',{src:c.photo,alt:label,loading:'lazy'}):label;
       var b=el('button',{type:'button','aria-label':'Jump to '+label+(row<0?' (not in the plot)':''),'data-id':c.id},[img]);
-      b.addEventListener('click',function(){row=L.find(S.P,c.id);if(row>=0)select(row,true);else window.open('https://www.inaturalist.org/observations/'+c.id,'_blank','noopener');});
+      b.addEventListener('click',function(){row=L.find(S.P,c.id);if(row>=0)select(row,true);else window.open('https://www.inaturalist.ca/observations/'+c.id,'_blank','noopener');});
       var sc=el('span',{'class':'score'},['Cosine '+score[c.id].toFixed(3)]);
       sc.title='cosine similarity '+score[c.id];
       b.addEventListener('mouseenter',function(){

@@ -205,7 +205,7 @@ def test_text_search_renders_hits_drops_unneeded_and_hands_off(open_page, site):
     assert page.locator(".card img").first.get_attribute("src").endswith("/small.jpg")
     assert [len(c) for c in page.stub["calls"]] == [200]
     identify = page.locator("#actions a").first.get_attribute("href")
-    assert identify.startswith("https://www.inaturalist.org/observations/identify?")
+    assert identify.startswith("https://www.inaturalist.ca/observations/identify?")
     listed = identify.rsplit("id=", 1)[1].split(",")
     assert (
         len(listed) == 198 and str(hits[0]) in listed and str(page.stub["research"]) not in listed

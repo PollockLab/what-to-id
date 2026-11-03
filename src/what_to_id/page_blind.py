@@ -18,7 +18,7 @@ from what_to_id import page_nav
 
 ASSETS = Path(__file__).parent / "blind_assets"
 PAGE_NAME = "blind.html"
-OBS_URL = "https://www.inaturalist.org/observations/"
+OBS_URL = "https://www.inaturalist.ca/observations/"
 
 CSS = """
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,sans-serif}

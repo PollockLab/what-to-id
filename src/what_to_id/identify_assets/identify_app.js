@@ -5,7 +5,7 @@
 (function(){
 'use strict';
 var CFG=IDENTIFY_CONFIG,L=EmbeddingsLayout,Meta=AtlasSearchMeta,PER_SPECIES=3,LIMIT=12,STEPS=16,NO_LOOK=65535,NOTAX=65535,LS='wtid-identify-level',IO=null,T=0;
-var MAP=new URL(CFG.mapUrl,location.href).href,nf=new Intl.NumberFormat('en-CA'),OBS='https://www.inaturalist.org/observations/';
+var MAP=new URL(CFG.mapUrl,location.href).href,nf=new Intl.NumberFormat('en-CA'),OBS='https://www.inaturalist.ca/observations/';
 var META=null,SYNC=null,MORE=new Map(),TAXA=null,P=null,BYID=null,LEVEL=null,Q=null,LOOKS=null,R=null,MF=null,TF=null,PEND=null,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,ONE='',CACHE=new Map(),FIRST=null,SHOWN,STAY=false;
 function $(id){return document.getElementById(id);}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}

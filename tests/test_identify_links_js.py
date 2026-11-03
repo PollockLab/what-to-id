@@ -32,7 +32,7 @@ def test_exact_batches_cover_each_safe_integer_once_with_bounded_native_urls(cou
     actual = []
     for batch in batches:
         url = urlparse(batch["url"])
-        assert url.scheme == "https" and url.netloc == "www.inaturalist.org"
+        assert url.scheme == "https" and url.netloc == "www.inaturalist.ca"
         assert url.path == "/observations/identify"
         assert len(batch["url"]) <= 8000
         query = parse_qs(url.query)
@@ -88,7 +88,7 @@ def test_map_aliases_preserve_existing_order_batch_shape_and_duplicate_behavior(
         "original": [2, 2, 1],
         "batches": [
             {
-                "url": "https://www.inaturalist.org/observations/identify?quality_grade=needs_id&reviewed=false&place_id=any&per_page=200&id=2,2,1",
+                "url": "https://www.inaturalist.ca/observations/identify?quality_grade=needs_id&reviewed=false&place_id=any&per_page=200&id=2,2,1",
                 "n": 3,
                 "lo": 1,
                 "hi": 2,

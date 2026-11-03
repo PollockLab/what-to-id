@@ -22,7 +22,7 @@ function getIndex(){
 }
 // CLIP text towers match captions best, so a bare query gets the caption template the search test used.
 function caption(text){text=Meta.plain(text);return /^(an? )?(photo|picture|image)\b/i.test(text)?text:'a photo of '+text;}
-function obsUrl(id){return 'https://www.inaturalist.org/observations/'+id;}
+function obsUrl(id){return 'https://www.inaturalist.ca/observations/'+id;}
 function taxonId(t){return t.id;}
 function same(a,b){return a&&b&&a.kind===b.kind&&(a.kind==='id'?a.id===b.id:a.text===b.text);}
 

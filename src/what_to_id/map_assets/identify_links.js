@@ -2,7 +2,7 @@
 var IdentifyLinks=(function(){
 'use strict';
 var BATCH=200,MAX_IDS=10000,MAX_URL_LENGTH=8000;
-var IDS='https://www.inaturalist.org/observations/identify?quality_grade=needs_id&reviewed=false'+
+var IDS='https://www.inaturalist.ca/observations/identify?quality_grade=needs_id&reviewed=false'+
   '&place_id=any&per_page='+BATCH+'&id=';
 // Preserve the full map's newest-first order and {url,n,lo,hi} batch contract.
 function order(ids){return Array.prototype.slice.call(ids).sort(function(a,b){return b-a;});}

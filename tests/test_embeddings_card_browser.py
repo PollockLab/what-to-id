@@ -54,7 +54,7 @@ def test_click_opens_card_with_neighbours_and_jump(open_page, site):
         card.get_by_role("link", name="More like this").get_attribute("href").split("#id=")[1]
     )
     assert card.get_by_role("link", name="Help identify on iNaturalist").get_attribute("href") == (
-        f"https://www.inaturalist.org/observations/{mine}"
+        f"https://www.inaturalist.ca/observations/{mine}"
     )
     assert card.get_by_role("link", name="Show on map").get_attribute("href") == (
         f"map.html#record={mine}"

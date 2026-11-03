@@ -90,7 +90,7 @@ def test_unreadable_shared_area_retains_criterion_and_blocks_identify_until_clea
     assert result["rechecked"] == before
     assert "unavailable" in before["note"].lower()
     assert cleared["invalid"] is False and cleared["hash"] == ""
-    assert cleared["href"].startswith("https://www.inaturalist.org/observations/identify?")
+    assert cleared["href"].startswith("https://www.inaturalist.ca/observations/identify?")
     assert cleared["disabled"] is None
 
 
