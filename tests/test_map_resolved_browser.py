@@ -34,6 +34,7 @@ def site(tmp_path_factory):
     ago = [0, 1, 2, 3, 4, 5, 6, 0, 1, 2] + [8 + i % 20 for i in range(30)]
     log = log_frame(range(1001, 1041), ago)
     log["iconic_taxon"] = ["Aves"] * 5 + ["Insecta"] * 5 + ["Plantae"] * 30
+    log["reason"] = [5] * 5 + [1] * 35  # backfilled Research Grade counts as Research Grade
     blobs["pool-resolved.bin"] = encode_left(log, pool, TREE, NOW)
     for name, blob in blobs.items():
         (root / name).write_bytes(blob)
@@ -96,7 +97,7 @@ def test_thirty_days_and_off_change_the_hash_and_the_layer(browser, site):
     page = open_map(browser, site)
     assert page.locator("#leftbox button").all_inner_texts() == ["Off", "7 days", "30 days"]
     page.click("#leftbox button:text('30 days')")
-    says(page, "40 left needs-ID in view in the 30 days")
+    says(page, "40 left needs-ID in view since")  # the log is 27 days old, not 30
     page.wait_for_function("location.hash.includes('resolved=30')")
     page.wait_for_function(f"{LEFT}.join() === '40'")
     page.click("#leftbox button:text('Off')")
