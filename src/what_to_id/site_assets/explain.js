@@ -30,7 +30,7 @@ function prep(){
 pop=el('div','xpop');pop.id='explain-pop';pop.setAttribute('role','dialog');pop.hidden=true;pop.tabIndex=-1;
 var X=el('button','xx','×');X.type='button';X.setAttribute('aria-label','Close');
 X.onclick=function(){close(true);};
-var more=el('a','xmore','More →');
+var more=el('a','xmore','More →');more.target='_blank';more.rel='noopener';
 pop.append(X,el('p','xdef'),el('p','xuse'),more);
 vh=el('div','site-vh');(document.body||document.documentElement).append(pop,vh);
 function open(x,p,kb){

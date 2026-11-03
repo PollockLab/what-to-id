@@ -70,7 +70,7 @@ def test_desktop_hover_opens_after_a_delay_and_esc_closes(browser):
     assert not _shown(page)
     page.wait_for_selector(POP, state="visible")
     assert time.monotonic() - start >= 0.25
-    assert _lines(page)[1:] == [glossary.GLOSSARY["needs-id"][0]]
+    assert _lines(page)[1:] == [glossary.GLOSSARY["needs-id"][0], "More →"]
     assert page.get_attribute("#t", "aria-expanded") == "true"
     box, t = page.locator(POP).bounding_box(), page.locator("#t").bounding_box()
     assert box["y"] >= t["y"] + t["height"] and box["x"] + box["width"] <= 1000
@@ -118,7 +118,7 @@ def test_rows_drawn_later_work_without_wiring(browser):
     )
     page.wait_for_function("document.getElementById('late').tabIndex===0")
     page.click("#late")
-    assert _lines(page)[1:] == [glossary.GLOSSARY["research-grade"][0]]
+    assert _lines(page)[1:] == [glossary.GLOSSARY["research-grade"][0], "More →"]
     # an unknown key is left alone
     page.evaluate("document.getElementById('late').dataset.explain='no-such-key'")
     page.click("#far")
@@ -127,13 +127,12 @@ def test_rows_drawn_later_work_without_wiring(browser):
 
 
 def test_use_line_and_more_link_show_when_given(browser, monkeypatch):
-    monkeypatch.setitem(
-        glossary.GLOSSARY, "needs-id", ("A term.", "Use it when testing.", "about.html#x")
-    )
+    monkeypatch.setitem(glossary.GLOSSARY, "needs-id", ("A term.", "Use it when testing.", None))
     page = _page(browser)
     page.click("#t")
     assert _lines(page) == ["×", "A term.", "Use it when testing.", "More →"]
-    assert page.get_attribute(f"{POP} a", "href") == "about.html#x"
+    assert page.get_attribute(f"{POP} a", "href") == "terms.html#needs-id"
+    assert page.get_attribute(f"{POP} a", "target") == "_blank"
 
 
 def test_desktop_hover_explains_a_button_and_its_click_still_works(browser):
@@ -141,7 +140,7 @@ def test_desktop_hover_explains_a_button_and_its_click_still_works(browser):
     start = time.monotonic()
     page.hover("#b")
     page.wait_for_selector(POP, state="visible")
-    assert time.monotonic() - start >= 0.25 and _lines(page)[1:] == [DEF]
+    assert time.monotonic() - start >= 0.25 and _lines(page)[1:] == [DEF, "More →"]
     page.click("#b")
     assert page.get_attribute("#b", "data-hit") == "1" and _shown(page)
     assert page.get_attribute("#b", "aria-expanded") is None
@@ -153,7 +152,7 @@ def test_phone_tap_on_a_button_acts_and_explains_once(browser):
     page = _page(browser, phone=True)
     page.tap("#b")
     assert page.get_attribute("#b", "data-hit") == "1" and _shown(page)
-    assert _lines(page)[1:] == [DEF]
+    assert _lines(page)[1:] == [DEF, "More →"]
     page.tap("#far")
     assert not _shown(page)
     page.tap("#b")

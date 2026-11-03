@@ -113,7 +113,8 @@ _EXPLAIN = Path(__file__).parent / "site_assets"
 
 def explain() -> str:
     """The toggletips' style, the glossary as JSON and the script, for the end of the header."""
-    data = json.dumps(GLOSSARY, separators=(",", ":")).replace("<", "\\u003c")
+    linked = {k: (d, u, f"terms.html#{k}") for k, (d, u, _) in GLOSSARY.items()}
+    data = json.dumps(linked, separators=(",", ":")).replace("<", "\\u003c")
     return (
         f"<style>{(_EXPLAIN / 'explain.css').read_text().strip()}</style>\n"
         f'<script type="application/json" id="explain-data">{data}</script>\n'
