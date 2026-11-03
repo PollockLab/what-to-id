@@ -69,3 +69,13 @@ def test_study_and_blind_pages_carry_none_of_it():
         "study": [],
         "blind": [],
     }
+
+
+def test_keys_built_in_script_are_in_the_glossary():
+    # the Identify tabs map level numbers to keys, the legend switch names its keys beside its modes
+    app = (SRC / "identify_assets/identify_app.js").read_text()
+    keys = re.findall(r"'([a-z-]+)'", re.search(r"var XK=\[0,([^\]]+)\]", app).group(1))
+    assert len(keys) == 5
+    legend = (SRC / "map_assets/level_colour.js").read_text()
+    keys += re.findall(r"'(colour-by-[a-z]+)'", legend)
+    assert len(keys) == 7 and [k for k in keys if k not in GLOSSARY] == []

@@ -1,4 +1,4 @@
-[data-explain]{text-decoration:underline dotted;text-underline-offset:3px;cursor:help}
+[data-explain]:not(a,button,input,select,textarea,label,summary){text-decoration:underline dotted;text-underline-offset:3px;cursor:help}
 [data-explain][aria-expanded="true"]{text-decoration-style:solid}
 .xpop{position:fixed;z-index:30;width:300px;max-width:calc(100vw - 16px);box-sizing:border-box;padding:10px 36px 10px 12px;
   background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);

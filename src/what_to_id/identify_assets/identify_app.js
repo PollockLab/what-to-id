@@ -184,11 +184,13 @@ function first(){
   if(S.total[2])return 2;
   return (CFG.levels.filter(function(l){return S.total[l[0]];})[0]||CFG.levels[1])[0];
 }
+// each level tab explains itself from the glossary, by level number
+var XK=[0,'level-clear-matches','level-close-calls','level-narrow-it-down','level-odd-shots','level-might-be-mislabelled'];
 function tabs(){
   var box=$('tabs');
   CFG.levels.forEach(function(x){
     var t=el('button','tab'),n=el('b',null,'');t.type='button';t.id='tab'+x[0];t.dataset.lv=x[0];
-    t.setAttribute('role','tab');t.setAttribute('aria-controls','panel');t.append(el('span',null,x[1]),n);
+    t.dataset.explain=XK[x[0]];t.setAttribute('role','tab');t.setAttribute('aria-controls','panel');t.append(el('span',null,x[1]),n);
     t.onclick=function(){if(P)choose(x[0]);};
     box.appendChild(t);
   });

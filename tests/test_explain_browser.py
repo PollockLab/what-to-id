@@ -10,10 +10,12 @@ from . import test_embeddings_browser as eb
 browser = eb.browser
 BODY = (
     '<main id="main-content"><p>Records that <span id="t" data-explain="needs-id">need an ID</span>'
-    ' and a <button type="button" id="b" data-explain="needs-id" onclick="this.dataset.hit=1">'
+    ' and a <button type="button" id="b" data-explain="needs-id"'
+    ' onclick="this.dataset.hit=(+this.dataset.hit||0)+1">'
     "button</button>.</p><p id=far>Elsewhere</p></main>"
 )
 POP = "#explain-pop"
+DEF = glossary.GLOSSARY["needs-id"][0]
 
 
 def _page(browser, phone=False):
@@ -53,10 +55,11 @@ def test_at_rest_nothing_new_shows_and_controls_stay_controls(browser):
         "false",
     ]
     assert "dotted" in t.evaluate("e => getComputedStyle(e).textDecorationStyle")
-    # a tagged button keeps its own click and never opens the toggletip
-    assert page.get_attribute("#b", "role") is None
-    page.click("#b")
-    assert page.get_attribute("#b", "data-hit") == "1" and not _shown(page)
+    # a tagged button stays a button: no role, tab stop, state or underline, but a description
+    b = page.locator("#b")
+    assert [b.get_attribute(a) for a in ("role", "tabindex", "aria-expanded")] == [None] * 3
+    assert b.evaluate("e => getComputedStyle(e).textDecorationLine") == "none"
+    assert page.inner_text("#" + b.get_attribute("aria-describedby")) == DEF
     assert page.errors == []
 
 
@@ -131,3 +134,51 @@ def test_use_line_and_more_link_show_when_given(browser, monkeypatch):
     page.click("#t")
     assert _lines(page) == ["×", "A term.", "Use it when testing.", "More →"]
     assert page.get_attribute(f"{POP} a", "href") == "about.html#x"
+
+
+def test_desktop_hover_explains_a_button_and_its_click_still_works(browser):
+    page = _page(browser)
+    start = time.monotonic()
+    page.hover("#b")
+    page.wait_for_selector(POP, state="visible")
+    assert time.monotonic() - start >= 0.25 and _lines(page)[1:] == [DEF]
+    page.click("#b")
+    assert page.get_attribute("#b", "data-hit") == "1" and _shown(page)
+    assert page.get_attribute("#b", "aria-expanded") is None
+    page.mouse.move(900, 650)
+    page.wait_for_selector(POP, state="hidden")
+
+
+def test_phone_tap_on_a_button_acts_and_explains_once(browser):
+    page = _page(browser, phone=True)
+    page.tap("#b")
+    assert page.get_attribute("#b", "data-hit") == "1" and _shown(page)
+    assert _lines(page)[1:] == [DEF]
+    page.tap("#far")
+    assert not _shown(page)
+    page.tap("#b")
+    assert page.get_attribute("#b", "data-hit") == "2"
+    page.wait_for_timeout(400)
+    assert not _shown(page)
+
+
+def test_keyboard_focus_explains_a_button_and_enter_still_acts(browser):
+    page = _page(browser)
+    page.focus("#t")
+    page.keyboard.press("Tab")
+    assert page.evaluate("document.activeElement.id") == "b"
+    page.wait_for_selector(POP, state="visible")
+    assert page.evaluate("document.activeElement.id") == "b"
+    page.keyboard.press("Enter")
+    assert page.get_attribute("#b", "data-hit") == "1"
+    page.keyboard.press("Shift+Tab")
+    assert not _shown(page)
+
+
+def test_removing_the_open_trigger_closes_it(browser):
+    page = _page(browser)
+    page.hover("#b")
+    page.wait_for_selector(POP, state="visible")
+    page.evaluate("document.getElementById('b').remove()")
+    page.wait_for_selector(POP, state="hidden")
+    assert page.errors == []
