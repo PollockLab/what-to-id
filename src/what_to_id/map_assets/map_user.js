@@ -1,7 +1,8 @@
 // The user filter. The User box takes an iNaturalist login or user number (hash: user=, and umode=
-// observer or unid; none is My taxa). It always adds without_ident_user_id to the Identify link, and
-// the select narrows the map by one of three rules: My taxa keeps the dots inside a genus or family
-// the user has identified in BC, Observer the dots the user observed (pool-observer.bin, one uint32 per
+// observer or unid; none is My taxa). Observer opens Identify on the user's records (user_id); the
+// others add without_ident_user_id, which would hide nearly all of an observer's own records. The
+// select narrows the map by one of three rules: My taxa keeps the dots inside a genus or family the
+// user has identified in BC, Observer the dots the user observed (pool-observer.bin, one uint32 per
 // record in shard order), Not yet identified by me hides the dots the user identified in the view.
 // Everything but the observer file comes from api.inaturalist.org in the browser, one request at a
 // time and at least a second apart, and is kept for the session. Without a user nothing is filtered.
@@ -98,8 +99,8 @@ function userFilter(o){
       return hide?hide.has(Pn.id[i]):false;},
     key:function(){return key;},
     active:function(){return !!(mask||ob||hide);},
-    params:function(){return id?{without_ident_user_id:String(id)}:{};},
-    tip:function(){return id?' Records the user identified are left out; ones you skipped are hidden by iNaturalist when you are signed in.':'';},
+    params:function(){return !id?{}:S.umode==='observer'?{user_id:String(id)}:{without_ident_user_id:String(id)};},
+    tip:function(){return id&&S.umode!=='observer'?' Records the user identified are left out; ones you skipped are hidden by iNaturalist when you are signed in.':'';},
     // the map counts are approximate under My taxa and Not yet identified, as Identify cannot say them
     note:function(){return mask?'The map keeps only the genera and families '+S.user+' has identified'+(capped?' (first '+
       nf.format(USR_CAP.taxa*USR_PER.taxa)+' taxa only)':'')+', which Identify cannot filter, so its count differs.':

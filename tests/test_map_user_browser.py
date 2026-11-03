@@ -164,9 +164,10 @@ def test_observer_keeps_the_users_own_records(browser, site):
     page = open_map(browser, site, "#user=10&umode=observer")
     shown(page, N // 2)  # the fixture's observers alternate between users 10 and 11
     assert page.calls == [] and "observed by" in page.inner_text("#usrbox p")
-    assert parse_qs(urlparse(page.get_attribute("#identify", "href")).query)[
-        "without_ident_user_id"
-    ] == ["10"]
+    # Identify opens the user's records; without_ident_user_id would drop the ones they identified
+    # themselves, which is nearly all of an observer's own records
+    q = parse_qs(urlparse(page.get_attribute("#identify", "href")).query)
+    assert q["user_id"] == ["10"] and "without_ident_user_id" not in q
     assert page.errors == []
     page.close()
 
