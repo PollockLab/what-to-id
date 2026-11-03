@@ -42,7 +42,19 @@ def site(tmp_path_factory):
     server.shutdown()
 
 
-def open_map(browser, url, hash_):
+# Genus A (900): 30 + 25 = 55 IDs. Genus B (901): 49, one short of the default threshold of 50. The
+# ancestors include an order the pool lacks.
+SPECIES_COUNTS = {
+    "total_results": 3,
+    "results": [
+        {"count": 30, "taxon": {"id": 1000, "ancestor_ids": [1, 800, 900, 1000]}},
+        {"count": 25, "taxon": {"id": 1001, "ancestor_ids": [1, 800, 900, 1001]}},
+        {"count": 49, "taxon": {"id": 1003, "ancestor_ids": [1, 800, 901, 1003]}},
+    ],
+}
+
+
+def open_map(browser, url, hash_, counts=None):
     p = browser.new_page(viewport={"width": 1280, "height": 900})
     p.errors, p.calls = [], []
     p.on("pageerror", lambda e: p.errors.append(str(e)))
@@ -59,11 +71,7 @@ def open_map(browser, url, hash_):
         if u.path.endswith("/users/autocomplete"):  # a prefix match first, then the exact login
             body = {"results": [{"id": 5, "login": "jdoe2"}, {"id": 777, "login": "JDoe"}]}
         elif u.path.endswith("/identifications/species_counts"):
-            # one species of Genus A; its ancestors are the genus and an order the pool lacks
-            body = {
-                "total_results": 1,
-                "results": [{"count": 3, "taxon": {"id": 1000, "ancestor_ids": [1, 900, 1000]}}],
-            }
+            body = counts or SPECIES_COUNTS
         elif u.path.endswith("/observations"):  # the user identified records 1 to 3 in the view
             body = {"total_results": 3, "results": [{"id": i} for i in (1, 2, 3)]}
         else:
@@ -85,7 +93,7 @@ def test_my_taxa_keeps_the_users_genera_and_adds_the_user_to_the_identify_link(b
     page = open_map(browser, site, "#user=jdoe&umode=taxa")
     shown(page, IN_GENUS_A)
     assert page.input_value("#usrname") == "jdoe" and page.input_value("#usrbox select") == "taxa"
-    assert "has identified" in page.inner_text("#usrbox p")
+    assert page.inner_text("#usrbox p") == "Genera where jdoe has at least 50 IDs in BC (1 genus)."
     # the login is looked up once, then the taxa are read for the user number that matched exactly
     paths = [c[0].rsplit("/v1/", 1)[1] for c in page.calls]
     assert paths == ["users/autocomplete", "identifications/species_counts"]
@@ -94,7 +102,9 @@ def test_my_taxa_keeps_the_users_genera_and_adds_the_user_to_the_identify_link(b
     link = urlparse(page.get_attribute("#identify", "href"))
     assert parse_qs(link.query)["without_ident_user_id"] == ["777"]
     assert "skipped" in page.get_attribute("#identify", "title")
-    assert "differs" in page.inner_text("#idnote")  # the count is approximate under My taxa
+    # Identify gets the kept genera as taxon_id, so its count matches the map
+    assert parse_qs(link.query)["taxon_id"] == ["900"]
+    assert page.inner_text("#idnote") == "Genera where jdoe has at least 50 IDs in BC (1 genus)."
     # clearing the box brings every record back and takes the user out of the link and the hash
     page.fill("#usrname", "")
     page.press("#usrname", "Enter")
@@ -130,11 +140,7 @@ def test_a_throttled_reply_is_tried_again(browser, site):
         if len(hits) == 1:
             route.fulfill(status=429, body="")
         else:
-            body = {
-                "total_results": 1,
-                "results": [{"count": 1, "taxon": {"id": 1000, "ancestor_ids": [1, 900, 1000]}}],
-            }
-            route.fulfill(json=body)
+            route.fulfill(json=SPECIES_COUNTS)
 
     page.route("https://api.inaturalist.org/**", api)
     page.goto(site + "#user=42&umode=taxa")
@@ -156,6 +162,7 @@ def test_an_area_listed_by_id_keeps_the_user_out_of_every_batch(browser, site):
     q = parse_qs(link.query)
     assert q["id"] and q["without_ident_user_id"] == ["42"]
     assert len(q["id"][0].split(",")) == IN_GENUS_A
+    assert "taxon_id" not in q  # the ids already say which records
     assert page.errors == []
     page.close()
 
@@ -194,5 +201,86 @@ def test_not_yet_identified_hides_the_records_the_user_identified_in_the_view(br
     assert q["ident_user_id"] == ["42"] and q["quality_grade"] == ["needs_id"]
     assert {"swlat", "swlng", "nelat", "nelng"} <= q.keys()
     assert page.is_visible("#usrbox button") and "approximate" in page.inner_text("#idnote")
+    assert page.errors == []
+    page.close()
+
+
+def test_the_threshold_selector_filters_by_genus_sum_and_round_trips_in_the_hash(browser, site):
+    page = open_map(browser, site, "#user=42&umode=taxa")
+    shown(page, IN_GENUS_A)
+    assert page.input_value("#usrbox select:nth-of-type(2)") == "50"
+    assert "umin" not in page.evaluate("location.hash")  # the default is not written
+    page.select_option("#usrbox select:nth-of-type(2)", "20")  # Genus B has 49, enough for 20
+    shown(page, N)
+    page.wait_for_function("location.hash.includes('umin=20')")
+    assert parse_qs(urlparse(page.get_attribute("#identify", "href")).query)["taxon_id"] == [
+        "900,901"
+    ]
+    assert page.inner_text("#idnote") == "Genera where 42 has at least 20 IDs in BC (2 genera)."
+    assert [c[0].rsplit("/v1/", 1)[1] for c in page.calls] == ["identifications/species_counts"]
+    page.close()
+    page = open_map(browser, site, "#user=42&umode=taxa&umin=20")
+    shown(page, N)
+    assert page.input_value("#usrbox select:nth-of-type(2)") == "20"
+    page.close()
+
+
+def test_the_selector_shows_only_in_my_taxa_mode(browser, site):
+    page = open_map(browser, site, "#user=42&umode=taxa")
+    shown(page, IN_GENUS_A)
+    assert page.is_visible("#usrbox select:nth-of-type(2)")
+    page.select_option("#usrbox select:nth-of-type(1)", "unid")
+    page.wait_for_function("!document.querySelector('#usrbox select:nth-of-type(2)').offsetParent")
+    page.close()
+
+
+def test_a_threshold_that_keeps_nothing_falls_back_and_says_so_without_writing_it(browser, site):
+    page = open_map(browser, site, "#user=42&umode=taxa&umin=100")
+    shown(page, IN_GENUS_A)  # Genus A has 55, so 50 is the highest lower threshold that keeps one
+    assert page.input_value("#usrbox select:nth-of-type(2)") == "50"
+    text = "Genera where 42 has at least 50 IDs in BC (1 genus); none reach 100 yet."
+    assert page.inner_text("#usrbox p") == text and page.inner_text("#idnote") == text
+    assert "umin=100" in page.evaluate(
+        "location.hash"
+    )  # the pick stays, the fallback is not written
+    page.close()
+    few = {
+        "total_results": 1,
+        "results": [{"count": 7, "taxon": SPECIES_COUNTS["results"][0]["taxon"]}],
+    }
+    page = open_map(browser, site, "#user=42&umode=taxa", counts=few)
+    shown(page, IN_GENUS_A)
+    assert page.input_value("#usrbox select:nth-of-type(2)") == "5"
+    assert "none reach 50 yet" in page.inner_text("#idnote")
+    assert "umin" not in page.evaluate("location.hash")
+    page.close()
+
+
+def test_a_user_with_no_genus_at_five_keeps_nothing_and_says_so(browser, site):
+    none = {
+        "total_results": 1,
+        "results": [{"count": 4, "taxon": SPECIES_COUNTS["results"][0]["taxon"]}],
+    }
+    page = open_map(browser, site, "#user=42&umode=taxa", counts=none)
+    shown(page, 0)
+    text = "42 has fewer than 5 IDs in any BC genus yet. Try Observer or Not yet identified by me."
+    assert page.inner_text("#usrbox p") == text and page.inner_text("#idnote") == text
+    assert page.errors == []
+    page.close()
+
+
+def test_too_many_genera_for_one_link_send_the_top_ones_and_say_so(browser, site):
+    page = open_map(browser, site, "#user=42&umode=taxa&umin=20")
+    shown(page, N)
+    page.evaluate("META.max_url = 1504")  # room for one three-digit id
+    page.select_option("#usrbox select:nth-of-type(2)", "50")
+    page.select_option("#usrbox select:nth-of-type(2)", "20")
+    page.wait_for_function("document.getElementById('idnote').textContent.includes('top genus')")
+    # Genus B has more records to identify than Genus A
+    assert parse_qs(urlparse(page.get_attribute("#identify", "href")).query)["taxon_id"] == ["901"]
+    assert page.inner_text("#idnote") == (
+        "Genera where 42 has at least 20 IDs in BC (2 genera). "
+        "Identify gets only the top genus by records to identify."
+    )
     assert page.errors == []
     page.close()

@@ -163,3 +163,27 @@ def test_observer_is_the_default_with_an_observer_file_and_taxa_is_written():
     assert run(body % "taxa", META) == [["user=1"], ""]
     assert run(body % "taxa", meta) == [["user=1", "umode=taxa"], "taxa"]
     assert run(body % "observer", meta) == [["user=1"], ""]  # old links stay valid
+
+
+def test_umin_round_trips_in_taxa_mode_and_the_default_is_not_written():
+    meta = {**META, "observer": "pool-observer.bin"}
+    body = "var S=MF.read(new URLSearchParams(%s));return [MF.write(S),S.umin];"
+    for h, written, umin in [
+        ("user=1&umode=taxa&umin=20", ["user=1", "umode=taxa", "umin=20"], 20),
+        ("user=1&umode=taxa&umin=5", ["user=1", "umode=taxa", "umin=5"], 5),
+        ("user=1&umode=taxa&umin=100", ["user=1", "umode=taxa", "umin=100"], 100),
+        ("user=1&umode=taxa&umin=50", ["user=1", "umode=taxa"], 0),  # the default
+        ("user=1&umode=taxa", ["user=1", "umode=taxa"], 0),  # an old link
+        ("user=1&umode=taxa&umin=7", ["user=1", "umode=taxa"], 0),
+        ("user=1&umode=unid&umin=20", ["user=1", "umode=unid"], 20),  # read, not written
+    ]:
+        assert run(body % json.dumps(h), meta) == [written, umin]
+    # without an observer file My taxa is the default mode and writes no umode, but still umin
+    assert run(body % json.dumps("user=1&umin=20"), META) == [["user=1", "umin=20"], 20]
+    assert run(body % json.dumps("user=1&umode=observer&umin=20"), meta) == [["user=1"], 20]
+
+
+def test_tokens_keep_umin_for_explore_to_forward():
+    assert run("return MapFilter.tokens('#user=1&umode=taxa&umin=20&at=5/49/-123');") == (
+        "user=1&umode=taxa&umin=20"
+    )

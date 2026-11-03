@@ -38,7 +38,7 @@ var hashTimer=0,UF=userFilter({S:S,meta:META,get:get,taxa:function(){return TAXA
 // The split view hands the selection over live; the area and projects are not part of it yet.
 var SYNC=MapFilter.sync({key:function(){return MF.write(S).join('&');},apply:function(str){
   var r=MF.read(new URLSearchParams(str)),was=taxaKey();
-  ['up','lo','hi','months','groups','only','acc','user','umode'].forEach(function(k){S[k]=r[k];});
+  ['up','lo','hi','months','groups','only','acc','user','umode','umin'].forEach(function(k){S[k]=r[k];});
   S.picks.length=0;r.picks.forEach(function(p){S.picks.push(p);});S.split=[];
   // before the taxa and records are in, refilter runs once they are
   if(TAXA){search();FB.showClades();}
@@ -448,7 +448,7 @@ map.addControl(new maplibregl.NavigationControl({showCompass:false}));var GEO=ne
 var overlay=new deck.MapboxOverlay({interleaved:false,pickingRadius:8,layers:[]});map.addControl(overlay);
 var AREA=MapArea({map:map,S:S,LAST:LAST,hash:S.area,park:S.park,bcpark:S.bcpark,fit:!S.at,
   place:META.place_id,parks:META.parks,get:get,P:function(){return P;},keep:function(){return KEEP;},change:refilter,
-  sel:function(){return sel().join('&');},extra:function(){var u=UF.params();return Object.keys(u).map(function(k){return '&'+k+'='+encodeURIComponent(u[k]);}).join('');},
+  sel:function(){return sel().join('&');},extra:function(){var u=UF.params(true);return Object.keys(u).map(function(k){return '&'+k+'='+encodeURIComponent(u[k]);}).join('');},
   step:IdStep({a:$('identify'),prev:$('idprev'),next:$('idnext'),build:iso(LAST)})});
 // Guard activation before IdStep's handlers, including a stale batch or keyboard activation.
 function stopInvalidIdentify(e){if(AREA.invalid()){e.preventDefault();e.stopImmediatePropagation();}}

@@ -196,7 +196,7 @@ function oldQuery(){if(!S.oldq)return;
   showClades();}
 // The selection bar lists every chip, the dates too; its Clear all clears them, and Reset also the map view.
 function redraw(){showGroups();showMonths();showOnly();refilter();}
-function clearAll(){S.lo=0;S.hi=LAST;S.up=false;S.months=0;S.groups={};S.only={};S.acc='';S.user=S.umode='';S.picks.length=0;S.split=[];$('q').value='';showClades();
+function clearAll(){S.lo=0;S.hi=LAST;S.up=false;S.months=0;S.groups={};S.only={};S.acc='';S.user=S.umode='';S.umin=0;S.picks.length=0;S.split=[];$('q').value='';showClades();
   o.search();o.area().clear();PJ.reset();redraw();}
 $('reset').onclick=function(){clearAll();o.reset();};
 var BAR=CH.bar({box:$('selbar'),clear:clearAll,fallback:$('q')});
