@@ -25,6 +25,14 @@ def test_every_glossary_key_is_one_anchor_in_one_group():
     assert "Needs ID</dt>" in html and "Narrow it down</dt>" in html
 
 
+def test_labels_read_id_as_ID_and_match_the_page():
+    assert terms_page.label("agreeing-ids") == "Agreeing IDs"
+    assert terms_page.label("share-needing-id") == "Share needing ID"
+    assert terms_page.label("identified-to-rank") == "Identified to rank"
+    # the user filter's option text on the map
+    assert terms_page.label("not-identified-by-me") == "Not yet identified by me"
+
+
 def test_every_more_link_targets_an_anchor():
     data = re.search(r'id="explain-data">(.*?)</script>', page_nav.nav("map.html")).group(1)
     ids = _ids(terms_page.render())

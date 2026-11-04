@@ -19,14 +19,13 @@ from what_to_id.glossary import GLOSSARY
 
 HERE = Path(__file__).parent
 PAGE_NAME = "terms.html"
-# Labels the key does not give: "needs-id" would read "Needs id". Levels use the Identify names.
+# Labels the key does not give, after "id" is read as "ID". Levels use the Identify names.
 LABELS = {
-    "needs-id": "Needs ID",
     "research-grade": "Research Grade",
-    "left-needs-id": "Left needs ID",
     "globi": "GloBI",
     "match-n": "Match number",
     "my-taxa": "My taxa",
+    "not-identified-by-me": "Not yet identified by me",
     "all-of-bc": "All of BC",
     **{
         "level-" + re.sub("[^a-z]+", "-", name.lower()).strip("-"): name
@@ -61,7 +60,7 @@ dt:target{background:var(--chip);outline:2px solid var(--bar)}
 
 
 def label(key: str) -> str:
-    return LABELS.get(key) or key.replace("-", " ").capitalize()
+    return LABELS.get(key) or re.sub(r"\bid(s?)\b", r"ID\1", key.replace("-", " ").capitalize())
 
 
 def _cut(source: str, pattern: str) -> str:
