@@ -56,6 +56,22 @@ def test_sync_script_local_mode_orders_manifest_last_and_prunes(index, tmp_path)
     run("pull", str(work))
     assert (work / "base.codes.u8").exists()
 
+    # "taxa" and "identify" pull the manifest plus just those files, whatever else the host has
+    (host / "taxa-old.f16").write_bytes(b"t")
+    (host / "taxa-old.tsv.gz").write_bytes(b"n")
+    (host / "identify.parquet").write_bytes(b"i")
+    for only, want in (
+        ("taxa", {"taxa-old.f16", "taxa-old.tsv.gz"}),
+        ("identify", {"identify.parquet"}),
+    ):
+        run("pull", str(tmp_path / only), only)
+        assert {p.name for p in (tmp_path / only).iterdir()} == want | {"manifest.json"}
+    run("pull", str(tmp_path / "full"))
+    assert (tmp_path / "full" / "identify.parquet").exists()
+    assert not (tmp_path / "full" / "taxa-old.f16").exists()
+    for name in ("taxa-old.f16", "taxa-old.tsv.gz", "identify.parquet"):
+        (host / name).unlink()
+
     (host / "stale.bin").write_bytes(b"x")  # e.g. a delta part a compaction folded away
     (host / "model").mkdir()
     (host / "model" / "text_encoder-abc.onnx").write_bytes(b"m")  # seeded once, never synced
@@ -166,6 +182,8 @@ def test_workflow_is_gated_pinned_and_off_the_pages_group():
     assert wf["jobs"]["encode"]["timeout-minutes"] <= 180
     for name in ("plan", "apply"):  # atlas_sync.sh needs the hf CLI, which requirements.lock lacks
         assert any("huggingface_hub==" in step.get("run", "") for step in wf["jobs"][name]["steps"])
+    steps = [step.get("name") for step in wf["jobs"]["apply"]["steps"]]
+    assert steps.index("Score the new photos for Identify") == steps.index("Upload the index") - 1
     uses = re.findall(r"uses: (\S+)@(\S+)", text)
     assert uses and all(re.fullmatch(r"[0-9a-f]{40}", ref) for _, ref in uses)
     for action in ("checkout", "setup-python", "upload-artifact"):
