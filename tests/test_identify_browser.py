@@ -368,6 +368,21 @@ def test_the_batch_links_cover_the_listed_ids(browser, site):
     assert page.errors == []
 
 
+def test_the_batches_follow_the_card_order_not_the_newest_ids(browser, site):
+    base, _ = site
+    page = open_identify(browser, base)
+    # a list holds 21 cards, so append 200 newer ids: sorted newest first they would fill batch 1
+    page.evaluate(
+        "() => { const f = IdentifyLinks.batches; IdentifyLinks.batches = (ids, kept) => "
+        "f(Array.from(ids).concat(Array.from({length: 200}, (_, i) => 1e10 + i)), kept); }"
+    )
+    tab(page, 2).click()
+    shown = page.evaluate("__identify.view()")[2]
+    first = [int(i) for i in page.get_attribute("#go", "href").split("&id=")[1].split(",")]
+    assert set(shown) <= set(first) and first == sorted(first, reverse=True)
+    assert page.errors == []
+
+
 def test_without_the_range_file_the_cards_have_no_range_chips(browser, site):
     base, _ = site
     page = open_identify(browser, base, "#lvl=1")
