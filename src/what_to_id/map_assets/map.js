@@ -256,7 +256,7 @@ function link(){
   if(gl.out.length)why.push('Identify cannot leave out the '+gn(gl.out)+' group beside picked taxa, so it keeps it');
   if(lost.indexOf('taxa')>=0)why.push('too many taxa for one link, so it opens every taxon');
   if(lost.indexOf('not')>=0)why.push('too many taxa left out for one link, so it keeps them');
-  if(PJ.inexact())why.push(PJ.inexact());if(S.only.oneid)why.push('Identify cannot filter records one ID from Research Grade');if(ORDER&&!u)why.push('most needed first');
+  if(PJ.inexact())why.push(PJ.inexact());if(S.only.oneid)why.push('Identify cannot filter records one ID from Research Grade');if(ORDER&&!u)why.push('sorted by conservation status: listed by SARA or COSEWIC, then BC S1-S2, then BC S3, at most 5 records of a species a round');
   // listed by id (u stays null), the records are the map's, so only the way they open is said
   // these records' next agree settles them, so the note asks for an independent ID first
   // past the limit the first 10,000 open by default; the button switches to all of them and back

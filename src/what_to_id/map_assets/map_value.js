@@ -1,4 +1,4 @@
-// "Most needed first": the Identify batches open the records of species at risk in BC first, listed
+// "Sort by conservation status": the Identify batches open the records of species at risk in BC first, listed
 // in Canada (tier 1), then BC S1-S2 (2), then BC S3 (3), and the rest after them in map order. Within
 // a tier each species gives at most PER records a round, so one common listed species cannot fill
 // the first batches, and within a round the species with the fewest BC Research Grade records go

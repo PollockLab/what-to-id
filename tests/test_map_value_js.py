@@ -1,4 +1,4 @@
-"""The map's "Most needed first" order (map_value.js), run in node."""
+"""The map's "Sort by conservation status" order (map_value.js), run in node."""
 
 import json
 import shutil

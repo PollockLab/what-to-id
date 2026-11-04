@@ -152,7 +152,7 @@ def value_site(tmp_path_factory):
     server.shutdown()
 
 
-def test_most_needed_first_lists_at_risk_records_first_and_back(browser, value_site):
+def test_conservation_status_sort_lists_at_risk_records_first_and_back(browser, value_site):
     page = open_map(browser, value_site, "")
     shown(page, VN)
     order = page.locator("#idorder")
@@ -166,7 +166,9 @@ def test_most_needed_first_lists_at_risk_records_first_and_back(browser, value_s
     assert len(ids) == 200 and taxa.count(1003) == 50 and taxa.count(1001) == 50
     assert "batch 1 of 2" in page.inner_text("#identify")
     assert order.get_attribute("aria-pressed") == "true"
-    assert page.inner_text("#idnote").startswith("Most needed first, so it opens these records")
+    note = page.inner_text("#idnote")
+    assert note.startswith("Sorted by conservation status: listed by SARA or COSEWIC, then BC S1")
+    assert ", so it opens these records" in note
     order.click()
     page.wait_for_function("!(document.getElementById('identify').href || '').includes('&id=')")
     assert page.errors == []
