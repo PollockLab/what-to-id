@@ -123,14 +123,14 @@ function more(){
   if(IO&&!b.hidden){IO.unobserve(b);IO.observe(b);}  // observe again: a tall pane may still show it
 }
 // "Identify N listed", or with more than one batch "Identify 200 · batch 2 of 50": the button
-// names the batch it opens, since the arrows change only its link. Batches are newest first.
+// names the batch it opens, since the arrows change only its link. Batches follow the card order.
 function batch(){
   var all=view[LV]||[],t=all.n||all.length,rows=all.slice(0,IdentifyLinks.MAX_IDS),capped=rows.length<t;  // n: a first list's full length
-  LINKS=rows.length?IdentifyLinks.batches(rows.map(function(i){return P.id[i];})):[];BI=0;
+  LINKS=rows.length?IdentifyLinks.batches(rows.map(function(i){return P.id[i];}),true):[];BI=0;
   $('batch').hidden=!rows.length;$('cap').hidden=LINKS.length<2;
   ONE=capped?'Identify the first '+nf.format(rows.length)+' of '+nf.format(t):'Identify '+nf.format(rows.length)+' listed';
   $('cap').textContent=(capped?'The first '+nf.format(rows.length)+' of '+nf.format(t):nf.format(rows.length))+
-    ' listed, newest first, '+IdentifyLinks.BATCH+' per batch';
+    ' listed, in the order shown, '+IdentifyLinks.BATCH+' per batch';
   $('go').title='Up to '+PER_SPECIES+' per species';
   step(0);
 }
