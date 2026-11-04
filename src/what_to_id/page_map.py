@@ -63,7 +63,15 @@ from what_to_id.map_parks import PARKS_NAME, parks_blob, parks_version
 from what_to_id.map_projects import add_projects
 from what_to_id.page import ARM_WORDS, group_name
 from what_to_id.site_files import dump, hashed
-from what_to_id.taxonomy import GROUP_TAXA, NO_RANK, NO_TAXON, PRESETS, load_tree, taxa_table
+from what_to_id.taxonomy import (
+    AT_RISK,
+    GROUP_TAXA,
+    NO_RANK,
+    NO_TAXON,
+    PRESETS,
+    load_tree,
+    taxa_table,
+)
 
 MAP_NAME = "map.html"
 TAXA_NAME = "pool-taxa.bin"
@@ -115,6 +123,7 @@ MAP_JS = (
     "map_taxa.js",
     "map_step.js",
     "map_area.js",
+    "map_value.js",
     "map_projects.js",
     "map_user.js",
     "map_resolved.js",
@@ -223,7 +232,7 @@ def encode_points(pool: pd.DataFrame, tree: dict | None = None) -> tuple[dict[st
         "taxa_n": int(np.unique(tidx[tidx != NO_TAXON]).size),
     }
     if complete:
-        meta["presets"] = PRESETS
+        meta["presets"], meta["value"] = PRESETS, AT_RISK
     if users is not None:
         meta["observer"] = observer
     return out, meta

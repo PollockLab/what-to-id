@@ -4,11 +4,12 @@ var IdentifyLinks=(function(){
 var BATCH=200,MAX_IDS=10000,MAX_URL_LENGTH=8000;
 var IDS='https://www.inaturalist.ca/observations/identify?quality_grade=needs_id&reviewed=false'+
   '&place_id=any&per_page='+BATCH+'&id=';
-// Preserve the full map's newest-first order and {url,n,lo,hi} batch contract.
+// Preserve the full map's newest-first order and {url,n,lo,hi} batch contract. kept: the ids are
+// already in the order to open, so only each batch is sorted newest-first.
 function order(ids){return Array.prototype.slice.call(ids).sort(function(a,b){return b-a;});}
-function batches(ids){
-  var s=order(ids),out=[];
-  for(var i=0;i<s.length;i+=BATCH){var b=s.slice(i,i+BATCH);
+function batches(ids,kept){
+  var s=kept?ids:order(ids),out=[];
+  for(var i=0;i<s.length;i+=BATCH){var b=kept?order(s.slice(i,i+BATCH)):s.slice(i,i+BATCH);
     out.push({url:IDS+b.join(','),n:b.length,lo:b[b.length-1],hi:b[0]});}
   return out;
 }

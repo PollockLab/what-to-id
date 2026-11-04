@@ -456,19 +456,22 @@ function MapArea(ctx){
   // beside them. Past MAXB batches the note asks for a narrower selection, and until then the link
   // opens the box. url(box, params) builds the link; a null box leaves it out. With need, a filter
   // Identify cannot say, the records are listed by id even without an area (past the limit, the
-  // first of them, or all with EVERY).
+  // first of them, or all with EVERY). ctx.order(), when it gives a function, reorders the records first.
   function link(v,url,match,need){var t=term();LINKS=[];BOX=null;CAP=0;
     if(unresolved()){LINK='';ui();return null;}
     if(!(t||need)||!ctx.P().n){LINK='';ui();return url(v);}
     var P=ctx.P(),keep=ctx.keep(),S=ctx.S,day=S.up?P.up:P.obs,full=S.lo===0&&S.hi===ctx.LAST,
       ids=[],n=0,i,d,q=t?t.inat():{},L=need&&EVERY?1/0:BATCH*MAXB;
     function dated(i){d=day[i];return d===65535?full:d>=S.lo&&d<=S.hi;}
-    for(i=0;i<P.n;i++){if(!keep[i]||!dated(i))continue;if(++n<=L)ids.push(P.id[i]);}
+    var o=ctx.order&&ctx.order();
+    if(o){var ix=[];for(i=0;i<P.n;i++)if(keep[i]&&dated(i))ix.push(i);n=ix.length;ix=o(ix);
+      for(i=0;i<n&&i<L;i++)ids.push(P.id[ix[i]]);}
+    else for(i=0;i<P.n;i++){if(!keep[i]||!dated(i))continue;if(++n<=L)ids.push(P.id[i]);}
     if(q.exact){LINK='Identify uses the iNaturalist park filter for '+t.label+'. '+
       'The map uses public coordinates; obscuration and location uncertainty can make the sets differ.';ui();
       return url(null,q.params);}
     if(!n){LINK='No records inside this area match these filters.';ui();return url(v);}
-    var q2=ctx.extra?ctx.extra():'';function listed(){return batches(ids).map(function(b){b.url+=q2;return b;});}
+    var q2=ctx.extra?ctx.extra():'';function listed(){return batches(ids,!!o).map(function(b){b.url+=q2;return b;});}
     if(need&&n>BATCH*MAXB)CAP=n;
     if(n<=L){LINKS=listed();var k=LINKS.length;
       LINK='Exact: '+(k>1?nf.format(n)+' records in '+k+' batches of up to '+BATCH:n===1?'this record by id':
