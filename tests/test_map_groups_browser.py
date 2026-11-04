@@ -8,6 +8,7 @@ import threading
 import pytest
 
 from what_to_id.page_map import encode_points, render_map
+from what_to_id.taxonomy import PRESETS
 
 from . import test_embeddings_browser as eb
 from .embeddings_fixture import TREE, pool_frame
@@ -185,3 +186,16 @@ def test_a_record_message_opens_the_card_of_the_first_and_last_id_and_ignores_a_
     assert card(300).endswith("/observations/300")
     assert card(150).endswith("/observations/150")
     assert card(301) is None and card(0) is None
+
+
+def test_challenge_shortcut_picks_its_taxa_and_cycles(page):
+    ids = next(roots for label, roots, _ in PRESETS if label == "Conservation Challenge")
+    chip = page.locator("#cladebox button", has_text="Conservation Challenge")
+    chip.click()
+    page.wait_for_function("location.hash.includes('taxa=')")
+    taxa = page.evaluate("new URLSearchParams(location.hash.slice(1)).get('taxa')")
+    assert sorted(int(t) for t in taxa.split(",")) == ids
+    assert chip.get_attribute("aria-pressed") == "true"
+    chip.click()
+    chip.click()
+    page.wait_for_function("!location.hash.includes('taxa=')")
