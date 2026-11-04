@@ -102,7 +102,7 @@ def render(dates: dict | None = None) -> str:
     for group, keys in GROUPS.items():
         items = []
         for k in keys:
-            definition, use, _ = GLOSSARY[k]
+            definition, use = GLOSSARY[k]
             text = escape(definition) + (f" {escape(use)}" if use else "")
             items.append(f'<dt id="{k}">{escape(label(k))}</dt><dd>{text}</dd>')
         terms.append(f"<h3>{escape(group)}</h3>\n<dl>{''.join(items)}</dl>")

@@ -127,7 +127,7 @@ def test_rows_drawn_later_work_without_wiring(browser):
 
 
 def test_use_line_and_more_link_show_when_given(browser, monkeypatch):
-    monkeypatch.setitem(glossary.GLOSSARY, "needs-id", ("A term.", "Use it when testing.", None))
+    monkeypatch.setitem(glossary.GLOSSARY, "needs-id", ("A term.", "Use it when testing."))
     page = _page(browser)
     page.click("#t")
     assert _lines(page) == ["×", "A term.", "Use it when testing.", "More →"]

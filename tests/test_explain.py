@@ -42,10 +42,9 @@ def test_entries_are_plain_sentences():
     assert GLOSSARY
     for key, entry in GLOSSARY.items():
         assert re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", key), key
-        definition, use, more = entry
+        definition, use = entry
         assert definition.strip() and definition.rstrip().endswith("."), key
         assert use is None or (use.strip() and use.startswith("Use it when ")), key
-        assert more is None or more.strip(), key
         text = " ".join(x for x in entry if x)
         assert "—" not in text and "--" not in text, key
         assert not [w for w in FORBIDDEN if w in text.lower()], key
