@@ -228,6 +228,21 @@ jobs:
           scripts/atlas_sync.sh pull live identify
           python -m what_to_id.identify --live live --index index --pool state/pool.parquet \
             --tree state/taxonomy.json --taxa taxa --vectors "${files[@]}"
+      # Confused pairs for today's pool, from the live per-record scores (see what_to_id.confusion delta):
+      # records added or renamed since are scored from the raw vectors of every delta kept on the
+      # atlas-state release plus today's, records that left the pool drop out, and both tables are
+      # rebuilt. Nothing happens until a Fir run has pushed confusion-scores.parquet.
+      - name: Score the new photos for confused pairs
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          mkdir -p deltas
+          gh release download "$RAW_TAG" -D deltas -p 'raw-delta-*.npz' --clobber
+          scripts/atlas_sync.sh pull taxa taxa
+          scripts/atlas_sync.sh pull live confusion
+          python -m what_to_id.confusion delta --live live --index index --pool state/pool.parquet \
+            --taxa taxa --vectors deltas/raw-*.npz raw/raw-*.npz
       - name: Upload the index
         run: scripts/atlas_sync.sh push index
         env:

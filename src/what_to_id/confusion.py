@@ -26,7 +26,14 @@ on the 466 species it covers), and trimming or filtering the proposals changes n
 embeddings in chunks, score text margins only, and write the per-species confused pairs table
 (`confusion.parquet`) next to the atlas index, registered in its manifest for the page to fetch.
 The same pass also yields `fir_records`, the worst negative-margin photos of each listed pair
-(`confusion-records.parquet`), registered under its own manifest key.
+(`confusion-records.parquet`), registered under its own manifest key, and the per-record text
+scores (`SCORE_COLUMNS`, `confusion-scores.parquet`) that the daily atlas run extends.
+
+`delta` is that daily step: it scores the pool's species records that the live scores table lacks
+or that changed name since, from the raw vectors of the atlas deltas, drops records that left the
+pool, and rebuilds both tables from the result. A text margin needs only the photo's own vector,
+so the tables match a full Fir run for every record with a vector; a record renamed after the
+Fir run and without a delta vector drops out until the next Fir run.
 """
 
 from __future__ import annotations
@@ -69,6 +76,7 @@ TABLE_COLUMNS = (
     "share",
     "built_at",
 )
+SCORE_COLUMNS = ("id", "taxon_name", "own", "other", "other_name")
 TEXT_COLUMNS = ("text_own", "text_other", "text_other_name", "text_margin")
 
 
@@ -335,6 +343,64 @@ def fir_records(
     return out[list(RECORD_COLUMNS)].reset_index(drop=True)
 
 
+def daily_scores(
+    state: pd.DataFrame,
+    pool: pd.DataFrame,
+    E: np.ndarray,
+    ids: np.ndarray,
+    taxa: pd.Series,
+    T: np.ndarray,
+) -> pd.DataFrame:
+    """`SCORE_COLUMNS` for the pool's species records: `state` rows whose name still matches the
+    pool, rescored or new rows for records with a vector in `E` (rows `ids`), the rest dropped."""
+    sp = pool.loc[pool["rank"] == "species", ["id", "taxon_id", "taxon_name"]].dropna()
+    key = ["id", "taxon_name"]
+    kept = state[list(SCORE_COLUMNS)].astype({"taxon_name": str}).merge(sp[key], on=key)
+    todo = pool[pool["id"].isin(sp["id"]) & ~pool["id"].isin(kept["id"])]
+    new = fir_scores(todo, E, ids, taxa, T)[list(SCORE_COLUMNS)]
+    return pd.concat([kept, new], ignore_index=True).astype({"id": np.int64})
+
+
+def current_scores(state: pd.DataFrame, pool: pd.DataFrame) -> pd.DataFrame:
+    """`fir_scores` rows rebuilt from a `SCORE_COLUMNS` table and the pool rows it still matches."""
+    extra = [c for c in ("iconic_taxon", "photo_url") if c in pool.columns]
+    p = pool.loc[pool["rank"] == "species", ["id", "taxon_id", "taxon_name", *extra]].dropna(
+        subset=["id", "taxon_id", "taxon_name"]
+    )
+    s = state.astype({"taxon_name": str, "other_name": object})
+    out = p.merge(s, on=["id", "taxon_name"])
+    return out.assign(taxon_id=out["taxon_id"].astype(np.int64), margin=out["own"] - out["other"])
+
+
+def write_tables(atlas_dir: str | Path, manifest: dict, state: pd.DataFrame, scores: pd.DataFrame):
+    """Write the pairs, records and per-record score tables and register them in `manifest`."""
+    built_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    out = fir_table(scores, built_at)
+    records = fir_records(scores, out)
+    atlas = Path(atlas_dir)
+    files = {
+        "confusion": ("confusion.parquet", out),
+        "confusion_records": ("confusion-records.parquet", records),
+        "confusion_scores": ("confusion-scores.parquet", state[list(SCORE_COLUMNS)]),
+    }
+    for key, (name, df) in files.items():
+        tmp = atlas / f"{name}.tmp"
+        df.to_parquet(tmp, index=False)
+        tmp.replace(atlas / name)
+        manifest[key] = {"name": name, "built_at": built_at, "count": len(df)}
+    write_manifest(atlas_dir, manifest)
+    print(f"{len(out)} pairs for {out['taxon_id'].nunique()} species")
+    print(f"{len(records)} records for {records['taxon_id'].nunique()} species")
+
+
+def _read_pool(path) -> pd.DataFrame:
+    cols = ["id", "taxon_id", "taxon_name", "rank", "iconic_taxon", "photo_url"]
+    missing = [c for c in cols if c not in pq.read_schema(path).names]
+    if missing:
+        raise ValueError(f"pool {path} has no column {missing[0]!r}")
+    return pd.read_parquet(path, columns=cols)
+
+
 def fir_main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(prog="confusion fir", description="Write confusion.parquet")
     ap.add_argument("--emb", required=True, help="E.npy, float32 (n x d), memory-mapped")
@@ -347,29 +413,40 @@ def fir_main(argv: list[str]) -> int:
     ap.add_argument("--atlas-dir", required=True, help="atlas index dir holding manifest.json")
     args = ap.parse_args(argv)
     manifest = read_manifest(args.atlas_dir)
-    cols = ["id", "taxon_id", "taxon_name", "rank", "iconic_taxon", "photo_url"]
-    missing = [c for c in cols if c not in pq.read_schema(args.pool).names]
-    if missing:
-        raise ValueError(f"pool {args.pool} has no column {missing[0]!r}")
-    pool = pd.read_parquet(args.pool, columns=cols)
+    pool = _read_pool(args.pool)
     taxa, T = read_taxa_vectors(args.taxa_names, args.taxa_vectors)
     E = np.load(args.emb, mmap_mode="r")
-    built_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     scores = fir_scores(pool, E, np.load(args.ids), taxa, T)
-    out = fir_table(scores, built_at)
-    records = fir_records(scores, out)
-    atlas = Path(args.atlas_dir)
-    out.to_parquet(atlas / "confusion.parquet", index=False)
-    records.to_parquet(atlas / "confusion-records.parquet", index=False)
-    manifest["confusion"] = {"name": "confusion.parquet", "built_at": built_at, "count": len(out)}
-    manifest["confusion_records"] = {
-        "name": "confusion-records.parquet",
-        "built_at": built_at,
-        "count": len(records),
-    }
-    write_manifest(args.atlas_dir, manifest)
-    print(f"{len(out)} pairs for {out['taxon_id'].nunique()} species")
-    print(f"{len(records)} records for {records['taxon_id'].nunique()} species")
+    write_tables(args.atlas_dir, manifest, scores, scores)
+    return 0
+
+
+def delta_main(argv: list[str]) -> int:
+    ap = argparse.ArgumentParser(prog="confusion delta", description=__doc__)
+    ap.add_argument("--live", required=True, help="dir with the host's manifest and scores table")
+    ap.add_argument("--index", required=True, help="index dir to write the tables and manifest")
+    ap.add_argument("--pool", required=True, help="pool parquet, as for fir")
+    ap.add_argument("--taxa", required=True, help="dir with taxa-<sha>.tsv.gz and .f16")
+    ap.add_argument("--vectors", nargs="*", default=[], help="raw-*.npz (ids, E) of the deltas")
+    args = ap.parse_args(argv)
+    from what_to_id.identify import _one  # identify imports this module
+
+    live = Path(args.live)
+    if not (live / "confusion-scores.parquet").exists():
+        print("no live confusion-scores.parquet; run confusion_fir.sbatch first, nothing to extend")
+        return 0
+    state = pd.read_parquet(live / "confusion-scores.parquet")
+    pool = _read_pool(args.pool)
+    taxa, T = read_taxa_vectors(_one(args.taxa, "taxa-*.tsv.gz"), _one(args.taxa, "taxa-*.f16"))
+    zs = [np.load(v) for v in args.vectors]
+    ids = np.concatenate([z["ids"] for z in zs]) if zs else np.empty(0, np.int64)
+    E = np.concatenate([z["E"] for z in zs]) if zs else np.empty((0, T.shape[1]), np.float16)
+    if E.shape[1] != T.shape[1]:
+        raise ValueError(f"vectors have {E.shape[1]} dims, taxa vectors {T.shape[1]}")
+    ids, first = np.unique(ids.astype(np.int64), return_index=True)  # a record in two deltas
+    new = daily_scores(state, pool, E[first], ids, taxa, T)
+    print(f"{len(new) - len(state)} records net added to {len(state)} scored")
+    write_tables(args.index, read_manifest(args.index), new, current_scores(new, pool))
     return 0
 
 
@@ -377,6 +454,8 @@ def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv[:1] == ["fir"]:
         return fir_main(argv[1:])
+    if argv[:1] == ["delta"]:
+        return delta_main(argv[1:])
     ap = argparse.ArgumentParser(description="Label confusion scores (prototype margin) for a pool")
     ap.add_argument("pool", help="pool parquet with id, taxon_id, rank")
     ap.add_argument("--emb", required=True, nargs="+", help="embeddings npz files (ids, E)")
