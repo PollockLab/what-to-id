@@ -55,12 +55,13 @@ def test_metadata_reuses_map_presets_with_explicit_lichen_approximation(tmp_path
     assert metadata["complete_count"] == 2
     assert metadata["incomplete_count"] == 1
     for preset, (label, roots, description) in zip(metadata["presets"], PRESETS, strict=True):
+        hit = label != "Conservation Challenge"
         assert preset["label"] == label
         assert preset["taxon_ids"] == roots
         assert preset["description"] == description
         assert preset["approximate"] is (label == "Lichens")
-        assert preset["match_count"] == 1
-        assert preset["nonmatch_count"] == 1
+        assert preset["match_count"] == hit
+        assert preset["nonmatch_count"] == 2 - hit
         assert preset["unknown_count"] == 1
 
 
@@ -161,8 +162,8 @@ def test_fungal_metadata_appends_an_explicit_approximate_exclusion_without_reord
     original = tree.metadata(records)
     fungi = tree.metadata(records, group="Fungi")
     plants = tree.metadata(records, group="Plantae")
-    assert fungi["presets"][:2] == original["presets"] == plants["presets"]
-    included, outside = fungi["presets"][1:]
+    assert fungi["presets"][:-1] == original["presets"] == plants["presets"]
+    included, outside = fungi["presets"][1], fungi["presets"][-1]
     assert included["exclude"] is False and outside["exclude"] is True
     assert outside["label"] == "Outside listed lichen-forming groups"
     assert outside["taxon_ids"] == included["taxon_ids"]

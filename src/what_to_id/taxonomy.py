@@ -42,12 +42,19 @@ NO_RANK = 0xFF
 # 118252 and Multiclavula 175541 named on the forum
 # (https://forum.inaturalist.org/t/separate-lichen-and-fungi-into-two-categories/5212/10). It
 # misses smaller lichen lineages and holds a few non-lichenized Lecanoromycetes.
+# challenge_taxa.json copies the ids of where-to-blitz webapp/challenge_taxa.json at the commit and
+# sha256 it names; update both together when that list changes.
 PRESETS = [
     ["Bryophytes", [56327, 311249, 64615], "Hornworts, mosses and liverworts"],
     [
         "Lichens",
         [54743, 117869, 152030, 152028, 118252, 175541],
         "The main lichen-forming fungi; approximate, as lichens are no single clade",
+    ],
+    [
+        "Conservation Challenge",
+        json.loads((Path(__file__).with_name("challenge_taxa.json")).read_text())["taxon_ids"],
+        "The 335 taxa of the Conservation Challenge list, as in Where to Blitz",
     ],
 ]
 # The iNaturalist taxon behind each iconic group the map shows as a chip, so Identify can add the

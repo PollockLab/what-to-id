@@ -1,6 +1,7 @@
 import gzip
 import json
 import logging
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -151,7 +152,18 @@ def test_encode_points_with_tree_offers_presets():
 
 def test_presets_name_their_taxa_once():
     ids = [i for _, taxa, _ in PRESETS for i in taxa]
-    assert len(ids) == len(set(ids)) and [p[0] for p in PRESETS] == ["Bryophytes", "Lichens"]
+    assert len(ids) == len(set(ids)) and [p[0] for p in PRESETS] == [
+        "Bryophytes",
+        "Lichens",
+        "Conservation Challenge",
+    ]
+
+
+def test_challenge_preset_matches_its_pinned_source():
+    data = json.loads((Path(taxonomy.__file__).with_name("challenge_taxa.json")).read_text())
+    ids = data["taxon_ids"]
+    assert PRESETS[2][1] == ids and len(ids) == 335 and ids == sorted(set(ids))
+    assert len(data["source_sha256"]) == 64 and "bf5d38f" in data["source"]
 
 
 def test_cli_builds_with_and_without_tree(tmp_path, caplog):
