@@ -105,7 +105,7 @@ function projectFilter(o){
   function build(){
     box.appendChild(el('summary',null,'Projects ')).appendChild(el('span','n')).id='nproj';
     chips=box.appendChild(el('div','chips'));chips.setAttribute('role','group');chips.setAttribute('aria-label','Projects');
-    var f=box.appendChild(el('form','prow')),lab=f.appendChild(el('label','muted','Add another project for Identify only'));
+    var f=box.appendChild(el('form','prow')),lab=f.appendChild(el('label','muted','Add another project for Identify only'));lab.dataset.explain='identify-only';
     input=f.appendChild(el('input','padd'));input.id=lab.htmlFor='projpaste';input.type='text';
     input.placeholder='Project number or URL';input.autocomplete='off';input.spellcheck=false;
     f.appendChild(el('button','padd','Add')).type='submit';

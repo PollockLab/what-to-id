@@ -106,7 +106,8 @@ function userFilter(o){
         head());key++;o.changed();})
     .catch(function(e){if(e===0)return;mask=ob=hide=null;key++;
       say(e instanceof TypeError?'Could not reach iNaturalist.':e.message);o.changed();});}
-  function apply(){S.user=input.value.trim().slice(0,100);S.umode=mode.value===(META.observer?'observer':'taxa')?'':mode.value;o.changed();}
+  function tag(){mode.dataset.explain={observer:'observer-filter',taxa:'my-taxa',unid:'not-identified-by-me'}[mode.value];}
+  function apply(){tag();S.user=input.value.trim().slice(0,100);S.umode=mode.value===(META.observer?'observer':'taxa')?'':mode.value;o.changed();}
   if(box){
     box.appendChild(el('summary',null,'User'));
     var f=box.appendChild(el('form','prow')),lab=f.appendChild(el('label','muted','iNaturalist login or user number'));
@@ -126,7 +127,7 @@ function userFilter(o){
   return {
     // brings the box in line with S and starts any load it needs; P is the records so far
     sync:function(P){Pn=P;if(input){if(document.activeElement!==input)input.value=S.user;
-      mode.value=em();minsel.value=used||min();minsel.hidden=em()!=='taxa';again.hidden=em()!=='unid'||!S.user;}start();},
+      mode.value=em();tag();minsel.value=used||min();minsel.hidden=em()!=='taxa';again.hidden=em()!=='unid'||!S.user;}start();},
     drop:function(i){if(!id)return false;
       if(mask){var t=Pn.tax[i];return !(t<mask.length&&mask[t]===1);}
       if(ob)return i<ob.length&&ob[i]!==id;

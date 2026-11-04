@@ -78,3 +78,13 @@ def test_keys_built_in_script_are_in_the_glossary():
     legend = (SRC / "map_assets/level_colour.js").read_text()
     keys += re.findall(r"'(colour-by-[a-z]+)'", legend)
     assert len(keys) == 7 and [k for k in keys if k not in GLOSSARY] == []
+
+
+def test_every_glossary_key_is_tagged_on_some_page():
+    # quoted anywhere in a page asset: tags, and keys picked in script (Identify tabs, user modes)
+    text = "".join(
+        p.read_text()
+        for p in SRC.rglob("*")
+        if p.suffix in {".js", ".html"} and p.name != "explain.js"
+    )
+    assert [k for k in GLOSSARY if f"'{k}'" not in text and f'"{k}"' not in text] == []

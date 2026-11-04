@@ -19,10 +19,12 @@ function trig(e){
 // role, tab stop and state for the triggers on the page; rows drawn later get them on the next frame
 function prep(){
   [].forEach.call(document.querySelectorAll('[data-explain]'),function(x){
-    var k=x.dataset.explain,id='xd-'+k,d=x.getAttribute('aria-describedby')||'';
-    if(G[k]&&ctl(x)&&(' '+d+' ').indexOf(' '+id+' ')<0){
+    // a control describes itself by its current key: a select tagged by the mode it shows swaps it
+    var k=x.dataset.explain,id='xd-'+k,was=x.getAttribute('aria-describedby')||'',d=was.replace(/(^| )xd-\S+/g,'').trim();
+    if(G[k]&&ctl(x)){
       if(!document.getElementById(id)){var s=el('span',null,G[k][0]);s.id=id;vh.appendChild(s);}
-      x.setAttribute('aria-describedby',(d+' '+id).trim());}
+      d=(d+' '+id).trim();}
+    if(d!==was){if(d)x.setAttribute('aria-describedby',d);else x.removeAttribute('aria-describedby');}
     if(!G[k]||!free(x)||x.hasAttribute('aria-controls'))return;
     x.setAttribute('role','button');if(!x.hasAttribute('tabindex'))x.tabIndex=0;
     x.setAttribute('aria-expanded','false');x.setAttribute('aria-controls','explain-pop');});
@@ -96,6 +98,6 @@ document.addEventListener('focusout',function(e){
 });
 // a redraw that drops the open trigger (a recount rewriting its row) closes it
 new MutationObserver(function(){if(!q)q=requestAnimationFrame(function(){q=0;if(cur&&!cur.isConnected)close(false);prep();});})
-  .observe(document.documentElement,{childList:true,subtree:true});
+  .observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['data-explain']});
 prep();
 })();

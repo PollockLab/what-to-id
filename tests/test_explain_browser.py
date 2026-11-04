@@ -208,3 +208,18 @@ def test_a_control_with_its_own_aria_controls_is_still_described(browser):
     tab = page.locator("#tab")
     assert tab.get_attribute("aria-describedby") == "xd-needs-id"
     assert tab.get_attribute("aria-controls") == "panel"
+
+
+def test_a_select_tagged_by_its_mode_swaps_its_description(browser):
+    page = _page(browser)
+    page.evaluate(
+        "document.querySelector('main').insertAdjacentHTML('beforeend',"
+        " '<select id=m aria-describedby=lbl data-explain=needs-id><option>a</option></select>')"
+    )
+    page.wait_for_function(
+        "document.getElementById('m').getAttribute('aria-describedby')==='lbl xd-needs-id'"
+    )
+    page.evaluate("document.getElementById('m').dataset.explain='research-grade'")
+    page.wait_for_function(
+        "document.getElementById('m').getAttribute('aria-describedby')==='lbl xd-research-grade'"
+    )

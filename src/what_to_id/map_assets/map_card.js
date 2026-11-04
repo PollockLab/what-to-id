@@ -31,7 +31,7 @@ return function(c){
       b.type='button';b.dataset.id=x.id;b.title=label;b.setAttribute('aria-label','Match '+rank[x.id]+': '+label);
       if(x.photo){var im=el('img');im.src=x.photo;im.alt=label;im.loading='lazy';b.appendChild(im);}else b.textContent=label;
       b.onclick=function(){if(!c.go(x.id))window.open('https://www.inaturalist.ca/observations/'+x.id,'_blank','noopener');};
-      li.append(b,el('span','rank',rank[x.id]));ul.appendChild(li);
+      var r=el('span','rank',rank[x.id]);if(!ul.children.length)r.dataset.explain='match-n';li.append(b,r);ul.appendChild(li);
     });
     if(!cards.length||!box)return;
     a.href='search.html#id='+id;a.target='_blank';a.rel='noopener';
