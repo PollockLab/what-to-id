@@ -30,7 +30,9 @@ function bar(){
   if(mode==='look'&&!lg.childNodes.length){LM.LEVELS.slice(0,4).forEach(function(t,v){
     var i=document.createElement('i'),c=LM.RAMP[Math.round(v/3*(LM.RAMP.length-1))];
     i.style.background='rgb('+c.join(',')+')';lg.appendChild(i);lg.appendChild(document.createTextNode(t+(v===3?' or further':'')));});
-    lg.appendChild(document.createTextNode('. Skips pairs often photographed together (GloBI).'));}
+    var gb=document.createElement('span');gb.dataset.explain='globi';gb.textContent='GloBI';
+    var sk=lg.appendChild(document.createElement('span'));  // one flex item, so the sentence stays on one line
+    sk.append('. Skips pairs often photographed together (',gb,').');}
 }
 // pool-lookalike.bin, named in META.files; null when it is not there.
 function lookFile(){

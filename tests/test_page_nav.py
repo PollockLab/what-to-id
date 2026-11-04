@@ -74,7 +74,12 @@ def test_no_forbidden_words():
 
 def test_module_is_stdlib_only():
     src = Path(page_nav.__file__).read_text()
-    assert not re.search(r"^\s*(import|from)\s+(numpy|pandas|what_to_id)", src, re.M)
+    # the glossary is plain data with no imports of its own
+    assert not re.search(
+        r"^\s*(import|from)\s+(numpy|pandas|what_to_id(?!\.glossary\b))", src, re.M
+    )
+    glossary = Path(page_nav.__file__).with_name("glossary.py").read_text()
+    assert not re.search(r"^\s*(import|from)\s", glossary, re.M)
 
 
 # --- in a browser ---

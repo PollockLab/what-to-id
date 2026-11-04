@@ -54,7 +54,7 @@ function leftFilter(o){
     return C={k:k,idx:idx};}
   function set(v){win=v;err='';load();o.changed();}
   if(box){
-    box.appendChild(el('span','muted','Left Needs ID '));
+    box.appendChild(el('span','muted','Left Needs ID')).dataset.explain='left-needs-id';box.append(' ');
     var seg=box.appendChild(el('span','seg'));seg.setAttribute('role','group');seg.setAttribute('aria-label','Records that left Needs ID');
     [['Off',0],['7 days',7],['30 days',30]].forEach(function(b){var x=seg.appendChild(el('button',null,b[0]));x.type='button';
       x.title=b[1]?'Show the records that left Needs ID in the last '+b[1]+' days':'Hide them';x.onclick=function(){set(b[1]);};btns.push([x,b[1]]);});

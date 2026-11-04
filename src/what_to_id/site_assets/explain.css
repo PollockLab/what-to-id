@@ -1,0 +1,13 @@
+[data-explain]:not(a,button,input,select,textarea,label,summary){text-decoration:underline dotted;text-underline-offset:3px;cursor:help}
+[data-explain][aria-expanded="true"]{text-decoration-style:solid}
+.xpop{position:fixed;z-index:30;width:300px;max-width:calc(100vw - 16px);box-sizing:border-box;padding:10px 36px 10px 12px;
+  background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);
+  font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;text-align:left}
+.xpop p{margin:0}
+.xpop .xuse{margin-top:6px;color:var(--muted)}
+.xpop .xmore{display:inline-block;margin-top:6px;color:var(--ink)}
+.xpop [hidden]{display:none}
+.xx{position:absolute;top:2px;right:2px;width:32px;height:32px;font:inherit;font-size:20px;
+  line-height:1;border:0;background:none;color:var(--muted);cursor:pointer;border-radius:16px}
+@media (max-width:599px) and (hover:none){.xpop{left:0;right:0;bottom:0;top:auto;width:auto;max-width:none;max-height:85vh;
+  overflow:auto;border-radius:14px 14px 0 0;padding-bottom:20px}}

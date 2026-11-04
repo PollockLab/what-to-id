@@ -48,7 +48,7 @@ SCRIPTS = {
 }
 # One toggle per pane; a phone holds one pane, so there a toggle picks it.
 IDENTIFY_BUTTON = '<button type="button" data-p="identify">Identify</button>'
-TREE_BUTTON = '<button type="button" data-p="tree">Taxonomy</button>'
+TREE_BUTTON = '<button type="button" data-p="tree" data-explain="taxonomy">Taxonomy</button>'
 BAR = (
     '<div class="xbar" id="xbar"><span class="counts" id="counts" aria-live="polite"></span>'
     '<form id="sf" role="search"><input id="sq" type="search" aria-label="Photo search" '
@@ -58,7 +58,7 @@ BAR = (
     '<span id="sm" class="counts" aria-live="polite"></span>'
     f'<span class="seg" role="group" aria-label="View">{IDENTIFY_BUTTON}'
     '<button type="button" data-p="map">Map</button>'
-    '<button type="button" data-p="space">Photo space</button>'
+    '<button type="button" data-p="space" data-explain="photo-space">Photo space</button>'
     f"{TREE_BUTTON}</span>"
     '<button type="button" class="i" id="i" aria-expanded="false" aria-controls="note" '
     'aria-label="About this view">i</button>'

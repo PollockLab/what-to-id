@@ -100,8 +100,8 @@ function draw(){
   show.forEach(function(c,k){rows.appendChild(line(sc[k],cname(c),deep(c)?function(){pick(c);}:null));});
   if(cnt[top]>show.reduce(function(s,c){return s+cnt[c];},0)){var n=cname(top);
     rows.appendChild(line(sc[OTHER],/^other /i.test(n)?n:'Other '+(T[top][1]?n.toLowerCase():n)));}}
-bs=[['levels','Levels'],['groups','Groups']].map(function(m){var b=document.createElement('button');
-  b.type='button';b.textContent=m[1];b.onclick=function(){if(mode===m[0])return;mode=m[0];
+bs=[['levels','Levels','colour-by-levels'],['groups','Groups','colour-by-groups']].map(function(m){var b=document.createElement('button');
+  b.type='button';b.textContent=m[1];b.dataset.explain=m[2];b.onclick=function(){if(mode===m[0])return;mode=m[0];
     try{localStorage.setItem(KEY,mode);}catch(e){}
     apply();};seg.appendChild(b);return [m[0],b];});
 function apply(){var lvl=want&&!!lv,k;on=lvl&&mode==='levels';
