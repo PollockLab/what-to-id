@@ -232,8 +232,9 @@ function link(){
     all:META.groups.length,up:S.up,d1:S.lo>0?iso(S.lo):'',d2:S.hi<LAST?iso(S.hi):'',months:m,taxa:taxa,
     not:TF.not.concat(gl.not),only:S.only,acc:S.acc};
   // with an area on, the link may list the records by id instead, and then u stays null
-  var a=$('identify'),href=AREA.link(ALL?{w:-180,s:-90,e:180,n:90}:{w:b.getWest(),s:b.getSouth(),e:b.getEast(),n:b.getNorth()},
-    function(v,p,side){var r=TX.identifyUrl(st,v,META,Object.assign({},PJ.params(),UF.params(),p));if(!side)u=r;return r.url;},match);
+  var need=gl.inc.length||gl.out.length||PJ.inexact()||S.only.oneid,
+    a=$('identify'),href=AREA.link(ALL?{w:-180,s:-90,e:180,n:90}:{w:b.getWest(),s:b.getSouth(),e:b.getEast(),n:b.getNorth()},
+    function(v,p,side){var r=TX.identifyUrl(st,v,META,Object.assign({},PJ.params(),UF.params(),p));if(!side)u=r;return r.url;},match,!!need);
   if(AREA.invalid()){a.removeAttribute('href');a.setAttribute('aria-disabled','true');
     a.title='Wait for the selected areas to load, or explicitly clear or replace unresolved areas.';
     $('idprev').disabled=$('idnext').disabled=true;
@@ -243,12 +244,16 @@ function link(){
   a.title='Opens these records in the iNaturalist Identify page.'+UF.tip();
   // say when Identify cannot show the same records, and what it opens instead
   var why=[],lost=u?u.lost:[];function gn(gs){return gs.map(gname).join(' and ');}
-  if(u&&gl.inc.length)why.push('Identify cannot add the '+gn(gl.inc)+' group to picked taxa, so it opens every taxon');
-  if(u&&gl.out.length)why.push('Identify cannot leave out the '+gn(gl.out)+' group beside picked taxa, so it keeps it');
+  if(gl.inc.length)why.push('Identify cannot add the '+gn(gl.inc)+' group to picked taxa, so it opens every taxon');
+  if(gl.out.length)why.push('Identify cannot leave out the '+gn(gl.out)+' group beside picked taxa, so it keeps it');
   if(lost.indexOf('taxa')>=0)why.push('too many taxa for one link, so it opens every taxon');
   if(lost.indexOf('not')>=0)why.push('too many taxa left out for one link, so it keeps them');
-  if(u&&PJ.inexact())why.push(PJ.inexact());if(u&&S.only.oneid)why.push('Identify cannot filter records one ID from Research Grade');
-  var nt=$('idnote'),pf=u?[PJ.uncounted(),UF.note()].filter(Boolean).join(' '):'';nt.hidden=!why.length&&!pf;nt.textContent=(why.length?'Identify shows '+
+  if(PJ.inexact())why.push(PJ.inexact());if(S.only.oneid)why.push('Identify cannot filter records one ID from Research Grade');
+  // listed by id (u stays null), the records are the map's, so only the way they open is said
+  var nt=$('idnote');
+  if(!u&&why.length&&!AREA.term()){nt.hidden=false;nt.textContent=why.join('; ').replace(/^./,function(c){return c.toUpperCase();})+
+    ', so it opens these records by id in batches of up to '+IdentifyLinks.BATCH+', less any identified since.';return;}
+  var pf=u?[PJ.uncounted(),UF.note()].filter(Boolean).join(' '):'';nt.hidden=!why.length&&!pf;nt.textContent=(why.length?'Identify shows '+
     'more records than the map: '+why.join('; ')+'. ':'')+pf;
 }
 // The filter extension is kept between calls, as the point data is in pointData(), so deck.gl

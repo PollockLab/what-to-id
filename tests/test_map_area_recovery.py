@@ -157,3 +157,23 @@ refilter();window.probe=()=>({invalid:AREA.invalid(),hash:AREA.hash(),mask:AREA.
   href:$('identify').getAttribute('href'),disabled:$('identify').getAttribute('aria-disabled')});
 </script>"""
     )
+
+
+@pytest.mark.parametrize(
+    ("only", "count", "ids", "batches"),
+    [
+        ("{oneid:'inc'}", 250, 200, [1, 2]),
+        ("{oneid:'inc'}", 10001, 0, [1, 0]),
+        ("{}", 250, 0, [1, 0]),
+    ],
+)
+def test_filter_identify_cannot_say_lists_ids_without_an_area(only, count, ids, batches):
+    script = case_script("", count).replace("only:{}", f"only:{only}", 1)
+    result = subprocess.run(["node"], input=script, text=True, capture_output=True)
+    assert result.returncode == 0, result.stderr
+    out = json.loads(result.stdout)["before"]
+    got = parse_qs(urlparse(out["href"]).query).get("id", [""])[0]
+    assert len(got.split(",")) == (ids or 1) and bool(got) == bool(ids)
+    assert out["step"] == batches
+    assert ("by id in batches of up to 200" in out["note"]) == bool(ids)
+    assert ("more records than the map" in out["note"]) == (bool(only != "{}") and not ids)
