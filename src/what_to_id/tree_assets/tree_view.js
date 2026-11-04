@@ -149,7 +149,9 @@ function labels(V,h,on){
   // the inner labels show whole or not at all, by their screen boxes (a line of 11px type is 14px high): the selection and
   // its ancestors first, always, then the life groups, then the biggest clades; a hidden one keeps its name on hover. The
   // ring names (species, genus, ...) give way to them. 3px more width keeps a gap and fits the bolder selected label.
+  // A label also stays inside the canvas, as #radial clips what spills past its edges.
   var hit=function(b){return box.some(function(o){return b[0]<o[2]&&o[0]<b[2]&&b[1]<o[3]&&o[1]<b[3];});},
+    inn=function(b){return b[0]>=6&&b[1]>=6&&b[2]<=g.x1&&b[3]<=g.y1;},
     out=function(b){return [0,2].some(function(i){return [1,3].some(function(j){return Math.hypot(b[i]-g.cx,b[j]-g.cy)>g.RL-2;});});},
     up={};V.all.forEach(function(n){if(n.key===on)for(var x=n;x;x=x.parent)up[x.key]=1;});
   V.all.filter(function(n){return n.row>=0&&(n.kids.length||grpOf(n.row));}).map(function(n){return [n,n.parent?grpOf(n.row):'',up[n.key]||0];})
@@ -157,17 +159,19 @@ function labels(V,h,on){
     var n=q[0],xy=P(g,n.a,n.r).split(','),x=+xy[0],y=+xy[1],
       txt=fit(q[1]||(n.parent?cname(n.row,label(n.row)):M.name(D,n.row)+' · '+recs(n.tot)),Infinity,1),
       w=CX.measureText(txt).width+3,right=Math.sin(n.a)>=-0.01,
-      at=function(r,d){return n.parent?[r?x+7:x-7-w,y-16+d,r?x+7+w:x-7,y-2+d]:[x-w/2,y+8+d,x+w/2,y+22+d];},
+      at=function(r,d){return n.parent?[r?x+7:x-7-w,y-16+d,r?x+7+w:x-7,y-2+d]:[l,y+8+d,l+w,y+22+d];},
+      // the root's label centres under the node but stays inside the canvas, as a fan's apex sits at its left edge
+      l=Math.max(6,Math.min(g.x1-w,x-w/2)),
       // the groups move up or down a line or two, the selection's line also to the node's other side
       cs=[0,14,-14,28,-28].slice(0,q[1]||q[2]?5:1).reduce(function(a,d){return a.concat([at(right,d)],q[2]?[at(!right,d)]:[]);},[]),
-      b=cs.filter(function(c){return !hit(c)&&(!n.parent||!out(c));})[0]||q[2]&&(cs.filter(function(c){return !hit(c);})[0]||cs[0]);
+      b=cs.filter(function(c){return !hit(c)&&inn(c)&&(!n.parent||!out(c));})[0]||q[2]&&(cs.filter(function(c){return !hit(c);})[0]||cs[0]);
     if(!txt||!b)return;
     box.push(b);
     h.push('<text class="lb in'+(n.key===on?' on':'')+'" data-k="'+n.key+'" x="'+b[0].toFixed(1)+'" y="'+(b[3]-3).toFixed(1)+'"><title>'+
       esc(tip(n))+'</title>'+esc(txt)+'</text>');});
   CX.font='10px '+getComputedStyle(document.body).fontFamily;
   V.rk.forEach(function(r){var b=[r[0],r[1]-10,r[0]+CX.measureText(r[2]).width,r[1]+3];
-    if(!hit(b)&&box.push(b))h.push('<text class="rk" x="'+r[0]+'" y="'+r[1]+'">'+r[2]+'</text>');});
+    if(!hit(b)&&inn(b)&&box.push(b))h.push('<text class="rk" x="'+r[0]+'" y="'+r[1]+'">'+r[2]+'</text>');});
 }
 // ---- photos: iNaturalist's default photo per taxon, at most 30 taxa a request and a request a second; an
 // image shows only once it has loaded, and a taxon that failed is not asked again.
