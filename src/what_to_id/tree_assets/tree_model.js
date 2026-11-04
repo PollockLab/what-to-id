@@ -93,7 +93,8 @@ function crumbs(M,e){var out=[];for(var p=M.par[chain(M,e)[0]];p>=0;p=M.par[chai
   if(p!==M.n||lead(M,p)===p)out.unshift(p);return out;}
 // The selection the map and the photo space read for shown node e: a group's node is its group chip, any other
 // taxon its pick less the groups taken out from under it (taxa=47120,-47158,-47119 for the other arthropods).
-function pick(M,e){if(e<0||e===M.n)return '';if(M.par[chain(M,e)[0]]===M.n)return 'groups='+M.grp[e];
+// A group merged down into one taxon (Plantae › … › Rubus under #taxa=47544) picks that taxon, not the group.
+function pick(M,e){if(e<0||e===M.n)return '';e=lead(M,e);if(M.par[e]===M.n)return 'groups='+M.grp[e];
   return 'taxa='+[M.T[e][2]].concat((M.ex[e]||[]).map(function(i){return -i;})).join(',');}
 // The row a map selection names: its first included taxon, else its one included group, else -1.
 function find(M,s){var q={};String(s||'').split('&').forEach(function(t){var k=t.indexOf('=');

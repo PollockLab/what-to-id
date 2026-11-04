@@ -430,7 +430,8 @@ def test_the_root_is_life_and_the_group_cards_link_to_their_records(browser, lif
     page = open_tree(browser, life_site, hash_="#sel=3")
     page.wait_for_selector("#card:not([hidden])")
     ident = page.get_attribute("#card a:has-text('Help identify')", "href")
-    assert "iconic_taxa=Aves" in ident and "taxon_id" not in ident
+    # Aves holds only the robin, so its node is the robin's: the link names the robin, not all birds
+    assert "taxon_id=2000" in ident and "iconic_taxa" not in ident
     assert "No taxon" not in page.inner_text("#card dl")
     assert page.errors == []
     page.close()
