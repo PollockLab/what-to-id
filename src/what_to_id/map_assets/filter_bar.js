@@ -5,7 +5,7 @@
 //   P() (the records), taxa() (the taxa rows or null), area() (the area filter), cum() and tc() (the day
 //   and month counts behind the histograms, see recount in map.js),
 //   search() (rebuilds the taxon filter after a pick), refilter() (a filter changed, recount),
-//   render() (only the dates changed), extra() (more selection bar items), reset() (after Reset all),
+//   render() (only the dates changed), drag() (the dates moved mid-brush: move only the GPU range), extra() (more selection bar items), reset() (after Reset all),
 //   pass() (the records in view, the group filter left out) and inside(row) for the groups list's ranks.
 // It returns what the host calls back: update() after a recount, draw() on resize, show*() after the
 // host changes S, oldQuery(), total() and pct() for the header's share line, and groups (group_list.js).
@@ -101,6 +101,9 @@ function draw(){
   $('unit').textContent=cap;hist.setAttribute('aria-label',cap+' Drag to pick a period.');
 }
 function binAt(cv,e,x){var n=e.length-1;return Math.max(0,Math.min(n-1,Math.floor(x/(cv.clientWidth/n))));}
+// A drag redraws the histograms and the map's date range once a frame; the counts, hash and sync wait for pointerup.
+var dragRaf=0;
+function preview(){if(dragRaf)return;dragRaf=requestAnimationFrame(function(){dragRaf=0;draw();o.drag();});}
 function brush(cv,get){
   var st=null;
   cv.addEventListener('pointerdown',function(ev){cv.setPointerCapture(ev.pointerId);
@@ -118,11 +121,11 @@ function brush(cv,get){
     if(!st)return;
     if(Math.abs(ev.offsetX-st.x)>3)st.moved=true;
     if(st.moved){var a=binAt(cv,e,Math.min(st.x,ev.offsetX)),z=binAt(cv,e,Math.max(st.x,ev.offsetX));
-      S.lo=e[a];S.hi=e[z+1]-1;render();}
+      S.lo=e[a];S.hi=e[z+1]-1;if(o.drag)preview();else render();}
   });
   cv.addEventListener('pointerup',function(ev){
     if(st&&!st.moved){var k=binAt(cv,st.e,ev.offsetX);S.lo=st.e[k];S.hi=st.e[k+1]-1;}
-    st=null;drag=null;htip.hidden=true;render();});
+    cancelAnimationFrame(dragRaf);dragRaf=0;st=null;drag=null;htip.hidden=true;render();});
   cv.addEventListener('pointerleave',function(){htip.hidden=true;});
   cv.addEventListener('dblclick',function(){S.lo=0;S.hi=LAST;render();});
 }

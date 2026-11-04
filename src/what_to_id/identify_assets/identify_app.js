@@ -4,7 +4,7 @@
 // their photos come from iNaturalist 200 ids to a request as the cards are drawn, a batch at a time as the list scrolls.
 (function(){
 'use strict';
-var CFG=IDENTIFY_CONFIG,L=EmbeddingsLayout,Meta=AtlasSearchMeta,PER_SPECIES=3,LIMIT=12,STEPS=16,NO_LOOK=65535,NOTAX=65535,LS='wtid-identify-level',IO=null,T=0;
+var CFG=IDENTIFY_CONFIG,L=EmbeddingsLayout,Meta=AtlasSearchMeta,PER_SPECIES=3,LIMIT=12,STEPS=16,NO_LOOK=65535,NOTAX=65535,LS='wtid-identify-level',IO=null,T=0,TK=0,AB=null;
 var MAP=new URL(CFG.mapUrl,location.href).href,nf=new Intl.NumberFormat('en-CA'),OBS='https://www.inaturalist.ca/observations/';
 var META=null,SYNC=null,MORE=new Map(),TAXA=null,P=null,BYID=null,LEVEL=null,Q=null,LOOKS=null,R=null,MF=null,TF=null,PEND=null,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,ONE='',CACHE=new Map(),FIRST=null,SHOWN,STAY=false;
 function $(id){return document.getElementById(id);}
@@ -99,7 +99,8 @@ function card(i,lv){
 // Fills the photos of the cards just drawn; a record that left Needs ID or iNaturalist since the pool was built drops out.
 function photos(lis){
   var ids=lis.map(function(li){return +li.dataset.id;});
-  Meta.fetchObservations(ids,function(u){return fetch(u);},CACHE).then(function(){
+  var sig=AB&&AB.signal;
+  Meta.fetchObservations(ids,function(u){return fetch(u,{signal:sig});},CACHE).then(function(){
     lis.forEach(function(li){
       if(!li.isConnected)return;
       var o=CACHE.get(+li.dataset.id);
@@ -110,7 +111,7 @@ function photos(lis){
         img.src=String(p.url).replace('/square.','/medium.');ph.appendChild(img);}else ph.textContent='No photo on iNaturalist now';
       w.textContent=(o.observed_on||'Date unknown')+' · '+(o.place_guess||'Place unknown');w.title=w.textContent;
     });
-  }).catch(function(e){status('Could not load the photos: '+e.message);});
+  }).catch(function(e){if(!(sig&&sig.aborted))status('Could not load the photos: '+e.message);});
 }
 // The next LIMIT cards of the chosen level; the button is the scroll sentinel and stays as the fallback.
 function more(){
@@ -145,6 +146,7 @@ function paint(){
   var x=CFG.levels.filter(function(l){return l[0]===LV;})[0];
   [].forEach.call($('tabs').children,function(t){var on=+t.dataset.lv===LV;t.setAttribute('aria-selected',on);t.tabIndex=on?0:-1;});
   $('desc').textContent=x[2];$('panel').setAttribute('aria-labelledby','tab'+LV);
+  if(AB)AB.abort();AB=new AbortController();  // the cards redrawn below replace those whose photos are still loading
   $('grid').textContent='';shown=STAY?Math.max(LIMIT,drawn):LIMIT;drawn=0;
   if(R)R.draw(LV,SEL,LEVEL);
   empty();
@@ -265,7 +267,7 @@ function inbox(){
     else if(d.type==='wtid-keep'&&(d.ids===null||d.ids instanceof Uint32Array)){KEEPIDS=d.ids&&d.ids.slice().sort();again();}
     else if(d.type==='wtid-subset'&&(d.ids===null||Array.isArray(d.ids))){SUBIDS=d.ids&&Uint32Array.from(d.ids).sort();again();}  // the photo search's hits
   });
-  SYNC=MapFilter.sync({key:key,apply:function(str){if(MF)take(str,false);else{PEND=str;again();}},hash:false});
+  SYNC=MapFilter.sync({key:key,apply:function(str){if(MF){clearTimeout(TK);TK=setTimeout(function(){take(str,false);},60);}else{PEND=str;again();}},hash:false});
   addEventListener('hashchange',function(){if(MF)take(location.hash.slice(1),true);else again();});
 }
 function looks(buf){
