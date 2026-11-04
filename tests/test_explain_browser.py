@@ -181,3 +181,30 @@ def test_removing_the_open_trigger_closes_it(browser):
     page.evaluate("document.getElementById('b').remove()")
     page.wait_for_selector(POP, state="hidden")
     assert page.errors == []
+
+
+def test_esc_closes_only_the_popover_not_the_panel_around_it(browser):
+    page = _page(browser)
+    page.evaluate(
+        "document.addEventListener('keydown', e => {"
+        " if (e.key === 'Escape') document.body.dataset.panel = 'closed'; })"
+    )
+    page.click("#t")
+    assert _shown(page)
+    page.keyboard.press("Escape")
+    assert not _shown(page)
+    assert page.evaluate("document.body.dataset.panel") is None
+    page.keyboard.press("Escape")  # with nothing open, the page's own Esc still works
+    assert page.evaluate("document.body.dataset.panel") == "closed"
+
+
+def test_a_control_with_its_own_aria_controls_is_still_described(browser):
+    page = _page(browser)
+    page.evaluate(
+        "document.querySelector('main').insertAdjacentHTML('beforeend',"
+        " '<button id=tab role=tab aria-controls=panel data-explain=needs-id>Tab</button>')"
+    )
+    page.wait_for_function("document.getElementById('tab').getAttribute('aria-describedby')")
+    tab = page.locator("#tab")
+    assert tab.get_attribute("aria-describedby") == "xd-needs-id"
+    assert tab.get_attribute("aria-controls") == "panel"

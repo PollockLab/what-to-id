@@ -18,12 +18,12 @@ function trig(e){
 }
 // role, tab stop and state for the triggers on the page; rows drawn later get them on the next frame
 function prep(){
-  [].forEach.call(document.querySelectorAll('[data-explain]:not([aria-controls])'),function(x){
+  [].forEach.call(document.querySelectorAll('[data-explain]'),function(x){
     var k=x.dataset.explain,id='xd-'+k,d=x.getAttribute('aria-describedby')||'';
     if(G[k]&&ctl(x)&&(' '+d+' ').indexOf(' '+id+' ')<0){
       if(!document.getElementById(id)){var s=el('span',null,G[k][0]);s.id=id;vh.appendChild(s);}
       x.setAttribute('aria-describedby',(d+' '+id).trim());}
-    if(!G[k]||!free(x))return;
+    if(!G[k]||!free(x)||x.hasAttribute('aria-controls'))return;
     x.setAttribute('role','button');if(!x.hasAttribute('tabindex'))x.tabIndex=0;
     x.setAttribute('aria-expanded','false');x.setAttribute('aria-controls','explain-pop');});
 }
@@ -76,8 +76,11 @@ document.addEventListener('click',function(e){
   if(x===cur&&!pop.hidden&&(pin||e.detail===0)){close(e.detail===0);return;}
   open(x,true,e.detail===0);
 });
+// capture on window: Esc closes only the popover, not the panel or sheet it opened over
+window.addEventListener('keydown',function(e){
+  if(e.key!=='Escape'||pop.hidden)return;
+  e.stopPropagation();var a=document.activeElement;close(a===cur||pop.contains(a));},true);
 document.addEventListener('keydown',function(e){
-  if(e.key==='Escape'&&!pop.hidden){var a=document.activeElement;close(a===cur||pop.contains(a));return;}
   var x=(e.key==='Enter'||e.key===' ')&&trig(e);if(!x||ctl(x))return;
   e.preventDefault();
   if(x===cur&&!pop.hidden)close(true);else open(x,true,true);

@@ -156,7 +156,8 @@ function count(){
   var p=[];if(visible('identify'))p.push('<b>'+num('identify','status')+'</b> to identify');  // its status line starts with the kept count
   if(visible('map'))p.push('<b>'+num('map','count')+'</b> on map'+(cut?visible('identify')?', both in view':', in view':'')+(pcut?', in photo view':''));
   if(visible('space'))p.push('<b>'+num('space','count')+'</b> <span data-explain="photo-space">in photo space</span>'+(cut?', in map view':''));
-  var c=document.getElementById('counts'),h=p.join(' · ');if(c.innerHTML!==h)c.innerHTML=h;}
+  // against the last write, not innerHTML: explain.js adds attributes to the term, and a rewrite closes its popover
+  var c=document.getElementById('counts'),h=p.join(' · ');if(c.dataset.h!==h){c.dataset.h=h;c.innerHTML=h;}}
 setInterval(count,400);
 document.getElementById('xbar').addEventListener('click',function(e){
   var b=e.target.closest('[data-p]');if(!b)return;

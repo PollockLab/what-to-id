@@ -474,3 +474,18 @@ def test_with_the_map_shown_the_tree_follows_the_maps_counts_not_the_photo_space
     assert root.inner_text().split()[0] == "5"
     assert page.errors == []
     page.close()
+
+
+def test_the_counts_term_keeps_its_toggletip_open(split):
+    page, _ = split
+    page.evaluate("window.term = document.querySelector('#counts [data-explain]')")
+    page.click("#counts [data-explain='photo-space']")
+    page.wait_for_timeout(
+        1000
+    )  # past two of count()'s 400 ms ticks: an unchanged bar is not rewritten
+    assert (
+        page.evaluate("window.term.isConnected && window.term.getAttribute('aria-expanded')")
+        == "true"
+    )
+    assert page.locator(".xpop").is_visible()
+    assert page.errors == []
