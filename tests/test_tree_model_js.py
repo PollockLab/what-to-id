@@ -61,6 +61,12 @@ def test_a_taxon_with_one_child_and_no_records_merges_into_it():
     assert got["crumbs"] == [ROOT, 3]
 
 
+def test_a_group_merged_into_one_taxon_picks_the_taxon_not_the_group():
+    # as Plantae › … › Rubus under #taxa=47544: the card and map read Sphagnum, not all of Plantae
+    got = node("out([M.pick(D, 1), M.pick(D, 3), M.pick(D, 7)]);")
+    assert got == ["taxa=50", "taxa=50", "groups=Animalia"]
+
+
 def test_an_open_node_shows_k_children_then_a_bucket_for_the_rest():
     got = node(
         """
