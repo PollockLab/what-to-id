@@ -471,6 +471,9 @@ var AREA=MapArea({map:map,S:S,LAST:LAST,hash:S.area,park:S.park,bcpark:S.bcpark,
   sel:function(){return sel().join('&');},extra:function(){var u=UF.params(true);return Object.keys(u).map(function(k){return '&'+k+'='+encodeURIComponent(u[k]);}).join('');},
   order:function(){return ORDER&&function(ix){return MapValue.order(ix,P.tax,VR||(VR=MapValue.rows(TAXA,META.value)));};},
   step:IdStep({a:$('identify'),prev:$('idprev'),next:$('idnext'),build:iso(LAST)})});
+MapSuggest({taxa:function(){return TAXA;},counts:function(){return TX.counts(TAXA,P.tax,P.n);},S:S,ranks:META.ranks,area:AREA,pj:PJ,
+  pick:function(id){if(S.picks.some(function(p){return p.id===id;}))return;S.picks.push({id:id,not:false});search();FB.showClades();refilter();},
+  user:function(l){S.user=l;refilter();}});  // the split view's search box
 // Guard activation before IdStep's handlers, including a stale batch or keyboard activation.
 function stopInvalidIdentify(e){if(AREA.invalid()){e.preventDefault();e.stopImmediatePropagation();}}
 ['identify','idprev','idnext'].forEach(function(id){var el=$(id);

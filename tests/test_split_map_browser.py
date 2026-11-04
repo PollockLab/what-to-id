@@ -141,3 +141,53 @@ def test_the_tree_counts_what_the_map_keeps_as_its_dates_change(browser, site):
     page.wait_for_function(root, arg="300")
     assert page.errors == []
     page.close()
+
+
+def explore(browser, site):
+    page = browser.new_page(viewport={"width": 1400, "height": 900})
+    page.errors = []
+    page.on("pageerror", lambda e: page.errors.append(str(e)))
+    stub_taxa(page)
+    page.route("https://api.inaturalist.org/v1/users/**", lambda r: r.fulfill(json={"results": []}))
+    page.route("https://basemaps.cartocdn.com/**", lambda r: r.fulfill(body=BLANK))
+    page.goto(f"{site}/explore.html")
+    page.wait_for_function(
+        "() => { const d = document.getElementById('map')?.contentDocument;"
+        " return d && /^300 of 300/.test(d.getElementById('count').textContent); }",
+        timeout=60000,
+    )
+    return page, next(f for f in page.frames if "map.html" in f.url)
+
+
+def test_the_search_box_picks_a_taxon_in_the_map_as_its_own_box_does(browser, site):
+    page, left = explore(browser, site)
+    page.fill("#sq", "taxon 6")
+    page.locator("#sg li").nth(1).wait_for()
+    first = page.locator("#sg li").first.inner_text()
+    assert first.startswith("Taxon") and "Taxon 6" in first
+    assert "Photos like" in page.locator("#sg li").last.inner_text()
+    page.press("#sq", "Enter")
+    left.wait_for_function("/^2 of 300/.test(document.getElementById('count').textContent)")
+    page.wait_for_function("location.hash.includes('taxa=1006')")  # the split page holds the hash
+    assert left.locator("#selbar li", has_text="Taxon 6").count() == 1
+    assert page.locator("#sq").input_value() == ""
+    assert left.locator("#selbar li", has_text="Photo search").count() == 0
+    assert page.errors == []
+    page.close()
+
+
+def test_the_search_box_sets_the_map_user_from_a_login_and_offers_no_project_without_a_file(
+    browser, site
+):
+    page, left = explore(browser, site)
+    page.fill("#sq", "https://www.inaturalist.org/projects/bc-rarities")
+    page.wait_for_timeout(500)
+    assert page.locator("#sg li").count() == 1  # the map has no project file, so none to add
+    page.fill("#sq", "@birder")
+    page.locator("#sg li").nth(1).wait_for()
+    assert "@birder" in page.locator("#sg li").first.inner_text()
+    page.press("#sq", "Enter")
+    page.wait_for_function("location.hash.includes('user=birder')")
+    assert left.locator("#usrname").input_value() == "birder"
+    assert page.errors == []
+    page.close()

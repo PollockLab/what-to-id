@@ -14,7 +14,13 @@ body{display:flex;flex-direction:column}
 .xbar{display:flex;align-items:center;gap:8px 14px;margin-left:auto;min-width:0;font-size:13px;white-space:nowrap}
 .counts{color:var(--muted)}
 .counts b{color:var(--ink);font-weight:650;font-variant-numeric:tabular-nums}
-#sf{display:inline-flex;gap:6px;flex:0 1 auto;min-width:0}
+#sf{position:relative;display:inline-flex;gap:6px;flex:0 1 auto;min-width:0}
+#sg{position:absolute;left:0;top:100%;z-index:40;width:max(100%,320px);max-width:calc(100vw - 24px);margin:4px 0 0;padding:4px 0;list-style:none;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);white-space:normal}
+#sg[hidden]{display:none}
+#sg li{padding:6px 10px;cursor:pointer;min-height:36px}
+#sg li span{display:block;color:var(--muted);font-size:12px}
+#sg li i{float:right;margin-left:8px;font-style:normal;font-size:11px;color:var(--muted)}
+#sg li[aria-selected="true"]{background:var(--chip)}
 #sq{font:inherit;font-size:13px;width:min(230px,30vw);min-width:120px;flex:0 1 auto;min-height:28px;padding:0 10px;border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--ink)}
 #sf button{font:inherit;font-size:12px;min-height:28px;padding:0 11px;border:1px solid var(--line);border-radius:14px;background:var(--chip);color:var(--ink);cursor:pointer}
 .seg{display:inline-flex}
@@ -310,8 +316,7 @@ async function hitsFor(st){
   }
   return (await idx).search(q,{k:200});
 }
-document.getElementById('sf').addEventListener('submit',async function(e){
-  e.preventDefault();
+async function photos(){
   var st=AtlasSearchMeta.parseInput(sq.value),r=++run;
   if(!st){sm.textContent='';setSub(null);return;}
   sm.textContent='Searching…';
@@ -322,7 +327,49 @@ document.getElementById('sf').addEventListener('submit',async function(e){
     sm.textContent=hits.length?'':'No matching photos.';
     if(hits.length)setSub(hits.map(function(h){return h.id;}),st.kind==='id'?'like '+st.id:st.text);
   }catch(err){if(r===run)sm.textContent='Search failed: '+err.message;}
+}
+// One box, three kinds of pick: what the map frame offers for the text (taxa, places, a user or project; wtid-suggest,
+// answered with rows) and, always last, the photo search. A row is applied by the map (wtid-apply); with no map
+// frame, or before it answers, only the photo option shows. An exact name match comes first and is highlighted,
+// else the photo option is, so a free sentence plus Enter is the photo search as before.
+var sg=document.getElementById('sg'),opts=[],act=-1,seq=0;
+function hideSg(){sg.hidden=true;opts=[];act=-1;sq.setAttribute('aria-expanded','false');sq.removeAttribute('aria-activedescendant');}
+function markSg(){[].forEach.call(sg.children,function(li,k){li.setAttribute('aria-selected',String(k===act));});
+  if(act>=0)sq.setAttribute('aria-activedescendant','sg'+act);else sq.removeAttribute('aria-activedescendant');}
+function drawSg(rows,q){
+  opts=rows.filter(function(r){return r.exact;}).concat(rows.filter(function(r){return !r.exact;}));
+  opts.push({group:'Photos',label:'Photos like \u201c'+q+'\u201d',photo:true});
+  act=opts[0].exact?0:opts.length-1;sg.textContent='';
+  opts.forEach(function(r,k){var li=document.createElement('li'),g=li.appendChild(document.createElement('i')),
+    b=li.appendChild(document.createElement('b')),sp=li.appendChild(document.createElement('span'));
+    g.textContent=r.group;b.textContent=r.label;
+    sp.textContent=[r.sub,r.count?r.count.toLocaleString('en-CA')+(r.count===1?' record':' records'):''].filter(Boolean).join(' · ');
+    sp.hidden=!sp.textContent;li.id='sg'+k;li.setAttribute('role','option');
+    li.onpointerdown=function(e){e.preventDefault();pickSg(k);};sg.appendChild(li);});
+  sg.hidden=false;sq.setAttribute('aria-expanded','true');markSg();}
+function askSg(){
+  var q=sq.value.trim(),st=AtlasSearchMeta.parseInput(sq.value),n=++seq;
+  if(!q||!st){hideSg();return;}
+  drawSg([],q);  // the photo option at once; the map's rows join it when they arrive
+  if(st.kind!=='id'&&frames.map&&frames.map.contentWindow)post('map',{type:'wtid-suggest',q:q,seq:n});}
+function pickSg(k){var r=opts[k];if(!r)return;hideSg();
+  if(r.photo){photos();return;}
+  ++seq;post('map',{type:'wtid-apply',group:r.group,key:r.key});sq.value='';}
+addEventListener('message',function(e){
+  var d=e.data;
+  if(e.origin!==location.origin||!frames.map||e.source!==frames.map.contentWindow||!d||d.type!=='wtid-suggest'||
+    d.seq!==seq||!Array.isArray(d.rows)||sg.hidden)return;
+  drawSg(d.rows.filter(function(r){return r&&typeof r.group==='string'&&typeof r.key==='string'&&typeof r.label==='string';})
+    .map(function(r){return {group:r.group,key:r.key,label:r.label,sub:typeof r.sub==='string'?r.sub:'',count:+r.count||0,exact:!!r.exact};}),
+    sq.value.trim());
 });
+sq.addEventListener('input',askSg);sq.addEventListener('focus',askSg);sq.addEventListener('blur',hideSg);
+sq.addEventListener('keydown',function(e){
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){if(sg.hidden)askSg();if(!opts.length)return;
+    act=(act+(e.key==='ArrowDown'?1:opts.length-1))%opts.length;markSg();e.preventDefault();}
+  else if(e.key==='Enter'){if(!sg.hidden&&act>=0){pickSg(act);e.preventDefault();}}
+  else if(e.key==='Escape')hideSg();});
+document.getElementById('sf').addEventListener('submit',function(e){e.preventDefault();hideSg();photos();});
 sq.addEventListener('input',function(){if(!sq.value&&sub){++run;sm.textContent='';setSub(null);}});  // the field's own clear button
 // A chip's remove action in either frame clears the subset.
 addEventListener('message',function(e){

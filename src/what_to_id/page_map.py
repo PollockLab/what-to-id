@@ -132,6 +132,7 @@ MAP_JS = (
     "clade_colour.js",
     "group_list.js",
     "filter_bar.js",
+    "map_suggest.js",
     "level_colour.js",
     "map_card.js",
     "map.js",
