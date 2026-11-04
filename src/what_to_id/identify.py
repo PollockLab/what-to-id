@@ -11,19 +11,56 @@ rank, then easy / taxonomist at species rank with no per-species or per-group ca
 for a higher rank whose clade has a prototype, then mislabel: a species-ranked margin below
 `-TAXONOMIST_MARGIN` with a look-alike of `MIN_LOOKALIKE_RECORDS` records. Everything else is
 level 0.
+
+`identify_delta` adds the records a base table lacks (the daily atlas run) against cut-offs frozen
+from that table (`freeze_cutoffs`): the per-group weird cut and, per species, the lowest `own` of
+its Clear matches. A species with fewer than `MIN_PER_CLASS` base records never gets a Clear
+match, as in the full run. Base rows are never rewritten; a Fir rerun replaces the whole file.
+
+    python -m what_to_id.identify --live DIR --index DIR --pool pool.parquet --tree taxonomy.json \\
+        --taxa DIR --vectors raw-delta-*.npz [--bc-counts bc-verifiable-counts.parquet]
+
+DIR for --live holds the host's current manifest.json and identify.parquet; --index gets the merged
+identify.parquet and its manifest's ``"identify"`` entry, taken from the live one.
 """
 
 from __future__ import annotations
 
+import argparse
+import json
+import sys
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import NamedTuple
+
 import numpy as np
 import pandas as pd
 
-from what_to_id.confusion import CHUNK, FIR_SLICE
+from what_to_id.atlas_index_io import read_manifest, write_manifest
+from what_to_id.confusion import CHUNK, FIR_SLICE, MIN_PER_CLASS, read_taxa_vectors
 from what_to_id.levels import TAXONOMIST_MARGIN, WEIRD_SHARE, lookalike_known, species_masks
 
 IDENTIFY_COLUMNS = ("id", "taxon_id", "level", "score", "score2", "looks_like")
 NONE, EASY, TAXONOMIST, NARROW, WEIRD, MISLABEL = 0, 1, 2, 3, 4, 5
 LEVEL_NAMES = ("none", "easy", "taxonomist", "narrow", "weird", "mislabel")
+
+
+class Frozen(NamedTuple):
+    weird: pd.Series  # iconic group ("" for none) -> highest `top` that is weird
+    easy: pd.Series  # taxon id -> lowest `own` among its Clear matches
+    n: pd.Series  # taxon id -> species-ranked records in the base
+
+
+def freeze_cutoffs(base: pd.DataFrame, pool: pd.DataFrame) -> Frozen:
+    """Cut-offs read back from `base` (`identify_levels` output); `pool` adds rank, iconic_taxon."""
+    m = base.merge(pool[["id", "rank", "iconic_taxon"]].drop_duplicates("id"), on="id")
+    weird = m[m["level"] == WEIRD]
+    easy = m[m["level"] == EASY]
+    return Frozen(
+        weird["score"].groupby(weird["iconic_taxon"].fillna("")).max(),
+        easy["score"].groupby(easy["taxon_id"]).min(),
+        m[m["rank"] == "species"].groupby("taxon_id").size(),
+    )
 
 
 def clade_columns(
@@ -136,21 +173,36 @@ def identify_scores(
     return pd.concat(parts, ignore_index=True).astype({"id": np.int64, "taxon_id": np.int64})
 
 
-def identify_levels(scores: pd.DataFrame, bc_counts: pd.Series | None = None) -> pd.DataFrame:
+def identify_levels(
+    scores: pd.DataFrame, bc_counts: pd.Series | None = None, frozen: Frozen | None = None
+) -> pd.DataFrame:
     """`IDENTIFY_COLUMNS` rows from `identify_scores`, one per record, in score order of `scores`.
 
     `score` is `own` for easy, the margin for taxonomist and mislabel, in-clade best minus
     outside best for narrow and `top` for weird; `score2` is best minus second-best in-clade
     (narrow only); `looks_like` is the look-alike species (taxonomist, mislabel) or the probable
     species (narrow).
+
+    With `frozen`, the weird cut and the easy share come from it, not from `scores`; a group or
+    species it lacks gets neither level. `bc_counts` should then cover the whole pool.
     """
     s = scores.copy()
     s["group"] = s["iconic_taxon"].fillna("")
-    weird = s["top"] <= s.groupby("group")["top"].transform(lambda x: x.quantile(WEIRD_SHARE))
+    if frozen is None:
+        weird = s["top"] <= s.groupby("group")["top"].transform(lambda x: x.quantile(WEIRD_SHARE))
+    else:
+        weird = s["top"] <= s["group"].map(frozen.weird).astype(float)
     sp = s[(s["rank"] == "species") & s["own"].notna() & s["other"].notna()].assign(
         margin=lambda d: d["own"] - d["other"]
     )
     easy, tax = species_masks(sp, weird.loc[sp.index], bc_counts)
+    if frozen is not None:
+        easy = (
+            (sp["margin"] > 0)
+            & (sp["taxon_id"].map(frozen.n).astype(float).fillna(0) >= MIN_PER_CLASS)
+            & (sp["own"] >= sp["taxon_id"].map(frozen.easy).astype(float))
+            & ~weird.loc[sp.index]
+        )
     easy, tax = easy.reindex(s.index, fill_value=False), tax.reindex(s.index, fill_value=False)
     narrow = (s["rank"] != "species") & s["in_best"].notna() & ~weird
     # species rank only, so disjoint from narrow; the margin test is disjoint from easy and tax
@@ -184,6 +236,87 @@ def identify_levels(scores: pd.DataFrame, bc_counts: pd.Series | None = None) ->
     )
 
 
+def identify_delta(
+    base: pd.DataFrame,
+    pool: pd.DataFrame,
+    E: np.ndarray,
+    ids: np.ndarray,
+    taxa: pd.Series,
+    T: np.ndarray,
+    tree: dict,
+    bc_counts: pd.Series | None = None,
+) -> pd.DataFrame:
+    """`base` plus the levels of pool records with a vector in `E` (rows `ids`) that it lacks."""
+    frozen = freeze_cutoffs(base, pool)
+    new = pool[~pool["id"].isin(base["id"])]
+    if bc_counts is None:  # the whole pool, as a full run counts look-alikes
+        bc_counts = pool.loc[pool["rank"] == "species", "taxon_name"].value_counts()
+    add = identify_levels(identify_scores(new, E, ids, taxa, T, tree), bc_counts, frozen)
+    out = pd.concat([base, add], ignore_index=True)
+    looks = out["looks_like"].astype("string").astype("category")
+    return out.assign(looks_like=looks.to_numpy())
+
+
+def _one(folder: str, pattern: str) -> Path:
+    found = sorted(Path(folder).glob(pattern))
+    if len(found) != 1:
+        raise ValueError(f"expected one {pattern} in {folder}, found {len(found)}")
+    return found[0]
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(prog="python -m what_to_id.identify", description=__doc__)
+    ap.add_argument(
+        "--live", required=True, help="dir with the host's manifest and identify.parquet"
+    )
+    ap.add_argument(
+        "--index", required=True, help="index dir to write identify.parquet and manifest"
+    )
+    ap.add_argument("--pool", required=True, help="pool parquet: id, taxon_id, taxon_name, rank")
+    ap.add_argument("--tree", required=True, help="map-state taxonomy.json")
+    ap.add_argument("--taxa", required=True, help="dir with taxa-<sha>.tsv.gz and .f16")
+    ap.add_argument("--vectors", nargs="*", default=[], help="raw-*.npz (ids, E) of new records")
+    ap.add_argument("--bc-counts", help="as levels.py; default counts look-alikes in the pool")
+    args = ap.parse_args(sys.argv[1:] if argv is None else argv)
+    from what_to_id.taxonomy import load_tree
+
+    live = Path(args.live)
+    registered = json.loads((live / "manifest.json").read_text()).get("identify")
+    if not (live / "identify.parquet").exists() or not registered:
+        print("no live identify.parquet; run levels_fir.sbatch first, nothing to extend")
+        return 0
+    base = pd.read_parquet(live / "identify.parquet")
+    tree = load_tree(args.tree)
+    if not tree:
+        raise ValueError(f"{args.tree!r} has no taxa")
+    pool = pd.read_parquet(
+        args.pool, columns=["id", "taxon_id", "taxon_name", "rank", "iconic_taxon"]
+    )
+    taxa, T = read_taxa_vectors(_one(args.taxa, "taxa-*.tsv.gz"), _one(args.taxa, "taxa-*.f16"))
+    zs = [np.load(v) for v in args.vectors]
+    ids = np.concatenate([z["ids"] for z in zs]) if zs else np.empty(0, np.int64)
+    E = np.concatenate([z["E"] for z in zs]) if zs else np.empty((0, T.shape[1]), np.float16)
+    if E.shape[1] != T.shape[1]:
+        raise ValueError(f"vectors have {E.shape[1]} dims, taxa vectors {T.shape[1]}")
+    bc = pd.read_parquet(args.bc_counts).set_index("name")["count"] if args.bc_counts else None
+    out = identify_delta(base, pool, E, ids.astype(np.int64), taxa, T, tree, bc)
+    out_dir = Path(args.index)
+    tmp = out_dir / "identify.parquet.tmp"
+    out.to_parquet(tmp, index=False)
+    tmp.replace(out_dir / "identify.parquet")
+    manifest = read_manifest(
+        out_dir
+    )  # this run's, with its new parts; only "identify" comes from live
+    manifest["identify"] = {
+        **registered,
+        "count": len(out),
+        "delta_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    write_manifest(out_dir, manifest)
+    print(f"{len(out) - len(base)} records added to {len(base)}")
+    return 0
+
+
 def describe(scores: pd.DataFrame, out: pd.DataFrame) -> str:
     """Records per level, and per iconic group and level."""
     lvl = pd.Series(np.array(LEVEL_NAMES)[out["level"].to_numpy()], name="level")
@@ -200,3 +333,7 @@ def describe(scores: pd.DataFrame, out: pd.DataFrame) -> str:
             counts.to_string(),
         ]
     )
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

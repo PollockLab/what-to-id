@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Move the static atlas index between a local directory and its host.
 #
-#   scripts/atlas_sync.sh pull DIR [ids]   download the index into DIR; with "ids" only the
-#                                          manifest and the id files (enough for `atlas_update plan`)
+#   scripts/atlas_sync.sh pull DIR [ONLY]  download the index into DIR; with "ids" only the
+#                                          manifest and the id files (enough for `atlas_update plan`),
+#                                          "taxa" the manifest and taxa-* (for identify delta),
+#                                          "identify" the manifest and identify.parquet
 #   scripts/atlas_sync.sh push DIR         upload DIR; part files first, manifest.json last, so a
 #                                          reader only sees a part once the manifest names it
 #
@@ -55,8 +57,12 @@ pull_local() {
   local f
   for f in "$ATLAS_LOCAL_DIR"/*; do
     case "$(basename "$f")" in
-      model | taxa-*.f16) continue ;;
-      manifest.json | *.ids.u32) ;;
+      model) continue ;;
+      manifest.json) ;;
+      taxa-*.f16) [ "$only" = taxa ] || continue ;;
+      taxa-*) [ -z "$only" ] || [ "$only" = taxa ] || continue ;;
+      identify.parquet) [ -z "$only" ] || [ "$only" = identify ] || continue ;;
+      *.ids.u32) [ -z "$only" ] || [ "$only" = ids ] || continue ;;
       *) [ -z "$only" ] || continue ;;
     esac
     cp "$f" "$dir/"
@@ -86,11 +92,14 @@ push_local() {
 
 pull_hf() {
   [ -n "${ATLAS_HF_REPO:-}" ] || die "ATLAS_HF_REPO is not set"
-  local include=()
-  [ -z "$only" ] || include=(--include manifest.json --include "*.ids.u32")
+  local include=() skip=(--exclude "taxa-*.f16")
+  case "$only" in
+    ids) include=(--include manifest.json --include "*.ids.u32") ;;
+    taxa) include=(--include manifest.json --include "taxa-*") skip=() ;;
+    identify) include=(--include manifest.json --include identify.parquet) ;;
+  esac
   hf_cli download "$ATLAS_HF_REPO" --repo-type dataset --local-dir "$dir" --exclude "model/*" \
-    --exclude "taxa-*.f16" \
-    ${include[@]+"${include[@]}"}
+    ${skip[@]+"${skip[@]}"} ${include[@]+"${include[@]}"}
 }
 
 # Index file names; prune deletes only these, never the dataset card, .gitattributes or model/.
@@ -120,10 +129,14 @@ r2_env() {
 
 pull_r2() {
   r2_env
-  local filter=()
-  [ -z "$only" ] || filter=(--exclude "*" --include manifest.json --include "*.ids.u32")
+  local filter=() skip=(--exclude "taxa-*.f16")
+  case "$only" in
+    ids) filter=(--exclude "*" --include manifest.json --include "*.ids.u32") ;;
+    taxa) filter=(--exclude "*" --include manifest.json --include "taxa-*") skip=() ;;
+    identify) filter=(--exclude "*" --include manifest.json --include identify.parquet) ;;
+  esac
   aws s3 sync "s3://$ATLAS_R2_BUCKET/" "$dir" --endpoint-url "$ATLAS_R2_ENDPOINT" --only-show-errors \
-    --exclude "model/*" --exclude "taxa-*.f16" ${filter[@]+"${filter[@]}"}
+    --exclude "model/*" ${skip[@]+"${skip[@]}"} ${filter[@]+"${filter[@]}"}
 }
 
 push_r2() {
