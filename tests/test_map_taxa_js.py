@@ -135,3 +135,11 @@ def test_terms_shape():
     assert pre[5] == [1, 1, 0, 1, 0] and pre[6]["params"] == {"taxon_id": "3,64615"}
     assert cl[:6] == ["taxon", "clade", 47167, "Agaricales", True, [0, 0, 1, 0, 0]]
     assert cl[6] == {"params": {"without_taxon_id": "47167"}, "exact": True}
+
+
+def test_suggest_matches_names_in_any_case_across_repeated_calls():
+    r = run(
+        "return [TX.suggest(T,'SPHAG',null,[]),TX.suggest(T,'peat moss',null,[]),"
+        "TX.suggest(T,'sphag',null,[{id:4}]),TX.suggest(T,'zzz',null,[])];"
+    )
+    assert r == [[0, 5], [0, 5], [0], []]
