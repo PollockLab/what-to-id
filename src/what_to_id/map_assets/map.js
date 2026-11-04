@@ -61,7 +61,7 @@ function writeHash(){SYNC.send();clearTimeout(hashTimer);hashTimer=setTimeout(fu
 var P={n:0,id:new Uint32Array(0),pos:new Float32Array(0),obs:new Uint16Array(0),
   up:new Uint16Array(0),tax:new Uint16Array(0),grp:new Uint8Array(0),ids:new Uint8Array(0),
   fl:new Uint8Array(0),start:[0]};
-var TAXA=null,TF=TX.filter(null,[]),GONE={},GONE_NEW=false,KEEP=new Uint8Array(0),BK=KEEP,VM=KEEP,SEL=-1,NBR=[],
+var ORDER=false,VR=null,TAXA=null,TF=TX.filter(null,[]),GONE={},GONE_NEW=false,KEEP=new Uint8Array(0),BK=KEEP,VM=KEEP,SEL=-1,NBR=[],
   CUM=new Float64Array(META.days+1),TOT=META.totals||null,TC=null,NODAY=0,PER=null,ALT=0,FIT=false;
 function cat(a,b){var c=new a.constructor(a.length+b.length);c.set(a);c.set(b,a.length);return c;}
 function unzip(buf){
@@ -240,7 +240,7 @@ function link(){
     all:META.groups.length,up:S.up,d1:S.lo>0?iso(S.lo):'',d2:S.hi<LAST?iso(S.hi):'',months:m,taxa:taxa,
     not:TF.not.concat(gl.not),only:S.only,acc:S.acc};
   // with an area on, the link may list the records by id instead, and then u stays null
-  var need=gl.inc.length||gl.out.length||PJ.inexact()||S.only.oneid,
+  var need=gl.inc.length||gl.out.length||PJ.inexact()||S.only.oneid||ORDER,
     a=$('identify'),href=AREA.link(ALL?{w:-180,s:-90,e:180,n:90}:{w:b.getWest(),s:b.getSouth(),e:b.getEast(),n:b.getNorth()},
     function(v,p,side){var r=TX.identifyUrl(st,v,META,Object.assign({},PJ.params(),UF.params(),p));if(!side)u=r;return r.url;},match,!!need);
   if(AREA.invalid()){a.removeAttribute('href');a.setAttribute('aria-disabled','true');
@@ -256,7 +256,7 @@ function link(){
   if(gl.out.length)why.push('Identify cannot leave out the '+gn(gl.out)+' group beside picked taxa, so it keeps it');
   if(lost.indexOf('taxa')>=0)why.push('too many taxa for one link, so it opens every taxon');
   if(lost.indexOf('not')>=0)why.push('too many taxa left out for one link, so it keeps them');
-  if(PJ.inexact())why.push(PJ.inexact());if(S.only.oneid)why.push('Identify cannot filter records one ID from Research Grade');
+  if(PJ.inexact())why.push(PJ.inexact());if(S.only.oneid)why.push('Identify cannot filter records one ID from Research Grade');if(ORDER&&!u)why.push('most needed first');
   // listed by id (u stays null), the records are the map's, so only the way they open is said
   // these records' next agree settles them, so the note asks for an independent ID first
   // past the limit the first 10,000 open by default; the button switches to all of them and back
@@ -469,6 +469,7 @@ var overlay=new deck.MapboxOverlay({interleaved:false,pickingRadius:8,layers:[]}
 var AREA=MapArea({map:map,S:S,LAST:LAST,hash:S.area,park:S.park,bcpark:S.bcpark,fit:!S.at,
   place:META.place_id,parks:META.parks,get:get,P:function(){return P;},keep:function(){return KEEP;},change:refilter,
   sel:function(){return sel().join('&');},extra:function(){var u=UF.params(true);return Object.keys(u).map(function(k){return '&'+k+'='+encodeURIComponent(u[k]);}).join('');},
+  order:function(){return ORDER&&function(ix){return MapValue.order(ix,P.tax,VR||(VR=MapValue.rows(TAXA,META.value)));};},
   step:IdStep({a:$('identify'),prev:$('idprev'),next:$('idnext'),build:iso(LAST)})});
 // Guard activation before IdStep's handlers, including a stale batch or keyboard activation.
 function stopInvalidIdentify(e){if(AREA.invalid()){e.preventDefault();e.stopImmediatePropagation();}}
@@ -498,7 +499,8 @@ var HINT=$('hint').textContent,HINT_TOT='Top: records still needing an ID per ye
 render();
 PJ.load(get);
 var names0=get(META.taxa).then(function(buf){TAXA=JSON.parse(new TextDecoder().decode(buf));
-  FB.oldQuery();search();FB.showClades();refilter();});
+  FB.oldQuery();search();FB.showClades();refilter();
+  var ob=$('idorder');ob.hidden=!META.value;ob.onclick=function(){ORDER=!ORDER;ob.setAttribute('aria-pressed',ORDER);link();};});
 // One shard downloads at a time, so on a slow link the recent shard gets all the bandwidth.
 var chain=Promise.resolve(),prev=Promise.resolve();
 META.shards.forEach(function(s,k){

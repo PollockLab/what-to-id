@@ -9,6 +9,7 @@ import pytest
 from what_to_id import taxonomy
 from what_to_id.page_map import encode_points, main
 from what_to_id.taxonomy import (
+    AT_RISK,
     GROUP_TAXA,
     NO_RANK,
     PRESETS,
@@ -144,7 +145,7 @@ def test_encode_points_with_tree_offers_presets():
     _, meta = encode_points(pool)
     assert "presets" not in meta and meta["taxa_n"] == 2
     blobs, meta = encode_points(pool, TREE)
-    assert meta["presets"] == PRESETS and meta["taxa_n"] == 2
+    assert meta["presets"] == PRESETS and meta["value"] == AT_RISK and meta["taxa_n"] == 2
     rows = json.loads(gzip.decompress(blobs[meta["taxa"]]))
     assert len(rows) == 6 and all(len(r) == 6 for r in rows)
     assert meta["group_ids"] == {g: GROUP_TAXA[g] for g in meta["groups"] if g in GROUP_TAXA}
@@ -165,6 +166,18 @@ def test_challenge_preset_matches_its_pinned_source():
     assert PRESETS[2][1] == ids and len(ids) == 325 and ids == sorted(set(ids))
     assert len(data["skipped_genus_ids"]) == 10 and not set(ids) & set(data["skipped_genus_ids"])
     assert len(data["source_sha256"]) == 64 and "bf5d38f" in data["source"]
+
+
+def test_at_risk_value_table_is_pinned_with_its_rule():
+    data = json.loads((Path(taxonomy.__file__).with_name("at_risk_bc_taxa.json")).read_text())
+    rows = data["taxa"]
+    assert data["columns"] == ["taxon_id", "tier", "bc_research_grade"] and len(rows) == 1496
+    assert [r[0] for r in rows] == sorted({r[0] for r in rows})
+    assert {r[1] for r in rows} == {1, 2, 3}
+    ids = [t for t, tier, _ in rows if tier <= 2]
+    assert rows == AT_RISK and len(ids) == 490
+    assert "S1-S2" in data["rule"] and "SARA" in data["rule"] and "2026-11-04" in data["source"]
+    assert 68083 in ids and 40346 in ids  # Pinus albicaulis (SARA), Myotis lucifugus (SARA)
 
 
 def test_cli_builds_with_and_without_tree(tmp_path, caplog):

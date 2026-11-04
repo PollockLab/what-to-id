@@ -58,6 +58,11 @@ PRESETS = [
         "The species, subspecies and varieties of the Conservation Challenge list",
     ],
 ]
+# at_risk_bc_taxa.json holds the taxa of BC needs-ID records flagged threatened on 2026-11-03 that
+# are listed in Canada (tier 1) or ranked S1-S2 (2) or S3 (3) in BC, with their BC Research Grade
+# count, for the map's "Most needed first" order (map_value.js); its "source" and "rule" say how.
+# shortcut: species first seen in BC needs-ID after that day are missing, refetch when stale.
+AT_RISK = json.loads((Path(__file__).with_name("at_risk_bc_taxa.json")).read_text())["taxa"]
 # The iNaturalist taxon behind each iconic group the map shows as a chip, so Identify can add the
 # chosen groups to the picked taxa in one taxon_id. Animalia (animals in no other group) and
 # Unknown have no single taxon.
