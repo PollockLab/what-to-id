@@ -447,17 +447,19 @@ function MapArea(ctx){
       for(;i<n;i++)for(j=0;j<I.length;j++)if(inside(I[j],pos[2*i],pos[2*i+1])){m[i]=1;break;}
       MASK=m;return m;},
     // The Identify link, through ctx.step, which steps through the batches when there are several.
-    link:function(v,url,match){var u=link(v,url,match);return ctx.step.set(ctx.sel(),LINKS,u);}
+    link:function(v,url,match,need){var u=link(v,url,match,need);return ctx.step.set(ctx.sel(),LINKS,u);}
   };
   // What iNaturalist can filter (the parks' place_ids) goes into the link as is. Otherwise it lists
   // the records by id, in LINKS, batches of BATCH, and offers the areas' bounding box as one link
   // beside them. Past MAXB batches the note asks for a narrower selection, and until then the link
-  // opens the box. url(box, params) builds the link; a null box leaves it out.
-  function link(v,url,match){var t=term();LINKS=[];BOX=null;
+  // opens the box. url(box, params) builds the link; a null box leaves it out. With need, a filter
+  // Identify cannot say, the records are listed by id even without an area (past the limit the
+  // plain link stays).
+  function link(v,url,match,need){var t=term();LINKS=[];BOX=null;
     if(unresolved()){LINK='';ui();return null;}
-    if(!t||!ctx.P().n){LINK='';ui();return url(v);}
+    if(!(t||need)||!ctx.P().n){LINK='';ui();return url(v);}
     var P=ctx.P(),keep=ctx.keep(),S=ctx.S,day=S.up?P.up:P.obs,full=S.lo===0&&S.hi===ctx.LAST,
-      ids=[],n=0,i,d,q=t.inat();
+      ids=[],n=0,i,d,q=t?t.inat():{};
     function dated(i){d=day[i];return d===65535?full:d>=S.lo&&d<=S.hi;}
     for(i=0;i<P.n;i++){if(!keep[i]||!dated(i))continue;if(++n<=BATCH*MAXB)ids.push(P.id[i]);}
     if(q.exact){LINK='Identify uses the iNaturalist park filter for '+t.label+'. '+
@@ -468,7 +470,8 @@ function MapArea(ctx){
       LINKS=batches(ids).map(function(b){b.url+=q2;return b;});var k=LINKS.length;
       LINK='Exact: '+(k>1?nf.format(n)+' records in '+k+' batches of up to '+BATCH:n===1?'this record by id':
         'these '+nf.format(n)+' records by id')+(n>1?', less any identified since.':'.');
-      if(k>1)BOX=boxlink(v,url,match,dated,true);ui();return LINKS[0].url;}
+      if(k>1&&t)BOX=boxlink(v,url,match,dated,true);ui();return LINKS[0].url;}
+    if(!t){LINK='';ui();return url(v);}
     var o=boxlink(v,url,match,dated);
     LINK=nf.format(n)+' records: too many to open exactly (limit '+nf.format(BATCH*MAXB)+'). Make the '+
       'area smaller or add filters. Identify now opens the box around '+(drawn()?'the shape':t.label)+

@@ -468,14 +468,14 @@ def test_page_inlines_the_area_filter_before_the_map_script():
     assert "park:S.park,bcpark:S.bcpark," in html and "q.set(k,extra[k])" in html
     assert "parks:META.parks,get:get" in html
     # the Identify box count reads the filters without the area
-    assert "if(!side)u=r;return r.url;},match)" in html and "function match(i)" in html
+    assert "if(!side)u=r;return r.url;},match,!!need)" in html and "function match(i)" in html
     # the Identify button steps through an area's batches, with a ‹ › beside it to step by hand
     assert html.index("var IdStep=") < html.index("var AREA=MapArea(")
     assert 'id="idprev" class="idarrow" aria-label="Previous batch" hidden' in html
     assert 'id="idnext" class="idarrow" aria-label="Next batch" hidden' in html
     # beside several batches, the box around the shape is offered as one link in a new tab
     assert '<a class="abox" target="_blank" rel="noopener" hidden></a>' in html
-    assert "if(k>1)BOX=boxlink(v,url,match,dated,true)" in html
+    assert "if(k>1&&t)BOX=boxlink(v,url,match,dated,true)" in html
 
 
 _AREA_JS = r"""
