@@ -357,7 +357,7 @@ def test_the_batch_links_cover_the_listed_ids(browser, site):
     assert page.locator("#go").inner_text() == "Identify 2 · batch 1 of 3"
     assert (
         page.locator("#cap").inner_text()
-        == f"The first 5 of {n:,} listed, newest first, 200 per batch"
+        == f"The first 5 of {n:,} listed, in the order shown, 200 per batch"
     )
     page.click("#next")
     assert page.locator("#go").inner_text() == "Identify 2 · batch 2 of 3"
