@@ -297,7 +297,7 @@ function layers(){
 var FB=FilterBar({S:S,META:META,mf:MF,nf:nf,pj:PJ,sel:sel,P:function(){return P;},taxa:function(){return TAXA;},
   area:function(){return AREA;},cum:function(){return CUM;},tc:function(){return TC;},search:search,
   pass:function(){return VM;},inside:function(r){return !!TF.inc&&TF.inc[r]===1;},
-  refilter:refilter,render:render,reset:function(){
+  refilter:refilter,render:render,drag:layers,reset:function(){
     if(parent!==window)parent.postMessage({type:'wtid-reset'},location.origin);},  // the photo space beside it zooms out
   extra:function(){return SUB?[{label:'Photo search: "'+SUBL+'" ('+SUB.size+')',
     remove:function(){parent.postMessage({type:'wtid-subset',ids:null},location.origin);}}]:[];}});

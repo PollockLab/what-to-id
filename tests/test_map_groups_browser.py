@@ -147,3 +147,22 @@ def test_the_months_sit_in_the_bottom_bar_and_fit_a_phone(page):
     page.set_viewport_size({"width": 390, "height": 844})
     assert page.evaluate("document.documentElement.scrollWidth") <= 390
     assert page.evaluate("document.getElementById('time').scrollWidth") <= 390
+
+
+def test_dragging_the_date_brush_renders_once_at_pointerup(page):
+    box = page.locator("#hist").bounding_box()
+    page.evaluate(
+        """() => { window.fullRenders = 0;
+        new MutationObserver(() => window.fullRenders++).observe(
+          document.getElementById('count'), {childList: true}); }"""
+    )
+    y = box["y"] + box["height"] / 2
+    page.mouse.move(box["x"] + 20, y)
+    page.mouse.down()
+    for i in range(40):
+        page.mouse.move(box["x"] + 20 + 5 * i, y)
+    page.wait_for_timeout(100)
+    assert page.evaluate("window.fullRenders") == 0  # only the GPU range and bars moved
+    page.mouse.up()
+    page.wait_for_timeout(100)
+    assert page.evaluate("window.fullRenders") == 1
