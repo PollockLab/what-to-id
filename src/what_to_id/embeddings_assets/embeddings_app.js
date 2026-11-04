@@ -437,7 +437,7 @@ function select(i,fly){
       sc.title='cosine similarity '+score[c.id];
       b.addEventListener('mouseenter',function(){
         if(parent!==window)parent.postMessage({type:'wtid-focus',id:c.id},location.origin);});
-      nb.appendChild(el('li',{},[b,el('span',{'class':'rank'},[String(rank[c.id])]),sc]));
+      nb.appendChild(el('li',{},[b,el('span',{'class':'rank','data-explain':nb.children.length?null:'match-n'},[String(rank[c.id])]),sc]));
     });
   })();
 }
