@@ -162,7 +162,8 @@ def test_presets_name_their_taxa_once():
 def test_challenge_preset_matches_its_pinned_source():
     data = json.loads((Path(taxonomy.__file__).with_name("challenge_taxa.json")).read_text())
     ids = data["taxon_ids"]
-    assert PRESETS[2][1] == ids and len(ids) == 335 and ids == sorted(set(ids))
+    assert PRESETS[2][1] == ids and len(ids) == 325 and ids == sorted(set(ids))
+    assert len(data["skipped_genus_ids"]) == 10 and not set(ids) & set(data["skipped_genus_ids"])
     assert len(data["source_sha256"]) == 64 and "bf5d38f" in data["source"]
 
 

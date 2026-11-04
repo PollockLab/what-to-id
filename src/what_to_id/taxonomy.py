@@ -43,7 +43,8 @@ NO_RANK = 0xFF
 # (https://forum.inaturalist.org/t/separate-lichen-and-fungi-into-two-categories/5212/10). It
 # misses smaller lichen lineages and holds a few non-lichenized Lecanoromycetes.
 # challenge_taxa.json copies the ids of where-to-blitz webapp/challenge_taxa.json at the commit and
-# sha256 it names; update both together when that list changes.
+# sha256 it names, less its genus entries ("Berberis spp.", "Monochamus spp." and others): with
+# descendants they would add Oregon grape and other common BC species. Update both together.
 PRESETS = [
     ["Bryophytes", [56327, 311249, 64615], "Hornworts, mosses and liverworts"],
     [
@@ -54,7 +55,7 @@ PRESETS = [
     [
         "Conservation Challenge",
         json.loads((Path(__file__).with_name("challenge_taxa.json")).read_text())["taxon_ids"],
-        "The 335 taxa of the Conservation Challenge list, as in Where to Blitz",
+        "The species, subspecies and varieties of the Conservation Challenge list",
     ],
 ]
 # The iNaturalist taxon behind each iconic group the map shows as a chip, so Identify can add the
