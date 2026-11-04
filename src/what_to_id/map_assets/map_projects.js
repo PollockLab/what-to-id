@@ -136,6 +136,8 @@ function projectFilter(o){
     items:function(){return lists?sel.map(function(s){return {label:'in '+projLabel(s,list),not:s.st==='not',
       tag:s.k<0?'Identify only':'',remove:function(){sel.splice(sel.indexOf(s),1);change();},
       flip:function(){s.st=s.st==='not'?'inc':'not';change();}};}):[];},
+    // a project from the split view's search box (a URL), as a paste would add it
+    add:function(id){if(!id||find(id))return;sel.push({id:id,k:list.map(function(p){return String(p.id);}).indexOf(id),st:'inc'});change();},
     hash:function(){return sel.length?'projects='+projWrite(sel):'';},
     reset:function(){if(!sel.length)return;sel=[];bits();key++;if(chips)draw();}
   };

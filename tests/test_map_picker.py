@@ -213,6 +213,22 @@ def test_keyboard_ticks_parks_keeps_the_list_open_and_backspace_removes_the_last
     assert pg.errors == []
 
 
+def test_the_split_search_gets_park_rows_and_a_pick_ticks_the_park(browser):
+    pg = _page(browser)
+    rows = pg.evaluate("AREA.suggest('Garibaldi')")
+    assert rows == [{"key": "0001", "label": "Garibaldi Park", "sub": "Park", "exact": True}]
+    assert pg.evaluate("AREA.suggest('g')") == []  # one letter is no search
+    assert pg.evaluate("AREA.suggest('nowhere')") == []
+    assert [r["exact"] for r in pg.evaluate("AREA.suggest('lakes')")] == [False]
+    pg.evaluate("AREA.pick('0001')")
+    _chips(pg, 1)
+    assert _state(pg)["hash"] == "bcpark=0001"
+    assert pg.evaluate("AREA.suggest('Garibaldi')") == []  # a ticked park is not offered again
+    pg.evaluate("AREA.pick('9999')")  # an unknown key changes nothing
+    assert _state(pg)["hash"] == "bcpark=0001"
+    assert pg.errors == []
+
+
 def test_removing_a_chip_unticks_its_row_and_selected_parks_come_first(browser):
     pg = _page(browser, "#bcpark=0003,0002")
     _chips(pg, 2)

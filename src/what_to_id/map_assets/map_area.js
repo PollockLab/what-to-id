@@ -439,6 +439,13 @@ function MapArea(ctx){
     idx:function(){return loaded().map(function(a){return a.idx;});},
     hash:hash,
     term:term,
+    // Park matches for the split view's search box (the picker's matcher), and a pick that ticks one.
+    suggest:function(t){if(fold(t).length<2)return Promise.resolve([]);
+      var strip=function(x){return fold(x).replace(DESIG,' ').replace(/ +/g,' ').trim();};
+      return parks().then(function(){return listing(PARKS,t,picked,inView).groups.reduce(function(a,g){return a.concat(g.rows);},[])
+        .filter(function(r){return !picked(r.p);}).slice(0,5).map(function(r){
+          return {key:r.p.key,label:r.p.name,sub:r.p.kind,exact:!!strip(t)&&strip(r.p.name)===strip(t)};});}).catch(function(){return [];});},
+    pick:function(key){return parks().then(function(){var b=find(key);if(b&&!picked(b))add(b,true);});},
     clear:function(){if(mode)stop();close();if(AREAS.length||NOTE||INVALID)set(null);},
     // 1 for each record inside any of the areas, null without one; extended as shards arrive.
     mask:function(n){var I=loaded().map(function(a){return a.idx;});if(!I.length)return null;
