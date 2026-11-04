@@ -37,16 +37,16 @@ GROUPS = {
     "Records": [
         *("needs-id", "research-grade", "left-needs-id", "batch", "identify-only"),
         *("location-hidden", "location-uncertain", "location-accuracy"),
-        *("observed", "uploaded", "introduced", "threatened"),
+        *("observed", "uploaded", "introduced", "threatened", "agreeing-ids"),
     ],
     "Levels": ["levels", *(k for k in GLOSSARY if k.startswith("level-"))],
     "Map filters": [
         *("life-groups", "observer-filter", "my-taxa", "not-identified-by-me"),
-        *("colour-by-levels", "colour-by-groups", "in-view", "all-of-bc"),
+        *("colour-by-levels", "colour-by-groups", "in-view", "all-of-bc", "your-groups"),
     ],
     "Views": [
         *("photo-space", "taxonomy", "confused-pairs", "closest-matches", "match-n", "cosine"),
-        *("globi", "backlog-per-identifier", "share-needing-id", "identified-to-rank"),
+        *("clade", "globi", "backlog-per-identifier", "share-needing-id", "identified-to-rank"),
     ],
 }
 CSS = """
