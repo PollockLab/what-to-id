@@ -176,7 +176,7 @@ function listing(parks,t,sel,view){var g=[],n=0,left=MAXROWS;
 function MapArea(ctx){
   // AREAS: {key (BC park, '' for none), place (iNaturalist place id, 0 for none), label, drawn,
   // rings, idx (null until restored), error and rawPlace for an invalid shared place token.
-  var map=ctx.map,AREAS=[],VER=0,MASK=null,NOTE='',INVALID='',LINK='',LINKS=[],BOX=null,INITIAL=true,CHIPS='',UID='apark'+(++MapArea.n),
+  var map=ctx.map,AREAS=[],VER=0,MASK=null,NOTE='',INVALID='',LINK='',LINKS=[],BOX=null,CAP=0,EVERY=false,INITIAL=true,CHIPS='',UID='apark'+(++MapArea.n),
     mode=false,ended=0,pts=[],cursor=null,ready=false,color=getComputedStyle(document.documentElement)
       .getPropertyValue('--share').trim()||'#c2410c',nf=new Intl.NumberFormat('en-CA');
   var box=document.createElement('div');box.className='maplibregl-ctrl area';
@@ -447,30 +447,36 @@ function MapArea(ctx){
       for(;i<n;i++)for(j=0;j<I.length;j++)if(inside(I[j],pos[2*i],pos[2*i+1])){m[i]=1;break;}
       MASK=m;return m;},
     // The Identify link, through ctx.step, which steps through the batches when there are several.
-    link:function(v,url,match,need){var u=link(v,url,match,need);return ctx.step.set(ctx.sel(),LINKS,u);}
+    link:function(v,url,match,need){var u=link(v,url,match,need);return ctx.step.set(ctx.sel(),LINKS,u);},
+    // the records matched past the limit with a filter Identify cannot say, else 0; every(on) lists them all
+    capped:function(){return CAP;},every:function(on){if(on!=null)EVERY=!!on;return EVERY;}
   };
   // What iNaturalist can filter (the parks' place_ids) goes into the link as is. Otherwise it lists
   // the records by id, in LINKS, batches of BATCH, and offers the areas' bounding box as one link
   // beside them. Past MAXB batches the note asks for a narrower selection, and until then the link
   // opens the box. url(box, params) builds the link; a null box leaves it out. With need, a filter
-  // Identify cannot say, the records are listed by id even without an area (past the limit the
-  // plain link stays).
-  function link(v,url,match,need){var t=term();LINKS=[];BOX=null;
+  // Identify cannot say, the records are listed by id even without an area (past the limit, the
+  // first of them, or all with EVERY).
+  function link(v,url,match,need){var t=term();LINKS=[];BOX=null;CAP=0;
     if(unresolved()){LINK='';ui();return null;}
     if(!(t||need)||!ctx.P().n){LINK='';ui();return url(v);}
     var P=ctx.P(),keep=ctx.keep(),S=ctx.S,day=S.up?P.up:P.obs,full=S.lo===0&&S.hi===ctx.LAST,
-      ids=[],n=0,i,d,q=t?t.inat():{};
+      ids=[],n=0,i,d,q=t?t.inat():{},L=need&&EVERY?1/0:BATCH*MAXB;
     function dated(i){d=day[i];return d===65535?full:d>=S.lo&&d<=S.hi;}
-    for(i=0;i<P.n;i++){if(!keep[i]||!dated(i))continue;if(++n<=BATCH*MAXB)ids.push(P.id[i]);}
+    for(i=0;i<P.n;i++){if(!keep[i]||!dated(i))continue;if(++n<=L)ids.push(P.id[i]);}
     if(q.exact){LINK='Identify uses the iNaturalist park filter for '+t.label+'. '+
       'The map uses public coordinates; obscuration and location uncertainty can make the sets differ.';ui();
       return url(null,q.params);}
     if(!n){LINK='No records inside this area match these filters.';ui();return url(v);}
-    if(n<=BATCH*MAXB){var q2=ctx.extra?ctx.extra():'';
-      LINKS=batches(ids).map(function(b){b.url+=q2;return b;});var k=LINKS.length;
+    var q2=ctx.extra?ctx.extra():'';function listed(){return batches(ids).map(function(b){b.url+=q2;return b;});}
+    if(need&&n>BATCH*MAXB)CAP=n;
+    if(n<=L){LINKS=listed();var k=LINKS.length;
       LINK='Exact: '+(k>1?nf.format(n)+' records in '+k+' batches of up to '+BATCH:n===1?'this record by id':
-        'these '+nf.format(n)+' records by id')+(n>1?', less any identified since.':'.');
+        'these '+nf.format(n)+' records by id')+(n>1?', less any identified since or already reviewed by you.':'.');
       if(k>1&&t)BOX=boxlink(v,url,match,dated,true);ui();return LINKS[0].url;}
+    // a filter Identify cannot say: the first records by id beat a link that opens records the map leaves out
+    if(need){LINKS=listed();LINK='Exact: the first '+nf.format(ids.length)+' of '+nf.format(n)+' records in '+
+      LINKS.length+' batches of up to '+BATCH+', less any identified since or already reviewed by you. Add filters to reach the rest.';ui();return LINKS[0].url;}
     if(!t){LINK='';ui();return url(v);}
     var o=boxlink(v,url,match,dated);
     LINK=nf.format(n)+' records: too many to open exactly (limit '+nf.format(BATCH*MAXB)+'). Make the '+

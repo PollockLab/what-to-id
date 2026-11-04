@@ -50,7 +50,7 @@ const CH={groupLink:()=>({inc:[],taxa:[],not:[],groups:[],out:[]})},TF={ids:[],n
 const META={groups:['Plantae'],place_id:7085,max_url:8000};
 const PJ={params:()=>({}),inexact:()=>'',uncounted:()=>''},
 UF={params:()=>({}),tip:()=>'',note:()=>''},match=()=>true;
-const iso=()=>'',gname=x=>x;
+const iso=()=>'',gname=x=>x,nf=new Intl.NumberFormat('en-CA');
 const step=IdStep({a:$('identify'),prev:$('idprev'),next:$('idnext'),build:'fixture',
   store:()=>{throw Error('off');}});
 var AREA=MapArea({map,S,LAST,hash:RAW,P:()=>P,keep:()=>KEEP,change:()=>{},
@@ -139,7 +139,7 @@ const CH={groupLink:()=>({inc:[],taxa:[],not:[],groups:[],out:[]})},TF={ids:[],n
 const META={groups:['Plantae'],place_id:7085,max_url:8000};
 const PJ={params:()=>({}),inexact:()=>'',uncounted:()=>''},
 UF={params:()=>({}),tip:()=>'',note:()=>''},match=()=>true;
-const iso=()=>'',gname=x=>x;
+const iso=()=>'',gname=x=>x,nf=new Intl.NumberFormat('en-CA');
 var AREA=MapArea({map,S,LAST,hash:new URLSearchParams(location.hash.slice(1)).get('area')||'',
   park:new URLSearchParams(location.hash.slice(1)).get('park')||'',
   bcpark:new URLSearchParams(location.hash.slice(1)).get('bcpark')||'',
@@ -163,7 +163,7 @@ refilter();window.probe=()=>({invalid:AREA.invalid(),hash:AREA.hash(),mask:AREA.
     ("only", "count", "ids", "batches"),
     [
         ("{oneid:'inc'}", 250, 200, [1, 2]),
-        ("{oneid:'inc'}", 10001, 0, [1, 0]),
+        ("{oneid:'inc'}", 10001, 200, [1, 50]),  # past the limit, the first 10,000 by id
         ("{}", 250, 0, [1, 0]),
     ],
 )
@@ -177,3 +177,19 @@ def test_filter_identify_cannot_say_lists_ids_without_an_area(only, count, ids, 
     assert out["step"] == batches
     assert ("by id in batches of up to 200" in out["note"]) == bool(ids)
     assert ("more records than the map" in out["note"]) == (bool(only != "{}") and not ids)
+    assert ("the first 10,000 of these 10,001 records" in out["note"]) == (count > 10000)
+    # one agree settles these records, so the note asks for an ID made from the photos first
+    assert out["note"].startswith("One agree makes each of these Research Grade") == (only != "{}")
+
+
+def test_open_all_lists_every_record_past_the_limit_and_back():
+    script = case_script("", 10001).replace("only:{}", "only:{oneid:'inc'}", 1)
+    script = script.replace("const before=state();", "AREA.every(true);const before=state();", 1)
+    script = script.replace("AREA.clear();", "AREA.every(false);AREA.clear();", 1)
+    result = subprocess.run(["node"], input=script, text=True, capture_output=True)
+    assert result.returncode == 0, result.stderr
+    out = json.loads(result.stdout)
+    assert out["before"]["step"] == [1, 51]  # all 10,001 records, the map's count
+    assert "opens these records by id" in out["before"]["note"]
+    assert out["cleared"]["step"] == [2, 50]  # the batch reached stays, the first 50 are the same
+    assert "the first 10,000 of these 10,001 records" in out["cleared"]["note"]

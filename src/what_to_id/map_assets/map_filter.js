@@ -137,7 +137,7 @@ var MONTH=['January','February','March','April','May','June','July','August','Se
 // The show only chips as [key, label, flag, hint], those the data has the flag for.
 var ONLYDEF=[['introduced','Introduced to BC','introduced','Species not native to BC'],
   ['threatened','Threatened','threatened','Species with a threatened status'],
-  ['oneid','One ID from Research Grade','oneid','Species where one more agreeing ID makes the record Research Grade. Identify cannot filter this, so its count is larger']]
+  ['oneid','One ID from Research Grade','oneid','Species where one more agreeing ID makes the record Research Grade, so agree only with an ID you would make yourself from the photos']]
   .filter(function(o){return META.flags.indexOf(o[2])>=0;});
 return {rest:rest,ACCDEF:ACCDEF,accClass:accClass,accOut:accOut,MONTH:MONTH,ONLYDEF:ONLYDEF,oneId:oneId,oneIds:oneIds,DAY:DAY,D0:D0,NO:NO,NOTAX:NOTAX,LAST:LAST,FLAG:FLAG,ONLYFLAG:ONLYFLAG,ONLYKEYS:ONLYKEYS,ST_INTRO:ST_INTRO,
   ST_THREAT:ST_THREAT,ST_INEXACT:ST_INEXACT,ST_KEEP:ST_KEEP,ST_SAMPLE:ST_SAMPLE,iso:iso,dayOf:dayOf,clamp:clamp,

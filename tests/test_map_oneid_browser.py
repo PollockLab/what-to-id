@@ -30,13 +30,11 @@ N = 80
 WANT = sum(1 for i in range(N) if i % 8 < 5)
 
 
-@pytest.fixture(scope="module")
-def site(tmp_path_factory):
-    root = tmp_path_factory.mktemp("map-oneid")
-    pool = pool_frame(range(1, N + 1))
-    pool["ident_count"] = [CASES[i % 8][0] for i in range(N)]
-    pool["agree"] = [CASES[i % 8][1] for i in range(N)]
-    pool["taxon_id"] = [CASES[i % 8][2] for i in range(N)]
+def serve(root, n):
+    pool = pool_frame(range(1, n + 1))
+    pool["ident_count"] = [CASES[i % 8][0] for i in range(n)]
+    pool["agree"] = [CASES[i % 8][1] for i in range(n)]
+    pool["taxon_id"] = [CASES[i % 8][2] for i in range(n)]
     pool["taxon_name"] = [f"Taxon {c % 1000}" if c >= 1000 else "Genus A" for c in pool["taxon_id"]]
     pool["rank"] = ["species" if c >= 1000 else "genus" for c in pool["taxon_id"]]
     blobs, meta = encode_points(pool, TREE)
@@ -53,7 +51,13 @@ def site(tmp_path_factory):
         ("127.0.0.1", 0), functools.partial(Quiet, directory=str(root))
     )
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    yield f"http://127.0.0.1:{server.server_port}/map.html?standalone=1"
+    return server, f"http://127.0.0.1:{server.server_port}/map.html?standalone=1"
+
+
+@pytest.fixture(scope="module")
+def site(tmp_path_factory):
+    server, url = serve(tmp_path_factory.mktemp("map-oneid"), N)
+    yield url
     server.shutdown()
 
 
@@ -100,4 +104,35 @@ def test_identify_cannot_filter_it_and_says_so(browser, site):
     assert "cannot filter records one ID from Research Grade" in page.inner_text("#idnote")
     q = parse_qs(urlparse(page.get_attribute("#identify", "href")).query)
     assert "rank" not in q and "introduced" not in q
+    page.close()
+
+
+BIG = 16100  # 10,063 one ID from Research Grade, past the 10,000 listed by id
+
+
+@pytest.fixture(scope="module")
+def big_site(tmp_path_factory):
+    server, url = serve(tmp_path_factory.mktemp("map-oneid-big"), BIG)
+    yield url
+    server.shutdown()
+
+
+def test_past_the_limit_the_note_offers_every_record_and_back(browser, big_site):
+    want = sum(1 for i in range(BIG) if i % 8 < 5)
+    page = open_map(browser, big_site, "#only=oneid")
+    page.wait_for_function(
+        "document.getElementById('idnote').textContent.includes('the first 10,000')"
+    )
+    assert f"the first 10,000 of these {want:,} records" in page.inner_text("#idnote")
+    assert "batch 1 of 50" in page.inner_text("#identify")
+    # Identify hides records the viewer reviewed, which the map cannot know, so the note says so
+    assert "already reviewed by you" in page.inner_text("#idnote")
+    page.click("#idnote button:has-text('Open all')")
+    page.wait_for_function("document.getElementById('identify').textContent.includes('of 51')")
+    assert "opens these records by id" in page.inner_text("#idnote")
+    # the new button keeps keyboard focus, so a keyboard user can switch back
+    assert page.evaluate("document.activeElement.textContent") == "Open only the first 10,000"
+    page.keyboard.press("Enter")
+    page.wait_for_function("document.getElementById('identify').textContent.includes('of 50')")
+    assert page.errors == []
     page.close()
