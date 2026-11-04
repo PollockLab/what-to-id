@@ -328,7 +328,7 @@ var remote=false;
 function tell(id){if(parent!==window&&!remote)parent.postMessage({type:'wtid-record',id:id},location.origin);}
 addEventListener('message',function(e){
   if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-record'||!S.P)return;
-  var id=e.data.id,i=id==null?-1:Array.prototype.indexOf.call(S.P.id,id);
+  var id=e.data.id,i=id==null?-1:L.find(S.P,id);
   if(i===S.sel||(id!=null&&i<0))return;
   remote=true;try{if(i<0)closeCard();else select(i,true);}finally{remote=false;}
 });

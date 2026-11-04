@@ -60,7 +60,7 @@ function writeHash(){SYNC.send();clearTimeout(hashTimer);hashTimer=setTimeout(fu
 // Records, concatenated as shards arrive.
 var P={n:0,id:new Uint32Array(0),pos:new Float32Array(0),obs:new Uint16Array(0),
   up:new Uint16Array(0),tax:new Uint16Array(0),grp:new Uint8Array(0),ids:new Uint8Array(0),
-  fl:new Uint8Array(0)};
+  fl:new Uint8Array(0),start:[0]};
 var TAXA=null,TF=TX.filter(null,[]),GONE={},GONE_NEW=false,KEEP=new Uint8Array(0),BK=KEEP,VM=KEEP,SEL=-1,NBR=[],
   CUM=new Float64Array(META.days+1),TOT=META.totals||null,TC=null,NODAY=0,PER=null,ALT=0,FIT=false;
 function cat(a,b){var c=new a.constructor(a.length+b.length);c.set(a);c.set(b,a.length);return c;}
@@ -86,7 +86,15 @@ function addShard(buf,n){
   for(var s=0,i=0;i<n;i++)id[i]=s=(s+id[i])>>>0;
   for(i=0;i<n;i++){pos[2*i]=b[0]+qx[i]*sx;pos[2*i+1]=b[1]+qy[i]*sy;}
   P={n:P.n+n,id:cat(P.id,id),pos:cat(P.pos,pos),obs:cat(P.obs,obs),up:cat(P.up,up),
-    tax:cat(P.tax,tax),grp:cat(P.grp,grp),ids:cat(P.ids,ids),fl:cat(P.fl,fl)};
+    tax:cat(P.tax,tax),grp:cat(P.grp,grp),ids:cat(P.ids,ids),fl:cat(P.fl,fl),start:P.start.concat(P.n+n)};
+}
+// Row of an observation id, or -1: ids are sorted inside each shard, not across shards.
+function rowOf(id){
+  for(var k=0;k+1<P.start.length;k++){
+    var lo=P.start[k],hi=P.start[k+1]-1;
+    while(lo<=hi){var m=(lo+hi)>>1,v=P.id[m];if(v===id)return m;if(v<id)lo=m+1;else hi=m-1;}
+  }
+  return -1;
 }
 
 // The map filters on the GPU. Each record carries its observed and uploaded day (-1 for none) as
@@ -362,11 +370,10 @@ function reveal(i){var c=[P.pos[2*i],P.pos[2*i+1]];if(!map.getBounds().contains(
 function mark(i){SEL=i;NBR=[];card.hidden=true;if(ctl)ctl.abort();MC.hide();layers();reveal(i);}
 // The closest matches of the open record, as ids best first, get their numbered dots (those on the map).
 function nbrs(ids){
-  var rank={};ids.forEach(function(d,k){rank[d]=k+1;});
-  NBR=[];for(var i=0;i<P.n;i++)if(rank[P.id[i]])NBR.push({i:i,r:rank[P.id[i]]});
+  NBR=[];ids.forEach(function(d,k){var i=rowOf(d);if(i>=0)NBR.push({i:i,r:k+1});});
   layers();
 }
-function go(id){var i=P.id.indexOf(id);if(i<0)return false;reveal(i);openCard(i);return true;}
+function go(id){var i=rowOf(id);if(i<0)return false;reveal(i);openCard(i);return true;}
 var MC=MapCard({META:META,P:function(){return P;},TAXA:function(){return TAXA;},NOTAX:NOTAX,nbr:nbrs,go:go,place:place});
 // The photo space sends the closest matches of the picked record; those that are on the map get a ring.
 addEventListener('message',function(e){
@@ -377,8 +384,8 @@ addEventListener('message',function(e){
 // Hovering a tile in the photo space brings its match into view; nothing else changes.
 addEventListener('message',function(e){
   if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-focus')return;
-  for(var i=0;i<P.n;i++)if(P.id[i]===e.data.id){var c=[P.pos[2*i],P.pos[2*i+1]];
-    if(!map.getBounds().contains(c))map.easeTo({center:c});return;}
+  var i=rowOf(e.data.id);if(i>=0){var c=[P.pos[2*i],P.pos[2*i+1]];
+    if(!map.getBounds().contains(c))map.easeTo({center:c});}
 });
 // The photo space's lasso keeps the same records here; nothing marks it but the count.
 addEventListener('message',function(e){
@@ -397,7 +404,7 @@ addEventListener('message',function(e){
   if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-record')return;
   var id=e.data.id,i,idf=e.data.from==='identify';  // an Identify card opens the record's card; a photo space pick rings it
   if(id==null){S.rec=S.mark=null;if(SEL>=0){SEL=-1;NBR=[];card.hidden=true;if(ctl)ctl.abort();MC.hide();layers();}return;}
-  if((i=P.id.indexOf(id))>=0){if(idf){MC.min(false);reveal(i);if(i!==SEL||card.hidden)openCard(i);}else if(i!==SEL)mark(i);return;}
+  if((i=rowOf(id))>=0){if(idf){MC.min(false);reveal(i);if(i!==SEL||card.hidden)openCard(i);}else if(i!==SEL)mark(i);return;}
   S.rec=id;S.fly=false;S.mark=!idf;  // the shards that hold it have not loaded yet
 });
 function openCard(i){
@@ -495,8 +502,9 @@ META.shards.forEach(function(s,k){
     if(k===0)return names0;
   }).then(function(){
     refilter();
-    if(S.rec&&SEL<0){for(var i=0;i<P.n;i++)if(P.id[i]===S.rec){S.rec=null;if(S.mark){S.mark=false;mark(i);break;}openCard(i);
-      if(S.fly){S.fly=false;map.flyTo({center:[P.pos[2*i],P.pos[2*i+1]],zoom:12});}break;}}
+    var at=S.rec&&SEL<0?rowOf(S.rec):-1;
+    if(at>=0){S.rec=null;if(S.mark){S.mark=false;mark(at);}else{openCard(at);
+      if(S.fly){S.fly=false;map.flyTo({center:[P.pos[2*at],P.pos[2*at+1]],zoom:12});}}}
     if(k===META.shards.length-1&&S.rec){S.rec=null;writeHash();}
     // the range chip's file is optional, and holds one record per shard record, so it waits for the last shard
     if(k===META.shards.length-1&&META.files.range)get(META.files.range).then(MC.range).catch(function(){});

@@ -166,3 +166,22 @@ def test_dragging_the_date_brush_renders_once_at_pointerup(page):
     page.mouse.up()
     page.wait_for_timeout(100)
     assert page.evaluate("window.fullRenders") == 1
+
+
+def test_a_record_message_opens_the_card_of_the_first_and_last_id_and_ignores_a_missing_one(page):
+    def card(rid):
+        page.evaluate(
+            "id => { document.getElementById('card').hidden = true;"
+            " postMessage({type: 'wtid-record', id, from: 'identify'}, location.origin); }",
+            rid,
+        )
+        page.wait_for_timeout(50)
+        return page.evaluate(
+            "() => { const c = document.getElementById('card');"
+            " return c.hidden ? null : c.querySelector('a.btn').href; }"
+        )
+
+    assert card(1).endswith("/observations/1")
+    assert card(300).endswith("/observations/300")
+    assert card(150).endswith("/observations/150")
+    assert card(301) is None and card(0) is None

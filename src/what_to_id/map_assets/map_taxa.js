@@ -9,9 +9,9 @@ var TX=(function(){
 var MAX_IDS=50,SUGGEST=8,memo=null,cmemo=null;
 function index(T){
   if(memo&&memo.T===T)return memo;
-  var n=T.length,par=new Int32Array(n),row=new Map();
-  for(var i=0;i<n;i++){row.set(T[i][2],i);par[i]=T[i].length>4?T[i][4]:-1;}
-  return memo={T:T,par:par,row:row};
+  var n=T.length,par=new Int32Array(n),row=new Map(),lat=new Array(n),com=new Array(n);  // lat, com: lower-cased names, for suggest
+  for(var i=0;i<n;i++){row.set(T[i][2],i);par[i]=T[i].length>4?T[i][4]:-1;lat[i]=T[i][0].toLowerCase();com[i]=T[i][1].toLowerCase();}
+  return memo={T:T,par:par,row:row,lat:lat,com:com};
 }
 // 1 for each row that is a hit or lies below one. Each row is settled once: a walk up stops at the
 // first row already known, then marks the rows it passed.
@@ -37,8 +37,8 @@ function suggest(T,text,cnt,picks){
   var q=String(text||'').trim().toLowerCase(),out=[],had={};
   if(!T||q.length<2)return out;
   picks.forEach(function(p){had[p.id]=1;});
-  for(var i=0;i<T.length;i++)if(!had[T[i][2]]&&(T[i][0].toLowerCase().indexOf(q)>=0||
-    T[i][1].toLowerCase().indexOf(q)>=0))out.push(i);
+  var ix=index(T);
+  for(var i=0;i<T.length;i++)if(!had[T[i][2]]&&(ix.lat[i].indexOf(q)>=0||ix.com[i].indexOf(q)>=0))out.push(i);
   out.sort(function(a,b){return (cnt?cnt[b]-cnt[a]:0)||a-b;});
   return out.slice(0,SUGGEST);
 }
