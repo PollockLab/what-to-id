@@ -140,6 +140,16 @@ GLOSSARY: dict[str, tuple[str, str | None]] = {
         "This taxon's share of all the records that need an ID.",
         None,
     ),
+    "clade": (
+        "A branch of the tree of life: one group and everything below it, such as a genus, family"
+        " or order.",
+        None,
+    ),
+    "agreeing-ids": ("How many of the IDs agree with the record's community ID.", None),
+    "your-groups": (
+        "The map shows only the groups you saved. Show all brings back every group.",
+        None,
+    ),
     "identified-to-rank": (
         "Records whose ID stops at this taxon and goes no further down.",
         None,

@@ -310,8 +310,8 @@ function badges(i,ex){var f=P.fl[i],out=[];
   if(f&FLAG.obscured)out.push(['Location hidden','warn','location-hidden']);
   else if(MF.accClass(f)===1)out.push(['Location over 1 km uncertain','warn','location-uncertain']);
   return out.map(function(b){return '<span class="badge '+b[1]+'"'+(ex?' data-explain="'+b[2]+'"':'')+'>'+b[0]+'</span>';}).join('');}
-function idText(i){var n=P.ids[i]&15,a=P.ids[i]>>4;
-  return n?(n>=15?'15+':n)+(n===1?' ID':' IDs')+(a?', '+(a>=15?'15+':a)+' agreeing':''):'No IDs yet';}
+function idText(i,ex){var n=P.ids[i]&15,a=P.ids[i]>>4,w=ex?'<span data-explain="agreeing-ids">agreeing</span>':'agreeing';
+  return n?(n>=15?'15+':n)+(n===1?' ID':' IDs')+(a?', '+(a>=15?'15+':a)+' '+w:''):'No IDs yet';}
 function when(v,early){return v===NO?'unknown':early?'before 1900':iso(v);}
 // The hover tip sits below right of the pointer and flips to the other side of it near the window's
 // right or bottom edge. It is fixed to the window above the record card, so neither the map's
@@ -403,7 +403,7 @@ function openCard(i){
     (t.rank?' ('+esc(t.rank)+')':'')+'</p><div class="badges">'+badges(i,1)+'</div><dl>'+
     '<dt>Group</dt><dd>'+esc(t.group)+'</dd><dt>Observed</dt><dd>'+when(P.obs[i],P.fl[i]&FLAG.earlyObs)+'</dd>'+
     '<dt>Uploaded</dt><dd>'+when(P.up[i],P.fl[i]&FLAG.earlyUp)+(lag>0?' ('+nf.format(lag)+(lag===1?' day':' days')+
-    ' later)':'')+'</dd><dt>IDs</dt><dd>'+idText(i)+'</dd><dt>Place</dt><dd id="place">…</dd></dl>'+
+    ' later)':'')+'</dd><dt>IDs</dt><dd>'+idText(i,1)+'</dd><dt>Place</dt><dd id="place">…</dd></dl>'+
     '<div id="rng"></div><div id="now"></div><div id="nbrs" hidden></div><a class="btn" target="_blank" rel="noopener" '+
     'href="https://www.inaturalist.ca/observations/'+id+'">Help identify on iNaturalist</a>'+
     '<p class="attr" id="attr"></p></div>';
