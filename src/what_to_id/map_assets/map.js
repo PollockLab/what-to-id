@@ -258,11 +258,18 @@ function link(){
   if(lost.indexOf('not')>=0)why.push('too many taxa left out for one link, so it keeps them');
   if(PJ.inexact())why.push(PJ.inexact());if(S.only.oneid)why.push('Identify cannot filter records one ID from Research Grade');
   // listed by id (u stays null), the records are the map's, so only the way they open is said
-  var nt=$('idnote');
-  if(!u&&why.length&&!AREA.term()){nt.hidden=false;nt.textContent=why.join('; ').replace(/^./,function(c){return c.toUpperCase();})+
-    ', so it opens these records by id in batches of up to '+IdentifyLinks.BATCH+', less any identified since.';return;}
-  var pf=u?[PJ.uncounted(),UF.note()].filter(Boolean).join(' '):'';nt.hidden=!why.length&&!pf;nt.textContent=(why.length?'Identify shows '+
-    'more records than the map: '+why.join('; ')+'. ':'')+pf;
+  // these records' next agree settles them, so the note asks for an independent ID first
+  // past the limit the first 10,000 open by default; the button switches to all of them and back
+  var nt=$('idnote'),c=AREA.capped(),e=AREA.every(),warn=S.only.oneid&&S.only.oneid!=='not'?'One agree makes each of these Research Grade: agree only '+
+    'with an ID you would make yourself from the photos. ':'';
+  if(!u&&why.length&&!AREA.term()){nt.hidden=false;nt.textContent=warn+why.join('; ').replace(/^./,function(c){return c.toUpperCase();})+
+    ', so it opens '+(c&&!e?'the first '+nf.format(IdentifyLinks.MAX_IDS)+' of these '+nf.format(c)+' records':'these records')+
+    ' by id in batches of up to '+IdentifyLinks.BATCH+', less any identified since or already reviewed by you.';more();return;}
+  var pf=u?[PJ.uncounted(),UF.note()].filter(Boolean).join(' '):'';nt.hidden=!(why.length&&u)&&!pf&&!warn;nt.textContent=warn+(why.length&&u?'Identify shows '+
+    'more records than the map: '+why.join('; ')+'. ':'')+pf;more();
+  function more(){if(!c)return;var x=document.createElement('button');x.type='button';x.className='link';nt.hidden=false;
+    x.textContent=e?'Open only the first '+nf.format(IdentifyLinks.MAX_IDS):'Open all '+nf.format(c)+' in '+Math.ceil(c/IdentifyLinks.BATCH)+' batches';
+    x.onclick=function(){AREA.every(!e);link();var y=nt.querySelector('button');if(y)y.focus();};nt.append(' ',x);}
 }
 // The filter extension is kept between calls, as the point data is in pointData(), so deck.gl
 // uploads nothing when only the filter settings change. deck.gl would also run every category
