@@ -56,20 +56,22 @@ def test_sync_script_local_mode_orders_manifest_last_and_prunes(index, tmp_path)
     run("pull", str(work))
     assert (work / "base.codes.u8").exists()
 
-    # "taxa" and "identify" pull the manifest plus just those files, whatever else the host has
+    # "taxa", "identify" and "confusion" pull the manifest plus just those files
     (host / "taxa-old.f16").write_bytes(b"t")
     (host / "taxa-old.tsv.gz").write_bytes(b"n")
     (host / "identify.parquet").write_bytes(b"i")
+    (host / "confusion-scores.parquet").write_bytes(b"c")
     for only, want in (
         ("taxa", {"taxa-old.f16", "taxa-old.tsv.gz"}),
         ("identify", {"identify.parquet"}),
+        ("confusion", {"confusion-scores.parquet"}),
     ):
         run("pull", str(tmp_path / only), only)
         assert {p.name for p in (tmp_path / only).iterdir()} == want | {"manifest.json"}
     run("pull", str(tmp_path / "full"))
     assert (tmp_path / "full" / "identify.parquet").exists()
     assert not (tmp_path / "full" / "taxa-old.f16").exists()
-    for name in ("taxa-old.f16", "taxa-old.tsv.gz", "identify.parquet"):
+    for name in ("taxa-old.f16", "taxa-old.tsv.gz", "identify.parquet", "confusion-scores.parquet"):
         (host / name).unlink()
 
     (host / "stale.bin").write_bytes(b"x")  # e.g. a delta part a compaction folded away

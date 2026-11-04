@@ -4,7 +4,8 @@
 #   scripts/atlas_sync.sh pull DIR [ONLY]  download the index into DIR; with "ids" only the
 #                                          manifest and the id files (enough for `atlas_update plan`),
 #                                          "taxa" the manifest and taxa-* (for identify delta),
-#                                          "identify" the manifest and identify.parquet
+#                                          "identify" the manifest and identify.parquet,
+#                                          "confusion" the manifest and confusion-scores.parquet
 #   scripts/atlas_sync.sh push DIR         upload DIR; part files first, manifest.json last, so a
 #                                          reader only sees a part once the manifest names it
 #
@@ -62,6 +63,7 @@ pull_local() {
       taxa-*.f16) [ "$only" = taxa ] || continue ;;
       taxa-*) [ -z "$only" ] || [ "$only" = taxa ] || continue ;;
       identify.parquet) [ -z "$only" ] || [ "$only" = identify ] || continue ;;
+      confusion-scores.parquet) [ -z "$only" ] || [ "$only" = confusion ] || continue ;;
       *.ids.u32) [ -z "$only" ] || [ "$only" = ids ] || continue ;;
       *) [ -z "$only" ] || continue ;;
     esac
@@ -97,6 +99,7 @@ pull_hf() {
     ids) include=(--include manifest.json --include "*.ids.u32") ;;
     taxa) include=(--include manifest.json --include "taxa-*") skip=() ;;
     identify) include=(--include manifest.json --include identify.parquet) ;;
+    confusion) include=(--include manifest.json --include confusion-scores.parquet) ;;
   esac
   hf_cli download "$ATLAS_HF_REPO" --repo-type dataset --local-dir "$dir" --exclude "model/*" \
     ${skip[@]+"${skip[@]}"} ${include[@]+"${include[@]}"}
@@ -134,6 +137,7 @@ pull_r2() {
     ids) filter=(--exclude "*" --include manifest.json --include "*.ids.u32") ;;
     taxa) filter=(--exclude "*" --include manifest.json --include "taxa-*") skip=() ;;
     identify) filter=(--exclude "*" --include manifest.json --include identify.parquet) ;;
+    confusion) filter=(--exclude "*" --include manifest.json --include confusion-scores.parquet) ;;
   esac
   aws s3 sync "s3://$ATLAS_R2_BUCKET/" "$dir" --endpoint-url "$ATLAS_R2_ENDPOINT" --only-show-errors \
     --exclude "model/*" ${skip[@]+"${skip[@]}"} ${filter[@]+"${filter[@]}"}

@@ -257,6 +257,8 @@ def test_fir_cli_writes_table_and_manifest_key(tmp_path):
     assert rec["name"] == "confusion-records.parquet" and rec["count"] == len(records) == 5
     assert rec["built_at"] == entry["built_at"]
     assert list(records.columns) == list(RECORD_COLUMNS)
+    scores = pd.read_parquet(atlas / "confusion-scores.parquet")
+    assert read_manifest(atlas)["confusion_scores"]["count"] == len(scores) == 10
 
 
 def test_fir_cli_rejects_a_pool_without_photo_url(tmp_path):
