@@ -395,7 +395,7 @@ function select(i,fly){
   if(P.grp)actions.appendChild(onlyGroup(P.grp[i]));
   var title=el('h2',{},[t.common||t.latin||t.group||'Observation '+id]);
   card.textContent='';
-  [resizer(),x,mn,ph,el('div',{'class':'body'},[title,sub,place,actions,el('p',{'class':'muted','data-explain':'closest-matches'},['Closest matches, from the full image space']),nbNote,nb])]
+  [resizer(),x,mn,ph,el('div',{'class':'body'},[title,sub,place,actions,SavedRecords.controls(id),el('p',{'class':'muted','data-explain':'closest-matches'},['Closest matches, from the full image space']),nbNote,nb])]
     .forEach(function(c){card.appendChild(c);});
   card.hidden=false;minCard(MIN);x.focus();
   // the shards arrived after this card opened: fill in what they know, unless iNaturalist's answer already did

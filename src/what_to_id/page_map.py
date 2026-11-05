@@ -116,6 +116,7 @@ SHARED_JS = (
     "atlas_search_assets/atlas_search_meta.js",
     "identify_assets/identify_ranges.js",
     "embeddings_assets/taxon_tree.js",
+    "site_assets/saved_records.js",
 )
 SHARED_CSS = ("identify_assets/identify_ranges.css",)
 MAP_JS = (

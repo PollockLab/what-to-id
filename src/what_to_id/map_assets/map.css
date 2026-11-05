@@ -203,6 +203,8 @@ html.rail-only .xsheet [data-a=draw]{display:none}  /* no map to draw on */
 .card.min .x{order:3}
 .card .btn{display:block;text-align:center;margin:10px 0 0;padding:8px;border-radius:8px;
   background:var(--on);color:var(--onink);text-decoration:none;font-weight:600}
+.card .sv button{border:0;border-radius:14px;padding:4px 10px;background:var(--chip);color:var(--ink);font:inherit;cursor:pointer}
+.card .sv{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px}.card .sv[hidden],.card .sv [hidden]{display:none}
 .card .attr{font-size:11px;color:var(--muted);margin:8px 0 0}
 .card #rng:not(:empty){margin:6px 0}
 .card .mt{margin:10px 0 4px;font-size:12px;color:var(--muted)}

@@ -4,6 +4,8 @@ Fixtures and helpers live in test_embeddings_browser.py.
 """
 
 import json
+import re
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 
@@ -181,4 +183,44 @@ def test_minimize_shrinks_the_card_to_a_strip_and_survives_picks(open_page):
     assert page.locator("#card").is_hidden()
     page.evaluate("__deck.props.onClick({index: 7, layer: {id: 'pts'}})")
     assert page.locator("#card.min").count() == 0  # after ×, the next pick opens in full
+
+
+def test_card_saves_records_and_opens_them_in_identify(open_page):
+    page = open_page(drop=None)
+    ready(page)
+    card = page.locator("#card")
+    save = card.locator(".sv button[aria-pressed]")
+    saved = {}
+    for index in (7, 8):
+        page.evaluate(f"__deck.props.onClick({{index: {index}, layer: {{id: 'pts'}}}})")
+        page.wait_for_selector(".nbrs button")
+        saved[index] = int(
+            card.get_by_role("link", name="Help identify on iNaturalist")
+            .get_attribute("href")
+            .rsplit("/", 1)[1]
+        )
+        assert save.get_attribute("aria-pressed") == "false"
+        assert card.get_by_role("link", name="Saved (1)").is_visible() == (
+            index == 8
+        )  # none yet at 7
+        save.click()
+        assert save.get_attribute("aria-pressed") == "true" and "Saved" in save.inner_text()
+    link = card.get_by_role("link", name="Saved (2)")
+    ids = parse_qs(urlparse(link.get_attribute("href")).query)["id"][0].split(",")
+    assert sorted(ids) == sorted(str(i) for i in saved.values())
+    page.evaluate("__deck.props.onClick({index: 7, layer: {id: 'pts'}})")  # reopened: still saved
+    page.wait_for_selector(".nbrs button")
+    assert save.get_attribute("aria-pressed") == "true"
+    save.click()
+    assert save.get_attribute("aria-pressed") == "false"
+    assert card.get_by_role("link", name="Saved (1)").is_visible()
+    page.reload()  # the list outlives the page
+    ready(page)
+    assert page.evaluate("SavedRecords.ids()") == [saved[8]]
+    page.evaluate("__deck.props.onClick({index: 8, layer: {id: 'pts'}})")
+    page.wait_for_selector(".nbrs button")
+    card.get_by_role("button", name="Clear saved").click()
+    assert page.evaluate("SavedRecords.ids()") == []
+    assert save.get_attribute("aria-pressed") == "false"
+    assert card.get_by_role("link", name=re.compile(r"Saved \(")).is_hidden()
     assert page.errors == []

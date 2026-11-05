@@ -318,3 +318,34 @@ def test_an_identify_click_opens_the_full_card_over_a_minimized_one(browser, ran
     assert left.locator("#card a.btn").is_visible()
     assert page.errors == []
     page.close()
+
+
+def test_the_card_saves_records_and_opens_them_in_identify(browser, range_site):
+    page = open_map(browser, f"{range_site}/map.html?standalone=1#record=1000&at=9/49/-123")
+    card = page.locator("#card")
+    save = card.locator(".sv button[aria-pressed]")
+    save.wait_for()
+    assert save.get_attribute("aria-pressed") == "false"
+    assert card.get_by_role("link", name=re.compile(r"Saved \(")).is_hidden()
+    save.click()
+    assert save.get_attribute("aria-pressed") == "true" and "Saved" in save.inner_text()
+    page.evaluate(
+        "SavedRecords.toggle(3000)"
+    )  # another record saved elsewhere, e.g. the other frame
+    link = card.get_by_role("link", name="Saved (2)")
+    ids = parse_qs(urlparse(link.get_attribute("href")).query)["id"][0].split(",")
+    assert sorted(ids) == ["1000", "3000"]
+    page.goto(f"{range_site}/map.html?standalone=1#record=2000&at=9/49/-123")  # a card reopened
+    page.reload()
+    save.wait_for()
+    assert save.get_attribute("aria-pressed") == "false"
+    page.goto(f"{range_site}/map.html?standalone=1#record=1000&at=9/49/-123")
+    page.reload()
+    save.wait_for()
+    assert save.get_attribute("aria-pressed") == "true"
+    card.get_by_role("button", name="Clear saved").click()
+    assert page.evaluate("SavedRecords.ids()") == []
+    assert save.get_attribute("aria-pressed") == "false"
+    assert card.get_by_role("link", name=re.compile(r"Saved \(")).is_hidden()
+    assert page.errors == []
+    page.close()
