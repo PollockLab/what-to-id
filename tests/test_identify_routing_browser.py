@@ -52,7 +52,8 @@ def counted(browser, base, hash_=""):
                     {
                         "id": int(i),
                         "default_photo": {
-                            "square_url": f"https://static.inaturalist.org/photos/{i}/square.jpg"
+                            "square_url": f"https://static.inaturalist.org/photos/{i}/square.jpg",
+                            "attribution": "(c) A. Photographer, some rights reserved (CC BY-NC)",
                         },
                     }
                     if i == "1000"
@@ -164,6 +165,13 @@ def test_a_card_with_a_look_alike_shows_both_reference_photos(browser, ranges_si
     img = box.locator("img").first
     assert img.get_attribute("src") == "https://static.inaturalist.org/photos/1000/small.jpg"
     assert img.get_attribute("alt") == "Label Taxon 0, reference photo"
+    figs = box.locator("figure")
+    assert figs.first.get_attribute("title") == (
+        "Taxon 0. Photo (c) A. Photographer, some rights reserved (CC BY-NC)"
+    )
+    link = box.locator("a").first
+    assert link.get_attribute("href") == "https://www.inaturalist.org/taxa/1000"
+    assert link.get_attribute("target") == "_blank" and link.get_attribute("rel") == "noopener"
     assert [c[0] for c in page.api] == ["taxa/1000"]  # one request, each taxon once
     assert page.errors == []
 
