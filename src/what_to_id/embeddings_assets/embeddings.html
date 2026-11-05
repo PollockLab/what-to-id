@@ -14,13 +14,14 @@ __SITE_CSS__
 __SELECT_CSS__
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
-body{display:grid;grid-template-columns:260px minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);grid-template-areas:"nav nav" "head head" "side plot"}
+body{position:relative;display:grid;grid-template-columns:260px minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);grid-template-areas:"nav nav" "head head" "side plot"}
 .embed header{display:none}
 .info{display:none;position:absolute;z-index:7;top:8px;right:8px;width:28px;height:28px;padding:0;border-radius:50%;font:italic 700 14px Georgia,serif}
 .embed .info{display:block}
 h1 .info{display:inline-block;position:static;vertical-align:3px;margin-left:6px;width:22px;height:22px;font-size:12px}
 html:not(.about) #honest{display:none}
 #lclear,#ldraw{display:none;position:absolute;z-index:7;top:8px;right:44px}
+#lclear,#ldraw,#info{grid-area:plot}  /* on the plot: on a phone the filters sit above it */
 #lclear{right:104px}
 .embed #lclear:not([hidden]),.embed #ldraw{display:block}
 #ldraw[aria-pressed="true"]{background:var(--on);color:var(--onink);border-color:var(--on)}
