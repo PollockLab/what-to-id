@@ -44,6 +44,15 @@ h1{font-size:18px;margin:0}
   display:flex;flex-direction:column;gap:6px}
 .lbl{display:block;font-size:12px;font-weight:600;margin:6px 0 2px}
 .lbl .muted{font-weight:400}
+#acclbl{display:flex;gap:6px;align-items:baseline}
+.accu{margin-left:auto}
+.accu[aria-pressed="true"]{color:var(--ink);font-weight:600}
+.accr{display:block;width:100%;margin:2px 0 0;accent-color:var(--on)}
+/* each label centred under its stop, the thumb's half width in from the ends */
+.accticks{display:flex;justify-content:space-between;padding:0 8px;font-size:11px;color:var(--muted)}
+.accticks span{width:0;display:flex;justify-content:center;white-space:nowrap}
+.accticks span:first-child{justify-content:flex-start}.accticks span:last-child{justify-content:flex-end}
+.accticks .on{color:var(--ink);font-weight:600}
 .idnote{flex:1 1 100%;margin:0;font-size:12px;color:var(--warn);background:var(--warnbg);
   border-radius:6px;padding:4px 8px}
 .idnote[hidden]{display:none}

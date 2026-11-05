@@ -162,20 +162,25 @@ var MB_=MON.map(function(m,i){var b=chip('months',m,!!(S.months>>i&1),
   return b;});
 function showMonths(){MB_.forEach(function(b,i){b.setAttribute('aria-pressed',String(!!(S.months>>i&1)));});}
 $('mclear').onclick=function(){S.months=0;showMonths();refilter();};
-// Introduced and threatened can be left out too. The location accuracy is one choice of several, so its
-// chips exclude each other, and a click on the chosen one clears it; a pool without accuracy has none.
+// Introduced and threatened can be left out too. The location accuracy is one choice of several: the known
+// classes run from any to within 10 m, so one slider, and unknown, off that scale, is a toggle on its label
+// line; a pool without accuracy has neither.
 var ONLYDEF=MF.ONLYDEF,
   ONLY=ONLYDEF.map(function(d){return CH.chip($('flags'),d[0],d[1],function(){return S.only;},true,
     d[3],refilter);}),
-  ACCDEF=META.flags.indexOf('accuracy')<0?[]:MF.ACCDEF,
-  ACC=ACCDEF.map(function(d){var b=document.createElement('button');b.type='button';b.title=d[2]+'. Click to pick.';
-    b.onclick=function(){S.acc=S.acc===d[0]?'':d[0];showOnly();refilter();};$('acc').appendChild(b);return b;});
+  ACCDEF=META.flags.indexOf('accuracy')<0?[]:MF.ACCDEF,STOPS=['','known','1000','100','10'],AR=$('accr'),
+  UB=ACCDEF.length?document.createElement('button'):null;
+if(UB){UB.type='button';UB.className='link accu';UB.title=ACCDEF[0][2]+'. Click to pick.';$('acclbl').appendChild(UB);
+  UB.onclick=function(){S.acc=S.acc==='unknown'?'':'unknown';showOnly();refilter();};
+  AR.oninput=function(){S.acc=STOPS[+AR.value];showOnly();refilter();};}
 function accLabel(){var d=ACCDEF.filter(function(a){return a[0]===S.acc;})[0];return d?d[1]:'';}
 function showOnly(){ONLY.forEach(function(b,j){CH.show(b,ONLYDEF[j][1],S.only[ONLYDEF[j][0]]||'');});
-  ACC.forEach(function(b,j){CH.show(b,ACCDEF[j][1],S.acc===ACCDEF[j][0]?'inc':'');});}
+  if(!UB)return;CH.show(UB,'Unknown only',S.acc==='unknown'?'inc':'');
+  var k=STOPS.indexOf(S.acc);AR.value=Math.max(k,0);AR.setAttribute('aria-valuetext',accLabel()||'Any accuracy');
+  [].forEach.call($('acc').querySelectorAll('.accticks span'),function(t,j){t.classList.toggle('on',j===k);});AR.title=k>0?ACCDEF[k][2]:'Any location accuracy';}
 showOnly();
-if(!ONLY.length&&!ACC.length)$('flagbox').hidden=true;
-if(!ACC.length)$('acc').hidden=$('acclbl').hidden=true;
+if(!ONLY.length&&!UB)$('flagbox').hidden=true;
+if(!UB)$('acc').hidden=$('acclbl').hidden=true;
 // Picked taxa: chips in the selection bar, one set with the groups. A shortcut picks, then leaves out, a set
 // of taxa, and shows only once the taxa file carries the whole tree.
 function counts(){var p=o.P();return TX.counts(o.taxa(),p.tax,p.n);}
