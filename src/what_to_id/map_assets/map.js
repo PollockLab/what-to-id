@@ -37,12 +37,11 @@ var PJ=projectFilter({meta:META,hash:new URLSearchParams(location.hash.slice(1))
 var hashTimer=0,UF=userFilter({S:S,meta:META,get:get,taxa:function(){return TAXA;},changed:function(){refilter();},bounds:function(){var b=map.getBounds();return {w:b.getWest(),s:b.getSouth(),e:b.getEast(),n:b.getNorth()};}}),RS=leftFilter({S:S,MF:MF,meta:META,get:get,tf:function(){return TF;},area:function(){return AREA;},all:function(){return ALL;},map:function(){return map;},off:function(){return !!(PJ.active()||UF.active()||SUB||FK);},changed:function(){render();}});
 // The split view hands the selection over live; the area and projects are not part of it yet.
 var SYNC=MapFilter.sync({key:function(){return MF.write(S).join('&');},apply:function(str){
-  var r=MF.read(new URLSearchParams(str)),was=taxaKey();
+  var r=MF.read(new URLSearchParams(str));
   ['up','lo','hi','months','groups','only','acc','user','umode','umin'].forEach(function(k){S[k]=r[k];});
   S.picks.length=0;r.picks.forEach(function(p){S.picks.push(p);});S.split=[];
   // before the taxa and records are in, refilter runs once they are
   if(TAXA){search();FB.showClades();}
-  FIT=taxaKey()!==was&&taxaKey()!=='';  // a taxon or group picked in the tree or photo space brings its records into view
   FB.showGroups();FB.showMonths();FB.showOnly();if(P.n)refilter();render();}});
 function taxaKey(){return MF.write(S).filter(function(t){return /^(taxa|groups)=/.test(t);}).join('&');}
 // The selection: the hash without the open record and the view.
@@ -62,7 +61,7 @@ var P={n:0,id:new Uint32Array(0),pos:new Float32Array(0),obs:new Uint16Array(0),
   up:new Uint16Array(0),tax:new Uint16Array(0),grp:new Uint8Array(0),ids:new Uint8Array(0),
   fl:new Uint8Array(0),start:[0]};
 var ORDER=false,VR=null,TAXA=null,TF=TX.filter(null,[]),GONE={},GONE_NEW=false,KEEP=new Uint8Array(0),BK=KEEP,VM=KEEP,SEL=-1,NBR=[],
-  CUM=new Float64Array(META.days+1),TOT=META.totals||null,TC=null,NODAY=0,PER=null,ALT=0,FIT=false;
+  CUM=new Float64Array(META.days+1),TOT=META.totals||null,TC=null,NODAY=0,PER=null,ALT=0,TK0=null,MOVED=!!S.at;
 function cat(a,b){var c=new a.constructor(a.length+b.length);c.set(a);c.set(b,a.length);return c;}
 function unzip(buf){
   var u=new Uint8Array(buf,0,Math.min(2,buf.byteLength));
@@ -175,7 +174,7 @@ function recount(){CT=0;
   // the photo space beside the map keeps the records the projects keep; it has no project file of its own
   if(parent!==window&&PJP!==PJ.key()+':'+n){PJP=PJ.key()+':'+n;parent.postMessage({type:'wtid-projects',ids:PJ.ids(P)},location.origin);}
   render();
-  if(FIT){FIT=false;fitTo(shows());}
+  fitNew();
 }
 function full(){return S.lo===0&&S.hi===LAST;}
 // records without a date show only over all dates, as the GPU filter does
@@ -188,6 +187,8 @@ function fitTo(keep){
   // the new count can rewrap the bar above the map; MapLibre sees the new size only a frame later, so a fit
   // to the old one sits off centre
   if(w<=e){map.resize();map.fitBounds([[w,s],[e,n]],{padding:40,maxZoom:14});}}
+// a new taxon or group, from any box, brings its records into view, unless the viewer has moved the map: a button offers it then
+function fitNew(){var tk=taxaKey();if(TK0!==null&&tk!==TK0){ZB.hidden=!tk||!MOVED;if(tk&&!MOVED)fitTo(shows());}TK0=tk;}
 // kept records dated in S.lo..S.hi like CUM and inside the viewport, null for the world or with ALL (the switch on
 // All of BC); g counts them per group and VM marks them with the group filter left out, for the groups list
 var VC=null,ALL=false;
@@ -467,6 +468,9 @@ else{opts.bounds=[[b[0],b[1]],[b[2],b[3]]];opts.fitBoundsOptions={padding:20};}
 var map=new maplibregl.Map(opts);document.body.appendChild(ptip);
 document.addEventListener('click',function(e){var a=e.target.closest('.maplibregl-ctrl-attrib a');if(a){a.target='_blank';a.rel='noopener';}},true);  // in Explore's frame a credit link would replace the map
 map.addControl(new maplibregl.NavigationControl({showCompass:false}));var GEO=new maplibregl.GeolocateControl({fitBoundsOptions:{maxZoom:11}});map.addControl(GEO);GEO.on('error',function(e){alert(e.code===1?'Location is blocked for this site. Allow it in your browser and system settings, then reload.':'Your device could not find where it is. On a laptop, turn Wi-Fi on so the system can place you, then try again.');});
+var ZB=document.createElement('button');ZB.type='button';ZB.className='zoomrec';ZB.hidden=true;ZB.textContent='Zoom to these records';
+ZB.onclick=function(){ZB.hidden=true;MOVED=false;fitTo(shows());};map.getContainer().appendChild(ZB);
+map.on('movestart',function(e){if(e.originalEvent)MOVED=true;});  // only the viewer's own drag, wheel or pinch
 var overlay=new deck.MapboxOverlay({interleaved:false,pickingRadius:8,layers:[]});map.addControl(overlay);
 var AREA=MapArea({map:map,S:S,LAST:LAST,hash:S.area,park:S.park,bcpark:S.bcpark,fit:!S.at,
   place:META.place_id,parks:META.parks,get:get,P:function(){return P;},keep:function(){return KEEP;},change:refilter,
