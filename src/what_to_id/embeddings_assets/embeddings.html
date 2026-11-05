@@ -81,6 +81,17 @@ button[hidden]{display:none}
 .card .rz{position:absolute;z-index:1;left:0;top:0;bottom:0;width:7px;padding:0;border:0;border-radius:10px 0 0 10px;background:none;cursor:col-resize;touch-action:none}
 .card .rz:hover,.card .rz:focus-visible,.card .rz.on{background:var(--on)}
 .card .x{position:absolute;top:6px;right:6px;z-index:1;width:28px;height:28px;padding:0;font-size:16px;line-height:1}
+.card .mn{position:absolute;top:6px;right:40px;z-index:1;width:28px;height:28px;padding:0;font-size:16px;line-height:1}
+/* minimized, as on the map: a 48px strip with the thumbnail, the name, and the + and × buttons */
+.card.min:not([hidden]){display:flex;align-items:center;gap:8px;height:48px;overflow:hidden;padding:0 8px 0 4px;cursor:pointer}
+.card.min .rz{display:none}
+.card.min .ph{flex:none;width:40px;height:40px;min-height:0;border-radius:6px;overflow:hidden;font-size:0}
+.card.min .ph img{height:100%}
+.card.min .body{flex:1;min-width:0;padding:0}
+.card.min .body>:not(h2){display:none}
+.card.min h2{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card.min .mn,.card.min .x{position:static;flex:none;order:2}
+.card.min .x{order:3}
 .ph{background:var(--chip);min-height:120px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px}
 .ph img{width:100%;display:block;max-height:260px;object-fit:cover}
 .body{padding:10px 12px 12px;display:flex;flex-direction:column;gap:6px}
