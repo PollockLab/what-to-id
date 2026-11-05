@@ -309,3 +309,14 @@ def test_show_on_map_opens_the_record_in_the_map_pane_not_a_new_tab(browser, sit
     assert str(mf.evaluate("got.find(d => d.open).id")) == rid
     assert page.errors == []
     page.close()
+
+
+def test_the_search_placeholder_fits_its_box(browser, site):
+    page = _split(browser, site, 1024, 800, "?view=space")
+    fit = page.evaluate(
+        "(() => { const e = document.getElementById('sq'), c = document.createElement('canvas')"
+        ".getContext('2d'); c.font = getComputedStyle(e).font;"
+        " return [c.measureText(e.placeholder).width, e.clientWidth - 20]; })()"
+    )
+    assert fit[0] <= fit[1]
+    page.close()
