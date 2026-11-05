@@ -349,3 +349,18 @@ def test_the_card_saves_records_and_opens_them_in_identify(browser, range_site):
     assert card.get_by_role("link", name=re.compile(r"Saved \(")).is_hidden()
     assert page.errors == []
     page.close()
+
+
+def test_on_a_short_phone_help_identify_stays_in_reach_under_the_photo(browser, range_site):
+    page = open_map(browser, f"{range_site}/map.html?standalone=1#record=3000&at=9/49/-123", 400)
+    page.set_viewport_size({"width": 400, "height": 560})
+    page.locator("#card .rchip").wait_for()
+    reach = (
+        "(() => { const c = document.getElementById('card'), b = c.querySelector('.btn'),"
+        " r = b.getBoundingClientRect();"
+        " return [c.scrollHeight > c.clientHeight, r.bottom <= c.getBoundingClientRect().bottom,"
+        " document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) === b]; })()"
+    )
+    assert page.evaluate(reach) == [True, True, True]
+    assert page.errors == []
+    page.close()
