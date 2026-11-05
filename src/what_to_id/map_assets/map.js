@@ -409,7 +409,7 @@ addEventListener('message',function(e){
 });
 addEventListener('message',function(e){
   if(e.origin!==location.origin||e.source!==parent||!e.data||e.data.type!=='wtid-record')return;
-  var id=e.data.id,i,idf=e.data.from==='identify';  // an Identify card opens the record's card; a photo space pick rings it
+  var id=e.data.id,i,idf=e.data.from==='identify'||e.data.open===true;  // an Identify card or Show on map opens the record's card; a photo space pick rings it
   if(id==null){S.rec=S.mark=null;if(SEL>=0){SEL=-1;NBR=[];card.hidden=true;if(ctl)ctl.abort();MC.hide();layers();}return;}
   if((i=rowOf(id))>=0){if(idf){MC.min(false);reveal(i);if(i!==SEL||card.hidden)openCard(i);}else if(i!==SEL)mark(i);return;}
   S.rec=id;S.fly=false;S.mark=!idf;  // the shards that hold it have not loaded yet

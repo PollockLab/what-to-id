@@ -389,7 +389,9 @@ function select(i,fly){
   var link=function(href,text,cls){return el('a',{'class':'btn '+(cls||''),href:href,target:'_blank',rel:'noopener'},[text]);};
   var actions=el('div',{'class':'actions'},[
     link('https://www.inaturalist.ca/observations/'+id,'Help identify on iNaturalist','primary'),
-    link(CFG.searchUrl+'#id='+id,'More like this'),link(CFG.mapUrl+'#record='+id,'Show on map')]);
+    link(CFG.searchUrl+'#id='+id,'More like this'),link(CFG.mapUrl+'#record='+id,'Show on map','show')]);
+  // in Explore the map pane opens the card, so the search, filters and photo space stay as they are
+  if(parent!==window)actions.querySelector('.show').addEventListener('click',function(e){e.preventDefault();parent.postMessage({type:'wtid-show',id:id},location.origin);});
   var tx=S.TAXA&&P.tax&&P.tax[i]!==65535&&S.TAXA[P.tax[i]];
   if(tx&&tx.length>5)actions.appendChild(link('tree.html#sel='+tx[2],'Show in tree'));  // counts ship only with the tree page
   if(P.grp)actions.appendChild(onlyGroup(P.grp[i]));
