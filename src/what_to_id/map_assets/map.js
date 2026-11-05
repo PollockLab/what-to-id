@@ -465,6 +465,7 @@ var b=META.bbox,opts={container:'map',style:dark?BASEMAPS.dark:BASEMAPS.light,
 if(S.at){opts.center=[S.at[2],S.at[1]];opts.zoom=S.at[0];}
 else{opts.bounds=[[b[0],b[1]],[b[2],b[3]]];opts.fitBoundsOptions={padding:20};}
 var map=new maplibregl.Map(opts);document.body.appendChild(ptip);
+document.addEventListener('click',function(e){var a=e.target.closest('.maplibregl-ctrl-attrib a');if(a){a.target='_blank';a.rel='noopener';}},true);  // in Explore's frame a credit link would replace the map
 map.addControl(new maplibregl.NavigationControl({showCompass:false}));var GEO=new maplibregl.GeolocateControl({fitBoundsOptions:{maxZoom:11}});map.addControl(GEO);GEO.on('error',function(e){alert(e.code===1?'Location is blocked for this site. Allow it in your browser and system settings, then reload.':'Your device could not find where it is. On a laptop, turn Wi-Fi on so the system can place you, then try again.');});
 var overlay=new deck.MapboxOverlay({interleaved:false,pickingRadius:8,layers:[]});map.addControl(overlay);
 var AREA=MapArea({map:map,S:S,LAST:LAST,hash:S.area,park:S.park,bcpark:S.bcpark,fit:!S.at,
