@@ -137,6 +137,18 @@ def test_terms_shape():
     assert cl[6] == {"params": {"without_taxon_id": "47167"}, "exact": True}
 
 
+def test_a_rank_inside_a_genus_names_its_rank_on_the_chip():
+    # Carex subgenus Carex would otherwise read as the genus
+    t = [["Carex", "Sedges", 47130, 0, -1], ["Carex", "", 1225413, 1, 0]]
+    meta = {**META, "ranks": ["genus", "subgenus"]}
+    picks = [{"id": 47130, "not": False}, {"id": 1225413, "not": False}]
+    body = (
+        f"return TX.terms({{T:{json.dumps(t)},picks:{json.dumps(picks)},groups:[],"
+        f"meta:{json.dumps(meta)},n:0}}).map(function(x){{return x.label;}});"
+    )
+    assert run(body) == ["Carex", "Carex (subgenus)"]
+
+
 def test_suggest_matches_names_in_any_case_across_repeated_calls():
     r = run(
         "return [TX.suggest(T,'SPHAG',null,[]),TX.suggest(T,'peat moss',null,[]),"
