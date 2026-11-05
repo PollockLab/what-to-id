@@ -13,7 +13,8 @@ the atlas is behind and the build fails; re-preparing on the cluster is the fall
 within --grace-hours of the pool's newest row do not count: the pool is pulled after the atlas's
 last run, so its newest records can not have a vector yet. With --open-pool (the map pool, which
 the atlas embeds) rows outside it do not count either: they left Needs ID before the atlas reached
-them, so no later day covers them.
+them, so no later day covers them. Rows created after the map pool's newest record still count, so a
+map pool that stopped updating fails the build as before.
 
     python -m what_to_id.assemble_bundle --pool POOL.parquet --base DIR --deltas DIR \
       --reference-embeddings 'data/ref_sample_2026-09-11/emb_{group}_bioclip25.npz' --out BUNDLE \
@@ -143,7 +144,10 @@ def assemble(
         created = pd.to_datetime(pool.set_index("id")["created_at"], utc=True)
         old = created < created.max() - pd.Timedelta(hours=grace_hours)
         if open_pool is not None:
-            old &= old.index.isin(pd.read_parquet(open_pool, columns=["id"])["id"])
+            known = pd.read_parquet(open_pool, columns=["id", "created_at"])
+            # rows past the map pool's newest record still count, so a stalled map update fails
+            horizon = pd.to_datetime(known["created_at"], utc=True).max()
+            old &= old.index.isin(known["id"]) | (created > horizon)
         for group, ids in uncovered.items():
             late = int(old.reindex(ids).sum())
             if late / sizes[group] > max_uncovered_share:

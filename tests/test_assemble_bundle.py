@@ -139,6 +139,14 @@ def test_records_that_left_the_map_pool_do_not_fail_the_build(inputs, tmp_path):
         run(inputs, grace_hours=0, open_pool=inputs["pool"])
 
 
+def test_records_newer_than_a_stale_map_pool_still_fail_the_build(inputs, tmp_path):
+    pool = pd.read_parquet(inputs["pool"])
+    stale = pool[pool["id"] != inputs["ids"]["missing"]].assign(created_at="2000-01-01T00:00:00Z")
+    stale.to_parquet(tmp_path / "stale-map-pool.parquet", index=False)
+    with pytest.raises(SystemExit, match="atlas is behind"):
+        run(inputs, grace_hours=0, open_pool=tmp_path / "stale-map-pool.parquet")
+
+
 def test_zero_vector_is_rejected(inputs):
     np.savez(
         inputs["deltas"] / "raw-delta-20261003.npz",
