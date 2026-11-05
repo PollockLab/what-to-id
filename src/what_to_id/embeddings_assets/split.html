@@ -85,6 +85,7 @@ __ATLAS_SEARCH_ENCODER__
 (function(){
 var box=document.getElementById("main-content"),frames={},last=MapFilter.tokens(location.hash),
   h0=location.hash.slice(1).split('&').filter(Boolean),want=new URLSearchParams(location.search).get('view'),
+  qs=new URLSearchParams(location.search).get('q')||'',
   LEVELS=__LEVELS__,FILES={identify:__IDENTIFY_FILE__,map:__MAP_FILE__,space:__SPACE_FILE__,tree:__TREE_FILE__},view,
   ORDER=['map','identify','space','tree'],ALIAS={side:'map-space',tree:'map-tree'},
   rest=h0.filter(function(t){return MapFilter.tokens(t)==='';});
@@ -171,7 +172,8 @@ document.getElementById('xbar').addEventListener('click',function(e){
   if(on&&view.length===1)return;  // the last pane stays
   setView(innerWidth<800?[p]:order.filter(function(n){return n===p?!on:view.indexOf(n)>=0;}));
   url();});
-function url(){history.replaceState(null,'','?view='+serialize(order.filter(function(n){return view.indexOf(n)>=0;}))+location.hash);}
+function url(){history.replaceState(null,'','?view='+serialize(order.filter(function(n){return view.indexOf(n)>=0;}))+
+  (qs?'&q='+encodeURIComponent(qs):'')+location.hash);}
 var i=document.getElementById('i'),note=document.getElementById('note');
 i.addEventListener('click',function(){note.hidden=!note.hidden;i.setAttribute('aria-expanded',!note.hidden);});
 addEventListener('keydown',function(e){if(e.key==='Escape'&&!note.hidden)i.click();});
@@ -302,6 +304,7 @@ function tally(force){var s=visible('map')?'map':visible('space')?'space':null;
 var sub=null,sq=document.getElementById('sq'),sm=document.getElementById('sm'),idx=null,enc=null,run=0,
   DATA=new URL(__DATA_URL__,location.href).href.replace(/\/*$/,'/');
 function setSub(ids,label){
+  qs=ids?sq.value.trim():'';url();  // the search rides the link, as the filters do
   sub=ids?{type:'wtid-subset',ids:ids,label:label}:null;
   if(sub)late['wtid-subset']=sub;else delete late['wtid-subset'];  // a frame made or shown later gets it with the rest
   ['identify','map','space'].forEach(function(n){post(n,sub||{type:'wtid-subset',ids:null});});}
@@ -389,6 +392,7 @@ addEventListener('message',function(e){
 addEventListener('hashchange',function(){var s=MapFilter.tokens(location.hash);
   if(s!==last){last=s;Object.keys(frames).forEach(function(n){if(live(n))sendSel(n,s);});}});
 setView(v0);
+if(qs){sq.value=qs;photos();}  // a shared or reloaded link reruns its photo search
 })();
 </script>
 </body>

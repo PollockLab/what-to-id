@@ -3,6 +3,8 @@
 Fixtures and helpers live in test_embeddings_browser.py.
 """
 
+from urllib.parse import parse_qs, urlparse
+
 import pytest
 
 from . import test_embeddings_browser as eb
@@ -336,4 +338,23 @@ def test_on_a_short_phone_help_identify_sits_in_the_card_under_a_tall_photo(brow
         " return b.bottom <= c.getBoundingClientRect().bottom; })()"
     )
     assert reach
+    page.close()
+
+
+def test_the_photo_search_rides_the_link_and_a_reload_reruns_it(browser, site):
+    pool = site[2]
+    page = _split(browser, site, 1280, 800, "?view=map-space")
+    link = f"https://www.inaturalist.org/observations/{int(sorted(pool)[0])}"
+    page.fill("#sq", link)
+    page.press("#sq", "Enter")
+    chip = "#selbar li:has-text('Photo search')"
+    page.frame_locator("#space").locator(chip).wait_for(state="attached")
+    assert parse_qs(urlparse(page.url).query)["q"] == [link]
+    page.reload()
+    page.frame_locator("#space").locator(chip).wait_for(state="attached")
+    assert page.input_value("#sq") == link
+    page.frame_locator("#map").locator(chip + " button").click()  # the peer folds its panel
+    page.frame_locator("#space").locator(chip).wait_for(state="detached")
+    assert urlparse(page.url).query == "view=map-space"
+    assert page.errors == []
     page.close()
