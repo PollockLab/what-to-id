@@ -290,12 +290,16 @@ def test_on_a_phone_draw_and_the_info_button_sit_on_the_plot_not_the_filters(bro
 
 
 def test_show_on_map_opens_the_record_in_the_map_pane_not_a_new_tab(browser, site):
-    # the fixture's map frame is a photo space too, so this pins the relay; map.js opens on open: true
+    # the fixture's map frame is a photo space too, so this pins the relay;
+    # map.js opens the card on open: true
     page = _split(browser, site, 1280, 800, "?view=space")
     sf = page.query_selector("#space").content_frame()
     sf.wait_for_function("document.getElementById('count').textContent.includes('shown')")
     mf = page.query_selector("#map").content_frame()
-    mf.evaluate("window.got = []; addEventListener('message', e => e.data.type === 'wtid-record' && got.push(e.data))")
+    mf.evaluate(
+        "window.got = [];"
+        "addEventListener('message', e => e.data.type === 'wtid-record' && got.push(e.data))"
+    )
     sf.evaluate("__deck.props.onClick({index: 7, layer: {id: 'pts'}})")
     rid = sf.evaluate("document.querySelector('#card .show').href.split('#record=')[1]")
     sf.click("#card .show")
