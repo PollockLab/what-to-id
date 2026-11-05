@@ -122,6 +122,7 @@ button[hidden]{display:none}
 .tree [aria-expanded]{flex-wrap:wrap}
 @media (max-width:760px){body{grid-template-columns:1fr;grid-template-rows:auto auto auto minmax(0,1fr);grid-template-areas:"nav" "head" "side" "plot"}
   .side{border-right:0;border-bottom:1px solid var(--line);max-height:30vh}
+  .card .ph img{max-height:25vh}  /* the sheet is 60vh: Help identify, under the photo, stays in it */
   html:not(.peer) .card{top:auto;bottom:0;right:0;left:0;width:auto!important;max-height:60vh;border-radius:10px 10px 0 0}html:not(.peer) .card .rz{display:none}}
 /* the split frame is about half the window and has no side column, so the sheet only takes over on a phone */
 @media (max-width:560px){.peer .card{top:auto;bottom:0;right:0;left:0;width:auto!important;max-height:60vh;border-radius:10px 10px 0 0}.peer .card .rz{display:none}}

@@ -320,3 +320,20 @@ def test_the_search_placeholder_fits_its_box(browser, site):
     )
     assert fit[0] <= fit[1]
     page.close()
+
+
+def test_on_a_short_phone_help_identify_sits_in_the_card_under_a_tall_photo(browser, site):
+    page = _split(browser, site, 390, 700, "?view=space")
+    sf = page.query_selector("#space").content_frame()
+    sf.wait_for_function("document.getElementById('count').textContent.includes('shown')")
+    sf.evaluate("__deck.props.onClick({index: 7, layer: {id: 'pts'}})")
+    sf.wait_for_selector("#card .primary")
+    reach = sf.evaluate(
+        "(() => { const c = document.getElementById('card'), ph = c.querySelector('.ph'),"
+        " i = document.createElement('img'); i.width = 400; i.height = 300;"  # a 4:3 photo
+        " i.style.width = '100%'; i.style.height = 'auto'; ph.textContent = ''; ph.appendChild(i);"
+        " const b = c.querySelector('.primary').getBoundingClientRect();"
+        " return b.bottom <= c.getBoundingClientRect().bottom; })()"
+    )
+    assert reach
+    page.close()
