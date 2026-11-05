@@ -159,3 +159,24 @@ def test_failed_shards_leave_the_plot_usable(browser, site):
         assert layer(page, "pts")["n"] == TOTAL
     finally:
         page.close()
+
+
+def test_minimize_shrinks_the_card_to_a_strip_and_survives_picks(open_page):
+    page = open_page(drop=None)
+    ready(page)
+    page.evaluate("__deck.props.onClick({index: 7, layer: {id: 'pts'}})")
+    btn = page.locator("#card .mn")
+    assert btn.get_attribute("aria-label") == "Minimize card"
+    btn.click()
+    height = "document.getElementById('card').getBoundingClientRect().height"
+    assert page.locator("#card.min").count() == 1 and page.evaluate(height) == 48
+    assert not page.locator("#card a.btn").first.is_visible()
+    assert btn.get_attribute("aria-expanded") == "false"
+    page.evaluate("__deck.props.onClick({index: 3, layer: {id: 'pts'}})")
+    assert page.locator("#card.min").count() == 1  # the next pick stays a strip
+    page.locator("#card h2").click()  # a click on the strip restores it
+    assert page.locator("#card.min").count() == 0 and page.locator("#card a.btn").first.is_visible()
+    page.locator("#card .mn").click()
+    page.locator("#card .x").click()
+    assert page.locator("#card").is_hidden()
+    assert page.errors == []

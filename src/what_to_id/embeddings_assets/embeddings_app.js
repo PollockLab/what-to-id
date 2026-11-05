@@ -352,6 +352,13 @@ function resizer(){
     else if(e.key==='Home'){cardWidth(null);e.preventDefault();}});
   return rz;
 }
+// The card as a strip (thumbnail, name, + and ×) or in full, as on the map; kept across picks this session.
+var MIN=false;
+function minCard(v){
+  var card=$('card'),b=card.querySelector('.mn');MIN=v;card.classList.toggle('min',v);
+  if(b){b.textContent=v?'+':'–';b.setAttribute('aria-expanded',String(!v));b.setAttribute('aria-label',v?'Show card':'Minimize card');}
+}
+$('card').addEventListener('click',function(e){if(MIN&&!e.target.closest('.x,.mn,.rz'))minCard(false);});
 async function neighborsOf(id){
   try{return await S.idx.neighbors(id);}
   catch(e){  // the daily update renamed files: reload the manifest once
@@ -376,6 +383,7 @@ function select(i,fly){
   }
   writeHash();
   var x=el('button',{type:'button','class':'x','aria-label':'Close'},['×']);x.addEventListener('click',closeCard);
+  var mn=el('button',{type:'button','class':'mn'},['']);mn.addEventListener('click',function(){minCard(!MIN);});
   var ph=el('div',{'class':'ph'},['Loading photo']),sub=el('p',{'class':'muted'},[t.group||LOADING]),place=el('p',{'class':'muted'},['']);
   var nb=el('ul',{'class':'nbrs','aria-label':'Closest matches'}),nbNote=el('p',{'class':'muted'},['Finding closest matches…']);
   var link=function(href,text,cls){return el('a',{'class':'btn '+(cls||''),href:href,target:'_blank',rel:'noopener'},[text]);};
@@ -387,9 +395,9 @@ function select(i,fly){
   if(P.grp)actions.appendChild(onlyGroup(P.grp[i]));
   var title=el('h2',{},[t.common||t.latin||t.group||'Observation '+id]);
   card.textContent='';
-  [resizer(),x,ph,el('div',{'class':'body'},[title,sub,place,actions,el('p',{'class':'muted','data-explain':'closest-matches'},['Closest matches, from the full image space']),nbNote,nb])]
+  [resizer(),x,mn,ph,el('div',{'class':'body'},[title,sub,place,actions,el('p',{'class':'muted','data-explain':'closest-matches'},['Closest matches, from the full image space']),nbNote,nb])]
     .forEach(function(c){card.appendChild(c);});
-  card.hidden=false;x.focus();
+  card.hidden=false;minCard(MIN);x.focus();
   // the shards arrived after this card opened: fill in what they know, unless iNaturalist's answer already did
   S.relabel=function(){
     var n=names(S.sel);if(sub.textContent!==LOADING)return;
