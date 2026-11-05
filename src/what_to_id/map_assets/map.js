@@ -426,6 +426,7 @@ function openCard(i){
     '<div id="rng"></div><div id="now"></div><div id="nbrs" hidden></div><a class="btn" target="_blank" rel="noopener" '+
     'href="https://www.inaturalist.ca/observations/'+id+'">Help identify on iNaturalist</a>'+
     '<p class="attr" id="attr"></p></div>';
+  card.querySelector('.body').insertBefore(SavedRecords.controls(id),$('rng'));
   card.hidden=false;card.querySelector('.x').onclick=closeCard;card.querySelector('.x').focus();
   MC.wire(card);
   layers();writeHash();MC.show(i);
