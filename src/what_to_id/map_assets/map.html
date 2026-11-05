@@ -43,8 +43,9 @@ fetch('explore.html',{method:'HEAD'}).then(function(r){if(r.ok)location.replace(
 </details>
 <details class="sec" id="flagbox" open><summary>Show only <span class="n" id="nonly"></span></summary>
 <div id="flags" class="chips" role="group" aria-label="Show only"></div>
-<p class="lbl" id="acclbl"><span data-explain="location-accuracy">Location accuracy</span> <span class="muted">(pick one)</span></p>
-<div id="acc" class="chips" role="group" aria-labelledby="acclbl"></div></details>
+<p class="lbl" id="acclbl"><label for="accr"><span data-explain="location-accuracy">Location accuracy</span></label></p>
+<div id="acc"><input id="accr" class="accr" type="range" min="0" max="4" step="1" value="0">
+<div class="accticks" aria-hidden="true"><span>Any</span><span>Known</span><span>1 km</span><span>100 m</span><span>10 m</span></div></div></details>
 <details class="sec" id="projbox" hidden></details>
 <details class="sec" id="usrbox" hidden></details>
 </section>

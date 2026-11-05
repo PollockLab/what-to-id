@@ -109,7 +109,8 @@ def test_an_accuracy_choice_sent_by_the_other_frame_reaches_the_map(browser, sit
         "{type: 'wtid-selection', sel: 'acc=100'}, location.origin)"
     )
     left.wait_for_function("/^150 of 300/.test(document.getElementById('count').textContent)")
-    assert left.locator("#acc button[aria-pressed=true]").inner_text() == "Within 100 m"
+    assert left.locator("#accr").input_value() == "3"
+    assert left.locator("#accr").get_attribute("aria-valuetext") == "Within 100 m"
     assert page.errors == []
     page.close()
 
@@ -225,5 +226,25 @@ def test_a_taxon_from_the_search_box_fits_the_map_until_the_viewer_moves_it(brow
     assert not in_view(left, [ONE])  # the map stays where the viewer put it
     zoom.click()
     assert in_view(left, [ONE]) and zoom.is_hidden()
+
+
+def test_the_accuracy_slider_steps_through_the_known_classes_and_unknown_is_a_chip(browser, site):
+    page, left = explore(browser, site)
+    count = "n => document.getElementById('count').textContent.startsWith(n + ' of 300')"
+    left.locator("#accr").fill("3")
+    left.wait_for_function(count, arg="150")
+    assert left.locator("#accr").get_attribute("aria-valuetext") == "Within 100 m"
+    page.wait_for_function("location.hash.includes('acc=100')")
+    left.locator("#accr").fill("1")
+    left.wait_for_function(count, arg="300")
+    assert left.locator("#acc .on").inner_text() == "Known"
+    unknown = left.locator("#acclbl button", has_text="Unknown only")
+    unknown.click()  # every fixture record reports an accuracy
+    left.wait_for_function(count, arg="0")
+    assert unknown.get_attribute("aria-pressed") == "true"
+    assert left.locator("#accr").input_value() == "0"
+    left.locator("#accr").fill("4")  # the slider leaves unknown
+    left.wait_for_function("document.getElementById('accr').ariaValueText === 'Within 10 m'")
+    assert unknown.get_attribute("aria-pressed") == "false"
     assert page.errors == []
     page.close()
