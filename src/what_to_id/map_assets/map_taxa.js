@@ -83,7 +83,9 @@ function terms(o){
     tree=!!(o.T&&o.T.length&&o.T[0].length>4);
   function recs(ids){var f=filter(o.T,ids.map(function(id){return {id:id};})).inc,r=new Uint8Array(o.n);
     if(f)for(var i=0;i<o.n;i++)r[i]=o.tax[i]<f.length?f[o.tax[i]]:0;return r;}
-  function name(id){var r=ix?ix.row.get(id):null;return r==null?'Taxon '+id:o.T[r][0];}
+  // a rank inside a genus often repeats the genus's name, as Carex subgenus Carex
+  function name(id){var r=ix?ix.row.get(id):null,t=r==null?null:o.T[r],k=t&&t[3]!==255&&m.ranks?m.ranks[t[3]]:'';
+    return !t?'Taxon '+id:t[0]+(/^(subgenus|section|subsection|series|complex|zoosection|zoosubsection)$/.test(k)?' ('+k+')':'');}
   o.groups.forEach(function(g){var k=m.groups.indexOf(g),id=gid[g]||null;
     out.push({dim:'taxon',kind:'group',id:id,label:m.names[g]||g,exclude:false,
       mask:function(){var r=new Uint8Array(o.n);for(var i=0;i<o.n;i++)r[i]=o.grp[i]===k?1:0;return r;},
