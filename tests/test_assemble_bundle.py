@@ -130,6 +130,15 @@ def test_records_newer_than_the_atlas_can_have_seen_do_not_fail_the_build(inputs
     assert run(inputs)["Aves"] == 1  # still left out of today's pool, enters a later day
 
 
+def test_records_that_left_the_map_pool_do_not_fail_the_build(inputs, tmp_path):
+    pool = pd.read_parquet(inputs["pool"])
+    open_pool = tmp_path / "map-pool.parquet"
+    pool[pool["id"] != inputs["ids"]["missing"]].to_parquet(open_pool, index=False)
+    assert run(inputs, grace_hours=0, open_pool=open_pool)["Aves"] == 1
+    with pytest.raises(SystemExit, match="atlas is behind"):  # still Needs ID: counts
+        run(inputs, grace_hours=0, open_pool=inputs["pool"])
+
+
 def test_zero_vector_is_rejected(inputs):
     np.savez(
         inputs["deltas"] / "raw-delta-20261003.npz",
@@ -195,7 +204,13 @@ def test_daily_fetch_embeddings_assembles_from_release_assets(inputs, tmp_path):
         "EMBEDDING_RELEASE": "test-release",
         "EMBEDDING_BUNDLE": str(bundle),
         "TEST_ASSET_DIRS": os.pathsep.join(
-            str(d) for d in (inputs["base"], inputs["deltas"], Path(inputs["reference"]).parent)
+            str(d)
+            for d in (
+                inputs["base"],
+                inputs["deltas"],
+                Path(inputs["reference"]).parent,
+                inputs["pool"].parent,  # the map pool
+            )
         ),
     }
     env.pop("REFERENCE_EMBEDDINGS", None)

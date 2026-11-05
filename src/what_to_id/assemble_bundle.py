@@ -11,10 +11,13 @@ bundle and left out of its pool, but they are not excluded from the study: they 
 day, once the atlas has embedded them. If a group's uncovered share exceeds --max-uncovered-share
 the atlas is behind and the build fails; re-preparing on the cluster is the fallback. Rows created
 within --grace-hours of the pool's newest row do not count: the pool is pulled after the atlas's
-last run, so its newest records can not have a vector yet.
+last run, so its newest records can not have a vector yet. With --open-pool (the map pool, which
+the atlas embeds) rows outside it do not count either: they left Needs ID before the atlas reached
+them, so no later day covers them.
 
     python -m what_to_id.assemble_bundle --pool POOL.parquet --base DIR --deltas DIR \
-      --reference-embeddings 'data/ref_sample_2026-09-11/emb_{group}_bioclip25.npz' --out BUNDLE
+      --reference-embeddings 'data/ref_sample_2026-09-11/emb_{group}_bioclip25.npz' --out BUNDLE \
+      [--open-pool MAP_POOL.parquet]
 """
 
 from __future__ import annotations
@@ -83,6 +86,7 @@ def assemble(
     out: Path,
     max_uncovered_share: float = 0.01,
     grace_hours: float = 48,
+    open_pool: Path | None = None,
 ) -> dict[str, int]:
     """Pack the bundle at `out`; return the uncovered count per group."""
     pool = pd.read_parquet(pool_path)
@@ -138,6 +142,8 @@ def assemble(
         sizes = pool.groupby("iconic_taxon").size()
         created = pd.to_datetime(pool.set_index("id")["created_at"], utc=True)
         old = created < created.max() - pd.Timedelta(hours=grace_hours)
+        if open_pool is not None:
+            old &= old.index.isin(pd.read_parquet(open_pool, columns=["id"])["id"])
         for group, ids in uncovered.items():
             late = int(old.reindex(ids).sum())
             if late / sizes[group] > max_uncovered_share:
@@ -178,6 +184,7 @@ def main(argv: list[str] | None = None) -> int:
         ap.add_argument("--" + flag, required=True)
     ap.add_argument("--max-uncovered-share", type=float, default=0.01)
     ap.add_argument("--grace-hours", type=float, default=48)
+    ap.add_argument("--open-pool", type=Path, help="map pool; rows outside it never fail the build")
     a = ap.parse_args(argv)
     try:
         assemble(
@@ -188,6 +195,7 @@ def main(argv: list[str] | None = None) -> int:
             Path(a.out),
             a.max_uncovered_share,
             a.grace_hours,
+            a.open_pool,
         )
     except (OSError, ValueError, KeyError) as exc:
         ap.exit(1, f"assemble_bundle: {exc}\n")
