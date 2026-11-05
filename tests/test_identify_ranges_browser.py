@@ -125,7 +125,7 @@ def test_clear_matches_start_with_far_records_hidden_and_the_segments_filter(bro
     assert page.locator("#rout [role=radiogroup]").count() == 1
     assert seg(page).all_inner_texts() == ["All 4", "Hide far outside 3", "Only far outside 1"]
     assert picked(page) == "Hide far outside 3"
-    assert page.locator(".segnote").inner_text() == (
+    assert page.locator("#rout .segnote").inner_text() == (
         "Far outside: 50 km or more from the labelled species' known range in BC. "
         "Records with no range map count as in range."
     )

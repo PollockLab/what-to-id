@@ -57,6 +57,8 @@ SCRIPTS = {
     "__EMBEDDINGS_LAYOUT__": HERE / "embeddings_assets" / "embeddings_layout.js",
     "__SPACE_MASK__": HERE / "embeddings_assets" / "space_mask.js",
     "__IDENTIFY_RANGES__": ASSETS / "identify_ranges.js",
+    "__MAP_USER__": HERE / "map_assets" / "map_user.js",
+    "__IDENTIFY_UNCONFIRMED__": ASSETS / "identify_unconfirmed.js",
     "__IDENTIFY_APP__": ASSETS / "identify_app.js",
 }
 
