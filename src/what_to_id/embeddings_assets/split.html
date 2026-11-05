@@ -288,6 +288,14 @@ addEventListener('message',function(e){
   railOpen=d.open;if(d.shut&&frames.map.classList.contains('sheet'))SB.close();
   layout();
 });
+// Photo space's Show on map: the map pane shown, then the record's card opened in it, as an Identify pick does.
+addEventListener('message',function(e){
+  var d=e.data,m;if(e.origin!==location.origin||!frames.space||e.source!==frames.space.contentWindow||!d||d.type!=='wtid-show'||d.id==null)return;
+  rec=d.id;m={type:'wtid-record',id:d.id,open:true};
+  if(!visible('map')){setView(innerWidth<800?['map']:order.filter(function(n){return n==='map'||visible(n);}));url();}
+  var f=frames.map;if(!f)return;
+  if(f.contentDocument&&f.contentDocument.readyState==='complete')post('map',m);else f.addEventListener('load',function(){post('map',m);},{once:true});
+});
 function tally(force){var s=visible('map')?'map':visible('space')?'space':null;
   if(visible('tree')&&(force||s!==src)){src=s;post('tree',cnt[s]||{type:'wtid-counts',own:null});}}
 // Photo search: the query is resolved as search.html does, and its hits go to both frames as a subset of the points.
