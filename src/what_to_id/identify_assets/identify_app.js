@@ -6,10 +6,15 @@
 'use strict';
 var CFG=IDENTIFY_CONFIG,L=EmbeddingsLayout,Meta=AtlasSearchMeta,PER_SPECIES=3,LIMIT=12,STEPS=16,NO_LOOK=65535,NOTAX=65535,LS='wtid-identify-level',IO=null,T=0,TK=0,AB=null;
 var MAP=new URL(CFG.mapUrl,location.href).href,nf=new Intl.NumberFormat('en-CA'),OBS='https://www.inaturalist.ca/observations/';
+var TAB=[],SUBK=[],NK=1,KIND=null,SUB=null,KF=0,KC=[],MINE=null,CMP=null,SEEN='wtid-identify-seen';
+// CFG.merge: the kinds (levels) a tab shows, in order; SUBK a kind's place in its tab
+Object.keys(CFG.merge).forEach(function(t){CFG.merge[t].forEach(function(k,j){TAB[k]=+t;SUBK[k]=j;});NK=Math.max(NK,CFG.merge[t].length);});
 var META=null,SYNC=null,MORE=new Map(),TAXA=null,P=null,BYID=null,LEVEL=null,Q=null,LOOKS=null,R=null,MF=null,TF=null,PEND=null,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,ONE='',CACHE=new Map(),FIRST=null,SHOWN,STAY=false,X=null;
 function $(id){return document.getElementById(id);}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 function status(t){$('status').textContent=t;}
+// A GoatCounter event when the page has its script (page_identify --goatcounter); never a login or record id.
+function track(name){var g=window.goatcounter;if(g&&g.count)try{g.count({path:'identify/'+name,title:name,event:true});}catch(e){}}
 function get(url){return fetch(url).then(function(r){
   if(!r.ok)throw new Error('Could not load '+String(url).split('/').pop().split('?')[0]+' ('+r.status+')');
   return r.arrayBuffer();}).then(L.gunzip);}
@@ -25,8 +30,9 @@ function select(){
   var I=SpaceMask.areaIndex(AREA),V=SpaceMask.areaIndex(VIEW),m=[I&&SpaceMask.area(I,P),V&&SpaceMask.area(V,P),KEEPIDS&&SpaceMask.ids(KEEPIDS,P),SUBIDS&&SpaceMask.ids(SUBIDS,P)];
   m.forEach(function(v){if(v)for(var j=0;j<n;j++)SEL[j]&=v[j];});
 }
-// Per level the kept records best first (quantized score, a bucket each), newest (highest id) first within a bucket, then at most PER_SPECIES of any one taxon, none
-// cut when the level holds one taxon only. MORE: for the first card of a cut taxon, how many records it left out.
+// Per level the kept records best first: with My taxa first the user's records ahead, then each kind of the tab in CFG.merge's
+// order, then the quantized score (a bucket each), newest (highest id) first within a bucket; then at most PER_SPECIES of any one
+// taxon, none cut when the level holds one taxon only. The kind control (KF) keeps one kind of its tab; KC counts the kinds. MORE: for the first card of a cut taxon, how many records it left out.
 // With the range file (R), a level's records also pass its outside-its-range chip.
 // Rows in ascending id: each shard's rows are id-sorted, so a merge of the shards.
 function byId(P){
@@ -36,18 +42,19 @@ function byId(P){
 }
 function on(i){return SEL[i]&&LEVEL[i]&&(!R||R.pass(i,LEVEL[i]))&&(!X||X.pass(i));}
 function build(){
-  var n=P.n,c=new Uint32Array(6*STEPS+1),i,k,lv;
-  for(i=0;i<n;i++)if(on(i))c[LEVEL[i]*STEPS+Q[i]+1]++;
+  var n=P.n,W=2*NK*STEPS,c=new Uint32Array(6*W+1),key=new Uint16Array(n),mine=MINE&&MINE.active(),i,k,lv;
+  for(i=0;i<n;i++)if(on(i)){key[i]=LEVEL[i]*W+(mine&&MINE.has(i)?NK*STEPS:0)+(NK-1-SUB[i])*STEPS+Q[i];c[key[i]+1]++;}
   for(k=1;k<c.length;k++)c[k]+=c[k-1];
   var at=c.slice(),order=new Int32Array(c[c.length-1]);
-  for(k=0;k<n;k++){i=BYID[k];if(on(i))order[at[LEVEL[i]*STEPS+Q[i]]++]=i;}
-  var out=[],total=[];MORE.clear();
+  for(k=0;k<n;k++){i=BYID[k];if(on(i))order[at[key[i]]++]=i;}
+  var out=[],total=[];MORE.clear();KC=[];
   for(lv=1;lv<=5;lv++){
-    var tot=new Uint32Array(65536),taken=new Uint32Array(65536),rows=[],a=c[lv*STEPS],b=c[(lv+1)*STEPS],nd=0,cut;
-    for(k=a;k<b;k++)if(!tot[P.tax[order[k]]]++)nd++;
-    cut=nd===1?Infinity:PER_SPECIES;
-    for(k=b-1;k>=a;k--){i=order[k];
-      if(taken[P.tax[i]]<cut){rows.push(i);if(!taken[P.tax[i]]++&&tot[P.tax[i]]>cut)MORE.set(i,tot[P.tax[i]]-cut);}}
+    // the cut is per kind, so a merged tab lists each kind's level list in turn, as pool_levels writes them
+    var tot=new Uint32Array(65536*NK),taken=new Uint32Array(65536*NK),rows=[],a=c[lv*W],b=c[(lv+1)*W],nd=[],cut,t,kf=KF&&TAB[KF]===lv?KF:0;
+    for(k=a;k<b;k++){i=order[k];KC[KIND[i]]=(KC[KIND[i]]||0)+1;if(kf&&KIND[i]!==kf){order[k]=-1;continue;}
+      if(!tot[SUB[i]*65536+P.tax[i]]++)nd[SUB[i]]=(nd[SUB[i]]||0)+1;}
+    for(k=b-1;k>=a;k--){i=order[k];if(i<0)continue;t=SUB[i]*65536+P.tax[i];cut=nd[SUB[i]]===1?Infinity:PER_SPECIES;
+      if(taken[t]<cut){rows.push(i);if(!taken[t]++&&tot[t]>cut)MORE.set(i,tot[t]-cut);}}
     out[lv]=rows;total[lv]=b-a;
   }
   view=out;S.total=total;
@@ -89,7 +96,10 @@ function card(i,lv){
   w.href=OBS+id;w.target='_blank';w.rel='noopener';
   a.href=IdentifyLinks.batches([id])[0].url;a.target='_blank';a.rel='noopener';a.setAttribute('aria-label','Identify this record on iNaturalist');
   li.append(ph,title(i,lv),w);
+  if(KIND&&CFG.merge[lv]&&!KF)li.insertBefore(el('div','kind',kindName(KIND[i])),w);
+  if(MINE&&MINE.active()&&MINE.has(i))li.insertBefore(el('div','mine','In your taxa'),w);
   if(MORE.has(i))li.appendChild(more_(i));
+  a.addEventListener('click',function(){track('card-'+(KIND?KIND[i]:lv));});
   li.appendChild(R?R.links(a,i,lv):a);
   li.onmouseenter=li.onfocus=function(){tell('wtid-focus',id);};
   li.onclick=function(e){if(!e.target.closest('a,button'))tell('wtid-record',id);};
@@ -119,7 +129,7 @@ function more(){
   for(var j=drawn;j<to;j++){var li=card(rows[j],LV);ol.appendChild(li);lis.push(li);}
   drawn=to;
   b.hidden=rows.length<=to;b.textContent='Show more ('+nf.format(rows.length-to)+' left)';
-  if(lis.length)photos(lis);
+  if(lis.length){photos(lis);if(CMP&&LOOKS)CMP.fill(lis);}
   if(IO&&!b.hidden){IO.unobserve(b);IO.observe(b);}  // observe again: a tall pane may still show it
 }
 // "Identify N listed", or with more than one batch "Identify 200 · batch 2 of 50": the button
@@ -145,15 +155,32 @@ function step(d){
 function paint(){
   var x=CFG.levels.filter(function(l){return l[0]===LV;})[0];
   [].forEach.call($('tabs').children,function(t){var on=+t.dataset.lv===LV;t.setAttribute('aria-selected',on);t.tabIndex=on?0:-1;});
-  $('desc').textContent=x[2];$('panel').setAttribute('aria-labelledby','tab'+LV);
+  $('desc').textContent=x[2];kinds();$('panel').setAttribute('aria-labelledby','tab'+LV);
   if(AB)AB.abort();AB=new AbortController();  // the cards redrawn below replace those whose photos are still loading
   $('grid').textContent='';shown=STAY?Math.max(LIMIT,drawn):LIMIT;drawn=0;
-  if(R)R.draw(LV,SEL,LEVEL);
-  if(X)X.draw(LV,SEL,LEVEL);
+  var kf=KF&&TAB[KF]===LV;  // the controls count the chosen kind, as the cards show it
+  if(R)R.draw(kf?KF:LV,SEL,kf?KIND:LEVEL);
+  if(X)X.draw(kf?KF:LV,SEL,kf?KIND:LEVEL);
   empty();
   more();batch();if(!STAY)scrollTo(0,0);STAY=false;
 }
 function redraw(){build();counts();paint();}
+function kindName(k){return (CFG.kinds.filter(function(x){return x[0]===k;})[0]||[0,''])[1];}
+// The kind control (All, then each kind) over a tab that shows several kinds; hash kind=.
+function kinds(){
+  var box=$('kind'),ks=CFG.merge[LV];
+  box.hidden=!ks;box.textContent='';if(!ks)return;
+  var g=el('div','seg');g.setAttribute('role','radiogroup');g.setAttribute('aria-label','Kind');
+  [[0,'All']].concat(ks.map(function(k){return [k,kindName(k)];})).forEach(function(x){
+    var b=el('button','segb',x[1]+' '+nf.format(x[0]?KC[x[0]]||0:S.total[LV]||0)),on=KF===x[0]||(!x[0]&&TAB[KF]!==LV);
+    b.type='button';if(KX[x[0]])b.dataset.explain=KX[x[0]];b.setAttribute('role','radio');b.setAttribute('aria-checked',String(on));b.tabIndex=on?0:-1;
+    b.onclick=function(){KF=x[0];keep('kind',KF||'');track('kind-'+KF);if(MF)redraw();else{SHOWN=null;early();}};
+    g.appendChild(b);});
+  g.onkeydown=function(e){var d={ArrowLeft:-1,ArrowRight:1}[e.key],all=[].slice.call(g.children),at=all.indexOf(document.activeElement);
+    if(!d||at<0)return;e.preventDefault();all[(at+d+all.length)%all.length].click();
+    var c=$('kind').querySelector('[aria-checked=true]');if(c)c.focus();};  // the click drew the control again
+  box.append(el('span',null,'Kind: '),g);
+}
 function counts(){
   [].forEach.call($('tabs').children,function(t){var n=S.total[+t.dataset.lv]||0;t.lastChild.textContent=nf.format(n);t.classList.toggle('zero',!n);});
 }
@@ -172,7 +199,7 @@ function keep(k,v){
   history.replaceState(null,'','#'+t.join('&'));  // no hashchange, so no refresh
 }
 function choose(lv){
-  LV=lv;
+  LV=lv;track('tab-'+lv);
   try{localStorage.setItem(LS,lv);}catch(e){}
   keep('lvl',lv);
   if(R){R.level(lv);redraw();}else paint();
@@ -182,13 +209,16 @@ function saved(){
   try{v=v||+localStorage.getItem(LS);}catch(e){}
   return CFG.levels.some(function(l){return l[0]===v;})?v:0;
 }
-// With no saved level: Close calls, or the first level that has records.
+// With no saved level: Easy confirms on a first visit (a quick start), else Might be wrong, else the first level that has records.
 function first(){
-  if(S.total[2])return 2;
+  var seen=true;try{seen=!!localStorage.getItem(SEEN);localStorage.setItem(SEEN,'1');}catch(e){}
+  if(!seen&&S.total[1])return 1;
+  if(S.total[5])return 5;
   return (CFG.levels.filter(function(l){return S.total[l[0]];})[0]||CFG.levels[1])[0];
 }
 // each level tab explains itself from the glossary, by level number
-var XK=[0,'level-clear-matches','level-close-calls','level-narrow-it-down','level-odd-shots','level-might-be-mislabelled'];
+var XK=[0,'level-clear-matches','level-close-calls','level-narrow-it-down','level-odd-shots','level-might-be-wrong'],
+  KX=[0,0,'level-close-calls',0,'level-odd-shots','level-might-be-mislabelled'];  // a kind's own entry
 function tabs(){
   var box=$('tabs');
   CFG.levels.forEach(function(x){
@@ -207,6 +237,7 @@ function tabs(){
     if(es.some(function(x){return x.isIntersecting;})){shown+=LIMIT;more();}},{rootMargin:'400px'});
   $('more').onclick=function(){shown+=LIMIT;more();};
   $('unpick').onclick=function(){pick([]);};
+  $('go').addEventListener('click',function(){track('batch-'+LV+(KF?'-'+KF:''));});
   $('prev').onclick=function(){step(-1);};$('next').onclick=function(){step(1);};
 }
 function refresh(){
@@ -246,7 +277,11 @@ function early(){
   if(s===SHOWN)return;SHOWN=s;P=s&&FIRST.P;
   if(!s){view=[];$('grid').textContent='';$('none').hidden=$('more').hidden=$('batch').hidden=$('cap').hidden=true;
     [].forEach.call($('tabs').children,function(t){t.lastChild.textContent='';});status('Loading all the records for this selection…');return;}
-  view=s.rows;S.total=s.total;counts();
+  // a tab of several kinds starts as its first kind's list (or the chosen kind's), its count their sum
+  view=s.rows.slice();S.total=s.total.slice();KC=s.total.slice();
+  Object.keys(CFG.merge).forEach(function(tb){var ks=CFG.merge[tb];
+    S.total[tb]=ks.reduce(function(x,k){return x+(s.total[k]||0);},0);view[tb]=s.rows[KF&&TAB[KF]===+tb?KF:ks[0]];});
+  counts();
   if(!LV)LV=saved()||first();
   status('Showing the top records, loading all of them…');paint();
 }
@@ -292,19 +327,25 @@ async function load(){
   P=L.pool(d[0],META.bbox);BYID=byId(P);TAXA=d[1];LOOKS=null;
   var raw=new Uint8Array(d[2]);
   if(raw.length!==P.n)throw new Error('the levels file holds '+raw.length+' records, the map '+P.n);
-  LEVEL=raw.map(function(v){return v&15;});Q=raw.map(function(v){return v>>4;});
+  LEVEL=raw.map(function(v){return TAB[v&15]||v&15;});KIND=raw.map(function(v){return v&15;});SUB=raw.map(function(v){return SUBK[v&15]||0;});Q=raw.map(function(v){return v>>4;});
   X=IdentifyUnconfirmed({P:P,taxa:TAXA,ranks:META.ranks,area:function(){return AREA;},redraw:redraw});
+  MINE=IdentifyMine({taxa:TAXA,ranks:META.ranks,place:META.place_id,tax:P.tax,look:looksOf,redraw:function(){if(MF)redraw();},track:track});
+  CMP=IdentifyCompare({taxa:TAXA,tax:P.tax,look:looksOf});
   MF=MapFilter(META);
   STAY=!!SHOWN;take(location.hash.slice(1),AREA==='');
   if(PEND!==null){take(PEND,false);PEND=null;}
   lk.then(function(b){if(!b)return;LOOKS=looks(b);
-    [].forEach.call($('grid').children,function(li){var t=li.querySelector('.title');if(t)t.replaceWith(title(+li.dataset.i,LV));});});
+    [].forEach.call($('grid').children,function(li){var t=li.querySelector('.title');if(t)t.replaceWith(title(+li.dataset.i,LV));});
+    CMP.fill([].slice.call($('grid').children));});
   rg.then(function(b){if(!b)return;
     R=IdentifyRanges(b,{P:P,name:function(i){return P.tax[i]!==NOTAX&&TAXA[P.tax[i]]?TAXA[P.tax[i]][0]:null;},look:looksOf,redraw:redraw});
     R.level(LV,true);redraw();});
   window.__identify={ids:idsOf,view:function(){return view.map(function(r){return r&&Array.from(r.map(function(i){return P.id[i];}));});},
-    total:function(){return S.total;},levelled:function(){var n=0;for(var i=0;i<P.n;i++)if(SEL[i]&&LEVEL[i])n++;return n;},level:function(){return LV;},ranges:function(){return !!R;},refresh:function(){var t=performance.now();select();build();return performance.now()-t;}};
+    total:function(){return S.total;},levelled:function(){var n=0;for(var i=0;i<P.n;i++)if(SEL[i]&&LEVEL[i])n++;return n;},level:function(){return LV;},kind:function(){return KF;},kinds:function(){return KC.slice();},mine:function(){return !!(MINE&&MINE.active());},ranges:function(){return !!R;},refresh:function(){var t=performance.now();select();build();return performance.now()-t;}};
 }
+var KD=/(?:^|&)kind=(\d)/.exec(location.hash.slice(1));KF=KD&&TAB[+KD[1]]?+KD[1]:0;
+// until the records load, Apply on My taxa first only keeps the login for IdentifyMine to read
+$('me').querySelector('form').onsubmit=function(e){e.preventDefault();keep('me',encodeURIComponent($('melogin').value.trim().slice(0,100)));};
 tabs();inbox();
 load().catch(function(e){status('Could not load the records: '+e.message);});
 })();

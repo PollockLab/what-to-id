@@ -147,8 +147,9 @@ def test_clear_matches_start_with_far_records_hidden_and_the_segments_filter(bro
     assert shown(page, 1) == [2] and picked(page) == "Only far outside 1"  # kept in the hash
     seg(page).nth(1).click()
     assert shown(page, 1) == [0, 1, 3] and "out=" not in page.url
-    page.locator("#tab4").click()  # another level starts at All
-    assert shown(page, 4) == [8, 9] and picked(page) == "All 2"
+    page.locator("#tab5").click()  # another level starts at All
+    page.locator("#kind .segb", has_text="Odd shots").click()  # the counts follow the kind
+    assert shown(page, 5) == [8, 9] and picked(page) == "All 2"
     assert seg(page).all_inner_texts() == ["All 2", "Hide far outside 1", "Only far outside 1"]
     assert chips(page) == ["About 80 km outside", "Range map"]
     assert not [w for w in FORBIDDEN if w in page.inner_text("body").lower()]
@@ -160,9 +161,12 @@ def test_the_first_lists_leave_out_far_clear_matches_as_the_page_does(browser, s
     page = opened(browser, site, "#lvl=1")
     view = page.evaluate("__identify.view()")
     assert [r[0] // 1000 - 1 for r in first["rows"][1]] == [3, 1, 0]  # no 2: 1,234 km outside
-    for lv in range(1, 6):
-        assert [r[0] for r in first["rows"][lv]] == view[lv]
-    assert first["total"] == [0, *page.evaluate("__identify.total()")[1:]]
+    total = page.evaluate("__identify.total()")
+    for lv in (1, 3):
+        assert [r[0] for r in first["rows"][lv]] == view[lv] and first["total"][lv] == total[lv]
+    kinds = [k for k, _ in page_identify.KINDS]
+    assert [r[0] for k in kinds for r in first["rows"][k]] == view[5]
+    assert sum(first["total"][k] for k in kinds) == total[5]
 
 
 def test_the_segments_move_with_the_arrow_keys(browser, site):
@@ -190,7 +194,7 @@ def test_with_nothing_far_outside_only_is_disabled(browser, site):
 
 
 def test_a_close_call_chip_gives_the_note_and_opens_the_map_by_click_and_keyboard(browser, site):
-    page = opened(browser, site, "#lvl=2")
+    page = opened(browser, site, "#lvl=5&kind=2")
     assert chips(page) == [
         "About 300 km outside",
         "Fits the look-alike, not the label",
@@ -234,7 +238,9 @@ def test_a_phone_popover_is_a_bottom_sheet(browser, site):
 
 
 def test_a_narrow_pane_opens_the_map_on_hover_beside_the_chip(browser, site):
-    page = opened(browser, site, "#lvl=3", (400, 1400))  # Identify's width inside Explore
+    page = opened(
+        browser, site, "#lvl=3", (400, 2000)
+    )  # Identify's width inside Explore; room below the reference photos
     chip, pop = page.locator(".rchip").first, page.locator("#rpop")
     chip.hover()
     pop.wait_for(state="visible")
