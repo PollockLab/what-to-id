@@ -179,4 +179,6 @@ def test_minimize_shrinks_the_card_to_a_strip_and_survives_picks(open_page):
     page.locator("#card .mn").click()
     page.locator("#card .x").click()
     assert page.locator("#card").is_hidden()
+    page.evaluate("__deck.props.onClick({index: 7, layer: {id: 'pts'}})")
+    assert page.locator("#card.min").count() == 0  # after ×, the next pick opens in full
     assert page.errors == []

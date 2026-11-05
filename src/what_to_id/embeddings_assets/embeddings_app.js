@@ -308,7 +308,7 @@ function tip(o){
 function pick(o){if(S.P&&o.index>=0&&o.layer&&o.layer.id==='pts')select(o.index,false);else LV.click(o);}
 
 function closeCard(){
-  S.sel=-1;S.nbr=[];S.run++;$('card').hidden=true;
+  S.sel=-1;S.nbr=[];S.run++;$('card').hidden=true;minCard(false);  // × is done with it: the next pick opens in full, as on the map
   writeHash();layers();tell(null);
 }
 // The split view's photo search hands over a set of ids (null clears it); one that arrives before the join waits for it.
