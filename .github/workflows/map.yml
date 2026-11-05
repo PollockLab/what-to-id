@@ -199,7 +199,7 @@ jobs:
           if [ -z "$ATLAS_HF_REPO" ]; then echo "no ATLAS_HF_REPO; no Identify page"; exit 0; fi
           python -m what_to_id.pool_levels --out _site \
             --data-url "https://huggingface.co/datasets/${ATLAS_HF_REPO}/resolve/main/"
-          python -m what_to_id.page_identify --out _site
+          python -m what_to_id.page_identify --out _site --goatcounter wietze
       # confusion.html: per species, the species its photos most often look like, from the small parquet
       # beside the atlas index. The tree card links to it through confusion-taxa.json.
       - name: Add the confused pairs page
