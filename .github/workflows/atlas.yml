@@ -201,10 +201,9 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          part="delta-$(date -u +%Y%m%d)"
-          if jq -e --arg p "$part" '.parts | map(.name) | index($p)' index/manifest.json >/dev/null; then
-            part="$part-$(date -u +%H%M)" # a second run on the same day
-          fi
+          # the time too: a compaction folds the day's earlier part away, so the date alone can
+          # repeat and overwrite that part's raw vectors on the release
+          part="delta-$(date -u +%Y%m%d-%H%M)"
           compact=()
           if [ "$COMPACT" = true ]; then compact=(--compact); fi
           mkdir -p raw
@@ -255,4 +254,4 @@ jobs:
           [ ${#files[@]} -gt 0 ] || exit 0
           gh release view "$RAW_TAG" >/dev/null 2>&1 ||
             gh release create "$RAW_TAG" --title "$RAW_TAG" --notes "Raw float16 vectors of the daily atlas deltas, for rebuilds."
-          gh release upload "$RAW_TAG" "${files[@]}" --clobber
+          gh release upload "$RAW_TAG" "${files[@]}" # no --clobber: raw vectors are kept, never replaced
