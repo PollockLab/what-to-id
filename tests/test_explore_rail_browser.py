@@ -120,6 +120,22 @@ def test_with_the_map_hidden_the_rail_stays_and_counts_all_of_bc(browser, site):
     page.close()
 
 
+def test_with_the_map_hidden_the_folded_rail_keeps_its_what_tab(browser, site):
+    page = open_page(browser, f"{site[0]}/explore.html")
+    frame = map_frame(page)
+    page.click("[data-p=map]")
+    frame.wait_for_function("document.documentElement.classList.contains('rail-only')")
+    frame.click("#railx")
+    page.wait_for_function("document.getElementById('map').offsetWidth === 36")
+    # the 36 px frame is a phone-width viewport of its own: the tab must not take the phone rules
+    assert page.evaluate(f"({BOX})('map')") == [0, 36] and frame.is_visible("#railx")
+    frame.click("#railx")
+    page.wait_for_function("document.getElementById('map').offsetWidth === 280")
+    frame.evaluate("localStorage.removeItem('wtid-rail')")
+    assert page.errors == []
+    page.close()
+
+
 def test_on_a_phone_the_rail_is_a_sheet_from_the_state_bars_filters(browser, site):
     page = open_page(browser, f"{site[0]}/explore.html", width=390)
     page.wait_for_function("document.getElementById('identify')")
