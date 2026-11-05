@@ -52,7 +52,18 @@ GLOSSARY: dict[str, tuple[str, str | None]] = {
     ),
     "life-groups": (
         "Big groups of life, such as birds, plants and fungi. Each has its own colour on the map"
-        " and in the photo space.",
+        " and in the photo space. The bar shows each group's share of the records in view, or in"
+        " all of BC with All of BC on. Click a group to pick it, again to clear it; groups combine"
+        " with each other and with the taxa.",
+        None,
+    ),
+    "taxa-filter": (
+        "Pick several to combine. A taxon keeps everything below it, so Bryophyta keeps all"
+        " mosses.",
+        None,
+    ),
+    "your-selection": (
+        "What the map keeps. Click a chip to flip it, between keep and leave out.",
         None,
     ),
     "location-hidden": (

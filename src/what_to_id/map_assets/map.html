@@ -27,19 +27,17 @@ fetch('explore.html',{method:'HEAD'}).then(function(r){if(r.ok)location.replace(
 </header>
 <section id="side" class="side" aria-label="What">
 <div class="railhd"><b>What</b><button type="button" id="railx" class="railx" aria-controls="side" aria-expanded="true">Hide</button></div>
-<div id="selbar" class="selbar" role="region" aria-label="Your selection" hidden><p class="lbl">Your selection <button type="button" class="link">Clear all</button></p><ul class="chips"></ul></div>
+<div id="selbar" class="selbar" role="region" aria-label="Your selection" hidden><p class="lbl"><span data-explain="your-selection">Your selection</span> <button type="button" class="link">Clear all</button></p><ul class="chips"></ul></div>
 <details class="sec" id="grpsec" open><summary data-explain="life-groups">Groups <span class="n" id="ngroups"></span><span id="gbar" class="gbar" role="img" aria-label="No records in view"></span></summary>
-<p class="muted">Share of the records in view, or in all of BC with All of BC on. Groups combine with each other and with the taxa. <button type="button" id="gall" class="link">All groups</button> <button type="button" id="gkeep" class="link" hidden></button></p>
+<p class="muted"><button type="button" id="gall" class="link">All groups</button> <button type="button" id="gkeep" class="link" hidden></button></p>
 <ul id="groups" class="gl" role="list" aria-label="Taxon groups"></ul>
 </details>
-<p class="muted">Click a group to pick it, again to clear it. In Your selection, click a chip to flip it.</p>
-<details class="sec" id="taxsec" open><summary>Taxa <span class="n" id="ntaxa"></span></summary>
+<details class="sec" id="taxsec" open><summary data-explain="taxa-filter">Taxa <span class="n" id="ntaxa"></span></summary>
 <div class="picker"><label for="q" class="vh">Find a taxon</label>
 <input id="q" type="search" placeholder="Latin or common name, e.g. Carex" autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="sugg">
 <ul id="sugg" class="sugg" role="listbox" aria-label="Matching taxa" hidden></ul></div>
 <p id="qn" class="muted" aria-live="polite"></p>
 <div id="cladebox" hidden><div id="clades" class="chips" role="group" aria-label="Taxon shortcuts"></div></div>
-<p class="muted">Pick several to combine. A taxon keeps everything below it, so Bryophyta keeps all mosses.</p>
 </details>
 <details class="sec" id="flagbox" open><summary>Show only <span class="n" id="nonly"></span></summary>
 <div id="flags" class="chips" role="group" aria-label="Show only"></div>
