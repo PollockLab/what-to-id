@@ -276,3 +276,14 @@ def test_old_page_urls_open_the_matching_explore_view_with_the_hash(browser, sit
     page.wait_for_url(f"{base}/explore.html?view=space#months=8")
     assert page.evaluate(FRAMES) == ["space"]
     page.close()
+
+
+def test_on_a_phone_draw_and_the_info_button_sit_on_the_plot_not_the_filters(browser, site):
+    page = _split(browser, site, 390, 800, "?view=space")
+    sf = page.query_selector("#space").content_frame()
+    sf.wait_for_function("document.getElementById('count').textContent.includes('shown')")
+    side = sf.evaluate("document.querySelector('.side').getBoundingClientRect().bottom")
+    for b in ("ldraw", "info"):  # below the filters, so none of their text is covered
+        assert sf.evaluate(f"document.getElementById({b!r}).getBoundingClientRect().top") >= side
+    assert page.errors == []
+    page.close()
