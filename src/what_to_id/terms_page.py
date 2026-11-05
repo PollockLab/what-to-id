@@ -40,7 +40,14 @@ GROUPS = {
     ],
     "Levels": ["levels", *(k for k in GLOSSARY if k.startswith("level-"))],
     "Map filters": [
-        *("life-groups", "observer-filter", "my-taxa", "not-identified-by-me"),
+        *(
+            "your-selection",
+            "life-groups",
+            "taxa-filter",
+            "observer-filter",
+            "my-taxa",
+            "not-identified-by-me",
+        ),
         *("colour-by-levels", "colour-by-groups", "in-view", "all-of-bc", "your-groups"),
     ],
     "Views": [
