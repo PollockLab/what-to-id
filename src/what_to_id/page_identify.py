@@ -63,7 +63,6 @@ SCRIPTS = {
     "__IDENTIFY_RANGES__": ASSETS / "identify_ranges.js",
     "__MAP_USER__": HERE / "map_assets" / "map_user.js",
     "__IDENTIFY_UNCONFIRMED__": ASSETS / "identify_unconfirmed.js",
-    "__IDENTIFY_MINE__": ASSETS / "identify_mine.js",
     "__IDENTIFY_COMPARE__": ASSETS / "identify_compare.js",
     "__IDENTIFY_APP__": ASSETS / "identify_app.js",
 }

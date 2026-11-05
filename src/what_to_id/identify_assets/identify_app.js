@@ -6,7 +6,7 @@
 'use strict';
 var CFG=IDENTIFY_CONFIG,L=EmbeddingsLayout,Meta=AtlasSearchMeta,PER_SPECIES=3,LIMIT=12,STEPS=16,NO_LOOK=65535,NOTAX=65535,LS='wtid-identify-level',IO=null,T=0,TK=0,AB=null;
 var MAP=new URL(CFG.mapUrl,location.href).href,nf=new Intl.NumberFormat('en-CA'),OBS='https://www.inaturalist.ca/observations/';
-var TAB=[],SUBK=[],NK=1,KIND=null,SUB=null,KF=0,KC=[],MINE=null,CMP=null,SEEN='wtid-identify-seen';
+var TAB=[],SUBK=[],NK=1,KIND=null,SUB=null,KF=0,KC=[],UF=null,UON=false,CMP=null,SEEN='wtid-identify-seen';
 // CFG.merge: the kinds (levels) a tab shows, in order; SUBK a kind's place in its tab
 Object.keys(CFG.merge).forEach(function(t){CFG.merge[t].forEach(function(k,j){TAB[k]=+t;SUBK[k]=j;});NK=Math.max(NK,CFG.merge[t].length);});
 var META=null,SYNC=null,MORE=new Map(),TAXA=null,P=null,BYID=null,LEVEL=null,Q=null,LOOKS=null,R=null,MF=null,TF=null,PEND=null,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,ONE='',CACHE=new Map(),FIRST=null,SHOWN,STAY=false,X=null;
@@ -20,17 +20,18 @@ function get(url){return fetch(url).then(function(r){
   return r.arrayBuffer();}).then(L.gunzip);}
 
 // The records the selection keeps, 1 each in SEL: MapFilter.keep for the taxa, the group chips' verdict, MapFilter.rest
-// for the dates, months, show only and accuracy, then the area, the map's viewport and the lasso's ids.
+// for the dates, months, show only and accuracy, then the area, the map's viewport, the lasso's ids and the User filter.
 function select(){
-  var n=P.n,i;
+  var n=P.n,i;UF.sync(P);
   SEL=MF.keep(TF,MF.groupSet(S,TF),P.tax,P.grp,n,new Uint8Array(n));
   var ok=CH.groupPass(S.groups,META.groups,!!TF.inc);
   for(i=0;i<n;i++)if(!ok[P.grp[i]])SEL[i]=0;
   MF.rest(S,P.obs,P.up,P.flags,n,SEL);
   var I=SpaceMask.areaIndex(AREA),V=SpaceMask.areaIndex(VIEW),m=[I&&SpaceMask.area(I,P),V&&SpaceMask.area(V,P),KEEPIDS&&SpaceMask.ids(KEEPIDS,P),SUBIDS&&SpaceMask.ids(SUBIDS,P)];
   m.forEach(function(v){if(v)for(var j=0;j<n;j++)SEL[j]&=v[j];});
+  for(i=0;i<n;i++)if(SEL[i]&&UF.drop(i))SEL[i]=0;
 }
-// Per level the kept records best first: with My taxa first the user's records ahead, then each kind of the tab in CFG.merge's
+// Per level the kept records best first: each kind of the tab in CFG.merge's
 // order, then the quantized score (a bucket each), newest (highest id) first within a bucket; then at most PER_SPECIES of any one
 // taxon, none cut when the level holds one taxon only. The kind control (KF) keeps one kind of its tab; KC counts the kinds. MORE: for the first card of a cut taxon, how many records it left out.
 // With the range file (R), a level's records also pass its outside-its-range chip.
@@ -42,8 +43,8 @@ function byId(P){
 }
 function on(i){return SEL[i]&&LEVEL[i]&&(!R||R.pass(i,LEVEL[i]))&&(!X||X.pass(i));}
 function build(){
-  var n=P.n,W=2*NK*STEPS,c=new Uint32Array(6*W+1),key=new Uint16Array(n),mine=MINE&&MINE.active(),i,k,lv;
-  for(i=0;i<n;i++)if(on(i)){key[i]=LEVEL[i]*W+(mine&&MINE.has(i)?NK*STEPS:0)+(NK-1-SUB[i])*STEPS+Q[i];c[key[i]+1]++;}
+  var n=P.n,W=NK*STEPS,c=new Uint32Array(6*W+1),key=new Uint16Array(n),i,k,lv;
+  for(i=0;i<n;i++)if(on(i)){key[i]=LEVEL[i]*W+(NK-1-SUB[i])*STEPS+Q[i];c[key[i]+1]++;}
   for(k=1;k<c.length;k++)c[k]+=c[k-1];
   var at=c.slice(),order=new Int32Array(c[c.length-1]);
   for(k=0;k<n;k++){i=BYID[k];if(on(i))order[at[key[i]]++]=i;}
@@ -97,7 +98,6 @@ function card(i,lv){
   a.href=IdentifyLinks.batches([id])[0].url;a.target='_blank';a.rel='noopener';a.setAttribute('aria-label','Identify this record on iNaturalist');
   li.append(ph,title(i,lv),w);
   if(KIND&&CFG.merge[lv]&&!KF)li.insertBefore(el('div','kind',kindName(KIND[i])),w);
-  if(MINE&&MINE.active()&&MINE.has(i))li.insertBefore(el('div','mine','In your taxa'),w);
   if(MORE.has(i))li.appendChild(more_(i));
   a.addEventListener('click',function(){track('card-'+(KIND?KIND[i]:lv));});
   li.appendChild(R?R.links(a,i,lv):a);
@@ -288,10 +288,18 @@ function early(){
 // A selection: the dates, months, groups, show only, accuracy and taxa out of a hash string; the area only when asked.
 function take(str,withArea){
   var r=MF.read(new URLSearchParams(str));
-  ['up','lo','hi','months','groups','only','acc','picks'].forEach(function(k){S[k]=r[k];});
+  ['up','lo','hi','months','groups','only','acc','picks','user','umode','umin'].forEach(function(k){S[k]=r[k];});
   if(withArea)AREA=r.area;
   TF=TX.filter(TAXA,S.picks);
   if(P)refresh();
+}
+// The User box changed S or finished a load: standalone its part of the hash follows S, then the split view and the cards.
+function user(){
+  var re=/^(user|umode|umin)=/;
+  if(parent===window)history.replaceState(null,'','#'+location.hash.slice(1).split('&').filter(function(x){return x&&!re.test(x);})
+    .concat(MF.write(S).filter(function(x){return re.test(x);})).join('&'));
+  var on=UF.active();if(on&&!UON)track('user-'+(S.umode||(META.observer?'observer':'taxa')));UON=on;
+  SYNC.send();refresh();
 }
 function key(){return MF?MF.write(S).join('&'):PEND||'';}
 function idsOf(){var out=[];for(var i=0;i<P.n;i++)if(SEL[i])out.push(P.id[i]);return out;}
@@ -329,11 +337,14 @@ async function load(){
   if(raw.length!==P.n)throw new Error('the levels file holds '+raw.length+' records, the map '+P.n);
   LEVEL=raw.map(function(v){return TAB[v&15]||v&15;});KIND=raw.map(function(v){return v&15;});SUB=raw.map(function(v){return SUBK[v&15]||0;});Q=raw.map(function(v){return v>>4;});
   X=IdentifyUnconfirmed({P:P,taxa:TAXA,ranks:META.ranks,area:function(){return AREA;},redraw:redraw});
-  MINE=IdentifyMine({taxa:TAXA,ranks:META.ranks,place:META.place_id,tax:P.tax,look:looksOf,redraw:function(){if(MF)redraw();},track:track});
+  // Not yet identified by me asks iNaturalist within the pool's extent: Identify has no map viewport of its own
+  var b=META.bbox;UF=userFilter({S:S,meta:META,get:function(f){return get(new URL(f,MAP));},taxa:function(){return TAXA;},changed:user,
+    bounds:function(){return {w:b[0],s:b[1],e:b[2],n:b[3]};}});
   CMP=IdentifyCompare({taxa:TAXA,tax:P.tax,look:looksOf});
   MF=MapFilter(META);
   STAY=!!SHOWN;take(location.hash.slice(1),AREA==='');
   if(PEND!==null){take(PEND,false);PEND=null;}
+  $('usrbox').open=!!S.user;
   lk.then(function(b){if(!b)return;LOOKS=looks(b);
     [].forEach.call($('grid').children,function(li){var t=li.querySelector('.title');if(t)t.replaceWith(title(+li.dataset.i,LV));});
     CMP.fill([].slice.call($('grid').children));});
@@ -341,11 +352,9 @@ async function load(){
     R=IdentifyRanges(b,{P:P,name:function(i){return P.tax[i]!==NOTAX&&TAXA[P.tax[i]]?TAXA[P.tax[i]][0]:null;},look:looksOf,redraw:redraw});
     R.level(LV,true);redraw();});
   window.__identify={ids:idsOf,view:function(){return view.map(function(r){return r&&Array.from(r.map(function(i){return P.id[i];}));});},
-    total:function(){return S.total;},levelled:function(){var n=0;for(var i=0;i<P.n;i++)if(SEL[i]&&LEVEL[i])n++;return n;},level:function(){return LV;},kind:function(){return KF;},kinds:function(){return KC.slice();},mine:function(){return !!(MINE&&MINE.active());},ranges:function(){return !!R;},refresh:function(){var t=performance.now();select();build();return performance.now()-t;}};
+    total:function(){return S.total;},levelled:function(){var n=0;for(var i=0;i<P.n;i++)if(SEL[i]&&LEVEL[i])n++;return n;},level:function(){return LV;},kind:function(){return KF;},kinds:function(){return KC.slice();},user:function(){return UF.active();},ranges:function(){return !!R;},refresh:function(){var t=performance.now();select();build();return performance.now()-t;}};
 }
 var KD=/(?:^|&)kind=(\d)/.exec(location.hash.slice(1));KF=KD&&TAB[+KD[1]]?+KD[1]:0;
-// until the records load, Apply on My taxa first only keeps the login for IdentifyMine to read
-$('me').querySelector('form').onsubmit=function(e){e.preventDefault();keep('me',encodeURIComponent($('melogin').value.trim().slice(0,100)));};
 tabs();inbox();
 load().catch(function(e){status('Could not load the records: '+e.message);});
 })();

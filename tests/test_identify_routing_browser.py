@@ -1,5 +1,6 @@
 """Identify's routing in Chromium: a first visit opens on Easy confirms, Might be wrong's kind
-control, My taxa first, the reference photos and the GoatCounter events. iNaturalist is stubbed."""
+control, the User filter, the reference photos and the GoatCounter events. iNaturalist is
+stubbed."""
 
 from urllib.parse import parse_qs, urlparse
 
@@ -115,45 +116,54 @@ def test_the_kind_control_filters_might_be_wrong_and_keeps_the_kind_in_the_hash(
     assert page.errors == []
 
 
-def test_my_taxa_first_lists_the_users_genera_first_in_every_tab(browser, site):
+def test_the_user_filter_keeps_only_the_users_genera_as_the_map_does(browser, site):
     base, pts = site
-    page = counted(browser, base, "#lvl=1")
+    # My taxa, the default here: the test map has no observer file
+    page = counted(browser, base, "#lvl=1&user=JDoe&umode=taxa")
     taxon = dict(zip(pts["id"], pts["taxon_id"], strict=True))
-    page.fill("#melogin", "jdoe")
-    page.click("#me button")
-    page.wait_for_function("__identify.mine()")
-    assert page.inner_text("#me .segnote") == (
-        "Records in your 1 genus (at least 50 of your IDs each) come first."
-    )
+    page.wait_for_function("__identify.user()")
     # the login is looked up once, then the taxa are read for the user number that matched exactly
     assert [c[0] for c in page.api] == ["users/autocomplete", "identifications/species_counts"]
     assert page.api[1][1]["user_id"] == ["777"]
-    for lv, *_ in page_identify.LEVELS:
-        tab(page, lv).click()
-        mine = [taxon[i] in GENUS_A for i in page.evaluate("__identify.view()")[lv]]
-        assert any(mine) and mine == sorted(mine, reverse=True), lv  # all of the user's first
-    assert page.locator("#grid .card").first.locator(".mine").count() == 1
-    assert "me=jdoe" in page.evaluate("location.hash")
-    page.reload()
-    page.wait_for_function("window.__identify && __identify.mine()")  # kept in the hash
-    assert page.input_value("#melogin") == "jdoe"
-    page.fill("#melogin", "")
-    page.click("#me button")
-    page.wait_for_function("!__identify.mine()")
-    assert "me=" not in page.evaluate("location.hash") and page.locator("#grid .mine").count() == 0
-    assert not any("jdoe" in e or "777" in e for e in events(page))  # no login in the counts
-    assert "identify/mine-on" in events(page) and page.errors == []
-
-
-def test_an_unknown_login_says_so_and_keeps_the_order(browser, site):
-    base, _ = site
-    page = counted(browser, base, "#lvl=1&me=nobody")
-    page.wait_for_function(
-        "/No iNaturalist user/.test(document.querySelector('#me .segnote').textContent)"
-    )
-    assert page.inner_text("#me .segnote") == 'No iNaturalist user "nobody"'
-    assert page.evaluate("__identify.mine()") is False and page.locator("#grid .mine").count() == 0
+    ids = page.evaluate("__identify.ids()")
+    assert ids and {taxon[i] for i in ids} <= GENUS_A
+    assert page.locator("#usrbox").get_attribute("open") is not None
+    assert page.input_value("#usrname") == "JDoe" and page.input_value("#usrbox select") == "taxa"
+    assert "identify/user-taxa" in events(page)
+    # no login in the counts
+    assert not any("jdoe" in e.lower() or "777" in e for e in events(page))
     assert page.errors == []
+
+
+def test_a_login_typed_on_identify_goes_to_the_hash(browser, site):
+    base, _ = site
+    page = counted(browser, base, "#lvl=1")
+    n = len(page.evaluate("__identify.ids()"))
+    page.click("#usrbox summary")
+    page.fill("#usrname", "JDoe")
+    page.press("#usrname", "Enter")
+    page.wait_for_function("__identify.user()")
+    assert "user=JDoe" in page.evaluate("location.hash")
+    assert 0 < len(page.evaluate("__identify.ids()")) < n
+    page.fill("#usrname", "")
+    page.press("#usrname", "Enter")
+    page.wait_for_function("!__identify.user()")
+    assert "user=" not in page.evaluate("location.hash")
+    assert len(page.evaluate("__identify.ids()")) == n and page.errors == []
+
+
+def test_an_unknown_login_says_so_and_filters_nothing(browser, site):
+    base, _ = site
+    page = counted(browser, base, "#lvl=1")
+    n = len(page.evaluate("__identify.ids()"))
+    page.goto(f"{base}/identify.html#lvl=1&user=nobody")
+    page.wait_for_function("window.__identify")
+    page.wait_for_function(
+        "/No iNaturalist user/.test(document.querySelector('#usrbox p').textContent)"
+    )
+    assert page.text_content("#usrbox p") == 'No iNaturalist user "nobody"'
+    assert page.evaluate("__identify.user()") is False
+    assert len(page.evaluate("__identify.ids()")) == n and page.errors == []
 
 
 def test_a_card_with_a_look_alike_shows_both_reference_photos(browser, ranges_site):
