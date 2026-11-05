@@ -148,6 +148,7 @@ def explore(browser, site):
     page.errors = []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     stub_taxa(page)
+    page.add_init_script(HOOK)
     page.route("https://api.inaturalist.org/v1/users/**", lambda r: r.fulfill(json={"results": []}))
     page.route("https://basemaps.cartocdn.com/**", lambda r: r.fulfill(body=BLANK))
     page.goto(f"{site}/explore.html")
@@ -189,5 +190,40 @@ def test_the_search_box_sets_the_map_user_from_a_login_and_offers_no_project_wit
     page.press("#sq", "Enter")
     page.wait_for_function("location.hash.includes('user=birder')")
     assert left.locator("#usrname").input_value() == "birder"
+    assert page.errors == []
+    page.close()
+
+
+def in_view(left, points):
+    left.wait_for_function("window.__map && !__map.isMoving()", polling=200)
+    left.wait_for_timeout(300)
+    return left.evaluate(
+        "pts => { const b = __map.getBounds(); return pts.every(p => b.contains(p)); }", points
+    )
+
+
+def test_a_taxon_from_the_search_box_fits_the_map_until_the_viewer_moves_it(browser, site):
+    page, left = explore(browser, site)
+    zoom = left.locator(".zoomrec")
+    page.fill("#sq", "taxon 6")
+    page.locator("#sg li").nth(1).wait_for()
+    page.press("#sq", "Enter")
+    left.wait_for_function("/^2 of 300/.test(document.getElementById('count').textContent)")
+    assert in_view(left, SPREAD) and left.evaluate("__map.getZoom()") > 7
+    assert zoom.is_hidden()
+    box = left.locator("#map").bounding_box()  # the viewer drags the map off the records
+    page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+    page.mouse.down()
+    page.mouse.move(box["x"] + 20, box["y"] + 20, steps=8)
+    page.mouse.up()
+    assert not in_view(left, [ONE])
+    page.fill("#sq", "taxon 4")
+    page.locator("#sg li").nth(1).wait_for()
+    page.press("#sq", "Enter")
+    left.wait_for_function("document.querySelectorAll('#selbar li').length === 2")
+    zoom.wait_for(state="visible")
+    assert not in_view(left, [ONE])  # the map stays where the viewer put it
+    zoom.click()
+    assert in_view(left, [ONE]) and zoom.is_hidden()
     assert page.errors == []
     page.close()

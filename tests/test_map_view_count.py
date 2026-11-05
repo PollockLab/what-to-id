@@ -114,20 +114,16 @@ const P={n:3,pos:Float32Array.of(-123,49,-120,50,-125,48)};
 
 
 @needs_node
-def test_a_taxon_or_group_from_the_split_view_asks_for_a_fit_and_nothing_else_does():
+def test_a_new_taxon_or_group_fits_the_map_unless_the_viewer_moved_it():
     harness = """
-let SY=null,FIT=false,TAXA=null;const P={n:0},S={picks:[],groups:'',months:0};
-const MapFilter={sync:o=>{SY=o;return {send(){}};}},noop=()=>{};
-const [search,refilter,render]=Array(3).fill(noop),
-  FB={showClades:noop,showGroups:noop,showMonths:noop,showOnly:noop};
-const MF={read:p=>({up:false,lo:0,hi:9,months:p.get('months')||0,groups:p.get('groups')||'',only:{},
-  picks:(p.get('taxa')||'').split(',').filter(Boolean)}),
-  write:s=>[s.groups&&'groups='+s.groups,s.picks.length&&'taxa='+s.picks.join(','),
-    s.months&&'months='+s.months].filter(Boolean)};
+let K='',TK0=null,MOVED=false,fits=0;const ZB={hidden:true};
+const taxaKey=()=>K,shows=()=>null,fitTo=()=>fits++;
 """
+    # the first key is the page's own, a months change leaves the key, a moved map gets the button
     script = (
-        "console.log(JSON.stringify(['taxa=5','taxa=5','taxa=5&months=3','groups=Aves','']"
-        ".map(s=>{SY.apply(s);const f=FIT;FIT=false;return f;})))"
+        "console.log(JSON.stringify([['taxa=5',0],['taxa=5',0],['taxa=6',0],['',0],"
+        "['groups=Aves',1],['',1]].map(([k,m])=>{K=k;MOVED=!!m;const f=fits;fitNew();"
+        "return [fits-f,ZB.hidden];})))"
     )
-    got = _node(harness, "var SYNC=", "// The selection:", script)
-    assert got == [True, False, False, True, False]
+    got = _node(harness, "// a new taxon or group", "// kept records dated", script)
+    assert got == [[0, True], [0, True], [1, True], [0, True], [0, False], [0, True]]
