@@ -1,6 +1,7 @@
 """The confused-pairs page in Chromium, photo hosts stubbed: group tabs, a pair's records worst
 first, the tree's #t<id> link, the Identify handoff, keys and seen marks, the pairs-only build."""
 
+import pandas as pd
 import pytest
 
 from what_to_id import page_confusion
@@ -14,10 +15,10 @@ browser = eb.browser
 OBS = "https://www.inaturalist.ca/observations/"
 
 
-def site_for(tmp_path_factory, records):
+def site_for(tmp_path_factory, records, pairs=None):
     root = tmp_path_factory.mktemp("confusion-site")
     pq, rq = root / "c.parquet", root / "r.parquet"
-    pairs_frame().to_parquet(pq)
+    (pairs_frame() if pairs is None else pairs).to_parquet(pq)
     if records:
         records_frame().to_parquet(rq)
     page_confusion.build(root, None, pq, rq if records else None)
@@ -29,6 +30,13 @@ def site_for(tmp_path_factory, records):
 @pytest.fixture(scope="module")
 def site(tmp_path_factory):
     yield from site_for(tmp_path_factory, True)
+
+
+@pytest.fixture(scope="module")
+def tiny_site(tmp_path_factory):
+    tiny = pd.DataFrame([(7, "Eus fus", None, "Gus hus", 2, 2, 1.0)], columns=pairs_frame().columns)
+    both = pd.concat([pairs_frame(), tiny]).astype({"looks_like_taxon_id": "Int64"})
+    yield from site_for(tmp_path_factory, False, both)
 
 
 @pytest.fixture(scope="module")
@@ -176,12 +184,19 @@ def subs(page, i):
     return [s.split(" (")[i] for s in page.locator("#pairs .sub").all_inner_texts()]
 
 
-def test_default_order_is_highest_share_first(browser, site):
+def test_default_order_is_surest_share_first(browser, site):
     page = open_page(browser, site)
-    assert page.locator("#sort option:checked").inner_text().startswith("Share of its photos")
+    assert page.locator("#sort option:checked").inner_text() == "Share, surest first"
     assert page.locator("#dir").get_attribute("aria-label") == "Sort direction: descending"
     assert [s[:3] for s in subs(page, 1)] == ["75%", "50%", "30%"]
     assert "sort=" not in page.url and "dir=" not in page.url
+
+
+def test_tiny_sample_ranks_below_a_bigger_one_unless_sorted_by_share(browser, tiny_site):
+    page = open_page(browser, tiny_site)  # Wilson: 2 of 2 < 9 of 12
+    assert subs(page, 0) == ["9 of 12 photos", "2 of 2 photos", "5 of 10 photos", "3 of 10 photos"]
+    page = open_page(browser, tiny_site, "#sort=pct")
+    assert subs(page, 0)[0] == "2 of 2 photos" and "sort=pct" in page.url
 
 
 def test_sort_by_photos_rides_the_hash_and_share_flips(browser, site):
@@ -194,8 +209,11 @@ def test_sort_by_photos_rides_the_hash_and_share_flips(browser, site):
     page.click("#dir")
     assert page.locator("#dir").get_attribute("aria-label") == "Sort direction: ascending"
     assert [s[:3] for s in subs(page, 1)] == ["30%", "50%", "75%"]
-    assert "dir=asc" in page.url and "sort=" not in page.url
+    assert "dir=asc" in page.url and "sort=pct" in page.url
     page.click("#dir")
+    assert [s[:3] for s in subs(page, 1)] == ["75%", "50%", "30%"]
+    assert "sort=pct" in page.url and "dir=" not in page.url
+    page.select_option("#sort", "sure")
     assert pair_names(page) == default and "sort=" not in page.url and "dir=" not in page.url
     page.select_option("#sort", "lab")  # names start A to Z
     assert pair_names(page)[0].startswith("Aus bus")
