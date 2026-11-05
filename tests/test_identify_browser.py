@@ -3,6 +3,7 @@ file, and the photos come 200 ids to a request. iNaturalist is stubbed."""
 
 import functools
 import http.server
+import re
 import threading
 
 import numpy as np
@@ -21,13 +22,6 @@ from .test_page_nav import FORBIDDEN
 browser = eb.browser
 N = 2100
 LOOKS = ["Bombus a", "Bombus b", "Apis c"]
-LABELS = [
-    "Clear matches",
-    "Close calls",
-    page_identify.NARROW_LABEL,
-    "Odd shots",
-    "Might be mislabelled",
-]
 
 
 class Quiet(http.server.SimpleHTTPRequestHandler):
@@ -156,6 +150,13 @@ def tab(page, lv):
     return page.locator(f"#tab{lv}")
 
 
+def kind(page, name):
+    return page.locator("#kind .segb", has_text=re.compile(f"^{name} "))
+
+
+ORDER = [k for k, _ in page_identify.KINDS]  # Might be wrong lists its kinds in this order
+
+
 def test_cards_follow_the_chosen_level_with_a_few_per_species_and_photos_in_batches(browser, site):
     base, pts = site
     page = open_identify(browser, base, "#lvl=1", (380, 500))
@@ -163,10 +164,16 @@ def test_cards_follow_the_chosen_level_with_a_few_per_species_and_photos_in_batc
     shown = page.evaluate("__identify.view()")
     level = dict(zip(pts["id"], pts["level"], strict=True))
     taxon = dict(zip(pts["id"], pts["taxon_id"], strict=True))
-    for lv in (1, 2, 3, 4):
+    for lv in (1, 3):
         assert shown[lv] and all(level[i] == lv for i in shown[lv])
         counts = pd.Series([taxon[i] for i in shown[lv]]).value_counts()
         assert counts.max() <= 3 and len(counts) == 7  # a few of each of the seven species
+    assert not shown[2] and not shown[4]  # both in Might be wrong
+    kinds = [level[i] for i in shown[5]]
+    assert kinds == sorted(kinds, key=ORDER.index) and set(kinds) == {5, 4, 2}
+    for k in (4, 2):  # the cut is per kind
+        counts = pd.Series([taxon[i] for i in shown[5] if level[i] == k]).value_counts()
+        assert counts.max() <= 3 and len(counts) == 7
     assert page.locator("#grid .card").count() == 12
     assert all(len(c) <= 200 for c in page.calls) and page.calls
     before = len(page.calls)
@@ -177,14 +184,17 @@ def test_cards_follow_the_chosen_level_with_a_few_per_species_and_photos_in_batc
     page.wait_for_selector("#grid .card .look")
     text = page.locator("#grid .card .look").first.inner_text()
     assert text.startswith("Probably ") and text.split()[1] in {"Bombus", "Apis"}
-    tab(page, 2).click()
+    tab(page, 5).click()
+    page.wait_for_selector("#grid .card .kind")
+    assert page.locator("#grid .card .kind").first.text_content() == "Likely mislabelled"
+    assert page.locator("#grid .card .look").first.inner_text().startswith("Looks more like ")
+    kind(page, "Close calls").click()
     page.wait_for_selector("#grid .card .look")
     assert "Looks more like" in page.locator("#grid .card .look").first.inner_text()
-    tab(page, 5).click()
-    page.wait_for_selector("#grid .card .look")
+    assert page.locator("#grid .card .kind").count() == 0  # one kind shown, no tags
+    kind(page, "Likely mislabelled").click()
     assert page.locator("#grid .card").count() == 1
-    assert page.locator("#grid .card .look").first.inner_text().startswith("Looks more like ")
-    assert "Might be mislabelled" in page.locator(".about").text_content()
+    assert "Might be wrong" in page.locator(".about").text_content()
     body = page.inner_text("body").lower()
     assert not any(word in body for word in FORBIDDEN)
     assert "photo download" in page.locator(".about").text_content()
@@ -263,14 +273,14 @@ def test_an_empty_level_hides_its_batch_link_and_points_at_the_levels_that_have_
         "r => MapArea.encode([r])", [x - d, y - d, x + d, y - d, x + d, y + d, x - d, y + d]
     )
     page.evaluate("a => postMessage({type: 'wtid-view', area: a}, location.origin)", view)
-    page.wait_for_function("__identify.total()[2] === 0 && __identify.total()[4] > 0")
-    assert page.evaluate("__identify.level()") == 2
+    page.wait_for_function("__identify.total()[1] === 0 && __identify.total()[5] > 0")
+    assert page.evaluate("__identify.level()") == 1
     assert page.locator("#batch").is_hidden()
     total = page.evaluate("__identify.total()")
-    for lv in range(1, 5):
+    for lv, *_ in page_identify.LEVELS:
         assert ("zero" in tab(page, lv).get_attribute("class")) == (total[lv] == 0)
-    page.locator("#none button", has_text=LABELS[3]).click()
-    assert page.evaluate("__identify.level()") == 4
+    page.locator("#none button", has_text="Might be wrong").click()
+    assert page.evaluate("__identify.level()") == 5
     assert page.locator("#none").is_hidden() and page.locator("#batch").is_visible()
     assert page.errors == []
 
@@ -279,28 +289,34 @@ def test_the_tabs_switch_the_cards_and_their_counts_are_the_totals(browser, site
     base, pts = site
     page = open_identify(browser, base)
     total = page.evaluate("__identify.total()")
-    assert page.evaluate("__identify.level()") == 2  # opens on Close calls
+    assert page.evaluate("__identify.level()") == 1  # a first visit opens on Easy confirms
     assert page.get_by_role("tab", selected=True).count() == 1
-    for lv, label in enumerate(LABELS, 1):
+    assert [t.get_attribute("id") for t in page.get_by_role("tab").all()] == [
+        "tab1",
+        "tab5",
+        "tab3",
+    ]
+    for lv, label, _ in page_identify.LEVELS:
         assert " ".join(tab(page, lv).inner_text().split()) == f"{label} {total[lv]:,}"
-    tab(page, 2).focus()
+    assert total[5] == int(pts["level"].isin([2, 4, 5]).sum())
+    tab(page, 1).focus()
+    page.keyboard.press("ArrowRight")
+    assert page.evaluate("__identify.level()") == 5
+    assert tab(page, 5).get_attribute("aria-selected") == "true"
+    assert tab(page, 5).get_attribute("tabindex") == "0"
+    assert tab(page, 1).get_attribute("tabindex") == "-1"
     page.keyboard.press("ArrowRight")
     assert page.evaluate("__identify.level()") == 3
-    assert tab(page, 3).get_attribute("aria-selected") == "true"
-    assert tab(page, 3).get_attribute("tabindex") == "0"
-    assert tab(page, 2).get_attribute("tabindex") == "-1"
-    page.keyboard.press("ArrowRight")
-    assert page.evaluate("__identify.level()") == 4
     page.wait_for_selector("#grid .card")
     shown = {
         int(i) for i in page.eval_on_selector_all("#grid .card", "l => l.map(e => e.dataset.id)")
     }
     level = dict(zip(pts["id"], pts["level"], strict=True))
-    assert shown and {level[i] for i in shown} == {4}
-    assert page.locator("#desc").inner_text() == page_identify.LEVELS[3][2]
+    assert shown and {level[i] for i in shown} == {3}
+    assert page.locator("#desc").inner_text() == page_identify.LEVELS[2][2]
     page.reload()
     page.wait_for_function("window.__identify")
-    assert page.evaluate("__identify.level()") == 4  # kept in the hash
+    assert page.evaluate("__identify.level()") == 3  # kept in the hash
     assert page.errors == []
 
 
@@ -333,7 +349,7 @@ def test_scrolling_loads_more_cards(browser, site):
 def test_the_batch_links_cover_the_listed_ids(browser, site):
     base, _ = site
     page = open_identify(browser, base)
-    for lv in (1, 2, 3, 4):
+    for lv in (1, 3, 5):
         tab(page, lv).click()
         want = sorted(page.evaluate("__identify.view()")[lv])
         href = page.get_attribute("#go", "href")
@@ -342,8 +358,8 @@ def test_the_batch_links_cover_the_listed_ids(browser, site):
         assert page.locator("#go").get_attribute("target") == "_blank"
     page.evaluate("IdentifyLinks.MAX_IDS = 5")  # past the cap the button names both numbers
     tab(page, 1).click()
-    tab(page, 2).click()
-    n = len(page.evaluate("__identify.view()")[2])
+    tab(page, 5).click()
+    n = len(page.evaluate("__identify.view()")[5])
     assert page.locator("#go").inner_text() == f"Identify the first 5 of {n:,}"
     assert page.locator("#cap").is_hidden() and page.locator("#next").is_hidden()
     # two records per batch: the arrows must change the button's words, not only its link
@@ -352,7 +368,7 @@ def test_the_batch_links_cover_the_listed_ids(browser, site):
         "[ids.slice(0, 2), ids.slice(2, 4), ids.slice(4)].map(b => f(b)[0]); }"
     )
     tab(page, 1).click()
-    tab(page, 2).click()
+    tab(page, 5).click()
     first = page.get_attribute("#go", "href")
     assert page.locator("#go").inner_text() == "Identify 2 · batch 1 of 3"
     assert (
@@ -376,8 +392,8 @@ def test_the_batches_follow_the_card_order_not_the_newest_ids(browser, site):
         "() => { const f = IdentifyLinks.batches; IdentifyLinks.batches = (ids, kept) => "
         "f(Array.from(ids).concat(Array.from({length: 200}, (_, i) => 1e10 + i)), kept); }"
     )
-    tab(page, 2).click()
-    shown = page.evaluate("__identify.view()")[2]
+    tab(page, 5).click()
+    shown = page.evaluate("__identify.view()")[5]
     first = [int(i) for i in page.get_attribute("#go", "href").split("&id=")[1].split(",")]
     assert set(shown) <= set(first) and first == sorted(first, reverse=True)
     assert page.errors == []
@@ -443,15 +459,19 @@ def test_a_level_lists_the_newest_records_first_within_a_score_bucket_across_sha
     frame = pool_frame(ids)
     frame.loc[frame.index % 2 == 0, "observed_on"] = "2026-01-15"  # before the recent 90 days
     score = np.random.default_rng(5).normal(size=N).astype("float32")
-    server, _ = serve(tmp_path, frame, score)
+    server, pts = serve(tmp_path, frame, score)
     try:
         assert list(tmp_path.glob("pool-1.*.bin"))  # the older shard
         _, q = pool_levels.unpack(site_files.path(tmp_path, "levels").read_bytes())
         bucket = dict(zip(site_records(tmp_path)[0].tolist(), q.tolist(), strict=True))
         page = open_identify(browser, f"http://127.0.0.1:{server.server_port}", "#lvl=1")
+        level = dict(zip(pts["id"], pts["level"], strict=True))
         for rows in page.evaluate("__identify.view()"):
             for a, b in zip(rows or [], (rows or [])[1:], strict=False):
-                assert bucket[a] > bucket[b] or a > b, (a, b)
+                if level[a] == level[b]:  # Might be wrong lists its kinds one after another
+                    assert bucket[a] > bucket[b] or a > b, (a, b)
+                else:
+                    assert ORDER.index(level[a]) < ORDER.index(level[b]), (a, b)
         assert page.errors == []
     finally:
         server.shutdown()

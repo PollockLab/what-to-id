@@ -123,6 +123,11 @@ GLOSSARY: dict[str, tuple[str, str | None]] = {
         "The photo matches another species clearly better than its label.",
         "Use it when you want to check whether a label is wrong.",
     ),
+    "level-might-be-wrong": (
+        "Records whose photo may not support the label: likely mislabels first, then odd shots,"
+        " then close calls.",
+        "Use it when you want to check whether a label is right.",
+    ),
     "photo-space": (
         "Every photo placed so that photos the model finds alike sit together. Distance is not"
         " confidence.",

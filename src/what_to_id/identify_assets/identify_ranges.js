@@ -111,7 +111,7 @@ return function(buf,ctx){
   }
   // The chip on a card: the verdict in a few words.
   function verdict(i,lv){
-    if(lv===2&&NOTE[i]!==NONE){var t=D.notes[NOTE[i]].replace('Range: ','');
+    if((lv===2||lv===5)&&NOTE[i]!==NONE){var t=D.notes[NOTE[i]].replace('Range: ','');
       return t.charAt(0).toUpperCase()+t.slice(1).replace('both ranges','both ranges: maybe neither');}
     if(far(i))return 'About '+kmText(i)+' km outside';
     return OKM[i]===NONE?'Range map':OKM[i]===0?'In range':'Just outside range';
@@ -219,7 +219,7 @@ return function(buf,ctx){
     links:function(a,i,lv){
       var row=el('div','links');row.appendChild(a);
       if(bits(ctx.name(i)))row.appendChild(chip(i,lv));
-      else if(lv===2&&NOTE[i]!==NONE)row.appendChild(el('span','range',D.notes[NOTE[i]]));
+      else if((lv===2||lv===5)&&NOTE[i]!==NONE)row.appendChild(el('span','range',D.notes[NOTE[i]]));
       else row.appendChild(el('span','range','No range map: range unknown'));
       return row;
     },

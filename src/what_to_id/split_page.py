@@ -16,7 +16,7 @@ from pathlib import Path
 
 from what_to_id import page_nav
 from what_to_id.embeddings_page import ASSETS, HERE
-from what_to_id.page_identify import LEVELS
+from what_to_id.page_identify import LEVELS, MERGE
 
 PAGE_NAME = "explore.html"
 # the page was split.html; old links and bookmarks forward here with their query and hash
@@ -101,7 +101,8 @@ def build(
         "__SPACE_FILE__": json.dumps(space_url),
         "__TREE_FILE__": json.dumps(tree_url if has_tree else None),
         "__DATA_URL__": json.dumps(data_url),
-        "__LEVELS__": json.dumps([[n, name] for n, name, _ in LEVELS]),
+        # [tab, name, the levels it shows]: the map colours and picks dots by Identify's tabs
+        "__LEVELS__": json.dumps([[n, name, MERGE.get(n, (n,))] for n, name, _ in LEVELS]),
     }.items():
         html = html.replace(key, value)
     for key, path in SCRIPTS.items():

@@ -1,6 +1,7 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Identify: What to ID next</title>
+__ANALYTICS__
 <script>if(/[?&]embed=1/.test(location.search))document.documentElement.classList.add('embed');</script>
 <style>
 __SITE_CSS__
@@ -66,6 +67,14 @@ ol{list-style:none;margin:8px 0;padding:0;display:grid;gap:10px;
 .segnote{display:block;margin-top:4px;color:var(--muted)}
 .card .links{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
 .card .range{flex:1 1 8em;min-width:0;font-size:12px;color:var(--muted)}
+.card .kind{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.card .mine{font-size:11px;color:var(--bar);font-weight:600}
+.cmp{flex:none;display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:0}
+.cmp figure{margin:0;min-width:0;display:flex;flex-direction:column;gap:1px}
+.cmp img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:4px;display:block;background:var(--chip)}
+.cmp figcaption{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.me{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}
+.me input{font:inherit;min-height:28px;padding:0 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);width:11em}
 __IDENTIFY_RANGES_CSS__
 </style></head><body>
 __SITE_NAV__<main id="main-content">
@@ -78,27 +87,34 @@ the photo's embedding and the embedding of the text "a photo of &lt;species&gt;"
 match score of the label minus the best match score of any other species. __SCORING_DATES__</p>
 <p>A record takes the first level whose rule it meets, in this order:</p>
 <dl>
-<dt>__LEVEL_4__</dt><dd>Any rank. The photo's best match score to any species is in the lowest 2% of
-its group (birds, plants, fungi and so on).</dd>
 <dt>__LEVEL_1__</dt><dd>Labelled at species. The margin is above 0, and the record is in the top 25%
 of its species by match score to the label. Only species with 4 or more scored records.</dd>
-<dt>__LEVEL_2__</dt><dd>Labelled at species. One other species scores higher than the label, by 0.02
-or less, and has 20 or more verifiable iNaturalist records in BC. The card names it.</dd>
 <dt>__LEVEL_3__</dt><dd>Labelled above species (a genus or a family, say), and the pool names one or
 more species inside the label. Every such record goes here, whatever its match scores.</dd>
-<dt>__LEVEL_5__</dt><dd>Labelled at species. The margin is below −0.02 (Close calls runs from −0.02 to 0),
-the best other species has 20 or more verifiable iNaturalist records in BC, and the record is not an
-odd shot. The card names that species.</dd>
+<dt>__LEVEL_5__</dt><dd>Three kinds of record, in this order: might be mislabelled (lowest margin
+first), odd shots, close calls. This order put the records iNaturalist identifiers later corrected nearer the top than
+mixing the three did. Odd shots: any rank,
+the photo's best match score to any species is in the lowest 2% of its group (birds, plants, fungi
+and so on). Close calls: labelled at species, one other species scores higher than the label by 0.02
+or less and has 20 or more verifiable iNaturalist records in BC. Might be mislabelled: labelled at
+species, the margin is below −0.02 and the best other species has 20 or more verifiable iNaturalist
+records in BC. Close calls and might-be-mislabelled cards name that species and show a reference photo of it
+beside one of the label, from iNaturalist.</dd>
 <dt>No level</dt><dd>All other records: the margin is above 0 but the record is outside the top 25%
 of its species, or its species has fewer than 4 records; the look-alike
 has fewer than 20 BC records; the pool names no species inside the label, or the label is a species that was not in the pool at scoring; the record was not in the
 __PHOTO_DOWNLOAD__ (most were added after it); or its label changed after scoring.</dd>
 </dl>
-<p>A level sorts records for review. It does not say that a label is right or wrong.</p></details>
+<p>A level sorts records for review. It does not say that a label is right or wrong.</p>
+<p>With your iNaturalist login, records in genera where you have made 50 or more identifications in BC (fewer
+when you have none at 50) come first. Their labels or look-alikes are in those genera. The login stays in this browser
+and goes only to iNaturalist.</p></details>
 <p id="status" class="muted" aria-live="polite">Loading…</p>
 <p><button type="button" id="unpick" class="more" hidden>Clear the species filter</button></p>
 <div id="tabs" class="tabs" role="tablist" aria-label="Level"></div>
 <p id="desc" class="muted"></p>
+<div id="kind" class="rout" hidden></div>
+<div id="me" class="rout me"><form class="me"><label for="melogin">My taxa first: </label><input id="melogin" type="text" placeholder="iNaturalist login" autocomplete="off" spellcheck="false"><button class="segb" type="submit">Apply</button></form><span class="segnote" aria-live="polite"></span></div>
 <div id="rout" class="rout" hidden></div>
 <div id="rg" class="rout" hidden></div>
 <div id="panel" role="tabpanel">
@@ -123,5 +139,7 @@ __PHOTO_DOWNLOAD__ (most were added after it); or its label changed after scorin
 <script>__IDENTIFY_RANGES__</script>
 <script>__MAP_USER__</script>
 <script>__IDENTIFY_UNCONFIRMED__</script>
+<script>__IDENTIFY_MINE__</script>
+<script>__IDENTIFY_COMPARE__</script>
 <script>__IDENTIFY_APP__</script>
 </body></html>

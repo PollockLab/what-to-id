@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from datetime import date
 from pathlib import Path
 
@@ -28,25 +29,28 @@ FIRST_NAME = "pool-levels-first.bin"  # likewise: the first cards, drawn while t
 NARROW_LABEL = "Narrow it down"
 # (level as in identify.LEVEL_NAMES, name, one line for the page)
 LEVELS = (
-    (1, "Clear matches", "These look just like their label. Confirm many in one go."),
+    (1, "Easy confirms", "These look just like their label. Confirm many in one go."),
     (
-        2,
-        "Close calls",
-        "Another species looks almost as likely, or it may be something else. Take a careful look.",
+        5,
+        "Might be wrong",
+        "The photo is a hard shot, or another species matches it about as well or better."
+        " Check whether the label is right.",
     ),
     (
         3,
         NARROW_LABEL,
         "Labelled above species, and the photo points to one species of it. Take it to species.",
     ),
-    (4, "Odd shots", "Hard photos: hands, eggs, close-ups. Feeling lucky?"),
-    (
-        5,
-        "Might be mislabelled",
-        "The photo matches another species clearly better than its label."
-        " Check whether the label is wrong.",
-    ),
 )
+# The kinds a tab shows, in order: Might be wrong (5) lists likely mislabels by margin, then odd
+# shots, then close calls. This order beat interleaving the three by rank on crowd corrections
+# (AUC +0.028 [0.013, 0.044], 10-15 to 11-03 BC).
+MERGE = {5: (5, 4, 2)}
+# (level, the kind control's name) for Might be wrong's kinds
+KINDS = ((5, "Likely mislabelled"), (4, "Odd shots"), (2, "Close calls"))
+# GoatCounter's script, pinned (sha384 of https://gc.zgo.at/count.v4.js on 2026-11-05)
+GOATCOUNTER_JS = "https://gc.zgo.at/count.v4.js"
+GOATCOUNTER_SRI = "sha384-nRw6qfbWyJha9LhsOtSb2YJDyZdKvvCFh0fJYlkquSFjUxp9FVNugbfy8q1jdxI+"
 SCRIPTS = {
     "__ATLAS_SEARCH_META__": HERE / "atlas_search_assets" / "atlas_search_meta.js",
     "__MAP_TAXA__": HERE / "map_assets" / "map_taxa.js",
@@ -59,6 +63,8 @@ SCRIPTS = {
     "__IDENTIFY_RANGES__": ASSETS / "identify_ranges.js",
     "__MAP_USER__": HERE / "map_assets" / "map_user.js",
     "__IDENTIFY_UNCONFIRMED__": ASSETS / "identify_unconfirmed.js",
+    "__IDENTIFY_MINE__": ASSETS / "identify_mine.js",
+    "__IDENTIFY_COMPARE__": ASSETS / "identify_compare.js",
     "__IDENTIFY_APP__": ASSETS / "identify_app.js",
 }
 
@@ -70,9 +76,28 @@ def _day(iso: str | None) -> str | None:
     return f"{d.day} {d:%B %Y}"
 
 
-def render(map_url: str = "map.html", dates: dict | None = None, first: str | None = None) -> str:
+def analytics(code: str | None) -> str:
+    """GoatCounter's counting script for site ``code`` (``<code>.goatcounter.com``), or nothing."""
+    if not code:
+        return ""
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,49}", code):
+        raise ValueError(f"not a GoatCounter site code: {code!r}")
+    return (
+        f'<script data-goatcounter="https://{code}.goatcounter.com/count" '
+        """data-goatcounter-settings='{"allow_frame":true}' async """
+        f'src="{GOATCOUNTER_JS}" integrity="{GOATCOUNTER_SRI}" crossorigin="anonymous"></script>'
+    )
+
+
+def render(
+    map_url: str = "map.html",
+    dates: dict | None = None,
+    first: str | None = None,
+    goatcounter: str | None = None,
+) -> str:
     """The page; `dates` is `pool_levels.scoring_dates` output, for the About; `first` the URL of
-    the first cards beside the map, None without them."""
+    the first cards beside the map, None without them; `goatcounter` a GoatCounter site code,
+    None for no counting."""
     photos, scored = _day((dates or {}).get("photos")), _day((dates or {}).get("scored"))
     when = f"Photos downloaded on {photos}" if photos else ""
     if scored:
@@ -82,12 +107,13 @@ def render(map_url: str = "map.html", dates: dict | None = None, first: str | No
         "__SITE_CSS__": page_nav.CSS,
         "__SITE_NAV__": page_nav.nav(PAGE_NAME),
         "__IDENTIFY_RANGES_CSS__": (ASSETS / "identify_ranges.css").read_text().rstrip(),
-        "__CONFIG__": json.dumps({"mapUrl": map_url, "levels": LEVELS, "first": first}).replace(
-            "<", "\\u003c"
-        ),
+        "__CONFIG__": json.dumps(
+            {"mapUrl": map_url, "levels": LEVELS, "merge": MERGE, "kinds": KINDS, "first": first}
+        ).replace("<", "\\u003c"),
         **{f"__LEVEL_{n}__": name for n, name, _ in LEVELS},
         "__SCORING_DATES__": f"{when}." if when else "",
         "__PHOTO_DOWNLOAD__": f"{photos} photo download" if photos else "last photo download",
+        "__ANALYTICS__": analytics(goatcounter),
     }.items():
         html = html.replace(key, value)
     for key, path in SCRIPTS.items():
@@ -95,7 +121,7 @@ def render(map_url: str = "map.html", dates: dict | None = None, first: str | No
     return html
 
 
-def build(out_dir: str | Path, map_url: str = "map.html") -> Path:
+def build(out_dir: str | Path, map_url: str = "map.html", goatcounter: str | None = None) -> Path:
     """Write ``identify.html`` into ``out_dir`` and return its path."""
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -107,6 +133,7 @@ def build(out_dir: str | Path, map_url: str = "map.html") -> Path:
             map_url,
             json.loads(dates.read_text()) if dates.exists() else None,
             first.name if first else None,
+            goatcounter,
         )
     )
     return target
@@ -116,8 +143,12 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="python -m what_to_id.page_identify", description=__doc__)
     p.add_argument("--out", type=Path, required=True, help="site directory")
     p.add_argument("--map-url", default="map.html", help="map page whose pool files it reads")
+    p.add_argument(
+        "--goatcounter",
+        help="GoatCounter site code; counts page views and clicks (none: no counting)",
+    )
     a = p.parse_args(argv)
-    print(f"page_identify: wrote {build(a.out, a.map_url)}")
+    print(f"page_identify: wrote {build(a.out, a.map_url, a.goatcounter)}")
     return 0
 
 

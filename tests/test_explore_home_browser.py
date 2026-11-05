@@ -83,7 +83,7 @@ def map_frame(page):
 # the fill colours of records 0, 1 and 5, and whether the legend has its Levels | Groups switch
 COLOURS = """() => { const c = window.__layers[0].props.data.attributes.getFillColor.value,
   at = i => Array.from(c.slice(4 * i, 4 * i + 4)), l = document.querySelector('.lvleg');
-  return {c0: at(0), c1: at(1), c5: at(5),
+  return {c0: at(0), c1: at(1), c2: at(2), c5: at(5),
     legend: !!l && !l.hidden && !l.querySelector('.seg').hidden,
     names: l ? [...l.querySelectorAll('.lr')].map(s => s.textContent) : []}; }"""
 
@@ -96,6 +96,7 @@ def test_beside_identify_the_dots_take_the_level_colours_and_go_back_without_it(
     assert got["c0"] == GREY and got["c1"] == GREEN  # no level is faint grey, still drawn
     assert got["c5"] not in (GREY, GREEN) and got["c5"][3] > GREY[3]  # level 5 has its own colour
     assert got["names"] == [name for _, name, _ in LEVELS] + ["No level"]
+    assert got["c2"] == got["c5"]  # a close call takes its tab's colour, Might be wrong's
     page.click("[data-p=identify]")  # the map alone: the group colours again
     frame.wait_for_function(f"!({COLOURS})().legend")
     got = frame.evaluate(COLOURS)
@@ -126,7 +127,7 @@ def test_the_legend_toggles_between_level_and_group_colours_and_picks_levels(bro
     got = frame.evaluate(COLOURS)
     assert got["c1"] == GREEN and got["c0"][3] == 0
     assert rows.nth(0).get_attribute("aria-pressed") == "true"
-    assert rows.nth(4).get_attribute("aria-pressed") == "false"
+    assert rows.nth(1).get_attribute("aria-pressed") == "false"
     rows.last.click()  # and No level: two picks show both
     frame.wait_for_function(f"({COLOURS})().c0[3] > 0")
     assert frame.evaluate(COLOURS)["c5"][3] == 0

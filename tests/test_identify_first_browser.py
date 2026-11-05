@@ -8,7 +8,7 @@ import urllib.request
 
 import pytest
 
-from what_to_id import site_files
+from what_to_id import page_identify, site_files
 
 from . import test_embeddings_browser as eb
 from . import test_identify_browser as ib
@@ -30,10 +30,16 @@ def test_the_first_lists_are_the_lists_the_page_builds(browser, site, hash_):
     base, _ = site
     want = first_lists(base)[hash_[1:]]
     page = open_identify(browser, base, hash_)
-    view = page.evaluate("__identify.view()")
-    assert page.evaluate("__identify.total()")[1:] == want["total"][1:]
-    for lv in range(1, 6):
+    view, total = page.evaluate("__identify.view()"), page.evaluate("__identify.total()")
+    for lv in (1, 3):
+        assert total[lv] == want["total"][lv]
         assert [r[0] for r in want["rows"][lv]] == view[lv][:200] and want["n"][lv] == len(view[lv])
+    # Might be wrong is the level lists of its kinds, one after another
+    kinds = [k for k, _ in page_identify.KINDS]
+    assert total[5] == sum(want["total"][k] for k in kinds)
+    rows = {k: [r[0] for r in want["rows"][k]] for k in kinds}
+    assert all(want["n"][k] == len(rows[k]) for k in kinds)  # whole, under the 200 a list holds
+    assert view[5] == [i for k in kinds for i in rows[k]]
     assert page.errors == []
 
 
