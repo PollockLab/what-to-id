@@ -98,7 +98,8 @@ update_pool() {
 }
 
 # Today's bundle: the base release's float16 vectors plus the atlas-state raw deltas, for
-# today's pool. Records the atlas has not embedded yet wait for a later day.
+# today's pool. Records the atlas has not embedded yet wait for a later day; records that left the
+# map pool (Needs ID) never will, so they do not fail the build.
 fetch_embeddings() {
   : "${EMBEDDING_RELEASE:?set EMBEDDING_RELEASE to the base embedding release tag}"
   local source_repo=${EMBEDDING_REPO:-${GITHUB_REPOSITORY:-PollockLab/what-to-id}}
@@ -109,15 +110,16 @@ fetch_embeddings() {
   local reference="$downloads/reference/emb_{group}_bioclip25.npz"
   reference=${REFERENCE_EMBEDDINGS:-$reference}
   [ ! -e "$downloads" ] || die "embedding download destination exists; use a fresh path"
-  mkdir -p "$STATE" "$downloads/base" "$downloads/deltas" "$downloads/reference"
+  mkdir -p "$STATE" "$downloads/base" "$downloads/deltas" "$downloads/reference" "$downloads/open"
   update_pool
   gh release download "$EMBEDDING_RELEASE" --repo "$source_repo" -D "$downloads/base" -p 'base_*'
   gh release download "$EMBEDDING_RELEASE" --repo "$source_repo" -D "$downloads/reference" -p 'emb_*_bioclip25.npz'
   gh release download atlas-state --repo "$atlas_repo" -D "$downloads/deltas" -p 'raw-delta-*.npz'
+  gh release download map-state --repo "$atlas_repo" -D "$downloads/open" -p pool.parquet
   $PY -m what_to_id.assemble_bundle --pool "$STATE/pool.parquet" \
     --base "$downloads/base" --deltas "$downloads/deltas" \
     --reference-embeddings "$reference" \
-    --out "$EMBEDDING_BUNDLE"
+    --out "$EMBEDDING_BUNDLE" --open-pool "$downloads/open/pool.parquet"
   rm -rf "$downloads" # Keep runner disk for the build.
 }
 
