@@ -56,9 +56,22 @@ def publish(site: Path, key: str, name: str, blob: bytes | None) -> Path | None:
     if blob is not None:
         files[key] = hashed(name, blob)
         (page.parent / files[key]).write_bytes(blob)
+    _write(page, html, meta)
+    return page.parent / files[key] if key in files else None
+
+
+def flag(site: Path, name: str, on: bool) -> None:
+    """Name ``name`` in META.flags once when ``on``, or drop it."""
+    page = Path(site) / MAP_NAME
+    html = page.read_text()
+    meta = read_meta(html)
+    meta["flags"] = [f for f in meta.get("flags", []) if f != name] + ([name] if on else [])
+    _write(page, html, meta)
+
+
+def _write(page: Path, html: str, meta: dict) -> None:
     start, end = html.find(START) + len(START), html.find(END)
     page.write_text(html[:start] + dump(meta) + html[end:])
-    return page.parent / files[key] if key in files else None
 
 
 def path(site: Path, key: str) -> Path | None:

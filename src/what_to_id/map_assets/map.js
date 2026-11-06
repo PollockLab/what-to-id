@@ -113,7 +113,7 @@ function fmask(n){
 function inc(){return !!TF.inc;}
 function pointData(){
   PJ.sync(P);UF.sync(P);
-  var n=P.n,gone=Object.keys(GONE).length,i,key=[TF,inc()?CH.picked(S.groups,META.groups,'inc').join():'',AREA.ver(),PJ.key(),UF.key(),SUBV,FKV,S.acc,S.only.oneid&&TAXA?S.only.oneid:''];
+  var n=P.n,gone=Object.keys(GONE).length,i,key=[TF,inc()?CH.picked(S.groups,META.groups,'inc').join():'',AREA.ver(),PJ.key(),UF.key(),SUBV,FKV,S.acc,S.only.oneid&&TAXA?S.only.oneid:'',S.only.range&&MC.outside()?S.only.range:''];
   if(PD&&PD.length===n&&PD_KEY&&PD_KEY.every(function(k,j){return k===key[j];})&&PD_GONE===gone)return;
   var same=PD&&PD.length===n,days=same?PD.days:new Float32Array(2*n),
     cat=same?PD.attributes.getFilterCategory.value.slice():new Uint8Array(4*n);
@@ -123,12 +123,12 @@ function pointData(){
   // OUT keeps the records out for any reason but the area, for the Identify box count; PJW marks
   // the records Identify opens when it cannot say the projects exactly (see map_projects.js)
   var kb=MF.keep(TF,MF.groupSet(S,TF),P.tax,P.grp,n,new Uint8Array(n)),id=P.id,am=AREA.mask(n),wide=PJ.wide(),
-    fm=FK&&fmask(n),oo=S.only.oneid&&TAXA?MF.oneIds(P.ids,P.tax,TAXA,n):null,nv=S.only.oneid==='not'?1:0;
+    fm=FK&&fmask(n),oo=S.only.oneid&&TAXA?MF.oneIds(P.ids,P.tax,TAXA,n):null,nv=S.only.oneid==='not'?1:0,ro=S.only.range?MC.outside():null,rv=S.only.range==='not'?1:0;
   if(OUT.length!==n)OUT=new Uint8Array(n);PJW=wide?new Uint8Array(n):null;
   for(i=0;i<n;i++){var keep=kb[i]===1;
     if(gone>0&&GONE[id[i]]===1)keep=false;
     if(SUB&&!SUB.has(id[i]))keep=false;
-    if(wide&&keep&&(am===null||am[i]))PJW[i]=wide(i)?1:0;if(keep&&(PJ.drop(i)||UF.drop(i)||(fm&&!fm[i])||(oo&&oo[i]===nv)))keep=false;
+    if(wide&&keep&&(am===null||am[i]))PJW[i]=wide(i)?1:0;if(keep&&(PJ.drop(i)||UF.drop(i)||(fm&&!fm[i])||(oo&&oo[i]===nv)||(ro&&ro[i]===rv)))keep=false;
     OUT[i]=keep?0:1;cat[4*i+3]=cat[4*i+3]&~(ST_KEEP|ST_INEXACT)|(keep&&(am===null||am[i])?ST_KEEP:0)|MF.accOut(S.acc,P.fl[i]);}
   // a new pick, area or deletion swaps only the categories, so deck.gl uploads only those
   if(same){PD.attributes.getFilterCategory={value:cat,size:4};PD_CAT++;}
@@ -246,7 +246,7 @@ function link(){
     all:META.groups.length,up:S.up,d1:S.lo>0?iso(S.lo):'',d2:S.hi<LAST?iso(S.hi):'',months:m,taxa:taxa,
     not:TF.not.concat(gl.not),only:S.only,acc:S.acc};
   // with an area on, the link may list the records by id instead, and then u stays null
-  var need=gl.inc.length||gl.out.length||PJ.inexact()||S.only.oneid||ORDER,
+  var need=gl.inc.length||gl.out.length||PJ.inexact()||S.only.oneid||S.only.range||ORDER,
     a=$('identify'),href=AREA.link(ALL?{w:-180,s:-90,e:180,n:90}:{w:b.getWest(),s:b.getSouth(),e:b.getEast(),n:b.getNorth()},
     function(v,p,side){var r=TX.identifyUrl(st,v,META,Object.assign({},PJ.params(),UF.params(),p));if(!side)u=r;return r.url;},match,!!need);
   if(AREA.invalid()){a.removeAttribute('href');a.setAttribute('aria-disabled','true');
@@ -262,7 +262,7 @@ function link(){
   if(gl.out.length)why.push('Identify cannot leave out the '+gn(gl.out)+' group beside picked taxa, so it keeps it');
   if(lost.indexOf('taxa')>=0)why.push('too many taxa for one link, so it opens every taxon');
   if(lost.indexOf('not')>=0)why.push('too many taxa left out for one link, so it keeps them');
-  if(PJ.inexact())why.push(PJ.inexact());if(S.only.oneid)why.push('Identify cannot filter records one ID from Research Grade');if(ORDER&&!u)why.push('sorted by conservation status: listed by SARA or COSEWIC, then BC S1-S2, then BC S3, at most 5 records of a species a round');
+  if(PJ.inexact())why.push(PJ.inexact());if(S.only.oneid)why.push('Identify cannot filter records one ID from Research Grade');if(S.only.range)why.push('Identify cannot filter records outside their range');if(ORDER&&!u)why.push('sorted by conservation status: listed by SARA or COSEWIC, then BC S1-S2, then BC S3, at most 5 records of a species a round');
   // listed by id (u stays null), the records are the map's, so only the way they open is said
   // these records' next agree settles them, so the note asks for an independent ID first
   // past the limit the first 10,000 open by default; the button switches to all of them and back
@@ -530,7 +530,7 @@ META.shards.forEach(function(s,k){
       if(S.fly){S.fly=false;map.flyTo({center:[P.pos[2*at],P.pos[2*at+1]],zoom:12});}}}
     if(k===META.shards.length-1&&S.rec){S.rec=null;writeHash();}
     // the range chip's file is optional, and holds one record per shard record, so it waits for the last shard
-    if(k===META.shards.length-1&&META.files.range)get(META.files.range).then(MC.range).catch(function(){});
+    if(k===META.shards.length-1&&META.files.range)get(META.files.range).then(function(b){MC.range(b);if(S.only.range)refilter();}).catch(function(){});
   });
 });
 chain.catch(function(e){$('count').textContent='Could not load the records ('+e.message+')';});

@@ -27,7 +27,7 @@ return function(buf,ctx){
   var P=ctx.P,n=P.n,dv=new DataView(buf),size=dv.getUint32(0,true);
   if(buf.byteLength!==4+size+2*n)throw new Error('the range file holds '+buf.byteLength+' bytes, expected '+(4+size+2*n));
   var D=JSON.parse(new TextDecoder().decode(new Uint8Array(buf,4,size))),OKM=new Uint8Array(buf,4+size,n),NOTE=new Uint8Array(buf,4+size+n,n),
-    RI=new Map(D.names.map(function(x,k){return [x,k];})),memo=[],BOX=null,OUTL=null,
+    RI=new Map(D.names.map(function(x,k){return [x,k];})),memo=[],BOX=null,OUTL=null,FAR=null,
     S={lv:0,o:0},Q={i:-1,lv:0,chip:null,pin:false,t:0},pop=null;  // S.o: 0 all, 1 only far outside, -1 hide far outside
   // a name's bitset over the grid cells, null when its range is unknown
   function bits(name){
@@ -207,6 +207,8 @@ return function(buf,ctx){
   SEG=seg();
   return {
     pass:pass,
+    // 1 per record far outside its label's range, for the map's Outside usual range chip
+    outside:function(){if(!FAR){FAR=new Uint8Array(n);for(var i=0;i<n;i++)FAR[i]=far(i)?1:0;}return FAR;},
     // the chip alone, or null when the label's range is unknown; close drops its popover
     chip:function(i,lv){return bits(ctx.name(i))?chip(i,lv):null;},
     close:function(){closePop(false);},

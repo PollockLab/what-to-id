@@ -182,12 +182,16 @@ def test_the_build_lines_the_ranges_up_with_the_site_and_skips_them_when_absent(
     args = ["--out", str(site), "--parquet", str(tmp_path / "identify.parquet")]
     assert pool_levels.main(args) == 0
     assert site_files.path(site, "range") is None
+    assert "range" not in flags(site)
     assert "no pool-levels-range.bin, so no range maps: no --ranges" in capsys.readouterr().err
     assert pool_levels.main([*args, "--ranges", str(tmp_path / "nowhere")]) == 0
     assert "could not read the range tables" in capsys.readouterr().err
     write_ranges(tmp_path / "ranges", points)
     assert pool_levels.main([*args, "--ranges", str(tmp_path / "ranges")]) == 0
     assert "pool-levels-range." in capsys.readouterr().out
+    assert flags(site).count("range") == 1
+    assert pool_levels.main([*args, "--ranges", str(tmp_path / "ranges")]) == 0
+    assert flags(site).count("range") == 1  # a rebuild names it once
     head, km, notes = pool_levels.unpack_range(site_files.path(site, "range").read_bytes(), N)
     row = df.set_index("id")
     for i, pid in enumerate(points["id"]):
@@ -199,6 +203,11 @@ def test_the_build_lines_the_ranges_up_with_the_site_and_skips_them_when_absent(
     assert head["notes"] == ["Range: outside both ranges"]
     assert pool_levels.main(args) == 0  # a later build without ranges drops the stale file
     assert site_files.path(site, "range") is None
+    assert "range" not in flags(site)
+
+
+def flags(site):
+    return site_files.read_meta((site / site_files.MAP_NAME).read_text())["flags"]
 
 
 def test_the_manifest_names_the_range_tables_or_the_levels_go_out_alone(tmp_path, monkeypatch):

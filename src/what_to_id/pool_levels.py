@@ -282,6 +282,8 @@ def build(
         site_files.publish(site, "range", RANGE_NAME, None)
     first = pack_first(site, ids, tax, rows, level, quantize(level, score), looks, far)
     site_files.publish(site, "first", FIRST_NAME, first)
+    # the map's Outside usual range chip shows only with the file
+    site_files.flag(site, "range", site_files.path(site, "range") is not None)
     if site_files.path(site, "range") is None:
         print(f"pool_levels: no {RANGE_NAME}, so no range maps: {why}", file=sys.stderr)
     return {int(lv): int(c) for lv, c in zip(*np.unique(level, return_counts=True), strict=True)}

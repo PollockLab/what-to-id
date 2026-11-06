@@ -6,7 +6,7 @@ function MapFilter(META){
 'use strict';
 var DAY=864e5,D0=Date.parse(META.day0+'T00:00:00Z'),NO=65535,NOTAX=65535,LAST=META.days-1;
 var FLAG={introduced:1,threatened:2,obscured:4,imprecise:8,earlyObs:16,earlyUp:32},ONLYFLAG={introduced:'introduced',
-  threatened:'threatened',oneid:'oneid'},ONLYKEYS=Object.keys(ONLYFLAG);
+  threatened:'threatened',oneid:'oneid',range:'range'},ONLYKEYS=Object.keys(ONLYFLAG);
 // Each record's status value: bit 1 introduced, 2 threatened, 4 outside the chosen location accuracy
 // (set by accOut, so it follows the choice and not the data), 8 kept by the taxon picks, the area and
 // the projects and not deleted, 16 one record in ten.
@@ -142,7 +142,8 @@ var MONTH=['January','February','March','April','May','June','July','August','Se
 // The show only chips as [key, label, flag, hint], those the data has the flag for.
 var ONLYDEF=[['introduced','Introduced to BC','introduced','Species not native to BC'],
   ['threatened','Threatened','threatened','Species with a threatened status'],
-  ['oneid','One ID from Research Grade','oneid','Species where one more agreeing ID makes the record Research Grade, so agree only with an ID you would make yourself from the photos']]
+  ['oneid','One ID from Research Grade','oneid','Species where one more agreeing ID makes the record Research Grade, so agree only with an ID you would make yourself from the photos'],
+  ['range','Outside usual range','range','Records more than 50 km outside the iNaturalist range map of their label, so the ID or the location deserves a second look']]
   .filter(function(o){return META.flags.indexOf(o[2])>=0;});
 return {rest:rest,ACCDEF:ACCDEF,accClass:accClass,accOut:accOut,MONTH:MONTH,ONLYDEF:ONLYDEF,oneId:oneId,oneIds:oneIds,DAY:DAY,D0:D0,NO:NO,NOTAX:NOTAX,LAST:LAST,FLAG:FLAG,ONLYFLAG:ONLYFLAG,ONLYKEYS:ONLYKEYS,ST_INTRO:ST_INTRO,
   ST_THREAT:ST_THREAT,ST_INEXACT:ST_INEXACT,ST_KEEP:ST_KEEP,ST_SAMPLE:ST_SAMPLE,iso:iso,dayOf:dayOf,clamp:clamp,
