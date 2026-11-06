@@ -196,8 +196,8 @@ function counts(){
 function empty(){
   var box=$('none'),others=CFG.levels.filter(function(l){return l[0]!==LV&&S.total[l[0]];});
   box.hidden=!!(view[LV]||[]).length;box.textContent='';if(box.hidden)return;
-  if(!others.length&&UF&&UF.active()&&UF.mode()==='observer'){  // the map's advice (zoom out) does not fit here
-    var f=el('button',null,'Show My taxa first instead');f.type='button';f.onclick=function(){UF.first();};
+  if(!others.length&&UF&&UF.active()&&UF.flags().split(',').indexOf('observer')>=0){  // the map's advice (zoom out) does not fit here
+    var f=el('button',null,'Show all records, your genera first');f.type='button';f.onclick=function(){UF.first();};
     box.append('No records observed by '+S.user+' here. ',f);return;}
   box.append(others.length?'None at this level here. Try ':'No records here: zoom out or widen the filters.');
   others.forEach(function(l,k){var b=el('button',null,l[1]+' ('+nf.format(S.total[l[0]])+')');b.type='button';
@@ -309,7 +309,7 @@ function user(){
   var re=/^(user|umode|umin)=/;
   if(parent===window)history.replaceState(null,'','#'+location.hash.slice(1).split('&').filter(function(x){return x&&!re.test(x);})
     .concat(MF.write(S).filter(function(x){return re.test(x);})).join('&'));
-  var on=UF.active()||UF.ranked();if(on&&!UON)track('user-'+UF.mode());UON=on;
+  var on=UF.active()||UF.ranked();if(on&&!UON)track('user-'+UF.flags().replace(/,/g,'-'));UON=on;
   SYNC.send();refresh();
 }
 function key(){return MF?MF.write(S).join('&'):PEND||'';}

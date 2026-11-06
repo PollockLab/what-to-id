@@ -155,3 +155,34 @@ def test_paging_that_fits_is_not_capped_even_on_the_last_allowed_page():
 
 def test_the_real_caps_are_five_pages_of_500_taxa_and_25_of_200_ids():
     assert run("return [USR_CAP.taxa*USR_PER.taxa,USR_CAP.unid*USR_PER.unid];") == [2500, 5000]
+
+
+def top(results):
+    return run(f"return usrTop(T,RANKS,{json.dumps(results)});")
+
+
+def test_automatic_keeps_the_top_genera_holding_80_percent_and_none_under_five():
+    # Aus 60, Dus 25, Gus 15: Aus holds 60%, Aus and Dus 85%
+    r = [res(101, 40, [5, 1, 11, 101]), res(102, 20, [5, 1, 11, 102])]
+    r += [res(201, 25, [5, 1, 12, 201]), res(301, 15, [5, 13, 301])]
+    assert top(r) == {"genera": [[11, 60], [12, 25]], "total": 100, "n": 85}
+    # Aus 96 is 80% of 120 on its own
+    assert top([res(101, 96, [5, 1, 11, 101]), res(201, 24, [5, 1, 12, 201])])["genera"] == [
+        [11, 96]
+    ]
+    # Dus has 4, under the floor of 5, so 80% is out of reach and Aus alone stays
+    got = top([res(101, 10, [5, 1, 11, 101]), res(201, 4, [5, 1, 12, 201])])
+    assert got == {"genera": [[11, 10]], "total": 14, "n": 10}
+
+
+def test_automatic_keeps_nothing_without_a_genus_of_five():
+    assert top([res(101, 4, [5, 1, 11, 101])]) == {"genera": [], "total": 4, "n": 0}
+    assert top([]) == {"genera": [], "total": 0, "n": 0}
+
+
+def test_storage_that_throws_reads_as_nothing():
+    body = (
+        "globalThis.localStorage={getItem(){throw 1},setItem(){throw 1},removeItem(){throw 1}};"
+        "usrStore('k','v');usrStore('k',null);return usrStore('k');"
+    )
+    assert run(body) is None

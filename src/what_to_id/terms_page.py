@@ -24,9 +24,10 @@ LABELS = {
     "research-grade": "Research Grade",
     "globi": "GloBI",
     "match-n": "Match number",
-    "my-taxa": "My taxa",
-    "my-taxa-first": "My taxa first",
-    "not-identified-by-me": "Not yet identified by me",
+    "observer-filter": "Only records I observed",
+    "my-taxa": "Only my genera",
+    "my-taxa-first": "Your genera first",
+    "not-identified-by-me": "Hide records I identified",
     "all-of-bc": "All of BC",
     **{
         "level-" + re.sub("[^a-z]+", "-", name.lower()).strip("-"): name

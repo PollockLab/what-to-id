@@ -81,19 +81,23 @@ GLOSSARY: dict[str, tuple[str, str | None]] = {
     ),
     "introduced": ("A species that is not native to BC.", None),
     "threatened": ("A species with a threatened status.", None),
-    "observer-filter": ("Keeps the records this user observed.", None),
+    "observer-filter": (
+        "Keeps only the records this user observed. Off while Hide records I identified is ticked.",
+        None,
+    ),
     "my-taxa-first": (
-        "Puts the records inside a genus this user has identified in BC first, and dims the rest on"
-        " the map. Nothing is hidden here;"
+        "With a login, the records inside the user's genera come first and the rest are dimmed on"
+        " the map: by default the genera holding about 80% of their identifications in BC, or under"
+        " Adjust those with a set number of IDs. Nothing is hidden by this;"
         " the iNaturalist link still leaves out records they identified.",
         None,
     ),
     "my-taxa": (
-        "Keeps the records inside a genus this user has identified in BC.",
+        "Keeps only the records inside the user's genera.",
         None,
     ),
     "not-identified-by-me": (
-        "Hides the records this user has already identified.",
+        "Hides the records this user has already identified. Remembered for the next login.",
         None,
     ),
     "colour-by-levels": (

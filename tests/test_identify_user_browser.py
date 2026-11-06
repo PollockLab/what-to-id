@@ -1,5 +1,5 @@
-"""Identify's User box on a pool with an observer file: the My taxa first top line and badges, and
-the Observer view with no records."""
+"""Identify's User box on a pool with an observer file: the top line and badges of the user's
+genera, and the Only records I observed view with no records."""
 
 import numpy as np
 import pytest
@@ -27,7 +27,7 @@ def site(tmp_path_factory):
 
 def test_my_taxa_first_says_so_above_the_cards_and_badges_the_users_genera(browser, site):
     base, pts = site
-    page = counted(browser, base, "#lvl=1&user=JDoe&umode=first")
+    page = counted(browser, base, "#lvl=1&user=JDoe&umode=first&umin=50")
     page.wait_for_function("__identify.user()")
     m = page.evaluate("__identify.mine()")
     assert page.locator("#grid li").first.get_attribute("class") == "sep top"
@@ -41,7 +41,7 @@ def test_my_taxa_first_says_so_above_the_cards_and_badges_the_users_genera(brows
     )
     assert badged.first.locator(".badge").inner_text() == "Your genus"
     page.close()
-    page = counted(browser, base, "#lvl=1&user=JDoe&umode=taxa")
+    page = counted(browser, base, "#lvl=1&user=JDoe&umode=taxa&umin=50")
     page.wait_for_function("__identify.user()")
     assert page.locator("#grid .sep, #grid .badge").count() == 0
     page.close()
@@ -67,12 +67,13 @@ def test_an_observer_view_with_no_records_offers_my_taxa_first(browser, site):
     base, _ = site
     page = counted(
         browser, base, "#lvl=1&user=JDoe"
-    )  # an old link: Observer, and JDoe (777) posted nothing
+    )  # an old link: Only records I observed, and JDoe (777) posted nothing
     page.wait_for_function("document.querySelector('#none button')")
     assert page.inner_text("#none").startswith("No records observed by JDoe here.")
     assert "zoom out" not in page.inner_text("#none")
+    assert page.inner_text("#none button") == "Show all records, your genera first"
     page.click("#none button")
     page.wait_for_function("__identify.user() && __identify.ids().length")
-    assert page.input_value("#usrbox select") == "first"
+    assert not any(page.is_checked(f"#usr{f}") for f in ("taxa", "unid", "observer"))
     assert "umode=first" in page.evaluate("location.hash") and page.errors == []
     page.close()

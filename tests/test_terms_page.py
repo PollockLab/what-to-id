@@ -29,8 +29,10 @@ def test_labels_read_id_as_ID_and_match_the_page():
     assert terms_page.label("agreeing-ids") == "Agreeing IDs"
     assert terms_page.label("share-needing-id") == "Share needing ID"
     assert terms_page.label("identified-to-rank") == "Identified to rank"
-    # the user filter's option text on the map
-    assert terms_page.label("not-identified-by-me") == "Not yet identified by me"
+    # the user filter's tick labels on the map
+    assert terms_page.label("not-identified-by-me") == "Hide records I identified"
+    assert terms_page.label("my-taxa") == "Only my genera"
+    assert terms_page.label("observer-filter") == "Only records I observed"
 
 
 def test_every_more_link_targets_an_anchor():

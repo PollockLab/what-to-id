@@ -1,4 +1,4 @@
-"""The map's User filter in Chromium, My taxa mode, with the iNaturalist API answered by route
+"""The map's User filter in Chromium, Only my genera, with the iNaturalist API answered by route
 interception: the real map page over the stand-ins of test_map_groups_browser.py."""
 
 import functools
@@ -42,8 +42,8 @@ def site(tmp_path_factory):
     server.shutdown()
 
 
-# Genus A (900): 30 + 25 = 55 IDs. Genus B (901): 49, one short of the default threshold of 50. The
-# ancestors include an order the pool lacks.
+# Genus A (900): 30 + 25 = 55 IDs. Genus B (901): 49, one short of the threshold of 50; automatic
+# keeps both, as Genus A alone holds 53% of 104. The ancestors include an order the pool lacks.
 SPECIES_COUNTS = {
     "total_results": 3,
     "results": [
@@ -51,6 +51,11 @@ SPECIES_COUNTS = {
         {"count": 25, "taxon": {"id": 1001, "ancestor_ids": [1, 800, 900, 1001]}},
         {"count": 49, "taxon": {"id": 1003, "ancestor_ids": [1, 800, 901, 1003]}},
     ],
+}
+
+NONE = {
+    "total_results": 1,
+    "results": [{"count": 4, "taxon": SPECIES_COUNTS["results"][0]["taxon"]}],
 }
 
 
@@ -91,9 +96,9 @@ def shown(page, n):
 
 
 def test_my_taxa_keeps_the_users_genera_and_adds_the_user_to_the_identify_link(browser, site):
-    page = open_map(browser, site, "#user=jdoe&umode=taxa")
+    page = open_map(browser, site, "#user=jdoe&umode=taxa&umin=50")
     shown(page, IN_GENUS_A)
-    assert page.input_value("#usrname") == "jdoe" and page.input_value("#usrbox select") == "taxa"
+    assert page.input_value("#usrname") == "jdoe" and checked(page) == ["taxa"]
     assert page.inner_text("#usrbox p") == "Genera where jdoe has at least 50 IDs in BC (1 genus)."
     # the login is looked up once, then the taxa are read for the user number that matched exactly
     paths = [c[0].rsplit("/v1/", 1)[1] for c in page.calls]
@@ -117,7 +122,7 @@ def test_my_taxa_keeps_the_users_genera_and_adds_the_user_to_the_identify_link(b
 
 
 def test_a_user_number_skips_the_lookup_and_a_bad_name_asks_for_a_login(browser, site):
-    page = open_map(browser, site, "#user=42&umode=taxa")
+    page = open_map(browser, site, "#user=42&umode=taxa&umin=50")
     shown(page, IN_GENUS_A)
     assert [c[0].rsplit("/v1/", 1)[1] for c in page.calls] == ["identifications/species_counts"]
     assert page.calls[0][1]["user_id"] == ["42"]
@@ -145,7 +150,7 @@ def test_a_throttled_reply_is_tried_again(browser, site):
             route.fulfill(json=SPECIES_COUNTS)
 
     page.route("https://api.inaturalist.org/**", api)
-    page.goto(site + "#user=42&umode=taxa")
+    page.goto(site + "#user=42&umode=taxa&umin=50")
     page.wait_for_function("document.querySelector('#usrbox p').textContent.includes('busy')")
     shown(page, IN_GENUS_A)
     assert len(hits) == 2 and hits[0] == hits[1]
@@ -158,7 +163,7 @@ def test_an_area_listed_by_id_keeps_the_user_out_of_every_batch(browser, site):
     ring = [-124, 48, -122, 48, -122, 50, -124, 50]  # every record, so the area opens by id
     area = page.evaluate("r => MapArea.encode([r])", ring)
     page.close()
-    page = open_map(browser, site, f"#user=42&umode=taxa&area={area}")
+    page = open_map(browser, site, f"#user=42&umode=taxa&umin=50&area={area}")
     shown(page, IN_GENUS_A)
     link = urlparse(page.get_attribute("#identify", "href"))
     q = parse_qs(link.query)
@@ -172,13 +177,26 @@ def test_an_area_listed_by_id_keeps_the_user_out_of_every_batch(browser, site):
 def test_observer_keeps_the_users_own_records(browser, site):
     page = open_map(browser, site, "#user=10&umode=observer")
     shown(page, N // 2)  # the fixture's observers alternate between users 10 and 11
-    assert page.calls == [] and "observed by" in page.inner_text("#usrbox p")
+    assert "observed by" in page.inner_text("#usrbox p")
+    assert [c[0].rsplit("/v1/", 1)[1] for c in page.calls] == ["identifications/species_counts"]
     # Identify opens the user's records; without_ident_user_id would drop the ones they identified
     # themselves, which is nearly all of an observer's own records
     q = parse_qs(urlparse(page.get_attribute("#identify", "href")).query)
     assert q["user_id"] == ["10"] and "without_ident_user_id" not in q
     assert page.errors == []
     page.close()
+
+
+def adjust(page, umin):
+    """Picks a genus threshold under the Adjust disclosure."""
+    page.evaluate("document.querySelector('#usrbox details').open = true")
+    page.select_option("#usrbox select", umin)
+
+
+def checked(page):
+    return page.evaluate(
+        "['taxa','unid','observer'].filter(f => document.getElementById('usr' + f).checked)"
+    )
 
 
 ALPHA = """() => { const d = L.find(l => l.id === 'pts').props.data,
@@ -189,15 +207,19 @@ ALPHA = """() => { const d = L.find(l => l.id === 'pts').props.data,
 def test_an_old_link_with_a_login_alone_still_opens_on_observer(browser, site):
     page = open_map(browser, site, "#user=10")
     shown(page, N // 2)
-    assert page.input_value("#usrbox select") == "observer" and page.calls == []
+    assert checked(page) == ["observer"]
     assert "umode" not in page.evaluate("location.hash")
+    assert page.inner_text("#usrbox > summary") == "User: 10 · Only records I observed"
+    # an observer's own ID counts as one, so Hide is off while Observed is ticked
+    assert page.is_disabled("#usrunid") and page.get_attribute("#usrunid", "title")
+    page.close()
 
 
 def test_my_taxa_first_ranks_the_users_genera_and_dims_the_rest(browser, site):
-    page = open_map(browser, site, "#user=42&umode=first")
+    page = open_map(browser, site, "#user=42&umode=first&umin=50")
     page.wait_for_function("/^Genera/.test(document.querySelector('#usrbox p').textContent)")
     shown(page, N)  # nothing is hidden
-    assert page.input_value("#usrbox select") == "first"
+    assert checked(page) == []
     # the dots in Genus A keep their colour, the rest drop to a fifth of its opacity
     alpha = page.evaluate(ALPHA)
     bright = max(alpha)
@@ -206,34 +228,45 @@ def test_my_taxa_first_ranks_the_users_genera_and_dims_the_rest(browser, site):
     q = parse_qs(urlparse(page.get_attribute("#identify", "href")).query)
     assert q["without_ident_user_id"] == ["42"] and "taxon_id" not in q
     assert "dimmed" in page.inner_text("#idnote")
-    page.select_option("#usrbox select", "observer")
-    page.wait_for_function("!location.hash.includes('umode')")  # Observer, the default
-    page.wait_for_function(f"(new Set(({ALPHA})())).size === 1")  # the colours come back
-    page.close()
-    page = open_map(browser, site, "#user=42&umode=taxa")
+    page.check("#usrtaxa")  # everything left is theirs, so nothing is ranked
+    page.wait_for_function("location.hash.includes('umode=taxa&')")
     shown(page, IN_GENUS_A)
-    assert page.input_value("#usrbox select") == "taxa"
+    page.wait_for_function(f"(new Set(({ALPHA})())).size === 1")  # the colours come back
+    assert "dimmed" not in page.inner_text("#idnote")
     page.close()
 
 
 def test_not_yet_identified_hides_the_records_the_user_identified_in_the_view(browser, site):
     page = open_map(browser, site, "#user=42&umode=unid")
     shown(page, N - 3)
+    assert checked(page) == ["unid"] and page.is_disabled("#usrobserver")
     q = page.calls[-1][1]
     assert page.calls[-1][0].endswith("/observations")
     assert q["ident_user_id"] == ["42"] and q["quality_grade"] == ["needs_id"]
     assert {"swlat", "swlng", "nelat", "nelng"} <= q.keys()
-    assert page.is_visible("#usrbox button") and "approximate" in page.inner_text("#idnote")
+    assert page.is_visible("#usrbox button:has-text('Reload')")
+    assert "approximate" in page.inner_text("#idnote")
     assert page.errors == []
+    page.close()
+
+
+def test_automatic_keeps_the_genera_holding_80_percent_and_says_so(browser, site):
+    page = open_map(browser, site, "#user=42&umode=taxa")
+    shown(page, N)  # Genus A holds 53% of the 104 IDs, so Genus B joins it
+    assert page.input_value("#usrbox select") == "0"
+    assert "umin" not in page.evaluate("location.hash")  # automatic is not written
+    text = "Your top 2 genera, 100% of your 104 IDs in BC."
+    assert page.inner_text("#usrbox p") == text and page.inner_text("#idnote") == text
     page.close()
 
 
 def test_the_threshold_selector_filters_by_genus_sum_and_round_trips_in_the_hash(browser, site):
     page = open_map(browser, site, "#user=42&umode=taxa")
+    shown(page, N)
+    adjust(page, "50")  # Genus B has 49, one short
     shown(page, IN_GENUS_A)
-    assert page.input_value("#usrbox select:nth-of-type(2)") == "50"
-    assert "umin" not in page.evaluate("location.hash")  # the default is not written
-    page.select_option("#usrbox select:nth-of-type(2)", "20")  # Genus B has 49, enough for 20
+    page.wait_for_function("location.hash.includes('umin=50')")  # no longer the default
+    adjust(page, "20")
     shown(page, N)
     page.wait_for_function("location.hash.includes('umin=20')")
     assert parse_qs(urlparse(page.get_attribute("#identify", "href")).query)["taxon_id"] == [
@@ -244,51 +277,41 @@ def test_the_threshold_selector_filters_by_genus_sum_and_round_trips_in_the_hash
     page.close()
     page = open_map(browser, site, "#user=42&umode=taxa&umin=20")
     shown(page, N)
-    assert page.input_value("#usrbox select:nth-of-type(2)") == "20"
+    assert page.input_value("#usrbox select") == "20"
     page.close()
 
 
-def test_the_selector_shows_only_in_my_taxa_mode(browser, site):
-    page = open_map(browser, site, "#user=42&umode=taxa")
-    shown(page, IN_GENUS_A)
-    assert page.is_visible("#usrbox select:nth-of-type(2)")
-    page.select_option("#usrbox select:nth-of-type(1)", "unid")
-    page.wait_for_function("!document.querySelector('#usrbox select:nth-of-type(2)').offsetParent")
+def test_the_selector_sits_under_adjust_and_shows_only_with_a_user(browser, site):
+    page = open_map(browser, site, "")
+    assert page.is_hidden("#usrbox details")
+    page.close()
+    page = open_map(browser, site, "#user=42&umode=unid")
+    shown(page, N - 3)
+    assert page.is_hidden("#usrbox select")
+    page.click("#usrbox details summary")
+    assert page.is_visible("#usrbox select")
+    assert page.inner_text("#usrbox details summary") == "Adjust"
     page.close()
 
 
 def test_a_threshold_that_keeps_nothing_falls_back_and_says_so_without_writing_it(browser, site):
     page = open_map(browser, site, "#user=42&umode=taxa&umin=100")
     shown(page, IN_GENUS_A)  # Genus A has 55, so 50 is the highest lower threshold that keeps one
-    assert page.input_value("#usrbox select:nth-of-type(2)") == "100"  # min(), not the fallback
+    assert page.input_value("#usrbox select") == "100"  # min(), not the fallback
     text = "Genera where 42 has at least 50 IDs in BC (1 genus); none reach 100 yet."
     assert page.inner_text("#usrbox p") == text and page.inner_text("#idnote") == text
-    assert "umin=100" in page.evaluate(
-        "location.hash"
-    )  # the pick stays, the fallback is not written
-    page.close()
-    few = {
-        "total_results": 1,
-        "results": [{"count": 7, "taxon": SPECIES_COUNTS["results"][0]["taxon"]}],
-    }
-    page = open_map(browser, site, "#user=42&umode=taxa", counts=few)
-    shown(page, IN_GENUS_A)
-    assert (
-        page.input_value("#usrbox select:nth-of-type(2)") == "50"
-    )  # min(), the fallback is in the message
-    assert "none reach 50 yet" in page.inner_text("#idnote")
-    assert "umin" not in page.evaluate("location.hash")
+    # the pick stays, the fallback is not written
+    assert "umin=100" in page.evaluate("location.hash")
     page.close()
 
 
 def test_a_user_with_no_genus_at_five_keeps_nothing_and_says_so(browser, site):
-    none = {
-        "total_results": 1,
-        "results": [{"count": 4, "taxon": SPECIES_COUNTS["results"][0]["taxon"]}],
-    }
-    page = open_map(browser, site, "#user=42&umode=taxa", counts=none)
+    page = open_map(browser, site, "#user=42&umode=taxa", counts=NONE)
     shown(page, 0)
-    text = "42 has fewer than 5 IDs in any BC genus yet. Try Observer or Not yet identified by me."
+    text = (
+        "42 has fewer than 5 IDs in any BC genus yet. "
+        "Try Only records I observed or Hide records I identified."
+    )
     assert page.inner_text("#usrbox p") == text and page.inner_text("#idnote") == text
     assert page.errors == []
     page.close()
@@ -298,8 +321,8 @@ def test_too_many_genera_for_one_link_send_the_top_ones_and_say_so(browser, site
     page = open_map(browser, site, "#user=42&umode=taxa&umin=20")
     shown(page, N)
     page.evaluate("META.max_url = 1504")  # room for one three-digit id
-    page.select_option("#usrbox select:nth-of-type(2)", "50")
-    page.select_option("#usrbox select:nth-of-type(2)", "20")
+    adjust(page, "50")
+    adjust(page, "20")
     page.wait_for_function("document.getElementById('idnote').textContent.includes('top genus')")
     # Genus B has more records to identify than Genus A
     assert parse_qs(urlparse(page.get_attribute("#identify", "href")).query)["taxon_id"] == ["901"]
@@ -309,12 +332,6 @@ def test_too_many_genera_for_one_link_send_the_top_ones_and_say_so(browser, site
     )
     assert page.errors == []
     page.close()
-
-
-NONE = {
-    "total_results": 1,
-    "results": [{"count": 4, "taxon": SPECIES_COUNTS["results"][0]["taxon"]}],
-}
 
 
 def test_a_user_with_no_genus_is_not_ranked_and_nothing_is_dimmed(browser, site):
@@ -327,18 +344,22 @@ def test_a_user_with_no_genus_is_not_ranked_and_nothing_is_dimmed(browser, site)
     page.close()
 
 
-def test_the_box_names_the_user_and_mode_and_the_dimming_when_collapsed(browser, site):
+def test_the_box_names_the_user_and_ticks_and_the_dimming_when_collapsed(browser, site):
     page = open_map(browser, site, "")
-    assert page.inner_text("#usrbox summary") == "User" and page.is_hidden(
-        "#usrbox select:nth-of-type(2)"
-    )
+    assert page.inner_text("#usrbox > summary") == "User" and page.is_hidden("#usrbox select")
+    assert page.is_hidden("#usrbox button:has-text('Sign out')")
     page.close()
-    page = open_map(browser, site, "#user=42&umode=first")
+    page = open_map(browser, site, "#user=42&umode=first&umin=50")
     page.wait_for_function("/^Genera/.test(document.querySelector('#usrbox p').textContent)")
-    assert page.inner_text("#usrbox summary") == "User: 42 · My taxa first"
-    assert page.eval_on_selector("#usrbox summary", "e => e.offsetHeight") >= 24
+    assert page.inner_text("#usrbox > summary") == "User: 42 · Your genera first"
+    assert page.eval_on_selector("#usrbox > summary", "e => e.offsetHeight") >= 24
     assert "dimmed on the map" in page.inner_text("#usrbox p")
-    assert page.input_value("#usrbox select:nth-of-type(2)") == "50"
+    page.close()
+    page = open_map(browser, site, "#user=42&umode=taxa,unid")
+    shown(page, N - 3)
+    assert page.inner_text("#usrbox > summary") == (
+        "User: 42 · Only my genera, Hide records I identified"
+    )
     page.close()
 
 
@@ -353,7 +374,7 @@ def test_the_box_names_the_user_and_mode_and_the_dimming_when_collapsed(browser,
 )
 def test_a_pasted_profile_link_or_at_login_is_taken_for_the_login(browser, site, typed, user):
     page = open_map(browser, site, "")
-    page.click("#usrbox summary")
+    page.click("#usrbox > summary")
     page.fill("#usrname", typed)
     page.press("#usrname", "Enter")
     page.wait_for_function(f"location.hash.includes('user={user}&')")
@@ -362,7 +383,7 @@ def test_a_pasted_profile_link_or_at_login_is_taken_for_the_login(browser, site,
 
 
 def test_an_unparseable_entry_is_not_written_to_the_hash(browser, site):
-    page = open_map(browser, site, "#user=42&umode=taxa")
+    page = open_map(browser, site, "#user=42&umode=taxa&umin=50")
     shown(page, IN_GENUS_A)
     page.fill("#usrname", "not a login!")
     page.press("#usrname", "Enter")
@@ -375,7 +396,7 @@ def test_the_same_login_can_be_tried_again_after_a_failed_lookup(browser, site):
     page = open_map(browser, site, "")
     page.unroute("https://api.inaturalist.org/**")
     page.route("https://api.inaturalist.org/**", lambda r: r.fulfill(status=400, body=""))
-    page.click("#usrbox summary")
+    page.click("#usrbox > summary")
     page.fill("#usrname", "JDoe")
     page.press("#usrname", "Enter")
     page.wait_for_function("document.querySelector('#usrbox p').textContent === 'HTTP 400'")
@@ -389,5 +410,5 @@ def test_the_same_login_can_be_tried_again_after_a_failed_lookup(browser, site):
         ),
     )
     page.press("#usrname", "Enter")
-    page.wait_for_function("/^Genera/.test(document.querySelector('#usrbox p').textContent)")
+    page.wait_for_function("/^Your top/.test(document.querySelector('#usrbox p').textContent)")
     page.close()
