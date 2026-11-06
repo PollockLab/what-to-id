@@ -1,0 +1,116 @@
+<p>How the site computes what it shows. Every number here is read from the code or from the
+index manifest at build time, so this text and the site cannot drift apart.</p>
+
+<h3 id="methods-data">Data</h3>
+<p>The pool is every iNaturalist observation in British Columbia whose quality grade is still
+Needs ID. Each record contributes its first photo at iNaturalist's medium size. Records are added
+and removed as iNaturalist changes; the photo index is rebuilt in full now and then and grows
+by small daily updates between rebuilds (see Daily updates).</p>
+
+<h3 id="methods-model">Model</h3>
+<p>Photos and species names are embedded by BioCLIP 2.5 Huge, a CLIP model with a ViT-H/14 image
+tower trained on the TreeOfLife-200M data set and later additions, <code>__MODEL_ID__</code> at revision
+<code>__MODEL_REVISION__</code> [1, 2]. Each photo is resized and centre-cropped to 224 pixels and
+becomes one vector of __DIMS__ numbers, scaled to unit length. Each scientific name in the pool
+becomes one text vector from the prompt "__PROMPT__"; the index holds __TAXA_COUNT__ of them.
+The reference for every score below is text only. No photo is ever the reference.</p>
+
+<h3 id="methods-scores">Scores</h3>
+<p>The match score of a photo to a species is the cosine between the photo vector and that
+species' text vector. For a record labelled at species, <em>own</em> is its score to the label
+and <em>other</em> is its best score to any other species in the pool; the margin is own minus
+other. A margin above 0 means the label is the model's first choice among the pool's species.
+For a record labelled above species (a genus, say), the best score inside the label's clade is
+compared with the best score outside it.</p>
+
+<h3 id="methods-levels">Identify levels</h3>
+<p>Every record is scored once and takes the first level whose rule it meets, in this order:</p>
+<ol>
+<li>Odd shots: the best score to any species is in the lowest __WEIRD_SHARE__ of the record's
+iconic group (birds, plants, fungi and so on). Any rank.</li>
+<li>Clear matches: species rank, margin above 0, own in the top __EASY_TOP_SHARE__ of the
+species' scored records, and the species has __MIN_PER_CLASS__ or more scored records.</li>
+<li>Close calls: species rank, margin below 0 but not below &minus;__TAXONOMIST_MARGIN__, and the
+best other species has __MIN_LOOKALIKE_RECORDS__ or more verifiable records in BC.</li>
+<li>Narrow it down: a rank above species whose clade holds at least one species with a text
+vector. The score is the in-clade best minus the best outside the clade.</li>
+<li>Might be mislabelled: species rank, margin below &minus;__TAXONOMIST_MARGIN__, and the
+best other species has __MIN_LOOKALIKE_RECORDS__ or more verifiable records in BC.</li>
+</ol>
+<p>The page shows Odd shots, Close calls and Might be mislabelled as one list. Within a level,
+records are ranked by their score and the rank is stored in __STEPS__ equal buckets; the bucket,
+not the raw score, orders the cards. Odd shots and Might be mislabelled show the farthest and
+the most negative first. Levels order records for review; they do not say that a label is right
+or wrong.</p>
+<p>Daily updates score only the records the last full run lacks, against cut-offs frozen from
+that run: the per-group Odd shots cut and, per species, the lowest own among its Clear matches.
+A species with fewer than __MIN_PER_CLASS__ records in the full run gets no Clear match until the
+next full run.</p>
+
+<h3 id="methods-pairs">Confused pairs</h3>
+<p>Only records labelled at species count. A record is confused when its margin is below 0; it
+points to the species that beat its label. A species needs __MIN_PER_CLASS__ or more scored
+photos, a pair needs at least two photos pointing to the same other species, and each species
+lists at most __PAIRS_PER_SPECIES__ pairs with up to __RECORDS_PER_PAIR__ records each, the most
+negative margin first. A species' share is its confused photos divided by its scored photos.</p>
+
+<h3 id="methods-space">Photo space</h3>
+<p>Closest matches are the __NEIGHBOR_K__ photos with the highest cosine to a photo, computed
+exactly against every photo in the index at the last full rebuild. The 2D layout is a t-SNE of
+the same vectors [3, 4], run with openTSNE as the manifest records it: __LAYOUT_DETAIL__.
+The layout is a lossy squeeze: on a random sample of __FID_N__ photos, the __FID_K__ nearest
+points on the plot keep on average __FID_MEAN__ of the __FID_K__ true closest matches (median
+__FID_MEDIAN__, and __FID_ZERO__ of sampled photos keep none). Nearness on the plot says two
+photos look alike to the model, not what either one is.</p>
+
+<h3 id="methods-index">Text search and daily updates</h3>
+<p>Typed searches and daily updates use an approximate index of the same vectors: an inverted
+file of __NLIST__ lists with optimised product quantisation to __M__ codes of __NBITS__ bits each
+[5, 6, 7], scored by inner product, then a refine stage of __REFINE_BITS__ bits per code. The
+page probes __NPROBE__ lists and re-scores a shortlist of __SHORTLIST__ candidates.</p>
+<p id="methods-daily">A daily update embeds the new records, finds their closest matches among
+the new records exactly and in the index approximately (__UPDATE_NPROBE__ lists), and places
+each new photo on the plot at the cosine-weighted mean of its closest matches that already
+have a position. Existing records keep their closest matches and positions until the next full
+rebuild, so a new photo can list an old one as a match while the old one does not list it.</p>
+
+<h3 id="methods-hosts">Host pairs</h3>
+<p>The look-alike statistics on the photo-space page skip pairs of families that are often
+photographed together, such as a host plant and its insect. Those pairs come from the Global
+Biotic Interactions database [8], release __GLOBI_RELEASE__, keeping family pairs with
+__GLOBI_MIN_ROWS__ or more recorded interactions. The confused-pairs table does not apply this
+filter.</p>
+
+<h3 id="methods-limits">Limits</h3>
+<p>The model sees one photo per record, so a record whose first photo is not the organism gets
+a poor score. Only names in the pool are candidates, so a species not yet observed in BC cannot
+be proposed. Text vectors carry what the model learned about a name during training, which is
+thin for rare or recently split taxa. Cut-offs were read from the distribution of scores in the
+BC pool and are not calibrated probabilities. The level order was chosen by comparing levels
+with the records that iNaturalist identifiers later corrected; that comparison is described on
+the Identify page's About.</p>
+
+<h3 id="methods-refs">References</h3>
+<ol class="refs">
+<li>Gu J. et al. (2025). BioCLIP 2: Emergent properties from scaling hierarchical contrastive
+learning. NeurIPS 2025. <a href="https://arxiv.org/abs/2505.23883">arXiv:2505.23883</a>.</li>
+<li>Imageomics Institute. BioCLIP 2.5 Huge model card.
+<a href="https://huggingface.co/imageomics/bioclip-2.5-vith14">huggingface.co/imageomics/bioclip-2.5-vith14</a>.</li>
+<li>Poličar P. G., Stražar M., Zupan B. (2024). openTSNE: A modular Python library for t-SNE
+dimensionality reduction and embedding. Journal of Statistical Software 109(3).
+<a href="https://doi.org/10.18637/jss.v109.i03">doi:10.18637/jss.v109.i03</a>.</li>
+<li>Linderman G. C. et al. (2019). Fast interpolation-based t-SNE for improved visualization of
+single-cell RNA-seq data. Nature Methods 16, 243&ndash;245.
+<a href="https://doi.org/10.1038/s41592-018-0308-4">doi:10.1038/s41592-018-0308-4</a>.</li>
+<li>Douze M. et al. (2024). The Faiss library.
+<a href="https://arxiv.org/abs/2401.08281">arXiv:2401.08281</a>.</li>
+<li>Jégou H., Douze M., Schmid C. (2011). Product quantization for nearest neighbor search.
+IEEE TPAMI 33(1), 117&ndash;128.
+<a href="https://doi.org/10.1109/TPAMI.2010.57">doi:10.1109/TPAMI.2010.57</a>.</li>
+<li>Ge T., He K., Ke Q., Sun J. (2013). Optimized product quantization for approximate nearest
+neighbor search. CVPR 2013, 2946&ndash;2953.
+<a href="https://doi.org/10.1109/CVPR.2013.379">doi:10.1109/CVPR.2013.379</a>.</li>
+<li>Poelen J. H., Simons J. D., Mungall C. J. (2014). Global biotic interactions: An open
+infrastructure to share and analyze species-interaction datasets. Ecological Informatics 24,
+148&ndash;159. <a href="https://doi.org/10.1016/j.ecoinf.2014.08.005">doi:10.1016/j.ecoinf.2014.08.005</a>.</li>
+</ol>

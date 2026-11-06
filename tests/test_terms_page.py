@@ -82,3 +82,80 @@ def test_no_nav_tab_and_study_stays_frozen():
     assert "terms.html" not in [p for p, _ in page_nav.PAGES]
     study = page_nav.nav("study.html")
     assert "terms.html" not in study and "explain-data" not in study
+
+
+MANIFEST = {
+    "dims": 1024,
+    "nlist": 4096,
+    "m": 64,
+    "nbits": 8,
+    "refine": {"bits": 3},
+    "defaults": {"nprobe": 96, "shortlist": 500},
+    "model": {"id": "hf-hub:x/y", "revision": "abc123"},
+    "taxa": {"count": 34717, "prompt": "a photo of {}"},
+    "layout": {
+        "fidelity": {
+            "k": 12,
+            "n_eval": 100000,
+            "mean": 0.1466,
+            "median": 0.0833,
+            "share_zero": 0.269,
+            "affinities": "uniform symmetric exact 12-NN",
+            "init": "PCA",
+            "gradient": "fft",
+            "learning_rate": "auto",
+            "early_exaggeration": [12, 250],
+            "phases": "250@12, 500@4, 500@1",
+        }
+    },
+}
+
+
+def test_methods_numbers_come_from_the_code_and_the_manifest():
+    from what_to_id import atlas_update, confusion, host_pairs, levels, pool_levels, terms_methods
+
+    html = terms_page.render(manifest=MANIFEST)
+    methods = html.split('id="methods"')[1]
+    assert "__" not in methods and terms_methods.MISSING not in methods
+    for text in (
+        f"lowest {levels.WEIRD_SHARE:.0%} of",
+        f"top {levels.EASY_TOP_SHARE:.0%} of",
+        f"not below &minus;{levels.TAXONOMIST_MARGIN:g},",
+        f"{levels.MIN_LOOKALIKE_RECORDS} or more verifiable records",
+        f"has {confusion.MIN_PER_CLASS} or more scored",
+        f"at most {confusion.FIR_PAIRS_PER_SPECIES} pairs with up to "
+        f"{confusion.FIR_RECORDS_PER_PAIR} records",
+        f"in {pool_levels.STEPS} equal buckets",
+        f"the {atlas_update.NEIGHBOR_K} photos with the highest cosine",
+        f"approximately ({atlas_update.DEFAULT_NPROBE} lists)",
+        f"release {host_pairs.DUMP_RELEASE}, keeping family pairs with\n"
+        f"{host_pairs.MIN_ROWS} or more",
+        "<code>hf-hub:x/y</code>",
+        "<code>abc123</code>",
+        "vector of 1024 numbers",
+        'prompt "a photo of {}"; the index holds 34,717',
+        "sample of 100,000 photos, the 12 nearest",
+        "on average 15% of the 12 true closest matches (median\n8%, and 27% of sampled",
+        "early exaggeration 12 for 250 iterations; phases 250@12, 500@4, 500@1",
+        "4,096 lists with optimised product quantisation to 64 codes of 8 bits",
+        "refine stage of 3 bits per code",
+        "probes 96 lists and re-scores a shortlist of 500",
+    ):
+        assert text in methods, text
+    for ref in (
+        "10.18637/jss.v109.i03",
+        "2505.23883",
+        "2401.08281",
+        "10.1016/j.ecoinf.2014.08.005",
+    ):
+        assert ref in methods
+    assert {"methods-levels", "methods-space", "methods-refs"} <= _ids(methods)
+
+
+def test_methods_without_an_index_and_without_leaked_list_names():
+    from what_to_id import terms_methods
+
+    html = terms_page.render()
+    assert terms_methods.MISSING in html and "__" not in html.split("</style>")[1]
+    assert not re.search("recency|gap_first|gap first|similarity|novelty|surprise", html, re.I)
+    assert "—" not in html  # no em dashes
