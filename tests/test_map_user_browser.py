@@ -186,12 +186,18 @@ ALPHA = """() => { const d = L.find(l => l.id === 'pts').props.data,
   return Array.from({length: d.length}, (_, i) => c[4 * i + 3]); }"""
 
 
-def test_a_login_alone_ranks_my_taxa_first_and_dims_the_rest(browser, site):
-    page = open_map(browser, site, "#user=42")
+def test_an_old_link_with_a_login_alone_still_opens_on_observer(browser, site):
+    page = open_map(browser, site, "#user=10")
+    shown(page, N // 2)
+    assert page.input_value("#usrbox select") == "observer" and page.calls == []
+    assert "umode" not in page.evaluate("location.hash")
+
+
+def test_my_taxa_first_ranks_the_users_genera_and_dims_the_rest(browser, site):
+    page = open_map(browser, site, "#user=42&umode=first")
     page.wait_for_function("/^Genera/.test(document.querySelector('#usrbox p').textContent)")
     shown(page, N)  # nothing is hidden
     assert page.input_value("#usrbox select") == "first"
-    assert "umode" not in page.evaluate("location.hash")
     # the dots in Genus A keep their colour, the rest drop to a fifth of its opacity
     alpha = page.evaluate(ALPHA)
     bright = max(alpha)
@@ -201,7 +207,7 @@ def test_a_login_alone_ranks_my_taxa_first_and_dims_the_rest(browser, site):
     assert q["without_ident_user_id"] == ["42"] and "taxon_id" not in q
     assert "dimmed" in page.inner_text("#idnote")
     page.select_option("#usrbox select", "observer")
-    page.wait_for_function("location.hash.includes('umode=observer')")
+    page.wait_for_function("!location.hash.includes('umode')")  # Observer, the default
     page.wait_for_function(f"(new Set(({ALPHA})())).size === 1")  # the colours come back
     page.close()
     page = open_map(browser, site, "#user=42&umode=taxa")

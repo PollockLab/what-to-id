@@ -1,8 +1,9 @@
 // The user filter. The User box takes an iNaturalist login or user number (hash: user=, and umode=
-// observer, taxa or unid; none is My taxa first; umin= is the genus threshold of My taxa and My taxa first,
+// first, taxa or unid; none is Observer, or My taxa without an observer file, so old links keep their meaning; a typed
+// login starts on My taxa first; umin= is the genus threshold of My taxa and My taxa first,
 // 5, 20 or 100, none is 50). Observer opens
 // Identify on the user's records (user_id); the others add without_ident_user_id, which would hide nearly all of an observer's own records. The
-// select applies one of four rules: My taxa first (the default) hides nothing but ranks the records inside a genus where
+// select applies one of four rules: My taxa first hides nothing but ranks the records inside a genus where
 // the user has at least umin current identifications in BC (mine(i): first on Identify, the rest dimmed on the map),
 // My taxa keeps only those, Observer keeps the dots the user observed
 // (pool-observer.bin, one uint32 per record in shard order), Not yet identified by me hides the dots the user identified in the view.
@@ -68,7 +69,7 @@ function userFilter(o){
     api=inatGate({gap:o.gap,fetch:o.fetch,say:function(t){say(t);}}),cur='',run=0,id=0,mask=null,ob=null,hide=null,capped=false,key=0,Pn=null,gen=[],used=0,fit=null,input,mode,minsel,msg,again;
   function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;
     if(text!=null)e.textContent=text;return e;}
-  function em(){return S.umode||'first';}
+  function em(){return S.umode||(META.observer?'observer':'taxa');}
   function min(){return S.umin||USR_MIN;}
   // the genera kept and how many go to Identify: ids that fit the URL beside the rest of the link
   function kept(){var n=Pn?Pn.n:0;
@@ -108,7 +109,7 @@ function userFilter(o){
     .catch(function(e){if(e===0)return;mask=ob=hide=null;key++;
       say(e instanceof TypeError?'Could not reach iNaturalist.':e.message);o.changed();});}
   function tag(){mode.dataset.explain={first:'my-taxa-first',observer:'observer-filter',taxa:'my-taxa',unid:'not-identified-by-me'}[mode.value];}
-  function apply(){tag();S.user=input.value.trim().slice(0,100);S.umode=mode.value==='first'?'':mode.value;o.changed();}
+  function apply(){tag();S.user=input.value.trim().slice(0,100);S.umode=mode.value===(META.observer?'observer':'taxa')?'':mode.value;o.changed();}
   if(box){
     box.appendChild(el('summary',null,'User'));
     var f=box.appendChild(el('form','prow')),lab=f.appendChild(el('label','muted','iNaturalist login or user number'));
@@ -118,6 +119,7 @@ function userFilter(o){
     [['first','My taxa first'],['taxa','My taxa'],['unid','Not yet identified by me'],['observer','Observer']].forEach(function(m){
       var op=mode.appendChild(el('option',null,m[1]));op.value=m[0];
       if(m[0]==='observer'&&!META.observer)op.disabled=true;});
+    mode.value='first';  // until a user is set, what a typed login starts on
     minsel=f.appendChild(el('select'));minsel.setAttribute('aria-label','Fewest IDs in a genus');
     USR_MINS.forEach(function(v){var op=minsel.appendChild(el('option',null,v+'+ IDs'));op.value=v;});
     again=f.appendChild(el('button','padd','Reload for this view'));again.type='button';again.hidden=true;
@@ -128,12 +130,13 @@ function userFilter(o){
   return {
     // brings the box in line with S and starts any load it needs; P is the records so far
     sync:function(P){Pn=P;if(input){if(document.activeElement!==input)input.value=S.user;
-      mode.value=em();tag();minsel.value=used||min();minsel.hidden=em()!=='taxa'&&em()!=='first';again.hidden=em()!=='unid'||!S.user;}start();},
+      if(S.user)mode.value=em();tag();minsel.value=used||min();minsel.hidden=mode.value!=='taxa'&&mode.value!=='first';again.hidden=em()!=='unid'||!S.user;}start();},
     drop:function(i){if(!id||em()==='first')return false;
       if(mask){var t=Pn.tax[i];return !(t<mask.length&&mask[t]===1);}
       if(ob)return i<ob.length&&ob[i]!==id;
       return hide?hide.has(Pn.id[i]):false;},
     key:function(){return key;},
+    mode:em,
     // true while some records are left out; My taxa first leaves none out, it ranks them (ranked, mine)
     active:function(){return !!(mask&&em()!=='first'||ob||hide);},
     ranked:function(){return !!mask&&em()==='first';},

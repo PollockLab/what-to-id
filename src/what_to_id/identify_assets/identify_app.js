@@ -302,7 +302,7 @@ function user(){
   var re=/^(user|umode|umin)=/;
   if(parent===window)history.replaceState(null,'','#'+location.hash.slice(1).split('&').filter(function(x){return x&&!re.test(x);})
     .concat(MF.write(S).filter(function(x){return re.test(x);})).join('&'));
-  var on=UF.active()||UF.ranked();if(on&&!UON)track('user-'+(S.umode||'first'));UON=on;
+  var on=UF.active()||UF.ranked();if(on&&!UON)track('user-'+UF.mode());UON=on;
   SYNC.send();refresh();
 }
 function key(){return MF?MF.write(S).join('&'):PEND||'';}
