@@ -109,7 +109,19 @@ def evaluation() -> dict[str, str]:
             f"<tr><td>{name}</td><td>{r['n']:,}</td><td>{r['corrected_per_1000']:.2f}</td>"
             f"<td>{rr}</td></tr>"
         )
+    mis, none = ev["levels"]["mislabel"], ev["levels"]["none"]
+
+    def rr(r: dict, col: str) -> str:
+        lo, hi = r[f"{col}_rr_ci"]
+        return f"{r[f'{col}_rr']:.2f} [{lo:.2f}, {hi:.2f}]"
+
     return {
+        "__SUG_MIS__": _pct(mis["to_suggested_share"]),
+        "__SUG_MIS_GENUS__": _pct(mis["to_suggested_genus_share"]),
+        "__SUG_NONE__": _pct(none["to_suggested_share"]),
+        "__SUG_NONE_GENUS__": _pct(none["to_suggested_genus_share"]),
+        "__SUG_MIS_RR__": rr(mis, "to_suggested"),
+        "__SUG_MIS_GENUS_RR__": rr(mis, "to_suggested_genus"),
         "__EVAL_SCORED__": ev["scored_on"],
         "__EVAL_OUTCOME__": ev["outcome_on"],
         "__EVAL_REPS__": f"{ev['bootstrap_reps']:,}",
