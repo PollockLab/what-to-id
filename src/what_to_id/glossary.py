@@ -144,8 +144,8 @@ GLOSSARY: dict[str, tuple[str, str | None]] = {
         None,
     ),
     "taxonomy": (
-        "Every BC record that still needs an ID, counted at the taxon its community ID has"
-        " reached and rolled up iNaturalist's taxonomy.",
+        "Every BC record that still needs an ID, counted at the taxon iNaturalist shows for it"
+        " and rolled up iNaturalist's taxonomy.",
         None,
     ),
     "confused-pairs": (
@@ -158,8 +158,8 @@ GLOSSARY: dict[str, tuple[str, str | None]] = {
     "observed": ("The date the photo was taken.", None),
     "uploaded": ("The date the record was added to iNaturalist.", None),
     "backlog-per-identifier": (
-        "The records here that need an ID, divided by the number of people who identify this"
-        " taxon in BC.",
+        "The records here that need an ID, divided by the number of people who have ever"
+        " identified this taxon in BC.",
         None,
     ),
     "share-needing-id": (

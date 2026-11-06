@@ -222,6 +222,10 @@ jobs:
           atlas=()
           if [ -n "$ATLAS_HF_REPO" ]; then atlas=(--data-url "https://huggingface.co/datasets/${ATLAS_HF_REPO}/resolve/main/"); fi
           python -m what_to_id.terms_page --out _site "${atlas[@]}"
+          # the pages added after the first leak check get the same one
+          if grep -ril -E 'recency|gap_first|gap first|similarity|novelty|surprise' _site; then
+            echo "::error::a list name leaked into the site"; exit 1
+          fi
       - name: Include the photo-search page
         env:
           ATLAS_HF_REPO: ${{ vars.ATLAS_HF_REPO }}
