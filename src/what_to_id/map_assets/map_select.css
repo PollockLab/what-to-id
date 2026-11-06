@@ -11,6 +11,7 @@
 /* folding filter sections; the summary counts what is active inside */
 .sec{border-top:1px solid var(--line);padding:2px 0 4px}
 .sec>summary{cursor:pointer;font-size:12px;font-weight:600;padding:6px 0 4px;list-style-position:inside}
+#usrbox>summary{min-height:24px}
 .sec>summary .n:not(:empty){display:inline-block;margin-left:4px;min-width:18px;padding:0 5px;border-radius:9px;
   background:var(--on);color:var(--onink);font-size:11px;line-height:16px;text-align:center}
 .sec>*+*{margin-top:4px}

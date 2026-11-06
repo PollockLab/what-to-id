@@ -135,6 +135,26 @@ def test_the_user_filter_keeps_only_the_users_genera_as_the_map_does(browser, si
     assert page.errors == []
 
 
+def test_my_taxa_first_lists_the_users_genera_first_then_a_divider_then_the_rest(browser, site):
+    base, pts = site
+    page = counted(browser, base, "#lvl=1")
+    before = page.evaluate("__identify.view()[1]")
+    page.close()
+    page = counted(browser, base, "#lvl=1&user=JDoe&umode=first")
+    page.wait_for_function("__identify.user()")
+    taxon = dict(zip(pts["id"], pts["taxon_id"], strict=True))
+    rows, m = page.evaluate("__identify.view()[1]"), page.evaluate("__identify.mine()")
+    assert sorted(rows) == sorted(before) and 0 < m < len(rows)  # nothing hidden, only ranked
+    assert {taxon[i] for i in rows[:m]} <= GENUS_A and not {taxon[i] for i in rows[m:]} & GENUS_A
+    assert page.input_value("#usrbox select") == "first"
+    while page.locator("#grid .sep").count() == 0:
+        page.click("#more")
+    sep = page.locator("#grid .sep:not(.top)")
+    assert sep.inner_text() == f"End of your genera · {m} card{'s' if m > 1 else ''}"
+    assert sep.evaluate("e => [...e.parentNode.children].indexOf(e)") == m + 1  # the top line leads
+    assert "identify/user-first" in events(page) and page.errors == []
+
+
 def test_a_login_typed_on_identify_goes_to_the_hash(browser, site):
     base, _ = site
     page = counted(browser, base, "#lvl=1")
@@ -143,8 +163,13 @@ def test_a_login_typed_on_identify_goes_to_the_hash(browser, site):
     page.fill("#usrname", "JDoe")
     page.press("#usrname", "Enter")
     page.wait_for_function("__identify.user()")
-    assert "user=JDoe" in page.evaluate("location.hash")
-    assert 0 < len(page.evaluate("__identify.ids()")) < n
+    assert "user=JDoe&umode=first" in page.evaluate("location.hash")  # a typed login starts there
+    assert len(page.evaluate("__identify.ids()")) == n  # My taxa first hides nothing
+    page.select_option("#usrbox select", "taxa")
+    page.wait_for_function(
+        "!location.hash.includes('umode')"
+    )  # My taxa, the default without an observer file
+    page.wait_for_function(f"__identify.ids().length < {n}")
     page.fill("#usrname", "")
     page.press("#usrname", "Enter")
     page.wait_for_function("!__identify.user()")

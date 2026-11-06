@@ -12,7 +12,7 @@ from what_to_id.page_map import encode_points, render_map
 
 from . import test_embeddings_browser as eb
 from .embeddings_fixture import TREE, pool_frame
-from .test_map_groups_browser import STUB
+from .test_map_resolved_browser import LAYERS_STUB
 
 browser = eb.browser
 N = 300
@@ -61,7 +61,8 @@ def open_map(browser, url, hash_, counts=None):
     p.route(
         "https://unpkg.com/**",
         lambda r: r.fulfill(
-            body=STUB if r.request.url.endswith(".js") else "", content_type="text/javascript"
+            body=LAYERS_STUB if r.request.url.endswith(".js") else "",
+            content_type="text/javascript",
         ),
     )
 
@@ -131,7 +132,8 @@ def test_a_user_number_skips_the_lookup_and_a_bad_name_asks_for_a_login(browser,
 def test_a_throttled_reply_is_tried_again(browser, site):
     page = browser.new_page()
     page.route(
-        "https://unpkg.com/**", lambda r: r.fulfill(body=STUB, content_type="text/javascript")
+        "https://unpkg.com/**",
+        lambda r: r.fulfill(body=LAYERS_STUB, content_type="text/javascript"),
     )
     hits = []
 
@@ -179,13 +181,34 @@ def test_observer_keeps_the_users_own_records(browser, site):
     page.close()
 
 
-def test_a_login_alone_selects_observer_and_taxa_round_trips_in_the_hash(browser, site):
+ALPHA = """() => { const d = L.find(l => l.id === 'pts').props.data,
+  c = d.attributes.getFillColor.value;
+  return Array.from({length: d.length}, (_, i) => c[4 * i + 3]); }"""
+
+
+def test_an_old_link_with_a_login_alone_still_opens_on_observer(browser, site):
     page = open_map(browser, site, "#user=10")
     shown(page, N // 2)
     assert page.input_value("#usrbox select") == "observer" and page.calls == []
     assert "umode" not in page.evaluate("location.hash")
-    page.select_option("#usrbox select", "taxa")
-    page.wait_for_function("location.hash.includes('umode=taxa')")
+
+
+def test_my_taxa_first_ranks_the_users_genera_and_dims_the_rest(browser, site):
+    page = open_map(browser, site, "#user=42&umode=first")
+    page.wait_for_function("/^Genera/.test(document.querySelector('#usrbox p').textContent)")
+    shown(page, N)  # nothing is hidden
+    assert page.input_value("#usrbox select") == "first"
+    # the dots in Genus A keep their colour, the rest drop to a fifth of its opacity
+    alpha = page.evaluate(ALPHA)
+    bright = max(alpha)
+    assert alpha.count(bright) == IN_GENUS_A and alpha.count(bright // 5) == N - IN_GENUS_A
+    # Identify gets every record the user has not identified, not only Genus A
+    q = parse_qs(urlparse(page.get_attribute("#identify", "href")).query)
+    assert q["without_ident_user_id"] == ["42"] and "taxon_id" not in q
+    assert "dimmed" in page.inner_text("#idnote")
+    page.select_option("#usrbox select", "observer")
+    page.wait_for_function("!location.hash.includes('umode')")  # Observer, the default
+    page.wait_for_function(f"(new Set(({ALPHA})())).size === 1")  # the colours come back
     page.close()
     page = open_map(browser, site, "#user=42&umode=taxa")
     shown(page, IN_GENUS_A)
@@ -237,7 +260,7 @@ def test_the_selector_shows_only_in_my_taxa_mode(browser, site):
 def test_a_threshold_that_keeps_nothing_falls_back_and_says_so_without_writing_it(browser, site):
     page = open_map(browser, site, "#user=42&umode=taxa&umin=100")
     shown(page, IN_GENUS_A)  # Genus A has 55, so 50 is the highest lower threshold that keeps one
-    assert page.input_value("#usrbox select:nth-of-type(2)") == "50"
+    assert page.input_value("#usrbox select:nth-of-type(2)") == "100"  # min(), not the fallback
     text = "Genera where 42 has at least 50 IDs in BC (1 genus); none reach 100 yet."
     assert page.inner_text("#usrbox p") == text and page.inner_text("#idnote") == text
     assert "umin=100" in page.evaluate(
@@ -250,7 +273,9 @@ def test_a_threshold_that_keeps_nothing_falls_back_and_says_so_without_writing_i
     }
     page = open_map(browser, site, "#user=42&umode=taxa", counts=few)
     shown(page, IN_GENUS_A)
-    assert page.input_value("#usrbox select:nth-of-type(2)") == "5"
+    assert (
+        page.input_value("#usrbox select:nth-of-type(2)") == "50"
+    )  # min(), the fallback is in the message
     assert "none reach 50 yet" in page.inner_text("#idnote")
     assert "umin" not in page.evaluate("location.hash")
     page.close()
@@ -283,4 +308,86 @@ def test_too_many_genera_for_one_link_send_the_top_ones_and_say_so(browser, site
         "Identify gets only the top genus by records to identify."
     )
     assert page.errors == []
+    page.close()
+
+
+NONE = {
+    "total_results": 1,
+    "results": [{"count": 4, "taxon": SPECIES_COUNTS["results"][0]["taxon"]}],
+}
+
+
+def test_a_user_with_no_genus_is_not_ranked_and_nothing_is_dimmed(browser, site):
+    page = open_map(browser, site, "#user=42&umode=first", counts=NONE)
+    page.wait_for_function("/fewer than 5/.test(document.querySelector('#usrbox p').textContent)")
+    shown(page, N)
+    assert len(set(page.evaluate(ALPHA))) == 1
+    assert "dimmed" not in page.inner_text("#idnote") + page.inner_text("#usrbox p")
+    assert page.errors == []
+    page.close()
+
+
+def test_the_box_names_the_user_and_mode_and_the_dimming_when_collapsed(browser, site):
+    page = open_map(browser, site, "")
+    assert page.inner_text("#usrbox summary") == "User" and page.is_hidden(
+        "#usrbox select:nth-of-type(2)"
+    )
+    page.close()
+    page = open_map(browser, site, "#user=42&umode=first")
+    page.wait_for_function("/^Genera/.test(document.querySelector('#usrbox p').textContent)")
+    assert page.inner_text("#usrbox summary") == "User: 42 · My taxa first"
+    assert page.eval_on_selector("#usrbox summary", "e => e.offsetHeight") >= 24
+    assert "dimmed on the map" in page.inner_text("#usrbox p")
+    assert page.input_value("#usrbox select:nth-of-type(2)") == "50"
+    page.close()
+
+
+@pytest.mark.parametrize(
+    ("typed", "user"),
+    [
+        ("https://www.inaturalist.org/people/JDoe", "JDoe"),
+        ("https://www.inaturalist.ca/people/42?x=1", "42"),
+        ("@JDoe", "JDoe"),
+        ("inaturalist.org/people/JDoe/", "JDoe"),
+    ],
+)
+def test_a_pasted_profile_link_or_at_login_is_taken_for_the_login(browser, site, typed, user):
+    page = open_map(browser, site, "")
+    page.click("#usrbox summary")
+    page.fill("#usrname", typed)
+    page.press("#usrname", "Enter")
+    page.wait_for_function(f"location.hash.includes('user={user}&')")
+    assert page.input_value("#usrname") == user
+    page.close()
+
+
+def test_an_unparseable_entry_is_not_written_to_the_hash(browser, site):
+    page = open_map(browser, site, "#user=42&umode=taxa")
+    shown(page, IN_GENUS_A)
+    page.fill("#usrname", "not a login!")
+    page.press("#usrname", "Enter")
+    assert page.inner_text("#usrbox p") == "Enter an iNaturalist login or user number."
+    assert "user=42" in page.evaluate("location.hash")
+    page.close()
+
+
+def test_the_same_login_can_be_tried_again_after_a_failed_lookup(browser, site):
+    page = open_map(browser, site, "")
+    page.unroute("https://api.inaturalist.org/**")
+    page.route("https://api.inaturalist.org/**", lambda r: r.fulfill(status=400, body=""))
+    page.click("#usrbox summary")
+    page.fill("#usrname", "JDoe")
+    page.press("#usrname", "Enter")
+    page.wait_for_function("document.querySelector('#usrbox p').textContent === 'HTTP 400'")
+    page.unroute("https://api.inaturalist.org/**")
+    page.route(
+        "https://api.inaturalist.org/**",
+        lambda r: r.fulfill(
+            json={"results": [{"id": 9, "login": "JDoe"}]}
+            if r.request.url.split("?")[0].endswith("/users/autocomplete")
+            else SPECIES_COUNTS
+        ),
+    )
+    page.press("#usrname", "Enter")
+    page.wait_for_function("/^Genera/.test(document.querySelector('#usrbox p').textContent)")
     page.close()

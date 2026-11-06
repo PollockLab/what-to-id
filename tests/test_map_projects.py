@@ -436,7 +436,8 @@ const MF={ST_KEEP:8,ST_INEXACT:4,accOut:()=>0,record(){},groupSet(){},
   keep:(a,b,c,d,n,out)=>out.fill(1)},TF={},
   CH={picked:()=>[]},S={groups:{},only:{}},META={groups:['g']},AREA={ver:()=>0,mask:()=>null},GONE={},
   PJ={sync(){},key:()=>'',wide:()=>null,drop:()=>false},
-  UF={sync(){},key:()=>'',drop:()=>false},LC={fill:(g,n)=>new Uint8Array(4*n)};
+  UF={sync(){},key:()=>'',drop:()=>false,ranked:()=>false},LC={fill:(g,n)=>new Uint8Array(4*n)};
+var PD_COL=0;
 const P={n:4,id:Uint32Array.of(5,300,70000,400),pos:new Float32Array(8),tax:new Uint16Array(4),
   grp:new Uint8Array(4),obs:new Uint16Array(4),up:new Uint16Array(4),fl:new Uint8Array(4)};
 function refilter(){pointData();}

@@ -1,15 +1,20 @@
 // The user filter. The User box takes an iNaturalist login or user number (hash: user=, and umode=
-// taxa or unid; none is Observer, or My taxa on a map without an observer file; umin= is My taxa's
-// threshold, 5, 20 or 100, none is 50). Observer opens
+// first, taxa or unid; none is Observer, or My taxa without an observer file, so old links keep their meaning; a typed
+// login starts on My taxa first; umin= is the genus threshold of My taxa and My taxa first,
+// 5, 20 or 100, none is 50). Observer opens
 // Identify on the user's records (user_id); the others add without_ident_user_id, which would hide nearly all of an observer's own records. The
-// select narrows the map by one of three rules: Observer (the default) keeps the dots the user observed
-// (pool-observer.bin, one uint32 per record in shard order), My taxa the dots inside a genus where
-// the user has at least umin current identifications in BC, Not yet identified by me hides the dots the user identified in the view.
+// select applies one of four rules: My taxa first hides nothing but ranks the records inside a genus where
+// the user has at least umin current identifications in BC (mine(i): first on Identify, the rest dimmed on the map),
+// My taxa keeps only those, Observer keeps the dots the user observed
+// (pool-observer.bin, one uint32 per record in shard order), Not yet identified by me hides the dots the user identified in the view.
 // Everything but the observer file comes from api.inaturalist.org in the browser, one request at a
 // time and at least a second apart, and is kept for the session. Without a user nothing is filtered.
 var USR_CAP={taxa:5,unid:25},USR_PER={taxa:500,unid:200},USR_MINS=[5,20,50,100],USR_MIN=50;
 // {id} for a user number, {login} for a login, null for anything else.
+// A profile link (any iNaturalist network host) or a leading @ is taken for the login or number it holds.
 function usrParse(s){s=String(s||'').trim();
+  var u=/^(?:https?:\/\/)?(?:[\w-]+\.)*inaturalist\.[a-z]{2,3}\/people\/([^\/?#]+)/i.exec(s);if(u)s=u[1];
+  s=s.replace(/^@/,'');
   return /^\d+$/.test(s)?(+s>0&&+s<=4294967295?{id:+s}:null):/^[A-Za-z0-9_-]{1,40}$/.test(s)?{login:s}:null;}
 // The genera the My taxa mode keeps, as [iNaturalist id, count] pairs: each species_counts count is added to
 // the pool genus row among the taxon and its ancestors (ancestor_ids), and a genus stays at min or more.
@@ -64,7 +69,7 @@ function inatGate(o){var cache={},q=Promise.resolve(),last=0,gap=o.gap==null?100
     q=p.catch(function(){delete cache[url];});return p;};}
 function userFilter(o){
   var S=o.S,META=o.meta,nf=new Intl.NumberFormat('en-CA'),box=document.getElementById('usrbox'),
-    api=inatGate({gap:o.gap,fetch:o.fetch,say:function(t){say(t);}}),cur='',run=0,id=0,mask=null,ob=null,hide=null,capped=false,key=0,Pn=null,gen=[],used=0,fit=null,input,mode,minsel,msg,again;
+    api=inatGate({gap:o.gap,fetch:o.fetch,say:function(t){say(t);}}),cur='',bad=0,run=0,id=0,mask=null,ob=null,hide=null,capped=false,key=0,Pn=null,gen=[],used=0,fit=null,input,mode,minsel,msg,again,sum;
   function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;
     if(text!=null)e.textContent=text;return e;}
   function em(){return S.umode||(META.observer?'observer':'taxa');}
@@ -75,7 +80,9 @@ function userFilter(o){
       Pn?Pn.tax:[],META.max_url-1500));return fit;}
   function head(){return gen.length?'Genera where '+S.user+' has at least '+used+' IDs in BC ('+nf.format(gen.length)+
     (gen.length===1?' genus':' genera')+')'+(used<min()?'; none reach '+min()+' yet.':'.'):
-    S.user+' has fewer than '+USR_MINS[0]+' IDs in any BC genus yet. Try Observer or Not yet identified by me.';}
+    S.user+' has fewer than '+USR_MINS[0]+' IDs in any BC genus yet. Try '+(META.observer?'Observer or ':'')+'Not yet identified by me.';}
+  // My taxa first with genera: the rest come last on Identify and are dimmed on the map
+  function dim(){return em()==='first'&&gen.length?' Other records are listed last on Identify and dimmed on the map.':'';}
   function say(t){if(msg)msg.textContent=t;}
   function load(m,p){
     var place='&place_id='+META.place_id;
@@ -91,9 +98,9 @@ function userFilter(o){
       mask=usrMask(o.taxa(),gen.map(function(e){return e[0];}));});}
   // Starts what S.user and S.umode ask for once, whenever the records are drawn again.
   function start(){
-    var u=S.user,m=em(),p=usrParse(u),k=u?u+'|'+m+(m==='taxa'?'|'+min():''):'';
-    if(k===cur||(p&&m==='taxa'&&!o.taxa()))return;  // My taxa waits for the taxa table; the next refilter retries
-    var tag=++run;cur=k;id=0;mask=ob=hide=null;gen=[];used=0;fit=null;capped=false;key++;
+    var u=S.user,m=em(),g=m==='taxa'||m==='first',p=usrParse(u),k=u?u+'|'+m+(g?'|'+min():''):'';
+    if(k===cur||(p&&g&&!o.taxa()))return;  // the genus modes wait for the taxa table; the next refilter retries
+    bad=0;var tag=++run;cur=k;id=0;mask=ob=hide=null;gen=[];used=0;fit=null;capped=false;key++;
     if(!u){say('');return;}
     if(!p){say('Enter an iNaturalist login or user number.');return;}
     say('Looking up '+u+'…');
@@ -103,22 +110,27 @@ function userFilter(o){
       if(!r)throw new Error('No iNaturalist user "'+p.login+'"');return r.id;})).then(live)
     .then(function(v){id=v;key++;o.changed();say('Loading '+u+'…');return load(m,p);}).then(live)
     .then(function(){say(m==='observer'?'Showing records observed by '+u+'.':m==='unid'?'Hiding records '+u+' identified.':
-        head());key++;o.changed();})
-    .catch(function(e){if(e===0)return;mask=ob=hide=null;key++;
+        head()+dim());key++;o.changed();})
+    .catch(function(e){if(e===0)return;bad=1;mask=ob=hide=null;key++;
       say(e instanceof TypeError?'Could not reach iNaturalist.':e.message);o.changed();});}
-  function tag(){mode.dataset.explain={observer:'observer-filter',taxa:'my-taxa',unid:'not-identified-by-me'}[mode.value];}
-  function apply(){tag();S.user=input.value.trim().slice(0,100);S.umode=mode.value===(META.observer?'observer':'taxa')?'':mode.value;o.changed();}
+  function tag(){mode.dataset.explain={first:'my-taxa-first',observer:'observer-filter',taxa:'my-taxa',unid:'not-identified-by-me'}[mode.value];}
+  // an unparseable entry is not written to the hash; a failed lookup is tried again on the next apply
+  function apply(){tag();var v=input.value.trim().slice(0,100),p=v&&usrParse(v);
+    if(v&&!p){say('Enter an iNaturalist login or user number.');return;}
+    if(bad){cur='';bad=0;}
+    S.user=p?String(p.id||p.login):'';input.value=S.user;S.umode=mode.value===(META.observer?'observer':'taxa')?'':mode.value;o.changed();}
   if(box){
-    box.appendChild(el('summary',null,'User'));
+    sum=box.appendChild(el('summary',null,'User'));
     var f=box.appendChild(el('form','prow')),lab=f.appendChild(el('label','muted','iNaturalist login or user number'));
     input=f.appendChild(el('input','padd'));input.id=lab.htmlFor='usrname';input.type='text';
     input.placeholder='Login or number';input.autocomplete='off';input.spellcheck=false;
     mode=f.appendChild(el('select'));mode.setAttribute('aria-label','What to do with the user');
-    [['observer','Observer'],['taxa','My taxa'],['unid','Not yet identified by me']].forEach(function(m){
+    [['first','My taxa first'],['taxa','My taxa'],['unid','Not yet identified by me'],['observer','Observer']].forEach(function(m){
       var op=mode.appendChild(el('option',null,m[1]));op.value=m[0];
       if(m[0]==='observer'&&!META.observer)op.disabled=true;});
+    mode.value='first';  // until a user is set, what a typed login starts on
     minsel=f.appendChild(el('select'));minsel.setAttribute('aria-label','Fewest IDs in a genus');
-    USR_MINS.forEach(function(v){var op=minsel.appendChild(el('option',null,v+'+ IDs'));op.value=v;});
+    USR_MINS.forEach(function(v){var op=minsel.appendChild(el('option',null,v+'+ of my IDs per genus'));op.value=v;});
     again=f.appendChild(el('button','padd','Reload for this view'));again.type='button';again.hidden=true;
     again.onclick=function(){cur='';o.changed();};
     f.onsubmit=function(e){e.preventDefault();apply();};input.onchange=apply;mode.onchange=apply;minsel.onchange=function(){S.umin=+minsel.value===USR_MIN?0:+minsel.value;o.changed();};
@@ -127,20 +139,29 @@ function userFilter(o){
   return {
     // brings the box in line with S and starts any load it needs; P is the records so far
     sync:function(P){Pn=P;if(input){if(document.activeElement!==input)input.value=S.user;
-      mode.value=em();tag();minsel.value=used||min();minsel.hidden=em()!=='taxa';again.hidden=em()!=='unid'||!S.user;}start();},
-    drop:function(i){if(!id)return false;
+      if(S.user)mode.value=em();tag();minsel.value=min();minsel.hidden=!S.user||mode.value!=='taxa'&&mode.value!=='first';again.hidden=!o.again||em()!=='unid'||!S.user;
+      sum.textContent=S.user?'User: '+S.user+' · '+mode.selectedOptions[0].text:'User';}start();},
+    drop:function(i){if(!id||em()==='first')return false;
       if(mask){var t=Pn.tax[i];return !(t<mask.length&&mask[t]===1);}
       if(ob)return i<ob.length&&ob[i]!==id;
       return hide?hide.has(Pn.id[i]):false;},
     key:function(){return key;},
-    active:function(){return !!(mask||ob||hide);},
+    mode:em,
+    // true while some records are left out; My taxa first leaves none out, it ranks them (ranked, mine)
+    active:function(){return !!(mask&&em()!=='first'||ob||hide);},
+    ranked:function(){return !!mask&&gen.length>0&&em()==='first';},
+    // the record tooltip's line under My taxa first
+    where:function(i){return this.ranked()?'<br>'+(this.mine(i)?'In':'Outside')+' your genera':'';},
+    // Identify's empty Observer view offers this
+    first:function(){mode.value='first';apply();},
+    mine:function(i){var t=Pn.tax[i];return t<mask.length&&mask[t]===1;},
     // noTaxa leaves taxon_id out, for links that list the records by id
     params:function(noTaxa){if(!id)return {};if(em()==='observer')return {user_id:String(id)};
-      var p={without_ident_user_id:String(id)},k=mask&&!noTaxa?kept().ids:[];if(k.length)p.taxon_id=k.join(',');return p;},
+      var p={without_ident_user_id:String(id)},k=mask&&!noTaxa&&em()==='taxa'?kept().ids:[];if(k.length)p.taxon_id=k.join(',');return p;},
     tip:function(){return id&&em()!=='observer'?' Records the user identified are left out; ones you skipped are hidden by iNaturalist when you are signed in.':'';},
     // the map counts are approximate under My taxa and Not yet identified, as Identify cannot say them
     note:function(){return mask?head()+(capped?' Only the first '+nf.format(USR_CAP.taxa*USR_PER.taxa)+' taxa were read.':'')+
-      (kept().cut?' Identify gets only the top '+(kept().ids.length===1?'genus':nf.format(kept().ids.length)+' genera')+
+      (em()==='first'?dim():kept().cut?' Identify gets only the top '+(kept().ids.length===1?'genus':nf.format(kept().ids.length)+' genera')+
         ' by records to identify.':''):
       hide?'The map hides records '+S.user+' identified'+(capped?' (first '+nf.format(USR_CAP.unid*USR_PER.unid)+' only)':'')+
         ', so its count is approximate.':'';}
