@@ -22,6 +22,11 @@ and <em>other</em> is its best score to any other species in the pool; the margi
 other. A margin above 0 means the label is the model's first choice among the pool's species.
 For a record labelled above species (a genus, say), the best score inside the label's clade is
 compared with the best score outside it.</p>
+<figure>__FIG_MARGIN__<figcaption>Margin of every species-labelled record in the scored pool,
+coloured by the level it took, on a log count axis. Dashed lines: the cut at 0 between Clear
+matches and Close calls, and at &minus;__TAXONOMIST_MARGIN__ between Close calls and Might be
+mislabelled. The end bins hold every record beyond &minus;0.15 and 0.15. From the committed
+output of the evaluation script below.</figcaption></figure>
 
 <h3 id="methods-levels">Identify levels</h3>
 <p>Every record is scored once and takes the first level whose rule it meets, in this order:</p>
@@ -39,9 +44,9 @@ best other species has __MIN_LOOKALIKE_RECORDS__ or more verifiable records in B
 </ol>
 <p>The page shows Odd shots, Close calls and Might be mislabelled as one list. Within a level,
 records are ranked by their score and the rank is stored in __STEPS__ equal buckets; the bucket,
-not the raw score, orders the cards. Odd shots and Might be mislabelled show the farthest and
-the most negative first. Levels order records for review; they do not say that a label is right
-or wrong.</p>
+not the raw score, orders the cards. Odd shots show the farthest first; Close calls and Might be
+mislabelled show the most negative margin first (see Evaluation for why). Levels order records for
+review; they do not say that a label is right or wrong.</p>
 <p>Daily updates score only the records the last full run lacks, against cut-offs frozen from
 that run: the per-group Odd shots cut and, per species, the lowest own among its Clear matches.
 A species with fewer than __MIN_PER_CLASS__ records in the full run gets no Clear match until the
@@ -113,6 +118,34 @@ __SUG_MIS_GENUS_RR__). The suggestion points in the right direction more often t
 rarely the exact answer, so the page shows it as a look-alike to check, not as a proposed ID. The bar
 set in advance for the exact species was a share of 0.25; it was not met. Records that left Needs ID
 are not counted here, since their new taxon is not in the pool.</p>
+<p>Does the margin itself predict a correction? The next figure bins the same cohort into
+__CAL_BINS__ groups of equal size by margin, lowest first, and shows the corrected share in each.
+The share falls as the margin rises and is flat above 0. The cut-offs are not probabilities: a
+record in the lowest bin is corrected a few times in a thousand, not often.</p>
+<figure>__FIG_CALIBRATION__<figcaption>Corrected per 1,000 records in each margin bin of equal
+record count, by __REPL_OUTCOME_FIRST__. Labels under the bars are the bin's lower margin.</figcaption></figure>
+<p>Are the levels better than a plain sort? The area under the curve (AUC) is the chance that a
+corrected record is shown before an uncorrected one; 0.5 is a random order. The first column ranks
+every species-labelled record, the second only the records the Might be wrong list holds.</p>
+<table class="eval"><thead><tr><th>Order</th><th>AUC, all records</th><th>AUC, shown records</th>
+</tr></thead><tbody>
+__BASELINE_ROWS__
+</tbody></table>
+<p>Within Close calls alone, showing the lowest margin first gives an AUC of __CLOSE_AUC__; the
+page used to show the margin nearest 0 first and was changed to this order on
+__CLOSE_CHANGED__. Across all records a plain sort by margin beats the page order, because the
+levels leave most records in no level and keep only __STEPS__ steps of order within a level; on the
+records the page shows, the two tie. The levels earn their place by what they say about a record,
+not by ranking it better than its margin would.</p>
+<p>Does it hold on a later pool? The same cohort looked up in the pool of __REPL_OUTCOME__:</p>
+<table class="eval"><thead><tr><th>Level</th><th>Records</th><th>Corrected per 1,000</th>
+<th>Rate ratio vs no level</th></tr></thead><tbody>
+__REPL_ROWS__
+</tbody></table>
+<p>Run it yourself. The scored cohort, one row per record with its level, scores, suggested
+species and outcome, is __COHORT_LINK__ on the index's data set. The script is
+<code>scripts/levels_outcome.py</code> in the repository; it takes the scores file and two pool
+files and writes the JSON this page reads, including the figure data above.</p>
 
 <h3 id="methods-refs">References</h3>
 <ol class="refs">

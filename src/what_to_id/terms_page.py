@@ -67,6 +67,8 @@ h3{font-size:15px;margin:20px 0 6px}
 a{color:var(--bar)}dt{font-weight:650;margin-top:10px}dd{margin:2px 0 0}
 code{font-size:12px;word-break:break-all}ol.refs{padding-left:20px}ol.refs li{margin:4px 0}
 table.eval{border-collapse:collapse;font-size:13px}
+figure{margin:12px 0}figure svg{width:100%;height:auto;font-size:11px;fill:var(--ink)}
+figcaption{font-size:13px;color:var(--muted,inherit)}
 table.eval th,table.eval td{border-bottom:1px solid var(--line);padding:4px 8px;text-align:left}
 dt:target{background:var(--chip);outline:2px solid var(--bar)}
 """.strip()
@@ -109,7 +111,9 @@ def views(dates: dict | None = None) -> list[tuple[str, str, str]]:
     ]
 
 
-def render(dates: dict | None = None, manifest: dict | None = None) -> str:
+def render(
+    dates: dict | None = None, manifest: dict | None = None, data_url: str | None = None
+) -> str:
     terms = []
     for group, keys in GROUPS.items():
         items = []
@@ -127,7 +131,7 @@ def render(dates: dict | None = None, manifest: dict | None = None) -> str:
         f"<title>How it works</title>\n<style>\n{page_nav.CSS}\n{CSS}\n</style></head><body>\n"
         f'{page_nav.nav(PAGE_NAME)}<main id="main-content">\n<h1>How it works</h1>\n'
         f"<h2>Terms</h2>\n{chr(10).join(terms)}\n<h2>How each view works</h2>\n{how}\n"
-        f'<h2 id="methods">Methods</h2>\n{terms_methods.render(manifest)}\n'
+        f'<h2 id="methods">Methods</h2>\n{terms_methods.render(manifest, data_url)}\n'
         "</main></body></html>\n"
     )
 
@@ -139,7 +143,9 @@ def build(out_dir: str | Path, data_url: str | None = None) -> Path:
     dates = out / page_identify.DATES_NAME
     manifest = terms_methods.fetch_manifest(data_url) if data_url else None
     target = out / PAGE_NAME
-    target.write_text(render(json.loads(dates.read_text()) if dates.exists() else None, manifest))
+    target.write_text(
+        render(json.loads(dates.read_text()) if dates.exists() else None, manifest, data_url)
+    )
     return target
 
 
