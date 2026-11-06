@@ -132,9 +132,11 @@ return function(buf,ctx){
   // The habitat model at the record's point (0-99 %), read once per model and record; a later open or a close drops it.
   function habText(i,v){
     if(v==null)return SDM+'no value here';
-    // shortcut: the 50 and 20 % cut-offs are unvalidated, set them against expert-checked records once there are some
-    var t=SDM+Math.round(v)+' % suitable here';
-    return !far(i)?t:v>=50?t+'. Habitat suits it: possibly a range extension, worth an expert look':
+    // shortcut: the 50 and 20 % cut-offs sit in the trough of the live distribution (2026-11-06, 480 far-outside
+    // modelled records: 348 at 50 % and up, 62 under 20 %), not yet set against expert-checked records
+    var t=SDM+Math.round(v)+' % suitable here',fl=P.flags||P.fl,intro=fl&&(fl[i]&1);
+    return !far(i)?t:v>=50?t+(intro?'. Habitat suits it and the species is introduced: the range map is likely behind its spread':
+      '. Habitat suits it: possibly a range extension, worth an expert look'):
       v<20?t+'. Habitat does not suit it either: check the ID or the location':t;
   }
   function habitat(h,i){
