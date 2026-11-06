@@ -41,11 +41,20 @@ def cohort(scores: Path, before: Path, after: Path) -> pd.DataFrame:
     easy, tax = species_masks(s, weird)
     mis = (s["margin"] < -TAXONOMIST_MARGIN) & lookalike_known(s) & ~weird
     s["level"] = np.select([weird, easy, tax, mis], [4, 1, 2, 5], 0)
-    b = pd.read_parquet(after, columns=["id", "taxon_id"]).rename(columns={"taxon_id": "taxon_b"})
+    b = pd.read_parquet(after, columns=["id", "taxon_id", "taxon_name"]).rename(
+        columns={"taxon_id": "taxon_b", "taxon_name": "name_b"}
+    )
     s = s.merge(b, on="id", how="left", validate="one_to_one")
     s["left"] = s["taxon_b"].isna()
     changed = ~s["left"] & (s["taxon_b"] != s["taxon_id"])
     s["corrected"] = changed & s["taxon_id"].isin(set(b["taxon_b"].unique()))
+    # where a corrected record went: the suggested species itself, or its genus
+
+    def genus(n: pd.Series) -> pd.Series:
+        return n.str.split(" ").str[0]
+
+    s["to_suggested"] = s["corrected"] & (s["name_b"] == s["other_name"])
+    s["to_suggested_genus"] = s["corrected"] & (genus(s["name_b"]) == genus(s["other_name"]))
     return s
 
 
@@ -77,6 +86,7 @@ def main(argv: list[str] | None = None) -> int:
     s = cohort(a.scores, a.pool_before, a.pool_after)
     rng = np.random.default_rng(a.seed)
     none = s.loc[s["level"] == 0, "corrected"].to_numpy()
+    none_c = s[(s["level"] == 0) & s["corrected"]]
     levels = {}
     for k, name in LEVELS.items():
         d = s[s["level"] == k]
@@ -85,9 +95,15 @@ def main(argv: list[str] | None = None) -> int:
             "left_per_1000": round(1000 * float(d["left"].mean()), 2),
             "corrected_per_1000": round(1000 * float(d["corrected"].mean()), 2),
         }
+        c = d[d["corrected"]]
+        for col in ("to_suggested", "to_suggested_genus"):
+            row[f"{col}_share"] = round(float(c[col].mean()), 3) if len(c) else None
         if k:
             rr, ci = rate_ratio(d["corrected"].to_numpy(), none, rng, a.reps)
             row["corrected_rr"], row["corrected_rr_ci"] = round(rr, 2), [round(v, 2) for v in ci]
+            for col in ("to_suggested", "to_suggested_genus"):
+                rr, ci = rate_ratio(c[col].to_numpy(), none_c[col].to_numpy(), rng, a.reps)
+                row[f"{col}_rr"], row[f"{col}_rr_ci"] = round(rr, 2), [round(v, 2) for v in ci]
         levels[name] = row
     out = {
         "script": "scripts/levels_outcome.py",

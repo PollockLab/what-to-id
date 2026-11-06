@@ -175,3 +175,7 @@ def test_evaluation_table_comes_from_the_committed_script_output():
     assert f"scored on\n{ev['scored_on']} were looked up again" in html
     assert f"in the pool of {ev['outcome_on']}" in html
     assert "<td>No level</td>" in html and "1 (reference)" in html
+    none = ev["levels"]["none"]
+    assert f"Might be mislabelled, {mis['to_suggested_share']:.0%}\nmoved to the species" in html
+    assert f"the shares are {none['to_suggested_share']:.0%} and " in html
+    assert f"(rate ratios {mis['to_suggested_rr']:.2f} [" in html

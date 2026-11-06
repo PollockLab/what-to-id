@@ -23,46 +23,96 @@
   "none": {
    "n": 788572,
    "left_per_1000": 9.52,
-   "corrected_per_1000": 0.59
+   "corrected_per_1000": 0.59,
+   "to_suggested_share": 0.026,
+   "to_suggested_genus_share": 0.393
   },
   "easy": {
    "n": 322244,
    "left_per_1000": 12.99,
    "corrected_per_1000": 0.35,
+   "to_suggested_share": 0.054,
+   "to_suggested_genus_share": 0.634,
    "corrected_rr": 0.59,
    "corrected_rr_ci": [
     0.49,
     0.73
+   ],
+   "to_suggested_rr": 2.07,
+   "to_suggested_rr_ci": [
+    0.55,
+    5.17
+   ],
+   "to_suggested_genus_rr": 1.61,
+   "to_suggested_genus_rr_ci": [
+    1.34,
+    1.92
    ]
   },
   "taxonomist": {
    "n": 73368,
    "left_per_1000": 4.77,
    "corrected_per_1000": 1.14,
+   "to_suggested_share": 0.083,
+   "to_suggested_genus_share": 0.476,
    "corrected_rr": 1.95,
    "corrected_rr_ci": [
     1.53,
-    2.44
+    2.39
+   ],
+   "to_suggested_rr": 3.22,
+   "to_suggested_rr_ci": [
+    1.16,
+    8.28
+   ],
+   "to_suggested_genus_rr": 1.21,
+   "to_suggested_genus_rr_ci": [
+    0.91,
+    1.53
    ]
   },
   "weird": {
    "n": 28796,
    "left_per_1000": 9.58,
    "corrected_per_1000": 1.6,
+   "to_suggested_share": 0.0,
+   "to_suggested_genus_share": 0.065,
    "corrected_rr": 2.72,
    "corrected_rr_ci": [
     1.97,
-    3.54
+    3.61
+   ],
+   "to_suggested_rr": 0.0,
+   "to_suggested_rr_ci": [
+    0.0,
+    0.0
+   ],
+   "to_suggested_genus_rr": 0.17,
+   "to_suggested_genus_rr_ci": [
+    0.0,
+    0.37
    ]
   },
   "mislabel": {
    "n": 226344,
    "left_per_1000": 4.18,
    "corrected_per_1000": 2.56,
+   "to_suggested_share": 0.069,
+   "to_suggested_genus_share": 0.461,
    "corrected_rr": 4.36,
    "corrected_rr_ci": [
-    3.83,
-    4.89
+    3.89,
+    4.87
+   ],
+   "to_suggested_rr": 2.67,
+   "to_suggested_rr_ci": [
+    1.5,
+    5.83
+   ],
+   "to_suggested_genus_rr": 1.17,
+   "to_suggested_genus_rr_ci": [
+    1.03,
+    1.35
    ]
   }
  }
