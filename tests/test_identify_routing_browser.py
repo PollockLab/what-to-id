@@ -40,7 +40,7 @@ def counted(browser, base, hash_=""):
     def api(route):
         u = urlparse(route.request.url)
         path = u.path.rsplit("/v1/", 1)[1]
-        if path == "observations":
+        if path == "observations" and "ident_user_id" not in u.query:
             return route.fallback()
         page.api.append((path, parse_qs(u.query)))
         if path == "users/autocomplete":  # a prefix match first, then the exact login
@@ -118,8 +118,8 @@ def test_the_kind_control_filters_might_be_wrong_and_keeps_the_kind_in_the_hash(
 
 def test_the_user_filter_keeps_only_the_users_genera_as_the_map_does(browser, site):
     base, pts = site
-    # My taxa, the default here: the test map has no observer file
-    page = counted(browser, base, "#lvl=1&user=JDoe&umode=taxa")
+    # Only my genera, the default here: the test map has no observer file
+    page = counted(browser, base, "#lvl=1&user=JDoe&umode=taxa&umin=50")
     taxon = dict(zip(pts["id"], pts["taxon_id"], strict=True))
     page.wait_for_function("__identify.user()")
     # the login is looked up once, then the taxa are read for the user number that matched exactly
@@ -128,7 +128,9 @@ def test_the_user_filter_keeps_only_the_users_genera_as_the_map_does(browser, si
     ids = page.evaluate("__identify.ids()")
     assert ids and {taxon[i] for i in ids} <= GENUS_A
     assert page.locator("#usrbox").get_attribute("open") is not None
-    assert page.input_value("#usrname") == "JDoe" and page.input_value("#usrbox select") == "taxa"
+    assert page.input_value("#usrname") == "JDoe" and page.is_checked("#usrtaxa")
+    assert page.is_disabled("#usrobserver")
+    assert page.get_attribute("#usrobserver", "title") == "This map has no observer file."
     assert "identify/user-taxa" in events(page)
     # no login in the counts
     assert not any("jdoe" in e.lower() or "777" in e for e in events(page))
@@ -140,13 +142,13 @@ def test_my_taxa_first_lists_the_users_genera_first_then_a_divider_then_the_rest
     page = counted(browser, base, "#lvl=1")
     before = page.evaluate("__identify.view()[1]")
     page.close()
-    page = counted(browser, base, "#lvl=1&user=JDoe&umode=first")
+    page = counted(browser, base, "#lvl=1&user=JDoe&umode=first&umin=50")
     page.wait_for_function("__identify.user()")
     taxon = dict(zip(pts["id"], pts["taxon_id"], strict=True))
     rows, m = page.evaluate("__identify.view()[1]"), page.evaluate("__identify.mine()")
     assert sorted(rows) == sorted(before) and 0 < m < len(rows)  # nothing hidden, only ranked
     assert {taxon[i] for i in rows[:m]} <= GENUS_A and not {taxon[i] for i in rows[m:]} & GENUS_A
-    assert page.input_value("#usrbox select") == "first"
+    assert not page.is_checked("#usrtaxa") and not page.is_checked("#usrunid")
     while page.locator("#grid .sep").count() == 0:
         page.click("#more")
     sep = page.locator("#grid .sep:not(.top)")
@@ -159,22 +161,38 @@ def test_a_login_typed_on_identify_goes_to_the_hash(browser, site):
     base, _ = site
     page = counted(browser, base, "#lvl=1")
     n = len(page.evaluate("__identify.ids()"))
-    page.click("#usrbox summary")
+    page.click("#usrbox > summary")
     page.fill("#usrname", "JDoe")
     page.press("#usrname", "Enter")
     page.wait_for_function("__identify.user()")
     assert "user=JDoe&umode=first" in page.evaluate("location.hash")  # a typed login starts there
     assert len(page.evaluate("__identify.ids()")) == n  # My taxa first hides nothing
-    page.select_option("#usrbox select", "taxa")
-    page.wait_for_function(
-        "!location.hash.includes('umode')"
-    )  # My taxa, the default without an observer file
-    page.wait_for_function(f"__identify.ids().length < {n}")
+    page.check("#usrtaxa")
+    # Only my genera, the default without an observer file
+    page.wait_for_function("!location.hash.includes('umode')")
+    page.wait_for_function("__identify.mine() === -1")  # all left is theirs: nothing is ranked
     page.fill("#usrname", "")
     page.press("#usrname", "Enter")
     page.wait_for_function("!__identify.user()")
     assert "user=" not in page.evaluate("location.hash")
     assert len(page.evaluate("__identify.ids()")) == n and page.errors == []
+
+
+def test_combined_ticks_count_as_one_event_and_the_login_is_kept_for_the_map(browser, site):
+    base, _ = site
+    page = counted(browser, base, "#lvl=1&user=JDoe&umode=taxa,unid")
+    # counted once both loads are in, after the genera alone already filter
+    page.wait_for_function("EV.some(e => e.path === 'identify/user-taxa-unid')")
+    page.close()
+    page = counted(browser, base, "#lvl=1")
+    page.click("#usrbox > summary")
+    page.fill("#usrname", "JDoe")
+    page.press("#usrname", "Enter")
+    page.wait_for_function("__identify.user()")
+    # the map on the same origin reads the same key
+    assert page.evaluate("JSON.parse(localStorage.getItem('wtid.user')).user") == "JDoe"
+    assert page.errors == []
+    page.close()
 
 
 def test_an_unknown_login_says_so_and_filters_nothing(browser, site):
