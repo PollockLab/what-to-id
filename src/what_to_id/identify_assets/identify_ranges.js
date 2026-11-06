@@ -1,13 +1,15 @@
 // Range maps on the Identify cards (pool-levels-range.bin, format in pool_levels.py). Beside Identify a chip gives the
 // verdict in a few words and opens one shared popover: BC grid cells, label-only / look-alike-only / both, the record.
 // Over the level, the far-outside control (All / Hide / Only) in #rout; Clear matches start with records far outside left out.
-// IdentifyRanges(buf,ctx), ctx {P, name(i) the label, look(i) the look-alike or null, redraw()}. The map's record card
-// takes only the chip and its popover (chip(i,lv)); it has no #rout, so no segmented control.
+// IdentifyRanges(buf,ctx), ctx {P, name(i) the label, look(i) the look-alike or null, redraw(), sdm the ECCC habitat
+// models (META.sdm, sdm_manifest.py; P.tax then indexes sdm.taxa) or none}. The map's record card takes only the chip and
+// its popover (chip(i,lv)); it has no #rout, so no segmented control.
 var IdentifyRanges=(function(){
 'use strict';
 // OUT_KM: a res-4 cell is ~22 km across, so under 50 km is cell-edge noise, not a range outlier.
 var OUT_KM=50,NONE=255,KX=Math.cos(54*Math.PI/180),NEITHER='Outside both ranges: maybe neither.',
-  REFS=[['Vancouver',-123120,49280],['Prince George',-122750,53920]];
+  REFS=[['Vancouver',-123120,49280],['Prince George',-122750,53920]],
+  SDM_POINT='https://tiler2.biodiversite-quebec.ca/cog/point/',SDM='Habitat model (ECCC 1 km): ';
 function $(id){return document.getElementById(id);}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 function svg(tag,attrs){var e=document.createElementNS('http://www.w3.org/2000/svg',tag);
@@ -28,7 +30,7 @@ return function(buf,ctx){
   if(buf.byteLength!==4+size+2*n)throw new Error('the range file holds '+buf.byteLength+' bytes, expected '+(4+size+2*n));
   var D=JSON.parse(new TextDecoder().decode(new Uint8Array(buf,4,size))),OKM=new Uint8Array(buf,4+size,n),NOTE=new Uint8Array(buf,4+size+n,n),
     RI=new Map(D.names.map(function(x,k){return [x,k];})),memo=[],BOX=null,OUTL=null,FAR=null,
-    S={lv:0,o:0},Q={i:-1,lv:0,chip:null,pin:false,t:0},pop=null;  // S.o: 0 all, 1 only far outside, -1 hide far outside
+    S={lv:0,o:0},Q={i:-1,lv:0,chip:null,pin:false,t:0},pop=null,HAB=new Map(),AB=null;  // S.o: 0 all, 1 only far outside, -1 hide far outside
   // a name's bitset over the grid cells, null when its range is unknown
   function bits(name){
     var k=name==null?undefined:RI.get(name);
@@ -122,10 +124,32 @@ return function(buf,ctx){
     pop.setAttribute('aria-label','Range map');pop.tabIndex=-1;
     var x=el('button','rx','×');x.type='button';x.setAttribute('aria-label','Close range map');
     x.onclick=function(){closePop(true);};
-    pop.append(x,el('canvas'),el('ul','rleg'),el('p','rcap'));
+    pop.append(x,el('canvas'),el('ul','rleg'),el('p','rcap'),el('p','rsdm'));
     pop.onmouseenter=function(){clearTimeout(Q.t);};
     pop.onmouseleave=leave;
     document.body.appendChild(pop);return pop;
+  }
+  // The habitat model at the record's point (0-99 %), read once per model and record; a later open or a close drops it.
+  function habText(i,v){
+    if(v==null)return SDM+'no value here';
+    // shortcut: the 50 and 20 % cut-offs are unvalidated, set them against expert-checked records once there are some
+    var t=SDM+Math.round(v)+' % suitable here';
+    return !far(i)?t:v>=50?t+'. Habitat suits it: possibly a range extension, worth an expert look':
+      v<20?t+'. Habitat does not suit it either: check the ID or the location':t;
+  }
+  function habitat(h,i){
+    var m=ctx.sdm,s=m&&m.taxa[P.tax[i]],cog=s&&m.cog.replace('{slug}',s),k=cog+' '+i;
+    if(AB){AB.abort();AB=null;}
+    h.hidden=!s;
+    if(!s)return;
+    if(HAB.has(k)){h.textContent=habText(i,HAB.get(k));return;}
+    h.textContent=SDM+'checking…';
+    var ab=AB=new AbortController();
+    fetch(SDM_POINT+P.lonlat[2*i].toFixed(5)+','+P.lonlat[2*i+1].toFixed(5)+'?url='+encodeURIComponent(cog),{signal:ab.signal})
+      .then(function(r){return r.json();})
+      .then(function(j){var v=j.values[0];v=v>=0&&v<=99?v:null;HAB.set(k,v);return v;})  // nodata is 255 or null
+      .catch(function(){return null;})
+      .then(function(v){if(AB!==ab)return;AB=null;h.textContent=habText(i,v);});
   }
   function openPop(chip,i,lv,pinned,kb){
     clearTimeout(Q.t);
@@ -139,7 +163,7 @@ return function(buf,ctx){
     (b?[['lab',a,1],['look',b,1],['both','both']]:[['lab',a,1]]).concat([[null,'this record']]).forEach(function(x){
       var li=el('li');li.appendChild(x[0]?el('span','sw '+x[0]):el('span','sw dot'));
       li.appendChild(x[2]?el('i',null,x[1]):document.createTextNode(x[1]));lg.appendChild(li);});
-    p.children[3].textContent=t.cap;p.children[3].hidden=!t.cap;
+    p.children[3].textContent=t.cap;p.children[3].hidden=!t.cap;habitat(p.children[4],i);
     p.hidden=false;
     if(innerWidth>=600||matchMedia('(hover:hover)').matches){var r=chip.getBoundingClientRect(),w=p.offsetWidth,h=p.offsetHeight;
       p.style.left=Math.max(8,Math.min(r.left,innerWidth-w-8))+'px';
@@ -151,6 +175,7 @@ return function(buf,ctx){
   function closePop(refocus){
     if(!pop||pop.hidden)return;
     clearTimeout(Q.t);pop.hidden=true;Q.chip.setAttribute('aria-expanded','false');
+    if(AB){AB.abort();AB=null;}
     if(refocus)Q.chip.focus();
     Q.chip=null;
   }

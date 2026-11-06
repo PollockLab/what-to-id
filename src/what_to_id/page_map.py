@@ -62,6 +62,7 @@ from what_to_id.map_oneid import with_one_id
 from what_to_id.map_parks import PARKS_NAME, parks_blob, parks_version
 from what_to_id.map_projects import add_projects
 from what_to_id.page import ARM_WORDS, group_name
+from what_to_id.sdm_manifest import sdm_meta
 from what_to_id.site_files import dump, hashed
 from what_to_id.taxonomy import (
     AT_RISK,
@@ -493,8 +494,10 @@ def write_map(
     tree: dict | None = None,
     projects: Path | None = None,
     data_url: str | None = None,
+    sdm_manifest: str | Path | None = None,
 ) -> list[Path]:
-    """Write map.html and its data; totals from fetch_totals, projects from map_projects."""
+    """Write map.html and its data; totals from fetch_totals, projects from map_projects, the
+    habitat models of the range popover (META.sdm) from sdm_manifest."""
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     blobs, meta = encode_points(pool, tree)
@@ -506,6 +509,12 @@ def write_map(
         if over:
             _warn(f"{over} group-months hold more records than their totals; the page caps them")
     add_projects(blobs, meta, projects)
+    if sdm_manifest is not None:
+        taxa = json.loads(gzip.decompress(blobs[meta["taxa"]]))
+        try:
+            meta["sdm"] = sdm_meta(sdm_manifest, [t[0] for t in taxa])
+        except (OSError, requests.RequestException, KeyError, ValueError) as e:
+            _warn(f"no habitat models, the range popover goes without: {e}")  # the build goes on
     html = render_map(meta, freeze=freeze, data_url=data_url)
     low = html.lower()
     for w in ARM_WORDS:
@@ -549,6 +558,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--data-url", help="atlas index base URL, for the record card's closest matches"
     )
+    ap.add_argument(
+        "--sdm-manifest",
+        help="ECCC habitat model manifest.json, URL or file, for the range popover's habitat line",
+    )
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     pool = pd.read_parquet(a.pool)
@@ -571,6 +584,7 @@ def main(argv: list[str] | None = None) -> int:
         tree=tree,
         projects=a.projects,
         data_url=a.data_url,
+        sdm_manifest=a.sdm_manifest,
     ):
         logging.getLogger("what_to_id").info("wrote %s (%d bytes)", path, path.stat().st_size)
     return 0

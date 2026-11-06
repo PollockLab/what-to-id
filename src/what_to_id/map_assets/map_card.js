@@ -73,7 +73,7 @@ return function(c){
     // the range file has arrived, after every shard: a card already open gets its chip
     range:function(buf){
       var P=c.P();
-      R=IdentifyRanges(buf,{P:{n:P.n,lonlat:P.pos},look:function(){return null;},redraw:function(){},
+      R=IdentifyRanges(buf,{P:{n:P.n,lonlat:P.pos,tax:P.tax},sdm:c.META.sdm,look:function(){return null;},redraw:function(){},
         name:function(i){var t=P.tax[i]!==c.NOTAX&&c.TAXA()[P.tax[i]];return t?t[0]:null;}});
       chip();
     }
