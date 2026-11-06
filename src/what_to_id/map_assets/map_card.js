@@ -70,6 +70,8 @@ return function(c){
     hide:function(){RUN++;CUR=-1;if(R)R.close();},
     // 1 per record far outside its range, or null before the range file arrived
     outside:function(){return R&&R.outside();},
+    // a name's range cells (IdentifyRanges.cells), null before the range file or without a range
+    cells:function(name){return R?R.cells(name):null;},
     // the range file has arrived, after every shard: a card already open gets its chip
     range:function(buf){
       var P=c.P();

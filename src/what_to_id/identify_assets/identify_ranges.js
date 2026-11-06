@@ -237,6 +237,14 @@ return function(buf,ctx){
     // the chip alone, or null when the label's range is unknown; close drops its popover
     chip:function(i,lv){return bits(ctx.name(i))?chip(i,lv):null;},
     close:function(){closePop(false);},
+    // a name's range cells as a GeoJSON MultiPolygon in degrees (the grid holds lon/lat times 1000), null when unknown
+    cells:function(name){
+      var a=bits(name),m=[];
+      if(!a)return null;
+      D.grid.forEach(function(g,c){if(!has(a,c))return;
+        var r=[];for(var k=0;k<g.length;k+=2)r.push([g[k]/1000,g[k+1]/1000]);r.push(r[0]);m.push([r]);});
+      return m.length?{type:'MultiPolygon',coordinates:m}:null;
+    },
     // the chosen level, with the toggle out of the hash on load and at the level's default after
     level:function(lv,fromHash){
       var m=fromHash&&/(?:^|&)out=(-1|0|1)(?:&|$)/.exec(location.hash.slice(1));

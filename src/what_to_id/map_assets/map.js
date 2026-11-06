@@ -322,7 +322,7 @@ var FB=FilterBar({S:S,META:META,mf:MF,nf:nf,pj:PJ,sel:sel,P:function(){return P;
     if(parent!==window)parent.postMessage({type:'wtid-reset'},location.origin);},  // the photo space beside it zooms out
   extra:function(){return SUB?[{label:'Photo search: "'+SUBL+'" ('+SUB.size+')',
     remove:function(){parent.postMessage({type:'wtid-subset',ids:null},location.origin);}}]:[];}});
-function search(){TF=TX.filter(TAXA,S.picks);}
+function search(){TF=TX.filter(TAXA,S.picks);SDM.sync();}
 function gname(g){return META.names[g]||g;}
 $('toggle').onclick=function(){var o=$('side').classList.toggle('open');
   this.setAttribute('aria-expanded',String(o));};
@@ -477,6 +477,7 @@ var ZB=document.createElement('button');ZB.type='button';ZB.className='zoomrec';
 ZB.onclick=function(){ZB.hidden=true;MOVED=false;fitTo(shows());};map.getContainer().appendChild(ZB);
 map.on('movestart',function(e){if(e.originalEvent)MOVED=true;});  // only the viewer's own drag, wheel or pinch
 var overlay=new deck.MapboxOverlay({interleaved:false,pickingRadius:8,layers:[]});map.addControl(overlay);
+var SDM=MapSdm(map,{META:META,picks:function(){return S.picks;},TAXA:function(){return TAXA;},cells:MC.cells});
 var AREA=MapArea({map:map,S:S,LAST:LAST,hash:S.area,park:S.park,bcpark:S.bcpark,fit:!S.at,
   place:META.place_id,parks:META.parks,get:get,P:function(){return P;},keep:function(){return KEEP;},change:refilter,
   sel:function(){return sel().join('&');},extra:function(){var u=UF.params(true);return Object.keys(u).map(function(k){return '&'+k+'='+encodeURIComponent(u[k]);}).join('');},
@@ -530,7 +531,7 @@ META.shards.forEach(function(s,k){
       if(S.fly){S.fly=false;map.flyTo({center:[P.pos[2*at],P.pos[2*at+1]],zoom:12});}}}
     if(k===META.shards.length-1&&S.rec){S.rec=null;writeHash();}
     // the range chip's file is optional, and holds one record per shard record, so it waits for the last shard
-    if(k===META.shards.length-1&&META.files.range)get(META.files.range).then(function(b){MC.range(b);if(S.only.range)refilter();}).catch(function(){});
+    if(k===META.shards.length-1&&META.files.range)get(META.files.range).then(function(b){MC.range(b);SDM.sync();if(S.only.range)refilter();}).catch(function(){});
   });
 });
 chain.catch(function(e){$('count').textContent='Could not load the records ('+e.message+')';});
