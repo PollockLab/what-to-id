@@ -109,7 +109,7 @@ button[aria-pressed="true"],.btn.primary{background:var(--on);color:var(--onink)
 <body>
 __SITE_NAV__<header>
 <h1><span data-explain="taxonomy">Taxonomy</span></h1>
-<p class="sub">What the records are, counted on iNaturalist's tree at the taxon their community ID has reached.</p>
+<p class="sub">What the records are, counted on iNaturalist's tree at the taxon iNaturalist shows for them: the community ID when there is one, else the observer's ID.</p>
 <div class="picker"><label for="q" class="vh">Find a taxon</label>
 <input id="q" type="search" placeholder="Find a taxon, e.g. Carex" autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="sugg">
 <ul id="sugg" class="sugg" role="listbox" aria-label="Matching taxa" hidden></ul></div>
@@ -121,7 +121,7 @@ __SITE_NAV__<header>
 <p id="qn" aria-live="polite"></p>
 <p id="status" role="status"></p>
 <nav id="crumbs" aria-label="Focus"></nav>
-<p id="about" hidden>Every observation in BC that still needs an ID, counted at the taxon its community ID has reached and rolled up iNaturalist's taxonomy. The rings are taxonomic ranks, not time: this is not a dated phylogeny. A filled dot means every record stops at that taxon; a part-filled one, the share that does. Branches share the circle by the square root of their records, so small clades stay in sight: an angle is not a share. The outline's percentages, and the bars under them, are each taxon's plain share of all records that need an ID. Bars outside the tips show the records below each tip, on a log scale. Click to select a taxon (the tree stays put and its branch stands out), double-click or the card's Open to open or close it, shift+click or Open more below to open further down, Focus here to make it the centre, Esc to clear.</p>
+<p id="about" hidden>Every observation in BC that still needs an ID, counted at the taxon iNaturalist shows for it (the community ID when there is one, else the observer's ID) and rolled up iNaturalist's taxonomy. The rings are taxonomic ranks, not time: this is not a dated phylogeny. A filled dot means every record stops at that taxon; a part-filled one, the share that does. Branches share the circle by the square root of their records, so small clades stay in sight: an angle is not a share. The outline's percentages, and the bars under them, are each taxon's plain share of all records that need an ID. Bars outside the tips show the records below each tip, on a log scale. Click to select a taxon (the tree stays put and its branch stands out), double-click or the card's Open to open or close it, shift+click or Open more below to open further down, Focus here to make it the centre, Esc to clear.</p>
 </header>
 <section id="side" aria-label="Outline"><ul id="outline" role="tree" aria-label="Taxonomy"></ul></section>
 <main id="radial" tabindex="-1"><svg id="svg" role="img" aria-label="Radial tree of the taxa that need an ID; the outline holds the same tree"></svg></main>

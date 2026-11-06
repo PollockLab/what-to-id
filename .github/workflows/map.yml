@@ -212,9 +212,20 @@ jobs:
           python -m what_to_id.page_confusion --out _site \
             --data-url "https://huggingface.co/datasets/${ATLAS_HF_REPO}/resolve/main/"
       # terms.html: the glossary and each view's explanation, read from their templates. After the Identify
-      # step, whose scoring dates it prints. No tab: the toggletips' More links are the way in.
+      # step, whose scoring dates it prints, and with the index manifest for its Methods numbers. No tab: the
+      # toggletips' More links are the way in.
       - name: Add the How it works page
-        run: python -m what_to_id.terms_page --out _site
+        env:
+          ATLAS_HF_REPO: ${{ vars.ATLAS_HF_REPO }}
+        run: |
+          set -euo pipefail
+          atlas=()
+          if [ -n "$ATLAS_HF_REPO" ]; then atlas=(--data-url "https://huggingface.co/datasets/${ATLAS_HF_REPO}/resolve/main/"); fi
+          python -m what_to_id.terms_page --out _site "${atlas[@]}"
+          # the pages added after the first leak check get the same one
+          if grep -ril -E 'recency|gap_first|gap first|similarity|novelty|surprise' _site; then
+            echo "::error::a list name leaked into the site"; exit 1
+          fi
       - name: Include the photo-search page
         env:
           ATLAS_HF_REPO: ${{ vars.ATLAS_HF_REPO }}

@@ -14,7 +14,7 @@ import re
 from html import escape
 from pathlib import Path
 
-from what_to_id import page_identify, page_nav
+from what_to_id import page_identify, page_nav, terms_methods
 from what_to_id.glossary import GLOSSARY
 
 HERE = Path(__file__).parent
@@ -65,6 +65,9 @@ main{max-width:760px;margin:0 auto;padding:16px}
 h1{font-size:22px;margin:8px 0}h2{font-size:18px;margin:28px 0 8px}
 h3{font-size:15px;margin:20px 0 6px}
 a{color:var(--bar)}dt{font-weight:650;margin-top:10px}dd{margin:2px 0 0}
+code{font-size:12px;word-break:break-all}ol.refs{padding-left:20px}ol.refs li{margin:4px 0}
+table.eval{border-collapse:collapse;font-size:13px}
+table.eval th,table.eval td{border-bottom:1px solid var(--line);padding:4px 8px;text-align:left}
 dt:target{background:var(--chip);outline:2px solid var(--bar)}
 """.strip()
 
@@ -106,7 +109,7 @@ def views(dates: dict | None = None) -> list[tuple[str, str, str]]:
     ]
 
 
-def render(dates: dict | None = None) -> str:
+def render(dates: dict | None = None, manifest: dict | None = None) -> str:
     terms = []
     for group, keys in GROUPS.items():
         items = []
@@ -124,24 +127,28 @@ def render(dates: dict | None = None) -> str:
         f"<title>How it works</title>\n<style>\n{page_nav.CSS}\n{CSS}\n</style></head><body>\n"
         f'{page_nav.nav(PAGE_NAME)}<main id="main-content">\n<h1>How it works</h1>\n'
         f"<h2>Terms</h2>\n{chr(10).join(terms)}\n<h2>How each view works</h2>\n{how}\n"
+        f'<h2 id="methods">Methods</h2>\n{terms_methods.render(manifest)}\n'
         "</main></body></html>\n"
     )
 
 
-def build(out_dir: str | Path) -> Path:
+def build(out_dir: str | Path, data_url: str | None = None) -> Path:
     """Write ``terms.html`` into ``out_dir`` and return its path."""
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     dates = out / page_identify.DATES_NAME
+    manifest = terms_methods.fetch_manifest(data_url) if data_url else None
     target = out / PAGE_NAME
-    target.write_text(render(json.loads(dates.read_text()) if dates.exists() else None))
+    target.write_text(render(json.loads(dates.read_text()) if dates.exists() else None, manifest))
     return target
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(prog="python -m what_to_id.terms_page", description=__doc__)
     parser.add_argument("--out", type=Path, required=True, help="site directory")
-    print(build(parser.parse_args().out))
+    parser.add_argument("--data-url", help="atlas base URL holding manifest.json, for Methods")
+    args = parser.parse_args()
+    print(build(args.out, args.data_url))
 
 
 if __name__ == "__main__":
