@@ -67,14 +67,16 @@ ol{list-style:none;margin:8px 0;padding:0;display:grid;gap:10px;
 .segnote{display:block;margin-top:4px;color:var(--muted)}
 .card .links{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
 .card .range{flex:1 1 8em;min-width:0;font-size:12px;color:var(--muted)}
+.card .badge{align-self:flex-start;font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 4px}
+.sep.top{border-top:0;padding-top:0}
 .sep{grid-column:1/-1;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:6px}
 .card .kind{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
 .cmp{flex:none;display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:0}
 .cmp figure{margin:0;min-width:0;display:flex;flex-direction:column;gap:1px}
 .cmp img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:4px;display:block;background:var(--chip)}
 .cmp figcaption{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.usr{min-height:22px}  /* the User box fills in once the map data loads; its row is kept so the cards stay put */
-#usrbox summary{cursor:pointer;color:var(--muted)}
+.usr{min-height:24px}  /* the User box fills in once the map data loads; its row is kept so the cards stay put */
+#usrbox summary{cursor:pointer;color:var(--muted);min-height:24px}
 .prow{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin-top:6px}
 .prow label{flex:1 1 100%}
 .padd,.prow select{font:inherit;min-height:28px;padding:0 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink)}

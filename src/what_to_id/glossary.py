@@ -84,11 +84,12 @@ GLOSSARY: dict[str, tuple[str, str | None]] = {
     "observer-filter": ("Keeps the records this user observed.", None),
     "my-taxa-first": (
         "Puts the records inside a genus this user has identified in BC first, and dims the rest on"
-        " the map. Nothing is hidden.",
+        " the map. Nothing is hidden here;"
+        " the iNaturalist link still leaves out records they identified.",
         None,
     ),
     "my-taxa": (
-        "Keeps the records inside a genus or family this user has identified in BC.",
+        "Keeps the records inside a genus this user has identified in BC.",
         None,
     ),
     "not-identified-by-me": (

@@ -149,9 +149,9 @@ def test_my_taxa_first_lists_the_users_genera_first_then_a_divider_then_the_rest
     assert page.input_value("#usrbox select") == "first"
     while page.locator("#grid .sep").count() == 0:
         page.click("#more")
-    sep = page.locator("#grid .sep")
-    assert sep.inner_text() == f"End of your taxa · {m} record{'s' if m > 1 else ''}"
-    assert sep.evaluate("e => [...e.parentNode.children].indexOf(e)") == m
+    sep = page.locator("#grid .sep:not(.top)")
+    assert sep.inner_text() == f"End of your genera · {m} card{'s' if m > 1 else ''}"
+    assert sep.evaluate("e => [...e.parentNode.children].indexOf(e)") == m + 1  # the top line leads
     assert "identify/user-first" in events(page) and page.errors == []
 
 

@@ -34,7 +34,7 @@ var S=Object.assign({split:[],rec:null,at:null,fly:false},MF.read(new URLSearchP
   S.fly=!!S.rec&&!S.at;
 })();
 var PJ=projectFilter({meta:META,hash:new URLSearchParams(location.hash.slice(1)),changed:function(){refilter();}});
-var hashTimer=0,UF=userFilter({S:S,meta:META,get:get,taxa:function(){return TAXA;},changed:function(){refilter();},bounds:function(){var b=map.getBounds();return {w:b.getWest(),s:b.getSouth(),e:b.getEast(),n:b.getNorth()};}}),RS=leftFilter({S:S,MF:MF,meta:META,get:get,tf:function(){return TF;},area:function(){return AREA;},all:function(){return ALL;},map:function(){return map;},off:function(){return !!(PJ.active()||UF.active()||SUB||FK);},changed:function(){render();}});
+var hashTimer=0,UF=userFilter({S:S,meta:META,again:true,get:get,taxa:function(){return TAXA;},changed:function(){refilter();},bounds:function(){var b=map.getBounds();return {w:b.getWest(),s:b.getSouth(),e:b.getEast(),n:b.getNorth()};}}),RS=leftFilter({S:S,MF:MF,meta:META,get:get,tf:function(){return TF;},area:function(){return AREA;},all:function(){return ALL;},map:function(){return map;},off:function(){return !!(PJ.active()||UF.active()||SUB||FK);},changed:function(){render();}});
 // The split view hands the selection over live; the area and projects are not part of it yet.
 var SYNC=MapFilter.sync({key:function(){return MF.write(S).join('&');},apply:function(str){
   var r=MF.read(new URLSearchParams(str));
@@ -347,7 +347,7 @@ function tip(o){
   if(!P.n||o.index<0||!o.layer||o.layer.id!=='pts'||AREA.busy()){ptip.hidden=true;return;}
   var i=o.index,t=names(i);
   ptip.innerHTML='<b>'+esc(t.common||t.latin)+'</b>'+(t.common?'<br><i>'+esc(t.latin)+'</i>':'')+
-    '<br>'+esc(t.group)+' · observed '+when(P.obs[i],P.fl[i]&FLAG.earlyObs)+'<br>'+idText(i)+'<div class="badges">'+
+    '<br>'+esc(t.group)+' · observed '+when(P.obs[i],P.fl[i]&FLAG.earlyObs)+'<br>'+idText(i)+UF.where(i)+'<div class="badges">'+
     badges(i)+'</div>';
   ptip.hidden=false;
   var r=map.getContainer().getBoundingClientRect(),px=r.left+o.x,py=r.top+o.y,

@@ -100,6 +100,7 @@ function card(i,lv){
   a.href=IdentifyLinks.batches([id])[0].url;a.target='_blank';a.rel='noopener';a.setAttribute('aria-label','Identify this record on iNaturalist');
   li.append(ph,title(i,lv),w);
   if(KIND&&CFG.merge[lv]&&!KF)li.insertBefore(el('div','kind',kindName(KIND[i])),w);
+  if(UF&&UF.ranked()&&UF.mine(i))li.insertBefore(el('div','badge','Your genus'),w);
   if(MORE.has(i))li.appendChild(more_(i));
   a.addEventListener('click',function(){track('card-'+(KIND?KIND[i]:lv));});
   li.appendChild(R?R.links(a,i,lv):a);
@@ -126,10 +127,13 @@ function photos(lis){
   }).catch(function(e){if(!(sig&&sig.aborted))status('Could not load the photos: '+e.message);});
 }
 // Where the user's genera end in the list, under My taxa first: after n cards, or before the first when none are theirs.
-function sep(n){return el('li','sep',n?'End of your taxa · '+nf.format(n)+(n===1?' record':' records'):'None of your taxa here. The rest follow.');}
+// MINE counts cards (after the per-species cut), so both lines say cards.
+function sep(n,top){var c=nf.format(n)+(n===1?' card':' cards');
+  return el('li',top?'sep top':'sep',top?'Your genera first · '+c:n?'End of your genera · '+c:'None of your genera here. The rest follow.');}
 // The next LIMIT cards of the chosen level; the button is the scroll sentinel and stays as the fallback.
 function more(){
   var rows=view[LV]||[],ol=$('grid'),to=Math.min(rows.length,shown),lis=[],b=$('more');
+  if(!drawn&&MINE[LV]>0)ol.appendChild(sep(MINE[LV],1));
   for(var j=drawn;j<to;j++){if(j===MINE[LV])ol.appendChild(sep(j));var li=card(rows[j],LV);ol.appendChild(li);lis.push(li);}
   drawn=to;
   b.hidden=rows.length<=to;b.textContent='Show more ('+nf.format(rows.length-to)+' left)';
@@ -192,6 +196,9 @@ function counts(){
 function empty(){
   var box=$('none'),others=CFG.levels.filter(function(l){return l[0]!==LV&&S.total[l[0]];});
   box.hidden=!!(view[LV]||[]).length;box.textContent='';if(box.hidden)return;
+  if(!others.length&&UF&&UF.active()&&UF.mode()==='observer'){  // the map's advice (zoom out) does not fit here
+    var f=el('button',null,'Show My taxa first instead');f.type='button';f.onclick=function(){UF.first();};
+    box.append('No records observed by '+S.user+' here. ',f);return;}
   box.append(others.length?'None at this level here. Try ':'No records here: zoom out or widen the filters.');
   others.forEach(function(l,k){var b=el('button',null,l[1]+' ('+nf.format(S.total[l[0]])+')');b.type='button';
     b.onclick=function(){choose(l[0]);};box.append(k?(k===others.length-1?' or ':', '):'',b);});
