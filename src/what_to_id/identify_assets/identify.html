@@ -67,6 +67,7 @@ ol{list-style:none;margin:8px 0;padding:0;display:grid;gap:10px;
 .segnote{display:block;margin-top:4px;color:var(--muted)}
 .card .links{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
 .card .range{flex:1 1 8em;min-width:0;font-size:12px;color:var(--muted)}
+.sep{grid-column:1/-1;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:6px}
 .card .kind{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
 .cmp{flex:none;display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:0}
 .cmp figure{margin:0;min-width:0;display:flex;flex-direction:column;gap:1px}
@@ -111,9 +112,10 @@ has fewer than 20 BC records; the pool names no species inside the label, or the
 __PHOTO_DOWNLOAD__ (most were added after it); or its label changed after scoring.</dd>
 </dl>
 <p>A level sorts records for review. It does not say that a label is right or wrong.</p>
-<p>The User box is the map's: with an iNaturalist login it keeps the records the user observed (Observer), those in
-genera where the user has made 50 or more identifications in BC (My taxa), or hides those the user identified (Not yet
-identified by me). The login goes only to iNaturalist.</p></details>
+<p>The User box is the map's: with an iNaturalist login it lists first the records in genera where the user has made 50
+or more identifications in BC, then a line, then the rest (My taxa first, the default; the map dims the rest). It can
+instead keep only those genera (My taxa), keep the records the user observed (Observer), or hide those the user identified
+(Not yet identified by me). The login goes only to iNaturalist.</p></details>
 <p id="status" class="muted" aria-live="polite">Loading…</p>
 <p><button type="button" id="unpick" class="more" hidden>Clear the species filter</button></p>
 <div id="tabs" class="tabs" role="tablist" aria-label="Level"></div>

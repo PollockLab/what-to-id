@@ -25,6 +25,7 @@ LABELS = {
     "globi": "GloBI",
     "match-n": "Match number",
     "my-taxa": "My taxa",
+    "my-taxa-first": "My taxa first",
     "not-identified-by-me": "Not yet identified by me",
     "all-of-bc": "All of BC",
     **{
@@ -45,6 +46,7 @@ GROUPS = {
             "life-groups",
             "taxa-filter",
             "observer-filter",
+            "my-taxa-first",
             "my-taxa",
             "not-identified-by-me",
         ),

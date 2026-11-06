@@ -82,6 +82,11 @@ GLOSSARY: dict[str, tuple[str, str | None]] = {
     "introduced": ("A species that is not native to BC.", None),
     "threatened": ("A species with a threatened status.", None),
     "observer-filter": ("Keeps the records this user observed.", None),
+    "my-taxa-first": (
+        "Puts the records inside a genus this user has identified in BC first, and dims the rest on"
+        " the map. Nothing is hidden.",
+        None,
+    ),
     "my-taxa": (
         "Keeps the records inside a genus or family this user has identified in BC.",
         None,

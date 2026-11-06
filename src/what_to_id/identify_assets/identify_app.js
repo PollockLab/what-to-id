@@ -6,7 +6,7 @@
 'use strict';
 var CFG=IDENTIFY_CONFIG,L=EmbeddingsLayout,Meta=AtlasSearchMeta,PER_SPECIES=3,LIMIT=12,STEPS=16,NO_LOOK=65535,NOTAX=65535,LS='wtid-identify-level',IO=null,T=0,TK=0,AB=null;
 var MAP=new URL(CFG.mapUrl,location.href).href,nf=new Intl.NumberFormat('en-CA'),OBS='https://www.inaturalist.ca/observations/';
-var TAB=[],SUBK=[],NK=1,KIND=null,SUB=null,KF=0,KC=[],UF=null,UON=false,CMP=null,SEEN='wtid-identify-seen';
+var TAB=[],SUBK=[],NK=1,KIND=null,SUB=null,KF=0,KC=[],UF=null,UON=false,MINE=[],CMP=null,SEEN='wtid-identify-seen';
 // CFG.merge: the kinds (levels) a tab shows, in order; SUBK a kind's place in its tab
 Object.keys(CFG.merge).forEach(function(t){CFG.merge[t].forEach(function(k,j){TAB[k]=+t;SUBK[k]=j;});NK=Math.max(NK,CFG.merge[t].length);});
 var META=null,SYNC=null,MORE=new Map(),TAXA=null,P=null,BYID=null,LEVEL=null,Q=null,LOOKS=null,R=null,MF=null,TF=null,PEND=null,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,ONE='',CACHE=new Map(),FIRST=null,SHOWN,STAY=false,X=null;
@@ -42,9 +42,10 @@ function byId(P){
   return out;
 }
 function on(i){return SEL[i]&&LEVEL[i]&&(!R||R.pass(i,LEVEL[i]))&&(!X||X.pass(i));}
+// Under My taxa first the user's genera lead each level, each kind in turn, then the rest; MINE: how many cards they are, -1 without the mode.
 function build(){
-  var n=P.n,W=NK*STEPS,c=new Uint32Array(6*W+1),key=new Uint16Array(n),i,k,lv;
-  for(i=0;i<n;i++)if(on(i)){key[i]=LEVEL[i]*W+(NK-1-SUB[i])*STEPS+Q[i];c[key[i]+1]++;}
+  var n=P.n,W=2*NK*STEPS,c=new Uint32Array(6*W+1),key=new Uint16Array(n),rk=UF.ranked(),i,k,lv;
+  for(i=0;i<n;i++)if(on(i)){key[i]=LEVEL[i]*W+(rk&&UF.mine(i)?NK*STEPS:0)+(NK-1-SUB[i])*STEPS+Q[i];c[key[i]+1]++;}
   for(k=1;k<c.length;k++)c[k]+=c[k-1];
   var at=c.slice(),order=new Int32Array(c[c.length-1]);
   for(k=0;k<n;k++){i=BYID[k];if(on(i))order[at[key[i]]++]=i;}
@@ -57,6 +58,7 @@ function build(){
     for(k=b-1;k>=a;k--){i=order[k];if(i<0)continue;t=SUB[i]*65536+P.tax[i];cut=nd[SUB[i]]===1?Infinity:PER_SPECIES;
       if(taken[t]<cut){rows.push(i);if(!taken[t]++&&tot[t]>cut)MORE.set(i,tot[t]-cut);}}
     out[lv]=rows;total[lv]=b-a;
+    for(k=0;rk&&k<rows.length&&UF.mine(rows[k]);k++);MINE[lv]=rk?k:-1;
   }
   view=out;S.total=total;
 }
@@ -123,10 +125,12 @@ function photos(lis){
     });
   }).catch(function(e){if(!(sig&&sig.aborted))status('Could not load the photos: '+e.message);});
 }
+// Where the user's genera end in the list, under My taxa first: after n cards, or before the first when none are theirs.
+function sep(n){return el('li','sep',n?'End of your taxa · '+nf.format(n)+(n===1?' record':' records'):'None of your taxa here. The rest follow.');}
 // The next LIMIT cards of the chosen level; the button is the scroll sentinel and stays as the fallback.
 function more(){
   var rows=view[LV]||[],ol=$('grid'),to=Math.min(rows.length,shown),lis=[],b=$('more');
-  for(var j=drawn;j<to;j++){var li=card(rows[j],LV);ol.appendChild(li);lis.push(li);}
+  for(var j=drawn;j<to;j++){if(j===MINE[LV])ol.appendChild(sep(j));var li=card(rows[j],LV);ol.appendChild(li);lis.push(li);}
   drawn=to;
   b.hidden=rows.length<=to;b.textContent='Show more ('+nf.format(rows.length-to)+' left)';
   if(lis.length){photos(lis);if(CMP&&LOOKS)CMP.fill(lis);}
@@ -278,7 +282,7 @@ function early(){
   if(!s){view=[];$('grid').textContent='';$('none').hidden=$('more').hidden=$('batch').hidden=$('cap').hidden=true;
     [].forEach.call($('tabs').children,function(t){t.lastChild.textContent='';});status('Loading all the records for this selection…');return;}
   // a tab of several kinds starts as its first kind's list (or the chosen kind's), its count their sum
-  view=s.rows.slice();S.total=s.total.slice();KC=s.total.slice();
+  view=s.rows.slice();S.total=s.total.slice();KC=s.total.slice();MINE=[];
   Object.keys(CFG.merge).forEach(function(tb){var ks=CFG.merge[tb];
     S.total[tb]=ks.reduce(function(x,k){return x+(s.total[k]||0);},0);view[tb]=s.rows[KF&&TAB[KF]===+tb?KF:ks[0]];});
   counts();
@@ -298,7 +302,7 @@ function user(){
   var re=/^(user|umode|umin)=/;
   if(parent===window)history.replaceState(null,'','#'+location.hash.slice(1).split('&').filter(function(x){return x&&!re.test(x);})
     .concat(MF.write(S).filter(function(x){return re.test(x);})).join('&'));
-  var on=UF.active();if(on&&!UON)track('user-'+(S.umode||(META.observer?'observer':'taxa')));UON=on;
+  var on=UF.active()||UF.ranked();if(on&&!UON)track('user-'+(S.umode||'first'));UON=on;
   SYNC.send();refresh();
 }
 function key(){return MF?MF.write(S).join('&'):PEND||'';}
@@ -347,12 +351,12 @@ async function load(){
   $('usrbox').open=!!S.user;
   lk.then(function(b){if(!b)return;LOOKS=looks(b);
     [].forEach.call($('grid').children,function(li){var t=li.querySelector('.title');if(t)t.replaceWith(title(+li.dataset.i,LV));});
-    CMP.fill([].slice.call($('grid').children));});
+    CMP.fill([].slice.call($('grid').querySelectorAll('.card')));});
   rg.then(function(b){if(!b)return;
     R=IdentifyRanges(b,{P:P,name:function(i){return P.tax[i]!==NOTAX&&TAXA[P.tax[i]]?TAXA[P.tax[i]][0]:null;},look:looksOf,redraw:redraw});
     R.level(LV,true);redraw();});
   window.__identify={ids:idsOf,view:function(){return view.map(function(r){return r&&Array.from(r.map(function(i){return P.id[i];}));});},
-    total:function(){return S.total;},levelled:function(){var n=0;for(var i=0;i<P.n;i++)if(SEL[i]&&LEVEL[i])n++;return n;},level:function(){return LV;},kind:function(){return KF;},kinds:function(){return KC.slice();},user:function(){return UF.active();},ranges:function(){return !!R;},refresh:function(){var t=performance.now();select();build();return performance.now()-t;}};
+    total:function(){return S.total;},levelled:function(){var n=0;for(var i=0;i<P.n;i++)if(SEL[i]&&LEVEL[i])n++;return n;},level:function(){return LV;},kind:function(){return KF;},kinds:function(){return KC.slice();},user:function(){return UF.active()||UF.ranked();},mine:function(){return MINE[LV];},ranges:function(){return !!R;},refresh:function(){var t=performance.now();select();build();return performance.now()-t;}};
 }
 var KD=/(?:^|&)kind=(\d)/.exec(location.hash.slice(1));KF=KD&&TAB[+KD[1]]?+KD[1]:0;
 tabs();inbox();

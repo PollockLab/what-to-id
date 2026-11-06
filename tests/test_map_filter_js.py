@@ -157,12 +157,13 @@ def test_tokens_keep_user_and_its_mode_for_explore_to_forward():
     )
 
 
-def test_observer_is_the_default_with_an_observer_file_and_taxa_is_written():
+def test_my_taxa_first_is_the_default_and_the_other_modes_are_written():
     meta = {**META, "observer": "pool-observer.bin"}
     body = "var S=MF.read(new URLSearchParams('user=1&umode=%s'));return [MF.write(S),S.umode];"
-    assert run(body % "taxa", META) == [["user=1"], ""]
-    assert run(body % "taxa", meta) == [["user=1", "umode=taxa"], "taxa"]
-    assert run(body % "observer", meta) == [["user=1"], ""]  # old links stay valid
+    assert run(body % "first", meta) == [["user=1"], ""]
+    assert run(body % "nope", meta) == [["user=1"], ""]
+    for m in ("taxa", "unid", "observer"):
+        assert run(body % m, meta) == [["user=1", f"umode={m}"], m]
 
 
 def test_umin_round_trips_in_taxa_mode_and_the_default_is_not_written():
@@ -178,9 +179,12 @@ def test_umin_round_trips_in_taxa_mode_and_the_default_is_not_written():
         ("user=1&umode=unid&umin=20", ["user=1", "umode=unid"], 20),  # read, not written
     ]:
         assert run(body % json.dumps(h), meta) == [written, umin]
-    # without an observer file My taxa is the default mode and writes no umode, but still umin
-    assert run(body % json.dumps("user=1&umin=20"), META) == [["user=1", "umin=20"], 20]
-    assert run(body % json.dumps("user=1&umode=observer&umin=20"), meta) == [["user=1"], 20]
+    # My taxa first, the default, writes no umode but still umin
+    assert run(body % json.dumps("user=1&umin=20"), meta) == [["user=1", "umin=20"], 20]
+    assert run(body % json.dumps("user=1&umode=observer&umin=20"), meta) == [
+        ["user=1", "umode=observer"],
+        20,
+    ]
 
 
 def test_tokens_keep_umin_for_explore_to_forward():

@@ -12,7 +12,7 @@ from what_to_id.page_map import encode_points, render_map
 
 from . import test_embeddings_browser as eb
 from .embeddings_fixture import TREE, pool_frame
-from .test_map_groups_browser import STUB
+from .test_map_resolved_browser import LAYERS_STUB
 
 browser = eb.browser
 N = 300
@@ -61,7 +61,8 @@ def open_map(browser, url, hash_, counts=None):
     p.route(
         "https://unpkg.com/**",
         lambda r: r.fulfill(
-            body=STUB if r.request.url.endswith(".js") else "", content_type="text/javascript"
+            body=LAYERS_STUB if r.request.url.endswith(".js") else "",
+            content_type="text/javascript",
         ),
     )
 
@@ -131,7 +132,8 @@ def test_a_user_number_skips_the_lookup_and_a_bad_name_asks_for_a_login(browser,
 def test_a_throttled_reply_is_tried_again(browser, site):
     page = browser.new_page()
     page.route(
-        "https://unpkg.com/**", lambda r: r.fulfill(body=STUB, content_type="text/javascript")
+        "https://unpkg.com/**",
+        lambda r: r.fulfill(body=LAYERS_STUB, content_type="text/javascript"),
     )
     hits = []
 
@@ -179,13 +181,28 @@ def test_observer_keeps_the_users_own_records(browser, site):
     page.close()
 
 
-def test_a_login_alone_selects_observer_and_taxa_round_trips_in_the_hash(browser, site):
-    page = open_map(browser, site, "#user=10")
-    shown(page, N // 2)
-    assert page.input_value("#usrbox select") == "observer" and page.calls == []
+ALPHA = """() => { const d = L.find(l => l.id === 'pts').props.data,
+  c = d.attributes.getFillColor.value;
+  return Array.from({length: d.length}, (_, i) => c[4 * i + 3]); }"""
+
+
+def test_a_login_alone_ranks_my_taxa_first_and_dims_the_rest(browser, site):
+    page = open_map(browser, site, "#user=42")
+    page.wait_for_function("/^Genera/.test(document.querySelector('#usrbox p').textContent)")
+    shown(page, N)  # nothing is hidden
+    assert page.input_value("#usrbox select") == "first"
     assert "umode" not in page.evaluate("location.hash")
-    page.select_option("#usrbox select", "taxa")
-    page.wait_for_function("location.hash.includes('umode=taxa')")
+    # the dots in Genus A keep their colour, the rest drop to a fifth of its opacity
+    alpha = page.evaluate(ALPHA)
+    bright = max(alpha)
+    assert alpha.count(bright) == IN_GENUS_A and alpha.count(bright // 5) == N - IN_GENUS_A
+    # Identify gets every record the user has not identified, not only Genus A
+    q = parse_qs(urlparse(page.get_attribute("#identify", "href")).query)
+    assert q["without_ident_user_id"] == ["42"] and "taxon_id" not in q
+    assert "dimmed" in page.inner_text("#idnote")
+    page.select_option("#usrbox select", "observer")
+    page.wait_for_function("location.hash.includes('umode=observer')")
+    page.wait_for_function(f"(new Set(({ALPHA})())).size === 1")  # the colours come back
     page.close()
     page = open_map(browser, site, "#user=42&umode=taxa")
     shown(page, IN_GENUS_A)

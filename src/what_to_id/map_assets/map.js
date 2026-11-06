@@ -104,7 +104,7 @@ function rowOf(id){
 // the area or deletions change, or the groups change while a taxon is included (the groups and
 // included taxa are one set, so the kept bit then carries the groups too).
 var SUB=null,SUBL='',SUBV=0;  // the split view's photo search: a Set of ids, its label, a version for PD_KEY
-var ST_KEEP=MF.ST_KEEP,ST_INEXACT=MF.ST_INEXACT,PD=null,PD_KEY=null,PD_GONE=-1,PD_CAT=0,
+var ST_KEEP=MF.ST_KEEP,ST_INEXACT=MF.ST_INEXACT,PD=null,PD_KEY=null,PD_GONE=-1,PD_CAT=0,PD_UK=0,
   OUT=new Uint8Array(0),RC=null,PJW=null,FK=null,FKV=0,FKM=null,PJP='',KV=0,CNP='',CNT=0;
 // The photo space's lasso: the ids it keeps, or null; the mask is built once per list and shard count.
 function fmask(n){
@@ -134,13 +134,18 @@ function pointData(){
   if(same){PD.attributes.getFilterCategory={value:cat,size:4};PD_CAT++;}
   else PD={length:n,days:days,attributes:{getPosition:{value:P.pos,size:2},
     getFilterValue:{value:days,size:2},getFilterCategory:{value:cat,size:4},
-    getFillColor:{value:LC.fill(P.grp,n),size:4,normalized:true}}};
-  PD_KEY=key;PD_GONE=gone;
+    getFillColor:{value:colours(n),size:4,normalized:true}}};
+  if(same&&PD_UK!==UF.key()){PD.attributes.getFillColor={value:colours(n),size:4,normalized:true};PD_COL++;}
+  PD_KEY=key;PD_GONE=gone;PD_UK=UF.key();
 }
+// LC's colours, with the dots outside the user's genera at a fifth of their opacity under My taxa first
+function colours(n){var c=LC.fill(P.grp,n);
+  if(UF.ranked())for(var i=0;i<n;i++)if(!UF.mine(i))c[4*i+3]=c[4*i+3]/5;
+  return c;}
 function categories(thin){return MF.categories(S,inc(),thin);}
 // the group, clade or, beside Identify in Explore, level colours (level_colour.js); a switch swaps only the colours
 var LC=LevelColour({META:META,get:get,taxa:function(){return TAXA;},P:function(){return P;},st:function(){return S;},picked:function(){search();FB.showClades();FB.showGroups();refilter();},shown:function(){return KEEP.length===P.n&&!CT?{k:[KV,S.lo,S.hi,S.up].join(),f:shows()}:null;},url:META.files.levels,box:$('map'),
-  changed:function(){if(!PD)return;PD.attributes.getFillColor={value:LC.fill(P.grp,P.n),size:4,normalized:true};PD_COL++;layers();}}),PD_COL=0;
+  changed:function(){if(!PD)return;PD.attributes.getFillColor={value:colours(P.n),size:4,normalized:true};PD_COL++;layers();}}),PD_COL=0;
 // The counts behind the histograms, header and share run on the CPU after the map has redrawn.
 var CT=0;
 function refilter(){
