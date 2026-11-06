@@ -14,6 +14,14 @@ from what_to_id import atlas_update, confusion, host_pairs, levels, pool_levels
 from what_to_id.page_lookalike import _fetch
 
 TEMPLATE = Path(__file__).parent / "terms_assets/methods.html"
+OUTCOME = TEMPLATE.with_name("levels_outcome.json")  # scripts/levels_outcome.py
+LEVEL_NAMES = {
+    "none": "No level",
+    "easy": "Clear matches",
+    "taxonomist": "Close calls",
+    "weird": "Odd shots",
+    "mislabel": "Might be mislabelled",
+}
 MISSING = "(not in this build)"  # a build without an index still gets the text
 
 
@@ -87,9 +95,32 @@ def values(manifest: dict | None) -> dict[str, str]:
     }
 
 
+def evaluation() -> dict[str, str]:
+    """Placeholders filled from the committed output of scripts/levels_outcome.py."""
+    ev = json.loads(OUTCOME.read_text())
+    rows = []
+    for key, name in LEVEL_NAMES.items():
+        r = ev["levels"][key]
+        rr = "1 (reference)"
+        if "corrected_rr" in r:
+            lo, hi = r["corrected_rr_ci"]
+            rr = f"{r['corrected_rr']:.2f} [{lo:.2f}, {hi:.2f}]"
+        rows.append(
+            f"<tr><td>{name}</td><td>{r['n']:,}</td><td>{r['corrected_per_1000']:.2f}</td>"
+            f"<td>{rr}</td></tr>"
+        )
+    return {
+        "__EVAL_SCORED__": ev["scored_on"],
+        "__EVAL_OUTCOME__": ev["outcome_on"],
+        "__EVAL_REPS__": f"{ev['bootstrap_reps']:,}",
+        "__EVAL_COHORT__": f"{ev['cohort']:,}",
+        "__EVAL_ROWS__": "\n".join(rows),
+    }
+
+
 def render(manifest: dict | None = None) -> str:
     html = TEMPLATE.read_text()
-    for key, text in values(manifest).items():
+    for key, text in (values(manifest) | evaluation()).items():
         html = html.replace(key, text)
     if "__" in html:
         raise ValueError("terms_methods: a placeholder in methods.html has no value")

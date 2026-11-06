@@ -86,9 +86,26 @@ filter.</p>
 a poor score. Only names in the pool are candidates, so a species not yet observed in BC cannot
 be proposed. Text vectors carry what the model learned about a name during training, which is
 thin for rare or recently split taxa. Cut-offs were read from the distribution of scores in the
-BC pool and are not calibrated probabilities. The level order was chosen by comparing levels
-with the records that iNaturalist identifiers later corrected; that comparison is described on
-the Identify page's About.</p>
+BC pool and are not calibrated probabilities.</p>
+
+<h3 id="methods-eval">Evaluation</h3>
+<p>Do the levels predict what identifiers do? The species-labelled records scored on
+__EVAL_SCORED__ were looked up again in the pool of __EVAL_OUTCOME__. A record counts as
+corrected when it is still Needs ID under another taxon that still exists; a record whose old
+taxon vanished (a swap, merge or split) counts as neither. The rate ratio compares a level's
+corrected share with that of records in no level; the interval is a percentile bootstrap of
+__EVAL_REPS__ draws. Cohort: __EVAL_COHORT__ records. The script is
+<code>scripts/levels_outcome.py</code> and its output, with the input files' checksums, is
+committed beside this page's template.</p>
+<table class="eval"><thead><tr><th>Level</th><th>Records</th><th>Corrected per 1,000</th>
+<th>Rate ratio vs no level</th></tr></thead><tbody>
+__EVAL_ROWS__
+</tbody></table>
+<p>Records in Might be mislabelled were corrected at several times the rate of records in no
+level, and Clear matches at a lower rate. The level order on the page follows these rates.
+Narrow it down is not tested: it has no species label to be corrected from. The window overlaps
+the page's launch, so some corrections may have been prompted by the page itself. The bars for
+this test were written down before the outcome was read.</p>
 
 <h3 id="methods-refs">References</h3>
 <ol class="refs">

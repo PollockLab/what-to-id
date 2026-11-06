@@ -66,6 +66,8 @@ h1{font-size:22px;margin:8px 0}h2{font-size:18px;margin:28px 0 8px}
 h3{font-size:15px;margin:20px 0 6px}
 a{color:var(--bar)}dt{font-weight:650;margin-top:10px}dd{margin:2px 0 0}
 code{font-size:12px;word-break:break-all}ol.refs{padding-left:20px}ol.refs li{margin:4px 0}
+table.eval{border-collapse:collapse;font-size:13px}
+table.eval th,table.eval td{border-bottom:1px solid var(--line);padding:4px 8px;text-align:left}
 dt:target{background:var(--chip);outline:2px solid var(--bar)}
 """.strip()
 

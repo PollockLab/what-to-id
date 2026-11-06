@@ -159,3 +159,19 @@ def test_methods_without_an_index_and_without_leaked_list_names():
     assert terms_methods.MISSING in html and "__" not in html.split("</style>")[1]
     assert not re.search("recency|gap_first|gap first|similarity|novelty|surprise", html, re.I)
     assert "—" not in html  # no em dashes
+
+
+def test_evaluation_table_comes_from_the_committed_script_output():
+    from what_to_id import terms_methods
+
+    ev = json.loads(terms_methods.OUTCOME.read_text())
+    assert ev["script"] == "scripts/levels_outcome.py"
+    assert {"scores", "pool_before", "pool_after"} == ev["inputs"].keys()
+    assert all(len(v["sha256"]) == 64 for v in ev["inputs"].values())
+    html = terms_page.render()
+    mis = ev["levels"]["mislabel"]
+    assert f"<td>Might be mislabelled</td><td>{mis['n']:,}</td>" in html
+    assert f"{mis['corrected_rr']:.2f} [{mis['corrected_rr_ci'][0]:.2f}, " in html
+    assert f"scored on\n{ev['scored_on']} were looked up again" in html
+    assert f"in the pool of {ev['outcome_on']}" in html
+    assert "<td>No level</td>" in html and "1 (reference)" in html

@@ -1,0 +1,69 @@
+{
+ "script": "scripts/levels_outcome.py",
+ "scored_on": "2026-10-15",
+ "outcome_on": "2026-11-03",
+ "inputs": {
+  "scores": {
+   "name": "confusion-scores-2026-10-15.parquet",
+   "sha256": "58686fddc85596e0b85e7aa1acdff4b7086bcee18d431a0a5a4ed92754d56910"
+  },
+  "pool_before": {
+   "name": "pool.parquet",
+   "sha256": "e11f893f3a4edf6ab6e73cf12796cb2775f1f42c7314b467698fa9a0835a26b6"
+  },
+  "pool_after": {
+   "name": "pool-2026-11-03.parquet",
+   "sha256": "b4f131ea2c2836cee7a85ddf622ad6007c15744a07d1b1d108bac4b906bd4a6e"
+  }
+ },
+ "seed": 20261105,
+ "bootstrap_reps": 1000,
+ "cohort": 1439324,
+ "levels": {
+  "none": {
+   "n": 788572,
+   "left_per_1000": 9.52,
+   "corrected_per_1000": 0.59
+  },
+  "easy": {
+   "n": 322244,
+   "left_per_1000": 12.99,
+   "corrected_per_1000": 0.35,
+   "corrected_rr": 0.59,
+   "corrected_rr_ci": [
+    0.49,
+    0.73
+   ]
+  },
+  "taxonomist": {
+   "n": 73368,
+   "left_per_1000": 4.77,
+   "corrected_per_1000": 1.14,
+   "corrected_rr": 1.95,
+   "corrected_rr_ci": [
+    1.53,
+    2.44
+   ]
+  },
+  "weird": {
+   "n": 28796,
+   "left_per_1000": 9.58,
+   "corrected_per_1000": 1.6,
+   "corrected_rr": 2.72,
+   "corrected_rr_ci": [
+    1.97,
+    3.54
+   ]
+  },
+  "mislabel": {
+   "n": 226344,
+   "left_per_1000": 4.18,
+   "corrected_per_1000": 2.56,
+   "corrected_rr": 4.36,
+   "corrected_rr_ci": [
+    3.83,
+    4.89
+   ]
+  }
+ }
+}
