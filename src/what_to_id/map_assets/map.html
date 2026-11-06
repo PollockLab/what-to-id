@@ -28,6 +28,7 @@ fetch('explore.html',{method:'HEAD'}).then(function(r){if(r.ok)location.replace(
 <section id="side" class="side" aria-label="What">
 <div class="railhd"><b>What</b><button type="button" id="railx" class="railx" aria-controls="side" aria-expanded="true">Hide</button></div>
 <div id="selbar" class="selbar" role="region" aria-label="Your selection" hidden><p class="lbl"><span data-explain="your-selection">Your selection</span> <button type="button" class="link">Clear all</button></p><ul class="chips"></ul></div>
+<button type="button" id="sdmbtn" class="sdmbtn" aria-pressed="false" hidden>Show modelled range</button>
 <details class="sec" id="grpsec" open><summary data-explain="life-groups">Groups <span class="n" id="ngroups"></span><span id="gbar" class="gbar" role="img" aria-label="No records in view"></span></summary>
 <p class="muted"><button type="button" id="gall" class="link">All groups</button> <button type="button" id="gkeep" class="link" hidden></button></p>
 <ul id="groups" class="gl" role="list" aria-label="Taxon groups"></ul>
