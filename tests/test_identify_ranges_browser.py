@@ -37,11 +37,13 @@ ROWS = [
 N = len(ROWS)
 
 
-def write_site(root):
-    """Two cells, west and east of 123 W; record 4 sits in the east one."""
+def write_site(root, introduced=()):
+    """Two cells, west and east of 123 W; record 4 is in the east one; ``introduced`` marks rows."""
     pytest.importorskip("pyarrow")
     pool = pool_frame(np.arange(1, N + 1) * 1000)
     pool.loc[4, ["lat", "lon"]] = [49.0, -122.5]
+    if introduced:
+        pool["introduced"] = pool.index.isin(introduced)
     blobs, meta = encode_points(pool, TREE)
     for name, blob in blobs.items():
         (root / name).write_bytes(blob)

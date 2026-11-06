@@ -18,14 +18,15 @@ from .test_map_oneid_browser import open_map
 browser = rb.browser
 SDM = "Habitat model (ECCC 1 km): "
 COG = "https://example.org/sdm/{slug}.tif"
-# Taxon 0 in range, Taxon 1 just outside, Taxon 2 1,234 km outside; Taxon 4 has no model
+# Taxon 0 in range, Taxon 1 just outside (80 km at level 5), Taxon 2 1,234 km outside and introduced
+# (record 2); Taxon 4 has no model
 VALUES = {"taxon-0": [43.0], "taxon-1": [255], "taxon-2": [70.0]}
 
 
 @pytest.fixture(scope="module")
 def site(tmp_path_factory):
     root = tmp_path_factory.mktemp("sdm-site")
-    rb.write_site(root)
+    rb.write_site(root, introduced=(2,))
     page = root / "map.html"
     html = page.read_text()
     meta = read_meta(html)
@@ -74,14 +75,37 @@ def test_identify_reads_the_model_at_the_point_beside_the_range_map(browser, sit
     assert parse_qs(url.query)["url"] == ["https://example.org/sdm/taxon-0.tif"]
     assert habitat(page, "Just outside range") == SDM + "no value here"  # 255 is nodata
     assert habitat(page, "1,200 km outside") == (
-        SDM
-        + "70 % suitable here. Habitat suits it: possibly a range extension, worth an expert look"
+        SDM + "70 % suitable here. Habitat suits it and the species is introduced: "
+        "the range map is likely behind its spread"
     )
     assert (
         habitat(page, "In range") == SDM + "43 % suitable here" and len(page.asked) == 3
     )  # cached
     assert page.locator("#rpop .rcap").inner_text() == ""  # the range caption is its own line
     assert page.errors == []
+
+
+def test_far_outside_native_and_suitable_reads_as_a_possible_extension(browser, site):
+    page = rb.opened(browser, site, "#lvl=5&out=0")
+    VALUES["taxon-1"] = [70.0]
+    try:
+        tiler(page)
+        assert habitat(page, "80 km outside") == (
+            SDM + "70 % suitable here. Habitat suits it: possibly a range extension, "
+            "worth an expert look"
+        )
+    finally:
+        VALUES["taxon-1"] = [255]
+    assert page.errors == []
+
+
+def test_the_map_card_reads_the_introduced_flag(browser, site):
+    page = open_map(browser, f"{site}/map.html?standalone=1", "#record=3000&at=9/49/-123")
+    tiler(page)
+    page.locator("#card .rchip").wait_for()
+    assert habitat(page, "1,200 km outside").endswith("the range map is likely behind its spread")
+    assert page.errors == []
+    page.close()
 
 
 def test_far_outside_and_unsuitable_or_unreadable(browser, site):
