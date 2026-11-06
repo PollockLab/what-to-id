@@ -251,3 +251,17 @@ def test_oneid_chip_needs_the_flag_and_round_trips_in_the_hash():
     assert got == ["only=oneid", ["oneid"]]
     got = run("var S=MF.read(new URLSearchParams('only=oneid'));return [MF.write(S),S.only];")
     assert got == [[], {}]
+
+
+def test_range_chip_needs_the_flag_and_round_trips_in_the_hash():
+    meta = {**META, "flags": ["range"], "ranks": []}
+    got = run(
+        "return ['range','-range'].map(function(h){var S=MF.read(new URLSearchParams('only='+h));"
+        "return [MF.write(S).join('&'),S.only];}).concat([MF.ONLYDEF]);",
+        meta,
+    )
+    assert got[:2] == [["only=range", {"range": "inc"}], ["only=-range", {"range": "not"}]]
+    assert [d[:3] for d in got[2]] == [["range", "Outside usual range", "range"]]
+    assert "more than 50 km outside" in got[2][0][3]
+    got = run("var S=MF.read(new URLSearchParams('only=range'));return [MF.write(S),S.only];")
+    assert got == [[], {}]
