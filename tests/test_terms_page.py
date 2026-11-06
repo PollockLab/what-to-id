@@ -114,7 +114,7 @@ MANIFEST = {
 def test_methods_numbers_come_from_the_code_and_the_manifest():
     from what_to_id import atlas_update, confusion, host_pairs, levels, pool_levels, terms_methods
 
-    html = terms_page.render(manifest=MANIFEST)
+    html = terms_page.render(manifest=MANIFEST, data_url="https://x.test/atlas")
     methods = html.split('id="methods"')[1]
     assert "__" not in methods and terms_methods.MISSING not in methods
     for text in (
@@ -179,3 +179,39 @@ def test_evaluation_table_comes_from_the_committed_script_output():
     assert f"Might be mislabelled, {mis['to_suggested_share']:.0%}\nmoved to the species" in html
     assert f"the shares are {none['to_suggested_share']:.0%} and " in html
     assert f"(rate ratios {mis['to_suggested_rr']:.2f} [" in html
+
+
+def test_figures_baselines_replication_and_cohort_link_come_from_the_outputs():
+    from what_to_id import terms_methods
+
+    ev = json.loads(terms_methods.OUTCOME.read_text())
+    ev_b = json.loads(terms_methods.OUTCOME_B.read_text())
+    assert ev["inputs"]["scores"] == ev_b["inputs"]["scores"]
+    assert ev["inputs"]["pool_before"] == ev_b["inputs"]["pool_before"]
+    assert ev["outcome_on"] < ev_b["outcome_on"]
+    html = terms_page.render()
+    methods = html.split('id="methods"')[1]
+    assert methods.count("<figure>") == 2 and methods.count("<svg") == 2
+    page = ev["baselines"]["page"]
+    assert (
+        f"<td>The page's order (level, then score within the level)</td><td>{page['auc']:.3f} ["
+        in methods
+    )
+    assert f"{ev['baselines']['margin_lowest_first_shown']['auc']:.3f} [" in methods
+    assert (
+        f"gives an AUC of {ev['baselines']['close_calls_lowest_margin_first']['auc']:.3f} ["
+        in methods
+    )
+    assert f"the pool of {ev_b['outcome_on']}:</p>" in methods
+    mis, n = ev_b["levels"]["mislabel"], ev_b["levels"]["mislabel"]["n"]
+    assert (
+        f"<td>Might be mislabelled</td><td>{n:,}</td><td>{mis['corrected_per_1000']:.2f}</td>"
+        in methods
+    )
+    assert terms_methods.MISSING + " on the index" in methods
+    linked = terms_page.render(data_url="https://x.test/atlas/")
+    assert f'<a href="https://x.test/atlas/{ev["cohort_file"]}">{ev["cohort_file"]}</a>' in linked
+
+
+def test_identify_about_links_to_methods():
+    assert 'href="terms.html#methods"' in page_identify.render()

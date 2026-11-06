@@ -258,9 +258,11 @@ def test_the_scoring_dates_fall_back_to_the_model_source_and_skip_what_is_not_a_
     assert "__" not in html.split("<details", 1)[1].split("</details>", 1)[0]
 
 
-def test_mislabel_and_weird_show_their_lowest_score_first_and_the_others_their_highest():
-    level = np.array([2, 2, 4, 4, 5, 5], np.uint8)
-    score = np.array([-0.001, -0.019, 0.1, 0.3, -0.03, -0.2])
+def test_the_might_be_wrong_levels_show_their_lowest_score_first_and_the_others_their_highest():
+    level = np.array([2, 2, 4, 4, 5, 5, 1, 1], np.uint8)
+    score = np.array([-0.001, -0.019, 0.1, 0.3, -0.03, -0.2, 0.3, 0.1])
     q = pool_levels.quantize(level, score)
-    assert q[0] > q[1]  # close calls: the margin nearest 0 first
+    # close calls: the lowest margin first (levels_outcome.json, close_calls_lowest_margin_first)
+    assert q[1] > q[0]
     assert q[2] > q[3] and q[5] > q[4]  # odd shots and might be mislabelled: lowest first
+    assert q[6] > q[7]  # clear matches: highest own first

@@ -89,7 +89,7 @@ def quantize(level: np.ndarray, score: np.ndarray) -> np.ndarray:
     for lv in np.unique(level[level != NONE]):
         rows = np.flatnonzero(level == lv)
         s = np.nan_to_num(score[rows].astype(np.float64), nan=-np.inf)
-        order = np.argsort(-s if lv in (WEIRD, MISLABEL) else s, kind="stable")
+        order = np.argsort(-s if lv in (WEIRD, TAXONOMIST, MISLABEL) else s, kind="stable")
         rank = np.empty(len(rows), np.int64)
         rank[order] = np.arange(len(rows))
         q[rows] = rank * STEPS // len(rows)
