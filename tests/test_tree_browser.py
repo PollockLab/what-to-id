@@ -399,12 +399,12 @@ RIM = """() => [...document.querySelectorAll('#svg text.lb:not(.in)')].map(e => 
 @pytest.mark.parametrize("w", [693, 900, 1400])
 def test_a_crowded_circle_shows_tip_names_whole_or_not_at_all(browser, wide_site, w):
     page = open_tree(browser, wide_site, w=w, h=700)
-    page.wait_for_selector("#svg text.lb:not(.in)")
+    page.wait_for_selector("#svg text.lb")
     rim = page.evaluate(RIM)
-    assert rim
+    assert rim or w < 1400  # a crowded circle hides the names that would need type under 11px
     for shown, title, size in rim:
         assert title.startswith(shown) and not shown.endswith("…"), (shown, title)
-        assert size >= 9, (shown, size)
+        assert size >= 11, (shown, size)
     assert page.errors == []
     page.close()
 

@@ -192,7 +192,7 @@ def test_figures_baselines_replication_and_cohort_link_come_from_the_outputs():
     assert ev["outcome_on"] < ev_b["outcome_on"]
     html = terms_page.render()
     methods = html.split('id="methods"')[1]
-    assert methods.count("<figure>") == 2 and methods.count("<svg") == 2
+    assert methods.count("<figure ") == 2 and methods.count("<svg") == 2
     page = ev["baselines"]["page"]
     assert (
         f"<td>The page's order (level, then score within the level)</td><td>{page['auc']:.3f} ["

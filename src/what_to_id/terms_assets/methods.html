@@ -22,7 +22,7 @@ and <em>other</em> is its best score to any other species in the pool; the margi
 other. A margin above 0 means the label is the model's first choice among the pool's species.
 For a record labelled above species (a genus, say), the best score inside the label's clade is
 compared with the best score outside it.</p>
-<figure>__FIG_MARGIN__<figcaption>Margin of every species-labelled record in the scored pool,
+<figure tabindex="0" role="region" aria-labelledby="figcap-margin">__FIG_MARGIN__<figcaption id="figcap-margin">Margin of every species-labelled record in the scored pool,
 coloured by the level it took, on a log count axis. Dashed lines: the cut at 0 between Clear
 matches and Close calls, and at &minus;__TAXONOMIST_MARGIN__ between Close calls and Might be
 mislabelled. The end bins hold every record beyond &minus;0.15 and 0.15. From the committed
@@ -122,7 +122,7 @@ are not counted here, since their new taxon is not in the pool.</p>
 __CAL_BINS__ groups of equal size by margin, lowest first, and shows the corrected share in each.
 The share falls as the margin rises and is flat above 0. The cut-offs are not probabilities: a
 record in the lowest bin is corrected a few times in a thousand, not often.</p>
-<figure>__FIG_CALIBRATION__<figcaption>Corrected per 1,000 records in each margin bin of equal
+<figure tabindex="0" role="region" aria-labelledby="figcap-calibration">__FIG_CALIBRATION__<figcaption id="figcap-calibration">Corrected per 1,000 records in each margin bin of equal
 record count, by __REPL_OUTCOME_FIRST__. Labels under the bars are the bin's lower margin.</figcaption></figure>
 <p>Are the levels better than a plain sort? The area under the curve (AUC) is the chance that a
 corrected record is shown before an uncorrected one; 0.5 is a random order. The first column ranks

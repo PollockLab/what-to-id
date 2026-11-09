@@ -256,10 +256,8 @@ def test_meta_json_equals_the_pages_meta_and_follows_publish(tmp_path):
     write_map(tmp_path, make_pool(10), totals={"on": "2026-09-30", "obs": {}, "up": {}})
     html = (tmp_path / MAP_NAME).read_text()
     page = json.loads(re.search(r"var META=(\{.*?\});var BASEMAPS", html).group(1))
-    assert "totals" in page  # the map page keeps them, map-meta.json drops them
-    assert json.loads((tmp_path / META_NAME).read_text()) == {
-        k: v for k, v in page.items() if k != "totals"
-    }
+    assert "totals" not in page and (tmp_path / page["files"]["totals"]).exists()
+    assert json.loads((tmp_path / META_NAME).read_text()) == page
     publish(tmp_path, "levels", "pool-levels.bin", b"x")
     meta = json.loads((tmp_path / META_NAME).read_text())
     assert meta["files"]["levels"].startswith("pool-levels.")
@@ -455,7 +453,9 @@ def test_page_carries_totals_only_when_given(tmp_path):
     write_map(tmp_path / "b", pool, totals=raw)
     html = (tmp_path / "b" / MAP_NAME).read_text()
     meta = json.loads(re.search(r"var META=(\{.*?\});var BASEMAPS", html).group(1))
-    assert meta["totals"]["on"] == "2026-09-30" and len(meta["totals"]["obs"]) == len(groups)
+    assert "totals" not in meta
+    t = json.loads(gzip.decompress((tmp_path / "b" / meta["files"]["totals"]).read_bytes()))
+    assert t["on"] == "2026-09-30" and len(t["obs"]) == len(groups)
     assert 'id="share"' in html and 'id="hint"' in html
     assert not [w for w in ARM_WORDS if w in html.lower()]
 

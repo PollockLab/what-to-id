@@ -61,7 +61,7 @@ var P={n:0,id:new Uint32Array(0),pos:new Float32Array(0),obs:new Uint16Array(0),
   up:new Uint16Array(0),tax:new Uint16Array(0),grp:new Uint8Array(0),ids:new Uint8Array(0),
   fl:new Uint8Array(0),start:[0]};
 var ORDER=false,VR=null,TAXA=null,TF=TX.filter(null,[]),GONE={},GONE_NEW=false,KEEP=new Uint8Array(0),BK=KEEP,VM=KEEP,SEL=-1,NBR=[],
-  CUM=new Float64Array(META.days+1),TOT=META.totals||null,TC=null,NODAY=0,PER=null,ALT=0,TK0=null,MOVED=!!S.at;
+  CUM=new Float64Array(META.days+1),TOT=null,TC=null,NODAY=0,PER=null,ALT=0,TK0=null,MOVED=!!S.at;
 function cat(a,b){var c=new a.constructor(a.length+b.length);c.set(a);c.set(b,a.length);return c;}
 function unzip(buf){
   var u=new Uint8Array(buf,0,Math.min(2,buf.byteLength));
@@ -536,4 +536,6 @@ META.shards.forEach(function(s,k){
   });
 });
 chain.catch(function(e){$('count').textContent='Could not load the records ('+e.message+')';});
+// the all-record counts are optional and the bulk of the page, so they load beside the shards
+if(META.files.totals)get(META.files.totals).then(function(b){TOT=JSON.parse(new TextDecoder().decode(b));if(P.n)refilter();}).catch(function(){});
 })();

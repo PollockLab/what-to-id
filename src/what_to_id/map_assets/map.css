@@ -118,6 +118,9 @@ h1{font-size:18px;margin:0}
 .padd{font:inherit;font-size:12px;min-height:26px;max-width:100%;padding:2px 6px;border:1px solid var(--line);
   border-radius:6px;background:var(--panel);color:var(--ink)}
 .prow label{flex:1 1 100%}
+.prow input[type=checkbox]{width:24px;height:24px;margin:0 4px 0 0;vertical-align:middle}
+.prow label{min-height:24px}
+[data-explain=left-needs-id]{display:inline-block;min-height:24px;line-height:24px}
 .prow input.padd{flex:1 1 140px;min-width:0;font-size:16px}
 button.padd{cursor:pointer;background:var(--chip)}
 /* "Identify only": a pasted project, in the Identify link but not the map filter */
@@ -153,6 +156,7 @@ button.padd{cursor:pointer;background:var(--chip)}
 .lvleg [role=button]:hover em{text-decoration:underline}
 .lvleg [role=button]:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
 .lvleg span{max-width:16em}
+.lvleg span,.lvleg .lr{min-height:24px}
 .lvleg em{font-style:normal;overflow:hidden;text-overflow:ellipsis}
 .lvleg .lb{border:0;background:none;color:inherit;font:inherit;padding:0;cursor:pointer;text-decoration:underline;min-height:0}
 /* the trail takes a line of its own above the rows; its last step cuts to the line with an ellipsis */
