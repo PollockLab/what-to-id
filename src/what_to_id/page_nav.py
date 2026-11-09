@@ -44,7 +44,8 @@ CSS = """
   --warnbg:#3a2a14;--shadow:0 4px 16px rgba(0,0,0,.5)}
 :focus-visible{outline:3px solid var(--bar);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){*,::before,::after{
-  transition-duration:.01ms!important;animation-duration:.01ms!important}}
+  transition-duration:.01ms!important;animation-duration:.01ms!important;
+  scroll-behavior:auto!important}}
 .site-skip{position:absolute;left:8px;top:8px;z-index:100;transform:translateY(-200%);
 padding:10px 14px;
   background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px}
