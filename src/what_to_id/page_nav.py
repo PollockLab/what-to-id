@@ -31,18 +31,20 @@ BLITZ = "https://pollocklab.github.io/where-to-blitz/"
 
 CSS = """
 :root{--bg:#fbfbf9;--panel:#fff;--ink:#1d1d1b;--muted:#5f5e58;--line:#dcdbd3;--dot:42,120,214;
-  --bar:#2a78d6;--total:#d5e3f5;--share:#c2410c;--chip:#f0efe9;--on:#1d1d1b;--onink:#fff;
+  --bar:#206dcb;--total:#d5e3f5;--share:#c2410c;--chip:#f0efe9;--on:#1d1d1b;--onink:#fff;
 --warn:#8a4b00;--warnbg:#fdf0dc;
   --shadow:0 4px 16px rgba(0,0,0,.18)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1a1a19;--panel:#222220;
-  --ink:#fff;--muted:#c3c2b7;--line:#3a3a37;--dot:57,135,229;--bar:#3987e5;--total:#2b3a4d;
+  --ink:#fff;--muted:#c3c2b7;--line:#3a3a37;--dot:57,135,229;--bar:#529aeb;--total:#2b3a4d;
 --share:#fb923c;--chip:#2c2c2a;--on:#fff;
   --onink:#1a1a19;--warn:#ffc27a;--warnbg:#3a2a14;--shadow:0 4px 16px rgba(0,0,0,.5)}}
 :root[data-theme="dark"]{--bg:#1a1a19;--panel:#222220;--ink:#fff;--muted:#c3c2b7;--line:#3a3a37;
-  --dot:57,135,229;--bar:#3987e5;--total:#2b3a4d;--share:#fb923c;--chip:#2c2c2a;--on:#fff;
+  --dot:57,135,229;--bar:#529aeb;--total:#2b3a4d;--share:#fb923c;--chip:#2c2c2a;--on:#fff;
 --onink:#1a1a19;--warn:#ffc27a;
   --warnbg:#3a2a14;--shadow:0 4px 16px rgba(0,0,0,.5)}
 :focus-visible{outline:3px solid var(--bar);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*,::before,::after{
+  transition-duration:.01ms!important;animation-duration:.01ms!important}}
 .site-skip{position:absolute;left:8px;top:8px;z-index:100;transform:translateY(-200%);
 padding:10px 14px;
   background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px}
@@ -166,7 +168,7 @@ def nav(
     return (
         f'<a class="site-skip" href="#main-content" {_SKIP}>Skip to content</a>\n'
         f'<div class="site-shell"><a class="site-brand" href="{escape(base)}index.html">'
-        'What to ID<span class="site-bc"> · BC</span></a>'
+        'What to ID<span class="site-bc">\u00a0· BC</span></a>'
         f'<nav class="site-nav" aria-label="Views"{flags}>{"".join(links)}</nav>{extra}</div>\n'
         f"<script>{JS}</script>\n" + ("" if current in FROZEN else explain())
     )

@@ -47,11 +47,11 @@ ol{list-style:none;margin:8px 0;padding:0;display:grid;gap:10px;
 .card .name{font-size:13px}
 .card .com,.card .look,.card .when{font-size:12px;color:var(--muted)}
 .card .look{overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
-.card .when{display:block;text-decoration:none;min-height:1.4em}
+.card .when{display:block;text-decoration:none;min-height:24px;line-height:24px}
 .card .when:hover{text-decoration:underline}
 .btn{display:inline-flex;align-items:center;min-height:30px;padding:0 12px;border-radius:15px;
   background:var(--on);color:var(--onink);font-size:13px;font-weight:650;text-decoration:none}
-.card .sp{font:inherit;font-size:12px;color:var(--muted);background:none;border:0;padding:0;text-align:left;cursor:pointer;
+.card .sp{font:inherit;font-size:12px;color:var(--muted);background:none;border:0;padding:0;min-height:24px;text-align:left;cursor:pointer;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .card .sp:hover{text-decoration:underline}
 .card .btn{align-self:flex-start}
@@ -135,7 +135,7 @@ The login goes only to iNaturalist.</p></details>
 <p id="cap" class="muted" data-explain="batch" hidden></p>
 <p id="none" class="muted" hidden>No records at this level here.</p>
 <ol id="grid"></ol>
-<p id="end"><button type="button" id="more" class="more" hidden></button></p>
+<p id="end"><button type="button" id="more" class="more" hidden>Show more</button></p>
 </div>
 </main>
 <script>var IDENTIFY_CONFIG=__CONFIG__;</script>
