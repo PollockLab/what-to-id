@@ -12,7 +12,7 @@ header{grid-area:head;padding:10px 16px;border-bottom:1px solid var(--line);disp
 .embed .time{padding:4px 12px 6px}
 .embed .unit,.embed .hint{display:none}
 .embed #over{height:26px}
-.embed .months button{min-width:32px;min-height:22px;padding:1px 0;font-size:11px}
+.embed .months button{min-width:32px;min-height:24px;padding:1px 0;font-size:11px}
 /* embedded in Explore, the filters are a rail left of the map, full height; folded, a strip with a Filters
    button (map_rail.js); alone, while the map pane is hidden, the rail is the whole frame */
 .railhd{display:none}
@@ -29,7 +29,7 @@ header{grid-area:head;padding:10px 16px;border-bottom:1px solid var(--line);disp
 html.embed.rail-only body{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);grid-template-areas:"side"}
 .rail-only header,.rail-only #map,.rail-only .time,.rail-only .card,.rail-only .ptip{display:none!important}
 h1{font-size:18px;margin:0}
-.sub,.hint,.muted{color:var(--muted);margin:0;font-size:12px}
+.sub,.hint,.muted{color:var(--muted);margin:0;font-size:12px}.sub,.hint{max-width:58ch;text-wrap:pretty}
 .stat{margin:0;font-size:13px}
 #more{color:var(--muted)}
 .share{display:block;color:var(--muted);font-size:12px}
@@ -82,7 +82,7 @@ h1{font-size:18px;margin:0}
 .gl,.gl ul{list-style:none;margin:0;padding:0}
 .gl .gr{position:relative;display:flex;flex-wrap:wrap;align-items:center;min-height:28px}
 .gl .gw{display:contents}
-.gl .gt{order:-1;width:20px;margin:0;padding:0;border:0;background:none;color:var(--muted);cursor:pointer;flex:none}
+.gl .gt{order:-1;width:24px;min-height:24px;margin:0;padding:0;border:0;background:none;color:var(--muted);cursor:pointer;flex:none}
 .gl .gb{flex:1;min-width:0;display:flex;align-items:center;gap:6px;height:28px;padding:0 4px 2px;border:0;border-radius:4px;
   background:linear-gradient(var(--bar),var(--bar)) no-repeat 0 100%/var(--s,0) 2px;color:var(--ink);font:inherit;font-size:13px;
   text-align:left;cursor:pointer}
@@ -141,7 +141,7 @@ button.padd{cursor:pointer;background:var(--chip)}
 .zoomrec[hidden]{display:none}
 .lrows{display:contents}
 .lvleg button{pointer-events:auto}
-.lvleg .seg button{min-height:22px;padding:1px 9px}
+.lvleg .seg button{min-height:24px;padding:1px 9px}
 .lvleg .lt{color:var(--muted)}
 .lvleg .lr{border:0;background:none;color:inherit;font:inherit;padding:0;cursor:pointer}
 .lvleg .pick .lr[aria-pressed="false"]{opacity:.45;text-decoration:line-through}
@@ -188,7 +188,7 @@ html.rail-only .xsheet [data-a=draw]{display:none}  /* no map to draw on */
 .histwrap{position:relative;margin:6px 0 2px}
 #hist{width:100%;height:64px;display:block;cursor:crosshair;touch-action:none}
 #over{width:100%;height:34px;display:block;cursor:pointer;touch-action:none}
-.unit{margin:4px 0 0;font-size:11px;color:var(--muted)}
+.unit{margin:4px 0 0;font-size:12px;color:var(--muted)}
 .htip{position:absolute;top:-4px;transform:translate(-50%,-100%);background:var(--panel);
   color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:2px 6px;font-size:12px;
   white-space:nowrap;pointer-events:none;box-shadow:var(--shadow)}
@@ -237,7 +237,7 @@ html.rail-only .xsheet [data-a=draw]{display:none}  /* no map to draw on */
 .card .nbrs button{display:block;width:56px;height:56px;padding:0;border:0;border-radius:6px;overflow:hidden;
   background:var(--chip);color:var(--ink);font-size:10px;cursor:pointer}
 .card .nbrs img{width:100%;height:100%;object-fit:cover;display:block}
-.card .rank{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#1b5e4c;color:#fff;
+.card .rank{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--on);color:var(--onink);
   font-size:11px;font-weight:700;line-height:18px;text-align:center;pointer-events:none}
 .badges{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0}
 .badge{font-size:11px;padding:1px 7px;border-radius:9px;border:1px solid var(--line);color:var(--ink)}

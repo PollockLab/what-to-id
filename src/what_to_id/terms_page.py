@@ -60,15 +60,17 @@ GROUPS = {
 }
 CSS = """
 body{margin:0;background:var(--bg);color:var(--ink);
-  font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
-main{max-width:760px;margin:0 auto;padding:16px}
-h1{font-size:22px;margin:8px 0}h2{font-size:18px;margin:28px 0 8px}
-h3{font-size:15px;margin:20px 0 6px}
+  font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:55ch;margin:0 auto;padding:16px}  /* about 75 characters a line */
+main p,main dd,main li{text-wrap:pretty}
+h1{font-size:28px;line-height:1.2;margin:8px 0}h2{font-size:22px;line-height:1.25;margin:32px 0 8px}
+h3{font-size:18px;margin:24px 0 6px}
 a{color:var(--bar)}dt{font-weight:650;margin-top:10px}dd{margin:2px 0 0}
-code{font-size:12px;word-break:break-all}ol.refs{padding-left:20px}ol.refs li{margin:4px 0}
-table.eval{border-collapse:collapse;font-size:13px}
-figure{margin:12px 0}figure svg{width:100%;height:auto;font-size:11px;fill:var(--ink)}
-figcaption{font-size:13px;color:var(--muted,inherit)}
+code{font-size:14px;word-break:break-all}ol.refs{padding-left:20px}ol.refs li{margin:4px 0}
+table.eval{border-collapse:collapse;font-size:15px}
+figure{margin:12px 0;overflow-x:auto}
+figure svg{width:100%;min-width:560px;height:auto;font-size:14px;fill:var(--ink)}
+figcaption{font-size:15px;color:var(--muted,inherit)}
 table.eval th,table.eval td{border-bottom:1px solid var(--line);padding:4px 8px;text-align:left}
 dt:target{background:var(--chip);outline:2px solid var(--bar)}
 """.strip()

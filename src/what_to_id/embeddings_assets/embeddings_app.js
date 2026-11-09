@@ -189,6 +189,7 @@ function span(xs,ys,t){
 }
 // Shows the box in the plot, flying there over ms; beside the map, below the panel that floats over the plot's top.
 function frame(b,ms){
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches)ms=0;
   var box=$('plot'),top=document.documentElement.classList.contains('peer')?
       Math.max(0,document.querySelector('.side').getBoundingClientRect().bottom-box.getBoundingClientRect().top):0,
     z=Math.log2(Math.min(Math.max(box.clientWidth,1)/(b[2]-b[0]||1),Math.max(box.clientHeight-top,1)/(b[3]-b[1]||1))*.9);
