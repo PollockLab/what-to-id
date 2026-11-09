@@ -509,6 +509,10 @@ def write_map(
     if totals is not None:
         meta["totals"] = align_totals(totals, meta)
         over = over_totals(pool, meta)
+        gz = _gz(dump(meta.pop("totals")).encode())  # a file, not inline: it is most of the page
+        name = hashed("pool-totals.bin", gz)
+        blobs[name] = gz
+        meta.setdefault("files", {})["totals"] = name
         if over:
             _warn(f"{over} group-months hold more records than their totals; the page caps them")
     add_projects(blobs, meta, projects)
