@@ -5,7 +5,7 @@
 'use strict';
 var CT=new Set(),M=TreeModel,L=EmbeddingsLayout,META=CFG.meta,nf=new Intl.NumberFormat('en'),
   nc=new Intl.NumberFormat('en',{notation:'compact',maximumFractionDigits:1}),EMBED=/[?&]embed=1/.test(location.search),
-  BUDGET=400,BAR=26,TH=24,MINF=9,MINR=420,reduce=matchMedia('(prefers-reduced-motion: reduce)'),
+  BUDGET=400,BAR=26,TH=24,MINF=11,MINR=420,reduce=matchMedia('(prefers-reduced-motion: reduce)'),
   D=null,S=null,V=null,G={},GS=[],COL=new Map(),CC=null,prev=null,anim=0,SEL='',SY=null,PS=-1,PH={},Q=[],qt=0,qlast=0,lt=0,split=false,OL=null;
 function $(i){return document.getElementById(i);}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
@@ -169,7 +169,7 @@ function labels(V,h,on){
     box.push(b);
     h.push('<text class="lb in'+(n.key===on?' on':'')+'" data-k="'+n.key+'" x="'+b[0].toFixed(1)+'" y="'+(b[3]-3).toFixed(1)+'"><title>'+
       esc(tip(n))+'</title>'+esc(txt)+'</text>');});
-  CX.font='10px '+getComputedStyle(document.body).fontFamily;
+  CX.font='11px '+getComputedStyle(document.body).fontFamily;
   V.rk.forEach(function(r){var b=[r[0],r[1]-10,r[0]+CX.measureText(r[2]).width,r[1]+3];
     if(!hit(b)&&inn(b)&&box.push(b))h.push('<text class="rk" x="'+r[0]+'" y="'+r[1]+'">'+r[2]+'</text>');});
 }
@@ -282,7 +282,8 @@ function outline(){
 // card's photo has pushed the outline down on a phone.
 function seen(){var r=$('outline').querySelector('[aria-selected="true"]>.row');if(!r)return;
   var sd=$('side').getBoundingClientRect(),b=r.getBoundingClientRect(),pin=Math.min(4,r.parentNode.getAttribute('aria-level')-1)*28;
-  if(b.top<sd.top+pin||b.bottom>sd.bottom)r.scrollIntoView({block:'center'});}
+  if(b.top<sd.top+pin||b.bottom>sd.bottom){r.scrollIntoView({block:'center'});
+    var d=r.getBoundingClientRect().top-sd.top-pin;if(d<0)$('side').scrollTop+=d;}}  // a short side centres a row under the pins
 function items(){return [].slice.call($('outline').querySelectorAll('[role=treeitem]'));}
 function move(to){if(!to)return;items().forEach(function(i){i.tabIndex=-1;});to.tabIndex=0;to.focus();}
 $('outline').addEventListener('click',function(e){var t=e.target.closest('[data-k]');if(!t)return;
