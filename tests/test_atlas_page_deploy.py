@@ -2,6 +2,7 @@
 
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -45,7 +46,7 @@ def test_script_is_executable_in_git():
 
 def _run(tmp_path, **env):
     full = {k: v for k, v in os.environ.items() if k != "ATLAS_HF_REPO"}
-    full.update(env)
+    full.update(PYTHON=sys.executable, **env)
     return subprocess.run(
         [str(SCRIPT), str(tmp_path / "site")], capture_output=True, text=True, env=full
     )
