@@ -31,7 +31,7 @@ from what_to_id.page_map import (
     shard_name,
     write_map,
 )
-from what_to_id.site_files import hashed
+from what_to_id.site_files import META_NAME, hashed, publish
 
 from .conftest import make_pool
 
@@ -237,12 +237,32 @@ def test_write_map_and_cli(tmp_path):
     pool = make_pool(40)
     paths = write_map(tmp_path / "a", pool)
     _, meta = encode_points(pool)
-    names = [MAP_NAME, meta["shards"][0]["file"], meta["taxa"], PARKS_NAME, meta["observer"]]
+    names = [
+        MAP_NAME,
+        META_NAME,
+        meta["shards"][0]["file"],
+        meta["taxa"],
+        PARKS_NAME,
+        meta["observer"],
+    ]
     assert sorted(p.name for p in paths) == sorted(names)
     pool.to_parquet(tmp_path / "pool.parquet", index=False)
     assert main(["--pool", str(tmp_path / "pool.parquet"), "--out", str(tmp_path / "b")]) == 0
     for name in names:
         assert (tmp_path / "a" / name).read_bytes() == (tmp_path / "b" / name).read_bytes()
+
+
+def test_meta_json_equals_the_pages_meta_and_follows_publish(tmp_path):
+    write_map(tmp_path, make_pool(10), totals={"on": "2026-09-30", "obs": {}, "up": {}})
+    html = (tmp_path / MAP_NAME).read_text()
+    page = json.loads(re.search(r"var META=(\{.*?\});var BASEMAPS", html).group(1))
+    assert "totals" in page  # the map page keeps them, map-meta.json drops them
+    assert json.loads((tmp_path / META_NAME).read_text()) == {
+        k: v for k, v in page.items() if k != "totals"
+    }
+    publish(tmp_path, "levels", "pool-levels.bin", b"x")
+    meta = json.loads((tmp_path / META_NAME).read_text())
+    assert meta["files"]["levels"].startswith("pool-levels.")
 
 
 def test_taxa_file_numbers_taxa_by_frequency_and_carries_their_rank():

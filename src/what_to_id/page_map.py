@@ -63,7 +63,7 @@ from what_to_id.map_parks import PARKS_NAME, parks_blob, parks_version
 from what_to_id.map_projects import add_projects
 from what_to_id.page import ARM_WORDS, group_name
 from what_to_id.sdm_manifest import sdm_meta
-from what_to_id.site_files import dump, hashed
+from what_to_id.site_files import META_NAME, dump, hashed, read_meta, write_meta
 from what_to_id.taxonomy import (
     AT_RISK,
     GROUP_TAXA,
@@ -526,7 +526,8 @@ def write_map(
     for name, blob in blobs.items():
         (out / name).write_bytes(blob)
     (out / MAP_NAME).write_text(html)
-    return [out / MAP_NAME, *(out / name for name in blobs)]
+    write_meta(out, read_meta(html))
+    return [out / MAP_NAME, out / META_NAME, *(out / name for name in blobs)]
 
 
 MAPLIBRE_JS = "https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"

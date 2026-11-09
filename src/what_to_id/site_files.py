@@ -25,6 +25,8 @@ from pathlib import Path
 import requests
 
 MAP_NAME = "map.html"
+META_NAME = "map-meta.json"  # META alone, stable name: pages read it instead of the whole map page
+MAP_ONLY = ("totals",)  # the map page's own keys, the bulk of META and read by no other page
 START, END = "var META=", ";var BASEMAPS="
 SAFE = re.compile(r"[\w-]+(\.[\w-]+)*")  # a plain file name, no path
 
@@ -69,9 +71,15 @@ def flag(site: Path, name: str, on: bool) -> None:
     _write(page, html, meta)
 
 
+def write_meta(site: Path, meta: dict) -> None:
+    """map-meta.json beside the map page: META without the keys only the map reads."""
+    (Path(site) / META_NAME).write_text(dump({k: v for k, v in meta.items() if k not in MAP_ONLY}))
+
+
 def _write(page: Path, html: str, meta: dict) -> None:
     start, end = html.find(START) + len(START), html.find(END)
     page.write_text(html[:start] + dump(meta) + html[end:])
+    write_meta(page.parent, meta)
 
 
 def path(site: Path, key: str) -> Path | None:
