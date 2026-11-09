@@ -695,3 +695,22 @@ def test_embedded_filters_are_a_rail_left_of_the_map():
     rule = re.search(r"\.embed body\{([^}]*)\}", css).group(1)
     assert "280px" in rule and '"side head"' in rule and '"side map"' in rule
     assert ".embed .toggle{display:none}" in css  # no drawer button
+
+
+def test_taxon_search_is_a_combobox_and_touch_targets_are_44px():
+    _, meta = encode_points(make_pool(20))
+    html = render_map(meta, freeze=None)
+    q = re.search(r'<input id="q"[^>]*>', html).group(0)
+    for a in ('role="combobox"', 'aria-expanded="false"', 'aria-controls="sugg"'):
+        assert a in q
+    assert re.search(r'<ul id="sugg"[^>]*role="listbox"', html)
+    taxa = (_ASSETS / "map_taxa.js").read_text()
+    assert (
+        "setAttribute('role','option')" in taxa
+        and "aria-activedescendant" in taxa
+        and "aria-selected" in taxa
+    )
+    css = (_ASSETS / "map.css").read_text()
+    touch = css[css.index("@media (pointer:coarse)") :]
+    assert "min-height:44px!important" in touch and "min-width:44px!important" in touch
+    assert "#fff" not in (_ASSETS / "map_area.css").read_text()
