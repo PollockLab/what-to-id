@@ -95,7 +95,7 @@ h1{font-size:18px;margin:0}
 .gl .not .nm{text-decoration:line-through}
 .gl .z{opacity:.55}
 .gl .gx{flex:none;margin-left:2px;border:1px solid var(--line);border-radius:10px;background:var(--chip);color:var(--ink);
-  font:inherit;font-size:11px;padding:1px 6px;cursor:pointer}
+  font:inherit;font-size:11px;min-height:24px;padding:1px 6px;cursor:pointer}
 /* with a pointer it shows over the share on hover or focus, so it takes no room from the names */
 @media (hover:hover){.gl .gx:not([aria-pressed="true"]){position:absolute;right:0;top:4px;opacity:0;box-shadow:0 0 0 4px var(--panel)}
   .gl .gr:hover .gx,.gl .gx:focus-visible{opacity:1}}
@@ -106,7 +106,7 @@ h1{font-size:18px;margin:0}
 .gl .gs:empty{display:none}
 .gl .gs ul ul{margin-left:12px;border-left:1px solid var(--line)}
 .gl .tn{display:flex;align-items:center;gap:2px;min-height:26px}
-.gl .tw{flex:0 0 20px;padding:0;border:0;background:none;color:var(--muted);text-align:center;cursor:pointer}
+.gl .tw{flex:0 0 24px;min-height:24px;padding:0;border:0;background:none;color:var(--muted);text-align:center;cursor:pointer}
 .gl .tl{flex:1;min-width:0;border:0;border-radius:4px;background:none;color:var(--ink);font:inherit;font-size:12px;
   text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:2px 4px;cursor:pointer}
 .gl .tl:hover{background:var(--chip)}
