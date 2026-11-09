@@ -10,7 +10,7 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 
-from what_to_id.site_files import END, START, dump, read_meta
+from what_to_id.site_files import END, START, dump, read_meta, write_meta
 
 from . import test_identify_ranges_browser as rb
 from .test_map_oneid_browser import open_map
@@ -37,6 +37,7 @@ def site(tmp_path_factory):
         "taxa": {str(i): slugs[t[0]] for i, t in enumerate(taxa) if t[0] in slugs},
     }
     page.write_text(html[: html.find(START) + len(START)] + dump(meta) + html[html.find(END) :])
+    write_meta(root, meta)
     server = http.server.ThreadingHTTPServer(
         ("127.0.0.1", 0), functools.partial(rb.ib.Quiet, directory=str(root))
     )
