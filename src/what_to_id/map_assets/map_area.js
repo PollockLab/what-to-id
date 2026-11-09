@@ -180,7 +180,8 @@ function MapArea(ctx){
     mode=false,ended=0,pts=[],cursor=null,ready=false,color=getComputedStyle(document.documentElement)
       .getPropertyValue('--share').trim()||'#c2410c',nf=new Intl.NumberFormat('en-CA');
   var box=document.createElement('div');box.className='maplibregl-ctrl area';
-  box.innerHTML='<div class="abtns"><button type="button" data-a="draw">Draw area</button>'+
+  box.innerHTML='<button type="button" class="atoggle" aria-expanded="false">Draw area or park</button>'+
+    '<div class="abtns"><button type="button" data-a="draw">Draw area</button>'+
     '<label class="afile">Load GeoJSON<input type="file" accept=".geojson,.json,application/geo+json,'+
     'application/json"></label><button type="button" data-a="finish" hidden>Finish</button>'+
     '<button type="button" data-a="cancel" hidden>Cancel</button><button type="button" data-a="clear" '+
@@ -193,6 +194,9 @@ function MapArea(ctx){
     'aria-label="BC parks"></div><p class="amore" hidden></p></div></div><div class="achips" hidden></div>'+
     '<p class="anote" aria-live="polite" hidden></p><a class="abox" target="_blank" rel="noopener" hidden></a>'+
     '<p class="alive" aria-live="polite"></p>';
+  // a phone starts with the panel folded behind its toggle (map_area.css shows the toggle only there, never in Explore's sheet)
+  if(!document.documentElement.classList.contains('embed')){box.classList.add('acol');
+    box.querySelector('.atoggle').onclick=function(){this.setAttribute('aria-expanded',String(box.classList.toggle('acol')===false));};}
   function el(a){return box.querySelector('[data-a="'+a+'"]');}
   var note=box.querySelector('.anote'),file=box.querySelector('.afile input'),q=box.querySelector('.acombo input'),
     tog=box.querySelector('.atog'),panel=box.querySelector('.apanel'),hdr=box.querySelector('.ahdr'),

@@ -42,6 +42,13 @@
 .amore{margin:4px 6px 0;color:var(--muted)}
 .amore[hidden]{display:none}
 .alive{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.atoggle{display:none}
+@media (max-width:760px){
+  html:not(.embed) .atoggle{display:inline-flex;align-items:center;border:1px solid var(--line);background:var(--chip);color:var(--ink);
+    font:inherit;font-size:12px;padding:3px 9px;min-height:28px;cursor:pointer;border-radius:13px}
+  html:not(.embed) .area:not(.acol) .atoggle{margin-bottom:4px}
+  html:not(.embed) .area.acol>:not(.atoggle){display:none}
+}
 @media (max-width:479px){
   .apanel{position:fixed;left:8px;right:8px;z-index:10;background:var(--panel);border:1px solid var(--line);
     border-radius:8px;box-shadow:var(--shadow);padding:4px;max-height:50vh;display:flex;flex-direction:column}
