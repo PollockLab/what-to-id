@@ -123,6 +123,7 @@ def test_build_design_rotation_writes_only_index(tmp_path, webapp_dir):
     site = out / "site"
     assert sorted(re.sub(r"\.[0-9a-f]{12}\.", ".", p.name) for p in site.iterdir()) == [
         "bc-parks.bin",
+        "map-meta.json",
         "map.html",
         "pool-0.bin",
         "pool-observer.bin",

@@ -134,6 +134,9 @@ def render(
         f'{page_nav.nav(PAGE_NAME)}<main id="main-content">\n<h1>How it works</h1>\n'
         f"<h2>Terms</h2>\n{chr(10).join(terms)}\n<h2>How each view works</h2>\n{how}\n"
         f'<h2 id="methods">Methods</h2>\n{terms_methods.render(manifest, data_url)}\n'
+        f'<p>Planning a bioblitz? See <a href="{page_nav.BLITZ}" target="_blank" rel="noopener">'
+        'Where to Blitz\u00a0<span aria-hidden="true">\u2197</span>'
+        '<span class="site-vh"> (opens in a new tab)</span></a>.</p>\n'
         "</main></body></html>\n"
     )
 

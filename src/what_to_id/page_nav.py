@@ -24,6 +24,7 @@ PAGES = (
     ("explore.html", "Explore"),
     ("confusion.html", "Confused pairs"),
     ("study.html", "Study"),
+    ("terms.html", "Methods"),
 )
 OPTIONAL = {"confusion.html"}
 EXPLORE = "explore.html"
@@ -63,6 +64,8 @@ color:var(--muted);
   text-decoration:none;border-bottom:3px solid transparent;white-space:nowrap}
 .site-nav a:hover{color:var(--ink);background:var(--chip)}
 .site-nav a[aria-current="page"]{color:var(--ink);font-weight:650;border-bottom-color:var(--on)}
+.site-nav .ext{margin-left:auto;font-size:.875em}
+@media (max-width:480px){.site-nav .ext{display:none}}
 .site-vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);
 white-space:nowrap}
 .embed .site-shell,.embed .site-skip{display:none}
@@ -148,6 +151,8 @@ def nav(
     links = []
     here = EXPLORE if current in _EXPLORE_OF else current
     for page, label in PAGES:
+        if page == "terms.html" and current in FROZEN:
+            continue  # the running study keeps the nav it launched with
         if available is not None and page not in available and page != here:
             continue
         href = base + page
