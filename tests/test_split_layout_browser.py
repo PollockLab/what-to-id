@@ -174,7 +174,8 @@ def test_a_pane_is_loaded_only_once_shown_and_the_page_has_one_heading(browser, 
     base, *_ = site
     page = explore(browser, base, "?view=identify", 1500)
     page.wait_for_selector("#identify")
-    assert page.locator("#space, #tree").count() == 0  # no frame, so no request, for a pane not shown
+    # no frame, so no request, for a pane not shown
+    assert page.locator("#space, #tree").count() == 0
     assert page.locator("h1").all_inner_texts() == ["Explore"]
     page.click("[data-p=tree]")
     assert page.locator("#tree").get_attribute("src")
