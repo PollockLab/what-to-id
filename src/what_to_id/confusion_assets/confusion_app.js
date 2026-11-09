@@ -250,8 +250,7 @@ document.addEventListener('keydown',function(e){
 });
 addEventListener('hashchange',function(){readHash();$('q').value=S.q;update(true);});
 
-fetch(CONFIG.data).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);
-  return r.arrayBuffer();}).then(EmbeddingsLayout.gunzip).then(function(buf){
+fetchOnce(CONFIG.data).then(EmbeddingsLayout.gunzip).then(function(buf){
   D=decode(buf);readHash();$('q').value=S.q;update(true);
 }).catch(function(e){$('status').textContent='Could not load the pairs: '+e.message;});
 })();

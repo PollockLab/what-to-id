@@ -15,9 +15,8 @@ function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=c
 function status(t){$('status').textContent=t;}
 // A GoatCounter event when the page has its script (page_identify --goatcounter); never a login or record id.
 function track(name){var g=window.goatcounter;if(g&&g.count)try{g.count({path:'identify/'+name,title:name,event:true});}catch(e){}}
-function get(url){return fetch(url).then(function(r){
-  if(!r.ok)throw new Error('Could not load '+String(url).split('/').pop().split('?')[0]+' ('+r.status+')');
-  return r.arrayBuffer();}).then(L.gunzip);}
+function get(url){return fetchOnce(url).then(L.gunzip,function(e){
+  throw new Error('Could not load '+String(url).split('/').pop().split('?')[0]+' ('+e.message+')');});}
 
 // The records the selection keeps, 1 each in SEL: MapFilter.keep for the taxa, the group chips' verdict, MapFilter.rest
 // for the dates, months, show only and accuracy, then the area, the map's viewport, the lasso's ids and the User filter.
@@ -336,8 +335,7 @@ function looks(buf){
 async function load(){
   status('Reading the map data…');
   if(CFG.first)get(new URL(CFG.first,MAP)).then(function(b){if(!MF)firstOf(JSON.parse(new TextDecoder().decode(b)));}).catch(function(){});  // optional
-  var html=await fetch(MAP).then(function(r){if(!r.ok)throw new Error('Could not load the map page ('+r.status+')');return r.text();});
-  META=L.parseMapMeta(html);
+  META=await L.fetchMapMeta(MAP,fetch);
   function file(k){var f=META.files[k];return f?get(new URL(f,MAP)):Promise.reject(new Error('the map lists no '+k+' file'));}
   var taxa=get(new URL(META.taxa,MAP)).then(function(b){return JSON.parse(new TextDecoder().decode(b));});
   var shards=Promise.all(META.shards.map(function(s){return get(new URL(s.file,MAP)).then(function(b){return L.decodeShard(b,s.n);});}));

@@ -168,3 +168,15 @@ def test_a_more_link_in_identify_sends_its_species_to_the_map(browser, pts, site
     frame.locator("#grid .card .sp").first.click()
     page.wait_for_function("got.some(s => /(^|&)taxa=/.test(s))")
     page.close()
+
+
+def test_a_pane_is_loaded_only_once_shown_and_the_page_has_one_heading(browser, pts, site):
+    base, *_ = site
+    page = explore(browser, base, "?view=identify", 1500)
+    page.wait_for_selector("#identify")
+    # no frame, so no request, for a pane not shown
+    assert page.locator("#space, #tree").count() == 0
+    assert page.locator("h1").all_inner_texts() == ["Explore"]
+    page.click("[data-p=tree]")
+    assert page.locator("#tree").get_attribute("src")
+    page.close()

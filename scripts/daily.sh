@@ -151,8 +151,8 @@ check_wtb() {
 check_leaks() {
   local site="$OUT/final/site"
   [ -s "$site/study.html" ] || die "no page was built"
-  if find "$site" -type f ! -name '*.html' ! -name 'pool*.bin' ! -name bc-parks.bin | grep -q .; then
-    die "the site must hold only HTML pages, the map's pool*.bin files and its bc-parks.bin"
+  if find "$site" -type f ! -name '*.html' ! -name 'pool*.bin' ! -name bc-parks.bin ! -name map-meta.json | grep -q .; then
+    die "the site must hold only HTML pages, the map's pool*.bin files, its bc-parks.bin and map-meta.json"
   fi
   if grep -ril -E 'recency|gap_first|gap first|similarity|novelty|surprise' "$site"; then
     die "a list name leaked into the site"

@@ -11,6 +11,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1
 body{display:flex;flex-direction:column}
 .site-shell{flex-wrap:wrap;position:relative}
 .site-nav{flex:0 1 auto}
+/* the bar needs the row: the secondary Where to Blitz link would leave 1280 px about 1 % to spare, less with wider Linux fonts */
+@media (max-width:1439px){.site-nav .ext{display:none}}
 .xbar{display:flex;align-items:center;gap:8px 14px;margin-left:auto;min-width:0;font-size:13px;white-space:nowrap}
 .counts{color:var(--muted)}
 .counts b{color:var(--ink);font-weight:650;font-variant-numeric:tabular-nums}
@@ -73,7 +75,7 @@ body{display:flex;flex-direction:column}
 </head>
 <body>
 __SITE_NAV__
-<main id="main-content" tabindex="-1"></main>
+<main id="main-content" tabindex="-1"><h1 class="site-vh">Explore</h1></main>
 <div class="sbar" id="sbar" role="region" aria-label="Your selection"><span class="sbn" id="sbn" aria-live="polite"></span><ul class="sbc" id="sbc" aria-label="Active filters"></ul><button type="button" id="sbl" aria-expanded="false" aria-controls="map">Legend</button><button type="button" id="sbf" aria-expanded="false" aria-controls="map">When &amp; where</button></div>
 <script>
 __MAP_FILTER__

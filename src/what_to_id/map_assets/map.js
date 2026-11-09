@@ -69,8 +69,7 @@ function unzip(buf){
   return new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip')))
     .arrayBuffer();
 }
-function get(url){return fetch(url).then(function(r){
-  if(!r.ok)throw new Error('HTTP '+r.status);return r.arrayBuffer();}).then(unzip);}
+function get(url){return fetchOnce(url).then(unzip,function(e){throw new Error('HTTP '+e.message);});}
 // A shard stores each wider column byte by byte (every value's low byte, then the next), and ids
 // as steps from the previous id.
 function addShard(buf,n){
@@ -475,6 +474,8 @@ document.addEventListener('click',function(e){var a=e.target.closest('.maplibreg
 map.addControl(new maplibregl.NavigationControl({showCompass:false}));var GEO=new maplibregl.GeolocateControl({fitBoundsOptions:{maxZoom:11}});map.addControl(GEO);GEO.on('error',function(e){alert(e.code===1?'Location is blocked for this site. Allow it in your browser and system settings, then reload.':'Your device could not find where it is. On a laptop, turn Wi-Fi on so the system can place you, then try again.');});
 var ZB=document.createElement('button');ZB.type='button';ZB.className='zoomrec';ZB.hidden=true;ZB.textContent='Zoom to these records';
 ZB.onclick=function(){ZB.hidden=true;MOVED=false;fitTo(shows());};map.getContainer().appendChild(ZB);
+if(matchMedia('(max-width:760px)').matches&&!document.documentElement.classList.contains('embed'))map.once('load',function(){
+  var at=map.getContainer().querySelector('.maplibregl-ctrl-attrib');if(at){at.removeAttribute('open');at.classList.remove('maplibregl-compact-show');}});  // a phone starts with the credit folded to its icon
 map.on('movestart',function(e){if(e.originalEvent)MOVED=true;});  // only the viewer's own drag, wheel or pinch
 var overlay=new deck.MapboxOverlay({interleaved:false,pickingRadius:8,layers:[]});map.addControl(overlay);
 var SDM=MapSdm(map,{META:META,picks:function(){return S.picks;},TAXA:function(){return TAXA;},cells:MC.cells});

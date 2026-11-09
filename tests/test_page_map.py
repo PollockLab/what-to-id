@@ -31,7 +31,7 @@ from what_to_id.page_map import (
     shard_name,
     write_map,
 )
-from what_to_id.site_files import hashed
+from what_to_id.site_files import META_NAME, hashed, publish
 
 from .conftest import make_pool
 
@@ -237,12 +237,32 @@ def test_write_map_and_cli(tmp_path):
     pool = make_pool(40)
     paths = write_map(tmp_path / "a", pool)
     _, meta = encode_points(pool)
-    names = [MAP_NAME, meta["shards"][0]["file"], meta["taxa"], PARKS_NAME, meta["observer"]]
+    names = [
+        MAP_NAME,
+        META_NAME,
+        meta["shards"][0]["file"],
+        meta["taxa"],
+        PARKS_NAME,
+        meta["observer"],
+    ]
     assert sorted(p.name for p in paths) == sorted(names)
     pool.to_parquet(tmp_path / "pool.parquet", index=False)
     assert main(["--pool", str(tmp_path / "pool.parquet"), "--out", str(tmp_path / "b")]) == 0
     for name in names:
         assert (tmp_path / "a" / name).read_bytes() == (tmp_path / "b" / name).read_bytes()
+
+
+def test_meta_json_equals_the_pages_meta_and_follows_publish(tmp_path):
+    write_map(tmp_path, make_pool(10), totals={"on": "2026-09-30", "obs": {}, "up": {}})
+    html = (tmp_path / MAP_NAME).read_text()
+    page = json.loads(re.search(r"var META=(\{.*?\});var BASEMAPS", html).group(1))
+    assert "totals" in page  # the map page keeps them, map-meta.json drops them
+    assert json.loads((tmp_path / META_NAME).read_text()) == {
+        k: v for k, v in page.items() if k != "totals"
+    }
+    publish(tmp_path, "levels", "pool-levels.bin", b"x")
+    meta = json.loads((tmp_path / META_NAME).read_text())
+    assert meta["files"]["levels"].startswith("pool-levels.")
 
 
 def test_taxa_file_numbers_taxa_by_frequency_and_carries_their_rank():
@@ -695,3 +715,22 @@ def test_embedded_filters_are_a_rail_left_of_the_map():
     rule = re.search(r"\.embed body\{([^}]*)\}", css).group(1)
     assert "280px" in rule and '"side head"' in rule and '"side map"' in rule
     assert ".embed .toggle{display:none}" in css  # no drawer button
+
+
+def test_taxon_search_is_a_combobox_and_touch_targets_are_44px():
+    _, meta = encode_points(make_pool(20))
+    html = render_map(meta, freeze=None)
+    q = re.search(r'<input id="q"[^>]*>', html).group(0)
+    for a in ('role="combobox"', 'aria-expanded="false"', 'aria-controls="sugg"'):
+        assert a in q
+    assert re.search(r'<ul id="sugg"[^>]*role="listbox"', html)
+    taxa = (_ASSETS / "map_taxa.js").read_text()
+    assert (
+        "setAttribute('role','option')" in taxa
+        and "aria-activedescendant" in taxa
+        and "aria-selected" in taxa
+    )
+    css = (_ASSETS / "map.css").read_text()
+    touch = css[css.index("@media (pointer:coarse)") :]
+    assert "min-height:44px!important" in touch and "min-width:44px!important" in touch
+    assert "#fff" not in (_ASSETS / "map_area.css").read_text()

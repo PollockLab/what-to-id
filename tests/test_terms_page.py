@@ -78,8 +78,9 @@ def test_identify_dates_flow_through(tmp_path):
     assert "Photos downloaded on 2 January 2026, scored on 3 February 2026." in html
 
 
-def test_no_nav_tab_and_study_stays_frozen():
-    assert "terms.html" not in [p for p, _ in page_nav.PAGES]
+def test_methods_tab_everywhere_but_the_frozen_study():
+    assert "terms.html" in [p for p, _ in page_nav.PAGES]
+    assert 'href="terms.html"' in page_nav.nav("map.html")
     study = page_nav.nav("study.html")
     assert "terms.html" not in study and "explain-data" not in study
 

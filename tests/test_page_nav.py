@@ -30,8 +30,8 @@ def test_the_pages_inside_explore_mark_explore(current):
     assert "Photo space<" not in html and ">Map<" not in html and ">Taxonomy<" not in html
 
 
-def test_the_tabs_are_explore_look_alikes_study_and_blitz():
-    assert [label for _, label in PAGES] == ["Explore", "Confused pairs", "Study"]
+def test_the_tabs_are_explore_look_alikes_study_methods_and_blitz():
+    assert [label for _, label in PAGES] == ["Explore", "Confused pairs", "Study", "Methods"]
     assert "levels.html" not in nav("study.html") and ">Where to Blitz" in nav("study.html")
 
 
@@ -160,8 +160,17 @@ def test_shell_is_one_short_row_on_a_phone(browser):
     assert pg.locator(".site-shell").bounding_box()["height"] <= 56
     assert all(
         b["height"] >= 44
-        for b in pg.locator(".site-nav a").evaluate_all(
+        for b in pg.locator(".site-nav a >> visible=true").evaluate_all(
             "els => els.map(e => e.getBoundingClientRect().toJSON())"
         )
     )
     assert pg.evaluate("document.documentElement.scrollWidth") <= 390
+
+
+def test_blitz_is_a_secondary_link_hidden_on_phones_and_kept_on_methods():
+    from what_to_id import terms_page
+
+    assert ".site-nav .ext{margin-left:auto" in CSS
+    assert "@media (max-width:480px){.site-nav .ext{display:none}}" in CSS
+    body = terms_page.render().split('<main id="main-content">', 1)[1]
+    assert f'href="{BLITZ}"' in body and "Where to Blitz" in body

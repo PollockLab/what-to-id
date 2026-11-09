@@ -27,6 +27,7 @@ SCRIPTS = {
     / "map_user.js",  # inatGate, the throttled iNaturalist reader
     "__MAP_TAXA__": HERE / "map_assets" / "map_taxa.js",
     "__EMBEDDINGS_LAYOUT__": HERE / "embeddings_assets" / "embeddings_layout.js",
+    "__FETCH_ONCE__": HERE / "site_assets" / "fetch_once.js",
     "__TREE_MODEL__": ASSETS / "tree_model.js",
     "__TREE_VIEW__": ASSETS / "tree_view.js",
 }

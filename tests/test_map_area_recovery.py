@@ -20,7 +20,8 @@ def case_script(raw, count=3):
 const events = {}, nodes = new Map();
 class Element {
   constructor(){this.hidden=false;this.textContent='';this.style={};this.attrs={};
-    this.nodes=new Map();this.lastChild={};}
+    this.nodes=new Map();this.lastChild={};
+    this.classList={add(){},contains:()=>false,toggle:()=>false};}
   querySelector(key){if(!this.nodes.has(key))this.nodes.set(key,new Element());
     return this.nodes.get(key);}
   appendChild(){} append(){} setAttribute(k,v){this.attrs[k]=String(v);}
@@ -28,7 +29,7 @@ class Element {
   addEventListener(){} contains(){return false;}
   set href(value){this.attrs.href=String(value);} get href(){return this.attrs.href;}
 }
-const document={documentElement:{},createElement:()=>new Element(),addEventListener(){}};
+const document={documentElement:new Element(),createElement:()=>new Element(),addEventListener(){}};
 const getComputedStyle=()=>({getPropertyValue:()=>''});
 const addEventListener=(key,fn)=>(events[key]??=[]).push(fn);
 const location={hash:'#area='+encodeURIComponent(RAW)},window={},parent=window;

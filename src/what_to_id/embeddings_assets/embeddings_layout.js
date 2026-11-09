@@ -122,6 +122,12 @@ function parseMapMeta(html){
   if(b<0)throw new Error('Could not read the map data description from the map page.');
   return JSON.parse(html.slice(a+9,b));
 }
+// The map's META: the small map-meta.json beside the map page, else (an older deploy) parsed out of the page.
+function fetchMapMeta(mapUrl,get){
+  var ok=function(r){if(!r.ok)throw new Error('Could not load the map page ('+r.status+')');return r;};
+  return get(new URL('map-meta.json',mapUrl).href).then(ok).then(function(r){return r.json();})
+    .catch(function(){return get(mapUrl).then(ok).then(function(r){return r.text();}).then(parseMapMeta);});
+}
 // The plot's accuracy as one sentence part, from manifest.layout.fidelity.
 function fidelity(f){
   if(typeof f==='number')return {value:f,k:12};
@@ -130,5 +136,5 @@ function fidelity(f){
     Object.keys(f).map(function(k){return f[k];}).find(function(x){return typeof x==='number'&&x>=0&&x<=1;});
   return v===undefined?null:{value:v,k:f.k||12};
 }
-return {gunzip:gunzip,decodePart:decodePart,decodeShard:decodeShard,layoutOnly:layoutOnly,join:join,pool:pool,find:find,parseMapMeta:parseMapMeta,fidelity:fidelity};
+return {gunzip:gunzip,decodePart:decodePart,decodeShard:decodeShard,layoutOnly:layoutOnly,join:join,pool:pool,find:find,parseMapMeta:parseMapMeta,fetchMapMeta:fetchMapMeta,fidelity:fidelity};
 });
