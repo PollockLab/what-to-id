@@ -114,6 +114,7 @@ MAP_CSS = ("map.css", "map_select.css", "map_area.css")
 # search page) and range chip (the Identify page's range module), and the photo space's taxon tree
 # for the groups list's ranks, by path under the package.
 SHARED_JS = (
+    "site_assets/fetch_once.js",
     "atlas_search_assets/atlas_search_index.js",
     "atlas_search_assets/atlas_search_meta.js",
     "identify_assets/identify_ranges.js",

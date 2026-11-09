@@ -69,8 +69,7 @@ function unzip(buf){
   return new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip')))
     .arrayBuffer();
 }
-function get(url){return fetch(url).then(function(r){
-  if(!r.ok)throw new Error('HTTP '+r.status);return r.arrayBuffer();}).then(unzip);}
+function get(url){return fetchOnce(url).then(unzip,function(e){throw new Error('HTTP '+e.message);});}
 // A shard stores each wider column byte by byte (every value's low byte, then the next), and ids
 // as steps from the previous id.
 function addShard(buf,n){

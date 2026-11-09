@@ -29,6 +29,7 @@ SCRIPTS = {
     "__MAP_FILTER__": HERE / "map_assets" / "map_filter.js",
     "__TAXON_TREE__": ASSETS / "taxon_tree.js",
     "__EMBEDDINGS_LAYOUT__": ASSETS / "embeddings_layout.js",
+    "__FETCH_ONCE__": HERE / "site_assets" / "fetch_once.js",
     "__SPACE_MASK__": ASSETS / "space_mask.js",
     "__GROUP_BAR__": ASSETS / "group_bar.js",
     "__EMBEDDINGS_SELECT__": ASSETS / "embeddings_select.js",

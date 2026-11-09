@@ -38,8 +38,7 @@ function bar(){
 function lookFile(){
   if(lookP)return lookP;
   var sh=S.META.shards,f=S.META.files.lookalike,n=sh.reduce(function(t,s){return t+s.n;},0);
-  lookP=(f?fetch(new URL(f,o.MAP)):Promise.reject(new Error('not built'))).then(function(r){
-    if(!r.ok)throw new Error(r.status);return r.arrayBuffer();})
+  lookP=(f?fetchOnce(new URL(f,o.MAP)):Promise.reject(new Error('not built')))
     .then(EmbeddingsLayout.gunzip).then(function(b){return LM.decodeLookalike(b,n);})
     .catch(function(e){console.warn('No look-alike levels:',e.message);return null;});
   return lookP;

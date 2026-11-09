@@ -15,9 +15,8 @@ function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=c
 function status(t){$('status').textContent=t;}
 // A GoatCounter event when the page has its script (page_identify --goatcounter); never a login or record id.
 function track(name){var g=window.goatcounter;if(g&&g.count)try{g.count({path:'identify/'+name,title:name,event:true});}catch(e){}}
-function get(url){return fetch(url).then(function(r){
-  if(!r.ok)throw new Error('Could not load '+String(url).split('/').pop().split('?')[0]+' ('+r.status+')');
-  return r.arrayBuffer();}).then(L.gunzip);}
+function get(url){return fetchOnce(url).then(L.gunzip,function(e){
+  throw new Error('Could not load '+String(url).split('/').pop().split('?')[0]+' ('+e.message+')');});}
 
 // The records the selection keeps, 1 each in SEL: MapFilter.keep for the taxa, the group chips' verdict, MapFilter.rest
 // for the dates, months, show only and accuracy, then the area, the map's viewport, the lasso's ids and the User filter.

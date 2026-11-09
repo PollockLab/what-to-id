@@ -384,8 +384,8 @@ if(SY)addEventListener('message',function(e){var d=e.data;
 async function load(){
   status('Loading the taxa…');
   var has=fetch('explore.html',{method:'HEAD'}).then(function(r){return r.ok;},function(){return false;});
-  var r=await fetch(new URL(META.taxa,location.href));if(!r.ok)throw new Error('the taxa file answered '+r.status);
-  var T=JSON.parse(new TextDecoder().decode(await L.gunzip(await r.arrayBuffer())));
+  var raw=await fetchOnce(new URL(META.taxa,location.href)).catch(function(e){throw new Error('the taxa file answered '+e.message);});
+  var T=JSON.parse(new TextDecoder().decode(await L.gunzip(raw)));
   if(!T.length||T[0].length<6)throw new Error('this site was built without the taxon tree');
   Object.keys(META.group_ids||{}).forEach(function(g){G[META.group_ids[g]]=g;});
   if(META.groups.indexOf('Animalia')>=0)G[1]=G[1]||'Animalia';  // iNaturalist's iconic Animalia: kingdom 1, less the other groups

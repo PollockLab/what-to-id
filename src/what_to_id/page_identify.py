@@ -59,6 +59,7 @@ SCRIPTS = {
     "__MAP_AREA__": HERE / "map_assets" / "map_area.js",
     "__MAP_FILTER__": HERE / "map_assets" / "map_filter.js",
     "__EMBEDDINGS_LAYOUT__": HERE / "embeddings_assets" / "embeddings_layout.js",
+    "__FETCH_ONCE__": HERE / "site_assets" / "fetch_once.js",
     "__SPACE_MASK__": HERE / "embeddings_assets" / "space_mask.js",
     "__IDENTIFY_RANGES__": ASSETS / "identify_ranges.js",
     "__MAP_USER__": HERE / "map_assets" / "map_user.js",
