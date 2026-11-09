@@ -314,6 +314,17 @@ def test_the_card_never_covers_the_circle_and_names_wrap_between_words(browser, 
     page.close()
 
 
+# why a name reads 0 wide (CI only): each such name's box, the outline's, and whether it was rebuilt
+LAYOUT = """(() => { const st = e => { if (!e) return null; const c = getComputedStyle(e),
+    r = e.getBoundingClientRect();
+  return [c.display, c.visibility, e.hidden, Math.round(r.width), Math.round(r.height)]; };
+  const nm = [...document.querySelectorAll('#outline .nm')];
+  return {zero: nm.filter(e => !e.offsetWidth).slice(0, 3).map(e => [st(e), st(e.parentNode)]),
+    outline: st(document.getElementById('outline')), side: st(document.getElementById('side')),
+    rows: nm.length, fonts: document.fonts.status,
+    kept: !!document.querySelector('#outline .row[data-probe]')}; })()"""
+
+
 @pytest.mark.parametrize("col", [240, 340])
 def test_a_deep_outline_keeps_one_line_per_row_at_any_width(browser, deep_site, col):
     page = open_tree(browser, deep_site, hash_="#sel=1009")
@@ -323,12 +334,13 @@ def test_a_deep_outline_keeps_one_line_per_row_at_any_width(browser, deep_site, 
     page.wait_for_function(
         "[...document.querySelectorAll('#outline .nm')].every(e => e.offsetWidth > 0)"
     )
+    page.eval_on_selector("#outline .row", "r => r.dataset.probe = '1'")
     assert abs(page.locator("#side").bounding_box()["width"] - col) <= 2
     rows = page.eval_on_selector_all("#outline .row", "r => r.map(e => e.offsetHeight)")
     assert max(rows) <= 44, rows
     assert page.evaluate(SPLIT_WORDS) == []
     names = page.eval_on_selector_all("#outline .nm", "r => r.map(e => e.offsetWidth)")
-    assert min(names) >= 40, names  # depth never squeezes a name to nothing
+    assert min(names) >= 40, (names, page.evaluate(LAYOUT))  # depth never squeezes a name
     assert page.errors == []
     page.close()
 
