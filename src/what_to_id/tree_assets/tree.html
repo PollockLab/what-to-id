@@ -47,7 +47,8 @@ button[aria-pressed="true"],.btn.primary{background:var(--on);color:var(--onink)
 #outline [aria-selected="true"]>.row{background-color:var(--chip);font-weight:650}
 #outline .tw{flex:0 0 14px;text-align:center;color:var(--muted)}
 #outline i{flex:0 0 9px;height:9px;border-radius:50%}
-#outline .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+/* a name keeps 40px whatever width the container query has reached; #side scrolls sideways before a name collapses */
+#outline .nm{flex:1 0 40px;min-width:0;overflow:hidden;text-overflow:ellipsis}
 #outline .cm,.kids .cm{color:var(--muted);font-weight:400}
 #outline .tc{flex:0 0 92px;white-space:nowrap;text-align:right;padding-bottom:3px;background:linear-gradient(var(--c),var(--c)) no-repeat 100% 100%/var(--s) 2px}
 .tc{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
