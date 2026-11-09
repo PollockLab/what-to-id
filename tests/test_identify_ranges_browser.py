@@ -231,6 +231,30 @@ def test_a_close_call_chip_gives_the_note_and_opens_the_map_by_click_and_keyboar
     assert page.errors == []
 
 
+def test_the_hash_record_opens_its_range_popover_under_only_far_outside(browser, site):
+    page = opened(browser, site, "#lvl=1&out=1&record=3000")
+    page.wait_for_selector("#rpop:not([hidden])")
+    assert shown(page, 1) == [2] and picked(page) == "Only far outside 1"
+    assert page.locator('.card[data-id="3000"] .rchip').get_attribute("aria-expanded") == "true"
+    assert page.errors == []
+
+
+def test_the_hash_record_picks_its_level_and_leads_it(browser, site):
+    last = opened(browser, site, "#lvl=5&out=0").evaluate("__identify.view()")[1][-1]
+    page = opened(browser, site, f"#lvl=5&out=0&record={last}")
+    page.wait_for_selector("#rpop:not([hidden])")
+    assert page.evaluate("__identify.level()") == 1
+    assert page.evaluate("__identify.view()")[1][0] == last
+    assert page.locator(f'.card[data-id="{last}"] .rchip').get_attribute("aria-expanded") == "true"
+    assert page.errors == []
+
+
+def test_a_hash_record_not_on_the_list_opens_nothing(browser, site):
+    page = opened(browser, site, "#lvl=1&out=1&record=1000")
+    assert page.locator("#rpop").count() == 0 or page.locator("#rpop").is_hidden()
+    assert page.errors == []
+
+
 def test_a_phone_popover_is_a_bottom_sheet(browser, site):
     page = opened(browser, site, "#lvl=3", (390, 800), touch=True)
     page.locator(".rchip").tap()

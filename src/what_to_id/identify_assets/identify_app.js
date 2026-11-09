@@ -9,7 +9,7 @@ var MAP=new URL(CFG.mapUrl,location.href).href,nf=new Intl.NumberFormat('en-CA')
 var TAB=[],SUBK=[],NK=1,KIND=null,SUB=null,KF=0,KC=[],UF=null,UON=false,MINE=[],CMP=null,SEEN='wtid-identify-seen';
 // CFG.merge: the kinds (levels) a tab shows, in order; SUBK a kind's place in its tab
 Object.keys(CFG.merge).forEach(function(t){CFG.merge[t].forEach(function(k,j){TAB[k]=+t;SUBK[k]=j;});NK=Math.max(NK,CFG.merge[t].length);});
-var META=null,SYNC=null,MORE=new Map(),TAXA=null,P=null,BYID=null,LEVEL=null,Q=null,LOOKS=null,R=null,MF=null,TF=null,PEND=null,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,ONE='',CACHE=new Map(),FIRST=null,SHOWN,STAY=false,X=null;
+var META=null,SYNC=null,MORE=new Map(),TAXA=null,P=null,BYID=null,LEVEL=null,Q=null,LOOKS=null,R=null,MF=null,TF=null,PEND=null,REC=-1,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,ONE='',CACHE=new Map(),FIRST=null,SHOWN,STAY=false,X=null;
 function $(id){return document.getElementById(id);}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 function status(t){$('status').textContent=t;}
@@ -57,6 +57,8 @@ function build(){
       if(!tot[SUB[i]*65536+P.tax[i]]++)nd[SUB[i]]=(nd[SUB[i]]||0)+1;}
     for(k=b-1;k>=a;k--){i=order[k];if(i<0)continue;t=SUB[i]*65536+P.tax[i];cut=nd[SUB[i]]===1?Infinity:PER_SPECIES;
       if(taken[t]<cut){rows.push(i);if(!taken[t]++&&tot[t]>cut)MORE.set(i,tot[t]-cut);}}
+    // the #record= card leads its level, even past the per-species cut
+    if(REC>=0&&LEVEL[REC]===lv&&on(REC)&&rows[0]!==REC){k=rows.indexOf(REC);if(k>0)rows.splice(k,1);rows.unshift(REC);}
     out[lv]=rows;total[lv]=b-a;
     for(k=0;rk&&k<rows.length&&UF.mine(rows[k]);k++);MINE[lv]=rk?k:-1;
   }
@@ -361,7 +363,13 @@ async function load(){
     CMP.fill([].slice.call($('grid').querySelectorAll('.card')));});
   rg.then(function(b){if(!b)return;
     R=IdentifyRanges(b,{P:P,sdm:META.sdm,name:function(i){return P.tax[i]!==NOTAX&&TAXA[P.tax[i]]?TAXA[P.tax[i]][0]:null;},look:looksOf,redraw:redraw});
-    R.level(LV,true);redraw();});
+    // #record=<id> (the map's token): its level, its card first, its range popover open
+    var rec=/(?:^|&)record=(\d+)(?:&|$)/.exec(location.hash.slice(1));
+    for(var i=0;rec&&i<P.n;i++)if(P.id[i]===+rec[1]){REC=i;break;}
+    if(REC>=0&&LEVEL[REC])LV=LEVEL[REC];
+    R.level(LV,true);redraw();
+    var c=REC>=0&&document.querySelector('.card[data-id="'+P.id[REC]+'"] .rchip');
+    if(c)c.click();});
   window.__identify={ids:idsOf,view:function(){return view.map(function(r){return r&&Array.from(r.map(function(i){return P.id[i];}));});},
     total:function(){return S.total;},levelled:function(){var n=0;for(var i=0;i<P.n;i++)if(SEL[i]&&LEVEL[i])n++;return n;},level:function(){return LV;},kind:function(){return KF;},kinds:function(){return KC.slice();},user:function(){return UF.active()||UF.ranked();},mine:function(){return MINE[LV];},ranges:function(){return !!R;},refresh:function(){var t=performance.now();select();build();return performance.now()-t;}};
 }
