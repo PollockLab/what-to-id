@@ -1,8 +1,8 @@
 name: daily
 
-# Rebuilds the rotation page every evening (UTC), once the atlas job has embedded the day's records, from the day's BC needs-ID pool and keeps it as
-# study.html on the pool-state release. It does not deploy: map.yml runs after it and is the
-# only workflow that publishes the full site, taking study.html from the release.
+# Rebuilds the study's batches every evening (UTC), once the atlas job has embedded the day's records, from the day's BC needs-ID pool and keeps them as
+# study.json on the pool-state release. It does not deploy: map.yml runs after it and is the
+# only workflow that publishes the full site, building study.json into Identify.
 # The steps live in scripts/daily.sh so a laptop can run exactly the same build.
 # The repository is public, so nothing here may print or upload the list key or anything that
 # maps list letters to lists: the only files kept are the pool, the served log (letters only),

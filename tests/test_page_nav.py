@@ -30,24 +30,24 @@ def test_the_pages_inside_explore_mark_explore(current):
     assert "Photo space<" not in html and ">Map<" not in html and ">Taxonomy<" not in html
 
 
-def test_the_tabs_are_explore_look_alikes_study_methods_and_blitz():
-    assert [label for _, label in PAGES] == ["Explore", "Confused pairs", "Study", "Methods"]
-    assert "levels.html" not in nav("study.html") and ">Where to Blitz" in nav("study.html")
+def test_the_tabs_are_explore_look_alikes_methods_and_blitz():
+    assert [label for _, label in PAGES] == ["Explore", "Confused pairs", "Methods"]
+    assert "study.html" not in nav("identify.html") and ">Where to Blitz" in nav("identify.html")
 
 
 def test_available_drops_pages_that_were_not_built():
     # without the split page the Explore tab opens the map
-    html = nav("map.html", {"study.html", "map.html"})
+    html = nav("map.html", {"terms.html", "map.html"})
     hrefs = [h for h, _ in _links(html)]
-    assert hrefs == ["map.html", "study.html"]
+    assert hrefs == ["map.html", "terms.html"]
     assert BLITZ in html
     # the page you are on stays even when the set forgets it
-    assert 'href="confusion.html" aria-current="page"' in nav("confusion.html", {"study.html"})
+    assert 'href="confusion.html" aria-current="page"' in nav("confusion.html", {"terms.html"})
 
 
 def test_unknown_availability_is_probed_by_the_page():
-    assert '"Views" data-probe' in nav("study.html")
-    assert '"Views" data-probe' not in nav("study.html", {"study.html"})
+    assert '"Views" data-probe' in nav("terms.html")
+    assert '"Views" data-probe' not in nav("terms.html", {"terms.html"})
 
 
 def test_external_link_opens_a_new_tab_and_says_so():
@@ -62,9 +62,9 @@ def test_skip_link_keeps_the_hash():
 
 
 def test_base_prefixes_the_links():
-    html = nav("study.html", base="https://x.test/app/")
+    html = nav("terms.html", base="https://x.test/app/")
     assert 'href="https://x.test/app/explore.html"' in html
-    assert 'href="https://x.test/app/study.html" aria-current="page"' in html
+    assert 'href="https://x.test/app/terms.html" aria-current="page"' in html
 
 
 def test_no_forbidden_words():

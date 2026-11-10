@@ -35,7 +35,7 @@ def daily(tmp_path):
     ):
         (state / filename).write_text("existing state")
     (tmp_path / "out/final/site").mkdir(parents=True)
-    (tmp_path / "out/final/site/study.html").write_text("study")
+    (tmp_path / "out/final/site/study.json").write_text("{}")
     log = tmp_path / "calls.jsonl"
 
     def invoke(command, status, assets="", repo=None):

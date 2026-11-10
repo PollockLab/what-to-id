@@ -1,12 +1,14 @@
 """The Identify page: every pool record at its level, as a narrow column of cards.
 
-    python -m what_to_id.page_identify --out SITE_DIR [--map-url map.html]
+    python -m what_to_id.page_identify --out SITE_DIR [--map-url map.html] [--study study.json]
 
 It writes identify.html (every script inlined) and reads, at view time, the map's pool shards and
 the levels `pool_levels` wrote beside them (pool-levels.bin, pool-levels-looks.bin and, for the
 range maps, pool-levels-range.bin when it was written). The selection is the map's: dates, months,
 groups, taxa and the rest of the hash, the area (``wtid-area``) and the lasso's ids
-(``wtid-keep``), through the same MapFilter the map and the photo space use.
+(``wtid-keep``), through the same MapFilter the map and the photo space use. With ``--study``
+(page_rotation's study.json) the page opens on the Batches tab, which serves the study's batches
+as cards.
 """
 
 from __future__ import annotations
@@ -18,6 +20,7 @@ from datetime import date
 from pathlib import Path
 
 from what_to_id import page_nav, site_files
+from what_to_id.page_rotation import read_study
 
 HERE = Path(__file__).parent
 ASSETS = HERE / "identify_assets"
@@ -51,6 +54,11 @@ KINDS = ((5, "Likely mislabelled"), (4, "Odd shots"), (2, "Close calls"))
 # GoatCounter's script, pinned (sha384 of https://gc.zgo.at/count.v4.js on 2026-11-05)
 GOATCOUNTER_JS = "https://gc.zgo.at/count.v4.js"
 GOATCOUNTER_SRI = "sha384-nRw6qfbWyJha9LhsOtSb2YJDyZdKvvCFh0fJYlkquSFjUxp9FVNugbfy8q1jdxI+"
+# The iNaturalist OAuth app (PKCE, no secret) that posts identifications as the viewer.
+# Placeholder: set INAT_CLIENT_ID to the approved app's client id. Empty hides Sign in, and the
+# cards keep their Identify links. The app's redirect URI must be INAT_REDIRECT exactly.
+INAT_CLIENT_ID = ""
+INAT_REDIRECT = "https://pollocklab.github.io/what-to-id/identify.html"
 SCRIPTS = {
     "__ATLAS_SEARCH_META__": HERE / "atlas_search_assets" / "atlas_search_meta.js",
     "__MAP_TAXA__": HERE / "map_assets" / "map_taxa.js",
@@ -65,6 +73,8 @@ SCRIPTS = {
     "__MAP_USER__": HERE / "map_assets" / "map_user.js",
     "__IDENTIFY_UNCONFIRMED__": ASSETS / "identify_unconfirmed.js",
     "__IDENTIFY_COMPARE__": ASSETS / "identify_compare.js",
+    "__IDENTIFY_STUDY__": ASSETS / "identify_study.js",
+    "__IDENTIFY_INAT__": ASSETS / "identify_inat.js",
     "__IDENTIFY_APP__": ASSETS / "identify_app.js",
 }
 
@@ -94,10 +104,11 @@ def render(
     dates: dict | None = None,
     first: str | None = None,
     goatcounter: str | None = None,
+    study: dict | None = None,
 ) -> str:
     """The page; `dates` is `pool_levels.scoring_dates` output, for the About; `first` the URL of
     the first cards beside the map, None without them; `goatcounter` a GoatCounter site code,
-    None for no counting."""
+    None for no counting; `study` page_rotation's study.json, None for no Batches tab."""
     photos, scored = _day((dates or {}).get("photos")), _day((dates or {}).get("scored"))
     when = f"Photos downloaded on {photos}" if photos else ""
     if scored:
@@ -108,7 +119,15 @@ def render(
         "__SITE_NAV__": page_nav.nav(PAGE_NAME),
         "__IDENTIFY_RANGES_CSS__": (ASSETS / "identify_ranges.css").read_text().rstrip(),
         "__CONFIG__": json.dumps(
-            {"mapUrl": map_url, "levels": LEVELS, "merge": MERGE, "kinds": KINDS, "first": first}
+            {
+                "mapUrl": map_url,
+                "levels": LEVELS,
+                "merge": MERGE,
+                "kinds": KINDS,
+                "first": first,
+                "study": study and {k: study[k] for k in ("build", "day", "names", "lists")},
+                "oauth": {"client": INAT_CLIENT_ID, "redirect": INAT_REDIRECT},
+            }
         ).replace("<", "\\u003c"),
         **{f"__LEVEL_{n}__": name for n, name, _ in LEVELS},
         "__SCORING_DATES__": f"{when}." if when else "",
@@ -121,21 +140,26 @@ def render(
     return html
 
 
-def build(out_dir: str | Path, map_url: str = "map.html", goatcounter: str | None = None) -> Path:
-    """Write ``identify.html`` into ``out_dir`` and return its path."""
+def build(
+    out_dir: str | Path,
+    map_url: str = "map.html",
+    goatcounter: str | None = None,
+    study: str | Path | None = None,
+) -> Path:
+    """Write ``identify.html`` into ``out_dir`` and return its path; ``study`` a study.json."""
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     target = out / PAGE_NAME
     dates = out / DATES_NAME
     first = (out / site_files.MAP_NAME).exists() and site_files.path(out, "first")
-    target.write_text(
-        render(
-            map_url,
-            json.loads(dates.read_text()) if dates.exists() else None,
-            first.name if first else None,
-            goatcounter,
-        )
+    html = render(
+        map_url,
+        json.loads(dates.read_text()) if dates.exists() else None,
+        first.name if first else None,
+        goatcounter,
+        read_study(study) if study else None,
     )
+    target.write_text(html)
     return target
 
 
@@ -147,8 +171,9 @@ def main(argv: list[str] | None = None) -> int:
         "--goatcounter",
         help="GoatCounter site code; counts page views and clicks (none: no counting)",
     )
+    p.add_argument("--study", type=Path, help="study.json (page_rotation); adds the Batches tab")
     a = p.parse_args(argv)
-    print(f"page_identify: wrote {build(a.out, a.map_url, a.goatcounter)}")
+    print(f"page_identify: wrote {build(a.out, a.map_url, a.goatcounter, a.study)}")
     return 0
 
 

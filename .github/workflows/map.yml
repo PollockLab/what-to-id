@@ -2,10 +2,11 @@ name: map
 
 # Refreshes the map of records that need an ID (site/map.html and its pool*.bin files) every morning
 # and is the only workflow that publishes the full site: the landing page (index.html, a copy of
-# Explore, else the map), the map, the photo pages, and the study page. The study page is the committed site/study.html,
-# or, once the repository variable DAILY_ENABLED is "true", the study.html that daily.yml saves
-# on the pool-state release. It runs on its own schedule and again after each successful daily
-# run, so a new study page goes live without waiting. It keeps its own pool on the map-state release, apart from the study's
+# Explore, else the map), the map, the photo pages, and Identify. Once the repository variable DAILY_ENABLED is "true",
+# Identify serves the study's batches from the study.json that daily.yml saves on the pool-state release,
+# and until then the committed preview, site/study.json.
+# It runs on its own schedule and again after each successful daily
+# run, so new batches go live without waiting. It keeps its own pool on the map-state release, apart from the study's
 # pool-state, so it never changes what the study serves.
 #
 # Each run asks for every BC record iNaturalist updated since the last run, in any quality grade
@@ -43,7 +44,7 @@ name: map
 # then set the repository variable MAP_DAILY_ENABLED to "true".
 on:
   schedule:
-    - cron: "47 13 * * *" # morning refresh of the map; the study page follows each daily run through workflow_run below
+    - cron: "47 13 * * *" # morning refresh of the map; the study's batches follow each daily run through workflow_run below
   workflow_run:
     workflows: [daily]
     types: [completed]
@@ -145,9 +146,12 @@ jobs:
           set -euo pipefail
           mkdir -p _site
           cp site/*.html _site/
-          # the daily build's study page replaces the committed one only while the daily build is on
+          # the daily build's batches, which Identify and How it works build in, only while the daily build is on
           if [ "$DAILY_ENABLED" = true ]; then
-            gh release download pool-state -p study.html -D _site --clobber
+            gh release download pool-state -p study.json -D state --clobber ||
+              echo "::warning::no study.json on pool-state; Identify ships without batches"
+          else
+            cp site/study.json state/study.json  # the committed preview batches
           fi
           # the record card's closest matches read the atlas index, when there is one
           atlas=()
@@ -202,7 +206,9 @@ jobs:
           if [ -z "$ATLAS_HF_REPO" ]; then echo "no ATLAS_HF_REPO; no Identify page"; exit 0; fi
           python -m what_to_id.pool_levels --out _site \
             --data-url "https://huggingface.co/datasets/${ATLAS_HF_REPO}/resolve/main/"
-          python -m what_to_id.page_identify --out _site --goatcounter wietze
+          study=()
+          if [ -s state/study.json ]; then study=(--study state/study.json); fi
+          python -m what_to_id.page_identify --out _site --goatcounter wietze "${study[@]}"
       # confusion.html: per species, the species its photos most often look like, from the small parquet
       # beside the atlas index. The tree card links to it through confusion-taxa.json.
       - name: Add the confused pairs page
@@ -224,6 +230,7 @@ jobs:
           set -euo pipefail
           atlas=()
           if [ -n "$ATLAS_HF_REPO" ]; then atlas=(--data-url "https://huggingface.co/datasets/${ATLAS_HF_REPO}/resolve/main/"); fi
+          if [ -s state/study.json ]; then atlas+=(--study state/study.json); fi
           python -m what_to_id.terms_page --out _site "${atlas[@]}"
           # the pages added after the first leak check get the same one
           if grep -ril -E 'recency|gap_first|gap first|similarity|novelty|surprise' _site; then

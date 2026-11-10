@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One daily build of the rotation page. GitHub Actions (.github/workflows/daily.yml) runs
+# One daily build of the study data Identify serves (study.json). GitHub Actions (.github/workflows/daily.yml) runs
 # exactly these steps, and so can a laptop:
 #
 #   scripts/daily.sh pull    when the release holds no pool yet (or FULL_PULL=true), pull the
@@ -7,7 +7,7 @@
 #   scripts/daily.sh fetch   download the pool and served log from the pool-state release
 #   scripts/daily.sh build   load the prepared pool, build, drop identified records, rebuild,
 #                            keep the day's pool and build record, check for leaks, replay
-#   scripts/daily.sh save    upload the state and study.html back to the release
+#   scripts/daily.sh save    upload the state and study.json back to the release
 #
 # build needs WHAT_TO_ID_KEY (the private list key) and WTB_DIR (where-to-blitz's
 # cluster_results/ca, checked out at the commit in what_to_id.manifest.WHERE_TO_BLITZ_REF).
@@ -150,9 +150,9 @@ check_wtb() {
 
 check_leaks() {
   local site="$OUT/final/site"
-  [ -s "$site/study.html" ] || die "no page was built"
-  if find "$site" -type f ! -name '*.html' ! -name 'pool*.bin' ! -name bc-parks.bin ! -name map-meta.json | grep -q .; then
-    die "the site must hold only HTML pages, the map's pool*.bin files, its bc-parks.bin and map-meta.json"
+  [ -s "$site/study.json" ] || die "no study data was built"
+  if find "$site" -type f ! -name '*.html' ! -name 'pool*.bin' ! -name bc-parks.bin ! -name map-meta.json ! -name study.json | grep -q .; then
+    die "the site must hold only HTML pages, the map's pool*.bin files, its bc-parks.bin, map-meta.json and study.json"
   fi
   if grep -ril -E 'recency|gap_first|gap first|similarity|novelty|surprise' "$site"; then
     die "a list name leaked into the site"
@@ -230,9 +230,9 @@ save() {
   for f in "${files[@]}"; do
     [ -s "$f" ] || die "missing $f; run build first"
   done
-  # The study page rides on the release too: map.yml, the only Pages deployer, fetches it.
-  [ -s "$OUT/final/site/study.html" ] || die "missing $OUT/final/site/study.html; run build first"
-  files+=("$OUT/final/site/study.html")
+  # The study data rides on the release too: map.yml, the only Pages deployer, builds it into Identify.
+  [ -s "$OUT/final/site/study.json" ] || die "missing $OUT/final/site/study.json; run build first"
+  files+=("$OUT/final/site/study.json")
   upload_state "${files[@]}"
 }
 

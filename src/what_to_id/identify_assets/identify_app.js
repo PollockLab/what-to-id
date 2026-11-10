@@ -2,17 +2,19 @@
 // of cards under one tab per level. The selection is the map's: MapFilter's keep and rest over the pool shards, the group chips' verdict,
 // the area and the lasso's ids (SpaceMask). Up to PER_SPECIES cards per species, best first, are drawn at view time;
 // their photos come from iNaturalist 200 ids to a request as the cards are drawn, a batch at a time as the list scrolls.
+// With the study (CFG.study) a Batches tab comes first and is the default: it draws the study's batches (identify_study.js)
+// as the same cards, pool or not, and a viewer signed in with iNaturalist (identify_inat.js) can post an ID from a card.
 (function(){
 'use strict';
-var CFG=IDENTIFY_CONFIG,L=EmbeddingsLayout,Meta=AtlasSearchMeta,PER_SPECIES=3,LIMIT=12,STEPS=16,NO_LOOK=65535,NOTAX=65535,LS='wtid-identify-level',IO=null,T=0,TK=0,AB=null;
+var CFG=IDENTIFY_CONFIG,L=EmbeddingsLayout,Meta=AtlasSearchMeta,PER_SPECIES=3,LIMIT=12,STEPS=16,NO_LOOK=65535,NOTAX=65535,LS='wtid-identify-tab',IO=null,T=0,TK=0,AB=null;
 var MAP=new URL(CFG.mapUrl,location.href).href,nf=new Intl.NumberFormat('en-CA'),OBS='https://www.inaturalist.ca/observations/';
-var TAB=[],SUBK=[],NK=1,KIND=null,SUB=null,KF=0,KC=[],UF=null,UON=false,MINE=[],CMP=null,SEEN='wtid-identify-seen';
+var TAB=[],SUBK=[],NK=1,KIND=null,SUB=null,KF=0,KC=[],UF=null,UON=false,MINE=[],CMP=null,SEEN='wtid-identify-seen',BT=false,ST=null,SK='',IN=IdentifyInat(CFG.oauth);
 // CFG.merge: the kinds (levels) a tab shows, in order; SUBK a kind's place in its tab
 Object.keys(CFG.merge).forEach(function(t){CFG.merge[t].forEach(function(k,j){TAB[k]=+t;SUBK[k]=j;});NK=Math.max(NK,CFG.merge[t].length);});
 var META=null,SYNC=null,MORE=new Map(),TAXA=null,P=null,BYID=null,LEVEL=null,Q=null,LOOKS=null,R=null,MF=null,TF=null,PEND=null,REC=-1,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,ONE='',CACHE=new Map(),FIRST=null,SHOWN,STAY=false,X=null;
 function $(id){return document.getElementById(id);}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
-function status(t){$('status').textContent=t;}
+function status(t,err){var s=$('status');s.textContent=t;s.classList.toggle('err',!!err);}  // an error shows on Batches too
 // A GoatCounter event when the page has its script (page_identify --goatcounter); never a login or record id.
 function track(name){var g=window.goatcounter;if(g&&g.count)try{g.count({path:'identify/'+name,title:name,event:true});}catch(e){}}
 function get(url){return fetchOnce(url).then(L.gunzip,function(e){
@@ -94,17 +96,22 @@ function pick(picks){
   if(parent===window)keep('taxa',TX.write(picks));  // embedded, the split page holds the address
   again();SYNC.send();
 }
-function card(i,lv){
-  var id=P.id[i],li=el('li','card'),ph=el('div','ph','Loading photo'),w=el('a','when','Date and place…'),a=el('a','btn','Identify');
-  li.dataset.id=id;li.dataset.i=i;li.tabIndex=0;
+// i<0: a batch record the pool does not hold, its name filled in with its photo
+function card(i,lv,id){
+  id=i<0?id:P.id[i];
+  var li=el('li','card'),ph=el('div','ph','Loading photo'),w=el('a','when','Date and place…'),a=el('a','btn','Identify');
+  li.dataset.id=id;li.tabIndex=0;
   w.href=OBS+id;w.target='_blank';w.rel='noopener';
   a.href=IdentifyLinks.batches([id])[0].url;a.target='_blank';a.rel='noopener';a.setAttribute('aria-label','Identify this record on iNaturalist');
-  li.append(ph,title(i,lv),w);
-  if(KIND&&CFG.merge[lv]&&!KF)li.insertBefore(el('div','kind',kindName(KIND[i])),w);
-  if(UF&&UF.ranked()&&UF.mine(i))li.insertBefore(el('div','badge','Your genus'),w);
-  if(MORE.has(i))li.appendChild(more_(i));
-  a.addEventListener('click',function(){track('card-'+(KIND?KIND[i]:lv));});
-  li.appendChild(R?R.links(a,i,lv):a);
+  li.append(ph,i<0?el('div','title'):title(i,lv),w);
+  if(i>=0){li.dataset.i=i;li.dataset.lv=lv;}
+  if(i>=0&&!BT){
+    if(KIND&&CFG.merge[lv]&&!KF)li.insertBefore(el('div','kind',kindName(KIND[i])),w);
+    if(UF&&UF.ranked()&&UF.mine(i))li.insertBefore(el('div','badge','Your genus'),w);
+    if(MORE.has(i))li.appendChild(more_(i));
+  }
+  a.addEventListener('click',function(){track(BT?'study-card':'card-'+(KIND?KIND[i]:lv));});
+  li.appendChild(R&&i>=0?R.links(a,i,lv):a);
   li.onmouseenter=li.onfocus=function(){tell('wtid-focus',id);};
   li.onclick=function(e){if(!e.target.closest('a,button'))tell('wtid-record',id);};
   li.onkeydown=function(e){if(e.target===li&&(e.key==='Enter'||e.key===' ')){e.preventDefault();tell('wtid-record',id);}};
@@ -119,14 +126,49 @@ function photos(lis){
       if(!li.isConnected)return;
       var o=CACHE.get(+li.dataset.id);
       if(!o||o.quality_grade!=='needs_id'){li.remove();return;}
-      var p=o.photos&&o.photos[0],ph=li.querySelector('.ph'),w=li.querySelector('.when');
+      var p=o.photos&&o.photos[0],ph=li.querySelector('.ph'),w=li.querySelector('.when'),t=o.taxon;
+      if(!li.dataset.i){var nm=el('div','name');nm.appendChild(el('i',null,t?t.name:'Unidentified'));
+        li.querySelector('.title').replaceChildren(nm);if(t&&t.preferred_common_name)nm.after(el('div','com',t.preferred_common_name));}
       ph.textContent='';
       if(p){var img=el('img');img.loading='lazy';img.alt='Photo of '+li.querySelector('i').textContent;
         img.src=String(p.url).replace('/square.','/medium.');ph.appendChild(img);}else ph.textContent='No photo on iNaturalist now';
       w.textContent=(o.observed_on||'Date unknown')+' · '+(o.place_guess||'Place unknown');w.title=w.textContent;
+      if(IN.user()&&t&&t.id&&!li.querySelector('.acts'))acts(li,t);
     });
-  }).catch(function(e){if(!(sig&&sig.aborted))status('Could not load the photos: '+e.message);});
+  }).catch(function(e){if(!(sig&&sig.aborted))status('Could not load the photos: '+e.message,1);});
 }
+// Signed in: Agree with the record's taxon, and on a card that names a look-alike, ID it as that. The Identify link stays.
+function acts(li,t){
+  var id=+li.dataset.id,pr=li.dataset.i&&CMP&&CMP.pair(+li.dataset.i),row=el('div','acts');
+  function act(text,taxon,label){
+    var b=el('button','act',text);b.type='button';b.setAttribute('aria-label',label);
+    b.onclick=function(){b.disabled=true;b.textContent='Posting…';
+      IN.identify(id,taxon).then(function(){b.textContent='Posted';IdentifyStudy.posted(id,taxon,IN.user());track('post');},
+        function(){b.disabled=false;b.textContent='Not posted. Use Identify';signin();});};
+    row.appendChild(b);
+  }
+  act('Agree',t.id,'Agree with '+t.name+' on iNaturalist');
+  if(pr)act('ID as '+TAXA[pr[1]][0],TAXA[pr[1]][2],'Identify as '+TAXA[pr[1]][0]+' on iNaturalist');
+  li.querySelector('.when').after(row);
+}
+function signin(){
+  var box=$('sin');box.textContent='';if(!IN.on)return;
+  var u=IN.user(),b=el('button','lnk',u?'Sign out':'Sign in with iNaturalist');b.type='button';
+  b.onclick=function(){if(u){IN.out();signin();SK='';paint();}else IN.start();};
+  box.append(u?'Signed in as '+u.login+'. ':'',b,u?'':' to post IDs from here');
+}
+// The Batches tab's cards: the batch newest first, each a pool card when the pool holds it; drawn again only when
+// the batch or what a card can show (the pool, the look-alikes, the ranges, the sign in) changed.
+function find(id){var lo=0,hi=P.n-1,m,v;while(lo<=hi){m=(lo+hi)>>1;v=P.id[BYID[m]];if(v===id)return BYID[m];if(v<id)lo=m+1;else hi=m-1;}return -1;}
+function drawIds(ids){
+  var k=ids.join()+[!!BYID,!!LOOKS,!!R,!!IN.user()].join();if(k===SK)return;SK=k;
+  if(AB)AB.abort();AB=new AbortController();
+  var ol=$('sgrid'),lis=IdentifyLinks.order(ids).map(function(id){var i=BYID?find(id):-1;return i>=0?card(i,LEVEL[i]):card(-1,0,id);});
+  ol.replaceChildren.apply(ol,lis);
+  if(lis.length){photos(lis);if(CMP&&LOOKS)CMP.fill(lis);}
+}
+function mode(b){BT=b;document.body.classList.toggle('bt',b);if(!b)SK='';}  // leaving aborts the batch's photos
+function batches(){mode(true);track('tab-b');try{localStorage.setItem(LS,'b');}catch(e){}keep('lvl','b');paint();}
 // Where the user's genera end in the list, under My taxa first: after n cards, or before the first when none are theirs.
 // MINE counts cards (after the per-species cut), so both lines say cards.
 function sep(n,top){var c=nf.format(n)+(n===1?' card':' cards');
@@ -162,8 +204,9 @@ function step(d){
 }
 // Draws the chosen level from its first card; STAY (the records replacing the first list) keeps the cards drawn and the scroll.
 function paint(){
+  [].forEach.call($('tabs').children,function(t){var on=BT?!t.dataset.lv:+t.dataset.lv===LV;t.setAttribute('aria-selected',on);t.tabIndex=on?0:-1;});
+  if(BT){ST.show();return;}
   var x=CFG.levels.filter(function(l){return l[0]===LV;})[0];
-  [].forEach.call($('tabs').children,function(t){var on=+t.dataset.lv===LV;t.setAttribute('aria-selected',on);t.tabIndex=on?0:-1;});
   $('desc').textContent=x[2];kinds();$('panel').setAttribute('aria-labelledby','tab'+LV);
   if(AB)AB.abort();AB=new AbortController();  // the cards redrawn below replace those whose photos are still loading
   $('grid').textContent='';shown=STAY?Math.max(LIMIT,drawn):LIMIT;drawn=0;
@@ -191,7 +234,7 @@ function kinds(){
   box.append(el('span',null,'Kind: '),g);
 }
 function counts(){
-  [].forEach.call($('tabs').children,function(t){var n=S.total[+t.dataset.lv]||0;t.lastChild.textContent=nf.format(n);t.classList.toggle('zero',!n);});
+  [].forEach.call($('tabs').querySelectorAll('[data-lv]'),function(t){var n=S.total[+t.dataset.lv]||0;t.lastChild.textContent=nf.format(n);t.classList.toggle('zero',!n);});
 }
 // An empty level here points at the levels that do have records, rather than a dead end.
 function empty(){
@@ -211,16 +254,18 @@ function keep(k,v){
   history.replaceState(null,'','#'+t.join('&'));  // no hashchange, so no refresh
 }
 function choose(lv){
-  LV=lv;track('tab-'+lv);
+  LV=lv;mode(false);track('tab-'+lv);
   try{localStorage.setItem(LS,lv);}catch(e){}
   keep('lvl',lv);
   if(R){R.level(lv);redraw();}else paint();
 }
-function saved(){
-  var m=/(?:^|&)lvl=(\d)/.exec(location.hash.slice(1)),v=m?+m[1]:0;
-  try{v=v||+localStorage.getItem(LS);}catch(e){}
-  return CFG.levels.some(function(l){return l[0]===v;})?v:0;
+// the kept tab: a level number, or b for Batches
+function stored(){
+  var m=/(?:^|&)lvl=(\w)/.exec(location.hash.slice(1)),v=m?m[1]:'';
+  try{v=v||localStorage.getItem(LS)||'';}catch(e){}
+  return v;
 }
+function saved(){var v=+stored();return CFG.levels.some(function(l){return l[0]===v;})?v:0;}
 // With no saved level: Easy confirms on a first visit (a quick start), else Might be wrong, else the first level that has records.
 function first(){
   var seen=true;try{seen=!!localStorage.getItem(SEEN);localStorage.setItem(SEEN,'1');}catch(e){}
@@ -233,6 +278,8 @@ var XK=[0,'level-clear-matches','level-close-calls','level-narrow-it-down','leve
   KX=[0,0,'level-close-calls',0,'level-odd-shots','level-might-be-mislabelled'];  // a kind's own entry
 function tabs(){
   var box=$('tabs');
+  if(CFG.study){var b=el('button','tab');b.type='button';b.id='tabb';b.setAttribute('role','tab');b.setAttribute('aria-controls','study');
+    b.append(el('span',null,'Batches'),el('b',null,''));b.onclick=batches;box.appendChild(b);}
   CFG.levels.forEach(function(x){
     var t=el('button','tab'),n=el('b',null,'');t.type='button';t.id='tab'+x[0];t.dataset.lv=x[0];
     t.dataset.explain=XK[x[0]];t.setAttribute('role','tab');t.setAttribute('aria-controls','panel');t.append(el('span',null,x[1]),n);
@@ -288,7 +335,7 @@ function early(){
       return MapArea.inside(I,b[c[0]],b[c[1]]);}))&&FIRST.s[sel()]||null;
   if(s===SHOWN)return;SHOWN=s;P=s&&FIRST.P;
   if(!s){view=[];$('grid').textContent='';$('none').hidden=$('more').hidden=$('batch').hidden=$('cap').hidden=true;
-    [].forEach.call($('tabs').children,function(t){t.lastChild.textContent='';});status('Loading all the records for this selection…');return;}
+    [].forEach.call($('tabs').querySelectorAll('[data-lv]'),function(t){t.lastChild.textContent='';});status('Loading all the records for this selection…');return;}
   // a tab of several kinds starts as its first kind's list (or the chosen kind's), its count their sum
   view=s.rows.slice();S.total=s.total.slice();KC=s.total.slice();MINE=[];
   Object.keys(CFG.merge).forEach(function(tb){var ks=CFG.merge[tb];
@@ -358,7 +405,7 @@ async function load(){
   $('usrbox').open=!!S.user;
   lk.then(function(b){if(!b)return;LOOKS=looks(b);
     [].forEach.call($('grid').children,function(li){var t=li.querySelector('.title');if(t)t.replaceWith(title(+li.dataset.i,LV));});
-    CMP.fill([].slice.call($('grid').querySelectorAll('.card')));});
+    CMP.fill([].slice.call($('grid').querySelectorAll('.card')));if(BT)paint();});
   rg.then(function(b){if(!b)return;
     R=IdentifyRanges(b,{P:P,sdm:META.sdm,name:function(i){return P.tax[i]!==NOTAX&&TAXA[P.tax[i]]?TAXA[P.tax[i]][0]:null;},look:looksOf,redraw:redraw});
     // #record=<id> (the map's token): its level, its card first, its range popover open
@@ -372,6 +419,16 @@ async function load(){
     total:function(){return S.total;},levelled:function(){var n=0;for(var i=0;i<P.n;i++)if(SEL[i]&&LEVEL[i])n++;return n;},level:function(){return LV;},kind:function(){return KF;},kinds:function(){return KC.slice();},user:function(){return UF.active()||UF.ranked();},mine:function(){return MINE[LV];},ranges:function(){return !!R;},refresh:function(){var t=performance.now();select();build();return performance.now()-t;}};
 }
 var KD=/(?:^|&)kind=(\d)/.exec(location.hash.slice(1));KF=KD&&TAB[+KD[1]]?+KD[1]:0;
-tabs();inbox();
-load().catch(function(e){status('Could not load the records: '+e.message);});
+function start(){
+  tabs();inbox();
+  if(CFG.study){
+    ST=IdentifyStudy.tab({data:CFG.study,draw:drawIds,count:function(t){$('tabb').lastChild.textContent=t;},
+      active:function(){return BT;},track:function(n){track('study-'+n);}});
+    signin();
+    var v=stored();  // Batches unless another tab was kept or a #record= link asks for its level
+    if(!/(?:^|&)record=/.test(location.hash.slice(1))&&(v==='b'||!v)){mode(true);paint();}
+  }
+  load().catch(function(e){status('Could not load the records: '+e.message,1);});
+}
+if(IN.on&&/[?&]code=/.test(location.search))IN.finish().then(function(left){if(!left)start();});else start();
 })();

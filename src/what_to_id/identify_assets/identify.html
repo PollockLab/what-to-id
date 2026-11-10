@@ -85,6 +85,18 @@ ol{list-style:none;margin:8px 0;padding:0;display:grid;gap:10px;
 .prow input.padd{flex:1 1 11em;min-width:0}
 button.padd{cursor:pointer;background:var(--chip)}
 #usrbox p{margin:4px 0}
+/* Batches (the study): its box replaces the level's controls and cards */
+body:not(.bt) #study,.bt #status:not(.err),.bt #unpick,.bt #desc,.bt #kind,.bt .usr,.bt #rout,.bt #rg,.bt #panel{display:none!important}
+.srow{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:8px 0}
+.srow select{font:inherit;min-height:30px;padding:0 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink)}
+.btn:is(button){font:inherit;font-size:13px;font-weight:650;border:0;cursor:pointer}
+.btn:disabled{opacity:.5;cursor:default}
+.snote{font-size:12px;margin:0 0 8px}
+.lnk{font:inherit;color:var(--bar);background:none;border:0;padding:0;min-height:24px;text-decoration:underline;cursor:pointer}
+.card .acts{display:flex;flex-wrap:wrap;gap:4px}
+.card .act{font:inherit;font-size:12px;min-height:24px;padding:0 8px;border:1px solid var(--line);border-radius:12px;
+  background:var(--chip);color:var(--ink);cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card .act:disabled{cursor:default}
 __IDENTIFY_RANGES_CSS__
 </style></head><body>
 __SITE_NAV__<main id="main-content">
@@ -130,6 +142,16 @@ The login goes only to iNaturalist.</p></details>
 <div class="rout usr"><details id="usrbox" hidden></details></div>
 <div id="rout" class="rout" hidden></div>
 <div id="rg" class="rout" hidden></div>
+<div id="study" role="tabpanel" aria-labelledby="tabb">
+<div class="srow"><label for="sgroup">Group</label><select id="sgroup"></select>
+<button type="button" id="snext" class="btn" aria-keyshortcuts="n" title="Next batch (N)">Next batch</button>
+<span id="sprog" class="muted" aria-live="polite"></span></div>
+<p class="snote muted">These batches come from a research study. <a href="terms.html#study" target="_blank">About</a></p>
+<p id="sdone" class="muted" hidden>You have seen every batch in this group. <button type="button" id="sover" class="lnk">Start over</button></p>
+<ol id="sgrid"></ol>
+<p class="srow snote muted"><a id="sall" target="_blank" rel="noopener" hidden></a>
+<button type="button" id="sexport" class="lnk">Download my batches</button><span id="sin"></span></p>
+</div>
 <div id="panel" role="tabpanel">
 <div id="batch" class="batch" hidden><a id="go" class="btn" target="_blank" rel="noopener"></a>
 <button type="button" id="prev" class="arrow" aria-label="Previous batch">‹</button>
@@ -154,5 +176,7 @@ The login goes only to iNaturalist.</p></details>
 <script>__MAP_USER__</script>
 <script>__IDENTIFY_UNCONFIRMED__</script>
 <script>__IDENTIFY_COMPARE__</script>
+<script>__IDENTIFY_STUDY__</script>
+<script>__IDENTIFY_INAT__</script>
 <script>__IDENTIFY_APP__</script>
 </body></html>
