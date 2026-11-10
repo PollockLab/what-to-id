@@ -1,15 +1,13 @@
 """The glossary behind the toggletips: every tagged key has an entry, every entry is plain, and the
-study and blind pages, frozen for the preregistered study, carry none of it."""
+blind page carries none of it."""
 
 import re
 from pathlib import Path
 
 from what_to_id import page_blind, page_nav
 from what_to_id.glossary import GLOSSARY
-from what_to_id.page_rotation import render_rotation_index
 
 from .test_page_nav import FORBIDDEN
-from .test_page_rotation import _manifest
 
 SRC = Path(page_nav.__file__).parent
 # data-explain="k" in html, 'data-explain':'k' in an attrs object, .dataset.explain='k' in js
@@ -57,17 +55,8 @@ def test_nav_carries_the_glossary_and_script_once():
     assert "</" not in data
 
 
-def test_study_and_blind_pages_carry_none_of_it():
-    pages = {
-        "nav": page_nav.nav("study.html"),
-        "study": render_rotation_index(_manifest(), title="t", map_href="map.html"),
-        "blind": page_blind.render([]),
-    }
-    assert {k: [m for m in MARKS if m in v] for k, v in pages.items()} == {
-        "nav": [],
-        "study": [],
-        "blind": [],
-    }
+def test_blind_page_carries_none_of_it():
+    assert [m for m in MARKS if m in page_blind.render([])] == []
 
 
 def test_keys_built_in_script_are_in_the_glossary():

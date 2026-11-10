@@ -1,5 +1,5 @@
 """terms.html: every glossary key is an anchor, every More link lands on one, the copied
-explanations equal their sources, and the frozen study page is untouched."""
+explanations equal their sources, and the study section says what the study does."""
 
 import json
 import re
@@ -78,11 +78,11 @@ def test_identify_dates_flow_through(tmp_path):
     assert "Photos downloaded on 2 January 2026, scored on 3 February 2026." in html
 
 
-def test_methods_tab_everywhere_but_the_frozen_study():
+def test_methods_tab_everywhere():
     assert "terms.html" in [p for p, _ in page_nav.PAGES]
-    assert 'href="terms.html"' in page_nav.nav("map.html")
-    study = page_nav.nav("study.html")
-    assert "terms.html" not in study and "explain-data" not in study
+    for page in ("map.html", "identify.html", "terms.html"):
+        html = page_nav.nav(page)
+        assert 'href="terms.html"' in html and "explain-data" in html
 
 
 MANIFEST = {
@@ -216,3 +216,21 @@ def test_figures_baselines_replication_and_cohort_link_come_from_the_outputs():
 
 def test_identify_about_links_to_methods():
     assert 'href="terms.html#methods"' in page_identify.render()
+
+
+def test_the_study_section_and_its_fold_come_with_the_study_only():
+    from collections import Counter
+
+    from what_to_id.page_rotation import read_study
+
+    plain = terms_page.render()
+    assert '<h2 id="study">' in plain and 'id="study-methods"' not in plain
+    for words in ("only thing randomized", "public on iNaturalist", "nothing to sign up for"):
+        assert words in plain
+    study = read_study(SRC.parents[1] / "site" / "study.json")
+    html = terms_page.render(study=study)
+    assert 'id="study-methods"' in html and 'href="#study-methods-refs"' in html
+    ids = Counter(re.findall(r'\bid="([^"]+)"', html))
+    assert [i for i, n in ids.items() if n > 1] == []
+    assert html.index('id="study"') < html.index('id="study-methods"') < html.index('id="methods"')
+    assert not re.search("recency|gap_first|gap first|similarity|novelty|surprise", html, re.I)

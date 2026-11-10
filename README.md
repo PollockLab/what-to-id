@@ -43,7 +43,7 @@ flowchart TB
   split --> L3["<b>List 3</b><br/>look-alikes together"]
   split --> L4["<b>List 4</b><br/>unfamiliar photos first"]
   L1 & L2 & L3 & L4 --> page["<b>One page, lists unnamed</b><br/>each Next batch press<br/>serves the next list"]
-  page --> work["Identifiers work each batch<br/>in iNaturalist, as usual"]
+  page --> work["Identifiers work each batch<br/>on Identify, as usual"]
   work --> count["<b>Count</b> species-level IDs<br/>per identifier, per list<br/><i>each list on its own measure</i>"]
   count --> cmp["<b>Compare</b> each list with List 1<br/>within each identifier"]
 ```
@@ -64,7 +64,7 @@ Each identifier is then compared with themself, their IDs on List 2 against thei
 1. **Pull** the needs-ID records with a photo since a start date (BC, iNaturalist place 7085, set in `inat.py` and `batches.py`). The daily job adds new records and drops served ones that no longer need an ID.
 2. **Assign** each record to one list by a keyed hash of its id (`--key-env`). The key is private; every build record carries its fingerprint, which replay checks, so opening the key after the read-back can be verified.
 3. **Compose** each list into batches in its order.
-4. **Serve** one static page: lists A to D, each a stack of Identify links; the arm behind each letter lives only in the build's `manifest.json`. Each daily build appends what it served to a served log.
+4. **Serve** lists A to D as `study.json`, which the Batches tab on Identify deals out as cards; the arm behind each letter lives only in the build's `manifest.json`. Each daily build appends what it served to a served log.
 5. **Read back** every served record. Identifications keep their timestamps, so the per-identifier comparison is read within a week of the blitz and record outcomes at 30 days.
 
 The BC run is four lists over four weeks; the protocol and pre-fixed outcomes are in [docs/protocol.md](docs/protocol.md). Identification blitzes have precedent ([Mesaglio et al. 2025](https://doi.org/10.1002/ppp3.70005)); we found no published blitz that randomises the order of its records.
@@ -82,7 +82,8 @@ Try it in two minutes: a small sample, two lists, one page.
 ```bash
 python -m what_to_id.inat --d1 2025-01-01 --freeze 2026-11-01 --groups Aves --cap-pages 2 --out data/sample.parquet
 what-to-id build --pool data/sample.parquet --freeze 2026-11-01 --d1 2026-11-01 --seed 0 --arms recency,gap_first --design rotation --out out/sample
-open out/sample/site/study.html
+python -m what_to_id.page_identify --out out/sample/site --study out/sample/site/study.json
+open out/sample/site/identify.html
 ```
 
 ## Use

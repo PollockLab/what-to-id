@@ -128,12 +128,12 @@ def test_build_design_rotation_writes_only_index(tmp_path, webapp_dir):
         "pool-0.bin",
         "pool-observer.bin",
         "pool-taxa.bin",
-        "study.html",
+        "study.json",
     ]
-    html = (site / "study.html").read_text().lower()
-    assert 'href="map.html"' in html
+    text = (site / "study.json").read_text().lower()
+    assert json.loads(text)["day"] == "2026-09-01"
     for word in ("recency", "gap_first", "novelty", "batch_id"):
-        assert word not in html
+        assert word not in text
 
 
 def test_build_surprise_arm_reads_scores_and_stays_blind(tmp_path, webapp_dir):
@@ -154,7 +154,7 @@ def test_build_surprise_arm_reads_scores_and_stays_blind(tmp_path, webapp_dir):
     for _, row in first.iterrows():
         rest = b[(b["arm"] == "surprise") & (b["group"] == row["group"])]
         assert by_id[row["id"]] == max(by_id[i] for i in rest["id"])
-    html = (tmp_path / "out" / "site" / "study.html").read_text().lower()
+    html = (tmp_path / "out" / "site" / "study.json").read_text().lower()
     assert "surprise" not in html and "unexpected sightings first" in html
 
 

@@ -20,7 +20,7 @@ CODE = {
     "cells": "src/what_to_id/cells.py",
     "embed": "src/what_to_id/embed.py",
     "batches": "src/what_to_id/batches.py",
-    "page": "src/what_to_id/page_rotation.py",
+    "page": "src/what_to_id/identify_assets/identify_study.js",
     "manifest": "src/what_to_id/manifest.py",
     "participants": "src/what_to_id/participants.py",
     "readback": "src/what_to_id/readback.py",

@@ -200,9 +200,9 @@ def _pipeline(manifest: Manifest, n_lists: int) -> str:
             "During the blitz",
             (
                 "You press Next batch",
-                f"each press opens up to {manifest.batch_size} records from the next list in turn",
+                f"each press shows up to {manifest.batch_size} records from the next list in turn",
             ),
-            ("You identify", "in iNaturalist, as usual"),
+            ("You identify", "on the cards or in iNaturalist, as usual"),
         ),
         (
             "After",

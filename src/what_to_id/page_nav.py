@@ -13,7 +13,7 @@ from pathlib import Path
 
 from what_to_id.glossary import GLOSSARY
 
-# (file, label), one tab per job: Explore, Confused pairs (confusion.html), with the study last.
+# (file, label), one tab per job: Explore, Confused pairs (confusion.html), then Methods.
 # Explore is explore.html: Identify, the map, the photo space and the tree side by side; the pages
 # map.html, embeddings.html, tree.html and search.html keep their URLs and mark Explore as
 # current, as Explore's panes and its search box hold them. Without explore.html (a site built
@@ -23,7 +23,6 @@ from what_to_id.glossary import GLOSSARY
 PAGES = (
     ("explore.html", "Explore"),
     ("confusion.html", "Confused pairs"),
-    ("study.html", "Study"),
     ("terms.html", "Methods"),
 )
 OPTIONAL = {"confusion.html"}
@@ -111,9 +110,7 @@ a.href=a.dataset.base;}else a.remove();
 }).catch(function(){});});})();
 """.strip()
 
-# The toggletips (site_assets/explain.js) and the glossary go on every page nav draws but the
-# study page, frozen for the running preregistered study: its bytes must not change.
-FROZEN = {"study.html"}
+# The toggletips (site_assets/explain.js) and the glossary go on every page nav draws.
 _EXPLAIN = Path(__file__).parent / "site_assets"
 
 
@@ -151,8 +148,6 @@ def nav(
     links = []
     here = EXPLORE if current in _EXPLORE_OF else current
     for page, label in PAGES:
-        if page == "terms.html" and current in FROZEN:
-            continue  # the running study keeps the nav it launched with
         if available is not None and page not in available and page != here:
             continue
         href = base + page
@@ -176,5 +171,5 @@ def nav(
         f'<div class="site-shell"><a class="site-brand" href="{escape(base)}index.html">'
         'What to ID<span class="site-bc">\u00a0· BC</span></a>'
         f'<nav class="site-nav" aria-label="Views"{flags}>{"".join(links)}</nav>{extra}</div>\n'
-        f"<script>{JS}</script>\n" + ("" if current in FROZEN else explain())
+        f"<script>{JS}</script>\n" + explain()
     )
