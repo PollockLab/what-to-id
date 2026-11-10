@@ -105,7 +105,7 @@ function tab(ctx){
     next.disabled=!p.left;done.hidden=!!p.left;all.hidden=!ids;
     prog.textContent=(renewed?'New batches today. ':'')+(ids?'Batch '+p.opened+' of '+p.total:'');
     if(ids){var b=IdentifyLinks.batches(ids,true)[0];all.href=b.url;all.textContent='Open these '+b.n+' on iNaturalist';}
-    ctx.count(String(p.left));ctx.draw(ids||[]);
+    ctx.count(String(p.total));ctx.draw(ids||[]);
   }
   sel.onchange=function(){group=sel.value||null;renewed=false;keep();show();};
   next.onclick=function(){renewed=false;serve();};
