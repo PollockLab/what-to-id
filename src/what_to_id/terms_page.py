@@ -1,6 +1,6 @@
 """The How it works page, terms.html: the glossary's terms and each view's own explanation.
 
-    python -m what_to_id.terms_page --out SITE_DIR
+    python -m what_to_id.terms_page --out SITE_DIR [--data-url URL] [--study study.json]
 
 The only way in is the More link of a toggletip (glossary.py), so it has no tab. The view
 explanations are read from the templates of their pages at build time, never retyped.
@@ -16,6 +16,8 @@ from pathlib import Path
 
 from what_to_id import page_identify, page_nav, terms_methods
 from what_to_id.glossary import GLOSSARY
+from what_to_id.page_method import METHOD_CSS, METHOD_JS
+from what_to_id.page_rotation import read_study
 
 HERE = Path(__file__).parent
 PAGE_NAME = "terms.html"
@@ -73,7 +75,20 @@ figure svg{width:100%;min-width:560px;height:auto;font-size:14px;fill:var(--ink)
 figcaption{font-size:15px;color:var(--muted,inherit)}
 table.eval th,table.eval td{border-bottom:1px solid var(--line);padding:4px 8px;text-align:left}
 dt:target{background:var(--chip);outline:2px solid var(--bar)}
+.how{--mut:var(--muted);--acc:var(--bar)}
 """.strip()
+# Linked from the Batches tab on Identify: what the study changes, records and asks.
+STUDY = """<h2 id="study">The study behind Batches</h2>
+<p>The Batches tab on Identify comes from a research study of which records to show identifiers
+first. The records are split by chance into lists, and each list puts its records in its own
+order. Your browser takes the lists in a random order, drawn once, and each press of Next batch
+shows a batch from the next list in turn. That order of lists is the only thing randomized.</p>
+<p>What is recorded: the identifications people make, which are public on iNaturalist, and the
+batches your browser was served, which stay in your browser unless you press Download my
+batches. If you sign in with iNaturalist, the sign in lasts for that tab only, and the IDs you
+post from a card go straight to iNaturalist.</p>
+<p>Taking part is just identifying as usual. There is nothing to sign up for, and you can stop
+or switch to another tab at any time.</p>"""
 
 
 def label(key: str) -> str:
@@ -114,8 +129,12 @@ def views(dates: dict | None = None) -> list[tuple[str, str, str]]:
 
 
 def render(
-    dates: dict | None = None, manifest: dict | None = None, data_url: str | None = None
+    dates: dict | None = None,
+    manifest: dict | None = None,
+    data_url: str | None = None,
+    study: dict | None = None,
 ) -> str:
+    """The page; ``study`` (page_rotation's study.json) adds the test's fold under The study."""
     terms = []
     for group, keys in GROUPS.items():
         items = []
@@ -124,6 +143,16 @@ def render(
             text = escape(definition) + (f" {escape(use)}" if use else "")
             items.append(f'<dt id="{k}">{escape(label(k))}</dt><dd>{text}</dd>')
         terms.append(f"<h3>{escape(group)}</h3>\n<dl>{''.join(items)}</dl>")
+    fold = (
+        # the fold's heading and references ids would repeat the Methods section's
+        study["methods"]
+        .replace('<h3 id="methods">', '<h3 id="study-methods">')
+        .replace('"methods-refs"', '"study-methods-refs"')
+        .replace('"#methods-refs"', '"#study-methods-refs"')
+        + f"<style>{METHOD_CSS}</style><script>{METHOD_JS}</script>"
+        if study and study.get("methods")
+        else ""
+    )
     how = "\n".join(
         f'<section id="{i}"><h3>{escape(h)}</h3>\n{body}</section>' for i, h, body in views(dates)
     )
@@ -133,6 +162,7 @@ def render(
         f"<title>How it works</title>\n<style>\n{page_nav.CSS}\n{CSS}\n</style></head><body>\n"
         f'{page_nav.nav(PAGE_NAME)}<main id="main-content">\n<h1>How it works</h1>\n'
         f"<h2>Terms</h2>\n{chr(10).join(terms)}\n<h2>How each view works</h2>\n{how}\n"
+        f"{STUDY}\n{fold}\n"
         f'<h2 id="methods">Methods</h2>\n{terms_methods.render(manifest, data_url)}\n'
         f'<p>Planning a bioblitz? See <a href="{page_nav.BLITZ}" target="_blank" rel="noopener">'
         'Where to Blitz\u00a0<span aria-hidden="true">\u2197</span>'
@@ -141,15 +171,22 @@ def render(
     )
 
 
-def build(out_dir: str | Path, data_url: str | None = None) -> Path:
-    """Write ``terms.html`` into ``out_dir`` and return its path."""
+def build(
+    out_dir: str | Path, data_url: str | None = None, study: str | Path | None = None
+) -> Path:
+    """Write ``terms.html`` into ``out_dir`` and return its path; ``study`` a study.json."""
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     dates = out / page_identify.DATES_NAME
     manifest = terms_methods.fetch_manifest(data_url) if data_url else None
     target = out / PAGE_NAME
     target.write_text(
-        render(json.loads(dates.read_text()) if dates.exists() else None, manifest, data_url)
+        render(
+            json.loads(dates.read_text()) if dates.exists() else None,
+            manifest,
+            data_url,
+            read_study(study) if study else None,
+        )
     )
     return target
 
@@ -158,8 +195,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="python -m what_to_id.terms_page", description=__doc__)
     parser.add_argument("--out", type=Path, required=True, help="site directory")
     parser.add_argument("--data-url", help="atlas base URL holding manifest.json, for Methods")
+    parser.add_argument("--study", type=Path, help="study.json (page_rotation), for The study")
     args = parser.parse_args()
-    print(build(args.out, args.data_url))
+    print(build(args.out, args.data_url, args.study))
 
 
 if __name__ == "__main__":
