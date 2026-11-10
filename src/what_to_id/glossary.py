@@ -1,7 +1,7 @@
 """The site's glossary: a plain sentence a term, shown by the toggletips, site_assets/explain.js.
 
-Tag an element with ``data-explain="<key>"`` to explain it; page_nav puts this table on every page
-but the study page. Each entry is (definition, use when or None); page_nav adds the More link.
+Tag an element with ``data-explain="<key>"`` to explain it; page_nav puts this table on every page.
+Each entry is (definition, use when or None); page_nav adds the More link.
 Every sentence restates wording already on the site or in the repo: no new facts here. Stdlib
 only, no imports, as page_nav runs on a bare python3.
 """

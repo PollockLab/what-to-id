@@ -8,8 +8,8 @@ places.
 
 - Exposure: which scores the page deals a participant on each list. Batches are cut from each
   list's order and, with a cap, only the first ``max_batches`` of each list and group are kept
-  (batches.build_batches). The rotation page starts every browser at a uniform random batch of
-  each list and group, wraps at the end, and cycles the lists in turn (page_rotation.ROTATION_JS).
+  (batches.build_batches). Identify's Batches tab starts every browser at a uniform random batch of
+  each list and group, wraps at the end, and cycles the lists in turn (identify_study.js).
   When every record is served, a random start makes the expected scores met the same on every
   list whatever the order. When the cap binds, the data-poor list serves only its highest scores
   (arms.GapFirst) and the control its newest records (arms.Recency).

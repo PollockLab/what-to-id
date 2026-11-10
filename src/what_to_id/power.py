@@ -19,7 +19,7 @@ clusters, so power for ``sets`` is an upper bound.
 Within a queue, ``dealing`` controls how identifiers share out the records they work.
 ``stacked`` (default) has every identifier work the top ``depth_j`` records of the queue, so
 identifiers overlap completely (the model above). ``random-start`` matches the served page
-(page_rotation): each identifier gets an independent random start offset within the queue's
+(identify_study.js): each identifier gets an independent random start offset within the queue's
 served window and works ``effort`` consecutive positions from there, wrapping around, so
 identifiers spread out and overlap only where their stretches happen to meet.
 """
@@ -103,7 +103,7 @@ def _queue_random_start(effort: np.ndarray, p: np.ndarray, window: int, rng) -> 
     """Blitz-resolved records within the served window, each identifier from a random start.
 
     Each identifier works a contiguous, ``effort``-long stretch of window positions from an
-    independent uniform start, wrapping around at ``window``, as page_rotation deals each
+    independent uniform start, wrapping around at ``window``, as identify_study.js deals each
     browser. Unlike ``_queue``, no identified work reaches past the window, since the page only
     ever serves a ``window``-sized list.
     """
