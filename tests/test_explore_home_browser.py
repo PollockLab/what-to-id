@@ -57,8 +57,10 @@ def site(tmp_path_factory):
     server.shutdown()
 
 
-def open_page(browser, url, width=1280):
+def open_page(browser, url, width=1280, colour=None):
     p = browser.new_page(viewport={"width": width, "height": 900})
+    if colour:  # a viewer who chose a colouring before (the default is groups)
+        p.add_init_script(f"localStorage.setItem('wtid-colour-by', '{colour}')")
     p.errors = []
     p.on("pageerror", lambda e: p.errors.append(str(e)))
     p.route(
@@ -89,7 +91,7 @@ COLOURS = """() => { const c = window.__layers[0].props.data.attributes.getFillC
 
 
 def test_beside_identify_the_dots_take_the_level_colours_and_go_back_without_it(browser, site):
-    page = open_page(browser, f"{site[0]}/explore.html")
+    page = open_page(browser, f"{site[0]}/explore.html", colour="levels")
     frame = map_frame(page)
     frame.wait_for_function(f"({COLOURS})().legend")
     got = frame.evaluate(COLOURS)
@@ -112,7 +114,9 @@ def test_the_legend_toggles_between_level_and_group_colours_and_picks_levels(bro
     frame = map_frame(page)
     frame.wait_for_function(f"({COLOURS})().legend")
     page.click("#sbl")  # the legend is in the state bar's Legend sheet
-    assert frame.get_attribute(".lvleg .seg button:first-child", "aria-pressed") == "true"
+    assert frame.get_attribute(".lvleg .seg button:last-child", "aria-pressed") == "true"  # Groups
+    frame.click(".lvleg .seg button:first-child")  # Levels
+    frame.wait_for_function(f"({COLOURS})().c1[3] === 170")
     frame.click(".lvleg .seg button:last-child")  # Groups
     frame.wait_for_function(f"({COLOURS})().c1[3] === 110")
     got = frame.evaluate(COLOURS)

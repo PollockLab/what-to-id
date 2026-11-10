@@ -2,7 +2,7 @@
 // tab. split.html says which ({type:'wtid-colour',by:'level'|'group',names:[[tab,name,[level,...]],...]}, the
 // levels a tab shows taking its colour); the levels (pool-levels.bin, the low nibble per record, format in
 // pool_levels.py) load on the first ask.
-// The legend toggles Levels or Groups (kept in localStorage). Level rows pick as the filter chips do: none picked
+// The legend toggles Groups (the default) or Levels (kept in localStorage). Level rows pick as the filter chips do: none picked
 // shows every level, a click picks a level so only the picked ones show, a second click unpicks it.
 // Records without a level stay as faint grey dots. The level colours are Okabe and Ito's, told apart
 // with colour-blind sight too.
@@ -21,12 +21,12 @@ var NONE=[150,150,150,60],C=[NONE,[0,158,115,170],[230,159,0,170],[0,114,178,170
   TOP=8,OUT=-1,OTHER=TOP;
 function LevelColour(o){
 var G=o.META.groups,gc=G.map(function(g,j){return MapFilter.color(g,j).concat(110);}),lv=null,ask=null,want=false,on=false,
-  mode='levels',names=[],tb=[],sel={},KEY='wtid-colour-by',HID=[0,0,0,0],  // sel: the levels the viewer picked
+  mode='groups',names=[],tb=[],sel={},KEY='wtid-colour-by',HID=[0,0,0,0],  // sel: the levels the viewer picked
   leg=document.createElement('div'),seg=document.createElement('div'),rows=document.createElement('div'),bs,
   T=null,CC=null,row=null,cnt=null,cn=-1,inc=[],top=-1,show=[],sc=[],slot=null,key='';
 leg.className='lvleg';leg.hidden=true;leg.setAttribute('role','group');leg.setAttribute('aria-label','Dot colours');
 seg.className='seg';seg.setAttribute('role','group');seg.setAttribute('aria-label','Colour dots by');rows.className='lrows';
-try{if(localStorage.getItem(KEY)==='groups')mode='groups';}catch(e){}  // the choice is kept per browser
+try{if(localStorage.getItem(KEY)==='levels')mode='levels';}catch(e){}  // the choice is kept per browser
 function rgb(c){return 'rgb('+c.slice(0,3).join(',')+')';}
 function dot(c,faint){var i=document.createElement('i');i.style.background=rgb(c);if(faint)i.style.opacity=.5;return i;}
 function gname(g){return (o.META.names&&o.META.names[g]||g).replace(/ \([^)]*\)$/,'');}
