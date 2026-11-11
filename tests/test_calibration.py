@@ -143,3 +143,12 @@ def test_effect_recovery_uses_enrolled_denominator(monkeypatch):
 def test_bad_record_strength_fails(strength):
     with pytest.raises(ValueError, match="record_difficulty_strength"):
         Scenario(record_difficulty_strength=strength)
+
+
+def test_diagnostic_reports_ratio_interval_coverage():
+    result = diagnose(Scenario(participants=8), reps=4, seed=2, flips=100)
+    for got in result["comparisons"].values():
+        cov = got["ratio_interval_coverage"]
+        assert cov["with_interval"] + cov["no_interval"] == 4
+        assert 0 <= cov["covers_1"] <= cov["with_interval"]
+    json.dumps(result, allow_nan=False)

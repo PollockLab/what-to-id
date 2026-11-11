@@ -87,7 +87,9 @@ PRIMARY_NOTE = (
     "p: record-level re-randomisation test, keyed split. Primary rows (gap_first, similarity): "
     "one-sided, tested list ahead of the control, Holm over those two. Exploratory row "
     "(novelty) and secondary rows: two-sided, not Holm-adjusted. p_signflip and p_sign are "
-    "secondary. Valid only if every record in a list is served (no "
+    "secondary. ratio, ratio_lo, ratio_hi: list total over control total, with a 95% interval from "
+    "resampling participants; it does not use the record-level randomisation, so p decides. "
+    "Valid only if every record in a list is served (no "
     "cap on batches binds); the served files cannot show this, so check the build record."
 )
 

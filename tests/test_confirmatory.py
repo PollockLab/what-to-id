@@ -177,3 +177,41 @@ def test_cli_default_is_the_confirmatory_family(tmp_path, capsys):
     ]
     assert all(r[cols.index("p_holm")] == "nan" for r in body if r[3] != "primary")
     assert np.isfinite([float(r[cols.index("p")]) for r in body]).all()
+
+
+def test_ratio_interval_exact_ordered_and_seeded():
+    counts = pd.DataFrame({"recency": [1, 2, 3, 4], "novelty": [2, 2, 6, 6]})
+    ratio, lo, hi = confirmatory.ratio_interval(counts, "novelty", "recency", reps=500, seed=3)
+    assert ratio == 1.6 and lo <= ratio <= hi
+    assert (ratio, lo, hi) == confirmatory.ratio_interval(
+        counts, "novelty", "recency", reps=500, seed=3
+    )
+
+
+def test_ratio_interval_is_nan_without_a_control_total_or_two_participants():
+    zero = pd.DataFrame({"recency": [0, 0, 0], "novelty": [1, 2, 3]})
+    one = pd.DataFrame({"recency": [2], "novelty": [3]})
+    for counts in (zero, one):
+        got = confirmatory.ratio_interval(counts, "novelty", "recency", reps=100, seed=0)
+        assert all(np.isnan(got))
+
+
+def test_ratio_columns_follow_mean_diff_and_leave_the_tests_unchanged():
+    res = confirmatory.confirmatory(_idents(), SERVED, control="recency", reps=200, seed=7, **KW)
+    cols = list(confirmatory.COLUMNS)
+    assert list(res.columns) == cols
+    assert cols[cols.index("mean_diff") + 1 : cols.index("p")] == ["ratio", "ratio_lo", "ratio_hi"]
+    for weight in confirmatory.OUTCOME:
+        w = None if weight == "none" else weight
+        counts = analysis.identifier_counts(_idents(), SERVED, weight=w, **KW)
+        want = analysis.analyse(counts, control="recency", reps=200, seed=7).set_index("arm")
+        got = res[res["outcome"] == confirmatory.OUTCOME[weight]].set_index("arm")
+        for col in ("total", "total_control", "mean_diff", "p_sign"):
+            assert (got[col] == want.loc[got.index, col]).all()
+        assert (got["p_signflip"] == want.loc[got.index, "p"]).all()
+        for arm in got.index:
+            assert got.loc[arm, "ratio"] == pytest.approx(
+                counts[arm].sum() / counts["recency"].sum()
+            )
+    primary = res[res["role"] == "primary"].set_index("arm")
+    assert primary.loc["gap_first", "p"] == _record_p("gap_first", "cell_score", "greater")
