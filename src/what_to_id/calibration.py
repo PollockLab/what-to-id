@@ -154,6 +154,8 @@ def diagnose(sc: Scenario, *, reps: int = 500, seed: int = 0, flips: int = 2000)
     differences = dict.fromkeys(PRIMARY, 0.0)
     enrolled_differences = dict.fromkeys(PRIMARY, 0.0)
     expected_differences = dict.fromkeys(PRIMARY, 0.0)
+    covered = dict.fromkeys(PRIMARY, 0)
+    no_interval = dict.fromkeys(PRIMARY, 0)
     any_rejected = omitted = 0
     for _ in range(reps):
         draw = int(rng.integers(2**32))
@@ -175,6 +177,11 @@ def diagnose(sc: Scenario, *, reps: int = 500, seed: int = 0, flips: int = 2000)
         for arm in PRIMARY:
             raw[arm] += int(primary.loc[arm, "p"] < 0.05)
             adjusted[arm] += int(primary.loc[arm, "p_holm"] < 0.05)
+            lo, hi = primary.loc[arm, ["ratio_lo", "ratio_hi"]]
+            if np.isnan(lo) or np.isnan(hi):
+                no_interval[arm] += 1
+            else:
+                covered[arm] += int(lo <= 1.0 <= hi)
             difference = float(primary.loc[arm, "mean_diff"])
             differences[arm] += difference
             enrolled_differences[arm] += (
@@ -203,6 +210,14 @@ def diagnose(sc: Scenario, *, reps: int = 500, seed: int = 0, flips: int = 2000)
             arm: {
                 "raw": interval(raw[arm], reps),
                 "holm": interval(adjusted[arm], reps) if arm in HOLM_FAMILY else None,
+                "ratio_interval_coverage": {
+                    "covers_1": covered[arm],
+                    "with_interval": reps - no_interval[arm],
+                    "no_interval": no_interval[arm],
+                    "share": covered[arm] / (reps - no_interval[arm])
+                    if reps > no_interval[arm]
+                    else None,
+                },
                 "mean_participant_difference": differences[arm] / reps,
                 "mean_difference_per_enrolled_participant": enrolled_differences[arm] / reps,
                 "expected_injected_difference_per_enrolled_participant": (

@@ -51,11 +51,35 @@ COLUMNS = (
     "total",
     "total_control",
     "mean_diff",
+    "ratio",
+    "ratio_lo",
+    "ratio_hi",
     "p",
     "p_signflip",
     "p_sign",
     "p_holm",
 )
+
+
+def ratio_interval(
+    counts: pd.DataFrame, arm: str, control: str, *, reps: int, seed: int, level: float = 0.95
+) -> tuple[float, float, float]:
+    """Ratio of the list's total to the control's, with a percentile bootstrap over participants.
+
+    The interval describes variation between participants only; it does not use the record-level
+    redraw, so the test decides a finding. NaN when the control total is 0 or fewer than 2 rows.
+    """
+    a, c = counts[arm].to_numpy(float), counts[control].to_numpy(float)
+    if len(a) < 2 or c.sum() == 0:
+        return (np.nan, np.nan, np.nan)
+    idx = np.random.default_rng(seed).integers(0, len(a), size=(min(reps, 2000), len(a)))
+    with np.errstate(divide="ignore", invalid="ignore"):
+        boot = np.where(c[idx].sum(1) == 0, np.nan, a[idx].sum(1) / c[idx].sum(1))
+    if np.isnan(boot).all():
+        return (a.sum() / c.sum(), np.nan, np.nan)
+    tail = 50 * (1 - level)
+    lo, hi = np.nanpercentile(boot, [tail, 100 - tail])
+    return (float(a.sum() / c.sum()), float(lo), float(hi))
 
 
 def primary_outcome(arm: str) -> str:
@@ -140,6 +164,8 @@ def confirmatory(
         w = None if weight == "none" else weight
         counts = identifier_counts(idents, served, weight=w, **kw)
         res = analyse(counts, control=control, reps=reps, seed=seed)
+        ci = [ratio_interval(counts, a, control, reps=reps, seed=seed) for a in res["arm"]]
+        res[["ratio", "ratio_lo", "ratio_hi"]] = ci
         totals = record_totals(idents, served, weight=w, **kw)
         record = [
             record_shuffle_p(

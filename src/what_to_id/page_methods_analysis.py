@@ -181,6 +181,13 @@ def analysis_section(m: Manifest, f: dict, doc: Doc) -> str:
         f"{all_served} By default the analysis command reports this p, with the keyed redraw, "
         "as each comparison's <code>p</code> and Holm-adjusts the confirmatory ones. Run on one "
         "count for every list, it reports it as <code>p_record</code>, without adjustment.</p>"
+        "<p>Each comparison also reports the ratio of the participants' count on the tested "
+        "list to their count on newest first, with a 95% interval from resampling "
+        "participants. The interval describes variation between participants and does not use "
+        "the record-level randomisation, so the test, not the interval, decides a finding. "
+        "With about 10 participants the interval is too narrow: in simulation with no true "
+        "difference it holds a ratio of 1 "
+        "in 0.87 to 0.93 of runs, against 0.93 to 0.96 with 20.</p>"
     )
     holm = (
         "<p>Holm's method keeps the chance of any false finding at or below the test level over "
