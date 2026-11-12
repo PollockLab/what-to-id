@@ -192,3 +192,35 @@ def encode_stream(E, core: Core, chunk: int = CHUNK) -> tuple:
             x, core
         )
     return lists, codes, refine, fixed
+
+
+def reconstruct(index_dir: str | Path, manifest: dict, ids) -> tuple[np.ndarray, np.ndarray]:
+    """(ids found, unit float32 vectors) of the wanted `ids`, from the index codes and refine rows.
+
+    A vector is centroid + A^T (PQ reconstruction + refine error): 3-bit refine gives cosine ~0.998
+    to the original. Only the wanted rows of each part are read; ids the index lacks are skipped,
+    and a later part wins when a record sits in two.
+    """
+    core = load_core(index_dir, manifest)
+    dims, m = manifest["dims"], manifest["m"]
+    want = np.asarray(ids, dtype=np.int64)
+    found, vecs = [], []
+    for p in manifest["parts"]:
+        if p["count"] == 0:
+            continue
+        offsets, pids, codes, refine = open_part(index_dir, p["name"], manifest, p["count"])
+        rows = np.flatnonzero(np.isin(np.asarray(pids), want))
+        for lo in range(0, len(rows), CHUNK):
+            r = rows[lo : lo + CHUNK]
+            lists = np.searchsorted(np.asarray(offsets), r, side="right") - 1
+            y = core.pq[np.arange(m)[None, :], np.asarray(codes[r])].reshape(len(r), dims)
+            levels = atlas_refine.unpack(np.asarray(refine[r]), dims, core.bits)
+            y += atlas_refine.dequantize(levels, core.refine)
+            x = core.centroids[lists] + y @ core.rot
+            vecs.append(x / np.linalg.norm(x, axis=1, keepdims=True))
+            found.append(np.asarray(pids[r]).astype(np.int64))
+    if not found:
+        return np.empty(0, np.int64), np.empty((0, dims), np.float32)
+    found, vecs = np.concatenate(found), np.concatenate(vecs)
+    found, first = np.unique(found[::-1], return_index=True)
+    return found, vecs[::-1][first]

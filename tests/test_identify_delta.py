@@ -161,3 +161,82 @@ def test_vectors_with_the_wrong_width_are_refused(tmp_path):
              "--tree", str(tmp_path / "t.json"), "--taxa", str(folder),
              "--vectors", str(tmp_path / "raw.npz")]
         )  # fmt: skip
+
+
+def table():
+    """The bundle's pool, vectors and full-run levels."""
+    pool, E, ids, taxa, T = identify_bundle()
+    base = identify.identify_levels(identify.identify_scores(pool, E, ids, taxa, T, TREE))
+    return pool, E, ids, taxa, T, base
+
+
+def refresh(pool, E, ids, taxa, T, base, reconstruct=None):
+    return identify.identify_delta(base, pool, E, ids, taxa, T, TREE, reconstruct=reconstruct)
+
+
+def test_renamed_records_are_rescored_from_reconstructed_vectors():
+    pool, E, ids, taxa, T, base = table()
+    sp = pool[pool["rank"] == "species"]["id"].iloc[0]
+    row = base["id"] == sp
+    moved = pool.assign(taxon_id=np.where(pool["id"] == sp, 5, pool["taxon_id"]))
+    vec = dict(zip(ids, E, strict=True))
+    calls = []
+
+    def reconstruct(want):
+        calls.append(sorted(want))
+        return np.array(want), np.array([vec[i] for i in want])
+
+    out = refresh(moved, E[:0], ids[:0], taxa, T, base, reconstruct)
+    assert calls == [[sp]]  # only the renamed row is read back
+    assert out.loc[out["id"] == sp, "taxon_id"].item() == 5
+    assert len(out) == len(base) and out["id"].is_unique
+    rest = out["id"] != sp
+    pd.testing.assert_frame_equal(
+        out[rest].reset_index(drop=True), base[~row].reset_index(drop=True), check_categorical=False
+    )
+
+
+def test_raw_vectors_win_over_reconstruction_and_a_missing_vector_keeps_the_old_row():
+    pool, E, ids, taxa, T, base = table()
+    a, b = pool[pool["rank"] == "species"]["id"].iloc[:2]
+    moved = pool.assign(taxon_id=np.where(pool["id"].isin([a, b]), 5, pool["taxon_id"]))
+    raw = np.array([a])
+    out = refresh(moved, E[np.isin(ids, raw)], raw, taxa, T, base, lambda want: (want[:0], E[:0]))
+    assert out.loc[out["id"] == a, "taxon_id"].item() == 5
+    assert (
+        out.loc[out["id"] == b, "taxon_id"].item() == base.loc[base["id"] == b, "taxon_id"].item()
+    )
+    assert len(out) == len(base)
+
+
+def test_records_that_left_the_pool_drop_out():
+    pool, E, ids, taxa, T, base = table()
+    gone = pool["id"].iloc[:3]
+    out = refresh(pool[~pool["id"].isin(gone)], E[:0], ids[:0], taxa, T, base)
+    assert len(out) == len(base) - 3 and not out["id"].isin(gone).any()
+    unlabelled = pool.assign(taxon_id=pool["taxon_id"].mask(pool["id"].isin(gone)))
+    assert refresh(unlabelled, E[:0], ids[:0], taxa, T, base).equals(out)
+
+
+def test_pool_records_in_the_index_but_never_scored_get_a_row():
+    pool, E, ids, taxa, T, base = table()
+    hole = base["id"].iloc[5]
+    vec = dict(zip(ids, E, strict=True))
+    out = refresh(
+        pool, E[:0], ids[:0], taxa, T, base[base["id"] != hole],
+        lambda want: (np.array(want), np.array([vec[i] for i in want])),
+    )  # fmt: skip
+    assert hole in set(out["id"]) and len(out) == len(base)
+    assert (
+        out.loc[out["id"] == hole, "level"].item() == base.loc[base["id"] == hole, "level"].item()
+    )
+
+
+def test_untouched_pool_never_calls_reconstruct():
+    pool, E, ids, taxa, T, base = table()
+
+    def boom(want):
+        raise AssertionError("nothing to rescore")
+
+    out = refresh(pool, E[:0], ids[:0], taxa, T, base, boom)
+    pd.testing.assert_frame_equal(out, base, check_categorical=False)

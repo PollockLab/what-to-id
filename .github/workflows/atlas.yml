@@ -211,22 +211,25 @@ jobs:
             --vectors vectors/vec-*.npz --raw-out "raw/raw-$part.npz" ${compact[@]+"${compact[@]}"}
         env:
           COMPACT: ${{ needs.plan.outputs.compact }}
-      # Records added since the Fir run get Identify levels today, against the cut-offs frozen from the
-      # live identify.parquet (see what_to_id.identify). The live file is fetched here, right before the
-      # push, so a Fir push made during this run is extended, not overwritten; a Fir rerun replaces the
-      # file wholesale. A failure leaves the pulled identify.parquet and the index upload alone.
+      # Identify levels made to match the pool (see what_to_id.identify): records added, renamed or
+      # never scored since the Fir run are scored against the cut-offs frozen from the live
+      # identify.parquet, records that left the pool drop out. Vectors come from the raw deltas kept on
+      # the atlas-state release plus today's, else from the refine codes of the index pulled above. The
+      # live file is fetched here, right before the push, so a Fir push made during this run is
+      # extended, not overwritten; a Fir rerun replaces the file wholesale. A failure leaves the pulled
+      # identify.parquet and the index upload alone.
       - name: Score the new photos for Identify
         continue-on-error: true
         run: |
           set -euo pipefail
           shopt -s nullglob
-          files=(raw/raw-*.npz)
-          [ ${#files[@]} -gt 0 ] || exit 0
+          mkdir -p deltas
+          gh release download "$RAW_TAG" -D deltas -p 'raw-delta-*.npz' --clobber
           gh release download "$STATE_TAG" -D state -p taxonomy.json --clobber
           scripts/atlas_sync.sh pull taxa taxa
           scripts/atlas_sync.sh pull live identify
           python -m what_to_id.identify --live live --index index --pool state/pool.parquet \
-            --tree state/taxonomy.json --taxa taxa --vectors "${files[@]}"
+            --tree state/taxonomy.json --taxa taxa --vectors deltas/raw-*.npz raw/raw-*.npz
       # Confused pairs for today's pool, from the live per-record scores (see what_to_id.confusion delta):
       # records added or renamed since are scored from the raw vectors of every delta kept on the
       # atlas-state release plus today's, records that left the pool drop out, and both tables are
