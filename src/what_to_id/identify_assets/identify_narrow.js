@@ -11,16 +11,20 @@ function copy(name){
     (c&&c.writeText?c.writeText(name):Promise.reject()).then(function(){done('Copied');},function(){done('Copy failed');});};
   return b;
 }
+// The confidence band of the record's place r (0 first) among n: 0 top 1%, 1 top 5%, 2 top 25%, 3 the rest.
+function band(r,n){
+  var p=(r+1)/n;
+  return p<=0.01?0:p<=0.05?1:p<=0.25?2:3;
+}
 // "Top 1%" and so on from the record's place r (0 first) among n, else ''.
 function conf(r,n){
   if(!n||r==null)return '';
-  var p=(r+1)/n;
-  return p<=0.01?'Top 1%':p<=0.05?'Top 5%':p<=0.25?'Top 25%':'';
+  return ['Top 1%','Top 5%','Top 25%',''][band(r,n)];
 }
 // An observation (iNaturalist API v1) already at species or below, or with a current ID at species or below.
 function taken(o){
   function sp(t){return !!(t&&t.rank_level&&t.rank_level<=10);}
   return sp(o.taxon)||(o.identifications||[]).some(function(d){return d.current!==false&&sp(d.taxon);});
 }
-return {copy:copy,conf:conf,taken:taken};
+return {copy:copy,band:band,conf:conf,taken:taken};
 })();

@@ -29,7 +29,8 @@ def first_lists(base):
 def test_the_first_lists_are_the_lists_the_page_builds(browser, site, hash_):
     base, _ = site
     want = first_lists(base)[hash_[1:]]
-    page = open_identify(browser, base, hash_)
+    # level 3 as the first list holds it: every band, by rank
+    page = open_identify(browser, base, hash_ + ("&" if hash_ else "#") + "conf=all&sort=conf")
     view, total = page.evaluate("__identify.view()"), page.evaluate("__identify.total()")
     for lv in (1, 3):
         assert total[lv] == want["total"][lv]

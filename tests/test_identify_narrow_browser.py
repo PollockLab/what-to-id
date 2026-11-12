@@ -26,7 +26,7 @@ def rank_plane(base):
 
 def test_level_3_lists_strictly_by_rank_and_labels_the_top(browser, site):
     base, pts = site
-    page = ib.open_identify(browser, base, "#lvl=3")
+    page = ib.open_identify(browser, base, "#lvl=3&sort=conf&conf=all")
     page.wait_for_selector("#grid .card .conf")
     rank = dict(zip(pts["id"].tolist(), rank_plane(base).tolist(), strict=True))
     got = [rank[i] for i in page.evaluate("__identify.view()")[3]]

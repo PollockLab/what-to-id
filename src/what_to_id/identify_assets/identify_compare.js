@@ -17,7 +17,7 @@ return function(ctx){
   }
   function fig(r,cap){
     var f=el('figure'),a=el('a'),img=el('img');
-    a.href='https://www.inaturalist.org/taxa/'+T[r][2];a.target='_blank';a.rel='noopener';
+    a.href='https://www.inaturalist.org/taxa/'+T[r][2];IdentifyFlow.link(a);
     img.loading='lazy';img.alt=cap+' '+T[r][0]+', reference photo';img.dataset.t=T[r][2];
     a.append(img);f.append(a,el('figcaption',null,cap));f.title=T[r][0];show(img);
     return f;

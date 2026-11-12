@@ -210,7 +210,7 @@ def test_an_unknown_login_says_so_and_filters_nothing(browser, site):
 
 
 def test_a_card_with_a_look_alike_shows_both_reference_photos(browser, ranges_site):
-    page = counted(browser, ranges_site, "#lvl=3")
+    page = counted(browser, ranges_site, "#lvl=3&conf=all")  # one tiny fixture level
     box = page.locator("#grid .card .cmp")
     box.wait_for()
     assert box.locator("figcaption").all_inner_texts() == ["Label", "Suggested"]  # level 3
@@ -225,7 +225,7 @@ def test_a_card_with_a_look_alike_shows_both_reference_photos(browser, ranges_si
     )
     link = box.locator("a").first
     assert link.get_attribute("href") == "https://www.inaturalist.org/taxa/1000"
-    assert link.get_attribute("target") == "_blank" and link.get_attribute("rel") == "noopener"
+    assert link.get_attribute("target") == "wtid-inat" and link.get_attribute("rel") == "noopener"
     assert [c[0] for c in page.api] == ["taxa/1000"]  # one request, each taxon once
     assert page.errors == []
 

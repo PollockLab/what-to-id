@@ -99,6 +99,7 @@ body:not(.bt) #study,.bt #status:not(.err),.bt #unpick,.bt #desc,.bt #kind,.bt .
 .card .act:disabled{cursor:default}
 .card .copy{font:inherit;font-size:11px;min-height:24px;margin-left:4px;padding:0 6px;border:1px solid var(--line);border-radius:10px;background:var(--chip);color:var(--ink);cursor:pointer}
 .card .conf{margin-left:6px;font-size:11px;color:var(--muted)}
+.card .gap{margin-left:6px;font-size:11px;color:var(--muted)}
 .card .note{font-size:12px;color:var(--muted)}
 __IDENTIFY_RANGES_CSS__
 </style></head><body>
@@ -146,6 +147,8 @@ The login goes only to iNaturalist.</p></details>
 <div class="rout usr"><details id="usrbox" hidden></details></div>
 <div id="rout" class="rout" hidden></div>
 <div id="rg" class="rout" hidden></div>
+<div id="sort" class="rout" hidden></div>
+<p id="keys" class="muted" hidden>Keys: j next card, k previous, i or Enter Identify (copies the name, opens iNaturalist beside this list), c copy the name</p>
 <div id="study" role="tabpanel" aria-labelledby="tabb">
 <div class="srow"><label for="sgroup">Group</label><select id="sgroup"></select>
 <button type="button" id="snext" class="btn" aria-keyshortcuts="n" title="Next batch (N)">Next batch</button>
@@ -183,5 +186,7 @@ The login goes only to iNaturalist.</p></details>
 <script>__IDENTIFY_STUDY__</script>
 <script>__IDENTIFY_INAT__</script>
 <script>__IDENTIFY_NARROW__</script>
+<script>__IDENTIFY_FLOW__</script>
+<script>__IDENTIFY_GAPS__</script>
 <script>__IDENTIFY_APP__</script>
 </body></html>

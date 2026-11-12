@@ -162,7 +162,7 @@ def test_clear_matches_start_with_far_records_hidden_and_the_segments_filter(bro
 
 def test_the_first_lists_leave_out_far_clear_matches_as_the_page_does(browser, site):
     first = first_lists(site)[""]
-    page = opened(browser, site, "#lvl=1")
+    page = opened(browser, site, "#lvl=1&conf=all&sort=conf")  # level 3 as the first list holds it
     view = page.evaluate("__identify.view()")
     assert [r[0] // 1000 - 1 for r in first["rows"][1]] == [3, 1, 0]  # no 2: 1,234 km outside
     total = page.evaluate("__identify.total()")
@@ -191,7 +191,7 @@ def test_the_segments_move_with_the_arrow_keys(browser, site):
 
 
 def test_narrow_it_down_starts_with_records_in_the_suggestions_range(browser, site):
-    page = opened(browser, site, "#lvl=3")
+    page = opened(browser, site, "#lvl=3&conf=all")
     texts = seg(page).all_inner_texts()
     assert texts == ["All 1", "Suggestion in range 1", "Suggestion not in range 0"]
     assert seg(page).nth(2).is_disabled() and picked(page) == "Suggestion in range 1"
