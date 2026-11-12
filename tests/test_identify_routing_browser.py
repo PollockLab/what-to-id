@@ -213,11 +213,12 @@ def test_a_card_with_a_look_alike_shows_both_reference_photos(browser, ranges_si
     page = counted(browser, ranges_site, "#lvl=3")
     box = page.locator("#grid .card .cmp")
     box.wait_for()
-    assert box.locator("figcaption").all_inner_texts() == ["Label", "Look-alike"]
+    assert box.locator("figcaption").all_inner_texts() == ["Label", "Suggested"]  # level 3
     page.wait_for_function("document.querySelector('.cmp img').src")
     img = box.locator("img").first
     assert img.get_attribute("src") == "https://static.inaturalist.org/photos/1000/small.jpg"
     assert img.get_attribute("alt") == "Label Taxon 0, reference photo"
+    assert box.locator("img").nth(1).get_attribute("alt") == "Suggested Taxon 0, reference photo"
     figs = box.locator("figure")
     assert figs.first.get_attribute("title") == (
         "Taxon 0. Photo (c) A. Photographer, some rights reserved (CC BY-NC)"

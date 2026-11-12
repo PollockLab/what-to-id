@@ -76,6 +76,14 @@ def test_the_score_steps_rank_within_a_level_and_weird_shows_the_lowest_first():
     assert q[:4].tolist() == [0, 12, 8, 4] and q[4:8].tolist() == [12, 0, 4, 8] and q[8] == 0
 
 
+def test_the_rank_file_orders_level_3_by_score_highest_first_and_leaves_the_rest_0():
+    level = np.array([3, 3, 3, 1, 0, 3], np.int8)
+    score = np.array([0.2, 0.9, 0.5, 0.7, np.nan, np.nan], np.float32)
+    rank = np.frombuffer(gzip.decompress(pool_levels.pack_rank(level, score)), "<u4")
+    assert rank.tolist() == [2, 0, 1, 0, 0, 3]
+    assert len(gzip.decompress(pool_levels.pack_rank(level[:0], score[:0]))) == 0
+
+
 def test_a_build_without_a_table_says_so(tmp_path):
     site, _ = write_site(tmp_path)
     with pytest.raises(ValueError, match="--data-url or --parquet"):

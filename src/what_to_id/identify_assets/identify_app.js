@@ -11,7 +11,7 @@ var MAP=new URL(CFG.mapUrl,location.href).href,nf=new Intl.NumberFormat('en-CA')
 var TAB=[],SUBK=[],NK=1,KIND=null,SUB=null,KF=0,KC=[],UF=null,UON=false,MINE=[],CMP=null,SEEN='wtid-identify-seen',BT=false,ST=null,SK='',IN=IdentifyInat(CFG.oauth);
 // CFG.merge: the kinds (levels) a tab shows, in order; SUBK a kind's place in its tab
 Object.keys(CFG.merge).forEach(function(t){CFG.merge[t].forEach(function(k,j){TAB[k]=+t;SUBK[k]=j;});NK=Math.max(NK,CFG.merge[t].length);});
-var META=null,SYNC=null,MORE=new Map(),TAXA=null,P=null,BYID=null,LEVEL=null,Q=null,LOOKS=null,R=null,MF=null,TF=null,PEND=null,REC=-1,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,ONE='',CACHE=new Map(),FIRST=null,SHOWN,STAY=false,X=null;
+var META=null,SYNC=null,MORE=new Map(),TAXA=null,P=null,BYID=null,LEVEL=null,Q=null,LOOKS=null,RK=null,N3=0,R=null,MF=null,TF=null,PEND=null,REC=-1,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,ONE='',CACHE=new Map(),FIRST=null,SHOWN,STAY=false,X=null;
 function $(id){return document.getElementById(id);}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 function status(t,err){var s=$('status');s.textContent=t;s.classList.toggle('err',!!err);}  // an error shows on Batches too
@@ -36,6 +36,7 @@ function select(){
 // order, then the quantized score (a bucket each), newest (highest id) first within a bucket; then at most PER_SPECIES of any one
 // taxon, none cut when the level holds one taxon only. The kind control (KF) keeps one kind of its tab; KC counts the kinds. MORE: for the first card of a cut taxon, how many records it left out.
 // With the range file (R), a level's records also pass its outside-its-range chip.
+// Level 3 with the rank file (RK) goes by it instead, strictly by score, the id never deciding.
 // Rows in ascending id: each shard's rows are id-sorted, so a merge of the shards.
 function byId(P){
   var s=P.start,k=s.length-1,pos=s.slice(0,k),out=new Uint32Array(P.n),t,j,b;
@@ -46,10 +47,11 @@ function on(i){return SEL[i]&&LEVEL[i]&&(!R||R.pass(i,LEVEL[i]))&&(!X||X.pass(i)
 // Under My taxa first the user's genera lead each level, each kind in turn, then the rest; MINE: how many cards they are, -1 without the mode.
 function build(){
   var n=P.n,W=2*NK*STEPS,c=new Uint32Array(6*W+1),key=new Uint16Array(n),rk=UF.ranked(),i,k,lv;
-  for(i=0;i<n;i++)if(on(i)){key[i]=LEVEL[i]*W+(rk&&UF.mine(i)?NK*STEPS:0)+(NK-1-SUB[i])*STEPS+Q[i];c[key[i]+1]++;}
+  for(i=0;i<n;i++)if(on(i)){key[i]=LEVEL[i]*W+(rk&&UF.mine(i)?NK*STEPS:0)+(NK-1-SUB[i])*STEPS+(RK&&LEVEL[i]===3?0:Q[i]);c[key[i]+1]++;}
   for(k=1;k<c.length;k++)c[k]+=c[k-1];
   var at=c.slice(),order=new Int32Array(c[c.length-1]);
   for(k=0;k<n;k++){i=BYID[k];if(on(i))order[at[key[i]]++]=i;}
+  if(RK)order.subarray(c[3*W],c[4*W]).sort(function(x,y){return key[x]-key[y]||RK[y]-RK[x];});  // the best last, as the cut reads from the end
   var out=[],total=[];MORE.clear();KC=[];
   for(lv=1;lv<=5;lv++){
     // the cut is per kind, so a merged tab lists each kind's level list in turn, as pool_levels writes them
@@ -77,8 +79,10 @@ function title(i,lv){
   box.appendChild(nm);
   if(t&&t[1])box.appendChild(el('div','com',t[1]));
   if(lv===3&&lk)l.append('Probably ',el('i',null,lk));
+  if(lv===3&&lk&&!BT){var g=el('div','sugg'),cf=RK&&IdentifyNarrow.conf(RK[i],N3);g.appendChild(IdentifyNarrow.copy(lk));if(cf)g.appendChild(el('span','conf',cf));}
   else if((lv===2||lv===5)&&lk)l.append('Looks more like ',el('i',null,lk));
   if(l.firstChild)box.appendChild(l);
+  if(g)box.appendChild(g);
   return box;
 }
 // A card tells the map which record it is on (hover and focus) and which was picked (click); links are left alone.
@@ -134,6 +138,8 @@ function photos(lis){
         img.src=String(p.url).replace('/square.','/medium.');ph.appendChild(img);}else ph.textContent='No photo on iNaturalist now';
       w.textContent=(o.observed_on||'Date unknown')+' · '+(o.place_guess||'Place unknown');w.title=w.textContent;
       if(IN.user()&&t&&t.id&&!li.querySelector('.acts'))acts(li,t);
+      // level 3: an ID at species there would not be the first, so not an improving one
+      if(li.dataset.lv==='3'&&!li.classList.contains('taken')&&IdentifyNarrow.taken(o)){li.classList.add('taken');w.after(el('div','note','Species already suggested'));}
     });
   }).catch(function(e){if(!(sig&&sig.aborted))status('Could not load the photos: '+e.message,1);});
 }
@@ -190,8 +196,8 @@ function batch(){
   LINKS=rows.length?IdentifyLinks.batches(rows.map(function(i){return P.id[i];}),true):[];BI=0;
   $('batch').hidden=!rows.length;$('cap').hidden=LINKS.length<2;
   ONE=capped?'Identify the first '+nf.format(rows.length)+' of '+nf.format(t):'Identify '+nf.format(rows.length)+' listed';
-  $('cap').textContent=(capped?'The first '+nf.format(rows.length)+' of '+nf.format(t):nf.format(rows.length))+
-    ' listed, in the order shown, '+IdentifyLinks.BATCH+' per batch';
+  $('cap').textContent=nf.format(t)+' cards (up to '+PER_SPECIES+' per species) · '+(capped?'first '+nf.format(rows.length):'all')+
+    ' in '+LINKS.length+' batches of '+IdentifyLinks.BATCH+', in the order shown';
   $('go').title='Up to '+PER_SPECIES+' per species';
   step(0);
 }
@@ -308,9 +314,21 @@ function refresh(){
   status(nf.format(kept)+(VIEW?' in view':' records')+' · '+nf.format(lev)+' ');
   var why=el('a',null,'in a level');why.href='#about';why.onclick=function(e){e.preventDefault();$('about').open=true;$('about').scrollIntoView({block:'nearest'});};
   $('status').append(why,MORE.size?' · '+PER_SPECIES+' per species':'');
-  counts();$('unpick').hidden=parent!==window||!S.picks.length;
+  counts();groups(S.groups);$('unpick').hidden=parent!==window||!S.picks.length;
   if(!LV)LV=saved()||first();
   paint();
+}
+// The group control: the hash's groups= (MapFilter's S.groups), one group or all; another mix of groups shows as Mixed.
+function groups(st){
+  var s=$('grpsel'),gs=META.groups,inc=CH.picked(st,gs,'inc'),v=CH.any(st)?inc.length===1&&!CH.picked(st,gs,'not').length?inc[0]:'*':'';
+  if(!s.options.length){s.add(new Option('All groups',''));gs.forEach(function(g){s.add(new Option(g,g));});
+    s.onchange=function(){var w=s.value==='*'?'':s.value,t=w?CH.write(CH.read(w,gs),gs):'';track('group');
+      if(MF){S.groups=CH.read(t,gs);}else PEND=sel().split('&').filter(function(x){return x&&!/^groups=/.test(x);}).concat(t?['groups='+t]:[]).join('&');
+      if(parent===window)keep('groups',t);
+      again();SYNC.send();};
+    $('grp').hidden=false;}
+  if(v==='*'&&!s.querySelector('[value="*"]'))s.add(new Option('Mixed (from the map)','*'));
+  s.value=v;
 }
 // The map's viewport moves often: one refresh once it rests for a moment, on a frame.
 function soon(){clearTimeout(T);T=setTimeout(function(){requestAnimationFrame(again);},100);}
@@ -383,17 +401,20 @@ async function load(){
   status('Reading the map data…');
   if(CFG.first)get(new URL(CFG.first,MAP)).then(function(b){if(!MF)firstOf(JSON.parse(new TextDecoder().decode(b)));}).catch(function(){});  // optional
   META=await L.fetchMapMeta(MAP,fetch);
+  if(!MF)groups(CH.read(new URLSearchParams(sel()).get('groups'),META.groups));
   function file(k){var f=META.files[k];return f?get(new URL(f,MAP)):Promise.reject(new Error('the map lists no '+k+' file'));}
   var taxa=get(new URL(META.taxa,MAP)).then(function(b){return JSON.parse(new TextDecoder().decode(b));});
   var shards=Promise.all(META.shards.map(function(s){return get(new URL(s.file,MAP)).then(function(b){return L.decodeShard(b,s.n);});}));
   var lev=file('levels'),lk=file('looks').catch(function(){return null;}),  // optional: cards fill in their look-alike once it lands
-    rg=file('range').catch(function(){return null;});  // optional: no range maps without it
+    rg=file('range').catch(function(){return null;}),  // optional: no range maps without it
+    rkf=file('rank').catch(function(){return null;});  // optional: level 3 by score bucket without it
   if(!FIRST)status('Downloading the records…');
-  var d=await Promise.all([shards,taxa,lev]);
+  var d=await Promise.all([shards,taxa,lev,rkf]);
   P=L.pool(d[0],META.bbox);BYID=byId(P);TAXA=d[1];LOOKS=null;
   var raw=new Uint8Array(d[2]);
   if(raw.length!==P.n)throw new Error('the levels file holds '+raw.length+' records, the map '+P.n);
   LEVEL=raw.map(function(v){return TAB[v&15]||v&15;});KIND=raw.map(function(v){return v&15;});SUB=raw.map(function(v){return SUBK[v&15]||0;});Q=raw.map(function(v){return v>>4;});
+  if(d[3]&&d[3].byteLength===4*P.n){RK=new Uint32Array(d[3]);N3=0;for(var j=0;j<P.n;j++)if(KIND[j]===3)N3++;}
   X=IdentifyUnconfirmed({P:P,taxa:TAXA,ranks:META.ranks,area:function(){return AREA;},redraw:redraw});
   // Not yet identified by me asks iNaturalist within the pool's extent: Identify has no map viewport of its own
   var b=META.bbox;UF=userFilter({S:S,meta:META,get:function(f){return get(new URL(f,MAP));},taxa:function(){return TAXA;},changed:user,

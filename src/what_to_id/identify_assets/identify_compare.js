@@ -32,7 +32,7 @@ return function(ctx){
     var want=[],seen=new Set(),imgs=[];
     lis.forEach(function(li){var pr=pair(+li.dataset.i);if(!pr)return;
       var old=li.querySelector('.cmp'),box=el('div','cmp');
-      box.append(fig(pr[0],'Label'),fig(pr[1],'Look-alike'));
+      box.append(fig(pr[0],'Label'),fig(pr[1],li.dataset.lv==='3'?'Suggested':'Look-alike'));  // level 3: the species to propose
       if(old)old.replaceWith(box);else li.querySelector('.title').after(box);
       imgs.push.apply(imgs,box.querySelectorAll('img'));
       pr.forEach(function(r){var id=T[r][2];if(!photo.has(id)&&!seen.has(id)){seen.add(id);want.push(id);}});});

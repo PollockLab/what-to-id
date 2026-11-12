@@ -4,15 +4,18 @@
 
 The site directory holds the built map (map.html, its pool shards and pool-taxa.bin). The atlas
 manifest at ``--data-url`` names `identify.parquet` under ``"identify"``; ``--parquet`` reads a
-local file instead. It writes two files, records in the order of META.shards, as pool-lookalike.bin,
-and a third when the range tables are found, each under its content-hashed name in map.html's
-META.files (`site_files.publish`):
+local file instead. It writes three files, records in the order of META.shards, as
+pool-lookalike.bin, and a fourth when the range tables are found, each under its content-hashed
+name in map.html's META.files (`site_files.publish`):
 
 ``pool-levels.bin``: gzip of one plane of n bytes. The low nibble is the level (0 none, 1 easy,
 2 taxonomist, 3 narrow, 4 weird, 5 mislabel; `identify.LEVEL_NAMES`), the high nibble the
 record's score quantized to 16 steps within its level, 15 for the record to show first (the
 highest score, the lowest for weird and mislabel). A record missing from identify.parquet, or
 whose label changed since it was scored, is level 0.
+
+``pool-levels-rank.bin``: gzip of n uint32 LE, each level-3 record's place in its level by score,
+0 the highest (shown first), so level 3 lists in strict score order; 0 for the other records.
 
 ``pool-levels-looks.bin``: the look-alike species of the taxonomist, narrow and mislabel records,
 apart so the levels load first. A uint32 LE length and that many bytes of JSON
@@ -70,6 +73,7 @@ LOOKS_NAME = "pool-levels-looks.bin"
 STEPS = 16
 NO_LOOK = 0xFFFF
 RANGE_NAME = "pool-levels-range.bin"
+RANK_NAME = "pool-levels-rank.bin"
 NO_BYTE = 0xFF
 NOTAX = 0xFFFF
 FIRST_ROWS = 200  # one iNaturalist batch, IdentifyLinks.MAX_IDS
@@ -83,17 +87,28 @@ RANGE_FILES = {
 }
 
 
-def quantize(level: np.ndarray, score: np.ndarray) -> np.ndarray:
-    """Per record 0..STEPS-1: its rank among the records of its level, STEPS-1 to show first."""
-    q = np.zeros(len(level), np.uint8)
+def ranks(level: np.ndarray, score: np.ndarray) -> np.ndarray:
+    """Per record its place among the records of its level, 0 to show first; 0 for no level."""
+    out = np.zeros(len(level), np.int64)
     for lv in np.unique(level[level != NONE]):
         rows = np.flatnonzero(level == lv)
         s = np.nan_to_num(score[rows].astype(np.float64), nan=-np.inf)
         order = np.argsort(-s if lv in (WEIRD, TAXONOMIST, MISLABEL) else s, kind="stable")
-        rank = np.empty(len(rows), np.int64)
-        rank[order] = np.arange(len(rows))
-        q[rows] = rank * STEPS // len(rows)
-    return q
+        out[rows[order]] = np.arange(len(rows))[::-1]
+    return out
+
+
+def quantize(level: np.ndarray, score: np.ndarray) -> np.ndarray:
+    """Per record 0..STEPS-1: its rank among the records of its level, STEPS-1 to show first."""
+    n = np.bincount(level.astype(np.intp), minlength=1)[level.astype(np.intp)]
+    q = (n - 1 - ranks(level, score)) * STEPS // np.maximum(n, 1)
+    return np.where(level != NONE, q, 0).astype(np.uint8)
+
+
+def pack_rank(level: np.ndarray, score: np.ndarray) -> bytes:
+    """The gzipped rank file: each level-3 record's place in its level, 0 elsewhere."""
+    plane = np.where(level == NARROW, ranks(level, score), 0).astype("<u4")
+    return gzip.compress(plane.tobytes(), mtime=0)
 
 
 def pack(level: np.ndarray, score: np.ndarray) -> bytes:
@@ -265,6 +280,7 @@ def build(
     looks[hit] = scored["looks_like"].astype(object).to_numpy()[at[hit]]
     site_files.publish(site, "levels", OUT_NAME, pack(level, score))
     site_files.publish(site, "looks", LOOKS_NAME, pack_looks(level, looks))
+    site_files.publish(site, "rank", RANK_NAME, pack_rank(level, score))
     site_files.publish(site, "range", RANGE_NAME, None)  # a stale one would no longer line up
     far = None
     (site / DATES_NAME).unlink(missing_ok=True)
@@ -280,7 +296,9 @@ def build(
         why = f"the range tables do not fit: {exc}"
         far = None
         site_files.publish(site, "range", RANGE_NAME, None)
-    first = pack_first(site, ids, tax, rows, level, quantize(level, score), looks, far)
+    # level 3 in strict score order, as identify_app.js orders it with the rank file
+    key = np.where(level == NARROW, -ranks(level, score), quantize(level, score))
+    first = pack_first(site, ids, tax, rows, level, key, looks, far)
     site_files.publish(site, "first", FIRST_NAME, first)
     # the map's Outside usual range chip shows only with the file
     site_files.flag(site, "range", site_files.path(site, "range") is not None)
@@ -291,8 +309,9 @@ def build(
 
 def pack_first(site, ids, tax, taxa, level, q, looks, far) -> bytes:
     """The gzipped first lists (see the module doc), as `build()` in identify_app.js orders them:
-    best score bucket first, newest id first within one, PER_SPECIES of a taxon unless the level
-    holds one taxon only. `far` per record is far outside its label's range, None without ranges."""
+    highest `q` (the score bucket, minus the rank for level 3) first, newest id first within
+    one, PER_SPECIES of a taxon unless the level holds one taxon only. `far` per record is far
+    outside its label's range, None without ranges."""
     meta = map_meta(site, keys=("shards", "groups", "bbox"))
     grp = np.concatenate(
         [
@@ -375,7 +394,7 @@ def main(argv: list[str] | None = None) -> int:
     except (ValueError, FileNotFoundError, OSError) as exc:
         print(f"pool_levels: {exc}", file=sys.stderr)
         return 1
-    paths = [site_files.path(a.out, k) for k in ("levels", "looks", "range", "first")]
+    paths = [site_files.path(a.out, k) for k in ("levels", "rank", "looks", "range", "first")]
     sizes = ", ".join(f"{p.name} {p.stat().st_size / 1e6:.2f} MB" for p in paths if p)
     print(f"pool_levels: records per level {counts}; {sizes} gzipped")
     return 0

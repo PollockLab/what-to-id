@@ -373,7 +373,7 @@ def test_the_batch_links_cover_the_listed_ids(browser, site):
     assert page.locator("#go").inner_text() == "Identify 2 · batch 1 of 3"
     assert (
         page.locator("#cap").inner_text()
-        == f"The first 5 of {n:,} listed, in the order shown, 200 per batch"
+        == f"{n:,} cards (up to 3 per species) · first 5 in 3 batches of 200, in the order shown"
     )
     page.click("#next")
     assert page.locator("#go").inner_text() == "Identify 2 · batch 2 of 3"
@@ -468,7 +468,9 @@ def test_a_level_lists_the_newest_records_first_within_a_score_bucket_across_sha
         level = dict(zip(pts["id"], pts["level"], strict=True))
         for rows in page.evaluate("__identify.view()"):
             for a, b in zip(rows or [], (rows or [])[1:], strict=False):
-                if level[a] == level[b]:  # Might be wrong lists its kinds one after another
+                if level[a] == level[b] == 3:  # strictly by score (the rank file)
+                    assert bucket[a] >= bucket[b], (a, b)
+                elif level[a] == level[b]:  # Might be wrong lists its kinds one after another
                     assert bucket[a] > bucket[b] or a > b, (a, b)
                 else:
                     assert ORDER.index(level[a]) < ORDER.index(level[b]), (a, b)

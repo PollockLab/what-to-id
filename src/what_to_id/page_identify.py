@@ -75,6 +75,7 @@ SCRIPTS = {
     "__IDENTIFY_COMPARE__": ASSETS / "identify_compare.js",
     "__IDENTIFY_STUDY__": ASSETS / "identify_study.js",
     "__IDENTIFY_INAT__": ASSETS / "identify_inat.js",
+    "__IDENTIFY_NARROW__": ASSETS / "identify_narrow.js",
     "__IDENTIFY_APP__": ASSETS / "identify_app.js",
 }
 

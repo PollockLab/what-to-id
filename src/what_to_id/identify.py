@@ -179,8 +179,8 @@ def identify_levels(
     """`IDENTIFY_COLUMNS` rows from `identify_scores`, one per record, in score order of `scores`.
 
     `score` is `own` for easy, the margin for taxonomist and mislabel, the smaller of in-clade
-    best minus outside best and `score2` for narrow (most confident first) and `top` for weird; `score2` is best minus second-best in-clade
-    (narrow only); `looks_like` is the look-alike species (taxonomist, mislabel) or the probable
+    best minus outside best and `score2` for narrow (most confident first) and `top` for weird;
+    `score2` is best minus second-best in-clade (narrow only); `looks_like` is the look-alike species (taxonomist, mislabel) or the probable
     species (narrow).
 
     With `frozen`, the weird cut and the easy share come from it, not from `scores`; a group or
