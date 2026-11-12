@@ -1,5 +1,5 @@
 // Level 3 helpers: an improving ID there is the first at species, so a card carries its suggestion to iNaturalist
-// (copy), says how high it ranks in its level (conf) and whether a species is already proposed (taken).
+// (copy), says how high it ranks in its level (conf) and whether a record already has a species ID (taken).
 var IdentifyNarrow=(function(){
 'use strict';
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}

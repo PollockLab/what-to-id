@@ -137,9 +137,9 @@ function photos(lis){
       if(p){var img=el('img');img.loading='lazy';img.alt='Photo of '+li.querySelector('i').textContent;
         img.src=String(p.url).replace('/square.','/medium.');ph.appendChild(img);}else ph.textContent='No photo on iNaturalist now';
       w.textContent=(o.observed_on||'Date unknown')+' · '+(o.place_guess||'Place unknown');w.title=w.textContent;
-      if(IN.user()&&t&&t.id&&!li.querySelector('.acts'))acts(li,t);
       // level 3: an ID at species there would not be the first, so not an improving one
-      if(li.dataset.lv==='3'&&!li.classList.contains('taken')&&IdentifyNarrow.taken(o)){li.classList.add('taken');w.after(el('div','note','Species already suggested'));}
+      if(li.dataset.lv==='3'&&IdentifyNarrow.taken(o)){li.remove();return;}
+      if(IN.user()&&t&&t.id&&!li.querySelector('.acts'))acts(li,t);
     });
   }).catch(function(e){if(!(sig&&sig.aborted))status('Could not load the photos: '+e.message,1);});
 }

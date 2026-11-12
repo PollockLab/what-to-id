@@ -61,7 +61,7 @@ def test_the_copy_button_copies_the_suggestion_and_says_so(browser, site):
     assert b.inner_text() == "Copy failed" and page.errors == []
 
 
-def test_a_record_with_a_species_id_is_marked_already_suggested(browser, site):
+def test_a_record_with_a_species_id_is_dropped(browser, site):
     base, _ = site
     page = browser.new_page(viewport={"width": 600, "height": 900})
     page.errors = []
@@ -91,14 +91,10 @@ def test_a_record_with_a_species_id_is_marked_already_suggested(browser, site):
 
     page.route("https://api.inaturalist.org/v1/observations*", observations)
     page.goto(f"{base}/identify.html#lvl=3")
-    page.wait_for_selector("#grid .card.taken")
-    cards = page.eval_on_selector_all(
-        "#grid .card",
-        "l => l.map(e => [+e.dataset.id, e.classList.contains('taken'), "
-        "(e.querySelector('.note') || {}).textContent || ''])",
+    page.wait_for_function(
+        "(l => l.length && l.every(e => e.dataset.id % 2))"
+        "([...document.querySelectorAll('#grid .card')])"
     )
-    assert cards and all(t == (i % 2 == 0) for i, t, _ in cards)
-    assert all(n == ("Species already suggested" if t else "") for _, t, n in cards)
     assert calls and all(len(c) <= 200 for c in calls)  # the photos' own requests, none added
     assert page.errors == []
 
