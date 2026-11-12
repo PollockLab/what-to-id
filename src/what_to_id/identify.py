@@ -178,8 +178,8 @@ def identify_levels(
 ) -> pd.DataFrame:
     """`IDENTIFY_COLUMNS` rows from `identify_scores`, one per record, in score order of `scores`.
 
-    `score` is `own` for easy, the margin for taxonomist and mislabel, in-clade best minus
-    outside best for narrow and `top` for weird; `score2` is best minus second-best in-clade
+    `score` is `own` for easy, the margin for taxonomist and mislabel, the smaller of in-clade
+    best minus outside best and `score2` for narrow (most confident first) and `top` for weird; `score2` is best minus second-best in-clade
     (narrow only); `looks_like` is the look-alike species (taxonomist, mislabel) or the probable
     species (narrow).
 
@@ -217,7 +217,8 @@ def identify_levels(
             s["top"],
             s["own"],
             s["own"] - s["other"],
-            s["in_best"] - s["out_best"],
+            # the weaker of "in this clade" and "this species of it"
+            np.minimum(s["in_best"] - s["out_best"], s["in_best"] - s["in_second"]),
             s["own"] - s["other"],
         ],
         np.nan,

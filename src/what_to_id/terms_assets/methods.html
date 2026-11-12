@@ -38,7 +38,8 @@ species' scored records, and the species has __MIN_PER_CLASS__ or more scored re
 <li>Close calls: species rank, margin below 0 but not below &minus;__TAXONOMIST_MARGIN__, and the
 best other species has __MIN_LOOKALIKE_RECORDS__ or more verifiable records in BC.</li>
 <li>Narrow it down: a rank above species whose clade holds at least one species with a text
-vector. The score is the in-clade best minus the best outside the clade.</li>
+vector. The score is the smaller of two margins: the in-clade best minus the best outside the
+clade, and the in-clade best minus the second-best in the clade.</li>
 <li>Might be mislabelled: species rank, margin below &minus;__TAXONOMIST_MARGIN__, and the
 best other species has __MIN_LOOKALIKE_RECORDS__ or more verifiable records in BC.</li>
 </ol>

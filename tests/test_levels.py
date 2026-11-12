@@ -246,7 +246,7 @@ def test_higher_ranks_get_narrow_with_the_probable_species():
     cos = _unit([[1, 0.5, 0, 0.1]])[0]
     for i in (900, 901):  # genus and family both hold the two G species
         assert row.loc[i, "level"] == 3 and row.loc[i, "looks_like"] == "G a"
-        assert row.loc[i, "score"] == pytest.approx(cos[0] - cos[2], abs=1e-6)
+        assert row.loc[i, "score"] == pytest.approx(min(cos[0] - cos[2], cos[0] - cos[1]), abs=1e-6)
         assert row.loc[i, "score2"] == pytest.approx(cos[0] - cos[1], abs=1e-6)
     assert out.loc[out["level"] != 3, "score2"].isna().all()
     assert row.loc[902, "level"] == 0 and row.loc[903, "level"] == 0  # no prototype, not in tree
