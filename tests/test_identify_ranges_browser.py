@@ -38,10 +38,12 @@ N = len(ROWS)
 
 
 def write_site(root, introduced=()):
-    """Two cells, west and east of 123 W; record 4 is in the east one; ``introduced`` marks rows."""
+    """Two cells, west and east of 123 W; record 4 is in the east one, record 7 (Narrow it down) in
+    the west one, its suggestion's range; ``introduced`` marks rows."""
     pytest.importorskip("pyarrow")
     pool = pool_frame(np.arange(1, N + 1) * 1000)
     pool.loc[4, ["lat", "lon"]] = [49.0, -122.5]
+    pool.loc[7, ["lat", "lon"]] = [49.0, -123.5]
     if introduced:
         pool["introduced"] = pool.index.isin(introduced)
     blobs, meta = encode_points(pool, TREE)
@@ -188,11 +190,14 @@ def test_the_segments_move_with_the_arrow_keys(browser, site):
     assert page.errors == []
 
 
-def test_with_nothing_far_outside_only_is_disabled(browser, site):
+def test_narrow_it_down_starts_with_records_in_the_suggestions_range(browser, site):
     page = opened(browser, site, "#lvl=3")
     texts = seg(page).all_inner_texts()
-    assert texts[2] == "Only far outside 0" and seg(page).nth(2).is_disabled()
-    assert texts[0].split()[-1] == texts[1].split()[-1] and picked(page).startswith("All ")
+    assert texts == ["All 1", "Suggestion in range 1", "Suggestion not in range 0"]
+    assert seg(page).nth(2).is_disabled() and picked(page) == "Suggestion in range 1"
+    assert shown(page, 3) == [7] and "out=" not in page.url
+    assert page.locator("#grid .card .links .range").inner_text() == "Range: fits the suggestion"
+    assert page.errors == []
 
 
 def test_a_close_call_chip_gives_the_note_and_opens_the_map_by_click_and_keyboard(browser, site):
@@ -256,8 +261,8 @@ def test_a_hash_record_not_on_the_list_opens_nothing(browser, site):
 
 
 def test_a_phone_popover_is_a_bottom_sheet(browser, site):
-    page = opened(browser, site, "#lvl=3", (390, 800), touch=True)
-    page.locator(".rchip").tap()
+    page = opened(browser, site, "#lvl=1", (390, 800), touch=True)
+    page.locator(".rchip").first.tap()
     box = page.locator("#rpop").bounding_box()
     assert box["x"] == 0 and box["width"] == 390 and box["y"] + box["height"] == 800
     assert page.errors == []
@@ -265,7 +270,7 @@ def test_a_phone_popover_is_a_bottom_sheet(browser, site):
 
 def test_a_narrow_pane_opens_the_map_on_hover_beside_the_chip(browser, site):
     page = opened(
-        browser, site, "#lvl=3", (400, 2000)
+        browser, site, "#lvl=1", (400, 2000)
     )  # Identify's width inside Explore; room below the reference photos
     chip, pop = page.locator(".rchip").first, page.locator("#rpop")
     chip.hover()
