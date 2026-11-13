@@ -22,7 +22,6 @@
 #help .sbody>p:first-child{margin-top:0}.rline .qchip{min-height:30px;padding:0 10px;border:0}
 .pop{margin:0;inset:auto;position:fixed;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);
   box-shadow:0 8px 28px rgba(0,0,0,.2);max-width:min(420px,calc(100vw - 32px))}
-.pop .batch{margin:0 0 6px}.pop #cap{margin:0}
 dialog.sheet{padding:0;border:0;border-radius:20px;background:var(--panel);color:var(--ink);width:min(600px,calc(100vw - 32px));max-height:86vh;
   box-shadow:0 12px 40px rgba(0,0,0,.3)}
 dialog.sheet[open]{display:flex;flex-direction:column}

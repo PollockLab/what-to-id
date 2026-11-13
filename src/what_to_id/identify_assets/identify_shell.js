@@ -1,7 +1,7 @@
 // The page's chrome around the modules' own controls: the Filters button opens the Range, Confidence, Sort, Research Grade,
 // By species and User controls in a sheet (the search bar, identify_bar.js, holds What, When and Where). Each filter away from its
 // default (its hash key present) shows as a chip with a remove button, and the Filters button counts them. The result
-// line counts the cards from the batch caption (which becomes its title) and holds the batch links in a popover.
+// line counts the cards from the batch caption (which becomes its title).
 // A help sheet holds the page notes, totals, progress, the level description and the keys.
 // The modules keep writing their own controls and hash keys; this only moves and names them.
 (function(){
@@ -38,9 +38,8 @@ function chips(){
 function count(){
   var cap=$('cap').textContent,m=/^[\d,.\s ]+/.exec(cap),n=$('none').hidden?(m?m[0].trim():''):'0';
   var st=$('status').textContent;  // loading and load errors stay in sight while the totals sit in the help sheet
-  $('count').textContent=n?n+' cards to ID':/^(Loading|Could not)/.test(st)?st:'';$('count').title=cap;$('inatb').title=cap;
+  $('count').textContent=n?n+' cards to ID':/^(Loading|Could not)/.test(st)?st:'';$('count').title=cap;
   [].forEach.call(document.querySelectorAll('.sdone .n'),function(s){s.textContent=n||'0';});
-  $('inatb').hidden=$('batch').hidden;
 }
 function sheets(){
   [].forEach.call(document.querySelectorAll('dialog.sheet'),function(d){

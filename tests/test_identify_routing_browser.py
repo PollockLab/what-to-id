@@ -236,11 +236,10 @@ def test_a_card_with_a_look_alike_shows_both_reference_photos(browser, ranges_si
 def test_the_counted_events_name_the_choice_and_nothing_else(browser, site):
     base, _ = site
     page = counted(browser, base)
-    no_tabs = "e => e.target.closest('a') && e.preventDefault()"  # a popover opener still opens
+    no_tabs = "e => e.target.closest('a') && e.preventDefault()"
     page.evaluate(f"document.addEventListener('click', {no_tabs})")  # no new tabs
     tab(page, 5).click()
     kind(page, "Odd shots").click()
-    reveal(page, "#go")
     page.click("#go")
     ib.panel(page, page.locator("#grid .card").first)
     page.locator("#cpo").click()

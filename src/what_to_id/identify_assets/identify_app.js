@@ -215,13 +215,13 @@ function more(){
   if(lis.length){photos(lis);if(CMP&&LOOKS){CMP.fill(lis);lis.forEach(CARD.paint);}}
   if(IO&&!b.hidden){IO.unobserve(b);IO.observe(b);}  // observe again: a tall pane may still show it
 }
-// "Identify N listed", or with more than one batch "Identify 200 · batch 2 of 50": the button
-// names the batch it opens, since the arrows change only its link. Batches follow the card order.
+// "Identify these N on iNaturalist" opens the current batch; with more than one, "Batch 2 of 50" and the arrows
+// beside it pick which. Batches follow the card order.
 function batch(){
   var all=view[LV]||[],t=all.n||all.length,rows=all.slice(0,IdentifyLinks.MAX_IDS),capped=rows.length<t;  // n: a first list's full length
   LINKS=rows.length?IdentifyLinks.batches(rows.map(function(i){return P.id[i];}),true):[];BI=0;
-  $('batch').hidden=!rows.length;$('cap').hidden=LV===3?!rows.length:LINKS.length<2;
-  ONE=capped?'Identify the first '+nf.format(rows.length)+' of '+nf.format(t):'Identify '+nf.format(rows.length)+' listed';
+  $('batch').hidden=!rows.length;
+  ONE=capped?'Identify the first '+nf.format(rows.length)+' on iNaturalist':null;
   $('cap').textContent=LV===3?IdentifyNarrow.line(t,S.total[3],[GP&&GP.label(),R&&R.label(3)],RUN()?'all':'up to '+PER_SPECIES):
     nf.format(t)+' cards (up to '+PER_SPECIES+' per species) · '+(capped?'first '+nf.format(rows.length):'all')+
     ' in '+LINKS.length+' batches of '+IdentifyLinks.BATCH+', in the order shown';
@@ -231,7 +231,8 @@ function batch(){
 function step(d){
   BI=Math.max(0,Math.min(LINKS.length-1,BI+d));
   var b=LINKS[BI];
-  if(b){$('go').href=b.url;$('go').textContent=LINKS.length>1?'Identify '+nf.format(b.n)+' · batch '+(BI+1)+' of '+LINKS.length:ONE;}
+  if(b){$('go').href=b.url;$('go').textContent=ONE&&LINKS.length<2?ONE:b.n===1?'Identify this record on iNaturalist':'Identify these '+nf.format(b.n)+' on iNaturalist';}
+  $('bn').textContent=LINKS.length>1?'Batch '+(BI+1)+' of '+LINKS.length:'';
   $('prev').hidden=$('next').hidden=LINKS.length<2;
   $('prev').disabled=BI===0;$('next').disabled=BI>=LINKS.length-1;
 }
@@ -371,7 +372,7 @@ function early(){
     s=!AREA&&!KEEPIDS&&!SUBIDS&&!/(^|&)(area|out|rg)=/.test(h)&&(!VIEW||I&&[[0,1],[2,1],[2,3],[0,3]].every(function(c){
       return MapArea.inside(I,b[c[0]],b[c[1]]);}))&&FIRST.s[sel()]||null;
   if(s===SHOWN)return;SHOWN=s;P=s&&FIRST.P;
-  if(!s){view=[];$('grid').textContent='';$('none').hidden=$('more').hidden=$('batch').hidden=$('cap').hidden=true;
+  if(!s){view=[];$('grid').textContent='';$('none').hidden=$('more').hidden=$('batch').hidden=true;
     [].forEach.call($('tabs').querySelectorAll('[data-lv]'),function(t){t.lastChild.textContent='';});status('Loading all the records for this selection…');return;}
   // a tab of several kinds starts as its first kind's list (or the chosen kind's), its count their sum
   view=s.rows.slice();S.total=s.total.slice();KC=s.total.slice();MINE=[];

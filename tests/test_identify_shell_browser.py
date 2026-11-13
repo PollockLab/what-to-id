@@ -68,15 +68,20 @@ def test_the_what_segment_names_the_search_and_opens_its_panel(browser, site):
     assert page.errors == []
 
 
-def test_the_batch_links_open_in_a_popover(browser, site):
+def test_the_batch_button_is_in_view_and_keyboard_reachable(browser, site):
     base, _ = site
     page = ib.open_identify(browser, base, "#lvl=3")
     page.wait_for_selector("#grid .card")
-    assert page.locator("#go").is_hidden() and page.locator("#inatb").is_visible()
-    page.click("#inatb")
-    assert page.locator("#go").is_visible() and page.inner_text("#cap").endswith(")")
-    page.keyboard.press("Escape")
-    assert page.locator("#go").is_hidden()
+    go = page.locator("#go")
+    assert (
+        go.is_visible()
+        and go.inner_text().startswith("Identify ")
+        and go.inner_text().endswith(" on iNaturalist")
+    )
+    assert "/observations/identify?" in go.get_attribute("href")
+    assert page.inner_text("#cap").endswith(")")
+    go.focus()
+    assert page.evaluate("document.activeElement.id") == "go"
     assert page.errors == []
 
 
@@ -91,4 +96,35 @@ def test_the_help_button_holds_the_notes_totals_and_keys(browser, site):
     assert page.locator("#help .sub").is_visible()
     close(page)
     assert page.evaluate("document.activeElement.id") == "helpb"
+    assert page.errors == []
+
+
+def test_the_batch_button_opens_the_next_batch_by_keyboard(browser, site):
+    base, _ = site
+    page = ib.open_identify(browser, base, "#lvl=3")
+    page.wait_for_selector("#grid .card")
+    page.evaluate(  # two records per batch, so the list spans several
+        "() => { const f = IdentifyLinks.batches; IdentifyLinks.batches = ids => "
+        "Array.from({length: Math.ceil(ids.length / 2)}, "
+        "(_, i) => f(ids.slice(2 * i, 2 * i + 2))[0]); }"
+    )
+    ib.tab(page, 1).click()
+    ib.tab(page, 3).click()
+    go = page.locator("#go")
+
+    def ids():
+        return [int(i) for i in go.get_attribute("href").split("&id=")[1].split(",")]
+
+    n = len(page.evaluate("__identify.view()")[3])
+    assert go.inner_text() == "Identify these 2 on iNaturalist"
+    assert (
+        page.inner_text("#bn") == f"Batch 1 of {-(-n // 2)}" and page.locator("#prev").is_disabled()
+    )
+    first = ids()
+    page.focus("#next")
+    page.keyboard.press("Enter")
+    assert page.inner_text("#bn").startswith("Batch 2 of ") and ids() != first
+    page.focus("#go")  # Tab order: button, then the arrows, all keyboard reachable
+    page.keyboard.press("Tab")
+    assert page.evaluate("document.activeElement.id") == "prev"
     assert page.errors == []

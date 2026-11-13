@@ -212,9 +212,8 @@ def test_a_drop_after_show_more_keeps_the_batch_and_the_counts(browser, site):
     page.wait_for_selector("#grid .card")
     page.wait_for_load_state("networkidle")
     assert page.locator("#more").is_visible()  # the fixture lists more than one page
-    reveal(page, "#next")
     page.click("#next")
-    assert " · batch 2 of " in page.inner_text("#go")
+    assert page.inner_text("#bn").startswith("Batch 2 of ")
     before = len(page.evaluate("__identify.view()")[3])
     later.append(1)
     page.click("#more")
@@ -226,5 +225,5 @@ def test_a_drop_after_show_more_keeps_the_batch_and_the_counts(browser, site):
     more = page.locator("#more")
     assert more.is_hidden() if not left else more.inner_text() == f"Show more ({left} left)"
     n = -(-len(view) // 3)
-    assert page.inner_text("#go").endswith(f" · batch 2 of {n}")  # the batch held through the drop
+    assert page.inner_text("#bn") == f"Batch 2 of {n}"  # the batch held through the drop
     assert page.errors == []
