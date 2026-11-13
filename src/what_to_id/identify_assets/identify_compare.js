@@ -72,13 +72,16 @@ return function(ctx){
       '<div class="cpbar"><button type="button" id="cpk" class="arrow" aria-label="Previous card (k)" aria-keyshortcuts="k">‹</button>'+
       '<button type="button" id="cpj" class="arrow" aria-label="Next card (j)" aria-keyshortcuts="j">›</button>'+
       '<button type="button" id="cps" class="more" aria-keyshortcuts="s" title="Skip (s)">Skip</button>'+
-      '<span id="cpc"></span><button type="button" id="cpo" class="btn" aria-keyshortcuts="Enter" title="Identify on iNaturalist (Enter)">Identify (Enter)</button></div>';
+      '<span id="cpc"></span><span id="cpt" class="muted" role="status"></span><button type="button" id="cpo" class="btn" aria-keyshortcuts="Enter" title="Identify on iNaturalist (Enter)">Identify (Enter)</button></div>';
     document.body.appendChild(box);
     box.querySelector('#cpx').onclick=close;
     box.querySelector('#cpk').onclick=function(){go(-1);};box.querySelector('#cpj').onclick=function(){go(1);};
     box.querySelector('#cps').onclick=function(){IdentifyFlow.mark(cur,'Skipped');go(1);};
     box.querySelector('#cpo').onclick=function(){
-      var a=cur.querySelector('a.btn');if(!a)return;a.click();IdentifyFlow.mark(cur,'Opened');go(1);};
+      var a=cur.querySelector('a.btn'),t=named(cur),m=box.querySelector('#cpt'),c=navigator.clipboard;if(!a)return;
+      if(t&&c&&c.writeText)c.writeText(t[0]).then(function(){m.textContent='Copied '+t[0]+', paste in iNat';clearTimeout(m.t);
+        m.t=setTimeout(function(){m.textContent='';},4000);},function(){});
+      a.click();IdentifyFlow.mark(cur,'Opened');go(1);};
     box.addEventListener('keydown',function(e){
       var t=e.target,k=e.key;
       if(e.metaKey||e.ctrlKey||e.altKey||/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))return;

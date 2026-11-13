@@ -158,8 +158,11 @@ def test_the_compare_panel_shows_photos_and_works_from_the_keys(browser, site):
     page.keyboard.press("s")  # skipped, on to the next
     assert cards.nth(0).locator(".opened").inner_text() == "Skipped"
     assert panel.locator("#cpat").inner_text().startswith("2 of")
-    page.keyboard.press("Enter")  # opens in the one tab, marked, on to the next
-    assert page.evaluate("OPENED")[-1][1] == "wtid-inat"
+    second = cards.nth(1).locator(".look i").inner_text()
+    page.keyboard.press("Enter")  # copies, opens in the one tab, marked, on to the next
+    assert page.evaluate("OPENED")[-1][1] == "wtid-inat" and page.evaluate("COPIED")[-1] == second
+    page.wait_for_function("document.getElementById('cpt').textContent.length > 0")
+    assert panel.locator("#cpt").inner_text() == f"Copied {second}, paste in iNat"
     assert cards.nth(1).locator(".opened").inner_text() == "Opened"
     assert panel.locator("#cpat").inner_text().startswith("3 of")
     page.keyboard.press("k")

@@ -240,3 +240,11 @@ def test_untouched_pool_never_calls_reconstruct():
 
     out = refresh(pool, E[:0], ids[:0], taxa, T, base, boom)
     pd.testing.assert_frame_equal(out, base, check_categorical=False)
+
+
+def test_a_base_without_runner_up_gains_the_column_for_the_why_file():
+    # the live table predates runner_up: the daily step adds it, empty until a full run fills it
+    pool, E, ids, taxa, T = identify_bundle()
+    base = identify.identify_levels(identify.identify_scores(pool, E, ids, taxa, T, TREE))
+    out = identify.identify_delta(base.drop(columns="runner_up"), pool, E[:0], ids[:0], taxa, T, TREE)
+    assert "runner_up" in out and out["runner_up"].isna().all()
