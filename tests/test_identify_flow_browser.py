@@ -273,6 +273,7 @@ def test_a_photo_that_fails_leaves_a_blank_box_not_its_alt_text(browser, site):
     eb.stub_inat(page, None)
     page.route("https://static.inaturalist.org/**", lambda r: r.fulfill(status=404))
     page.goto(f"{base}/identify.html#lvl=3")
+    page.wait_for_selector("#grid .card .look", state="attached")  # the cards are drawn for good
     page.wait_for_function(
         "(l => l.length && l.every(i => !i.hasAttribute('src')))"
         "([...document.querySelectorAll('#grid .card .ph img')].slice(0, 2))"

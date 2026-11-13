@@ -255,7 +255,7 @@ function paint(){
   more();batch();scrollTo(0,STAY?y:0);STAY=false;
   if(LV===3&&WHYF)setTimeout(WHYF,0);
 }
-function redraw(){build();counts();paint();}
+function redraw(late){if(late===true)STAY=true;build();counts();paint();}  // late: records that arrived, not a choice, keep the scroll
 function kindName(k){return (CFG.kinds.filter(function(x){return x[0]===k;})[0]||[0,''])[1];}
 // The kind control (All, then each kind) over a tab that shows several kinds; hash kind=.
 function kinds(){
@@ -446,7 +446,7 @@ async function load(){
   LEVEL=raw.map(function(v){return TAB[v&15]||v&15;});KIND=raw.map(function(v){return v&15;});SUB=raw.map(function(v){return SUBK[v&15]||0;});Q=raw.map(function(v){return v>>4;});
   if(d[3]&&d[3].byteLength===4*P.n){RK=new Uint32Array(d[3]);N3=0;for(var j=0;j<P.n;j++)if(KIND[j]===3)N3++;}
   if(RK)GP=IdentifyGaps({P:P,groups:META.groups,keep:function(i){return KIND[i]===3;},band:function(i){return IdentifyNarrow.band(RK[i],N3);},
-    redraw:function(){if(LV===3)redraw();else build();}});  // optional: without it, the order by confidence; another level is not redrawn (an open range popover stays)
+    redraw:function(late){if(LV===3)redraw(late);else build();}});  // optional: without it, the order by confidence; another level is not redrawn (an open range popover stays)
   X=IdentifyUnconfirmed({P:P,taxa:TAXA,ranks:META.ranks,area:function(){return AREA;},redraw:redraw});
   // Not yet identified by me asks iNaturalist within the pool's extent: Identify has no map viewport of its own
   var b=META.bbox;UF=userFilter({S:S,meta:META,get:function(f){return get(new URL(f,MAP));},taxa:function(){return TAXA;},changed:user,
@@ -473,7 +473,7 @@ async function load(){
     var rec=/(?:^|&)record=(\d+)(?:&|$)/.exec(location.hash.slice(1));
     for(var i=0;rec&&i<P.n;i++)if(P.id[i]===+rec[1]){REC=i;break;}
     if(REC>=0&&LEVEL[REC])LV=LEVEL[REC];
-    R.level(LV,true);redraw();if(S.only.range)refresh();
+    R.level(LV,true);redraw(true);if(S.only.range)refresh();
     var li=REC>=0&&document.querySelector('.card[data-id="'+P.id[REC]+'"]'),c=li&&li.querySelector('.rchip');
     if(c){if(CMP)CMP.open(li);c.click();}});
   window.__identify={ids:idsOf,view:function(){return view.map(function(r){return r&&Array.from(r.map(function(i){return P.id[i];}));});},

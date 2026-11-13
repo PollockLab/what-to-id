@@ -3,7 +3,7 @@
 // the last one on cannot be turned off): both is the blend (band minus gap tier, then band, then rank), Confidence strict rank, Blitz gaps
 // the gap tier then rank. Gaps come from where-to-blitz's checklist layer (one 25 km PNG per group, read at run time): a record in a cell
 // short of the 30 observer-days of a checklist gets a gap tier (2 under half, 1 under 30, 0 lit or no data) and a badge.
-// IdentifyGaps(ctx), ctx {P, groups (META.groups), keep(i) the records to read, band(i) 0..3, redraw()}. A failed load leaves every gap at 0.
+// IdentifyGaps(ctx), ctx {P, groups (META.groups), keep(i) the records to read, band(i) 0..3, redraw(late) with late true when records arrived}. A failed load leaves every gap at 0.
 var IdentifyGaps=(function(){
 'use strict';
 var BASE='https://pollocklab.github.io/where-to-blitz/',DIR=BASE+'cluster_results/checklist/',RES='25000',ALL='All biodiversity',
@@ -54,7 +54,7 @@ return function(ctx){
           dy[i]=d;tr[i]=d>=lit?0:d<lit/2?2:1;nm[i]=[g,lit];
         }
         tier=tr;days=dy;names=nm;state='ready';});
-    }).catch(function(){state='failed';}).then(function(){ctx.redraw();});
+    }).catch(function(){state='failed';}).then(function(){ctx.redraw(true);});
   }
   function hash(){
     var t=location.hash.slice(1).split('&').filter(function(x){return x&&!/^(sort|conf)=/.test(x);});
