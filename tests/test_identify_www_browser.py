@@ -88,7 +88,7 @@ def test_at_risk_and_invasive_keep_cards_by_their_suggestions_bc_status(browser,
     assert "risk=" not in page.evaluate("location.hash") and page.errors == []
 
 
-def test_when_writes_the_map_filters_dates_and_where_links_to_the_map(browser, site):
+def test_when_writes_the_map_filters_dates(browser, site):
     base, pts = site
     page = open_row(browser, base, "#lvl=3")
     page.click("#bwhen")
@@ -100,8 +100,6 @@ def test_when_writes_the_map_filters_dates_and_where_links_to_the_map(browser, s
     page.locator("#presets button", has_text="All dates").click()
     assert "from=" not in page.evaluate("location.hash")
     page.keyboard.press("Escape")
-    page.click("#bwhere")
-    assert page.get_attribute("#wmap", "href").startswith("explore.html?view=map")
     page.goto(f"{base}/identify.html#lvl=3&from=2026-08-05&to=2026-08-20")
     page.reload()
     page.wait_for_function("window.__identify")

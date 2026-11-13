@@ -8,6 +8,7 @@
 <script src="{{MAPLIBRE_JS}}"></script>
 <script src="{{DECK_JS}}"></script>
 <script>if(/[?&]embed=1/.test(location.search))document.documentElement.classList.add('embed');
+if(/[?&]bare=1/.test(location.search))document.documentElement.classList.add('embed','bare');
 (function(){var q=location.search;if(/[?&](embed|standalone)=1/.test(q)||!/\/map\.html$/.test(location.pathname))return;
 fetch('explore.html',{method:'HEAD'}).then(function(r){if(r.ok)location.replace('explore.html?view=map'+location.hash);}).catch(function(){});})();</script>
 <style>{{CSS}}</style>

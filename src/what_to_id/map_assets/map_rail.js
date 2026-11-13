@@ -5,7 +5,7 @@
 // on a phone the rail is a sheet, opened by the shell's Filters button (wtid-rail open).
 (function(){
 'use strict';
-var H=document.documentElement;if(!H.classList.contains('embed'))return;
+var H=document.documentElement;if(!H.classList.contains('embed')||H.classList.contains('bare'))return;
 var KEY='wtid-rail',side=document.getElementById('side'),btn=document.getElementById('railx'),
   scope=document.getElementById('scope').children,ours=false,NARROW=matchMedia('(max-width:760px)'),saved=null;
 try{saved=localStorage.getItem(KEY);}catch(e){}

@@ -256,7 +256,7 @@ function MapArea(ctx){
   // The areas changed: a new mask, and a refilter unless quiet.
   function refresh(quiet){VER++;MASK=null;performance.mark('area');paint();ui();if(!quiet&&!INITIAL)ctx.change();
     // the split view's photo space keeps the same area: the drawn shape and the resolved parks as one ring list
-    if(parent!==window)parent.postMessage({type:'wtid-area',area:ringlist()},location.origin);}
+    if(parent!==window)parent.postMessage({type:'wtid-area',area:ringlist(),hash:hash(),label:(term()||{}).label||''},location.origin);}
   function ringlist(){return encode(loaded().reduce(function(r,a){return r.concat(a.rings);},[]));}
   // Sets a drawn or loaded shape in place of any area, or clears the area with null.
   function set(rings,msg,quiet){NOTE=msg||'';INVALID='';

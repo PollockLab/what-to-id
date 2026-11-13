@@ -1,0 +1,5 @@
+/* Identify's Where panel embeds the map bare (embed=1&bare=1): the canvas and the area tools, no header, filters, dates or card */
+html.bare body{display:block;position:relative}
+.bare body>:not(#map):not(.ptip):not(script){display:none!important}
+.bare #map{position:absolute;inset:0;min-height:0}
+.bare .lvleg,.bare .zoomrec,.bare .card{display:none!important}

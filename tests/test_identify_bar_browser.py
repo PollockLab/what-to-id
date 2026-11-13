@@ -11,6 +11,14 @@ site = ib.site
 PANELS = {"#bwhat": "#pwhat", "#bwhen": "#pwhen", "#bwhere": "#pwhere"}
 
 
+def blank_map(page):
+    """Where's map frame is not under test here, and the CDN is stubbed: an empty page stands in."""
+    page.route(
+        "**/map.html?embed=1*",
+        lambda r: r.fulfill(body="<!doctype html>", content_type="text/html"),
+    )
+
+
 def shown(page):
     return [p for p in PANELS.values() if page.locator(p).is_visible()]
 
@@ -18,6 +26,7 @@ def shown(page):
 def test_each_segment_opens_its_own_panel_and_a_click_outside_closes_it(browser, site):
     base, _ = site
     page = ib.open_identify(browser, base, "#lvl=1", size=(1100, 800))
+    blank_map(page)
     page.wait_for_function("__identify.ids().length > 0")
     assert shown(page) == []
     for seg, panel in PANELS.items():
@@ -56,6 +65,7 @@ def test_a_preset_writes_the_dates_into_the_hash(browser, site):
 def test_escape_returns_to_the_segment_and_the_arrows_move_the_open_panel(browser, site):
     base, _ = site
     page = ib.open_identify(browser, base, "#lvl=1", size=(1100, 800))
+    blank_map(page)
     page.click("#bwhat")
     page.focus("#bwhat")
     page.keyboard.press("ArrowRight")
@@ -65,7 +75,8 @@ def test_escape_returns_to_the_segment_and_the_arrows_move_the_open_panel(browse
     page.keyboard.press("ArrowRight")  # the last segment stays
     assert page.evaluate("document.activeElement.id") == "bwhere"
     page.keyboard.press("Tab")
-    assert page.evaluate("!!document.activeElement.closest('#pwhere')")
+    assert page.evaluate("!!document.activeElement.closest('#pwhere')")  # the map's frame
+    page.focus("#wexp")  # a key in the frame goes to the map, which tells the page (where's tests)
     page.keyboard.press("Escape")
     assert shown(page) == [] and page.evaluate("document.activeElement.id") == "bwhere"
     assert page.errors == []

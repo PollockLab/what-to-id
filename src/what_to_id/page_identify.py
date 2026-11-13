@@ -88,6 +88,7 @@ SCRIPTS = {
     "__IDENTIFY_PROGRESS__": ASSETS / "identify_progress.js",
     "__IDENTIFY_FLOW__": ASSETS / "identify_flow.js",
     "__IDENTIFY_CARD__": ASSETS / "identify_card.js",
+    "__IDENTIFY_WHERE__": ASSETS / "identify_where.js",
     "__IDENTIFY_BAR__": ASSETS / "identify_bar.js",
     "__IDENTIFY_SHELL__": ASSETS / "identify_shell.js",
     "__IDENTIFY_APP__": ASSETS / "identify_app.js",

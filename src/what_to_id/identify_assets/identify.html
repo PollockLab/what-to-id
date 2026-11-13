@@ -165,7 +165,7 @@ __SITE_NAV__<main id="main-content">
 <div class="histwrap"><canvas id="over" role="img" aria-label="Records per year, every year, on a log scale. Click a year to zoom to it."></canvas><p id="unit" class="unit"></p><canvas id="hist" role="img"></canvas><div id="htip" class="htip" hidden></div></div></div>
 <button type="button" id="bwhere" class="seg1" aria-expanded="false" aria-controls="pwhere" disabled><small>Where</small><b>Anywhere</b></button>
 <div id="pwhere" class="bpanel" role="group" aria-label="Where" hidden>
-<p class="muted wnote">Drawing needs the map. <a id="wmap" href="explore.html?view=map">Draw an area on the map</a>, or load a file or find a park here.</p></div>
+<div id="wbox" class="wbox"><div class="wfoot"><button type="button" id="wexp" class="btn" aria-expanded="false">Expand map</button></div></div></div>
 </div></div>
 <div id="qrow" class="qrow"><button type="button" id="fbtn" class="qchip" aria-haspopup="dialog" aria-controls="fsheet">
 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M7 12h10M10 17h4"/></svg> Filters <span id="fcount" class="fcount" hidden></span></button>
@@ -276,6 +276,7 @@ The login goes only to iNaturalist.</p></details>
 <script>__IDENTIFY_WWW__</script>
 <script>__MAP_HIST__</script>
 <script>__MAP_TIME__</script>
+<script>__IDENTIFY_WHERE__</script>
 <script>__IDENTIFY_BAR__</script>
 <script>__IDENTIFY_PROGRESS__</script>
 <script>__IDENTIFY_APP__</script>

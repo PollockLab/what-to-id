@@ -12,7 +12,7 @@
 .seg1 b{font-weight:400;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:22ch}
 .bpanel{position:absolute;top:calc(100% + 8px);left:0;z-index:5;box-sizing:border-box;width:min(420px,calc(100vw - 24px));max-height:70vh;overflow:auto;
   padding:12px 14px;border:1px solid var(--line);border-radius:20px;background:var(--panel);color:var(--ink);box-shadow:var(--shadow);text-align:left}
-#pwhat{width:min(380px,calc(100vw - 24px))}#pwhere{width:min(320px,calc(100vw - 24px))}
+#pwhat{width:min(380px,calc(100vw - 24px))}#pwhere{width:min(440px,calc(100vw - 24px))}
 .bpanel .row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:0 0 8px}
 .bpanel #q{box-sizing:border-box;width:100%;font-size:14px;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
 .bpanel .sugg{z-index:8;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);max-height:240px;overflow:auto}
@@ -40,10 +40,15 @@
 .tseg button:first-child{border-radius:14px 0 0 14px}.tseg button:last-child{border-radius:0 14px 14px 0;border-left:0}
 .bpanel .link{border:0;background:none;color:var(--muted);font:inherit;font-size:12px;text-decoration:underline;cursor:pointer;padding:0 2px;min-height:24px}
 .bpanel .vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-.bpanel .area{max-width:none;border:0;box-shadow:none;padding:0;background:none}
-.bpanel .atoggle,.bpanel [data-a="draw"]{display:none!important}  /* drawing needs a map */
-.bpanel .wnote{font-size:12px}
 .bpanel .row:has(#from){font-size:12px}
+.wbox{display:flex;flex-direction:column;gap:8px}  /* Where: the map, then its Expand button */
+.wbox iframe{width:100%;height:min(380px,50vh);border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+.wfoot{display:flex;justify-content:flex-end}
+.wbox.big{position:fixed;inset:0;z-index:60;gap:0;background:var(--bg)}  /* the whole window; Show N cards floats at the foot */
+.wbox.big iframe{flex:1;height:auto;border:0;border-radius:0}
+.wbox.big .wfoot{position:absolute;left:0;right:0;bottom:calc(40px + env(safe-area-inset-bottom,0px));justify-content:center;pointer-events:none}
+.wbox.big .wfoot .btn{pointer-events:auto;min-height:44px;padding:0 22px;border-radius:999px;box-shadow:var(--shadow)}
+.abody .wbox iframe{height:calc(100dvh - 400px);min-height:260px}  /* a phone: the map fills its section */
 .acc{border-top:1px solid var(--line)}
 .acc h3{margin:0;font-size:inherit}
 .ahead{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:56px;padding:0;border:0;background:none;color:var(--ink);font:inherit;

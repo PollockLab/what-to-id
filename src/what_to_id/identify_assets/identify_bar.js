@@ -1,13 +1,14 @@
 // The Identify search bar: What, When and Where, each opening its own panel under its segment. The panels are the map's
 // controls, shared: the taxon picker and groups list (What), the dates, months and histograms (When) and the area
-// loader and park finder (Where). A change writes S and calls changed(), so the cards follow at once. A phone (760px
+// live map and its area tools (Where). A change writes S and calls changed(), so the cards follow at once. A phone (760px
 // and under) opens one full-screen sheet with the three panels as accordion sections, one open at a time.
 // Keys: Left and Right move between the segments, an open panel follows the focus, Tab walks from a segment into its
 // panel, Esc closes it and returns to the segment, a click outside closes it.
 // IdentifyBar(o), o {S, META, mf (MapFilter(META)), nf, taxa(), P(), tf() (the taxon filter), mask(st) (1 per record
-// st keeps at the chosen level), changed() (S changed), where(rings, hash) (the area changed), get(url), embedded}.
+// st keeps at the chosen level), changed() (S changed), where(rings, hash) (the area changed), get(url), map (the map
+// page's address), key() (the selection as text), embedded}.
 // Returns update(), called after every selection and level change. Needs map_taxa.js, map_chips.js, map_area.js,
-// group_list.js, map_hist.js, map_time.js and map_only.js.
+// group_list.js, map_hist.js, map_time.js, map_only.js and identify_where.js.
 var IdentifyBar=(function(){
 'use strict';
 var NAMES=['What','When','Where'];
@@ -47,15 +48,16 @@ var TM=MapTime({S:S,mf:MF,render:o.changed,refilter:o.changed,byObs:$('byObs'),b
   months:$('months'),mclear:$('mclear')});
 var MH=MapHist({S:S,META:META,mf:MF,nf:o.nf,over:$('over'),hist:$('hist'),htip:$('htip'),unit:$('unit'),cum:cum,tc:function(){return null;},render:o.changed});
 
-// Where: the map's area loader and park finder, on a stand-in for the map (drawing needs a map, so its button is hidden)
+// Where: the live map (identify_where.js), loaded when the panel first opens. Until then, and for a shared link's area, a
+// stand-in for the map (no controls of its own) restores the address's area; the map takes over once it is live.
+var W=null,LBL=null;
 if(!o.embedded){
+  W=IdentifyWhere({box:$('wbox'),url:o.map,key:o.key,done:function(){if(SH.open)SH.close();else close(false);},leave:function(){if(!SH.open)close(true);},set:function(a,h,l){LBL=l;o.where(a,h);}});
   var h=new URLSearchParams(location.hash.slice(1)),world={getEast:function(){return 180;},getWest:function(){return -180;},
     getNorth:function(){return 90;},getSouth:function(){return -90;}};
-  A=MapArea({map:{addControl:function(c){$('pwhere').appendChild(c.onAdd());},on:function(){},getBounds:function(){return world;}},S:S,LAST:LAST,
+  A=MapArea({map:{addControl:function(){},on:function(){},getBounds:function(){return world;}},S:S,LAST:LAST,
     hash:h.get('area')||'',park:h.get('park')||'',bcpark:h.get('bcpark')||'',fit:false,place:META.place_id,parks:META.parks,get:o.get,P:o.P,
-    keep:function(){return null;},change:function(){o.where(A.area(),A.hash());},sel:function(){return '';},step:null});
-  $('pwhere').querySelector('.atoggle').hidden=true;
-  $('pwhere').querySelector('.area').classList.remove('acol');
+    keep:function(){return null;},change:function(){if(!W.live())o.where(A.area(),A.hash());},sel:function(){return '';},step:null});
 }
 
 // The segments' words
@@ -76,7 +78,7 @@ function when(){
   for(i=0;i<12;i++)m+=S.months>>i&1;
   return [S.up?'Uploaded':'',p&&S.lo===0?'Any time':p?p.el.textContent:iso(S.lo)+' to '+iso(S.hi),m?m+' months':''].filter(Boolean).join(' · ');
 }
-function where(){var t=A&&A.term();return t?t.label:'Anywhere';}
+function where(){var t=A&&A.term();return LBL!==null?LBL||'Anywhere':t?t.label:'Anywhere';}
 
 // The panels: the open one is raised under its segment, the rest of the bar greyed
 function visible(k){return SEG[k].p.offsetParent!==null;}
@@ -84,7 +86,7 @@ function fill(k){
   if(!visible(k))return;
   if(k===0)counts();
   else if(k===1)MH.draw();
-  else $('wmap').href='explore.html?view=map'+location.hash;
+  else if(W)W.show();
 }
 function place(k){
   var r=SEG[k].b.getBoundingClientRect(),b=bar.getBoundingClientRect(),p=SEG[k].p;
@@ -143,7 +145,7 @@ phone.addEventListener('change',function(){if(SH.open)SH.close();close(false);})
 SEG.forEach(function(s){s.b.disabled=false;});
 // After every selection or level change: the words, the controls, and the open panel's numbers
 function update(){
-  CUM=null;
+  CUM=null;if(W)W.sync();
   var w=[what(),when(),where()];
   SEG.forEach(function(s,k){s.l.textContent=w[k];ACC[k].h.lastChild.textContent=w[k];});
   GL.show();TM.update();OL.show();CL.show();

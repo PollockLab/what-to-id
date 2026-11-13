@@ -5,7 +5,7 @@
 // rail at the head of Filters, opened for it. Esc shuts it, and the shell is told.
 (function(){
 'use strict';
-var H=document.documentElement;if(!H.classList.contains('embed'))return;
+var H=document.documentElement;if(!H.classList.contains('embed')||H.classList.contains('bare'))return;
 var p=document.createElement('section'),f=p.appendChild(document.createElement('div')),
   l=p.appendChild(document.createElement('div')),leg=document.querySelector('.lvleg'),
   area=document.querySelector('.maplibregl-ctrl.area'),none=document.createElement('p'),open=null,
