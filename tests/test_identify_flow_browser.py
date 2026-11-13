@@ -73,8 +73,10 @@ def test_the_keys_move_open_and_copy_and_the_hint_shows_on_level_3_only(browser,
     page = level_3(browser, base)
     ids = page.evaluate("[...document.querySelectorAll('#grid .card')].map(c => c.dataset.id)")
     focused = "document.activeElement.dataset.id"
+    reveal(page, "#hint summary")
     page.click("#hint summary")  # the keys sit in the notes line
     assert page.locator("#keys").is_visible()
+    close(page)
     page.keyboard.press("j")
     assert page.evaluate(focused) == ids[0]
     page.keyboard.press("j")

@@ -2,6 +2,7 @@
 // button the Range, Confidence, Sort, Research Grade, By species and User controls in another. Each filter away from its
 // default (its hash key present) shows as a chip with a remove button, and the Filters button counts them. The result
 // line counts the cards from the batch caption (which becomes its title) and holds the batch links in a popover.
+// A help sheet holds the page notes, totals, progress, the level description and the keys.
 // The modules keep writing their own controls and hash keys; this only moves and names them.
 (function(){
 'use strict';
@@ -43,13 +44,14 @@ function pill(){
 }
 function count(){
   var cap=$('cap').textContent,m=/^[\d,.\s ]+/.exec(cap),n=$('none').hidden?(m?m[0].trim():''):'0';
-  $('count').textContent=n?n+' cards to ID':'';$('count').title=cap;$('inatb').title=cap;
+  var st=$('status').textContent;  // loading and load errors stay in sight while the totals sit in the help sheet
+  $('count').textContent=n?n+' cards to ID':/^(Loading|Could not)/.test(st)?st:'';$('count').title=cap;$('inatb').title=cap;
   [].forEach.call(document.querySelectorAll('.sdone .n'),function(s){s.textContent=n||'0';});
   $('inatb').hidden=$('batch').hidden;
 }
 function sheets(){
   [].forEach.call(document.querySelectorAll('dialog.sheet'),function(d){
-    d.querySelector('.shx').onclick=d.querySelector('.sdone').onclick=function(){d.close();};
+    [].forEach.call(d.querySelectorAll('.shx,.sdone'),function(b){b.onclick=function(){d.close();};});
     d.addEventListener('click',function(e){if(e.target===d)d.close();});  // a click on the backdrop
     d.addEventListener('close',function(){pill();chips();});
     d.addEventListener('keydown',function(e){  // Tab wraps inside, where a modal alone would let it out to the browser
@@ -65,7 +67,7 @@ function sheets(){
 function start(){
   sheets();pill();chips();count();
   var mo=new MutationObserver(function(){pill();chips();count();});
-  mo.observe($('cap'),{childList:true,characterData:true,subtree:true});
+  ['cap','status'].forEach(function(id){mo.observe($(id),{childList:true,characterData:true,subtree:true});});
   ['none','batch','fsheet','ssheet'].forEach(function(id){mo.observe($(id),{attributes:true,subtree:true,attributeFilter:['hidden','aria-checked']});});
   document.addEventListener('change',function(){pill();chips();});
   addEventListener('hashchange',function(){pill();chips();});

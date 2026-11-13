@@ -79,3 +79,17 @@ def test_the_batch_links_open_in_a_popover(browser, site):
     page.keyboard.press("Escape")
     assert page.locator("#go").is_hidden()
     assert page.errors == []
+
+
+def test_the_help_button_holds_the_notes_totals_and_keys(browser, site):
+    base, _ = site
+    page = ib.open_identify(browser, base, "#lvl=3")
+    page.wait_for_selector("#grid .card")
+    assert page.locator("#status").is_hidden() and page.locator("#about").is_hidden()
+    page.click("#helpb")
+    for sel in ("#status", "#prog", "#desc", "#hint summary", "#about summary"):
+        assert page.locator(sel).is_visible(), sel
+    assert page.locator("#help .sub").is_visible()
+    close(page)
+    assert page.evaluate("document.activeElement.id") == "helpb"
+    assert page.errors == []

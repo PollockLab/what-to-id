@@ -270,6 +270,7 @@ def test_a_viewport_narrows_the_ids_and_the_status_count_and_empty_restores_them
     assert page.locator("#status").inner_text().startswith("2,100 ")
     levelled = page.evaluate("__identify.levelled()")
     assert f"· {levelled:,} in a level" in page.locator("#status").inner_text()
+    reveal(page, "#status a")
     page.locator("#status a", has_text="in a level").click()
     assert page.locator("#about").get_attribute("open") is not None
     assert page.errors == []
