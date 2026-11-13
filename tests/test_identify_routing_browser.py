@@ -11,7 +11,6 @@ from what_to_id import page_identify
 from . import test_embeddings_browser as eb
 from . import test_identify_browser as ib
 from . import test_identify_ranges_browser as rb
-from .identify_sheets import reveal
 
 browser = eb.browser
 site = ib.site
@@ -77,17 +76,13 @@ def events(page):
     return [e["path"] for e in page.evaluate("EV")]
 
 
-def test_a_return_visit_opens_on_might_be_wrong(browser, site):
+def test_a_return_visit_opens_on_easy_confirms(browser, site):
     base, _ = site
     page = open_identify(browser, base)
     assert page.evaluate("__identify.level()") == 1
     page.goto(f"{base}/identify.html")
     page.wait_for_function("window.__identify")
-    assert page.evaluate("__identify.level()") == 5
-    assert (
-        page.locator("#kind").is_visible()
-        and kind(page, "All").get_attribute("aria-checked") == "true"
-    )
+    assert page.evaluate("__identify.level()") == 1
     assert page.errors == []
 
 
@@ -162,8 +157,7 @@ def test_a_login_typed_on_identify_goes_to_the_hash(browser, site):
     base, _ = site
     page = counted(browser, base, "#lvl=1")
     n = len(page.evaluate("__identify.ids()"))
-    reveal(page, "#usrbox > summary")
-    page.click("#usrbox > summary")
+    page.click("#ubtn")
     page.fill("#usrname", "JDoe")
     page.press("#usrname", "Enter")
     page.wait_for_function("__identify.user()")
@@ -187,8 +181,7 @@ def test_combined_ticks_count_as_one_event_and_the_login_is_kept_for_the_map(bro
     page.wait_for_function("EV.some(e => e.path === 'identify/user-taxa-unid')")
     page.close()
     page = counted(browser, base, "#lvl=1")
-    reveal(page, "#usrbox > summary")
-    page.click("#usrbox > summary")
+    page.click("#ubtn")
     page.fill("#usrname", "JDoe")
     page.press("#usrname", "Enter")
     page.wait_for_function("__identify.user()")

@@ -39,6 +39,7 @@ LABELS = {
 GROUPS = {
     "Records": [
         *("needs-id", "research-grade", "left-needs-id", "batch", "identify-only"),
+        "identify-keys",
         *("location-hidden", "location-uncertain", "location-accuracy"),
         *("observed", "uploaded", "introduced", "threatened", "agreeing-ids"),
     ],

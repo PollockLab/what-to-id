@@ -283,19 +283,26 @@ def test_a_photo_that_fails_leaves_a_blank_box_not_its_alt_text(browser, site):
     assert page.errors == []
 
 
-def test_a_first_visit_shows_the_key_tip_until_dismissed(browser, site):
+def test_the_keys_help_is_a_toggletip_on_hover_and_click_and_the_banner_is_gone(browser, site):
     base, _ = site
     page = level_3(browser, base)
-    tip = page.locator("#tip")
-    assert tip.is_visible() and "u undo" in tip.inner_text()
-    tip.locator("button").click()
-    assert not tip.is_visible()
-    page.reload()
-    page.wait_for_selector("#grid .card")
-    assert not page.locator("#tip").is_visible()
+    assert page.locator("#tip").count() == 0
+    help_ = page.locator("#keys1")
+    assert help_.is_visible()
+    help_.hover()
+    pop = page.locator("#explain-pop")
+    pop.wait_for(state="visible")
+    assert "u undoes" in pop.inner_text()
+    page.keyboard.press("Escape")
+    assert pop.is_hidden()
+    help_.click()
+    assert pop.is_visible() and "Enter opens iNat" in pop.inner_text()
+    page.mouse.click(5, 400)
+    assert pop.is_hidden()
+    assert page.errors == []
 
 
-def test_a_touch_device_tip_has_no_keys(browser, site):
+def test_a_touch_device_taps_a_card_without_a_keys_banner(browser, site):
     base, _ = site
     ctx = browser.new_context(
         has_touch=True, is_mobile=True, viewport={"width": 400, "height": 800}
@@ -304,8 +311,6 @@ def test_a_touch_device_tip_has_no_keys(browser, site):
     eb.stub_inat(page, None)
     page.goto(f"{base}/identify.html#lvl=3")
     page.wait_for_selector("#grid .card")
-    assert page.inner_text("#tip").startswith("Tap a card to compare. Identify opens iNat")
-    assert "undo" not in page.inner_text("#tip")
     page.locator("#grid .card .title").first.click()
     assert page.locator("#cpo").inner_text() == "Identify"  # no Enter key to name
     ctx.close()

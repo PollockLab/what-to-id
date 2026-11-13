@@ -4,55 +4,61 @@ cards, and the batch links sit in a popover. iNaturalist is stubbed."""
 
 from . import test_embeddings_browser as eb
 from . import test_identify_browser as ib
-from .identify_sheets import close, reveal
+from .identify_sheets import close
 
 browser = eb.browser
 site = ib.site
 
 
-def test_the_filters_sheet_holds_focus_closes_on_escape_and_counts_cards(browser, site):
+def test_the_modes_sit_on_the_bar_row_with_their_counts(browser, site):
     base, _ = site
-    page = ib.open_identify(browser, base, "#lvl=3")
-    page.wait_for_selector("#grid .card")
-    n = page.inner_text("#count").split(" ")[0]
-    assert page.inner_text("#count").endswith(" cards to ID")
-    page.click("#fbtn")
-    sheet = page.locator("#fsheet")
-    assert sheet.is_visible()
-    inside = "document.activeElement.closest('#fsheet') !== null"
-    assert page.evaluate(inside), page.evaluate("document.activeElement.outerHTML.slice(0, 200)")
-    for _ in range(30):  # Tab cycles inside the modal
-        page.keyboard.press("Tab")
-        assert page.evaluate(inside)
-    assert page.text_content("#fsheet .sdone") == f"Show {n} cards"
-    close(page)
-    assert sheet.is_hidden()
-    assert page.evaluate("document.activeElement.id") == "fbtn"  # focus returns to the opener
+    page = ib.open_identify(browser, base)
+    assert page.locator("#fbtn, #fsheet, #chips").count() == 0  # no Filters sheet any more
+    tabs = page.get_by_role("tab")
+    assert (
+        tabs.first.is_visible() and page.evaluate("__identify.level()") == 1
+    )  # Easy confirms by default
+    total = page.evaluate("__identify.total()")
+    assert " ".join(tabs.first.inner_text().split()) == f"Easy confirms {total[1]:,}"
+    top = page.locator(".top")
+    assert top.locator("#bar").is_visible() and top.locator("#tabs").is_visible()
+    assert top.locator("#qchips label").count() == 2  # At risk and Invasive
+    assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
     assert page.errors == []
 
 
-def test_a_filter_off_its_default_shows_a_chip_that_removes_it(browser, site):
+def test_no_filter_heading_is_ever_visible_without_its_control(browser, site):
     base, _ = site
-    page = ib.open_identify(browser, base, "#lvl=3")
-    page.wait_for_selector("#grid .card")
-    assert page.locator("#chips .chip").count() == 0 and page.locator("#fcount").is_hidden()
-    reveal(page, "#sort .seg")
-    page.click("#sort button:has-text('All')")
-    page.wait_for_function("location.hash.includes('conf=')")
-    close(page)
-    chip = page.locator("#chips .chip")
-    assert chip.count() == 1 and page.inner_text("#fcount") == "1"
-    assert page.get_attribute("#fbtn", "aria-label") == "Filters, 1 on"
-    x = chip.locator(".chipx")
-    assert x.get_attribute("aria-label").startswith("Remove Confidence")
-    x.click()
-    page.wait_for_function("!location.hash.includes('conf=')")
-    assert page.locator("#chips .chip").count() == 0
-    reveal(page, "#sort .seg")  # Clear all does the same for every filter
-    page.click("#sort button:has-text('All')")
-    page.wait_for_function("location.hash.includes('conf=')")
-    page.click("#fclear")
-    page.wait_for_function("!location.hash.includes('conf=')")
+    page = ib.open_identify(browser, base)
+    for lv in (1, 5, 3):
+        ib.tab(page, lv).click()
+        page.wait_for_selector("#grid .card")
+        empty = page.evaluate(
+            """() => [...document.querySelectorAll('.top .qseg')].filter(e => e.offsetParent
+            && !e.querySelector('button,input,select')).map(e => e.id)"""
+        )
+        assert empty == [], (lv, empty)
+        assert page.locator("#fsh, .ssec, .ssec h3").count() == 0
+    assert page.errors == []
+
+
+def test_the_you_popover_holds_the_login_threshold_and_the_three_ticks(browser, site):
+    base, _ = site
+    page = ib.open_identify(browser, base, "#lvl=1&user=12345&umin=20")
+    assert page.inner_text("#ubtn") in ("You", "@12345")
+    page.click("#ubtn")
+    page.wait_for_selector("#usrbox", state="visible")
+    assert page.locator("#uload").is_hidden()
+    assert page.locator("#usrname").is_visible()
+    assert page.locator("#usrbox select[aria-label='Fewest IDs in a genus']").is_visible()
+    labels = page.locator("#usrbox form > label:has(input[type=checkbox])").all_inner_texts()
+    assert [t.strip() for t in labels] == [
+        "Only my genera",
+        "Hide records I identified",
+        "Only records I observed",
+    ]
+    page.locator("#usrbox label", has_text="Only my genera").click()
+    page.wait_for_function("location.hash.includes('umode=')")
     assert page.errors == []
 
 

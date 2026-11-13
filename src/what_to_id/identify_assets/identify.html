@@ -8,8 +8,6 @@ __SITE_CSS__
 body{margin:0;background:var(--bg);color:var(--ink);
   font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
 main{max-width:1100px;margin:0 auto;padding:0 12px 16px}
-h1{font-size:20px;margin:12px 0 4px}
-.embed h1{display:none}
 a{color:var(--bar)}
 .muted,.sub{color:var(--muted)}
 #cap{min-height:24px;text-wrap:pretty}
@@ -20,13 +18,10 @@ input[type=checkbox]{width:24px;height:24px;margin:0 4px 0 0;vertical-align:midd
 .about dt{font-weight:600;margin-top:6px}
 .about dd{margin:0 0 0 1em}
 #status{margin:6px 0;font-size:13px}
-.tabs{position:sticky;top:0;z-index:2;display:flex;gap:4px;padding:6px 0;background:var(--bg);
-  border-bottom:1px solid var(--line);overflow-x:auto}
-.tab{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:1px;padding:5px 6px;
-  font:inherit;font-size:12px;line-height:1.2;color:var(--ink);background:var(--chip);
-  border:1px solid var(--line);border-radius:8px;cursor:pointer}
-.tab b{font-size:14px}
-@media (max-width:360px){.tabs{flex-wrap:wrap}.tab{flex:1 1 40%}}  /* a narrow pane: two rows of two, nothing cut off */
+.tabs{display:inline-flex;flex-wrap:wrap;gap:2px;padding:3px;border:1px solid var(--line);border-radius:20px;background:var(--panel)}
+.tab{min-width:0;display:flex;align-items:baseline;gap:6px;padding:6px 12px;font:inherit;font-size:13px;line-height:1.2;color:var(--ink);background:none;
+  border:0;border-radius:16px;cursor:pointer;white-space:nowrap}
+.tab b{font-size:13px;font-weight:650}
 .tab[aria-selected=true]{background:var(--on);color:var(--onink);border-color:var(--on)}
 .tab.zero:not([aria-selected=true]){opacity:.55}
 [hidden]{display:none!important}  /* .batch and the arrows set display, which would beat hidden */
@@ -88,7 +83,6 @@ ol{list-style:none;margin:8px 0;padding:0;display:grid;gap:10px;
 .cmp img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:4px;display:block;color:transparent}
 .cmp img:not([src]),.card .ph img:not([src]){visibility:hidden}
 .cmp figcaption{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.usr{min-height:24px}  /* the User box fills in once the map data loads; its row is kept so the cards stay put */
 #usrbox summary{cursor:pointer;color:var(--muted);min-height:24px}
 .prow{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin-top:6px}
 .prow label{flex:1 1 100%}
@@ -97,7 +91,7 @@ ol{list-style:none;margin:8px 0;padding:0;display:grid;gap:10px;
 button.padd{cursor:pointer;background:var(--chip)}
 #usrbox p{margin:4px 0}
 /* Batches (the study): its box replaces the level's controls and cards */
-body:not(.bt) #study,.bt #status:not(.err),.bt #unpick,.bt #desc,.bt #kind,.bt .usr,.bt #rout,.bt #rg,.bt #sort,.bt #hint,.bt #panel{display:none!important}
+body:not(.bt) #study,.bt #status:not(.err),.bt #unpick,.bt #desc,.bt #kind,.bt #rout,.bt #rg,.bt #sort,.bt #hint,.bt #panel{display:none!important}
 .srow{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:8px 0}
 .srow select{font:inherit;min-height:30px;padding:0 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink)}
 .btn:is(button){font:inherit;font-size:13px;font-weight:650;border:0;cursor:pointer}
@@ -138,11 +132,9 @@ __IDENTIFY_SHELL_CSS__
 __IDENTIFY_BAR_CSS__
 </style></head><body>
 __SITE_NAV__<main id="main-content">
-<h1>Identify</h1>
 <p><button type="button" id="unpick" class="more" hidden>Clear the species filter</button></p>
-<div id="tabs" class="tabs" role="tablist" aria-label="Level"></div>
 <div id="kind" class="rout" hidden></div>
-<div id="bar" class="bar"><div class="bseg" role="group" aria-label="What, when, where">
+<div class="top"><div id="bar" class="bar"><div class="bseg" role="group" aria-label="What, when, where">
 <button type="button" id="bwhat" class="seg1" aria-expanded="false" aria-controls="pwhat" disabled><small>What</small><b>All groups</b></button>
 <div id="pwhat" class="bpanel" role="group" aria-label="What" hidden>
 <div class="picker"><label for="q" class="vh">Find a taxon</label><input id="q" type="search" placeholder="Latin or common name, e.g. Carex" autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="sugg">
@@ -168,22 +160,21 @@ __SITE_NAV__<main id="main-content">
 <div id="pwhere" class="bpanel" role="group" aria-label="Where" hidden>
 <div id="wbox" class="wbox"><div class="wfoot"><button type="button" id="wexp" class="btn" aria-expanded="false">Expand map</button></div></div></div>
 </div></div>
-<div id="qrow" class="qrow"><button type="button" id="fbtn" class="qchip" aria-haspopup="dialog" aria-controls="fsheet">
-<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M7 12h10M10 17h4"/></svg> Filters <span id="fcount" class="fcount" hidden></span></button>
-<span class="vr" aria-hidden="true"></span><span id="qchips" class="qchips"></span><span id="chips" class="qchips"></span></div>
+<button type="button" id="ubtn" class="qchip ubtn" popovertarget="upop" aria-controls="upop">You</button>
+<div id="qrow" class="qrow"><div id="tabs" class="tabs" role="tablist" aria-label="Level"></div>
+<span id="qchips" class="qchips"></span>
+<div id="rout" class="rout qseg" hidden><span class="qlbl">Range</span></div>
+<div id="rg" class="rout qseg" hidden></div>
+<div id="sort" class="rout qseg" hidden></div></div></div>
+
 <dialog id="bsheet" class="sheet" aria-labelledby="bsh"><div class="shead"><h2 id="bsh">What, when, where</h2>
 <button type="button" class="shx" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><div class="sbody"></div>
 <div class="sfoot"><span></span><button type="button" class="btn sdone">Show <span class="n">0</span> cards</button></div></dialog>
-<dialog id="fsheet" class="sheet" aria-labelledby="fsh"><div class="shead"><h2 id="fsh">Filters</h2>
-<button type="button" class="shx" aria-label="Close filters"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><div class="sbody">
-<section class="ssec"><h3>Range</h3><div id="rout" class="rout" hidden></div></section>
-<section class="ssec"><div id="sort" class="rout" hidden></div></section>
-<section class="ssec"><h3>Research Grade here</h3><div id="rg" class="rout" hidden></div></section>
-<section class="ssec"><h3>User</h3><div class="rout usr"><details id="usrbox" hidden></details></div></section></div>
-<div class="sfoot"><button type="button" id="fclear" class="lnk">Clear all</button><button type="button" class="btn sdone">Show <span class="n">0</span> cards</button></div></dialog>
+<div id="upop" popover class="pop upop" aria-label="Your iNaturalist filters"><p id="uload" class="muted" role="status">Loading your filters…</p>
+<details id="usrbox" open hidden></details></div>
 <div id="sortpop" popover class="pop sortpop" aria-labelledby="sorth"><h2 id="sorth">Sort</h2><div id="sorto" class="rout"></div><hr>
 <div id="frun"></div><p class="segnote">Cards with the same suggested species sit together</p></div>
-<div id="study" role="tabpanel" aria-labelledby="tabb">
+<div id="study" role="region" aria-label="Study batches">
 <div class="srow"><label for="sgroup">Group</label><select id="sgroup"></select>
 <button type="button" id="snext" class="btn" aria-keyshortcuts="n" title="Next batch (N)">Next batch</button>
 <span id="sprog" class="muted" aria-live="polite"></span></div>
@@ -194,8 +185,7 @@ __SITE_NAV__<main id="main-content">
 <button type="button" id="sexport" class="lnk">Download my batches</button><span id="sin"></span></p>
 </div>
 <div id="panel" role="tabpanel">
-<p id="tip" class="muted" role="note" hidden>Click a card to compare. Enter opens iNat with the name copied, j/k next/prev, s skip, u undo. <button type="button" class="more" aria-label="Dismiss the tip">×</button></p>
-<div id="rline" class="rline"><b id="count" aria-live="polite"></b><span id="today" class="today" hidden></span><span class="sp1"></span>
+<div id="rline" class="rline"><b id="count" aria-live="polite"></b><span id="keys1" class="qhelp" data-explain="identify-keys" aria-label="Keyboard shortcuts">?</span><span id="today" class="today" hidden></span><span class="sp1"></span>
 <button type="button" id="sortb" class="qchip" popovertarget="sortpop" aria-controls="sortpop" hidden>Sort <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></button>
 <button type="button" id="helpb" class="qchip qicon" aria-haspopup="dialog" aria-controls="help" aria-label="About, notes and keys"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.7M12 17h.01"/></svg></button>
 </div>

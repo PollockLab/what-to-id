@@ -7,6 +7,11 @@ only, no imports, as page_nav runs on a bare python3.
 """
 
 GLOSSARY: dict[str, tuple[str, str | None]] = {
+    "identify-keys": (
+        "Click or tap a card to compare. On a keyboard, Enter opens iNat with the name copied,"
+        " j and k go to the next and previous card, s skips and u undoes.",
+        None,
+    ),
     "needs-id": (
         "A record on iNaturalist that still needs an ID. It stops needing one once it becomes"
         " Research Grade or casual.",
