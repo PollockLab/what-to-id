@@ -12,6 +12,7 @@ import pytest
 
 from what_to_id import page_identify, pool_levels, site_files
 from what_to_id.identify import IDENTIFY_COLUMNS
+from what_to_id.map_projects import add_projects
 from what_to_id.page_lookalike import site_records
 from what_to_id.page_map import decode_points, encode_points, render_map
 
@@ -30,9 +31,11 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
         pass
 
 
-def serve(root, frame, score):
-    """Writes the map, levels and Identify pages for these pool rows and scores, and serves them."""
+def serve(root, frame, score, projects=None):
+    """Writes the map, levels and Identify pages for these pool rows and scores, and serves them;
+    `projects` is a pool-projects.bin path for the map's Projects."""
     blobs, meta = encode_points(frame, TREE)
+    add_projects(blobs, meta, projects)
     for name, blob in blobs.items():
         (root / name).write_bytes(blob)
     meta["value"] = [[953, 2, 5]]  # the at-risk list: Apis c, the www tests' third suggestion

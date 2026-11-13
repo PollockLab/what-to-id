@@ -96,11 +96,11 @@ function join(shards,parts,layoutBbox,mapBbox){
 function pool(shards,mapBbox){
   var total=shards.reduce(function(t,s){return t+s.n;},0),mx=mapBbox[0],my=mapBbox[1],tx=(mapBbox[2]-mx||1)/Q,ty=(mapBbox[3]-my||1)/Q;
   var out={n:total,id:new Uint32Array(total),lonlat:new Float32Array(2*total),grp:new Uint8Array(total),tax:new Uint16Array(total),
-    obs:new Uint16Array(total),up:new Uint16Array(total),flags:new Uint8Array(total),start:[]};
+    obs:new Uint16Array(total),up:new Uint16Array(total),ids:new Uint8Array(total),flags:new Uint8Array(total),start:[]};
   var o=0;
   shards.forEach(function(s){
     out.start.push(o);
-    out.id.set(s.id,o);out.grp.set(s.grp,o);out.tax.set(s.tax,o);out.obs.set(s.obs,o);out.up.set(s.up,o);out.flags.set(s.flags,o);
+    out.id.set(s.id,o);out.grp.set(s.grp,o);out.tax.set(s.tax,o);out.obs.set(s.obs,o);out.up.set(s.up,o);out.ids.set(s.ids,o);out.flags.set(s.flags,o);
     for(var r=0;r<s.n;r++){out.lonlat[2*(o+r)]=mx+s.qlon[r]*tx;out.lonlat[2*(o+r)+1]=my+s.qlat[r]*ty;}
     o+=s.n;
   });

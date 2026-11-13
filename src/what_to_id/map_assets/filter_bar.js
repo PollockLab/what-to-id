@@ -9,7 +9,7 @@
 //   pass() (the records in view, the group filter left out) and inside(row) for the groups list's ranks.
 // It returns what the host calls back: update() after a recount, draw() on resize, show*() after the
 // host changes S, oldQuery(), total() and pct() for the header's share line, and groups (group_list.js).
-// Needs map_taxa.js (TX), map_chips.js (CH), map_hist.js, map_time.js and group_list.js.
+// Needs map_taxa.js (TX), map_chips.js (CH), map_hist.js, map_time.js, map_only.js and group_list.js.
 var FilterBar=(function(){
 'use strict';
 function $(id){return document.getElementById(id);}
@@ -24,45 +24,20 @@ var MH=MapHist({S:S,META:META,mf:MF,nf:nf,over:$('over'),hist:$('hist'),htip:$('
 // Controls (map_time.js).
 var TM=MapTime({S:S,mf:MF,render:render,refilter:refilter,byObs:$('byObs'),byUp:$('byUp'),presets:$('presets'),from:$('from'),to:$('to'),
   months:$('months'),mclear:$('mclear')}),showMonths=TM.showMonths;
-function chip(box,label,pressed,onclick,title){var b=document.createElement('button');
-  b.type='button';b.textContent=label;if(title)b.title=title;
-  b.setAttribute('aria-pressed',String(pressed));
-  b.onclick=function(){b.setAttribute('aria-pressed',String(onclick()));refilter();};
-  $(box).appendChild(b);return b;}
 // Like the months: with no group picked every group shows. The list's rows pick and leave out groups.
 var GL=GroupList({box:$('groups'),bar:$('gbar'),keep:$('gkeep'),mine:$('mine'),S:S,META:META,nf:nf,changed:refilter,taxa:o.taxa,P:o.P,
   pass:o.pass,inside:o.inside,pk:function(){return PK;}}),showGroups=GL.show;
 $('gall').onclick=function(){S.groups={};showGroups();refilter();};
-// Introduced and threatened can be left out too. The location accuracy is one choice of several: the known
-// classes run from any to within 10 m, so one slider, and unknown, off that scale, is a toggle on its label
-// line; a pool without accuracy has neither.
-var ONLYDEF=MF.ONLYDEF,
-  ONLY=ONLYDEF.map(function(d){return CH.chip($('flags'),d[0],d[1],function(){return S.only;},true,
-    d[3],refilter);}),
-  ACCDEF=META.flags.indexOf('accuracy')<0?[]:MF.ACCDEF,STOPS=['','known','1000','100','10'],AR=$('accr'),
-  UB=ACCDEF.length?document.createElement('button'):null;
-if(UB){UB.type='button';UB.className='link accu';UB.title=ACCDEF[0][2]+'. Click to pick.';$('acclbl').appendChild(UB);
-  UB.onclick=function(){S.acc=S.acc==='unknown'?'':'unknown';showOnly();refilter();};
-  AR.oninput=function(){S.acc=STOPS[+AR.value];showOnly();refilter();};}
-function accLabel(){var d=ACCDEF.filter(function(a){return a[0]===S.acc;})[0];return d?d[1]:'';}
-function showOnly(){ONLY.forEach(function(b,j){CH.show(b,ONLYDEF[j][1],S.only[ONLYDEF[j][0]]||'');});
-  if(!UB)return;CH.show(UB,'Unknown only',S.acc==='unknown'?'inc':'');
-  var k=STOPS.indexOf(S.acc);AR.value=Math.max(k,0);AR.setAttribute('aria-valuetext',accLabel()||'Any accuracy');
-  [].forEach.call($('acc').querySelectorAll('.accticks span'),function(t,j){t.classList.toggle('on',j===k);});AR.title=k>0?ACCDEF[k][2]:'Any location accuracy';}
-showOnly();
-if(!ONLY.length&&!UB)$('flagbox').hidden=true;
-if(!UB)$('acc').hidden=$('acclbl').hidden=true;
+// Show only chips and the location accuracy (map_only.js).
+var OL=MapOnly({S:S,META:META,mf:MF,box:$('flagbox'),flags:$('flags'),acclbl:$('acclbl'),acc:$('acc'),accr:$('accr'),refilter:refilter}),
+  ONLYDEF=MF.ONLYDEF,showOnly=OL.show,accLabel=OL.label;
 // Picked taxa: chips in the selection bar, one set with the groups. A shortcut picks, then leaves out, a set
 // of taxa, and shows only once the taxa file carries the whole tree.
 function counts(){var p=o.P();return TX.counts(o.taxa(),p.tax,p.n);}
 var PK=TX.picker({input:$('q'),list:$('sugg'),msg:$('qn'),picks:S.picks,ranks:META.ranks,
   nf:nf,taxa:o.taxa,counts:counts,
   onChange:function(){o.search();showClades();refilter();}});
-var PRE=META.presets||[],CB=PRE.map(function(c){return chip('clades',c[0],false,function(){
-  S.split=S.split.filter(function(n){return n!==c[0];});PK.cycle(c[1]);return PK.state(c[1])!=='';},c[2]);});
-$('cladebox').hidden=!CB.length;
-function showClades(){CB.forEach(function(b,k){CH.show(b,PRE[k][0],PK.state(PRE[k][1]));});}
-showClades();
+var CL=MapOnly.clades({S:S,box:$('clades'),wrap:$('cladebox'),pk:PK,presets:META.presets||[],refilter:refilter}),showClades=CL.show;
 // An old link's q, names to keep, becomes picks once the taxa load. It kept those names within the
 // groups; when every name lies inside the groups the picks alone say the same, so the groups clear.
 function oldQuery(){if(!S.oldq)return;

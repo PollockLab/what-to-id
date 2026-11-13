@@ -146,10 +146,16 @@ __SITE_NAV__<main id="main-content">
 <div id="pwhat" class="bpanel" role="group" aria-label="What" hidden>
 <div class="picker"><label for="q" class="vh">Find a taxon</label><input id="q" type="search" placeholder="Latin or common name, e.g. Carex" autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="sugg">
 <ul id="sugg" class="sugg" role="listbox" aria-label="Matching taxa" hidden></ul></div><p id="qn" class="muted" aria-live="polite"></p>
+<div id="cladebox" hidden><div id="clades" class="chips" role="group" aria-label="Taxon shortcuts"></div></div>
 <p id="mine" class="mine" role="status" hidden>Your groups <button type="button" class="link">Show all</button></p>
 <p class="muted"><button type="button" id="gall" class="link">All groups</button> <button type="button" id="gkeep" class="link" hidden></button></p>
 <span id="gbar" class="gbar" role="img" aria-label="No records in view"></span>
-<ul id="groups" class="gl" role="list" aria-label="Taxon groups"></ul></div>
+<ul id="groups" class="gl" role="list" aria-label="Taxon groups"></ul>
+<div id="flagbox"><p class="lbl">Show only</p><div id="flags" class="chips" role="group" aria-label="Show only"></div>
+<p class="lbl" id="acclbl"><label for="accr">Location accuracy</label></p>
+<div id="acc"><input id="accr" class="accr" type="range" min="0" max="4" step="1" value="0">
+<div class="accticks" aria-hidden="true"><span>Any</span><span>Known</span><span>1 km</span><span>100 m</span><span>10 m</span></div></div></div>
+<details class="sec" id="projbox" open hidden></details></div>
 <button type="button" id="bwhen" class="seg1" aria-expanded="false" aria-controls="pwhen" disabled><small>When</small><b>Any time</b></button>
 <div id="pwhen" class="bpanel" role="group" aria-label="When" hidden>
 <div class="row"><span class="tseg" role="group" aria-label="Date to filter on"><button type="button" id="byObs" aria-pressed="true">Observed</button><button type="button" id="byUp" aria-pressed="false">Uploaded</button></span>
@@ -256,6 +262,9 @@ The login goes only to iNaturalist.</p></details>
 <script>__SPACE_MASK__</script>
 <script>__IDENTIFY_RANGES__</script>
 <script>__MAP_USER__</script>
+<script>__MAP_PROJECTS__</script>
+<script>__MAP_ONLY__</script>
+<script>__IDENTIFY_ONLY__</script>
 <script>__IDENTIFY_UNCONFIRMED__</script>
 <script>__IDENTIFY_COMPARE__</script>
 <script>__IDENTIFY_STUDY__</script>

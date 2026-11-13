@@ -11,7 +11,7 @@ var MAP=new URL(CFG.mapUrl,location.href).href,nf=new Intl.NumberFormat('en-CA')
 var CARD=IdentifyCard({ref:function(n){return CMP?CMP.ref(n):Promise.resolve(null);}}),TAB=[],SUBK=[],NK=1,KIND=null,SUB=null,KF=0,KC=[],UF=null,UON=false,MINE=[],CMP=null,SEEN='wtid-identify-seen',BT=false,ST=null,SK='',IN=IdentifyInat(CFG.oauth);
 // CFG.merge: the kinds (levels) a tab shows, in order; SUBK a kind's place in its tab
 Object.keys(CFG.merge).forEach(function(t){CFG.merge[t].forEach(function(k,j){TAB[k]=+t;SUBK[k]=j;});NK=Math.max(NK,CFG.merge[t].length);});
-var META=null,SYNC=null,MORE=new Map(),TAXA=null,P=null,BYID=null,LEVEL=null,Q=null,LOOKS=null,WHY=null,WHYF=null,RK=null,N3=0,GP=null,R=null,MF=null,TF=null,PEND=null,REC=-1,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,ONE='',CACHE=new Map(),FIRST=null,SHOWN,STAY=false,X=null,WW=null,BAR=null;
+var META=null,SYNC=null,MORE=new Map(),TAXA=null,P=null,BYID=null,LEVEL=null,Q=null,LOOKS=null,WHY=null,WHYF=null,RK=null,N3=0,GP=null,R=null,MF=null,TF=null,PEND=null,OX=null,PIDS=null,REC=-1,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,ONE='',CACHE=new Map(),FIRST=null,SHOWN,STAY=false,X=null,WW=null,BAR=null;
 function $(id){return document.getElementById(id);}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 function status(t,err){var s=$('status');s.textContent=t;s.classList.toggle('err',!!err);}  // an error shows on Batches too
@@ -27,7 +27,7 @@ function kept(st){
   var n=P.n,i,out=MF.keep(TF,MF.groupSet(st,TF),P.tax,P.grp,n,new Uint8Array(n));
   var ok=CH.groupPass(st.groups,META.groups,!!TF.inc);
   for(i=0;i<n;i++)if(!ok[P.grp[i]])out[i]=0;
-  MF.rest(st,P.obs,P.up,P.flags,n,out);
+  MF.rest(st,P.obs,P.up,P.flags,n,out);OX.rest(st,out,PIDS);
   var I=SpaceMask.areaIndex(AREA),V=SpaceMask.areaIndex(VIEW),m=[I&&SpaceMask.area(I,P),V&&SpaceMask.area(V,P),KEEPIDS&&SpaceMask.ids(KEEPIDS,P),SUBIDS&&SpaceMask.ids(SUBIDS,P)];
   m.forEach(function(v){if(v)for(var j=0;j<n;j++)out[j]&=v[j];});
   for(i=0;i<n;i++)if(out[i]&&UF.drop(i))out[i]=0;
@@ -411,6 +411,7 @@ function inbox(){
     if(d.type==='wtid-area'&&typeof d.area==='string'){AREA=d.area;again();}
     else if(d.type==='wtid-view'&&typeof d.area==='string'){if(d.area!==VIEW){VIEW=d.area;soon();}}  // '' is no cut
     else if(d.type==='wtid-keep'&&(d.ids===null||d.ids instanceof Uint32Array)){KEEPIDS=d.ids&&d.ids.slice().sort();again();}
+    else if(d.type==='wtid-projects'){PIDS=d.ids instanceof Uint32Array?d.ids:null;again();}  // the map's projects
     else if(d.type==='wtid-record'&&CMP)CMP.pick(d.id);  // the map's or the photo space's pick
     else if(d.type==='wtid-subset'&&(d.ids===null||Array.isArray(d.ids))){SUBIDS=d.ids&&Uint32Array.from(d.ids).sort();again();}  // the photo search's hits
   });
@@ -450,6 +451,7 @@ async function load(){
     bounds:function(){return {w:b[0],s:b[1],e:b[2],n:b[3]};}});
   CMP=IdentifyCompare({taxa:TAXA,tax:P.tax,look:looksOf,why:whyOf,obs:function(id){return CACHE.get(id);},more:function(){shown+=LIMIT;more();},lend:CARD.lend});
   MF=MapFilter(META);Object.assign(S,MF.read(new URLSearchParams()));  // the defaults, until the address is read
+  OX=IdentifyOnly({META:META,mf:MF,P:function(){return P;},taxa:function(){return TAXA;},range:function(){return R;},rewrite:rewrite,changed:refresh,embedded:parent!==window,get:function(f){return get(new URL(f,MAP));}});
   BAR=IdentifyBar({S:S,META:META,mf:MF,nf:nf,taxa:function(){return TAXA;},P:function(){return P;},tf:function(){return TF;},mask:atLevel,changed:put,
     where:where,get:function(u){return get(new URL(u,MAP));},embedded:parent!==window});
   STAY=!!SHOWN;take(location.hash.slice(1),AREA==='');
@@ -469,7 +471,7 @@ async function load(){
     var rec=/(?:^|&)record=(\d+)(?:&|$)/.exec(location.hash.slice(1));
     for(var i=0;rec&&i<P.n;i++)if(P.id[i]===+rec[1]){REC=i;break;}
     if(REC>=0&&LEVEL[REC])LV=LEVEL[REC];
-    R.level(LV,true);redraw();
+    R.level(LV,true);redraw();if(S.only.range)refresh();
     var li=REC>=0&&document.querySelector('.card[data-id="'+P.id[REC]+'"]'),c=li&&li.querySelector('.rchip');
     if(c){if(CMP)CMP.open(li);c.click();}});
   window.__identify={ids:idsOf,view:function(){return view.map(function(r){return r&&Array.from(r.map(function(i){return P.id[i];}));});},

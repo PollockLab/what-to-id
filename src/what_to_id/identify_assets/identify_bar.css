@@ -23,6 +23,18 @@
 .bpanel .chips button,.tseg button{border:1px solid var(--line);background:var(--chip);color:var(--ink);font:inherit;font-size:12px;padding:3px 9px;
   min-height:28px;cursor:pointer;border-radius:14px}
 .bpanel .chips button[aria-pressed="true"],.tseg button[aria-pressed="true"]{background:var(--on);color:var(--onink);border-color:var(--on)}
+.bpanel .chips button.not,.bpanel .chips button[aria-pressed="true"].not{background:var(--warnbg);color:var(--warn);border:1px dashed var(--warn)}
+.bpanel .lbl{display:flex;align-items:center;margin:8px 0 4px;font-size:12px;font-weight:600}
+.bpanel .accu{margin-left:auto}.bpanel .accu[aria-pressed="true"]{color:var(--ink);font-weight:600}
+.bpanel .accr{display:block;width:100%;margin:2px 0 0;accent-color:var(--on)}
+.bpanel .accticks{display:flex;justify-content:space-between;padding:0 8px;font-size:11px;color:var(--muted)}  /* each label centred under its stop */
+.bpanel .accticks span{width:0;display:flex;justify-content:center;white-space:nowrap}
+.bpanel .accticks span:first-child{justify-content:flex-start}.bpanel .accticks span:last-child{justify-content:flex-end}
+.bpanel .accticks .on{color:var(--ink);font-weight:600}
+.bpanel .sec{border-top:1px solid var(--line);margin-top:8px;padding:2px 0}
+.bpanel .sec>summary{cursor:pointer;font-size:12px;font-weight:600;padding:6px 0 4px}
+.bpanel .prow{display:flex;flex-wrap:wrap;gap:4px}.bpanel .prow label,.bpanel .sec .muted{flex:0 0 100%;font-size:12px;margin:0}.bpanel .padd{font:inherit;font-size:12px;padding:3px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.bpanel .prow input.padd{flex:1;min-width:0}.bpanel .tag{margin-left:5px;font-size:10px;opacity:.8}
 .bpanel .months button{min-width:40px;padding:3px 0}
 .tseg{display:inline-flex}.tseg button{border-radius:0}
 .tseg button:first-child{border-radius:14px 0 0 14px}.tseg button:last-child{border-radius:0 14px 14px 0;border-left:0}

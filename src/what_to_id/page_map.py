@@ -106,7 +106,7 @@ _PKG = files("what_to_id")
 _ASSETS = _PKG / "map_assets"
 # Inlined in this order: map_taxa.js, map_area.js, map_step.js, map_projects.js, map_user.js,
 # map_resolved.js (records that left needs-ID), map_chips.js, map_filter.js the helpers and filter
-# state map.js calls, group_list.js, map_hist.js, map_time.js and filter_bar.js the filter panel,
+# state map.js calls, group_list.js, map_hist.js, map_time.js, map_only.js and filter_bar.js the filter panel,
 # map_card.js the card, map_sdm.js the habitat model overlay, clade_colour.js and level_colour.js the
 # colours, map_rail.js and map_sheet.js Explore's panels.
 MAP_CSS = ("map.css", "map_panels.css", "map_select.css", "map_area.css")
@@ -137,6 +137,7 @@ MAP_JS = (
     "group_list.js",
     "map_hist.js",
     "map_time.js",
+    "map_only.js",
     "filter_bar.js",
     "map_suggest.js",
     "level_colour.js",

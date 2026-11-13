@@ -7,7 +7,7 @@
 // IdentifyBar(o), o {S, META, mf (MapFilter(META)), nf, taxa(), P(), tf() (the taxon filter), mask(st) (1 per record
 // st keeps at the chosen level), changed() (S changed), where(rings, hash) (the area changed), get(url), embedded}.
 // Returns update(), called after every selection and level change. Needs map_taxa.js, map_chips.js, map_area.js,
-// group_list.js, map_hist.js and map_time.js.
+// group_list.js, map_hist.js, map_time.js and map_only.js.
 var IdentifyBar=(function(){
 'use strict';
 var NAMES=['What','When','Where'];
@@ -19,11 +19,14 @@ var S=o.S,META=o.META,MF=o.mf,G=META.groups,LAST=MF.LAST,iso=MF.iso,bar=$('bar')
   cur=-1,CUM=null,GM=null,A=null,ACC=[];
 SEG[2].b.hidden=o.embedded;  // the split view's map beside it holds the area
 
-// What: the taxon picker, then the groups list with the groups filter left out of its counts
+// What: the taxon picker and its shortcuts, then the groups list with the groups filter left out of its counts, then the Show only
+// chips and the location accuracy (the projects box is the app's, identify_only.js)
 var PK=TX.picker({input:$('q'),list:$('sugg'),msg:$('qn'),get picks(){return S.picks;},ranks:META.ranks,nf:o.nf,taxa:o.taxa,
   counts:function(){var p=o.P();return TX.counts(o.taxa(),p.tax,p.n);},onChange:o.changed});
 var GL=GroupList({box:$('groups'),bar:$('gbar'),keep:$('gkeep'),mine:$('mine'),S:S,META:META,nf:o.nf,changed:o.changed,taxa:o.taxa,P:o.P,
   pass:function(){return GM;},inside:function(r){var f=o.tf();return !!f.inc&&f.inc[r]===1;},pk:function(){return PK;},quiet:true});
+var CL=MapOnly.clades({S:S,box:$('clades'),wrap:$('cladebox'),pk:PK,presets:META.presets||[],refilter:o.changed}),
+  OL=MapOnly({S:S,META:META,mf:MF,box:$('flagbox'),flags:$('flags'),acclbl:$('acclbl'),acc:$('acc'),accr:$('accr'),refilter:o.changed});
 $('gall').onclick=function(){S.groups={};GL.show();o.changed();};
 function counts(){
   var P=o.P(),c=new Uint32Array(G.length),i;
@@ -64,6 +67,8 @@ function what(){
   if(inc.length)t.push(many(inc,'groups'));
   if(not.length)t.push('not '+many(not,'groups'));
   if(S.picks.length)t.push(S.picks.length===1?taxon(S.picks[0]):S.picks.length+' taxa');
+  MF.ONLYDEF.forEach(function(d){if(S.only[d[0]])t.push((S.only[d[0]]==='not'?'not ':'')+d[1].toLowerCase());});
+  if(S.acc)t.push(OL.label().toLowerCase()||S.acc);
   return t.join(', ')||'All groups';
 }
 function when(){
@@ -141,7 +146,7 @@ function update(){
   CUM=null;
   var w=[what(),when(),where()];
   SEG.forEach(function(s,k){s.l.textContent=w[k];ACC[k].h.lastChild.textContent=w[k];});
-  GL.show();TM.update();
+  GL.show();TM.update();OL.show();CL.show();
   SEG.forEach(function(s,k){if(!s.b.hidden)fill(k);});
 }
 return {update:update};
