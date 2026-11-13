@@ -29,7 +29,7 @@ def rank_plane(base):
 def test_level_3_lists_strictly_by_rank_and_labels_the_top(browser, site):
     base, pts = site
     page = ib.open_identify(browser, base, "#lvl=3&sort=conf&conf=all")
-    page.wait_for_selector("#grid .card .conf")
+    page.wait_for_selector("#grid .card .conf", state="attached")
     rank = dict(zip(pts["id"].tolist(), rank_plane(base).tolist(), strict=True))
     got = [rank[i] for i in page.evaluate("__identify.view()")[3]]
     assert got == sorted(got) and len(set(got)) == len(got) and got[0] == 0
@@ -51,9 +51,10 @@ def test_the_copy_button_copies_the_suggestion_and_says_so(browser, site):
     )
     eb.stub_inat(page, None)
     page.goto(f"{base}/identify.html#lvl=3")
-    b = page.locator("#grid .card .copy").first
-    b.wait_for()
+    page.locator("#grid .card .copy").first.wait_for(state="attached")
     name = page.locator("#grid .card .look i").first.inner_text()
+    ib.panel(page, page.locator("#grid .card").first)
+    b = page.locator("#cpc .copy")
     assert b.inner_text() == "Copy" and b.get_attribute("aria-label") == f"Copy {name}"
     assert b.get_attribute("aria-live") == "polite"
     b.click()
@@ -130,7 +131,7 @@ def test_the_group_control_sets_the_groups_filter(browser, site):
 def test_level_3_caps_by_the_suggested_species_and_other_levels_by_label(browser, site):
     base, pts = site
     page = ib.open_identify(browser, base, "#lvl=3&conf=all")
-    page.wait_for_selector("#grid .card .look")  # the look-alikes landed, the list was drawn again
+    page.wait_for_selector("#grid .card .look", state="attached")  # the look-alikes landed, the list was drawn again
     look = dict(zip(pts["id"].tolist(), [LOOKS[k % 3] for k in range(len(pts))], strict=True))
     view = page.evaluate("__identify.view()")
     per = pd.Series([look[i] for i in view[3]]).value_counts()
@@ -147,7 +148,7 @@ def test_level_3_caps_by_the_suggested_species_and_other_levels_by_label(browser
 def test_level_3_has_one_count_line_that_agrees_with_the_tab(browser, site):
     base, _ = site
     page = ib.open_identify(browser, base, "#lvl=3")
-    page.wait_for_selector("#grid .card .look")
+    page.wait_for_selector("#grid .card .look", state="attached")
     cards = len(page.evaluate("__identify.view()")[3])
     records = page.evaluate("__identify.total()")[3]
     assert page.inner_text("#tab3 b") == f"{records:,}"

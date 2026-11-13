@@ -56,7 +56,7 @@ def open_row(browser, base, hash_):
 
     page.route("**/v1/taxa**", taxa)
     page.goto(f"{base}/identify.html{hash_}")
-    page.wait_for_selector("#grid .card .look")
+    page.wait_for_selector("#grid .card .look", state="attached")
     return page
 
 
@@ -137,7 +137,7 @@ def test_progress_counts_cards_opened_today_and_a_logins_improving_ids(browser, 
 
     page.route("**/v1/identifications?*", ids)
     page.goto(f"{base}/identify.html#lvl=3&me=someone")
-    page.wait_for_selector("#grid .card .look")
+    page.wait_for_selector("#grid .card .look", state="attached")
     page.wait_for_function("document.getElementById('prog').textContent.includes('4/10')")
     q = asked[0]
     assert q["user_id"] == ["someone"] and q["category"] == ["improving"]
@@ -147,7 +147,7 @@ def test_progress_counts_cards_opened_today_and_a_logins_improving_ids(browser, 
     page.keyboard.press("i")
     page.wait_for_function("document.getElementById('prog').textContent.includes('1 opened today')")
     page.reload()
-    page.wait_for_selector("#grid .card .look")
+    page.wait_for_selector("#grid .card .look", state="attached")
     assert "1 opened today" in page.inner_text("#prog") and len(asked) == 1  # cached
     assert page.errors == []
 
@@ -163,7 +163,7 @@ def test_only_level_3_fetches_the_runner_up_file_after_its_cards(browser, site):
     page.wait_for_timeout(500)
     assert not [u for u in got if "why" in u.rsplit("/", 1)[-1]]
     page.click("#tab3")
-    page.wait_for_selector("#grid .card .why")
+    page.wait_for_selector("#grid .card .why", state="attached")
     assert [u for u in got if "why" in u.rsplit("/", 1)[-1]]
 
 

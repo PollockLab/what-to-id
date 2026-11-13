@@ -212,7 +212,7 @@ def test_an_unknown_login_says_so_and_filters_nothing(browser, site):
 def test_a_card_with_a_look_alike_shows_both_reference_photos(browser, ranges_site):
     page = counted(browser, ranges_site, "#lvl=3&conf=all")  # one tiny fixture level
     box = page.locator("#grid .card .cmp")
-    box.wait_for()
+    box.wait_for(state="attached")  # its photos are frames of the card's carousel
     assert box.locator("figcaption").all_inner_texts() == ["Label", "Suggested"]  # level 3
     page.wait_for_function("document.querySelector('.cmp img').src")
     img = box.locator("img").first
@@ -237,7 +237,8 @@ def test_the_counted_events_name_the_choice_and_nothing_else(browser, site):
     tab(page, 5).click()
     kind(page, "Odd shots").click()
     page.click("#go")
-    page.get_by_label("Identify this record on iNaturalist").first.click()
+    ib.panel(page, page.locator("#grid .card").first)
+    page.locator("#cpo").click()
     assert events(page) == [
         "identify/tab-5",
         "identify/kind-4",

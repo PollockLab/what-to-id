@@ -175,7 +175,7 @@ def test_the_last_sort_on_stays_on(browser, site):
 def test_the_badge_names_the_gap_and_links_to_the_cell(browser, site):
     base, _ = site
     page = open_level_3(browser, base)
-    page.wait_for_selector("#grid .card .gap")
+    page.wait_for_selector("#grid .card .gap", state="attached")
     seen = {}
     for card in page.locator("#grid .card").all():
         tier = page.evaluate(f"__identify.gap({card.get_attribute('data-id')})")

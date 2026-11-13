@@ -100,7 +100,7 @@ def test_a_species_picked_from_a_first_card_shows_once_the_records_land(browser,
     page.route(re.compile(r"/pool-\d+\.\w+\.bin"), lambda r: held.append(r))
     page.goto(f"{base}/identify.html#lvl=1")
     link = page.locator("#grid .card .sp").first
-    rid = int(link.locator("xpath=..").get_attribute("data-id"))
+    rid = int(link.locator("xpath=ancestor::li[1]").get_attribute("data-id"))
     link.click()
     assert "taxa=" in page.evaluate("location.hash") and not page.locator("#grid .card").count()
     for r in held:

@@ -1,0 +1,40 @@
+/* Photo-first cards (identify_card.js): the photo fills the card, the frames stack in it and one shows */
+ol{gap:16px 12px;grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}
+@media (max-width:600px){ol{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 10px}}
+.card{position:relative;background:none;border:0;padding:0;gap:4px;border-radius:12px}
+.card:focus-visible{outline-offset:3px}
+.car{position:relative;aspect-ratio:1;border-radius:12px;overflow:hidden;background:var(--chip);touch-action:pan-y}
+.car .ph,.car figure{position:absolute;inset:0;margin:0;aspect-ratio:auto;border-radius:0;display:none}
+.car .ph.on{display:flex}.car figure.on{display:block}
+.car .cmp{display:contents}.car figcaption{display:none}
+.car .cmp a{display:block;height:100%;pointer-events:none;border-radius:0}
+.car img,.car .cmp img{width:100%;height:100%;aspect-ratio:auto;object-fit:cover;border-radius:0}
+.car img:not([src]){visibility:hidden}
+.car .tag,.car .cap{position:absolute;left:8px;padding:1px 8px;border-radius:999px;background:rgba(255,255,255,.94);color:#1b1b1b;font-size:11px;font-weight:650;pointer-events:none}
+.car .tag{top:8px}.car .cap{bottom:20px}.car .cap:empty{display:none}
+.car .dots{position:absolute;left:0;right:0;bottom:8px;display:flex;justify-content:center;gap:5px;pointer-events:none}
+.car .dots span{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.55);box-shadow:0 0 2px rgba(0,0,0,.6)}
+.car .dots .on{background:#fff}
+.flip{position:absolute;top:50%;z-index:1;width:32px;height:32px;margin-top:-16px;padding:0;display:grid;place-items:center;
+  border:0;border-radius:50%;background:rgba(255,255,255,.94);color:#1b1b1b;cursor:pointer;opacity:0;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.flip svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.flip.prv{left:6px}.flip.nxt{right:6px}
+.card:hover .flip,.card:focus-within .flip{opacity:1}
+@media (hover:none){.flip{opacity:1;width:28px;height:28px;margin-top:-14px}}
+.card .title>:not(.face),.card>.when,.card>a.btn,.card>.det>:not(.sp){display:none}
+.card>.det{padding:0 2px}.card>.det .sp{background:none;border:0;padding:0;color:var(--muted);font:inherit;font-size:.85em;text-decoration:underline;cursor:pointer}
+.face .hl,.face .from{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.face .hl{font-size:14px;font-weight:600}
+.face .from{font-size:12px;color:var(--muted)}
+.card .badge,.card .kind{align-self:flex-start}
+/* the card's detail, lent to the compare panel */
+#cpdet{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;font-size:12px;color:var(--muted)}
+#cpdet:empty{display:none}
+#cpdet .copy{display:none}
+#cpdet .sugg,#cpdet .det,#cpdet .links{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
+#cpdet .sp,#cpdet .act{font:inherit;color:var(--bar);background:none;border:0;padding:0;min-height:24px;text-decoration:underline;cursor:pointer}
+#cpdet .act{color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:0 8px;text-decoration:none;background:var(--chip)}
+#cpdet .gap{color:var(--bar)}
+/* phones: the compare panel is a bottom sheet */
+@media (max-width:600px){#cpanel{top:auto;left:0;width:100%;max-height:88vh;border-left:0;border-top:1px solid var(--line);
+  border-radius:16px 16px 0 0;box-shadow:0 -4px 16px rgba(0,0,0,.2)}}

@@ -164,7 +164,7 @@ def test_a_more_link_in_identify_sends_its_species_to_the_map(browser, pts, site
         "window.got = []; document.getElementById('map').contentWindow.addEventListener("
         "'message', e => e.data.type === 'wtid-selection' && got.push(e.data.sel))"
     )
-    frame.wait_for_selector("#grid .card .sp")
+    frame.wait_for_selector("#grid .card .sp", state="attached")
     frame.locator("#grid .card .sp").first.click()
     page.wait_for_function("got.some(s => /(^|&)taxa=/.test(s))")
     page.close()

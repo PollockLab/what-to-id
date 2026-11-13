@@ -70,6 +70,15 @@ def site(tmp_path_factory):
     server.shutdown()
 
 
+def panel(page, card):
+    """Open the compare panel on a card the way a user does: close any open one, click the photo."""
+    if page.locator("#cpanel:visible").count():
+        page.locator("#cpx").click()
+    card.locator(".car").click()
+    page.wait_for_selector("#cpanel:visible")
+    return page.locator("#cpanel")
+
+
 def open_identify(browser, base, hash_="", size=(600, 900), touch=False):
     view = {"width": size[0], "height": size[1]}
     page = (
@@ -184,15 +193,15 @@ def test_cards_follow_the_chosen_level_with_a_few_per_species_and_photos_in_batc
     page.wait_for_function("document.querySelectorAll('#grid .card').length === 21")
     assert len(page.calls) == before + 1 and len(page.calls[-1]) == 9
     tab(page, 3).click()
-    page.wait_for_selector("#grid .card .look")
+    page.wait_for_selector("#grid .card .look", state="attached")
     text = page.locator("#grid .card .look").first.inner_text()
     assert text.startswith("Probably ") and text.split()[1] in {"Bombus", "Apis"}
     tab(page, 5).click()
-    page.wait_for_selector("#grid .card .kind")
+    page.wait_for_selector("#grid .card .kind", state="attached")
     assert page.locator("#grid .card .kind").first.text_content() == "Likely mislabelled"
     assert page.locator("#grid .card .look").first.inner_text().startswith("Looks more like ")
     kind(page, "Close calls").click()
-    page.wait_for_selector("#grid .card .look")
+    page.wait_for_selector("#grid .card .look", state="attached")
     assert "Looks more like" in page.locator("#grid .card .look").first.inner_text()
     assert page.locator("#grid .card .kind").count() == 0  # one kind shown, no tags
     kind(page, "Likely mislabelled").click()
@@ -414,10 +423,10 @@ def test_a_cut_species_offers_its_other_records_and_picking_it_shows_them_all(br
     base, pts = site
     page = open_identify(browser, base, "#lvl=1")
     taxon = dict(zip(pts["id"], pts["taxon_id"], strict=True))
-    page.wait_for_selector("#grid .card .sp")
+    page.wait_for_selector("#grid .card .sp", state="attached")
     shown = page.evaluate("__identify.view()")[1]
     link = page.locator("#grid .card .sp").first
-    species = taxon[int(link.locator("xpath=..").get_attribute("data-id"))]
+    species = taxon[int(link.locator("xpath=ancestor::li[1]").get_attribute("data-id"))]
     have = int(((pts["taxon_id"] == species) & (pts["level"] == 1)).sum())
     assert have > 3 and sum(taxon[i] == species for i in shown) == 3
     lead = f"+{have - 3} more "
@@ -448,7 +457,7 @@ def test_cards_show_before_the_look_alike_file_and_fill_it_in_where_they_stand(b
     assert page.locator("#grid .card .look").count() == 0
     page.evaluate("scrollTo(0, 40)")
     held[0].continue_()
-    page.wait_for_selector("#grid .card .look")
+    page.wait_for_selector("#grid .card .look", state="attached")
     assert page.locator("#grid .card .look").first.inner_text().startswith("Probably ")
     assert page.evaluate("scrollY") == 40  # filled in place, not redrawn from the top
     assert page.errors == []

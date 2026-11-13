@@ -26,7 +26,7 @@ def level_3(browser, base, hash_="#lvl=3"):
     eb.stub_inat(page, None)
     page.route("https://pollocklab.github.io/**", lambda r: r.abort())  # no gap data needed here
     page.goto(f"{base}/identify.html{hash_}")
-    page.wait_for_selector("#grid .card .copy")
+    page.wait_for_selector("#grid .card .copy", state="attached")
     return page
 
 
@@ -37,30 +37,32 @@ def test_identify_copies_the_name_and_opens_the_one_named_popup(browser, site):
     name = first.locator(".look i").inner_text()
     href = first.locator("a.btn").get_attribute("href")
     assert first.locator("a.btn").get_attribute("target") == "wtid-inat"
-    first.locator("a.btn").click()
-    second.locator("a.btn").click()
+    assert second.locator("a.btn").get_attribute("target") == "wtid-inat"
+    ib.panel(page, first)
+    page.locator("#cpo").click()  # Identify opens the card's link and moves to the next card
+    page.locator("#cpo").click()
     opened = page.evaluate("OPENED")
     assert [o[1] for o in opened] == ["wtid-inat", "wtid-inat"] and opened[0][0].endswith(
         href[-20:]
     )
     assert [o[2] for o in opened] == [None, None]  # a tab: no window features
     assert page.evaluate("COPIED")[0] == name
-    first.locator(".when").click()  # the observation link shares the window
+    page.locator("#cpk").click()
+    page.locator("#cpanel .cpwhen").click()  # the observation link shares the window
     assert page.evaluate("OPENED")[-1][1] == "wtid-inat"
     assert page.errors == []
 
 
-def test_identify_marks_the_card_opened_and_focuses_the_next(browser, site):
+def test_identify_marks_the_card_opened_once(browser, site):
     base, _ = site
     page = level_3(browser, base)
     cards = page.locator("#grid .card")
     assert cards.nth(0).locator(".opened").count() == 0
-    cards.nth(0).locator("a.btn").click()
+    ib.panel(page, cards.nth(0))
+    page.locator("#cpo").click()
     assert cards.nth(0).locator(".opened").inner_text() == "Opened"
-    assert page.evaluate("document.activeElement.dataset.id") == cards.nth(1).get_attribute(
-        "data-id"
-    )
-    cards.nth(0).locator("a.btn").click()
+    page.locator("#cpk").click()
+    page.locator("#cpo").click()
     assert cards.nth(0).locator(".opened").count() == 1  # marked once
     assert page.errors == []
 
@@ -232,7 +234,7 @@ def test_the_panel_asks_for_its_observation_when_the_cards_have_not_got_it(brows
 
     page.route("https://api.inaturalist.org/v1/observations*", hold)
     page.goto(f"{base}/identify.html#lvl=3")
-    page.wait_for_selector("#grid .card .copy")
+    page.wait_for_selector("#grid .card .copy", state="attached")
     assert page.locator("#grid .card .ph img").count() == 0 and held
     page.locator("#grid .card .title").first.click()
     page.wait_for_selector("#cpobs .cpbig")
@@ -243,7 +245,7 @@ def test_the_panel_asks_for_its_observation_when_the_cards_have_not_got_it(brows
 def test_the_why_line_names_the_runner_up_and_the_margin_in_words(browser, site):
     base, _ = site
     page = level_3(browser, base)
-    page.wait_for_selector("#grid .card .why")
+    page.wait_for_selector("#grid .card .why", state="attached")
     lines = page.locator("#grid .card .why")
     words = {t.split(", ")[-1] for t in lines.all_inner_texts()}
     assert words <= {"close call", "fair margin", "clear margin"} and len(words) > 1

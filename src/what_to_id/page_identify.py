@@ -80,6 +80,7 @@ SCRIPTS = {
     "__IDENTIFY_WWW__": ASSETS / "identify_www.js",
     "__IDENTIFY_PROGRESS__": ASSETS / "identify_progress.js",
     "__IDENTIFY_FLOW__": ASSETS / "identify_flow.js",
+    "__IDENTIFY_CARD__": ASSETS / "identify_card.js",
     "__IDENTIFY_APP__": ASSETS / "identify_app.js",
 }
 
@@ -123,6 +124,7 @@ def render(
         "__SITE_CSS__": page_nav.CSS,
         "__SITE_NAV__": page_nav.nav(PAGE_NAME),
         "__IDENTIFY_RANGES_CSS__": (ASSETS / "identify_ranges.css").read_text().rstrip(),
+        "__IDENTIFY_UI_CSS__": (ASSETS / "identify_ui.css").read_text().rstrip(),
         "__CONFIG__": json.dumps(
             {
                 "mapUrl": map_url,

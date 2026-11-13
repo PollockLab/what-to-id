@@ -50,7 +50,7 @@ return function(ctx){
     lis.slice().sort(function(a,b){return off(a)-off(b);}).forEach(function(li){var pr=pair(+li.dataset.i);if(!pr)return;
       var old=li.querySelector('.cmp'),b=el('div','cmp');
       b.append(fig(pr[0],'Label'),fig(pr[1],li.dataset.lv==='3'?'Suggested':'Look-alike'));  // level 3: the species to propose
-      if(old)old.replaceWith(b);else li.querySelector('.title').after(b);
+      if(old)old.replaceWith(b);else (li.querySelector('.car')||li.querySelector('.title')).appendChild(b);
       imgs.push.apply(imgs,b.querySelectorAll('img'));
       pr.forEach(function(r){want.push(T[r][2]);});});
     return taxa(want).then(function(){imgs.forEach(show);});
@@ -68,7 +68,7 @@ return function(ctx){
     box=el('aside');box.id='cpanel';box.setAttribute('role','dialog');box.setAttribute('aria-labelledby','cphead');box.tabIndex=-1;box.hidden=true;
     box.innerHTML='<div class="cptop"><h2 id="cphead"></h2><span id="cpat" class="muted"></span>'+
       '<button type="button" id="cpx" class="arrow" aria-label="Close (Esc)">×</button></div>'+
-      '<p id="cplive" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)"></p><div id="cpwhy"></div><div id="cpobs"></div><div id="cprefs"></div>'+
+      '<p id="cplive" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)"></p><div id="cpwhy"></div><div id="cpdet"></div><div id="cpobs"></div><div id="cprefs"></div>'+
       '<div class="cpbar"><button type="button" id="cpk" class="arrow" aria-label="Previous card (k)" aria-keyshortcuts="k">‹</button>'+
       '<button type="button" id="cpj" class="arrow" aria-label="Next card (j)" aria-keyshortcuts="j">›</button>'+
       '<button type="button" id="cps" class="more" aria-keyshortcuts="s" title="Skip (s)">Skip</button>'+
@@ -89,6 +89,7 @@ return function(ctx){
         var f=[].filter.call(box.querySelectorAll('a[href],button'),function(x){return x.offsetParent;}),a=f.indexOf(t);
         e.preventDefault();if(f.length)f[e.shiftKey?(a<=0?f.length-1:a-1):(a+1)%f.length].focus();return;}
       if(e.metaKey||e.ctrlKey||e.altKey||/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))return;
+      if(k==='Escape'&&document.querySelector('#rpop:not([hidden])'))return;  // the range map over the panel closes first
       if(k==='u'){var u=IdentifyFlow.undo();if(u){e.preventDefault();e.stopPropagation();open(u);}return;}
       var b={Escape:'#cpx',j:'#cpj',k:'#cpk',s:'#cps',c:'#cpc .copy',Enter:t.closest('button,a')?null:'#cpo'}[k];
       b=b&&box.querySelector(b);if(!b)return;
@@ -100,7 +101,7 @@ return function(ctx){
     if(d>0&&at===all.length-1&&ctx.more){ctx.more();all=cards();}
     var n=all[at+d];if(n)open(n);else if(d>0)close();
   }
-  function close(){if(!box||box.hidden)return;box.hidden=true;document.body.classList.remove('cpon');
+  function close(){if(!box||box.hidden)return;box.hidden=true;if(ctx.lend)ctx.lend(null);document.body.classList.remove('cpon');
     if(cur&&cur.isConnected){cur.focus({preventScroll:true});cur.scrollIntoView({block:'nearest'});}cur=null;}
   // the first sentence of iNaturalist's Wikipedia summary as text, at most 140 characters, and the whole summary; null without one
   function gist(html){
@@ -184,7 +185,7 @@ return function(ctx){
     box.querySelector('#cplive').textContent=(all.indexOf(li)+1)+' of '+all.length+', '+(nm?nm.textContent:'Record')+(t&&li.dataset.lv!=='1'?' to '+t[0]:'');
     c.replaceChildren();if(t)c.append(IdentifyNarrow.copy(t[0]));
     var y=why(li),wy=box.querySelector('#cpwhy');wy.replaceChildren();if(y)wy.append(IdentifyNarrow.why(y[0],y[1]));
-    obs(li);refs(li);
+    obs(li);refs(li);if(ctx.lend)ctx.lend(li,box.querySelector('#cpdet'));
     box.hidden=false;document.body.classList.add('cpon');li.scrollIntoView({block:'nearest'});
     [].forEach.call(document.querySelectorAll('.card.cur'),function(x){x.classList.remove('cur');});li.classList.add('cur');
     if(!box.contains(document.activeElement)||document.activeElement===box)box.focus({preventScroll:true});box.scrollTop=0;  // a button in use keeps focus; #cplive names the card
