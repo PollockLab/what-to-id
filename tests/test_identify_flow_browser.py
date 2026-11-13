@@ -293,6 +293,8 @@ def test_a_touch_device_tip_has_no_keys(browser, site):
     page.wait_for_selector("#grid .card")
     assert page.inner_text("#tip").startswith("Tap a card to compare. Identify opens iNat")
     assert "undo" not in page.inner_text("#tip")
+    page.locator("#grid .card .title").first.click()
+    assert page.locator("#cpo").inner_text() == "Identify"  # no Enter key to name
     ctx.close()
 
 

@@ -74,6 +74,7 @@ return function(ctx){
       '<button type="button" id="cps" class="more" aria-keyshortcuts="s" title="Skip (s)">Skip</button>'+
       '<span id="cpc"></span><span id="cpt" class="muted" role="status"></span><button type="button" id="cpo" class="btn" aria-keyshortcuts="Enter" title="Identify on iNaturalist (Enter)">Identify (Enter)</button></div>';
     document.body.appendChild(box);
+    if(matchMedia('(pointer: coarse)').matches)box.querySelector('#cpo').textContent='Identify';  // no Enter key on touch
     box.querySelector('#cpx').onclick=close;
     box.querySelector('#cpk').onclick=function(){go(-1);};box.querySelector('#cpj').onclick=function(){go(1);};
     box.querySelector('#cps').onclick=function(){IdentifyFlow.mark(cur,'Skipped');go(1);};
