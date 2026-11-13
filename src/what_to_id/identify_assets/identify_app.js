@@ -243,6 +243,7 @@ function paint(){
   if(BT){ST.show();return;}
   var x=CFG.levels.filter(function(l){return l[0]===LV;})[0];
   $('desc').textContent=x[2];kinds();$('panel').setAttribute('aria-labelledby','tab'+LV);
+  var y=scrollY;  // a layout between the clear and the redraw clamps the scroll to the empty page
   if(AB)AB.abort();AB=new AbortController();  // the cards redrawn below replace those whose photos are still loading
   $('grid').textContent='';shown=STAY?Math.max(LIMIT,drawn):LIMIT;drawn=0;
   var kf=KF&&TAB[KF]===LV;  // the controls count the chosen kind, as the cards show it
@@ -251,7 +252,7 @@ function paint(){
   if(GP)GP.draw(LV,SEL,LEVEL);
   IdentifyFlow.draw(LV);
   empty();
-  more();batch();if(!STAY)scrollTo(0,0);STAY=false;
+  more();batch();scrollTo(0,STAY?y:0);STAY=false;
   if(LV===3&&WHYF)setTimeout(WHYF,0);
 }
 function redraw(){build();counts();paint();}
