@@ -1,6 +1,6 @@
 """Every filter of the map's What panel in Identify: the map opens with the filter in its hash,
 Identify opens with the same hash and keeps the records the map's rule keeps, the key still in the
-address. The map is the real page over stand-ins for MapLibre and deck.gl, iNaturalist is stubbed."""
+address. The map is the real page over stand-ins for MapLibre and deck.gl, iNaturalist stubbed."""
 
 import numpy as np
 import pytest
