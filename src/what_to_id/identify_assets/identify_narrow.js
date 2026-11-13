@@ -39,5 +39,19 @@ function why(name,m){
   d.title='Second best: '+name+(m===255?'':'. Margin '+(m/1000).toFixed(3)+' cosine; under 0.010 a close call, under 0.040 fair, else clear');
   return d;
 }
-return {copy:copy,band:band,conf:conf,taken:taken,line:line,why:why};
+// Species runs: rows (best first) regrouped by key(i), each group where its best card stood; sizes per key.
+function runs(rows,key){
+  var at=new Map(),out=[];
+  rows.forEach(function(i){var k=key(i),g=at.get(k);if(!g){g=[];at.set(k,g);out.push(g);}g.push(i);});
+  var flat=[].concat.apply([],out);flat.size=new Map(out.map(function(g){return [key(g[0]),g.length];}));return flat;
+}
+// A run's header: the species, its card count and up to three of its reference photos (ref(name) gives the taxon).
+function head(name,n,ref){
+  var li=el('li','sep run'),p=el('span','rp');
+  li.append(el('i',null,name),' · '+n+(n===1?' card':' cards'),p);
+  ref(name).then(function(t){var ps=t&&t.taxon_photos?t.taxon_photos.map(function(x){return x.photo;}):t&&t.default_photo?[t.default_photo]:[];
+    ps.slice(0,3).forEach(function(x){var im=el('img');im.alt='';im.loading='lazy';im.src=String(x.url||x.square_url).replace('/square.','/small.');p.append(im);});});
+  return li;
+}
+return {copy:copy,band:band,conf:conf,taken:taken,line:line,why:why,runs:runs,head:head};
 })();

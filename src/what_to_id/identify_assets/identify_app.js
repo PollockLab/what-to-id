@@ -46,6 +46,7 @@ function byId(P){
 }
 // What the per-species cap counts: the record's label, but on level 3 the suggested species (the label is a coarse rank there).
 function ck(i,lv){var v=lv===3&&LOOKS?LOOKS.lo[i]|LOOKS.hi[i]<<8:NO_LOOK;return v===NO_LOOK?P.tax[i]:v;}
+function RUN(){return /(^|&)run=1(&|$)/.test(location.hash.slice(1));}
 function on(i){return SEL[i]&&LEVEL[i]&&(!R||R.pass(i,LEVEL[i]))&&(!X||X.pass(i))&&(!GP||KIND[i]!==3||GP.pass(i))&&(!WW||KIND[i]!==3||WW.pass(i));}
 // Under My taxa first the user's genera lead each level, each kind in turn, then the rest; MINE: how many cards they are, -1 without the mode.
 function build(){
@@ -65,10 +66,11 @@ function build(){
     var tot=new Uint32Array(65536*NK),taken=new Uint32Array(65536*NK),rows=[],a=c[lv*W],b=c[(lv+1)*W],nd=[],cut,t,kf=KF&&TAB[KF]===lv?KF:0;
     for(k=a;k<b;k++){i=order[k];KC[KIND[i]]=(KC[KIND[i]]||0)+1;if(kf&&KIND[i]!==kf){order[k]=-1;continue;}
       if(!tot[SUB[i]*65536+ck(i,lv)]++)nd[SUB[i]]=(nd[SUB[i]]||0)+1;}
-    for(k=b-1;k>=a;k--){i=order[k];if(i<0)continue;t=SUB[i]*65536+ck(i,lv);cut=nd[SUB[i]]===1?Infinity:PER_SPECIES;
+    for(k=b-1;k>=a;k--){i=order[k];if(i<0)continue;t=SUB[i]*65536+ck(i,lv);cut=nd[SUB[i]]===1||lv===3&&RUN()?Infinity:PER_SPECIES;
       if(taken[t]<cut){rows.push(i);if(!taken[t]++&&tot[t]>cut&&!(lv===3&&LOOKS))MORE.set(i,tot[t]-cut);}}
     // the #record= card leads its level, even past the per-species cut
     if(REC>=0&&LEVEL[REC]===lv&&on(REC)&&rows[0]!==REC){k=rows.indexOf(REC);if(k>0)rows.splice(k,1);rows.unshift(REC);}
+    if(lv===3&&RUN()&&LOOKS)rows=IdentifyNarrow.runs(rows,looksOf);
     out[lv]=rows;total[lv]=b-a;
     for(k=0;rk&&k<rows.length&&UF.mine(rows[k]);k++);MINE[lv]=rk?k:-1;
   }
@@ -199,7 +201,8 @@ function sep(n,top){var c=nf.format(n)+(n===1?' card':' cards');
 function more(){
   var rows=view[LV]||[],ol=$('grid'),to=Math.min(rows.length,shown),lis=[],b=$('more');
   if(!drawn&&MINE[LV]>0)ol.appendChild(sep(MINE[LV],1));
-  for(var j=drawn;j<to;j++){if(j===MINE[LV])ol.appendChild(sep(j));var li=card(rows[j],LV);ol.appendChild(li);lis.push(li);}
+  for(var j=drawn;j<to;j++){if(j===MINE[LV])ol.appendChild(sep(j));
+    if(rows.size&&CMP&&looksOf(rows[j])!==(j?looksOf(rows[j-1]):null))ol.appendChild(IdentifyNarrow.head(looksOf(rows[j]),rows.size.get(looksOf(rows[j])),CMP.ref));var li=card(rows[j],LV);ol.appendChild(li);lis.push(li);}
   drawn=to;
   b.hidden=rows.length<=to;b.textContent='Show more ('+nf.format(rows.length-to)+' left)';
   if(lis.length){photos(lis);if(CMP&&LOOKS)CMP.fill(lis);}
@@ -422,6 +425,10 @@ async function load(){
   if(CFG.first)get(new URL(CFG.first,MAP)).then(function(b){if(!MF)firstOf(JSON.parse(new TextDecoder().decode(b)));}).catch(function(){});  // optional
   META=await L.fetchMapMeta(MAP,fetch);
   if(!MF)groups(CH.read(new URLSearchParams(sel()).get('groups'),META.groups));
+  WW=IdentifyWWW({sel:function(){return MF?key():sel();},taxa:function(){return TAXA;},look:looksOf,redraw:function(){if(P)redraw();},area:function(){return AREA;},
+    set:function(t){if(MF)take(t,false);else{PEND=t;again();}if(parent===window)history.replaceState(null,'','#'+location.hash.slice(1).split('&')
+      .filter(function(x){return x&&!MapFilter.tokens(x);}).concat(t?t.split('&'):[]).join('&'));SYNC.send();},
+    clear:function(){AREA='';['area','park','bcpark'].forEach(function(k){keep(k,'');});refresh();}});
   function file(k){var f=META.files[k];return f?get(new URL(f,MAP)):Promise.reject(new Error('the map lists no '+k+' file'));}
   var taxa=get(new URL(META.taxa,MAP)).then(function(b){return JSON.parse(new TextDecoder().decode(b));});
   var shards=Promise.all(META.shards.map(function(s){return get(new URL(s.file,MAP)).then(function(b){return L.decodeShard(b,s.n);});}));
@@ -447,10 +454,6 @@ async function load(){
   STAY=!!SHOWN;take(location.hash.slice(1),AREA==='');
   if(PEND!==null){take(PEND,false);PEND=null;}
   $('usrbox').open=!!S.user;
-  WW=IdentifyWWW({sel:key,taxa:TAXA,look:looksOf,redraw:redraw,area:function(){return AREA;},
-    set:function(t){take(t,false);if(parent===window)history.replaceState(null,'','#'+location.hash.slice(1).split('&')
-      .filter(function(x){return x&&!MapFilter.tokens(x);}).concat(t?t.split('&'):[]).join('&'));SYNC.send();},
-    clear:function(){AREA='';['area','park','bcpark'].forEach(function(k){keep(k,'');});refresh();}});
   function retitle(){[].forEach.call($('grid').children,function(li){var t=li.querySelector('.title');if(t&&li.dataset.i)t.replaceWith(title(+li.dataset.i,LV));});}
   Promise.all([lk,wf]).then(function(b){if(b[0]&&b[1]){WHY=looks(b[1],1);if(LV===3)retitle();}});
   lk.then(function(b){if(!b)return;LOOKS=looks(b);

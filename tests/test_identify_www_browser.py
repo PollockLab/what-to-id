@@ -25,7 +25,8 @@ def open_row(browser, base, hash_):
         url = route.request.url
         if "/v1/taxa?" in url:
             name = parse_qs(urlparse(url).query)["q"][0]
-            body = {"results": [{"id": IDS[name], "name": name}]}
+            photo = {"url": "https://static.inaturalist.org/photos/1/square.jpg"}
+            body = {"results": [{"id": IDS[name], "name": name, "default_photo": photo}]}
         else:
             ids = [int(i) for i in url.split("/v1/taxa/")[1].split("?")[0].split(",")]
             page.asked.append((ids, parse_qs(urlparse(url).query)))
@@ -34,6 +35,14 @@ def open_row(browser, base, hash_):
                 "results": [
                     {
                         "id": i,
+                        "name": f"Taxon {i}",
+                        "taxon_photos": [
+                            {
+                                "photo": {
+                                    "url": f"https://static.inaturalist.org/photos/{i}/square.jpg"
+                                }
+                            }
+                        ],
                         "conservation_status": {"status": "wrong"},
                         "conservation_statuses": [{**bc, "iucn": 40}] if i == 953 else [],
                         "establishment_means": {"establishment_means": "introduced", **bc}
@@ -96,3 +105,17 @@ def test_when_writes_the_map_filters_dates_and_where_links_to_the_map(browser, s
     page.reload()
     page.wait_for_function("window.__identify")
     assert page.locator("#when").input_value() == "c" and page.errors == []
+
+
+def test_by_species_runs_each_suggestion_together_under_one_header(browser, site):
+    base, _ = site
+    page = open_row(browser, base, "#lvl=3&conf=all&run=1")
+    page.wait_for_selector("#grid .sep.run img", state="attached")
+    names = page.locator("#grid .card .look i").all_inner_texts()
+    blocks = [n for k, n in enumerate(names) if not k or names[k - 1] != n]
+    assert len(blocks) == len(set(names)) and max(names.count(n) for n in names) > 3
+    heads = page.locator("#grid .sep.run i").all_inner_texts()
+    assert heads == blocks and page.locator("#grid .sep.run").first.locator("img").count() == 1
+    page.uncheck("text=By species")
+    page.wait_for_function("!document.querySelector('#grid .sep.run')")
+    assert page.errors == []

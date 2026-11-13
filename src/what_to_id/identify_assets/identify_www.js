@@ -17,7 +17,6 @@ function flagsOf(t){
 }
 return function(ctx){
   var api=inatGate({gap:1000}),ids=new Map(),cache={},want=new Set(),busy=new Set(),T=0,need=0;
-  ctx.taxa.forEach(function(t){if(t[2])ids.set(t[0],t[2]);});
   try{var c=JSON.parse(localStorage.getItem(LS))||{};if(Date.now()-c.at<WEEK)cache=c.f||{};}catch(e){}
   function on(k){return new RegExp('(^|&)'+k+'=1(&|$)').test(location.hash.slice(1));}
   function keep(k,v){var t=location.hash.slice(1).split('&').filter(function(x){return x&&x.indexOf(k+'=')!==0;});if(v)t.push(k+'=1');
@@ -37,6 +36,7 @@ return function(ctx){
   // level 3 records pass unless a toggle is on and their suggestion fails it
   function pass(i){
     if(!need)return true;
+    if(!ids.size)ctx.taxa().forEach(function(t){if(t[2])ids.set(t[0],t[2]);});
     var nm=ctx.look(i),id=ids.get(nm);if(!id){if(nm&&id===undefined)named(nm);return false;}
     if(!(id in cache)){if(!want.size)setTimeout(ask,0);want.add(id);return false;}
     return (cache[id]&need)!==0;
@@ -63,8 +63,8 @@ return function(ctx){
     else{var a=el('a',null,'Anywhere');a.href='explore.html?view=map'+location.hash;a.title='Draw an area on the map';where.append(a);}
   }
   var w=el('span','rout');w.append(el('span','muted','When '),when);
-  box.after(w,where);box.querySelector('label').textContent='What ';
-  box.append(' ',toggle('risk','At risk'),' ',toggle('inv','Invasive'));
+  var t=el('span','rout');t.append(toggle('risk','At risk'),' ',toggle('inv','Invasive'),' ',toggle('run','By species'));
+  box.after(t,w,where);
   where.hidden=parent!==window;  // the split view's map beside it holds the area
   sync();
   return {pass:pass,sync:sync,active:function(){return on('risk')||on('inv');}};

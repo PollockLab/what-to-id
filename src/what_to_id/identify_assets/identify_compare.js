@@ -174,6 +174,6 @@ return function(ctx){
   }
   // the cards' request brought the observation: the panel showing it fills in
   function landed(li){if(box&&!box.hidden&&cur===li)obs(li);}
-  return {fill:fill,pair:pair,open:open,close:close,landed:landed,shown:function(){return box&&!box.hidden?cur:null;}};
+  return {ref:rival,fill:fill,pair:pair,open:open,close:close,landed:landed,shown:function(){return box&&!box.hidden?cur:null;}};
 };
 })();
