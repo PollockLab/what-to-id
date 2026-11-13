@@ -160,3 +160,66 @@ def test_level_3_has_one_count_line_that_agrees_with_the_tab(browser, site):
     assert page.inner_text("#tab3 b") == f"{records:,}"
     assert f"({records:,} records; up to 3 per suggested species)" in page.inner_text("#cap")
     assert page.errors == []
+
+
+def test_a_drop_after_show_more_keeps_the_batch_and_the_counts(browser, site):
+    base, _ = site
+    page = browser.new_page(viewport={"width": 600, "height": 900})
+    page.errors = []
+    page.on("pageerror", lambda e: page.errors.append(str(e)))
+    page.add_init_script("window.IntersectionObserver = undefined")  # only the button extends
+    page.add_init_script(  # batches of 3, so a short list has several
+        "Object.defineProperty(window, 'IdentifyLinks', {configurable: true, set(v) {"
+        " const b = v.batches; v.batches = (ids, x) => { const r = [];"
+        " for (let k = 0; k < ids.length; k += 3) r.push(b(ids.slice(k, k + 3), x)[0]);"
+        " return r; };"
+        " Object.defineProperty(window, 'IdentifyLinks', {value: v, writable: true}); }});"
+    )
+    eb.stub_inat(page, None)
+    later = []
+
+    def observations(route):  # after Show more, even ids already hold a species ID
+        ids = [int(i) for i in parse_qs(urlparse(route.request.url).query)["id"][0].split(",")]
+        ident = [{"current": True, "taxon": {"rank_level": 10, "name": "Bombus a"}}]
+        route.fulfill(
+            json={
+                "results": [
+                    {
+                        "id": i,
+                        "quality_grade": "needs_id",
+                        "photos": [],
+                        "taxon": {"name": "Bombus", "rank_level": 20},
+                        "identifications": ident if later and i % 2 == 0 else [],
+                    }
+                    for i in ids
+                ]
+            },
+            headers={"access-control-allow-origin": "*"},
+        )
+
+    page.route("https://api.inaturalist.org/v1/observations*", observations)
+    page.route(  # two cards a page, so the six at level 3 need Show more
+        "**/identify.html*",
+        lambda r: r.fulfill(
+            response=(f := r.fetch()), body=f.text().replace("LIMIT=12", "LIMIT=2")
+        ),
+    )
+    page.goto(f"{base}/identify.html#lvl=3&conf=all")
+    page.wait_for_selector("#grid .card")
+    page.wait_for_load_state("networkidle")
+    assert page.locator("#more").is_visible()  # the fixture lists more than one page
+    page.click("#next")
+    assert " · batch 2 of " in page.inner_text("#go")
+    before = len(page.evaluate("__identify.view()")[3])
+    later.append(1)
+    page.click("#more")
+    page.wait_for_function(f"__identify.view()[3].length < {before}")
+    page.wait_for_load_state("networkidle")
+    view = page.evaluate("__identify.view()")[3]
+    assert int(page.inner_text("#cap").split(" cards")[0].replace(",", "")) == len(view)
+    left = len(view) - page.locator("#grid .card").count()
+    more = page.locator("#more")
+    assert more.is_hidden() if not left else more.inner_text() == f"Show more ({left} left)"
+    n = -(-len(view) // 3)
+    assert page.inner_text("#go").endswith(f" · batch 2 of {n}")  # the batch held through the drop
+    assert page.errors == []
