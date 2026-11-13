@@ -240,10 +240,10 @@ jobs:
         env:
           ATLAS_HF_REPO: ${{ vars.ATLAS_HF_REPO }}
         run: scripts/atlas_page.sh _site
-      # The root opens Explore, or the map when the site was built without the photo space.
+      # The root opens Identify, or Explore (then the map) when the site was built without it.
       - name: Write the landing page
         run: |
-          for p in explore map; do if [ -f "_site/$p.html" ]; then cp "_site/$p.html" _site/index.html; break; fi; done
+          for p in identify explore map; do if [ -f "_site/$p.html" ]; then cp "_site/$p.html" _site/index.html; break; fi; done
       - id: pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
       # Each data file is named by its bytes (site_files) and a deploy replaces the whole site, so copy in
