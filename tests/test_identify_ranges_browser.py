@@ -15,6 +15,7 @@ from what_to_id.page_map import encode_points, render_map
 
 from . import test_identify_browser as ib
 from .embeddings_fixture import TREE, pool_frame
+from .identify_sheets import close, reveal
 from .test_identify_first_browser import first_lists
 from .test_page_nav import FORBIDDEN
 
@@ -38,10 +39,12 @@ N = len(ROWS)
 
 
 def write_site(root, introduced=()):
-    """Two cells, west and east of 123 W; record 4 is in the east one; ``introduced`` marks rows."""
+    """Two cells, west and east of 123 W; record 4 is in the east one, record 7 (Narrow it down) in
+    the west one, its suggestion's range; ``introduced`` marks rows."""
     pytest.importorskip("pyarrow")
     pool = pool_frame(np.arange(1, N + 1) * 1000)
     pool.loc[4, ["lat", "lon"]] = [49.0, -122.5]
+    pool.loc[7, ["lat", "lon"]] = [49.0, -123.5]
     if introduced:
         pool["introduced"] = pool.index.isin(introduced)
     blobs, meta = encode_points(pool, TREE)
@@ -101,7 +104,7 @@ def site(tmp_path_factory):
 def opened(browser, base, hash_, size=(1000, 900), touch=False):
     page = ib.open_identify(browser, base, hash_, size, touch)
     page.wait_for_function("window.__identify && __identify.ranges()")
-    page.wait_for_selector("#grid .card .links")
+    page.wait_for_selector(".links", state="attached")
     return page
 
 
@@ -127,13 +130,14 @@ def test_clear_matches_start_with_far_records_hidden_and_the_segments_filter(bro
     assert page.locator("#rout [role=radiogroup]").count() == 1
     assert seg(page).all_inner_texts() == ["All 4", "Hide far outside 3", "Only far outside 1"]
     assert picked(page) == "Hide far outside 3"
-    assert page.locator("#rout .segnote").inner_text() == (
+    assert page.locator("#hintbody .segnote").text_content() == (
         "Far outside: 50 km or more from the labelled species' known range in BC. "
         "Records with no range map count as in range."
     )
     assert shown(page, 1) == [0, 1, 3] and page.evaluate("__identify.total()")[1] == 3
     assert chips(page) == ["In range", "Just outside range", "No range map: range unknown"]
     assert "out=" not in page.url
+    reveal(page, "#rout .segb")
     seg(page).nth(0).click()
     assert shown(page, 1) == [0, 1, 2, 3] and "out=0" in page.url and picked(page) == "All 4"
     assert chips(page) == [
@@ -147,8 +151,10 @@ def test_clear_matches_start_with_far_records_hidden_and_the_segments_filter(bro
     page.reload()
     page.wait_for_function("window.__identify && __identify.ranges()")
     assert shown(page, 1) == [2] and picked(page) == "Only far outside 1"  # kept in the hash
+    reveal(page, "#rout .segb")
     seg(page).nth(1).click()
     assert shown(page, 1) == [0, 1, 3] and "out=" not in page.url
+    close(page)
     page.locator("#tab5").click()  # another level starts at All
     page.locator("#kind .segb", has_text="Odd shots").click()  # the counts follow the kind
     assert shown(page, 5) == [8, 9] and picked(page) == "All 2"
@@ -160,7 +166,7 @@ def test_clear_matches_start_with_far_records_hidden_and_the_segments_filter(bro
 
 def test_the_first_lists_leave_out_far_clear_matches_as_the_page_does(browser, site):
     first = first_lists(site)[""]
-    page = opened(browser, site, "#lvl=1")
+    page = opened(browser, site, "#lvl=1&conf=all&sort=conf")  # level 3 as the first list holds it
     view = page.evaluate("__identify.view()")
     assert [r[0] // 1000 - 1 for r in first["rows"][1]] == [3, 1, 0]  # no 2: 1,234 km outside
     total = page.evaluate("__identify.total()")
@@ -173,6 +179,7 @@ def test_the_first_lists_leave_out_far_clear_matches_as_the_page_does(browser, s
 
 def test_the_segments_move_with_the_arrow_keys(browser, site):
     page = opened(browser, site, "#lvl=1")
+    reveal(page, "#rout .segb")
     page.locator("#rout .segb[aria-checked=true]").focus()
     page.keyboard.press("ArrowRight")
     assert picked(page) == "Only far outside 1" and "out=1" in page.url and shown(page, 1) == [2]
@@ -188,11 +195,14 @@ def test_the_segments_move_with_the_arrow_keys(browser, site):
     assert page.errors == []
 
 
-def test_with_nothing_far_outside_only_is_disabled(browser, site):
-    page = opened(browser, site, "#lvl=3")
+def test_narrow_it_down_starts_with_records_in_the_suggestions_range(browser, site):
+    page = opened(browser, site, "#lvl=3&conf=all")
     texts = seg(page).all_inner_texts()
-    assert texts[2] == "Only far outside 0" and seg(page).nth(2).is_disabled()
-    assert texts[0].split()[-1] == texts[1].split()[-1] and picked(page).startswith("All ")
+    assert texts == ["All 1", "Suggestion in range 1", "Suggestion not in range 0"]
+    assert seg(page).nth(2).is_disabled() and picked(page) == "Suggestion in range 1"
+    assert shown(page, 3) == [7] and "out=" not in page.url
+    assert page.locator("#grid .card .links .range").inner_text() == "Range: fits the suggestion"
+    assert page.errors == []
 
 
 def test_a_close_call_chip_gives_the_note_and_opens_the_map_by_click_and_keyboard(browser, site):
@@ -205,6 +215,7 @@ def test_a_close_call_chip_gives_the_note_and_opens_the_map_by_click_and_keyboar
     assert picked(page).startswith("All ") and seg(page).nth(2).inner_text() == "Only far outside 2"
     chip, pop = page.locator(".rchip", has_text="Fits the look-alike"), page.locator("#rpop")
     assert chip.get_attribute("aria-expanded") == "false" and "bad" in chip.get_attribute("class")
+    ib.panel(page, page.locator(".card", has=chip))
     chip.click()
     assert pop.is_visible() and pop.get_attribute("role") == "dialog"
     assert chip.get_attribute("aria-expanded") == "true"
@@ -225,7 +236,9 @@ def test_a_close_call_chip_gives_the_note_and_opens_the_map_by_click_and_keyboar
     assert pop.is_visible() and page.evaluate("document.activeElement.id") == "rpop"
     pop.get_by_role("button", name="Close range map").click()
     assert pop.is_hidden()
-    page.locator(".rchip", has_text="300 km").click()  # the look-alike's range is unknown
+    far = page.locator(".rchip", has_text="300 km")
+    ib.panel(page, page.locator(".card", has=far))
+    far.click()  # the look-alike's range is unknown
     assert pop.locator(".rleg").inner_text().split("\n") == ["Taxon 5", "this record"]
     assert pop.locator(".rcap").inner_text() == "About 300 km outside the label's usual range."
     assert page.errors == []
@@ -235,7 +248,7 @@ def test_the_hash_record_opens_its_range_popover_under_only_far_outside(browser,
     page = opened(browser, site, "#lvl=1&out=1&record=3000")
     page.wait_for_selector("#rpop:not([hidden])")
     assert shown(page, 1) == [2] and picked(page) == "Only far outside 1"
-    assert page.locator('.card[data-id="3000"] .rchip').get_attribute("aria-expanded") == "true"
+    assert page.locator("#cpdet .rchip").get_attribute("aria-expanded") == "true"
     assert page.errors == []
 
 
@@ -245,7 +258,7 @@ def test_the_hash_record_picks_its_level_and_leads_it(browser, site):
     page.wait_for_selector("#rpop:not([hidden])")
     assert page.evaluate("__identify.level()") == 1
     assert page.evaluate("__identify.view()")[1][0] == last
-    assert page.locator(f'.card[data-id="{last}"] .rchip').get_attribute("aria-expanded") == "true"
+    assert page.locator("#cpdet .rchip").get_attribute("aria-expanded") == "true"
     assert page.errors == []
 
 
@@ -256,8 +269,9 @@ def test_a_hash_record_not_on_the_list_opens_nothing(browser, site):
 
 
 def test_a_phone_popover_is_a_bottom_sheet(browser, site):
-    page = opened(browser, site, "#lvl=3", (390, 800), touch=True)
-    page.locator(".rchip").tap()
+    page = opened(browser, site, "#lvl=1", (390, 800), touch=True)
+    ib.panel(page, page.locator(".card", has=page.locator(".rchip")).first)
+    page.locator("#cpdet .rchip").tap()
     box = page.locator("#rpop").bounding_box()
     assert box["x"] == 0 and box["width"] == 390 and box["y"] + box["height"] == 800
     assert page.errors == []
@@ -265,14 +279,18 @@ def test_a_phone_popover_is_a_bottom_sheet(browser, site):
 
 def test_a_narrow_pane_opens_the_map_on_hover_beside_the_chip(browser, site):
     page = opened(
-        browser, site, "#lvl=3", (400, 2000)
+        browser, site, "#lvl=1", (400, 2000)
     )  # Identify's width inside Explore; room below the reference photos
-    chip, pop = page.locator(".rchip").first, page.locator("#rpop")
+    ib.panel(page, page.locator(".card", has=page.locator(".rchip")).first)
+    chip, pop = page.locator("#cpdet .rchip"), page.locator("#rpop")
     chip.hover()
     pop.wait_for(state="visible")
     c, box = chip.bounding_box(), pop.bounding_box()
     assert (
-        box["width"] <= 400 - 16 and box["x"] >= 8 and abs(box["y"] - (c["y"] + c["height"])) < 20
+        box["width"] <= 400 - 16
+        and box["x"] >= 8
+        # below the chip, or above it when the panel's sheet puts the chip low
+        and min(abs(box["y"] - (c["y"] + c["height"])), abs(box["y"] + box["height"] - c["y"])) < 20
     )
     page.mouse.move(0, 0)
     pop.wait_for(state="hidden")

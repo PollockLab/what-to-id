@@ -8,7 +8,7 @@
 // with it, and mine (a note with a Show all button) says so while it is what shows.
 // o: box (the list), bar (the summary bar), keep, mine, S, META, nf, changed() after a click, taxa() (the taxa
 // rows or null), P() (the records), pass() (the records in view, a Uint8Array), inside(row), pk()
-// (the taxon picker).
+// (the taxon picker). quiet: do not tell the split view's shell the shares (a second GroupList beside the map's).
 var GroupList=(function(){
 'use strict';
 function pct(v,t){var f=t?v/t*100:0;
@@ -80,7 +80,7 @@ function set(c){
 // The shares go to Explore (wtid-groups), the groups left out of the pick dimmed.
 var ORD=[],sent='';
 function tell(){
-  if(parent===window||!cnt)return;
+  if(parent===window||!cnt||o.quiet)return;
   var on=G.filter(function(g){return S.groups[g];}).map(function(g){return (S.groups[g]==='not'?'not ':'')+gshort(g);}),
     inc=G.some(function(g){return S.groups[g]==='inc';}),text=on.join(', '),
     m={type:'wtid-groups',text:text,label:(text||'All groups')+'. '+o.bar.getAttribute('aria-label')+'. Opens the groups filter.',

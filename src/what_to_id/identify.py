@@ -12,10 +12,16 @@ for a higher rank whose clade has a prototype, then mislabel: a species-ranked m
 `-TAXONOMIST_MARGIN` with a look-alike of `MIN_LOOKALIKE_RECORDS` records. Everything else is
 level 0.
 
-`identify_delta` adds the records a base table lacks (the daily atlas run) against cut-offs frozen
+`identify_delta` brings a base table up to the pool (the daily atlas run) against cut-offs frozen
 from that table (`freeze_cutoffs`): the per-group weird cut and, per species, the lowest `own` of
 its Clear matches. A species with fewer than `MIN_PER_CLASS` base records never gets a Clear
-match, as in the full run. Base rows are never rewritten; a Fir rerun replaces the whole file.
+match, as in the full run. It drops records that left the pool (or lost their taxon), rescores
+records whose pool taxon_id differs from the stored one, and scores pool records the base lacks
+(new, or in the index but never scored). Other base rows are untouched. A record with no vector
+keeps its old row (or gets none). Vectors come from the raw deltas where present, else
+`atlas_index_io.reconstruct` rebuilds them from the index's refine codes. Levels of rescored
+Fir-era records come from 3-bit refine reconstructions, 97.7% level agreement with true vectors.
+A Fir rerun replaces the file.
 
     python -m what_to_id.identify --live DIR --index DIR --pool pool.parquet --tree taxonomy.json \\
         --taxa DIR --vectors raw-delta-*.npz [--bc-counts bc-verifiable-counts.parquet]
@@ -29,6 +35,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import NamedTuple
@@ -36,12 +43,13 @@ from typing import NamedTuple
 import numpy as np
 import pandas as pd
 
-from what_to_id.atlas_index_io import read_manifest, write_manifest
+from what_to_id.atlas_index_io import read_manifest, reconstruct, write_manifest
 from what_to_id.confusion import CHUNK, FIR_SLICE, MIN_PER_CLASS, read_taxa_vectors
 from what_to_id.levels import TAXONOMIST_MARGIN, WEIRD_SHARE, lookalike_known, species_masks
 
 IDENTIFY_COLUMNS = ("id", "taxon_id", "level", "score", "score2", "looks_like")
 NONE, EASY, TAXONOMIST, NARROW, WEIRD, MISLABEL = 0, 1, 2, 3, 4, 5
+CATEGORIES = ("looks_like", "runner_up")
 LEVEL_NAMES = ("none", "easy", "taxonomist", "narrow", "weird", "mislabel")
 
 
@@ -103,7 +111,7 @@ def identify_scores(
 
     Columns: id, taxon_id, taxon_name, rank, iconic_taxon, top, own, other, other_name (species
     rank), in_best, in_second, out_best, in_name (rank above species, clade with a prototype;
-    in_second and out_best are NaN when the clade has one species or all of them).
+    in_second_name; in_second and out_best are NaN when the clade has one species or all of them).
     """
     is_species = (taxa.str.split().str.len() == 2).to_numpy()
     names = taxa[is_species].drop_duplicates()
@@ -133,6 +141,7 @@ def identify_scores(
         }
         r["other_name"] = np.full(n, None, dtype=object)
         r["in_name"] = np.full(n, None, dtype=object)
+        r["in_second_name"] = np.full(n, None, dtype=object)
         for c in range(0, n, CHUNK):
             sims = (
                 X[c : c + CHUNK] @ protos.T if len(order) else np.empty((len(X[c : c + CHUNK]), 0))
@@ -156,7 +165,8 @@ def identify_scores(
                 j = int(seg.argmax())
                 r["in_best"][c + i], r["in_name"][c + i] = seg[j], order[lo + j]
                 if hi - lo > 1:
-                    r["in_second"][c + i] = np.partition(seg, -2)[-2]
+                    k = int(np.argpartition(seg, -2)[-2])
+                    r["in_second"][c + i], r["in_second_name"][c + i] = seg[k], order[lo + k]
                 # outside means elsewhere in the tree: the root's clade has no outside
                 if lo > 0 or hi < in_tree:
                     r["out_best"][c + i] = max(
@@ -169,6 +179,7 @@ def identify_scores(
             **{k: pd.Series(dtype=float) for k in ("in_second", "out_best")},
             other_name=pd.Series(dtype=object),
             in_name=pd.Series(dtype=object),
+            in_second_name=pd.Series(dtype=object),
         )
     return pd.concat(parts, ignore_index=True).astype({"id": np.int64, "taxon_id": np.int64})
 
@@ -178,10 +189,11 @@ def identify_levels(
 ) -> pd.DataFrame:
     """`IDENTIFY_COLUMNS` rows from `identify_scores`, one per record, in score order of `scores`.
 
-    `score` is `own` for easy, the margin for taxonomist and mislabel, in-clade best minus
-    outside best for narrow and `top` for weird; `score2` is best minus second-best in-clade
-    (narrow only); `looks_like` is the look-alike species (taxonomist, mislabel) or the probable
-    species (narrow).
+    `score` is `own` for easy, the margin for taxonomist and mislabel, the smaller of in-clade
+    best minus outside best and `score2` for narrow (most confident first) and `top` for weird;
+    `score2` is best minus second-best in-clade (narrow only); `looks_like` is the look-alike
+    species (taxonomist, mislabel) or the probable species (narrow); a trailing `runner_up` column
+    holds narrow's second-best species in the clade, the one `score2` is the margin over.
 
     With `frozen`, the weird cut and the easy share come from it, not from `scores`; a group or
     species it lacks gets neither level. `bc_counts` should then cover the whole pool.
@@ -217,7 +229,8 @@ def identify_levels(
             s["top"],
             s["own"],
             s["own"] - s["other"],
-            s["in_best"] - s["out_best"],
+            # the weaker of "in this clade" and "this species of it"
+            np.minimum(s["in_best"] - s["out_best"], s["in_best"] - s["in_second"]),
             s["own"] - s["other"],
         ],
         np.nan,
@@ -232,6 +245,9 @@ def identify_levels(
             "score": score.astype(np.float32),
             "score2": score2.astype(np.float32),
             "looks_like": pd.Series(looks, dtype="string").astype("category").to_numpy(),
+            "runner_up": pd.Series(np.where(narrow, s.get("in_second_name"), None), dtype="string")
+            .astype("category")
+            .to_numpy(),
         }
     )
 
@@ -245,16 +261,30 @@ def identify_delta(
     T: np.ndarray,
     tree: dict,
     bc_counts: pd.Series | None = None,
+    reconstruct: Callable[[np.ndarray], tuple[np.ndarray, np.ndarray]] | None = None,
 ) -> pd.DataFrame:
-    """`base` plus the levels of pool records with a vector in `E` (rows `ids`) that it lacks."""
+    """`base` brought up to `pool`: see the module docstring.
+
+    `E` holds vectors for `ids`; `reconstruct(ids)` returns (ids, vectors) for the ones to score
+    that `E` lacks.
+    """
     frozen = freeze_cutoffs(base, pool)
-    new = pool[~pool["id"].isin(base["id"])]
+    pool = pool.dropna(subset=["id", "taxon_id"]).drop_duplicates("id")  # a full run skips the rest
+    current = base["id"].map(pool.set_index("id")["taxon_id"])
+    stale = base["id"].isin(pool["id"]) & (current != base["taxon_id"])
+    todo = pool[~pool["id"].isin(base.loc[~stale, "id"])]
     if bc_counts is None:  # the whole pool, as a full run counts look-alikes
         bc_counts = pool.loc[pool["rank"] == "species", "taxon_name"].value_counts()
-    add = identify_levels(identify_scores(new, E, ids, taxa, T, tree), bc_counts, frozen)
-    out = pd.concat([base, add], ignore_index=True)
-    looks = out["looks_like"].astype("string").astype("category")
-    return out.assign(looks_like=looks.to_numpy())
+    ids = np.asarray(ids, dtype=np.int64)
+    missing = todo.loc[~todo["id"].isin(ids), "id"].to_numpy(np.int64)
+    if reconstruct is not None and len(missing):
+        rids, rE = reconstruct(missing)
+        ids, E = np.concatenate([ids, rids]), np.concatenate([E.astype(np.float32), rE])
+    add = identify_levels(identify_scores(todo, E, ids, taxa, T, tree), bc_counts, frozen)
+    kept = base[base["id"].isin(pool["id"]) & ~base["id"].isin(add["id"])]
+    out = pd.concat([kept, add], ignore_index=True)
+    cat = {k: out[k].astype("string").astype("category").to_numpy() for k in CATEGORIES}
+    return out.assign(**cat)
 
 
 def _one(folder: str, pattern: str) -> Path:
@@ -299,21 +329,24 @@ def main(argv: list[str] | None = None) -> int:
     if E.shape[1] != T.shape[1]:
         raise ValueError(f"vectors have {E.shape[1]} dims, taxa vectors {T.shape[1]}")
     bc = pd.read_parquet(args.bc_counts).set_index("name")["count"] if args.bc_counts else None
-    out = identify_delta(base, pool, E, ids.astype(np.int64), taxa, T, tree, bc)
     out_dir = Path(args.index)
+    manifest = read_manifest(out_dir)  # this run's, with its new parts; only "identify" is live's
+
+    def from_index(want):
+        return reconstruct(out_dir, manifest, want)
+
+    ids, first = np.unique(ids.astype(np.int64), return_index=True)  # a record in two deltas
+    out = identify_delta(base, pool, E[first], ids, taxa, T, tree, bc, from_index)
     tmp = out_dir / "identify.parquet.tmp"
     out.to_parquet(tmp, index=False)
     tmp.replace(out_dir / "identify.parquet")
-    manifest = read_manifest(
-        out_dir
-    )  # this run's, with its new parts; only "identify" comes from live
     manifest["identify"] = {
         **registered,
         "count": len(out),
         "delta_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
     write_manifest(out_dir, manifest)
-    print(f"{len(out) - len(base)} records added to {len(base)}")
+    print(f"{len(out)} records from {len(base)}: {len(out) - len(base):+d}")
     return 0
 
 

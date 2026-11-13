@@ -2,7 +2,9 @@
 file, and the photos come 200 ids to a request. iNaturalist is stubbed."""
 
 import functools
+import gzip
 import http.server
+import json
 import re
 import threading
 
@@ -12,11 +14,13 @@ import pytest
 
 from what_to_id import page_identify, pool_levels, site_files
 from what_to_id.identify import IDENTIFY_COLUMNS
+from what_to_id.map_projects import add_projects
 from what_to_id.page_lookalike import site_records
-from what_to_id.page_map import decode_points, encode_points, render_map
+from what_to_id.page_map import align_totals, decode_points, encode_points, render_map
 
 from . import test_embeddings_browser as eb
 from .embeddings_fixture import TREE, pool_frame
+from .identify_sheets import reveal
 from .test_page_nav import FORBIDDEN
 
 browser = eb.browser
@@ -29,11 +33,19 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
         pass
 
 
-def serve(root, frame, score):
-    """Writes the map, levels and Identify pages for these pool rows and scores, and serves them."""
+def serve(root, frame, score, projects=None, totals=None):
+    """Writes the map, levels and Identify pages for these pool rows and scores, and serves them;
+    `projects` is a pool-projects.bin path for the map's Projects, `totals` the all-record counts
+    as page_map.fetch_totals returns them, written as the map's totals file."""
     blobs, meta = encode_points(frame, TREE)
+    if totals is not None:
+        gz = gzip.compress(json.dumps(align_totals(totals, meta)).encode())
+        blobs["pool-totals.bin"] = gz
+        meta.setdefault("files", {})["totals"] = "pool-totals.bin"
+    add_projects(blobs, meta, projects)
     for name, blob in blobs.items():
         (root / name).write_bytes(blob)
+    meta["value"] = [[953, 2, 5]]  # the at-risk list: Apis c, the www tests' third suggestion
     (root / "map.html").write_text(render_map(meta, freeze=None))
     pts = decode_points(blobs, meta)
     i = np.arange(len(frame))
@@ -43,10 +55,11 @@ def serve(root, frame, score):
             "taxon_id": pts["taxon_id"].to_numpy(np.int64),
             "level": np.where(i % 6 == 0, 0, 1 + (i * 7) % 4).astype("int8"),
             "score": score,
-            "score2": np.float32(0),
+            "score2": (i % 5 * 0.012).astype("float32"),  # close, fair and clear margins
             "looks_like": pd.Series([LOOKS[k % 3] for k in i], dtype="category"),
+            "runner_up": pd.Series([LOOKS[(k + 1) % 3] for k in i], dtype="category"),
         }
-    )[list(IDENTIFY_COLUMNS)]
+    )[[*IDENTIFY_COLUMNS, "runner_up"]]
     scored.loc[scored.index[scored["level"] == 4][0], "level"] = 5  # the one likely mislabel
     scored.to_parquet(root / "identify.parquet")
     pool_levels.build(root, parquet=root / "identify.parquet")
@@ -68,6 +81,15 @@ def site(tmp_path_factory):
     server.shutdown()
 
 
+def panel(page, card):
+    """Open the compare panel on a card the way a user does: close any open one, click the photo."""
+    if page.locator("#cpanel:visible").count():
+        page.locator("#cpx").click()
+    card.locator(".car").click()
+    page.wait_for_selector("#cpanel:visible")
+    return page.locator("#cpanel")
+
+
 def open_identify(browser, base, hash_="", size=(600, 900), touch=False):
     view = {"width": size[0], "height": size[1]}
     page = (
@@ -81,6 +103,11 @@ def open_identify(browser, base, hash_="", size=(600, 900), touch=False):
     page.on(
         "response",
         lambda r: page.errors.append(r.url) if r.status >= 400 and ".html" not in r.url else None,
+    )
+    # the panel's taxa and look-alike lookups: empty answers, not the live API's 4xx for fake ids
+    page.route(
+        "https://api.inaturalist.org/v1/**",
+        lambda r: r.fulfill(json={"results": []}, headers={"access-control-allow-origin": "*"}),
     )
     page.calls = eb.stub_inat(page, None)
     page.goto(f"{base}/identify.html{hash_}")
@@ -166,8 +193,9 @@ def test_cards_follow_the_chosen_level_with_a_few_per_species_and_photos_in_batc
     taxon = dict(zip(pts["id"], pts["taxon_id"], strict=True))
     for lv in (1, 3):
         assert shown[lv] and all(level[i] == lv for i in shown[lv])
-        counts = pd.Series([taxon[i] for i in shown[lv]]).value_counts()
-        assert counts.max() <= 3 and len(counts) == 7  # a few of each of the seven species
+    counts = pd.Series([taxon[i] for i in shown[1]]).value_counts()
+    assert counts.max() <= 3 and len(counts) == 7  # a few of each of the seven species
+    assert len(shown[3]) == 6  # level 3 caps by suggestion: its records suggest 2 species, 3 each
     assert not shown[2] and not shown[4]  # both in Might be wrong
     kinds = [level[i] for i in shown[5]]
     assert kinds == sorted(kinds, key=ORDER.index) and set(kinds) == {5, 4, 2}
@@ -181,15 +209,15 @@ def test_cards_follow_the_chosen_level_with_a_few_per_species_and_photos_in_batc
     page.wait_for_function("document.querySelectorAll('#grid .card').length === 21")
     assert len(page.calls) == before + 1 and len(page.calls[-1]) == 9
     tab(page, 3).click()
-    page.wait_for_selector("#grid .card .look")
+    page.wait_for_selector("#grid .card .look", state="attached")
     text = page.locator("#grid .card .look").first.inner_text()
     assert text.startswith("Probably ") and text.split()[1] in {"Bombus", "Apis"}
     tab(page, 5).click()
-    page.wait_for_selector("#grid .card .kind")
+    page.wait_for_selector("#grid .card .kind", state="attached")
     assert page.locator("#grid .card .kind").first.text_content() == "Likely mislabelled"
     assert page.locator("#grid .card .look").first.inner_text().startswith("Looks more like ")
     kind(page, "Close calls").click()
-    page.wait_for_selector("#grid .card .look")
+    page.wait_for_selector("#grid .card .look", state="attached")
     assert "Looks more like" in page.locator("#grid .card .look").first.inner_text()
     assert page.locator("#grid .card .kind").count() == 0  # one kind shown, no tags
     kind(page, "Likely mislabelled").click()
@@ -257,6 +285,7 @@ def test_a_viewport_narrows_the_ids_and_the_status_count_and_empty_restores_them
     assert page.locator("#status").inner_text().startswith("2,100 ")
     levelled = page.evaluate("__identify.levelled()")
     assert f"· {levelled:,} in a level" in page.locator("#status").inner_text()
+    reveal(page, "#status a")
     page.locator("#status a", has_text="in a level").click()
     assert page.locator("#about").get_attribute("open") is not None
     assert page.errors == []
@@ -354,14 +383,14 @@ def test_the_batch_links_cover_the_listed_ids(browser, site):
         want = sorted(page.evaluate("__identify.view()")[lv])
         href = page.get_attribute("#go", "href")
         assert sorted(int(i) for i in href.split("&id=")[1].split(",")) == want
-        assert page.locator("#go").inner_text() == f"Identify {len(want)} listed"
+        assert page.locator("#go").inner_text() == f"Identify these {len(want)} on iNaturalist"
         assert page.locator("#go").get_attribute("target") == "_blank"
     page.evaluate("IdentifyLinks.MAX_IDS = 5")  # past the cap the button names both numbers
     tab(page, 1).click()
     tab(page, 5).click()
     n = len(page.evaluate("__identify.view()")[5])
-    assert page.locator("#go").inner_text() == f"Identify the first 5 of {n:,}"
-    assert page.locator("#cap").is_hidden() and page.locator("#next").is_hidden()
+    assert page.locator("#go").inner_text() == "Identify the first 5 on iNaturalist"
+    assert page.locator("#bn").inner_text() == "" and page.locator("#next").is_hidden()
     # two records per batch: the arrows must change the button's words, not only its link
     page.evaluate(
         "() => { const f = IdentifyLinks.batches; IdentifyLinks.batches = ids => "
@@ -370,16 +399,19 @@ def test_the_batch_links_cover_the_listed_ids(browser, site):
     tab(page, 1).click()
     tab(page, 5).click()
     first = page.get_attribute("#go", "href")
-    assert page.locator("#go").inner_text() == "Identify 2 · batch 1 of 3"
+    assert page.locator("#go").inner_text() == "Identify these 2 on iNaturalist"
+    assert page.locator("#bn").inner_text() == "Batch 1 of 3"
     assert (
         page.locator("#cap").inner_text()
-        == f"The first 5 of {n:,} listed, in the order shown, 200 per batch"
+        == f"{n:,} cards (up to 3 per species) · first 5 in 3 batches of 200, in the order shown"
     )
     page.click("#next")
-    assert page.locator("#go").inner_text() == "Identify 2 · batch 2 of 3"
+    assert page.locator("#go").inner_text() == "Identify these 2 on iNaturalist"
+    assert page.locator("#bn").inner_text() == "Batch 2 of 3"
     assert page.get_attribute("#go", "href") != first and page.locator("#prev").is_enabled()
     page.click("#next")
-    assert page.locator("#go").inner_text() == "Identify 1 · batch 3 of 3"
+    assert page.locator("#go").inner_text() == "Identify this record on iNaturalist"
+    assert page.locator("#bn").inner_text() == "Batch 3 of 3"
     assert page.locator("#next").is_disabled()
     assert page.errors == []
 
@@ -411,10 +443,10 @@ def test_a_cut_species_offers_its_other_records_and_picking_it_shows_them_all(br
     base, pts = site
     page = open_identify(browser, base, "#lvl=1")
     taxon = dict(zip(pts["id"], pts["taxon_id"], strict=True))
-    page.wait_for_selector("#grid .card .sp")
+    page.wait_for_selector("#grid .card .sp", state="attached")
     shown = page.evaluate("__identify.view()")[1]
     link = page.locator("#grid .card .sp").first
-    species = taxon[int(link.locator("xpath=..").get_attribute("data-id"))]
+    species = taxon[int(link.locator("xpath=ancestor::li[1]").get_attribute("data-id"))]
     have = int(((pts["taxon_id"] == species) & (pts["level"] == 1)).sum())
     assert have > 3 and sum(taxon[i] == species for i in shown) == 3
     lead = f"+{have - 3} more "
@@ -442,10 +474,12 @@ def test_cards_show_before_the_look_alike_file_and_fill_it_in_where_they_stand(b
     page.route("**/pool-levels-looks.*", lambda r: held.append(r))
     page.goto(f"{base}/identify.html#lvl=3")
     page.wait_for_function("window.__identify")  # the first cards carry their look-alike
+    # the cards' photos are in, so there is room to scroll
+    page.wait_for_function("document.documentElement.scrollHeight > innerHeight + 40")
     assert page.locator("#grid .card .look").count() == 0
     page.evaluate("scrollTo(0, 40)")
     held[0].continue_()
-    page.wait_for_selector("#grid .card .look")
+    page.wait_for_selector("#grid .card .look", state="attached")
     assert page.locator("#grid .card .look").first.inner_text().startswith("Probably ")
     assert page.evaluate("scrollY") == 40  # filled in place, not redrawn from the top
     assert page.errors == []
@@ -468,7 +502,9 @@ def test_a_level_lists_the_newest_records_first_within_a_score_bucket_across_sha
         level = dict(zip(pts["id"], pts["level"], strict=True))
         for rows in page.evaluate("__identify.view()"):
             for a, b in zip(rows or [], (rows or [])[1:], strict=False):
-                if level[a] == level[b]:  # Might be wrong lists its kinds one after another
+                if level[a] == level[b] == 3:  # strictly by score (the rank file)
+                    assert bucket[a] >= bucket[b], (a, b)
+                elif level[a] == level[b]:  # Might be wrong lists its kinds one after another
                     assert bucket[a] > bucket[b] or a > b, (a, b)
                 else:
                     assert ORDER.index(level[a]) < ORDER.index(level[b]), (a, b)

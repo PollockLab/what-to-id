@@ -56,7 +56,9 @@ def test_the_copied_explanations_equal_their_sources():
         "space": text("embeddings_assets/embeddings.html"),
     }
     # the Identify About, once its placeholders are filled the way page_identify fills them
-    about = re.search(r"</summary>(.*?)</details>", page_identify.render(), re.S).group(1)
+    about = re.search(
+        r'id="about"><summary>About</summary>(.*?)</details>', page_identify.render(), re.S
+    ).group(1)
     assert about.strip() in html and "__" not in about
     for src, pattern in (
         ("confusion", r"</summary>\n(<dl>.*?)<dt>Built</dt>"),

@@ -29,7 +29,8 @@ def first_lists(base):
 def test_the_first_lists_are_the_lists_the_page_builds(browser, site, hash_):
     base, _ = site
     want = first_lists(base)[hash_[1:]]
-    page = open_identify(browser, base, hash_)
+    # level 3 as the first list holds it: every band, by rank
+    page = open_identify(browser, base, hash_ + ("&" if hash_ else "#") + "conf=all&sort=conf")
     view, total = page.evaluate("__identify.view()"), page.evaluate("__identify.total()")
     for lv in (1, 3):
         assert total[lv] == want["total"][lv]
@@ -99,7 +100,7 @@ def test_a_species_picked_from_a_first_card_shows_once_the_records_land(browser,
     page.route(re.compile(r"/pool-\d+\.\w+\.bin"), lambda r: held.append(r))
     page.goto(f"{base}/identify.html#lvl=1")
     link = page.locator("#grid .card .sp").first
-    rid = int(link.locator("xpath=..").get_attribute("data-id"))
+    rid = int(link.locator("xpath=ancestor::li[1]").get_attribute("data-id"))
     link.click()
     assert "taxa=" in page.evaluate("location.hash") and not page.locator("#grid .card").count()
     for r in held:

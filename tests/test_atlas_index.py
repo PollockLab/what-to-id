@@ -321,3 +321,21 @@ def test_cli_roundtrip(tmp_path, data, capsys):
     ai.main(["recall", *base, *src, "--n-queries", "50", "--nprobe", "8"])
     assert json.loads(capsys.readouterr().out.strip().splitlines()[-1])["recall"] > 0.5
     ai.main(["compact", *base])
+
+
+def test_reconstruct_reads_only_the_wanted_rows_back_close_to_the_originals(built, data):
+    from what_to_id.atlas_index_io import read_manifest, reconstruct
+
+    E, ids = data
+    want = np.append(ids[[7, 3000, 4999]], [12345])  # the last id is not in the index
+    got, X = reconstruct(built, read_manifest(built), want)
+    assert sorted(got) == sorted(ids[[7, 3000, 4999]])
+    truth = E[pd_index(ids, got)]
+    assert (np.einsum("ij,ij->i", X, truth) > 0.97).all()
+    assert np.allclose(np.linalg.norm(X, axis=1), 1, atol=1e-4)
+    none, empty = reconstruct(built, read_manifest(built), np.array([12345]))
+    assert len(none) == 0 and empty.shape == (0, D)
+
+
+def pd_index(ids, found):
+    return np.array([int(np.flatnonzero(ids == i)[0]) for i in found])

@@ -1,6 +1,8 @@
 // Range maps on the Identify cards (pool-levels-range.bin, format in pool_levels.py). Beside Identify a chip gives the
 // verdict in a few words and opens one shared popover: BC grid cells, label-only / look-alike-only / both, the record.
 // Over the level, the far-outside control (All / Hide / Only) in #rout; Clear matches start with records far outside left out.
+// Level 3 (narrowing) has no species label, so its control asks instead whether the record sits in the suggested species' range,
+// and starts with the records that do.
 // IdentifyRanges(buf,ctx), ctx {P, name(i) the label, look(i) the look-alike or null, redraw(), sdm the ECCC habitat
 // models (META.sdm, sdm_manifest.py; P.tax then indexes sdm.taxa) or none}. The map's record card takes only the chip and
 // its popover (chip(i,lv)); it has no #rout, so no segmented control.
@@ -29,7 +31,7 @@ return function(buf,ctx){
   var P=ctx.P,n=P.n,dv=new DataView(buf),size=dv.getUint32(0,true);
   if(buf.byteLength!==4+size+2*n)throw new Error('the range file holds '+buf.byteLength+' bytes, expected '+(4+size+2*n));
   var D=JSON.parse(new TextDecoder().decode(new Uint8Array(buf,4,size))),OKM=new Uint8Array(buf,4+size,n),NOTE=new Uint8Array(buf,4+size+n,n),
-    RI=new Map(D.names.map(function(x,k){return [x,k];})),memo=[],BOX=null,OUTL=null,FAR=null,
+    RI=new Map(D.names.map(function(x,k){return [x,k];})),memo=[],BOX=null,OUTL=null,FAR=null,BIN=null,CELL=null,
     S={lv:0,o:0},Q={i:-1,lv:0,chip:null,pin:false,t:0},pop=null,HAB=new Map(),AB=null;  // S.o: 0 all, 1 only far outside, -1 hide far outside
   // a name's bitset over the grid cells, null when its range is unknown
   function bits(name){
@@ -45,10 +47,13 @@ return function(buf,ctx){
   function km(i){var c=OKM[i];return c<50?c:c<=95?50+(c-50)*10:c<=105?500+(c-95)*50:1000+(c-105)*100;}
   function kmText(i){return km(i).toLocaleString('en');}
   function far(i){return OKM[i]!==NONE&&OKM[i]>=OUT_KM;}
-  function near(i){return !far(i);}  // an unknown range is not a reason to leave a record out
-  // Clear matches are for confirming in bulk, so records far from their label's range start left out
-  function def(lv){return lv===1?-1:0;}
-  function pass(i,lv){var o=lv===S.lv?S.o:def(lv);return !o||(o>0?far(i):near(i));}
+  // the suggested species' range holds the record's cell; an unknown range does not, as the suggestion is unchecked
+  function fits(i){var a=bits(ctx.look(i));return !!a&&!!has(a,cellOf(i));}
+  // outside: far from the label's range, or for level 3 not in the suggestion's
+  function out(i,lv){return lv===3?!fits(i):far(i);}
+  // Clear matches are for confirming in bulk and level 3 for adding a species, so both start with the doubtful left out
+  function def(lv){return lv===1||lv===3?-1:0;}
+  function pass(i,lv){var o=lv===S.lv?S.o:def(lv);return !o||(o>0)===out(i,lv);}
   function two(i,lv){var l=(lv===2||lv===5)&&ctx.look(i);return l&&bits(l)?l:null;}
   function box(){
     if(BOX)return BOX;
@@ -70,6 +75,22 @@ return function(buf,ctx){
     var x=P.lonlat[2*i]*1000,y=P.lonlat[2*i+1]*1000;
     for(var c=0;c<D.grid.length;c++)if(inside(D.grid[c],x,y))return c;
     return -1;
+  }
+  // cellAt for every record of a level: grid cells binned by 0.1 degree, so a point tests only the few cells near it
+  function cellOf(i){
+    if(!BIN){
+      BIN=new Map();CELL=new Int16Array(n).fill(-2);
+      D.grid.forEach(function(g,c){
+        var x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+        for(var k=0;k<g.length;k+=2){x0=Math.min(x0,g[k]);x1=Math.max(x1,g[k]);y0=Math.min(y0,g[k+1]);y1=Math.max(y1,g[k+1]);}
+        for(var bx=Math.floor(x0/100);bx<=Math.floor(x1/100);bx++)for(var by=Math.floor(y0/100);by<=Math.floor(y1/100);by++){
+          var key=bx*4096+by;if(!BIN.has(key))BIN.set(key,[]);BIN.get(key).push(c);}});
+    }
+    if(CELL[i]!==-2)return CELL[i];
+    var x=P.lonlat[2*i]*1000,y=P.lonlat[2*i+1]*1000,cs=BIN.get(Math.floor(x/100)*4096+Math.floor(y/100))||[];
+    CELL[i]=-1;
+    for(var k=0;k<cs.length;k++)if(inside(D.grid[cs[k]],x,y)){CELL[i]=cs[k];break;}
+    return CELL[i];
   }
   // What the map says about the record's point, as words (caption and aria-label).
   function mapText(i,lv){
@@ -211,7 +232,11 @@ return function(buf,ctx){
     if(S.o!==def(S.lv))t.push('out='+S.o);
     history.replaceState(null,'','#'+t.join('&'));
   }
-  var OPTS=[[0,'All'],[-1,'Hide far outside'],[1,'Only far outside']],SEG=null;
+  var OPTS=[[0,'All'],[-1,'Hide far outside'],[1,'Only far outside']],SEG=null,SEGNOTE=null,
+    FAR_NOTE='Far outside: '+OUT_KM+" km or more from the labelled species' known range in BC. Records with no range map count as in range.",
+    // level 3's labels and note, in OPTS order
+    FIT_OPTS=['All','Suggestion in range','Suggestion not in range'],
+    FIT_NOTE="In range: the record's grid cell is in the suggested species' known range in BC. Records with no range map for the suggestion count as not in range.";
   function seg(){
     var g=$('rout');
     if(!g)return null;
@@ -227,8 +252,8 @@ return function(buf,ctx){
       var to=k===4?0:k===5?all.length-1:(at+(k%4<2?-1:1)+all.length)%all.length;
       all[to].focus();all[to].click();
     };
-    g.append(r,el('span','segnote','Far outside: '+OUT_KM+" km or more from the labelled species' known range in BC. "+
-      'Records with no range map count as in range.'));
+    SEGNOTE=el('span','segnote',FAR_NOTE);
+    g.append(r);($('hintbody')||g).append(SEGNOTE);  // the note sits in the page's one muted line
     return r;
   }
   SEG=seg();
@@ -255,22 +280,28 @@ return function(buf,ctx){
     // beside Identify, the range chip, or why there is none
     links:function(a,i,lv){
       var row=el('div','links');row.appendChild(a);
-      if(bits(ctx.name(i)))row.appendChild(chip(i,lv));
+      if(lv===3)row.appendChild(el('span','range',!bits(ctx.look(i))?'No range map for the suggestion':
+        fits(i)?"Range: fits the suggestion":"Range: outside the suggestion's"));
+      else if(bits(ctx.name(i)))row.appendChild(chip(i,lv));
       else if((lv===2||lv===5)&&NOTE[i]!==NONE)row.appendChild(el('span','range',D.notes[NOTE[i]]));
       else row.appendChild(el('span','range','No range map: range unknown'));
       return row;
     },
+    // level 3's range filter as the count line words it, '' when off
+    label:function(lv){var o=lv===S.lv?S.o:def(lv);return lv===3&&o?o<0?'in range':'not in range':'';},
     // the control and its counts, over the selected records of the level
     draw:function(lv,sel,level){
       if(!SEG)return;
       var f=0,t=0;
-      for(var i=0;i<n;i++)if(sel[i]&&level[i]===lv){t++;if(far(i))f++;}
+      for(var i=0;i<n;i++)if(sel[i]&&level[i]===lv){t++;if(out(i,lv))f++;}
       closePop(false);
       $('rout').hidden=false;
       var c={0:t,'-1':t-f,1:f};
+      SEGNOTE.textContent=lv===3?FIT_NOTE:FAR_NOTE;
+      SEG.setAttribute('aria-label',lv===3?"Records in the suggested species' range":'Records far outside their range');
       [].forEach.call(SEG.children,function(b,k){
         var o=OPTS[k][0],on=o===S.o;
-        b.textContent=OPTS[k][1]+' '+c[o].toLocaleString('en');
+        b.textContent=(lv===3?FIT_OPTS[k]:OPTS[k][1])+' '+c[o].toLocaleString('en');
         b.setAttribute('aria-checked',String(on));b.tabIndex=on?0:-1;
         b.disabled=o===1&&!f&&!on;});
     }

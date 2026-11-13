@@ -208,3 +208,57 @@ def test_the_levels_forward_is_written_beside_explore(tmp_path):
     split_page.build(tmp_path)
     html = (tmp_path / "levels.html").read_text()
     assert "explore.html?view=identify-map" in html and "groups=" in html
+
+
+SPY = (
+    "window.__m = []; "
+    "addEventListener('message', e => e.data && __m.push([e.data.type, e.data.id]))"
+)
+
+
+def first_cards(ident, n=3):
+    ident.wait_for_function(f"document.querySelectorAll('#grid .card').length >= {n}")
+    return [
+        int(i)
+        for i in ident.evaluate(
+            "[...document.querySelectorAll('#grid .card')].map(c => c.dataset.id)"
+        )
+    ][:n]
+
+
+def test_the_compare_panels_next_card_is_told_to_the_other_panes(browser, site, pts):
+    page = explore(browser, site[0])
+    ident, left = frame_of(page, "identify"), frame_of(page, "map")
+    a, b, _ = first_cards(ident)
+    left.evaluate(SPY)
+    ident.locator(f"#grid .card[data-id='{a}']").click(position={"x": 20, "y": 60})
+    ident.wait_for_function("!document.getElementById('cpanel').hidden")
+    left.evaluate("__m.length = 0")
+    ident.evaluate("document.getElementById('cpj').click()")
+    left.wait_for_function(f"__m.some(m => m[0] === 'wtid-record' && m[1] === {b})")
+    ident.evaluate("document.getElementById('cpk').click()")
+    left.wait_for_function(f"__m.some(m => m[0] === 'wtid-record' && m[1] === {a})")
+    assert page.errors == []
+    page.close()
+
+
+def test_a_record_picked_in_another_pane_rings_its_card_and_moves_the_open_panel(
+    browser, site, pts
+):
+    page = explore(browser, site[0])
+    ident, left = frame_of(page, "identify"), frame_of(page, "map")
+    a, b, c = first_cards(ident)
+    left.evaluate(f"parent.postMessage({{type: 'wtid-record', id: {b}}}, location.origin)")
+    ident.wait_for_function(f"document.querySelector('.card.cur')?.dataset.id === '{b}'")
+    assert ident.evaluate(
+        "document.getElementById('cpanel')?.hidden ?? true"
+    )  # no panel forced open
+    ident.locator(f"#grid .card[data-id='{a}']").click(position={"x": 20, "y": 60})
+    ident.wait_for_function("!document.getElementById('cpanel').hidden")
+    left.evaluate(f"parent.postMessage({{type: 'wtid-record', id: {c}}}, location.origin)")
+    ident.wait_for_function(f"document.querySelector('.card.cur')?.dataset.id === '{c}'")
+    assert ident.evaluate("document.getElementById('cpat').textContent").startswith("3 of")
+    left.evaluate("parent.postMessage({type: 'wtid-record', id: 1}, location.origin)")  # not drawn
+    assert ident.evaluate("document.querySelector('.card.cur').dataset.id") == str(c)
+    assert page.errors == []
+    page.close()

@@ -59,7 +59,10 @@ def tiler(page):
 
 
 def habitat(page, chip_text):
-    page.locator(".rchip", has_text=chip_text).click()
+    chip = page.locator(".rchip", has_text=chip_text)
+    if not chip.is_visible():  # Identify's chips sit in the compare panel, the map card's show
+        rb.ib.panel(page, page.locator(".card", has=chip))
+    chip.click()
     line = page.locator("#rpop .rsdm")
     page.wait_for_function(
         "!document.querySelector('#rpop .rsdm').textContent.includes('checking')"
@@ -130,7 +133,9 @@ def test_far_outside_and_unsuitable_or_unreadable(browser, site):
 def test_a_label_without_a_model_has_no_habitat_line(browser, site):
     page = rb.opened(browser, site, "#lvl=5&kind=2")
     tiler(page)
-    page.locator(".rchip", has_text="Fits the look-alike").click()
+    habitat_chip = page.locator(".rchip", has_text="Fits the look-alike")
+    rb.ib.panel(page, page.locator(".card", has=habitat_chip))
+    habitat_chip.click()
     assert page.locator("#rpop").is_visible() and page.locator("#rpop .rsdm").is_hidden()
     assert page.asked == [] and page.errors == []
 

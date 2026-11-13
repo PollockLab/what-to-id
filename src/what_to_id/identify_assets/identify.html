@@ -32,8 +32,9 @@ input[type=checkbox]{width:24px;height:24px;margin:0 4px 0 0;vertical-align:midd
 [hidden]{display:none!important}  /* .batch and the arrows set display, which would beat hidden */
 #none button{font:inherit;color:var(--ink);background:none;border:0;padding:0;text-decoration:underline;cursor:pointer}
 #desc{margin:6px 0 2px;font-size:12px}
-.batch{display:flex;align-items:center;gap:6px;margin:8px 0}  /* one row: the arrows stay beside the link */
-#cap{font-size:12px;margin:-4px 0 8px}
+.batch{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0;font-size:13px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);margin:0}  /* the batch caption: read aloud, the count line shows its number */
+.batch .nav{display:inline-flex;align-items:center;gap:6px}  /* wraps as one group */
 .arrow{font:inherit;min-width:32px;min-height:32px;cursor:pointer;color:var(--ink);
   border:1px solid var(--line);border-radius:6px;background:var(--chip)}
 .arrow:disabled{opacity:.4;cursor:default}
@@ -44,10 +45,11 @@ ol{list-style:none;margin:8px 0;padding:0;display:grid;gap:10px;
 .card:hover{border-color:var(--muted)}
 .card .ph{display:flex;align-items:center;justify-content:center;aspect-ratio:4/3;font-size:12px;
   border-radius:4px;background:var(--chip);color:var(--muted);overflow:hidden;text-align:center}
-.card img{width:100%;height:100%;object-fit:cover;display:block}
+.card img{width:100%;height:100%;object-fit:cover;display:block;color:transparent}
 .card .name,.card .com,.card .when{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .card .name{font-size:13px}
 .card .com,.card .look,.card .when{font-size:12px;color:var(--muted)}
+.card .why{font-size:11px;color:var(--muted);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .card .look{overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .card .when{display:block;text-decoration:none;min-height:24px;line-height:24px}
 .card .when:hover{text-decoration:underline}
@@ -67,15 +69,24 @@ ol{list-style:none;margin:8px 0;padding:0;display:grid;gap:10px;
 .segb[aria-checked=true]{background:var(--on);color:var(--onink)}
 .segb:disabled{opacity:.5;cursor:default}
 .segnote{display:block;margin-top:4px;color:var(--muted)}
+.ctl{display:flex;flex-wrap:wrap;align-items:center;gap:4px 16px}
+.ctl>.rout{margin:2px 0}.ctl #sort:not([hidden]){display:contents}.ctl .srow{margin:2px 0;gap:4px 6px}
+.ctl .segb{min-height:26px;padding:0 9px}
+.tog{margin-right:10px;white-space:nowrap}#prog.ok progress{accent-color:#2e7d32}
+#sort .segnote{margin:0}
+.hint{color:var(--muted)}.hint summary{cursor:pointer;min-height:24px}.hint .segnote,.hint p{margin:2px 0}
 .card .links{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
 .card .range{flex:1 1 8em;min-width:0;font-size:12px;color:var(--muted)}
 .card .badge{align-self:flex-start;font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 4px}
 .sep.top{border-top:0;padding-top:0}
+.sep.run{display:flex;align-items:center;gap:6px;flex-wrap:wrap;color:var(--ink)}.sep.run img{width:56px;height:56px;object-fit:cover;border-radius:4px;background:var(--chip)}.sep.run .rp{display:flex;gap:4px}
 .sep{grid-column:1/-1;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:6px}
 .card .kind{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
 .cmp{flex:none;display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:0}
 .cmp figure{margin:0;min-width:0;display:flex;flex-direction:column;gap:1px}
-.cmp img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:4px;display:block;background:var(--chip)}
+.cmp a{display:block;border-radius:4px;background:var(--chip)}
+.cmp img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:4px;display:block;color:transparent}
+.cmp img:not([src]),.card .ph img:not([src]){visibility:hidden}
 .cmp figcaption{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .usr{min-height:24px}  /* the User box fills in once the map data loads; its row is kept so the cards stay put */
 #usrbox summary{cursor:pointer;color:var(--muted);min-height:24px}
@@ -86,7 +97,7 @@ ol{list-style:none;margin:8px 0;padding:0;display:grid;gap:10px;
 button.padd{cursor:pointer;background:var(--chip)}
 #usrbox p{margin:4px 0}
 /* Batches (the study): its box replaces the level's controls and cards */
-body:not(.bt) #study,.bt #status:not(.err),.bt #unpick,.bt #desc,.bt #kind,.bt .usr,.bt #rout,.bt #rg,.bt #panel{display:none!important}
+body:not(.bt) #study,.bt #status:not(.err),.bt #unpick,.bt #desc,.bt #kind,.bt .usr,.bt #rout,.bt #rg,.bt #sort,.bt #hint,.bt #panel{display:none!important}
 .srow{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:8px 0}
 .srow select{font:inherit;min-height:30px;padding:0 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink)}
 .btn:is(button){font:inherit;font-size:13px;font-weight:650;border:0;cursor:pointer}
@@ -97,11 +108,109 @@ body:not(.bt) #study,.bt #status:not(.err),.bt #unpick,.bt #desc,.bt #kind,.bt .
 .card .act{font:inherit;font-size:12px;min-height:24px;padding:0 8px;border:1px solid var(--line);border-radius:12px;
   background:var(--chip);color:var(--ink);cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .card .act:disabled{cursor:default}
+.card .copy{font:inherit;font-size:11px;min-height:24px;margin-left:4px;padding:0 6px;border:1px solid var(--line);border-radius:10px;background:var(--chip);color:var(--ink);cursor:pointer}
+.card .conf{margin-left:6px;font-size:11px;color:var(--muted)}
+.card .gap{margin-left:6px;font-size:11px;color:var(--muted);white-space:nowrap}
+.card .note{font-size:12px;color:var(--muted)}
+.card.done{opacity:.6}.card.cur{outline:2px solid var(--on);outline-offset:1px}
+#cpanel{position:fixed;top:0;right:0;bottom:0;z-index:10;width:min(520px,100%);box-sizing:border-box;overflow:auto;
+  background:var(--panel);border-left:1px solid var(--line);box-shadow:-4px 0 16px rgba(0,0,0,.15);padding:8px 12px 0;display:flex;flex-direction:column;gap:8px}
+#cpanel:focus{outline:none}
+@media (min-width:900px){body.cpon main{margin-right:520px}}
+.cptop{display:flex;align-items:center;gap:8px}.cptop h2{flex:1;min-width:0;margin:0;font-size:15px;font-weight:600;overflow-wrap:anywhere}
+.cpbig{width:100%;max-height:min(52vh,480px);object-fit:contain;background:var(--chip);border-radius:6px;display:block}
+@media (max-width:600px){.cpbig{max-height:38vh}}  /* after the base rule, so it wins */
+.cpstrip{display:flex;gap:4px;overflow-x:auto;margin-top:4px}
+.cpthumb{padding:0;border:2px solid transparent;border-radius:4px;background:none;cursor:pointer;width:48px;height:48px;flex:none}
+.cpthumb[aria-pressed=true]{border-color:var(--on)}.cpthumb img{width:100%;height:100%;object-fit:cover;display:block}
+.cpwhen{display:block;font-size:12px;min-height:24px;line-height:24px}
+#cprefs{display:grid;gap:8px}.cpref h3{font-size:13px;font-weight:600;margin:0 0 2px}
+.cpph{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}.cpph img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:4px;display:block}
+.cpref a{font-size:12px}
+.cpbar{position:sticky;bottom:0;margin-top:auto;display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 0;background:var(--panel);border-top:1px solid var(--line)}
+#cpt{order:1;flex-basis:100%;height:1.4em;line-height:1.4em;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}  /* its own reserved line, so the toast never moves Identify */
+.cpbar .copy{font:inherit;font-size:13px;min-height:30px;padding:0 10px;border:1px solid var(--line);border-radius:15px;background:var(--chip);color:var(--ink);cursor:pointer}
 __IDENTIFY_RANGES_CSS__
+__MAP_AREA_CSS__
+__MAP_PANELS_CSS__
+__IDENTIFY_UI_CSS__
+__IDENTIFY_SHELL_CSS__
+__IDENTIFY_BAR_CSS__
 </style></head><body>
 __SITE_NAV__<main id="main-content">
 <h1>Identify</h1>
+<p><button type="button" id="unpick" class="more" hidden>Clear the species filter</button></p>
+<div id="tabs" class="tabs" role="tablist" aria-label="Level"></div>
+<div id="kind" class="rout" hidden></div>
+<div id="bar" class="bar"><div class="bseg" role="group" aria-label="What, when, where">
+<button type="button" id="bwhat" class="seg1" aria-expanded="false" aria-controls="pwhat" disabled><small>What</small><b>All groups</b></button>
+<div id="pwhat" class="bpanel" role="group" aria-label="What" hidden>
+<div class="picker"><label for="q" class="vh">Find a taxon</label><input id="q" type="search" placeholder="Latin or common name, e.g. Carex" autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="sugg">
+<ul id="sugg" class="sugg" role="listbox" aria-label="Matching taxa" hidden></ul></div><p id="qn" class="muted" aria-live="polite"></p>
+<div id="cladebox" hidden><div id="clades" class="chips" role="group" aria-label="Taxon shortcuts"></div></div>
+<p id="mine" class="mine" role="status" hidden>Your groups <button type="button" class="link">Show all</button></p>
+<p class="muted"><button type="button" id="gall" class="link">All groups</button> <button type="button" id="gkeep" class="link" hidden></button></p>
+<span id="gbar" class="gbar" role="img" aria-label="No records in view"></span>
+<ul id="groups" class="gl" role="list" aria-label="Taxon groups"></ul>
+<div id="flagbox"><p class="lbl">Show only</p><div id="flags" class="chips" role="group" aria-label="Show only"></div>
+<p class="lbl" id="acclbl"><label for="accr">Location accuracy</label></p>
+<div id="acc"><input id="accr" class="accr" type="range" min="0" max="4" step="1" value="0">
+<div class="accticks" aria-hidden="true"><span>Any</span><span>Known</span><span>1 km</span><span>100 m</span><span>10 m</span></div></div></div>
+<details class="sec" id="projbox" open hidden></details></div>
+<button type="button" id="bwhen" class="seg1" aria-expanded="false" aria-controls="pwhen" disabled><small>When</small><b>Any time</b></button>
+<div id="pwhen" class="bpanel" role="group" aria-label="When" hidden>
+<div class="row"><span class="tseg" role="group" aria-label="Date to filter on"><button type="button" id="byObs" aria-pressed="true">Observed</button><button type="button" id="byUp" aria-pressed="false">Uploaded</button></span>
+<span id="presets" class="chips" role="group" aria-label="Periods"></span></div>
+<div class="row"><span class="dates"><input id="from" type="date" aria-label="From"> to <input id="to" type="date" aria-label="To"></span></div>
+<div class="row"><span id="months" class="chips months" role="group" aria-label="Months of the year"></span><button type="button" id="mclear" class="link">Any month</button></div>
+<div class="histwrap"><canvas id="over" role="img" aria-label="Records per year, every year, on a log scale. Click a year to zoom to it."></canvas><p id="unit" class="unit"></p><canvas id="hist" role="img"></canvas><div id="htip" class="htip" hidden></div></div></div>
+<button type="button" id="bwhere" class="seg1" aria-expanded="false" aria-controls="pwhere" disabled><small>Where</small><b>Anywhere</b></button>
+<div id="pwhere" class="bpanel" role="group" aria-label="Where" hidden>
+<div id="wbox" class="wbox"><div class="wfoot"><button type="button" id="wexp" class="btn" aria-expanded="false">Expand map</button></div></div></div>
+</div></div>
+<div id="qrow" class="qrow"><button type="button" id="fbtn" class="qchip" aria-haspopup="dialog" aria-controls="fsheet">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M7 12h10M10 17h4"/></svg> Filters <span id="fcount" class="fcount" hidden></span></button>
+<span class="vr" aria-hidden="true"></span><span id="qchips" class="qchips"></span><span id="chips" class="qchips"></span></div>
+<dialog id="bsheet" class="sheet" aria-labelledby="bsh"><div class="shead"><h2 id="bsh">What, when, where</h2>
+<button type="button" class="shx" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><div class="sbody"></div>
+<div class="sfoot"><span></span><button type="button" class="btn sdone">Show <span class="n">0</span> cards</button></div></dialog>
+<dialog id="fsheet" class="sheet" aria-labelledby="fsh"><div class="shead"><h2 id="fsh">Filters</h2>
+<button type="button" class="shx" aria-label="Close filters"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><div class="sbody">
+<section class="ssec"><h3>Range</h3><div id="rout" class="rout" hidden></div></section>
+<section class="ssec"><div id="sort" class="rout" hidden></div></section>
+<section class="ssec"><h3>Research Grade here</h3><div id="rg" class="rout" hidden></div></section>
+<section class="ssec"><h3>User</h3><div class="rout usr"><details id="usrbox" hidden></details></div></section></div>
+<div class="sfoot"><button type="button" id="fclear" class="lnk">Clear all</button><button type="button" class="btn sdone">Show <span class="n">0</span> cards</button></div></dialog>
+<div id="sortpop" popover class="pop sortpop" aria-labelledby="sorth"><h2 id="sorth">Sort</h2><div id="sorto" class="rout"></div><hr>
+<div id="frun"></div><p class="segnote">Cards with the same suggested species sit together</p></div>
+<div id="study" role="tabpanel" aria-labelledby="tabb">
+<div class="srow"><label for="sgroup">Group</label><select id="sgroup"></select>
+<button type="button" id="snext" class="btn" aria-keyshortcuts="n" title="Next batch (N)">Next batch</button>
+<span id="sprog" class="muted" aria-live="polite"></span></div>
+<p class="snote muted">These batches come from a research study. <a href="terms.html#study" target="_blank">About</a></p>
+<p id="sdone" class="muted" hidden>You have seen every batch in this group. <button type="button" id="sover" class="lnk">Start over</button></p>
+<ol id="sgrid"></ol>
+<p class="srow snote muted"><a id="sall" target="_blank" rel="noopener" hidden></a>
+<button type="button" id="sexport" class="lnk">Download my batches</button><span id="sin"></span></p>
+</div>
+<div id="panel" role="tabpanel">
+<p id="tip" class="muted" role="note" hidden>Click a card to compare. Enter opens iNat with the name copied, j/k next/prev, s skip, u undo. <button type="button" class="more" aria-label="Dismiss the tip">×</button></p>
+<div id="rline" class="rline"><b id="count" aria-live="polite"></b><span id="today" class="today" hidden></span><span class="sp1"></span>
+<button type="button" id="sortb" class="qchip" popovertarget="sortpop" aria-controls="sortpop" hidden>Sort <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></button>
+<button type="button" id="helpb" class="qchip qicon" aria-haspopup="dialog" aria-controls="help" aria-label="About, notes and keys"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.7M12 17h.01"/></svg></button>
+</div>
+<div id="batch" class="batch" hidden><a id="go" class="btn" target="_blank" rel="noopener"></a>
+<span class="nav"><button type="button" id="prev" class="arrow" aria-label="Previous batch">‹</button><span id="bn" class="muted"></span>
+<button type="button" id="next" class="arrow" aria-label="Next batch">›</button></span></div>
+<p id="cap" class="sr"></p>
+<dialog id="help" class="sheet" aria-labelledby="hsh"><div class="shead"><h2 id="hsh">About this page</h2>
+<button type="button" class="shx" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><div class="sbody">
 <p class="sub">Records <span data-explain="levels">sorted for review</span> by how each photo matches its label.</p>
+<p id="desc" class="muted"></p>
+<p id="status" class="muted" aria-live="polite">Loading…</p>
+<p id="prog" class="rout"></p>
+<details id="hint" class="rout hint"><summary>Notes and keys</summary><div id="hintbody"></div>
+<p id="keys" hidden>Keys: j next card, k previous, i or Enter Identify (copies the name, opens iNaturalist in one reused tab), c copy the name. Click a card or press Space for the compare panel: j, k, Enter, c, s (skip), u (undo), Esc</p></details>
 <details class="about" id="about"><summary>About</summary>
 <p>Each record's first photo is compared with the names of the species in the pool by BioCLIP 2.5
 (ViT-H/14), an image and text model trained on the tree of life. A match score is the cosine between
@@ -134,29 +243,7 @@ cut-off, and a test of the levels against later corrections.</p>
 about 80% of their identifications in BC (Adjust sets a number of IDs per genus instead), then a line, then the rest; the map dims the rest.
 Ticks narrow it: Only my genera, Hide records I identified, or Only records I observed. The login is kept on this device for a day.
 The login goes only to iNaturalist.</p></details>
-<p id="status" class="muted" aria-live="polite">Loading…</p>
-<p><button type="button" id="unpick" class="more" hidden>Clear the species filter</button></p>
-<div id="tabs" class="tabs" role="tablist" aria-label="Level"></div>
-<p id="desc" class="muted"></p>
-<div id="kind" class="rout" hidden></div>
-<div class="rout usr"><details id="usrbox" hidden></details></div>
-<div id="rout" class="rout" hidden></div>
-<div id="rg" class="rout" hidden></div>
-<div id="study" role="tabpanel" aria-labelledby="tabb">
-<div class="srow"><label for="sgroup">Group</label><select id="sgroup"></select>
-<button type="button" id="snext" class="btn" aria-keyshortcuts="n" title="Next batch (N)">Next batch</button>
-<span id="sprog" class="muted" aria-live="polite"></span></div>
-<p class="snote muted">These batches come from a research study. <a href="terms.html#study" target="_blank">About</a></p>
-<p id="sdone" class="muted" hidden>You have seen every batch in this group. <button type="button" id="sover" class="lnk">Start over</button></p>
-<ol id="sgrid"></ol>
-<p class="srow snote muted"><a id="sall" target="_blank" rel="noopener" hidden></a>
-<button type="button" id="sexport" class="lnk">Download my batches</button><span id="sin"></span></p>
-</div>
-<div id="panel" role="tabpanel">
-<div id="batch" class="batch" hidden><a id="go" class="btn" target="_blank" rel="noopener"></a>
-<button type="button" id="prev" class="arrow" aria-label="Previous batch">‹</button>
-<button type="button" id="next" class="arrow" aria-label="Next batch">›</button></div>
-<p id="cap" class="muted" data-explain="batch" hidden></p>
+</div></dialog>
 <p id="none" class="muted" hidden>No records at this level here.</p>
 <ol id="grid"></ol>
 <p id="end"><button type="button" id="more" class="more" hidden>Show more</button></p>
@@ -167,6 +254,8 @@ The login goes only to iNaturalist.</p></details>
 <script>__MAP_TAXA__</script>
 <script>__MAP_CHIPS__</script>
 <script>__IDENTIFY_LINKS__</script>
+<script>__TAXON_TREE__</script>
+<script>__GROUP_LIST__</script>
 <script>__MAP_AREA__</script>
 <script>__MAP_FILTER__</script>
 <script>__FETCH_ONCE__</script>
@@ -174,9 +263,23 @@ The login goes only to iNaturalist.</p></details>
 <script>__SPACE_MASK__</script>
 <script>__IDENTIFY_RANGES__</script>
 <script>__MAP_USER__</script>
+<script>__MAP_PROJECTS__</script>
+<script>__MAP_ONLY__</script>
+<script>__IDENTIFY_ONLY__</script>
 <script>__IDENTIFY_UNCONFIRMED__</script>
 <script>__IDENTIFY_COMPARE__</script>
 <script>__IDENTIFY_STUDY__</script>
 <script>__IDENTIFY_INAT__</script>
+<script>__IDENTIFY_NARROW__</script>
+<script>__IDENTIFY_FLOW__</script>
+<script>__IDENTIFY_CARD__</script>
+<script>__IDENTIFY_GAPS__</script>
+<script>__IDENTIFY_WWW__</script>
+<script>__MAP_HIST__</script>
+<script>__MAP_TIME__</script>
+<script>__IDENTIFY_WHERE__</script>
+<script>__IDENTIFY_BAR__</script>
+<script>__IDENTIFY_PROGRESS__</script>
 <script>__IDENTIFY_APP__</script>
+<script>__IDENTIFY_SHELL__</script>
 </body></html>

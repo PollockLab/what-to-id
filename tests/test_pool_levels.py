@@ -66,6 +66,22 @@ def test_the_pack_round_trips_identify_parquet_in_shard_order(tmp_path):
         assert level[i] == want
         assert looks[i] == (row.at[pid, "looks_like"] if want in (2, 3, 5) else None)
     assert (level == 0).sum() >= N // 3 + 1 and set(level) == {0, 1, 2, 3, 4, 5}
+    assert site_files.path(site, "why") is None  # no runner_up column, no why file
+
+
+def test_the_why_file_holds_level_3_runner_ups_per_suggestion_and_their_margin():
+    level = np.array([3, 3, 2, 3, 0, 3, 3], np.int8)
+    looks = np.array(["B", "B", "A", "B", None, "A", "B"], dtype=object)
+    runner = np.array(["C", None, "D", "D", "C", "C", "D"], dtype=object)
+    margin = np.array([0.0284, 0.01, 0.2, 2.0, 0.1, np.nan, 0.004])
+    blob = pool_levels.pack_why(level, looks, runner, margin)
+    shown = pool_levels.unpack_looks(pool_levels.pack_looks(level, looks), 7)
+    got = pool_levels.unpack_why(blob, shown)
+    assert [g and g[0] for g in got] == ["C", None, None, "D", None, "C", "D"]
+    assert [g and g[1] for g in got] == pytest.approx([0.03, None, None, 1.27, None, None, 0.005])
+    raw = gzip.decompress(blob)
+    head = json.loads(raw[4 : 4 + int.from_bytes(raw[:4], "little")])
+    assert head["runners"] == [[0], [1, 0]]  # per suggestion A, B; B's commoner D first
 
 
 def test_the_score_steps_rank_within_a_level_and_weird_shows_the_lowest_first():
@@ -74,6 +90,14 @@ def test_the_score_steps_rank_within_a_level_and_weird_shows_the_lowest_first():
     got, q = pool_levels.unpack(pool_levels.pack(level, score))
     assert got.tolist() == level.tolist()
     assert q[:4].tolist() == [0, 12, 8, 4] and q[4:8].tolist() == [12, 0, 4, 8] and q[8] == 0
+
+
+def test_the_rank_file_orders_level_3_by_score_highest_first_and_leaves_the_rest_0():
+    level = np.array([3, 3, 3, 1, 0, 3], np.int8)
+    score = np.array([0.2, 0.9, 0.5, 0.7, np.nan, np.nan], np.float32)
+    rank = np.frombuffer(gzip.decompress(pool_levels.pack_rank(level, score)), "<u4")
+    assert rank.tolist() == [2, 0, 1, 0, 0, 3]
+    assert len(gzip.decompress(pool_levels.pack_rank(level[:0], score[:0]))) == 0
 
 
 def test_a_build_without_a_table_says_so(tmp_path):

@@ -185,7 +185,9 @@ def test_workflow_is_gated_pinned_and_off_the_pages_group():
     for name in ("plan", "apply"):  # atlas_sync.sh needs the hf CLI, which requirements.lock lacks
         assert any("huggingface_hub==" in step.get("run", "") for step in wf["jobs"][name]["steps"])
     steps = [step.get("name") for step in wf["jobs"]["apply"]["steps"]]
-    assert steps.index("Score the new photos for Identify") == steps.index("Upload the index") - 1
+    scored = steps.index("Score the new photos for Identify")
+    assert steps[scored + 1] == "Score the new photos for confused pairs"
+    assert scored == steps.index("Upload the index") - 2
     uses = re.findall(r"uses: (\S+)@(\S+)", text)
     assert uses and all(re.fullmatch(r"[0-9a-f]{40}", ref) for _, ref in uses)
     for action in ("checkout", "setup-python", "upload-artifact"):

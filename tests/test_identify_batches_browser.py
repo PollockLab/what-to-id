@@ -9,6 +9,7 @@ import pytest
 from what_to_id import page_identify
 
 from . import test_embeddings_browser as eb
+from . import test_identify_browser as ib
 from .embeddings_fixture import pool_frame
 from .test_identify_browser import serve
 
@@ -117,8 +118,8 @@ def test_signed_in_agree_posts_the_id_and_lands_in_the_trace(browser, site):
     page = open_batches(browser, base, signed_in=True)
     page.select_option("#sgroup", "Aves")
     first = cards(page)[0]
-    button = page.locator(f"#sgrid .card[data-id='{first}'] .act", has_text="Agree")
-    button.click()
+    ib.panel(page, page.locator(f"#sgrid .card[data-id='{first}']"))
+    page.locator("#cpdet .act", has_text="Agree").click()
     page.wait_for_function(
         "[...document.querySelectorAll('.act')].some(b=>b.textContent==='Posted')"
     )
