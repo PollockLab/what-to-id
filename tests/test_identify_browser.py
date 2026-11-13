@@ -2,7 +2,9 @@
 file, and the photos come 200 ids to a request. iNaturalist is stubbed."""
 
 import functools
+import gzip
 import http.server
+import json
 import re
 import threading
 
@@ -14,7 +16,7 @@ from what_to_id import page_identify, pool_levels, site_files
 from what_to_id.identify import IDENTIFY_COLUMNS
 from what_to_id.map_projects import add_projects
 from what_to_id.page_lookalike import site_records
-from what_to_id.page_map import decode_points, encode_points, render_map
+from what_to_id.page_map import align_totals, decode_points, encode_points, render_map
 
 from . import test_embeddings_browser as eb
 from .embeddings_fixture import TREE, pool_frame
@@ -31,10 +33,15 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
         pass
 
 
-def serve(root, frame, score, projects=None):
+def serve(root, frame, score, projects=None, totals=None):
     """Writes the map, levels and Identify pages for these pool rows and scores, and serves them;
-    `projects` is a pool-projects.bin path for the map's Projects."""
+    `projects` is a pool-projects.bin path for the map's Projects, `totals` the all-record counts
+    as page_map.fetch_totals returns them, written as the map's totals file."""
     blobs, meta = encode_points(frame, TREE)
+    if totals is not None:
+        gz = gzip.compress(json.dumps(align_totals(totals, meta)).encode())
+        blobs["pool-totals.bin"] = gz
+        meta.setdefault("files", {})["totals"] = "pool-totals.bin"
     add_projects(blobs, meta, projects)
     for name, blob in blobs.items():
         (root / name).write_bytes(blob)

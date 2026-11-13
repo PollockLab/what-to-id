@@ -17,7 +17,7 @@ function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=c
 return function(o){
 var S=o.S,META=o.META,MF=o.mf,G=META.groups,LAST=MF.LAST,iso=MF.iso,bar=$('bar'),SH=$('bsheet'),phone=matchMedia('(max-width:760px)'),
   SEG=NAMES.map(function(n){var b=$('b'+n.toLowerCase());return {b:b,p:$('p'+n.toLowerCase()),l:b.querySelector('b')};}),
-  cur=-1,CUM=null,GM=null,A=null,ACC=[];
+  cur=-1,CUM=null,TC,TOT=null,GM=null,A=null,ACC=[];
 SEG[2].b.hidden=o.embedded;  // the split view's map beside it holds the area
 
 // What: the taxon picker and its shortcuts, then the groups list with the groups filter left out of its counts, then the Show only
@@ -44,9 +44,15 @@ function cum(){
   for(i=0;i<META.days;i++)c[i+1]+=c[i];
   return (CUM=c);
 }
+// The all-record counts (the map's totals file) load beside the records; the light bars wait for them
+function tc(){
+  if(TC===undefined)TC=MapHist.tc(TOT,S,MF,CH.groupPass(S.groups,G,false),o.blocked());
+  return TC;
+}
+if(META.files.totals)o.get(META.files.totals).then(function(b){TOT=JSON.parse(new TextDecoder().decode(b));update();}).catch(function(){});
 var TM=MapTime({S:S,mf:MF,render:o.changed,refilter:o.changed,byObs:$('byObs'),byUp:$('byUp'),presets:$('presets'),from:$('from'),to:$('to'),
   months:$('months'),mclear:$('mclear')});
-var MH=MapHist({S:S,META:META,mf:MF,nf:o.nf,over:$('over'),hist:$('hist'),htip:$('htip'),unit:$('unit'),cum:cum,tc:function(){return null;},render:o.changed});
+var MH=MapHist({S:S,META:META,mf:MF,nf:o.nf,over:$('over'),hist:$('hist'),htip:$('htip'),unit:$('unit'),cum:cum,tc:tc,render:o.changed});
 
 // Where: the live map (identify_where.js), loaded when the panel first opens. Until then, and for a shared link's area, a
 // stand-in for the map (no controls of its own) restores the address's area; the map takes over once it is live.
@@ -145,7 +151,7 @@ phone.addEventListener('change',function(){if(SH.open)SH.close();close(false);})
 SEG.forEach(function(s){s.b.disabled=false;});
 // After every selection or level change: the words, the controls, and the open panel's numbers
 function update(){
-  CUM=null;if(W)W.sync();
+  CUM=null;TC=undefined;if(W)W.sync();
   var w=[what(),when(),where()];
   SEG.forEach(function(s,k){s.l.textContent=w[k];ACC[k].h.lastChild.textContent=w[k];});
   GL.show();TM.update();OL.show();CL.show();

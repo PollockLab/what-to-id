@@ -125,5 +125,17 @@ brush(over,function(){return {e:OE,u:'year'};});
 brush(hist,function(){return {e:HE,u:HU};});
 return {draw:draw,total:total,pct:pct};
 }
+// The all-record counts as running sums per month, for the groups g (a flag per group) and the months S.months, from
+// the totals file TOT. One picked status filter reads its own totals; two together, a left-out one, picked taxa or
+// anything else in blocked have none: null.
+MapHist.tc=function(TOT,S,MF,g,blocked){
+  var on=Object.keys(S.only).concat(S.acc?'acc_'+S.acc:[]),
+    tt=!TOT||S.picks.length||blocked||on.length>1||S.only[on[0]]==='not'?null:on.length?TOT.only&&TOT.only[on[0]]:TOT;
+  if(!tt)return null;
+  var rows=tt[S.up?'up':'obs'],nm=rows[0].length,m=S.months,TC=new Float64Array(nm+1);
+  for(var k=0;k<nm;k++){var v=0;if(!m||m>>(MF.M0+k)%12&1)for(var j=0;j<rows.length;j++)if(g[j])v+=rows[j][k];
+    TC[k+1]=TC[k]+v;}
+  return TC;
+};
 return MapHist;
 })();

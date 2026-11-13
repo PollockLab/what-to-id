@@ -3,12 +3,28 @@ filters the cards, a preset writes the dates, Esc returns to the segment, Left a
 between segments, and a phone's sheet holds the three panels as accordion sections. iNaturalist
 is stubbed."""
 
+import re
+
+import numpy as np
+import pandas as pd
+import pytest
+
 from . import test_embeddings_browser as eb
 from . import test_identify_browser as ib
+from .embeddings_fixture import GROUPS
 
 browser = eb.browser
 site = ib.site
 PANELS = {"#bwhat": "#pwhat", "#bwhen": "#pwhen", "#bwhere": "#pwhere"}
+
+# the canvas holds a pixel of the light layer's colour, --total in the light scheme
+LIGHT_BAR = """() => {
+  const c = document.getElementById('hist'), w = c.width, h = c.height;
+  const d = c.getContext('2d').getImageData(0, 0, w, h).data;
+  for (let i = 0; i < d.length; i += 4)
+    if (d[i] === 213 && d[i + 1] === 227 && d[i + 2] === 245 && d[i + 3] === 255) return true;
+  return false;
+}"""
 
 
 def blank_map(page):
@@ -96,3 +112,41 @@ def test_a_phone_opens_one_sheet_with_accordion_sections_and_a_spaced_footer(bro
     assert page.inner_text("#bsheet .sdone").replace("\n", " ") == f"Show {n} cards"
     page.tap("#bsheet .sdone")
     assert page.locator("#bsheet").is_hidden() and page.errors == []
+
+
+@pytest.fixture(scope="module")
+def totals_site(tmp_path_factory):
+    pytest.importorskip("pyarrow")
+    ids = np.random.default_rng(1).choice(2**32 - 2, ib.N, replace=False) + 1
+    score = np.random.default_rng(2).normal(size=ib.N).astype("float32")
+    months = [f"{y}-{m:02d}" for y in range(2023, 2031) for m in range(1, 13)]
+    every = {g: {ym: 10**4 for ym in months} for g in GROUPS}
+    raw = {"on": "2026-01-01", "obs": every, "up": every}
+    frame = ib.pool_frame(ids)
+    # three years of dates, so the detail histogram draws one bar per month
+    day = pd.Timestamp("2023-09-01") + pd.to_timedelta(np.arange(len(ids)) % 1100, unit="D")
+    frame["observed_on"] = [d.date().isoformat() for d in day]
+    frame["created_at"] = [d.isoformat() + "T00:00:00Z" for d in day]
+    server, _ = ib.serve(tmp_path_factory.mktemp("totals-site"), frame, score, totals=raw)
+    yield f"http://127.0.0.1:{server.server_port}"
+    server.shutdown()
+
+
+def test_the_when_histogram_has_the_maps_two_layers_and_its_tooltip(browser, totals_site):
+    page = ib.open_identify(browser, totals_site, "#lvl=1", size=(1100, 800))
+    page.wait_for_function("__identify.ids().length > 0")
+    page.click("#bwhen")
+    # the light layer is drawn behind the dark one: both of the map's colours land on the canvas
+    page.wait_for_function(LIGHT_BAR)
+    box = page.locator("#hist").bounding_box()
+    tip = ""
+    for x in range(2, int(box["width"]), 3):  # a bar with records: its tip names both counts
+        page.mouse.move(box["x"] + x, box["y"] + box["height"] - 20)
+        tip = page.inner_text("#htip")
+        if " of " in tip:
+            break
+    m = re.fullmatch(r"[A-Z][a-z]+ \d{4}: ([\d,]+) of ([\d,]+) still need an ID \((<1|\d+)%\)", tip)
+    assert m, tip
+    n, t = (int(g.replace(",", "")) for g in m.groups()[:2])
+    assert 0 < n <= t
+    assert page.errors == []

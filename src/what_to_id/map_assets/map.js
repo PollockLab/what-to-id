@@ -166,14 +166,7 @@ function recount(){CT=0;
     (day[i]===NO?full():day[i]>=S.lo&&day[i]<=S.hi))ALT++;
   VC=null;CUM=new Float64Array(META.days+1);
   for(var d=0;d<META.days;d++)CUM[d+1]=CUM[d]+PER[d];
-  // One picked status filter reads its own totals; two together, a left-out one, an area or a lasso have none
-  var on=Object.keys(S.only).concat(S.acc?'acc_'+S.acc:[]),
-    tt=!TOT||S.picks.length||AREA.on()||PJ.active()||UF.active()||FK||on.length>1||S.only[on[0]]==='not'?null:
-      on.length?TOT.only&&TOT.only[on[0]]:TOT;
-  TC=null;
-  if(tt){var rows=tt[S.up?'up':'obs'],nm=rows[0].length;TC=new Float64Array(nm+1);
-    for(var k=0;k<nm;k++){var v=0;if(!m||m>>(M0+k)%12&1)for(var j=0;j<rows.length;j++)if(g[j])v+=rows[j][k];
-      TC[k+1]=TC[k]+v;}}
+  TC=MapHist.tc(TOT,S,MF,g,AREA.on()||PJ.active()||UF.active()||FK);
   if(SEL>=0&&!KEEP[SEL])closeCard();
   // the photo space beside the map keeps the records the projects keep; it has no project file of its own
   if(parent!==window&&PJP!==PJ.key()+':'+n){PJP=PJ.key()+':'+n;parent.postMessage({type:'wtid-projects',ids:PJ.ids(P)},location.origin);}
