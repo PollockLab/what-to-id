@@ -168,10 +168,12 @@ def test_the_compare_panel_shows_photos_and_works_from_the_keys(browser, site):
     assert panel.locator("#cpat").inner_text().startswith("1 of")
     page.keyboard.press("s")
     second = cards.nth(1).locator(".look i").inner_text()
+    before = panel.locator("#cpo").bounding_box()
     page.keyboard.press("Enter")  # copies, opens in the one tab, marked, on to the next
     assert page.evaluate("OPENED")[-1][1] == "wtid-inat" and page.evaluate("COPIED")[-1] == second
     page.wait_for_function("document.getElementById('cpt').textContent.length > 0")
     assert panel.locator("#cpt").inner_text() == f"Copied {second}, paste in iNat"
+    assert panel.locator("#cpo").bounding_box() == before  # the toast does not move Identify
     assert cards.nth(1).locator(".opened").inner_text() == "Opened"
     assert panel.locator("#cpat").inner_text().startswith("3 of")
     page.keyboard.press("k")
