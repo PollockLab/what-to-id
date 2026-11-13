@@ -155,12 +155,15 @@ function photos(lis){
         img.src=String(p.url).replace('/square.','/medium.');ph.appendChild(img);}else ph.textContent='No photo on iNaturalist now';
       w.textContent=(o.observed_on||'Date unknown')+' · '+(o.place_guess||'Place unknown');w.title=w.textContent;
       // level 3: an ID at species there would not be the first, so not an improving one
-      if(li.dataset.lv==='3'&&IdentifyNarrow.taken(o)){li.remove();return;}
+      if(li.dataset.lv==='3'&&IdentifyNarrow.taken(o)){li.remove();drop(+li.dataset.i);return;}
       if(IN.user()&&t&&t.id&&!li.querySelector('.acts'))acts(li,t);
       if(CMP)CMP.landed(li);
     });
   }).catch(function(e){if(!(sig&&sig.aborted))status('Could not load the photos: '+e.message,1);});
 }
+// a removed card leaves the list, so the caption, Show more and the batches count only cards that can show
+function drop(i){var r=view[LV],k=r&&Array.isArray(r)?r.indexOf(i):-1;if(k<0)return;r.splice(k,1);if(r.n)r.n--;if(k<drawn)drawn--;
+  var b=$('more');b.hidden=r.length<=drawn;b.textContent='Show more ('+nf.format(r.length-drawn)+' left)';var bi=BI;batch();BI=bi;step(0);}
 // Signed in: Agree with the record's taxon, and on a card that names a look-alike, ID it as that. The Identify link stays.
 function acts(li,t){
   var id=+li.dataset.id,pr=li.dataset.i&&CMP&&CMP.pair(+li.dataset.i),row=el('div','acts');

@@ -98,6 +98,13 @@ def test_a_record_with_a_species_id_is_dropped(browser, site):
         "([...document.querySelectorAll('#grid .card')])"
     )
     assert calls and all(len(c) <= 200 for c in calls)  # the photos' own requests, none added
+    view = page.evaluate("__identify.view()")[3]
+    assert view and all(i % 2 for i in view)  # dropped from the list, not only the grid
+    cards = int(page.inner_text("#cap").split(" cards")[0].replace(",", ""))
+    assert cards == len(view)  # the caption counts only cards that can show
+    left = len(view) - page.locator("#grid .card").count()
+    more = page.locator("#more")
+    assert more.is_hidden() if not left else more.inner_text() == f"Show more ({left} left)"
     assert page.errors == []
 
 
