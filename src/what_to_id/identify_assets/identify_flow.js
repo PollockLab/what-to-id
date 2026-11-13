@@ -1,40 +1,37 @@
-// Fewer tab switches on level 3: iNaturalist links share one window beside the list (named wtid-inat, opened as a half-screen popup
-// and reused), Identify on a level 3 card first copies the suggested name, marks the card Opened and moves focus to the next card,
-// and j, k, i (or Enter) and c work the cards from the keyboard. A blocked popup or a modified click falls back to the link itself.
+// Fewer tab switches on level 3: iNaturalist links share one tab (named wtid-inat, reused), Identify on a level 3 card first copies the suggested name, marks the card Opened and moves focus to the next card,
+// and j, k, i (or Enter) and c work the cards from the keyboard. A blocked open or a modified click falls back to the link itself.
 var IdentifyFlow=(function(){
 'use strict';
-var NAME='wtid-inat',OPENED=new Set();
+var NAME='wtid-inat',DONE=new Map();
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
-// the right half of the screen, full height
-function feat(){
-  var s=window.screen,w=Math.floor(s.availWidth/2);
-  return 'popup,width='+w+',height='+s.availHeight+',left='+((s.availLeft||0)+s.availWidth-w)+',top='+(s.availTop||0);
-}
-// The popup keeps its opener, which is how the named window is found again; the link itself (a blocked popup, middle click) opens noopener.
+// A named tab is found again by its name; the link itself (a blocked open, middle click) opens noopener.
 function link(a,then){
   a.target=NAME;a.rel='noopener';
   a.addEventListener('click',function(e){
     if(e.defaultPrevented||e.button||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;
     if(then)then();
-    var w=window.open(a.href,NAME,feat());
+    var w=window.open(a.href,NAME);
     if(w){if(w.focus)w.focus();e.preventDefault();}
   });
 }
-function mark(li){
-  if(li.querySelector('.opened'))return;
-  var w=li.querySelector('.when');li.insertBefore(el('div','badge opened','Opened'),w);
+// a card done with: Opened or Skipped, kept across redraws
+function mark(li,text){
+  text=text||'Opened';DONE.set(li.dataset.id,text);li.classList.add('done');
+  var b=li.querySelector('.opened');if(b){if(text==='Opened')b.textContent=text;return;}
+  li.insertBefore(el('div','badge opened',text),li.querySelector('.when'));
 }
 function next(li){
   var n=li.nextElementSibling;
   while(n&&!n.classList.contains('card'))n=n.nextElementSibling;
   if(n){n.focus({preventScroll:true});n.scrollIntoView({block:'nearest'});}
 }
+function seen(li){if(DONE.has(li.dataset.id))mark(li,DONE.get(li.dataset.id));}
 return {
-  link:link,
+  link:link,mark:mark,seen:seen,
   // the Identify link of a level 3 card
   identify:function(a,li){
-    link(a,function(){var c=li.querySelector('.copy');if(c)c.click();OPENED.add(li.dataset.id);mark(li);next(li);});
-    if(OPENED.has(li.dataset.id))mark(li);
+    link(a,function(){var c=li.querySelector('.copy');if(c)c.click();mark(li);next(li);});
+    seen(li);
   },
   // ctx {level(), more()}: the keys work on level 3 only, never in a form field
   keys:function(ctx){

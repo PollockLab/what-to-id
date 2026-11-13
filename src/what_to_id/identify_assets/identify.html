@@ -44,10 +44,11 @@ ol{list-style:none;margin:8px 0;padding:0;display:grid;gap:10px;
 .card:hover{border-color:var(--muted)}
 .card .ph{display:flex;align-items:center;justify-content:center;aspect-ratio:4/3;font-size:12px;
   border-radius:4px;background:var(--chip);color:var(--muted);overflow:hidden;text-align:center}
-.card img{width:100%;height:100%;object-fit:cover;display:block}
+.card img{width:100%;height:100%;object-fit:cover;display:block;color:transparent}
 .card .name,.card .com,.card .when{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .card .name{font-size:13px}
 .card .com,.card .look,.card .when{font-size:12px;color:var(--muted)}
+.card .why{font-size:11px;color:var(--muted);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .card .look{overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .card .when{display:block;text-decoration:none;min-height:24px;line-height:24px}
 .card .when:hover{text-decoration:underline}
@@ -67,6 +68,11 @@ ol{list-style:none;margin:8px 0;padding:0;display:grid;gap:10px;
 .segb[aria-checked=true]{background:var(--on);color:var(--onink)}
 .segb:disabled{opacity:.5;cursor:default}
 .segnote{display:block;margin-top:4px;color:var(--muted)}
+.ctl{display:flex;flex-wrap:wrap;align-items:center;gap:4px 16px}
+.ctl>.rout{margin:2px 0}.ctl #sort:not([hidden]){display:contents}.ctl .srow{margin:2px 0;gap:4px 6px}
+.ctl .segb{min-height:26px;padding:0 9px}
+#sort .segnote{margin:0}
+.hint{color:var(--muted)}.hint summary{cursor:pointer;min-height:24px}.hint .segnote,.hint p{margin:2px 0}
 .card .links{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
 .card .range{flex:1 1 8em;min-width:0;font-size:12px;color:var(--muted)}
 .card .badge{align-self:flex-start;font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 4px}
@@ -75,7 +81,9 @@ ol{list-style:none;margin:8px 0;padding:0;display:grid;gap:10px;
 .card .kind{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
 .cmp{flex:none;display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:0}
 .cmp figure{margin:0;min-width:0;display:flex;flex-direction:column;gap:1px}
-.cmp img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:4px;display:block;background:var(--chip)}
+.cmp a{display:block;border-radius:4px;background:var(--chip)}
+.cmp img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:4px;display:block;color:transparent}
+.cmp img:not([src]),.card .ph img:not([src]){visibility:hidden}
 .cmp figcaption{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .usr{min-height:24px}  /* the User box fills in once the map data loads; its row is kept so the cards stay put */
 #usrbox summary{cursor:pointer;color:var(--muted);min-height:24px}
@@ -86,7 +94,7 @@ ol{list-style:none;margin:8px 0;padding:0;display:grid;gap:10px;
 button.padd{cursor:pointer;background:var(--chip)}
 #usrbox p{margin:4px 0}
 /* Batches (the study): its box replaces the level's controls and cards */
-body:not(.bt) #study,.bt #status:not(.err),.bt #unpick,.bt #desc,.bt #kind,.bt .usr,.bt #rout,.bt #rg,.bt #grp,.bt #panel{display:none!important}
+body:not(.bt) #study,.bt #status:not(.err),.bt #unpick,.bt #desc,.bt #kind,.bt .usr,.bt #rout,.bt #rg,.bt #grp,.bt #sort,.bt #hint,.bt #panel{display:none!important}
 .srow{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:8px 0}
 .srow select{font:inherit;min-height:30px;padding:0 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink)}
 .btn:is(button){font:inherit;font-size:13px;font-weight:650;border:0;cursor:pointer}
@@ -99,8 +107,25 @@ body:not(.bt) #study,.bt #status:not(.err),.bt #unpick,.bt #desc,.bt #kind,.bt .
 .card .act:disabled{cursor:default}
 .card .copy{font:inherit;font-size:11px;min-height:24px;margin-left:4px;padding:0 6px;border:1px solid var(--line);border-radius:10px;background:var(--chip);color:var(--ink);cursor:pointer}
 .card .conf{margin-left:6px;font-size:11px;color:var(--muted)}
-.card .gap{margin-left:6px;font-size:11px;color:var(--muted)}
+.card .gap{margin-left:6px;font-size:11px;color:var(--muted);white-space:nowrap}
 .card .note{font-size:12px;color:var(--muted)}
+.card.done{opacity:.6}.card.cur{outline:2px solid var(--on);outline-offset:1px}
+#cpanel{position:fixed;top:0;right:0;bottom:0;z-index:10;width:min(520px,100%);box-sizing:border-box;overflow:auto;
+  background:var(--panel);border-left:1px solid var(--line);box-shadow:-4px 0 16px rgba(0,0,0,.15);padding:8px 12px 0;display:flex;flex-direction:column;gap:8px}
+#cpanel:focus{outline:none}
+@media (min-width:900px){body.cpon main{margin-right:520px}}
+@media (max-width:600px){.cpbig{max-height:38vh}}
+.cptop{display:flex;align-items:center;gap:8px}.cptop h2{flex:1;min-width:0;margin:0;font-size:15px;font-weight:600;overflow-wrap:anywhere}
+.cpbig{width:100%;max-height:min(52vh,480px);object-fit:contain;background:var(--chip);border-radius:6px;display:block}
+.cpstrip{display:flex;gap:4px;overflow-x:auto;margin-top:4px}
+.cpthumb{padding:0;border:2px solid transparent;border-radius:4px;background:none;cursor:pointer;width:48px;height:48px;flex:none}
+.cpthumb[aria-pressed=true]{border-color:var(--on)}.cpthumb img{width:100%;height:100%;object-fit:cover;display:block}
+.cpwhen{display:block;font-size:12px;min-height:24px;line-height:24px}
+#cprefs{display:grid;gap:8px}.cpref h3{font-size:13px;font-weight:600;margin:0 0 2px}
+.cpph{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}.cpph img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:4px;display:block}
+.cpref a{font-size:12px}
+.cpbar{position:sticky;bottom:0;margin-top:auto;display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 0;background:var(--panel);border-top:1px solid var(--line)}
+.cpbar .copy{font:inherit;font-size:13px;min-height:30px;padding:0 10px;border:1px solid var(--line);border-radius:15px;background:var(--chip);color:var(--ink);cursor:pointer}
 __IDENTIFY_RANGES_CSS__
 </style></head><body>
 __SITE_NAV__<main id="main-content">
@@ -141,14 +166,15 @@ The login goes only to iNaturalist.</p></details>
 <p id="status" class="muted" aria-live="polite">Loading…</p>
 <p><button type="button" id="unpick" class="more" hidden>Clear the species filter</button></p>
 <div id="tabs" class="tabs" role="tablist" aria-label="Level"></div>
-<div id="grp" class="rout" hidden><label for="grpsel">Group </label><select id="grpsel" class="padd"></select></div>
 <p id="desc" class="muted"></p>
 <div id="kind" class="rout" hidden></div>
 <div class="rout usr"><details id="usrbox" hidden></details></div>
+<div class="ctl"><div id="grp" class="rout" hidden><label for="grpsel">What </label><select id="grpsel" class="padd"></select></div>
 <div id="rout" class="rout" hidden></div>
+<div id="sort" class="rout" hidden></div></div>
 <div id="rg" class="rout" hidden></div>
-<div id="sort" class="rout" hidden></div>
-<p id="keys" class="muted" hidden>Keys: j next card, k previous, i or Enter Identify (copies the name, opens iNaturalist beside this list), c copy the name</p>
+<details id="hint" class="rout hint"><summary>Notes and keys</summary><div id="hintbody"></div>
+<p id="keys" hidden>Keys: j next card, k previous, i or Enter Identify (copies the name, opens iNaturalist in one reused tab), c copy the name. Click a card or press Space for the compare panel: j, k, Enter, c, s (skip), Esc</p></details>
 <div id="study" role="tabpanel" aria-labelledby="tabb">
 <div class="srow"><label for="sgroup">Group</label><select id="sgroup"></select>
 <button type="button" id="snext" class="btn" aria-keyshortcuts="n" title="Next batch (N)">Next batch</button>
@@ -188,5 +214,6 @@ The login goes only to iNaturalist.</p></details>
 <script>__IDENTIFY_NARROW__</script>
 <script>__IDENTIFY_FLOW__</script>
 <script>__IDENTIFY_GAPS__</script>
+<script>__IDENTIFY_WWW__</script>
 <script>__IDENTIFY_APP__</script>
 </body></html>

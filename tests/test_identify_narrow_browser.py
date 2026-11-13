@@ -7,11 +7,13 @@ import urllib.request
 from urllib.parse import parse_qs, urlparse
 
 import numpy as np
+import pandas as pd
 
 from what_to_id import site_files
 
 from . import test_embeddings_browser as eb
 from . import test_identify_browser as ib
+from .test_identify_browser import LOOKS
 
 browser = eb.browser
 site = ib.site
@@ -115,4 +117,39 @@ def test_the_group_control_sets_the_groups_filter(browser, site):
     page.reload()
     page.wait_for_function("window.__identify && __identify.ids().length > 0")
     assert page.locator("#grpsel").input_value() == "*"
+    assert page.errors == []
+
+
+def test_level_3_caps_by_the_suggested_species_and_other_levels_by_label(browser, site):
+    base, pts = site
+    page = ib.open_identify(browser, base, "#lvl=3&conf=all")
+    page.wait_for_selector("#grid .card .look")  # the look-alikes landed, the list was drawn again
+    look = dict(zip(pts["id"].tolist(), [LOOKS[k % 3] for k in range(len(pts))], strict=True))
+    view = page.evaluate("__identify.view()")
+    per = pd.Series([look[i] for i in view[3]]).value_counts()
+    held = pd.Series([look[i] for i in pts["id"][pts["level"] == 3]]).value_counts()
+    assert len(per) > 1 and per.max() <= 3 and per.sum() == held.clip(upper=3).sum()
+    # +N more would pick the label, not the suggestion
+    assert page.locator("#grid .card .sp").count() == 0
+    tax = dict(zip(pts["id"].tolist(), pts["taxon_id"].tolist(), strict=True))
+    by_label = pd.Series([tax[i] for i in view[1]]).value_counts()
+    assert by_label.max() <= 3  # the other levels still cap by label
+    assert page.errors == []
+
+
+def test_level_3_has_one_count_line_that_agrees_with_the_tab(browser, site):
+    base, _ = site
+    page = ib.open_identify(browser, base, "#lvl=3")
+    page.wait_for_selector("#grid .card .look")
+    cards = len(page.evaluate("__identify.view()")[3])
+    records = page.evaluate("__identify.total()")[3]
+    assert page.inner_text("#tab3 b") == f"{records:,}"
+    assert page.inner_text("#cap") == (
+        f"{cards:,} cards to ID ({records:,} records, Top 5%; up to 3 per suggested species)"
+    )
+    assert page.locator("#cap").is_visible() and "records shown" not in page.inner_text("#sort")
+    page.click("#sort button:has-text('All')")
+    records = page.evaluate("__identify.total()")[3]
+    assert page.inner_text("#tab3 b") == f"{records:,}"
+    assert f"({records:,} records; up to 3 per suggested species)" in page.inner_text("#cap")
     assert page.errors == []

@@ -49,6 +49,7 @@ from what_to_id.levels import TAXONOMIST_MARGIN, WEIRD_SHARE, lookalike_known, s
 
 IDENTIFY_COLUMNS = ("id", "taxon_id", "level", "score", "score2", "looks_like")
 NONE, EASY, TAXONOMIST, NARROW, WEIRD, MISLABEL = 0, 1, 2, 3, 4, 5
+CATEGORIES = ("looks_like", "runner_up")
 LEVEL_NAMES = ("none", "easy", "taxonomist", "narrow", "weird", "mislabel")
 
 
@@ -110,7 +111,7 @@ def identify_scores(
 
     Columns: id, taxon_id, taxon_name, rank, iconic_taxon, top, own, other, other_name (species
     rank), in_best, in_second, out_best, in_name (rank above species, clade with a prototype;
-    in_second and out_best are NaN when the clade has one species or all of them).
+    in_second_name; in_second and out_best are NaN when the clade has one species or all of them).
     """
     is_species = (taxa.str.split().str.len() == 2).to_numpy()
     names = taxa[is_species].drop_duplicates()
@@ -140,6 +141,7 @@ def identify_scores(
         }
         r["other_name"] = np.full(n, None, dtype=object)
         r["in_name"] = np.full(n, None, dtype=object)
+        r["in_second_name"] = np.full(n, None, dtype=object)
         for c in range(0, n, CHUNK):
             sims = (
                 X[c : c + CHUNK] @ protos.T if len(order) else np.empty((len(X[c : c + CHUNK]), 0))
@@ -163,7 +165,8 @@ def identify_scores(
                 j = int(seg.argmax())
                 r["in_best"][c + i], r["in_name"][c + i] = seg[j], order[lo + j]
                 if hi - lo > 1:
-                    r["in_second"][c + i] = np.partition(seg, -2)[-2]
+                    k = int(np.argpartition(seg, -2)[-2])
+                    r["in_second"][c + i], r["in_second_name"][c + i] = seg[k], order[lo + k]
                 # outside means elsewhere in the tree: the root's clade has no outside
                 if lo > 0 or hi < in_tree:
                     r["out_best"][c + i] = max(
@@ -176,6 +179,7 @@ def identify_scores(
             **{k: pd.Series(dtype=float) for k in ("in_second", "out_best")},
             other_name=pd.Series(dtype=object),
             in_name=pd.Series(dtype=object),
+            in_second_name=pd.Series(dtype=object),
         )
     return pd.concat(parts, ignore_index=True).astype({"id": np.int64, "taxon_id": np.int64})
 
@@ -188,7 +192,8 @@ def identify_levels(
     `score` is `own` for easy, the margin for taxonomist and mislabel, the smaller of in-clade
     best minus outside best and `score2` for narrow (most confident first) and `top` for weird;
     `score2` is best minus second-best in-clade (narrow only); `looks_like` is the look-alike
-    species (taxonomist, mislabel) or the probable species (narrow).
+    species (taxonomist, mislabel) or the probable species (narrow); a trailing `runner_up` column
+    holds narrow's second-best species in the clade, the one `score2` is the margin over.
 
     With `frozen`, the weird cut and the easy share come from it, not from `scores`; a group or
     species it lacks gets neither level. `bc_counts` should then cover the whole pool.
@@ -240,6 +245,9 @@ def identify_levels(
             "score": score.astype(np.float32),
             "score2": score2.astype(np.float32),
             "looks_like": pd.Series(looks, dtype="string").astype("category").to_numpy(),
+            "runner_up": pd.Series(np.where(narrow, s.get("in_second_name"), None), dtype="string")
+            .astype("category")
+            .to_numpy(),
         }
     )
 
@@ -275,8 +283,8 @@ def identify_delta(
     add = identify_levels(identify_scores(todo, E, ids, taxa, T, tree), bc_counts, frozen)
     kept = base[base["id"].isin(pool["id"]) & ~base["id"].isin(add["id"])]
     out = pd.concat([kept, add], ignore_index=True)
-    looks = out["looks_like"].astype("string").astype("category")
-    return out.assign(looks_like=looks.to_numpy())
+    cat = {k: out[k].astype("string").astype("category").to_numpy() for k in CATEGORIES}
+    return out.assign(**cat)
 
 
 def _one(folder: str, pattern: str) -> Path:

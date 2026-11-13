@@ -11,7 +11,7 @@ var MAP=new URL(CFG.mapUrl,location.href).href,nf=new Intl.NumberFormat('en-CA')
 var TAB=[],SUBK=[],NK=1,KIND=null,SUB=null,KF=0,KC=[],UF=null,UON=false,MINE=[],CMP=null,SEEN='wtid-identify-seen',BT=false,ST=null,SK='',IN=IdentifyInat(CFG.oauth);
 // CFG.merge: the kinds (levels) a tab shows, in order; SUBK a kind's place in its tab
 Object.keys(CFG.merge).forEach(function(t){CFG.merge[t].forEach(function(k,j){TAB[k]=+t;SUBK[k]=j;});NK=Math.max(NK,CFG.merge[t].length);});
-var META=null,SYNC=null,MORE=new Map(),TAXA=null,P=null,BYID=null,LEVEL=null,Q=null,LOOKS=null,RK=null,N3=0,GP=null,R=null,MF=null,TF=null,PEND=null,REC=-1,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,ONE='',CACHE=new Map(),FIRST=null,SHOWN,STAY=false,X=null;
+var META=null,SYNC=null,MORE=new Map(),TAXA=null,P=null,BYID=null,LEVEL=null,Q=null,LOOKS=null,WHY=null,RK=null,N3=0,GP=null,R=null,MF=null,TF=null,PEND=null,REC=-1,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,ONE='',CACHE=new Map(),FIRST=null,SHOWN,STAY=false,X=null,WW=null;
 function $(id){return document.getElementById(id);}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 function status(t,err){var s=$('status');s.textContent=t;s.classList.toggle('err',!!err);}  // an error shows on Batches too
@@ -44,7 +44,9 @@ function byId(P){
   for(t=0;t<P.n;t++){b=-1;for(j=0;j<k;j++)if(pos[j]<s[j+1]&&(b<0||P.id[pos[j]]<P.id[pos[b]]))b=j;out[t]=pos[b]++;}
   return out;
 }
-function on(i){return SEL[i]&&LEVEL[i]&&(!R||R.pass(i,LEVEL[i]))&&(!X||X.pass(i))&&(!GP||KIND[i]!==3||GP.pass(i));}
+// What the per-species cap counts: the record's label, but on level 3 the suggested species (the label is a coarse rank there).
+function ck(i,lv){var v=lv===3&&LOOKS?LOOKS.lo[i]|LOOKS.hi[i]<<8:NO_LOOK;return v===NO_LOOK?P.tax[i]:v;}
+function on(i){return SEL[i]&&LEVEL[i]&&(!R||R.pass(i,LEVEL[i]))&&(!X||X.pass(i))&&(!GP||KIND[i]!==3||GP.pass(i))&&(!WW||KIND[i]!==3||WW.pass(i));}
 // Under My taxa first the user's genera lead each level, each kind in turn, then the rest; MINE: how many cards they are, -1 without the mode.
 function build(){
   var n=P.n,W=2*NK*STEPS,c=new Uint32Array(6*W+1),key=new Uint16Array(n),rk=UF.ranked(),i,k,lv;
@@ -62,9 +64,9 @@ function build(){
     // the cut is per kind, so a merged tab lists each kind's level list in turn, as pool_levels writes them
     var tot=new Uint32Array(65536*NK),taken=new Uint32Array(65536*NK),rows=[],a=c[lv*W],b=c[(lv+1)*W],nd=[],cut,t,kf=KF&&TAB[KF]===lv?KF:0;
     for(k=a;k<b;k++){i=order[k];KC[KIND[i]]=(KC[KIND[i]]||0)+1;if(kf&&KIND[i]!==kf){order[k]=-1;continue;}
-      if(!tot[SUB[i]*65536+P.tax[i]]++)nd[SUB[i]]=(nd[SUB[i]]||0)+1;}
-    for(k=b-1;k>=a;k--){i=order[k];if(i<0)continue;t=SUB[i]*65536+P.tax[i];cut=nd[SUB[i]]===1?Infinity:PER_SPECIES;
-      if(taken[t]<cut){rows.push(i);if(!taken[t]++&&tot[t]>cut)MORE.set(i,tot[t]-cut);}}
+      if(!tot[SUB[i]*65536+ck(i,lv)]++)nd[SUB[i]]=(nd[SUB[i]]||0)+1;}
+    for(k=b-1;k>=a;k--){i=order[k];if(i<0)continue;t=SUB[i]*65536+ck(i,lv);cut=nd[SUB[i]]===1?Infinity:PER_SPECIES;
+      if(taken[t]<cut){rows.push(i);if(!taken[t]++&&tot[t]>cut&&!(lv===3&&LOOKS))MORE.set(i,tot[t]-cut);}}
     // the #record= card leads its level, even past the per-species cut
     if(REC>=0&&LEVEL[REC]===lv&&on(REC)&&rows[0]!==REC){k=rows.indexOf(REC);if(k>0)rows.splice(k,1);rows.unshift(REC);}
     out[lv]=rows;total[lv]=b-a;
@@ -77,6 +79,11 @@ function looksOf(i){
   var v=LOOKS.lo[i]|LOOKS.hi[i]<<8;
   return v===NO_LOOK?null:LOOKS.names[v];
 }
+// level 3's runner-up: [name, margin in thousandths, 255 none], or null; its place is in its suggestion's list
+function whyOf(i){
+  var v=WHY&&LOOKS?LOOKS.lo[i]|LOOKS.hi[i]<<8:NO_LOOK,c=WHY?WHY.lo[i]:255,r=v===NO_LOOK||c===255?null:WHY.runners[v];
+  return r&&r[c]!=null?[WHY.names[r[c]],WHY.hi[i]===255?255:WHY.hi[i]*5]:null;
+}
 // Under a card's photo: its label, and for a close call, a likely mislabel or a record above species what it looks like.
 function title(i,lv){
   var t=P.tax[i]!==NOTAX&&TAXA[P.tax[i]],box=el('div','title'),nm=el('div','name'),lk=looksOf(i),l=el('div','look');
@@ -87,7 +94,7 @@ function title(i,lv){
   if(lv===3&&lk&&!BT){var g=el('div','sugg'),cf=RK&&IdentifyNarrow.conf(RK[i],N3);g.appendChild(IdentifyNarrow.copy(lk));if(cf)g.appendChild(el('span','conf',cf));var gp=GP&&GP.badge(i);if(gp)g.appendChild(gp);}
   else if((lv===2||lv===5)&&lk)l.append('Looks more like ',el('i',null,lk));
   if(l.firstChild)box.appendChild(l);
-  if(g)box.appendChild(g);
+  if(g){var y=whyOf(i);if(y)box.appendChild(IdentifyNarrow.why(y[0],y[1]));box.appendChild(g);}
   return box;
 }
 // A card tells the map which record it is on (hover and focus) and which was picked (click); links are left alone.
@@ -123,8 +130,10 @@ function card(i,lv,id){
   if(i>=0&&lv===3&&!BT)IdentifyFlow.identify(a,li);else IdentifyFlow.link(a);
   li.appendChild(R&&i>=0?R.links(a,i,lv):a);
   li.onmouseenter=li.onfocus=function(){tell('wtid-focus',id);};
-  li.onclick=function(e){if(!e.target.closest('a,button'))tell('wtid-record',id);};
-  li.onkeydown=function(e){if(e.target===li&&(e.key==='Enter'||e.key===' ')){e.preventDefault();tell('wtid-record',id);}};
+  // a click or Space opens the compare panel beside the list
+  li.onclick=function(e){if(!e.target.closest('a,button')){tell('wtid-record',id);if(CMP)CMP.open(li);}};
+  li.onkeydown=function(e){if(e.target===li&&(e.key==='Enter'||e.key===' ')){e.preventDefault();tell('wtid-record',id);if(e.key===' '&&CMP)CMP.open(li);}};
+  IdentifyFlow.seen(li);
   return li;
 }
 // Fills the photos of the cards just drawn; a record that left Needs ID or iNaturalist since the pool was built drops out.
@@ -140,12 +149,13 @@ function photos(lis){
       if(!li.dataset.i){var nm=el('div','name');nm.appendChild(el('i',null,t?t.name:'Unidentified'));
         li.querySelector('.title').replaceChildren(nm);if(t&&t.preferred_common_name)nm.after(el('div','com',t.preferred_common_name));}
       ph.textContent='';
-      if(p){var img=el('img');img.loading='lazy';img.alt='Photo of '+li.querySelector('i').textContent;
+      if(p){var img=el('img');img.loading='lazy';img.onerror=function(){img.removeAttribute('src');};img.alt='Photo of '+li.querySelector('i').textContent;
         img.src=String(p.url).replace('/square.','/medium.');ph.appendChild(img);}else ph.textContent='No photo on iNaturalist now';
       w.textContent=(o.observed_on||'Date unknown')+' · '+(o.place_guess||'Place unknown');w.title=w.textContent;
       // level 3: an ID at species there would not be the first, so not an improving one
       if(li.dataset.lv==='3'&&IdentifyNarrow.taken(o)){li.remove();return;}
       if(IN.user()&&t&&t.id&&!li.querySelector('.acts'))acts(li,t);
+      if(CMP)CMP.landed(li);
     });
   }).catch(function(e){if(!(sig&&sig.aborted))status('Could not load the photos: '+e.message,1);});
 }
@@ -200,11 +210,12 @@ function more(){
 function batch(){
   var all=view[LV]||[],t=all.n||all.length,rows=all.slice(0,IdentifyLinks.MAX_IDS),capped=rows.length<t;  // n: a first list's full length
   LINKS=rows.length?IdentifyLinks.batches(rows.map(function(i){return P.id[i];}),true):[];BI=0;
-  $('batch').hidden=!rows.length;$('cap').hidden=LINKS.length<2;
+  $('batch').hidden=!rows.length;$('cap').hidden=LV===3?!rows.length:LINKS.length<2;
   ONE=capped?'Identify the first '+nf.format(rows.length)+' of '+nf.format(t):'Identify '+nf.format(rows.length)+' listed';
-  $('cap').textContent=nf.format(t)+' cards (up to '+PER_SPECIES+' per species) · '+(capped?'first '+nf.format(rows.length):'all')+
+  $('cap').textContent=LV===3?IdentifyNarrow.line(t,S.total[3],[GP&&GP.label(),R&&R.label(3)],PER_SPECIES):
+    nf.format(t)+' cards (up to '+PER_SPECIES+' per species) · '+(capped?'first '+nf.format(rows.length):'all')+
     ' in '+LINKS.length+' batches of '+IdentifyLinks.BATCH+', in the order shown';
-  $('go').title='Up to '+PER_SPECIES+' per species';
+  $('go').title='Up to '+PER_SPECIES+(LV===3?' per suggested species':' per species');
   step(0);
 }
 function step(d){
@@ -322,7 +333,7 @@ function refresh(){
   status(nf.format(kept)+(VIEW?' in view':' records')+' · '+nf.format(lev)+' ');
   var why=el('a',null,'in a level');why.href='#about';why.onclick=function(e){e.preventDefault();$('about').open=true;$('about').scrollIntoView({block:'nearest'});};
   $('status').append(why,MORE.size?' · '+PER_SPECIES+' per species':'');
-  counts();groups(S.groups);$('unpick').hidden=parent!==window||!S.picks.length;
+  counts();groups(S.groups);if(WW)WW.sync();$('unpick').hidden=parent!==window||!S.picks.length;
   if(!LV)LV=saved()||first();
   paint();
 }
@@ -399,11 +410,12 @@ function inbox(){
   SYNC=MapFilter.sync({key:key,apply:function(str){if(MF){clearTimeout(TK);TK=setTimeout(function(){take(str,false);},60);}else{PEND=str;again();}},hash:false});
   addEventListener('hashchange',function(){if(MF)take(location.hash.slice(1),true);else again();});
 }
-function looks(buf){
-  var dv=new DataView(buf),size=dv.getUint32(0,true),n=P.n;
-  if(buf.byteLength!==4+size+2*n)throw new Error('the look-alike file holds '+buf.byteLength+' bytes, expected '+(4+size+2*n));
-  return {names:JSON.parse(new TextDecoder().decode(new Uint8Array(buf,4,size))).names,
-    lo:new Uint8Array(buf,4+size,n),hi:new Uint8Array(buf,4+size+n,n)};
+// the look-alike file, or (why) the runner-up file: the same header and two planes of n bytes
+function looks(buf,why){
+  var dv=new DataView(buf),size=dv.getUint32(0,true),n=P.n,h;
+  if(buf.byteLength!==4+size+2*n)throw new Error('the '+(why?'runner-up':'look-alike')+' file holds '+buf.byteLength+' bytes, expected '+(4+size+2*n));
+  h=JSON.parse(new TextDecoder().decode(new Uint8Array(buf,4,size)));
+  return {names:h.names,runners:h.runners,lo:new Uint8Array(buf,4+size,n),hi:new Uint8Array(buf,4+size+n,n)};
 }
 async function load(){
   status('Reading the map data…');
@@ -415,7 +427,8 @@ async function load(){
   var shards=Promise.all(META.shards.map(function(s){return get(new URL(s.file,MAP)).then(function(b){return L.decodeShard(b,s.n);});}));
   var lev=file('levels'),lk=file('looks').catch(function(){return null;}),  // optional: cards fill in their look-alike once it lands
     rg=file('range').catch(function(){return null;}),  // optional: no range maps without it
-    rkf=file('rank').catch(function(){return null;});  // optional: level 3 by score bucket without it
+    rkf=file('rank').catch(function(){return null;}),  // optional: level 3 by score bucket without it
+    wf=file('why').catch(function(){return null;});  // optional: no runner-up line without it
   if(!FIRST)status('Downloading the records…');
   var d=await Promise.all([shards,taxa,lev,rkf]);
   P=L.pool(d[0],META.bbox);BYID=byId(P);TAXA=d[1];LOOKS=null;
@@ -429,14 +442,21 @@ async function load(){
   // Not yet identified by me asks iNaturalist within the pool's extent: Identify has no map viewport of its own
   var b=META.bbox;UF=userFilter({S:S,meta:META,get:function(f){return get(new URL(f,MAP));},taxa:function(){return TAXA;},changed:user,
     bounds:function(){return {w:b[0],s:b[1],e:b[2],n:b[3]};}});
-  CMP=IdentifyCompare({taxa:TAXA,tax:P.tax,look:looksOf});
+  CMP=IdentifyCompare({taxa:TAXA,tax:P.tax,look:looksOf,why:whyOf,obs:function(id){return CACHE.get(id);},more:function(){shown+=LIMIT;more();}});
   MF=MapFilter(META);
   STAY=!!SHOWN;take(location.hash.slice(1),AREA==='');
   if(PEND!==null){take(PEND,false);PEND=null;}
   $('usrbox').open=!!S.user;
+  WW=IdentifyWWW({sel:key,taxa:TAXA,look:looksOf,redraw:redraw,area:function(){return AREA;},
+    set:function(t){take(t,false);if(parent===window)history.replaceState(null,'','#'+location.hash.slice(1).split('&')
+      .filter(function(x){return x&&!MapFilter.tokens(x);}).concat(t?t.split('&'):[]).join('&'));SYNC.send();},
+    clear:function(){AREA='';['area','park','bcpark'].forEach(function(k){keep(k,'');});refresh();}});
+  function retitle(){[].forEach.call($('grid').children,function(li){var t=li.querySelector('.title');if(t&&li.dataset.i)t.replaceWith(title(+li.dataset.i,LV));});}
+  Promise.all([lk,wf]).then(function(b){if(b[0]&&b[1]){WHY=looks(b[1],1);if(LV===3)retitle();}});
   lk.then(function(b){if(!b)return;LOOKS=looks(b);
-    [].forEach.call($('grid').children,function(li){var t=li.querySelector('.title');if(t)t.replaceWith(title(+li.dataset.i,LV));});
-    CMP.fill([].slice.call($('grid').querySelectorAll('.card')));if(BT)paint();});
+    retitle();
+    CMP.fill([].slice.call($('grid').querySelectorAll('.card')));if(BT)paint();
+    if(LV===3){STAY=true;redraw();}else build();});  // level 3's cap reads the suggestions
   rg.then(function(b){if(!b)return;
     R=IdentifyRanges(b,{P:P,sdm:META.sdm,name:function(i){return P.tax[i]!==NOTAX&&TAXA[P.tax[i]]?TAXA[P.tax[i]][0]:null;},look:looksOf,redraw:redraw});
     // #record=<id> (the map's token): its level, its card first, its range popover open

@@ -1,5 +1,6 @@
 // Level 3 helpers: an improving ID there is the first at species, so a card carries its suggestion to iNaturalist
-// (copy), says how high it ranks in its level (conf) and whether a record already has a species ID (taken).
+// (copy), says how high it ranks in its level (conf), what it beat and by how much (why) and whether a record already has
+// a species ID (taken).
 var IdentifyNarrow=(function(){
 'use strict';
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
@@ -26,5 +27,17 @@ function taken(o){
   function sp(t){return !!(t&&t.rank_level&&t.rank_level<=10);}
   return sp(o.taxon)||(o.identifications||[]).some(function(d){return d.current!==false&&sp(d.taxon);});
 }
-return {copy:copy,band:band,conf:conf,taken:taken};
+// The one count line of level 3: cards drawn, the records behind the tab's count, the filters on (empty tags drop out).
+function line(cards,records,tags,per){
+  var nf=new Intl.NumberFormat('en-CA'),t=tags.filter(Boolean);
+  return nf.format(cards)+' cards to ID ('+nf.format(records)+' records'+(t.length?', '+t.join(', '):'')+'; up to '+per+' per suggested species)';
+}
+// Why the suggestion: the runner-up species in the clade and, in words, the margin over it (thousandths of cosine, 255 none).
+function why(name,m){
+  var d=el('div','why'),w=m===255?'':m<10?', close call':m<40?', fair margin':', clear margin';
+  d.append('vs ',el('i',null,name),w);
+  d.title='Second best: '+name+(m===255?'':'. Margin '+(m/1000).toFixed(3)+' cosine; under 0.010 a close call, under 0.040 fair, else clear');
+  return d;
+}
+return {copy:copy,band:band,conf:conf,taken:taken,line:line,why:why};
 })();

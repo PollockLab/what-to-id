@@ -123,24 +123,26 @@ def test_each_sort_state_orders_level_3_as_it_says(browser, site):
     page = open_with(
         browser, base, "&conf=all"
     )  # the blend lets a gap outrank a lit record of the next band up
-    ids = view(page)
-    blend = [(band(i), page.evaluate(f"__identify.gap({i})")) for i in ids]
+    # over every level 3 record: the cap by suggestion leaves this fixture (3 look-alikes) a handful
+    ids = sorted(pts["id"][pts["level"] == 3].tolist(), key=lambda i: rank[i])
+    tier = {i: page.evaluate(f"__identify.gap({i})") for i in ids}
+    ids.sort(key=lambda i: (band(i) - tier[i], band(i), rank[i]))
+    blend = [(band(i), tier[i]) for i in ids]
     assert any(a[0] > b[0] for a, b in zip(blend, blend[1:], strict=False))
 
 
 def test_the_confidence_filter_keeps_its_bands_before_sorting(browser, site):
     base, pts = site
     n3, rank, band = ranks(base, pts)
+    level3 = pts["id"][pts["level"] == 3].tolist()
     for value, lim in LIMITS.items():
         for sort in ("&sort=conf", "&sort=gaps", ""):
             page = open_with(browser, base, f"&conf={value}{sort}")
             ids = view(page)
             assert ids and all(band(i) <= lim for i in ids), (value, sort)
-            want = sum(
-                1 for r in rank.values() if np.searchsorted([0.01, 0.05, 0.25], (r + 1) / n3) <= lim
-            )
-            text = page.inner_text("#sort .segnote >> nth=0")
-            assert text == f"{want:,} of {n3:,} records shown" or want > n3  # level 3 only
+            want = sum(1 for i in level3 if band(i) <= lim)
+            assert page.inner_text("#tab3 b") == f"{want:,}"  # the tab's count is the filter's
+            assert "records shown" not in page.inner_text("#sort")
             page.close()
 
 
@@ -186,8 +188,11 @@ def test_the_badge_names_the_gap_and_links_to_the_cell(browser, site):
                 r"https://pollocklab\.github\.io/where-to-blitz/\?at=4\d\.\d+,-12\d\.\d+&", href
             )
             assert "&res=25000&g=" in href and href.endswith("&goal=cl")
-    assert re.fullmatch(r"Blitz gap: 4 of 30 observer-days", seen[2])
-    assert re.fullmatch(r"Blitz gap: 22 of 30", seen[1])
+    assert seen == {2: "Gap 4/30", 1: "Gap 22/30"}  # compact, one line
+    big = page.locator("#grid .card .gap", has_text="Gap 4/30").first
+    assert big.get_attribute("aria-label") == "Blitz gap: 4 of 30 observer-days in this 25 km cell"
+    assert "30 make a checklist" in big.get_attribute("title")
+    assert big.evaluate("e => getComputedStyle(e).whiteSpace") == "nowrap"
     assert page.locator("#grid .card .conf", has_text="Top").count() >= 1
     assert page.errors == []
 

@@ -43,10 +43,11 @@ def serve(root, frame, score):
             "taxon_id": pts["taxon_id"].to_numpy(np.int64),
             "level": np.where(i % 6 == 0, 0, 1 + (i * 7) % 4).astype("int8"),
             "score": score,
-            "score2": np.float32(0),
+            "score2": (i % 5 * 0.012).astype("float32"),  # close, fair and clear margins
             "looks_like": pd.Series([LOOKS[k % 3] for k in i], dtype="category"),
+            "runner_up": pd.Series([LOOKS[(k + 1) % 3] for k in i], dtype="category"),
         }
-    )[list(IDENTIFY_COLUMNS)]
+    )[[*IDENTIFY_COLUMNS, "runner_up"]]
     scored.loc[scored.index[scored["level"] == 4][0], "level"] = 5  # the one likely mislabel
     scored.to_parquet(root / "identify.parquet")
     pool_levels.build(root, parquet=root / "identify.parquet")
@@ -166,8 +167,9 @@ def test_cards_follow_the_chosen_level_with_a_few_per_species_and_photos_in_batc
     taxon = dict(zip(pts["id"], pts["taxon_id"], strict=True))
     for lv in (1, 3):
         assert shown[lv] and all(level[i] == lv for i in shown[lv])
-        counts = pd.Series([taxon[i] for i in shown[lv]]).value_counts()
-        assert counts.max() <= 3 and len(counts) == 7  # a few of each of the seven species
+    counts = pd.Series([taxon[i] for i in shown[1]]).value_counts()
+    assert counts.max() <= 3 and len(counts) == 7  # a few of each of the seven species
+    assert len(shown[3]) == 6  # level 3 caps by suggestion: its records suggest 2 species, 3 each
     assert not shown[2] and not shown[4]  # both in Might be wrong
     kinds = [level[i] for i in shown[5]]
     assert kinds == sorted(kinds, key=ORDER.index) and set(kinds) == {5, 4, 2}

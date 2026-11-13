@@ -253,7 +253,7 @@ return function(buf,ctx){
       all[to].focus();all[to].click();
     };
     SEGNOTE=el('span','segnote',FAR_NOTE);
-    g.append(r,SEGNOTE);
+    g.append(r);($('hintbody')||g).append(SEGNOTE);  // the note sits in the page's one muted line
     return r;
   }
   SEG=seg();
@@ -287,6 +287,8 @@ return function(buf,ctx){
       else row.appendChild(el('span','range','No range map: range unknown'));
       return row;
     },
+    // level 3's range filter as the count line words it, '' when off
+    label:function(lv){var o=lv===S.lv?S.o:def(lv);return lv===3&&o?o<0?'in range':'not in range':'';},
     // the control and its counts, over the selected records of the level
     draw:function(lv,sel,level){
       if(!SEG)return;

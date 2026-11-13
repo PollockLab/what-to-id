@@ -7,7 +7,7 @@
 var IdentifyGaps=(function(){
 'use strict';
 var BASE='https://pollocklab.github.io/where-to-blitz/',DIR=BASE+'cluster_results/checklist/',RES='25000',ALL='All biodiversity',
-  LIMS=[['1','Top 1%'],['5','Top 5%'],['25','Top 25%'],['all','All']],nf=new Intl.NumberFormat('en-CA');
+  LIMS=[['1','Top 1%'],['5','Top 5%'],['25','Top 25%'],['all','All']];
 function $(id){return document.getElementById(id);}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 // where-to-blitz's Lambert azimuthal equal area (WGS 84, centre 45N 100W) forward: [x, y] metres of lat, lon in degrees
@@ -32,7 +32,7 @@ function png(url){
 return function(ctx){
   var P=ctx.P,h=location.hash.slice(1),sm=/(?:^|&)sort=([\w,]*)/.exec(h),cm=/(?:^|&)conf=(\w+)/.exec(h),
     list=sm?sm[1].split(','):['conf','gaps'],byConf=list.indexOf('conf')>=0,byGaps=list.indexOf('gaps')>=0,
-    lim=Math.max(0,LIMS.map(function(l){return l[0];}).indexOf(cm?cm[1]:'5')),state='load',tier=null,days=null,names=null,LSEG,TSEG,note,count;
+    lim=Math.max(0,LIMS.map(function(l){return l[0];}).indexOf(cm?cm[1]:'5')),state='load',tier=null,days=null,names=null,LSEG,TSEG,note;
   if(!byConf&&!byGaps)byConf=byGaps=true;
   function load(){
     json(DIR+'checklist.json').then(function(j){
@@ -83,8 +83,8 @@ return function(ctx){
     TSEG=seg('Sort: ','Sort','checkbox',['Confidence','Blitz gaps'],function(j){  // the last one on stays on
       if(j===0&&byConf&&!byGaps||j===1&&byGaps&&!byConf)return;
       if(j===0)byConf=!byConf;else byGaps=!byGaps;});
-    note=el('span','segnote');count=el('span','segnote');
-    g.append(LSEG.row,count,TSEG.row,note);
+    note=el('span','segnote');
+    g.append(LSEG.row,TSEG.row,note);
   }
   build();
   load();
@@ -99,19 +99,18 @@ return function(ctx){
     badge:function(i){
       var t=tier?tier[i]:0;
       if(!t)return null;
-      var a=el('a','gap','Blitz gap: '+days[i]+' of '+names[i][1]+(t===2?' observer-days':''));
+      var a=el('a','gap','Gap '+days[i]+'/'+names[i][1]),full='Blitz gap: '+days[i]+' of '+names[i][1]+' observer-days in this 25 km cell';
       a.href=BASE+'?at='+P.lonlat[2*i+1].toFixed(3)+','+P.lonlat[2*i].toFixed(3)+'&res='+RES+'&g='+encodeURIComponent(names[i][0])+'&goal=cl';
-      a.target='_blank';a.rel='noopener';a.title='Observer-days recorded in this 25 km cell; 30 make a checklist (where-to-blitz)';
+      a.target='_blank';a.rel='noopener';a.title=full+'; '+names[i][1]+' make a checklist (where-to-blitz)';a.setAttribute('aria-label',full);
       return a;
     },
-    // the controls, shown on level 3 only, and how many of the selected records the filter keeps
+    // the confidence filter's name for the count line, '' for all
+    label:function(){return lim===3?'':LIMS[lim][1];},
+    // the controls, shown on level 3 only
     draw:function(lv,sel,level){
       if(!LSEG)return;
       $('sort').hidden=lv!==3;
       if(lv!==3)return;
-      var t=0,k=0;
-      for(var i=0;i<P.n;i++)if(sel[i]&&level[i]===3&&ctx.keep(i)){t++;if(ctx.band(i)<=lim)k++;}
-      count.textContent=nf.format(k)+' of '+nf.format(t)+' records shown';
       [].forEach.call(LSEG.seg.children,function(x,j){x.setAttribute('aria-checked',String(j===lim));x.tabIndex=j===lim?0:-1;});
       [].forEach.call(TSEG.seg.children,function(x,j){x.setAttribute('aria-checked',String(j?byGaps:byConf));});
       note.textContent=state==='failed'?'The where-to-blitz checklist did not load. Listing by confidence.':state==='load'&&byGaps?

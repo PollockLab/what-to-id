@@ -318,7 +318,7 @@ def test_empty_pool_gives_an_empty_table():
     pool, E, ids, taxa, T = identify_bundle()
     s = identify.identify_scores(pool.iloc[:0], E, ids, taxa, T, TREE)
     out = identify.identify_levels(s)
-    assert out.empty and list(out.columns) == list(identify.IDENTIFY_COLUMNS)
+    assert out.empty and list(out.columns) == [*identify.IDENTIFY_COLUMNS, "runner_up"]
 
 
 def test_cli_identify_registers_the_new_key_and_leaves_levels(tmp_path, capsys):

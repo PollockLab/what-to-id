@@ -5,8 +5,8 @@
 The site directory holds the built map (map.html, its pool shards and pool-taxa.bin). The atlas
 manifest at ``--data-url`` names `identify.parquet` under ``"identify"``; ``--parquet`` reads a
 local file instead. It writes three files, records in the order of META.shards, as
-pool-lookalike.bin, and a fourth when the range tables are found, each under its content-hashed
-name in map.html's META.files (`site_files.publish`):
+pool-lookalike.bin, a fourth with the runner-up species and a fifth when the range tables are
+found, each under its content-hashed name in map.html's META.files (`site_files.publish`):
 
 ``pool-levels.bin``: gzip of one plane of n bytes. The low nibble is the level (0 none, 1 easy,
 2 taxonomist, 3 narrow, 4 weird, 5 mislabel; `identify.LEVEL_NAMES`), the high nibble the
@@ -21,6 +21,13 @@ whose label changed since it was scored, is level 0.
 apart so the levels load first. A uint32 LE length and that many bytes of JSON
 ``{"names": [...]}``, then two planes of n bytes (low byte, high byte) of indexes into
 ``names``, 65535 for none; all gzipped.
+
+``pool-levels-why.bin``: for narrow records, the runner-up species (identify.parquet's
+``runner_up``, the second best in the clade) and ``score2``, the margin over it. A uint32 LE length
+and that many bytes of JSON ``{"names": [...], "runners": [[index into names, ...] per name of the
+looks file]}``, each suggestion's runners-up most frequent first, then two planes of n bytes: the
+runner-up's place in its suggestion's list and the margin in steps of `WHY_STEP` (capped at 254),
+255 none; all gzipped. Written only when identify.parquet has ``runner_up``.
 
 ``pool-levels-range.bin``: the range maps, from `level_ranges` output (range-notes.parquet,
 level-ranges.parquet, level-range-cells.parquet): the manifest's identify entry names them under
@@ -70,6 +77,8 @@ from what_to_id.tree_page import map_meta
 
 OUT_NAME = "pool-levels.bin"
 LOOKS_NAME = "pool-levels-looks.bin"
+WHY_NAME = "pool-levels-why.bin"
+WHY_STEP = 0.005  # cosine; the page's margin words split at 0.01 and 0.04
 STEPS = 16
 NO_LOOK = 0xFFFF
 RANGE_NAME = "pool-levels-range.bin"
@@ -143,6 +152,51 @@ def unpack_looks(blob: bytes, n: int) -> list[str | None]:
     planes = np.frombuffer(raw, np.uint8, 2 * n, 4 + size).reshape(2, n)
     idx = planes[0].astype(np.uint16) | planes[1].astype(np.uint16) << 8
     return [None if i == NO_LOOK else names[i] for i in idx]
+
+
+def pack_why(level: np.ndarray, looks: np.ndarray, runner: np.ndarray, margin: np.ndarray) -> bytes:
+    """The gzipped why file: each narrow record's runner-up (name or None) and margin."""
+    looks = np.asarray(looks, dtype=object)
+    shown = np.isin(level, (TAXONOMIST, NARROW, MISLABEL)) & pd.notna(looks)
+    sugg = np.unique(looks[shown].astype(str))  # the looks file's names
+    keep = (level == NARROW) & pd.notna(looks) & pd.notna(runner)
+    s = np.searchsorted(sugg, looks[keep].astype(str))
+    names, r = np.unique(np.asarray(runner, dtype=object)[keep].astype(str), return_inverse=True)
+    pairs, at, count = np.unique(s * len(names) + r, return_inverse=True, return_counts=True)
+    order = np.lexsort((-count, pairs // max(len(names), 1)))
+    group = pairs[order] // max(len(names), 1)
+    first = np.flatnonzero(np.r_[True, group[1:] != group[:-1]])
+    place = np.empty(len(pairs), np.int64)
+    place[order] = np.arange(len(pairs)) - np.repeat(first, np.diff(np.r_[first, len(pairs)]))
+    if len(place) and place.max() >= NO_BYTE:
+        raise ValueError(f"a suggestion has {place.max() + 1} runners-up, more than fit a byte")
+    runners = [[] for _ in sugg]
+    for p in pairs[order]:
+        runners[p // len(names)].append(int(p % len(names)))
+    code = np.full(len(level), NO_BYTE, np.uint8)
+    code[keep] = place[at]
+    m = np.where(keep, np.asarray(margin, np.float64), np.nan)
+    q = np.full(len(level), NO_BYTE, np.uint8)
+    q[~np.isnan(m)] = np.clip(np.floor(m[~np.isnan(m)] / WHY_STEP + 0.5), 0, 254)
+    head = json.dumps({"names": names.tolist(), "runners": runners}, separators=(",", ":")).encode()
+    body = len(head).to_bytes(4, "little") + head + code.tobytes() + q.tobytes()
+    return gzip.compress(body, mtime=0)
+
+
+def unpack_why(blob: bytes, looks: list[str | None]) -> list[tuple[str, float | None] | None]:
+    """(runner-up, margin or None) per record of a why file, given the looks file's names."""
+    raw = gzip.decompress(blob)
+    size = int.from_bytes(raw[:4], "little")
+    head = json.loads(raw[4 : 4 + size])
+    n = len(looks)
+    code, q = np.frombuffer(raw, np.uint8, 2 * n, 4 + size).reshape(2, n)
+    sugg = {s: k for k, s in enumerate(sorted({x for x in looks if x is not None}))}
+    return [
+        None
+        if c == NO_BYTE
+        else (head["names"][head["runners"][sugg[lk]][c]], None if m == NO_BYTE else m * WHY_STEP)
+        for lk, c, m in zip(looks, code, q, strict=True)
+    ]
 
 
 def okm_code(km: np.ndarray) -> np.ndarray:
@@ -281,6 +335,14 @@ def build(
     site_files.publish(site, "levels", OUT_NAME, pack(level, score))
     site_files.publish(site, "looks", LOOKS_NAME, pack_looks(level, looks))
     site_files.publish(site, "rank", RANK_NAME, pack_rank(level, score))
+    why_blob = None
+    if "runner_up" in scored:
+        runner = np.full(len(ids), None, dtype=object)
+        runner[hit] = scored["runner_up"].astype(object).to_numpy()[at[hit]]
+        margin = np.full(len(ids), np.nan)
+        margin[hit] = scored["score2"].to_numpy(np.float64)[at[hit]]
+        why_blob = pack_why(level, looks, runner, margin)
+    site_files.publish(site, "why", WHY_NAME, why_blob)
     site_files.publish(site, "range", RANGE_NAME, None)  # a stale one would no longer line up
     far = None
     (site / DATES_NAME).unlink(missing_ok=True)
@@ -310,8 +372,8 @@ def build(
 def pack_first(site, ids, tax, taxa, level, q, looks, far) -> bytes:
     """The gzipped first lists (see the module doc), as `build()` in identify_app.js orders them:
     highest `q` (the score bucket, minus the rank for level 3) first, newest id first within
-    one, PER_SPECIES of a taxon unless the level holds one taxon only. `far` per record is far
-    outside its label's range, None without ranges."""
+    one, PER_SPECIES of a taxon (of the suggested species on level 3) unless the level holds one
+    taxon only. `far` per record is far outside its label's range, None without ranges."""
     meta = map_meta(site, keys=("shards", "groups", "bbox"))
     grp = np.concatenate(
         [
@@ -334,12 +396,16 @@ def pack_first(site, ids, tax, taxa, level, q, looks, far) -> bytes:
         for lv in range(1, 6):
             i = np.flatnonzero(keep & (level == lv))
             i = i[np.lexsort((-ids[i], -q[i].astype(np.int64)))]
-            _, inv, cnt = np.unique(tax[i], return_inverse=True, return_counts=True)
+            # level 3 caps by the suggested species: its label is a coarse rank
+            what = tax[i]
+            if lv == NARROW:
+                what = np.where(shows[i], looks[i].astype(str), "#" + tax[i].astype(str))
+            _, inv, cnt = np.unique(what, return_inverse=True, return_counts=True)
             cut = len(i) if len(cnt) == 1 else PER_SPECIES
             by = np.argsort(inv, kind="stable")
             rank = np.empty(len(i), np.int64)
             rank[by] = np.arange(len(i)) - np.r_[0, np.cumsum(cnt)[:-1]][inv[by]]
-            left = np.maximum(np.where(rank == 0, cnt[inv] - cut, 0), 0)
+            left = np.maximum(np.where(rank == 0, cnt[inv] - cut, 0), 0) * (lv != NARROW)
             i, left = i[rank < cut], left[rank < cut]
             st["total"].append(len(rank))
             st["n"].append(len(i))
@@ -394,7 +460,9 @@ def main(argv: list[str] | None = None) -> int:
     except (ValueError, FileNotFoundError, OSError) as exc:
         print(f"pool_levels: {exc}", file=sys.stderr)
         return 1
-    paths = [site_files.path(a.out, k) for k in ("levels", "rank", "looks", "range", "first")]
+    paths = [
+        site_files.path(a.out, k) for k in ("levels", "rank", "looks", "why", "range", "first")
+    ]
     sizes = ", ".join(f"{p.name} {p.stat().st_size / 1e6:.2f} MB" for p in paths if p)
     print(f"pool_levels: records per level {counts}; {sizes} gzipped")
     return 0

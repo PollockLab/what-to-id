@@ -105,7 +105,7 @@ def test_no_new_records_returns_the_base():
     out = identify.identify_delta(base, pool, E[:0], ids[:0], taxa, T, TREE)
     pd.testing.assert_frame_equal(out, base, check_categorical=False)
     empty = identify.identify_delta(base.iloc[:0], pool.iloc[:0], E[:0], ids[:0], taxa, T, TREE)
-    assert empty.empty and list(empty.columns) == list(identify.IDENTIFY_COLUMNS)
+    assert empty.empty and list(empty.columns) == [*identify.IDENTIFY_COLUMNS, "runner_up"]
 
 
 def test_cli_extends_the_live_table_and_keeps_the_new_manifest(tmp_path):
