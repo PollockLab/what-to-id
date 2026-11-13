@@ -7,7 +7,7 @@
 // look-alikes (the model's runner-up, iNaturalist's similar species), with j, k, Enter, c, s, u (undo) and Esc to work through the cards without a tab.
 var IdentifyCompare=(function(){
 'use strict';
-var MAX=30,NOTAX=65535,TAXON='https://www.inaturalist.org/taxa/';
+var AHEAD=3,MAX=30,NOTAX=65535,TAXON='https://www.inaturalist.org/taxa/';  // AHEAD: cards whose references load while the user is in iNat
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 function size(u,s){return String(u).replace(/\/(square|small|medium)\./,'/'+s+'.');}
 return function(ctx){
@@ -150,7 +150,8 @@ return function(ctx){
           sim=sim.filter(function(s){return s.name!==rv.name&&s.name!==main.name;}).slice(0,1);}  // three to compare, as on a phone
         sim.forEach(function(s){r.append(ref(full.get(s.id)||s,'Similar'));});
         if(!sim.length&&!rv&&t[2])r.append(el('p','muted','iNaturalist lists no similar species for it.'));
-        var n=cards()[cards().indexOf(li)+1],nt=n&&named(n);if(nt)similar(nt);});  // the next card's, ahead
+        cards().slice(cards().indexOf(li)+1,cards().indexOf(li)+1+AHEAD).forEach(function(n){  // the next cards', ahead
+          var nt=named(n),ny=why(n);if(nt)similar(nt);if(ny)rival(ny[0]);});});
   }
   // the observation the cards' request has not brought (yet): asked on the panel's own queue, null once iNaturalist has none
   var own=new Map();

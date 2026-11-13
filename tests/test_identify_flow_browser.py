@@ -320,3 +320,25 @@ def test_the_panel_keeps_focus_and_announces_each_card(browser, site):
     page.locator("#cpj").click()
     assert live.text_content().startswith("2 of ")
     assert page.errors == []
+
+
+def test_the_panel_loads_the_next_cards_runner_up_ahead(browser, site):
+    base, _ = site
+    page = level_3(browser, base)
+    stub_taxa(page)
+    asked = []
+    page.on("request", lambda r: asked.append(r.url) if "/v1/taxa?" in r.url else None)
+    rivals = page.evaluate(
+        "[...document.querySelectorAll('#grid .card')].slice(0, 4)"
+        ".map(c => (c.querySelector('.why i') || {}).textContent)"
+    )
+    page.locator("#grid .card .title").first.click()
+    want = {r for r in rivals if r}
+    page.wait_for_function(
+        f"() => {len(want)} <= performance.getEntriesByType('resource')"
+        ".filter(e => e.name.includes('/v1/taxa?')).length",
+        timeout=10000,
+    )  # the gate asks one a second
+    got = {parse_qs(urlparse(u).query)["q"][0] for u in asked}
+    assert want <= got and len(want) > 1
+    assert page.errors == []
