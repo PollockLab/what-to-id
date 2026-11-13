@@ -132,7 +132,9 @@ def test_the_group_control_sets_the_groups_filter(browser, site):
 def test_level_3_caps_by_the_suggested_species_and_other_levels_by_label(browser, site):
     base, pts = site
     page = ib.open_identify(browser, base, "#lvl=3&conf=all")
-    page.wait_for_selector("#grid .card .look", state="attached")  # the look-alikes landed, the list was drawn again
+    page.wait_for_selector(
+        "#grid .card .look", state="attached"
+    )  # the look-alikes landed, the list was drawn again
     look = dict(zip(pts["id"].tolist(), [LOOKS[k % 3] for k in range(len(pts))], strict=True))
     view = page.evaluate("__identify.view()")
     per = pd.Series([look[i] for i in view[3]]).value_counts()

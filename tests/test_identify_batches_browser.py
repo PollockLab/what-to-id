@@ -9,8 +9,8 @@ import pytest
 from what_to_id import page_identify
 
 from . import test_embeddings_browser as eb
-from .embeddings_fixture import pool_frame
 from . import test_identify_browser as ib
+from .embeddings_fixture import pool_frame
 from .test_identify_browser import serve
 
 browser = eb.browser

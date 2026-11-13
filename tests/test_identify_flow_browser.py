@@ -215,7 +215,9 @@ def test_the_compare_panel_fits_a_phone_with_the_species_and_two_similar(browser
     assert "/medium." in page.locator("#cprefs img").first.get_attribute("src")
     big = page.locator("#cpanel .cpbig")
     big.wait_for()
-    assert big.evaluate("e => getComputedStyle(e).maxHeight") == f"{0.38 * 740:g}px"  # room for the refs
+    assert (
+        big.evaluate("e => getComputedStyle(e).maxHeight") == f"{0.38 * 740:g}px"
+    )  # room for the refs
     box = page.locator("#cpanel").bounding_box()
     assert box["x"] == 0 and box["width"] == 360
     assert page.evaluate("document.querySelector('#cpanel').scrollWidth <= 360")
@@ -294,7 +296,9 @@ def test_a_first_visit_shows_the_key_tip_until_dismissed(browser, site):
 
 def test_a_touch_device_tip_has_no_keys(browser, site):
     base, _ = site
-    ctx = browser.new_context(has_touch=True, is_mobile=True, viewport={"width": 400, "height": 800})
+    ctx = browser.new_context(
+        has_touch=True, is_mobile=True, viewport={"width": 400, "height": 800}
+    )
     page = ctx.new_page()
     eb.stub_inat(page, None)
     page.goto(f"{base}/identify.html#lvl=3")
@@ -316,7 +320,9 @@ def test_the_panel_keeps_focus_and_announces_each_card(browser, site):
     cards.nth(0).locator(".title").click()
     live = page.locator("#cplive")
     assert live.get_attribute("aria-live") == "polite"
-    assert live.text_content().endswith(f", {label} to {look}") and live.text_content().startswith("1 of ")
+    assert live.text_content().endswith(f", {label} to {look}") and live.text_content().startswith(
+        "1 of "
+    )
     inside = "document.getElementById('cpanel').contains(document.activeElement)"
     for key in ["Tab"] * 12 + ["Shift+Tab"] * 12:
         page.keyboard.press(key)
@@ -329,7 +335,9 @@ def test_the_panel_keeps_focus_and_announces_each_card(browser, site):
     assert live.text_content().startswith("2 of ")
     page.focus("#cps")
     page.keyboard.press("Enter")  # Skip from the keyboard: focus stays on it, the card is announced
-    assert page.evaluate("document.activeElement.id") == "cps" and live.text_content().startswith("Skipped. 3 of ")
+    assert page.evaluate("document.activeElement.id") == "cps" and live.text_content().startswith(
+        "Skipped. 3 of "
+    )
     page.locator("#cpj").click()  # only Skip says so
     assert live.text_content().startswith("4 of ")
     assert page.errors == []

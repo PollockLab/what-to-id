@@ -152,7 +152,8 @@ def test_the_default_is_top_5_percent_with_both_sorts_on(browser, site):
     n3, rank, band = ranks(base, pts)
     page = open_with(browser, base, "")
     on = page.evaluate(
-        "[...document.querySelectorAll('#sort [aria-checked=true], #sorto [aria-checked=true]')].map(b => b.textContent)"
+        "[...document.querySelectorAll('#sort [aria-checked=true], #sorto [aria-checked=true]')]"
+        ".map(b => b.textContent)"
     )
     assert on == ["Top 5%", "Confidence", "Blitz gaps"]
     assert all(band(i) <= 1 for i in view(page))
@@ -212,11 +213,15 @@ def test_the_choices_are_kept_in_the_hash_and_shown_on_level_3_only(browser, sit
     page.reload()
     page.wait_for_function("window.__identify && __identify.ids().length > 0")
     on = page.evaluate(
-        "[...document.querySelectorAll('#sort [aria-checked=true], #sorto [aria-checked=true]')].map(b => b.textContent)"
+        "[...document.querySelectorAll('#sort [aria-checked=true], #sorto [aria-checked=true]')]"
+        ".map(b => b.textContent)"
     )
     assert on == ["Top 25%", "Confidence"]
     page.click("#tab1")
-    assert page.locator("#sort").get_attribute("hidden") is not None and page.locator("#sortb").is_hidden()
+    assert (
+        page.locator("#sort").get_attribute("hidden") is not None
+        and page.locator("#sortb").is_hidden()
+    )
     assert page.errors == []
 
 

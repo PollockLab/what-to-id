@@ -204,7 +204,9 @@ def test_ten_improving_ids_turn_the_bar_green_with_the_oauth_link(browser, site)
     eb.stub_inat(page, None)
     page.route(
         "**/v1/identifications?*",
-        lambda r: r.fulfill(json={"total_results": 12}, headers={"access-control-allow-origin": "*"}),
+        lambda r: r.fulfill(
+            json={"total_results": 12}, headers={"access-control-allow-origin": "*"}
+        ),
     )
     page.goto(f"{base}/identify.html#lvl=3&me=someone")
     link = page.locator("#prog a", has_text="OAuth ready")

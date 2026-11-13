@@ -1,6 +1,6 @@
-"""Every filter of the map's What panel in Identify: the map opens with the filter in its hash, Identify opens with the same
-hash and keeps the records the map's rule keeps, the key still in the address. The map is the real page over stand-ins for
-MapLibre and deck.gl, iNaturalist is stubbed."""
+"""Every filter of the map's What panel in Identify: the map opens with the filter in its hash,
+Identify opens with the same hash and keeps the records the map's rule keeps, the key still in the
+address. The map is the real page over stand-ins for MapLibre and deck.gl, iNaturalist is stubbed."""
 
 import numpy as np
 import pytest
@@ -27,7 +27,9 @@ def site(tmp_path_factory):
     frame["pos_acc"] = np.array([np.nan, 5000, 500, 50, 5])[i // 3 % 5]
     frame["ident_count"], frame["agree"] = 2 + i % 2, np.where(i % 3 == 0, 2, 0)
     mine = np.sort(frame["id"].to_numpy()[i % 4 == 0])
-    (root / "projects.bin").write_bytes(encode_projects({PID: {"ids": mine, "since": "2026-10-01T00:00:00Z"}}))
+    (root / "projects.bin").write_bytes(
+        encode_projects({PID: {"ids": mine, "since": "2026-10-01T00:00:00Z"}})
+    )
     score = np.random.default_rng(2).normal(size=ib.N).astype("float32")
     server, pts = ib.serve(root, frame, score, projects=root / "projects.bin")
     yield f"http://127.0.0.1:{server.server_port}", pts.assign(mine=pts["id"].isin(mine))
@@ -50,11 +52,14 @@ CASES = [
     ("acc=10", lambda p: p["acc_class"] >= 4),
     ("acc=unknown", lambda p: p["acc_class"] == 0),
     ("only=introduced&acc=100", lambda p: p["introduced"] & (p["acc_class"] >= 3)),
-    ("projects=%d" % PID, lambda p: p["mine"]),
-    ("projects=-%d" % PID, lambda p: ~p["mine"]),
+    (f"projects={PID}", lambda p: p["mine"]),
+    (f"projects=-{PID}", lambda p: ~p["mine"]),
     ("groups=Aves", lambda p: p["iconic_taxon"] == "Aves"),
     ("groups=-Aves", lambda p: p["iconic_taxon"] != "Aves"),
-    ("groups=Plantae&only=introduced", lambda p: (p["iconic_taxon"] == "Plantae") & p["introduced"]),
+    (
+        "groups=Plantae&only=introduced",
+        lambda p: (p["iconic_taxon"] == "Plantae") & p["introduced"],
+    ),
     ("taxa=900", lambda p: p["taxon_id"].isin([1000, 1001, 1002])),
 ]
 
@@ -84,7 +89,9 @@ def test_a_map_filter_in_the_hash_keeps_the_same_records_in_identify(browser, si
     page = ib.open_identify(browser, base, carried)
     want = sorted(pts["id"][verdict(pts)].tolist())
     assert want and len(want) < len(pts)
-    page.wait_for_function(f"__identify.ids().length === {len(want)}")  # the projects file lands late
+    page.wait_for_function(
+        f"__identify.ids().length === {len(want)}"
+    )  # the projects file lands late
     assert ib.ids(page) == want
     assert all(t in page.evaluate("location.hash") for t in hash_.split("&")) and page.errors == []
 
@@ -98,7 +105,9 @@ def test_the_what_panel_holds_the_shortcuts_show_only_accuracy_and_projects(brow
     page.wait_for_function(f"__identify.ids().length === {int(pts['introduced'].sum())}")
     assert "only=introduced" in page.evaluate("location.hash")
     assert page.inner_text("#bwhat b") == "Introduced to BC"
-    page.evaluate("a => { a.value = 3; a.dispatchEvent(new Event('input')); }", page.query_selector("#accr"))
+    page.evaluate(
+        "a => { a.value = 3; a.dispatchEvent(new Event('input')); }", page.query_selector("#accr")
+    )
     want = pts["introduced"] & (pts["acc_class"] >= 3)
     page.wait_for_function(f"__identify.ids().length === {int(want.sum())}")
     assert "acc=100&" in page.evaluate("location.hash") + "&"
