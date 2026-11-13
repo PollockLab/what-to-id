@@ -2,7 +2,7 @@
 // and j, k, i (or Enter) and c work the cards from the keyboard. A blocked open or a modified click falls back to the link itself.
 var IdentifyFlow=(function(){
 'use strict';
-var NAME='wtid-inat',DONE=new Map();
+var NAME='wtid-inat',DONE=new Map(),LAST=null;
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 // A named tab is found again by its name; the link itself (a blocked open, middle click) opens noopener.
 function link(a,then){
@@ -16,7 +16,7 @@ function link(a,then){
 }
 // a card done with: Opened or Skipped, kept across redraws
 function mark(li,text){
-  text=text||'Opened';DONE.set(li.dataset.id,text);
+  text=text||'Opened';DONE.set(li.dataset.id,text);LAST=li;
   if(text==='Opened')document.dispatchEvent(new CustomEvent('wtid-opened',{detail:li.dataset.id}));li.classList.add('done');
   var b=li.querySelector('.opened');if(b){if(text==='Opened')b.textContent=text;return;}
   li.insertBefore(el('div','badge opened',text),li.querySelector('.when'));
@@ -26,9 +26,16 @@ function next(li){
   while(n&&!n.classList.contains('card'))n=n.nextElementSibling;
   if(n){n.focus({preventScroll:true});n.scrollIntoView({block:'nearest'});}
 }
+// the last mark taken back, once: its card, or null
+function undo(){
+  var li=LAST;LAST=null;if(!li)return null;
+  if(DONE.get(li.dataset.id)==='Opened')document.dispatchEvent(new CustomEvent('wtid-unopened',{detail:li.dataset.id}));
+  DONE.delete(li.dataset.id);li.classList.remove('done');var b=li.querySelector('.opened');if(b)b.remove();
+  return li;
+}
 function seen(li){if(DONE.has(li.dataset.id))mark(li,DONE.get(li.dataset.id));}
 return {
-  link:link,mark:mark,seen:seen,
+  link:link,mark:mark,seen:seen,undo:undo,
   // the Identify link of a level 3 card
   identify:function(a,li){
     link(a,function(){var c=li.querySelector('.copy');if(c)c.click();mark(li);next(li);});

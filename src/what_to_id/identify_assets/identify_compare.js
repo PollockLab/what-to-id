@@ -4,7 +4,7 @@
 // [name, margin], or null), obs(id) (the observation, once fetched), more()}. fill(lis) adds them to the cards just drawn, 30 taxa to a request. Each photo links to its taxon page
 // on iNaturalist and names its photographer and licence on hover, as the licences ask. Needs map_user.js (inatGate).
 // open(li) shows the side panel: the observation's photos large beside the species the card names and its two closest
-// look-alikes (the model's runner-up, iNaturalist's similar species), with j, k, Enter, c, s and Esc to work through the cards without a tab.
+// look-alikes (the model's runner-up, iNaturalist's similar species), with j, k, Enter, c, s, u (undo) and Esc to work through the cards without a tab.
 var IdentifyCompare=(function(){
 'use strict';
 var MAX=30,NOTAX=65535,TAXON='https://www.inaturalist.org/taxa/';
@@ -85,6 +85,7 @@ return function(ctx){
     box.addEventListener('keydown',function(e){
       var t=e.target,k=e.key;
       if(e.metaKey||e.ctrlKey||e.altKey||/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))return;
+      if(k==='u'){var u=IdentifyFlow.undo();if(u){e.preventDefault();e.stopPropagation();open(u);}return;}
       var b={Escape:'#cpx',j:'#cpj',k:'#cpk',s:'#cps',c:'#cpc .copy',Enter:t.closest('button,a')?null:'#cpo'}[k];
       b=b&&box.querySelector(b);if(!b)return;
       e.preventDefault();e.stopPropagation();b.click();

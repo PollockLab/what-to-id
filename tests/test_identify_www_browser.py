@@ -177,3 +177,18 @@ def test_phones_fold_the_filters_into_one_row_naming_those_on(browser, site):
     assert page.locator("#chips .chip").all_inner_texts() == ["By species", "Custom"]
     page.click("#filt summary")
     assert page.locator("#when").is_visible()
+
+
+def test_ten_improving_ids_turn_the_bar_green_with_the_oauth_link(browser, site):
+    base, _ = site
+    page = browser.new_page(viewport={"width": 600, "height": 900})
+    eb.stub_inat(page, None)
+    page.route(
+        "**/v1/identifications?*",
+        lambda r: r.fulfill(json={"total_results": 12}, headers={"access-control-allow-origin": "*"}),
+    )
+    page.goto(f"{base}/identify.html#lvl=3&me=someone")
+    link = page.locator("#prog a", has_text="OAuth ready")
+    link.wait_for()
+    assert link.get_attribute("href") == "https://www.inaturalist.org/oauth/app_owner_application"
+    assert "ok" in page.get_attribute("#prog", "class") and "12/10" in page.inner_text("#prog")

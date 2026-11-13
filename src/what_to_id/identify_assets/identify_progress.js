@@ -15,10 +15,11 @@ return function(box){
   bar.max=GOAL;bar.hidden=true;
   function count(){n.textContent=ids.size+' opened today';}
   function improving(){
-    var u=me.value.trim();bar.hidden=true;t.textContent='';
+    var u=me.value.trim();bar.hidden=true;t.textContent='';box.classList.remove('ok');
     if(!/^[\w-]{1,40}$/.test(u))return;
     put(LOGIN,u);
-    var c=get(CACHE),show=function(v){bar.hidden=false;bar.value=Math.min(v,GOAL);t.textContent=v+'/'+GOAL+' IDs, 30 days';t.title='Improving IDs for others in the last 30 days; 10 open iNaturalist OAuth';};
+    var c=get(CACHE),show=function(v){bar.hidden=false;bar.value=Math.min(v,GOAL);t.textContent=v+'/'+GOAL+' IDs, 30 days';box.classList.toggle('ok',v>=GOAL);
+      if(v>=GOAL){var a=el('a',null,'OAuth ready');a.href='https://www.inaturalist.org/oauth/app_owner_application';a.target='_blank';a.rel='noopener';t.append(' · ',a);}t.title='Improving IDs for others in the last 30 days; 10 open iNaturalist OAuth';};
     if(c&&c.u===u&&Date.now()-c.at<TTL)return show(c.n);
     var q=new URLSearchParams({user_id:u,own_observation:'false',current:'true',category:'improving',
       d1:new Date(Date.now()-30*864e5).toISOString().slice(0,10),per_page:'1'});
@@ -26,6 +27,8 @@ return function(box){
       .then(function(j){if(me.value.trim()!==u)return;put(CACHE,{u:u,at:Date.now(),n:j.total_results});show(j.total_results);})
       .catch(function(){if(me.value.trim()===u)t.textContent='Login not found';});
   }
+  document.addEventListener('wtid-unopened',function(e){
+    if(ids.delete(e.detail)){put(OPENED,{d:day(),ids:[...ids]});count();}});
   document.addEventListener('wtid-opened',function(e){
     if(ids.has(e.detail))return;ids.add(e.detail);put(OPENED,{d:day(),ids:[...ids]});count();});
   me.onchange=improving;
