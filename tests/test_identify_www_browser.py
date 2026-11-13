@@ -171,8 +171,8 @@ def test_phones_fold_the_filters_into_one_row_naming_those_on(browser, site):
     base, _ = site
     page = browser.new_page(viewport={"width": 390, "height": 800})
     eb.stub_inat(page, None)
-    page.goto(f"{base}/identify.html#lvl=3&run=1&from=2020-01-01")
-    page.wait_for_selector("#chips .chip", state="attached")
+    page.goto(f"{base}/identify.html#lvl=3&run=1&from=2026-08-10&to=2026-09-10")
+    page.wait_for_function("document.querySelectorAll('#chips .chip').length === 2")
     assert not page.locator("#when").is_visible()
     assert page.locator("#chips .chip").all_inner_texts() == ["By species", "Custom"]
     page.click("#filt summary")
