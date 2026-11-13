@@ -270,3 +270,15 @@ def test_a_first_visit_shows_the_key_tip_until_dismissed(browser, site):
     page.reload()
     page.wait_for_selector("#grid .card")
     assert not page.locator("#tip").is_visible()
+
+
+def test_a_touch_device_tip_has_no_keys(browser, site):
+    base, _ = site
+    ctx = browser.new_context(has_touch=True, is_mobile=True, viewport={"width": 400, "height": 800})
+    page = ctx.new_page()
+    eb.stub_inat(page, None)
+    page.goto(f"{base}/identify.html#lvl=3")
+    page.wait_for_selector("#grid .card")
+    assert page.inner_text("#tip").startswith("Tap a card to compare. Identify opens iNat")
+    assert "undo" not in page.inner_text("#tip")
+    ctx.close()

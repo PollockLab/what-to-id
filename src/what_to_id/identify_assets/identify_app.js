@@ -477,6 +477,7 @@ async function load(){
 var KD=/(?:^|&)kind=(\d)/.exec(location.hash.slice(1));KF=KD&&TAB[+KD[1]]?+KD[1]:0;
 function start(){
   var tip=$('tip');try{tip.hidden=!!localStorage.getItem('wtid-tip');}catch(e){tip.hidden=false;}  // a first visit's key tip, until dismissed
+  if(matchMedia('(pointer: coarse)').matches)tip.firstChild.nodeValue='Tap a card to compare. Identify opens iNat with the name copied. ';
   tip.querySelector('button').onclick=function(){tip.hidden=true;try{localStorage.setItem('wtid-tip','1');}catch(e){}};
   tabs();inbox();IdentifyProgress($('prog'));IdentifyFlow.keys({level:function(){return BT?0:LV;},more:function(){shown+=LIMIT;more();}});
   if(CFG.study){
