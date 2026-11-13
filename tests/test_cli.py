@@ -127,6 +127,7 @@ def test_build_design_rotation_writes_only_index(tmp_path, webapp_dir):
         "map.html",
         "pool-0.bin",
         "pool-observer.bin",
+        "pool-sdm-mask.bin",
         "pool-taxa.bin",
         "study.json",
     ]

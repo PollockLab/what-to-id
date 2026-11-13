@@ -521,6 +521,10 @@ def write_map(
         if over:
             _warn(f"{over} group-months hold more records than their totals; the page caps them")
     add_projects(blobs, meta, projects)
+    # the habitat overlay's cover over the model outside Canada and the USA, see map_sdm.js
+    mask = (_ASSETS / "outside_ca_us.geojson.gz").read_bytes()
+    meta.setdefault("files", {})["sdmmask"] = hashed("pool-sdm-mask.bin", mask)
+    blobs[meta["files"]["sdmmask"]] = mask
     if sdm_manifest is not None:
         taxa = json.loads(gzip.decompress(blobs[meta["taxa"]]))
         try:

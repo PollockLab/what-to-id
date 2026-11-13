@@ -10,7 +10,8 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 
-from what_to_id.site_files import END, START, dump, read_meta, write_meta
+from what_to_id.page_map import _ASSETS
+from what_to_id.site_files import END, START, dump, publish, read_meta, write_meta
 
 from . import test_identify_ranges_browser as rb
 from .test_map_oneid_browser import open_map
@@ -27,6 +28,9 @@ VALUES = {"taxon-0": [43.0], "taxon-1": [255], "taxon-2": [70.0]}
 def site(tmp_path_factory):
     root = tmp_path_factory.mktemp("sdm-site")
     rb.write_site(root, introduced=(2,))
+    publish(
+        root, "sdmmask", "pool-sdm-mask.bin", (_ASSETS / "outside_ca_us.geojson.gz").read_bytes()
+    )
     page = root / "map.html"
     html = page.read_text()
     meta = read_meta(html)

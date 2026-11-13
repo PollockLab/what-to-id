@@ -471,7 +471,7 @@ if(matchMedia('(max-width:760px)').matches&&!document.documentElement.classList.
   var at=map.getContainer().querySelector('.maplibregl-ctrl-attrib');if(at){at.removeAttribute('open');at.classList.remove('maplibregl-compact-show');}});  // a phone starts with the credit folded to its icon
 map.on('movestart',function(e){if(e.originalEvent)MOVED=true;});  // only the viewer's own drag, wheel or pinch
 var overlay=new deck.MapboxOverlay({interleaved:false,pickingRadius:8,layers:[]});map.addControl(overlay);
-var SDM=MapSdm(map,{META:META,picks:function(){return S.picks;},TAXA:function(){return TAXA;},cells:MC.cells});
+var SDM=MapSdm(map,{META:META,get:get,picks:function(){return S.picks;},TAXA:function(){return TAXA;},cells:MC.cells});
 var AREA=MapArea({map:map,S:S,LAST:LAST,hash:S.area,park:S.park,bcpark:S.bcpark,fit:!S.at,
   place:META.place_id,parks:META.parks,get:get,P:function(){return P;},keep:function(){return KEEP;},change:refilter,
   sel:function(){return sel().join('&');},extra:function(){var u=UF.params(true);return Object.keys(u).map(function(k){return '&'+k+'='+encodeURIComponent(u[k]);}).join('');},
