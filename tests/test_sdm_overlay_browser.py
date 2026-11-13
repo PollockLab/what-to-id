@@ -64,8 +64,9 @@ def test_the_toggle_adds_the_model_and_the_range_outline_and_takes_them_off(brow
         btn.inner_text() == "Show modelled range" and btn.get_attribute("aria-pressed") == "false"
     )
     btn.click()
-    page.wait_for_function("window.__src && window.__src['sdm-range']")  # after the range file
-    assert btn.get_attribute("aria-pressed") == "true" and sources(page) == ["sdm", "sdm-range"]
+    page.wait_for_function("window.__src && window.__src['sdm-range'] && window.__src['sdm-mask']")
+    assert btn.get_attribute("aria-pressed") == "true"
+    assert sources(page) == ["sdm", "sdm-mask", "sdm-range"]
     raster = page.evaluate("__src.sdm")
     assert raster["type"] == "raster" and raster["tileSize"] == 256
     assert raster["attribution"] == "ECCC SDM via Biodiversité Québec"
@@ -80,7 +81,10 @@ def test_the_toggle_adds_the_model_and_the_range_outline_and_takes_them_off(brow
     assert {p[0] for e in geom["coordinates"] for p in e} == {-124, -123, -122}
     assert not [e for e in geom["coordinates"] if e[0][0] == e[1][0] == -123]  # the shared edge
     lyr = page.evaluate("Object.values(__lyr).map(x => [x[0].id, x[0].type])")
-    assert lyr == [["sdm", "raster"], ["sdm-range", "line"]]
+    assert sorted(lyr) == [["sdm", "raster"], ["sdm-mask", "fill"], ["sdm-range", "line"]]
+    mask = page.evaluate("__src['sdm-mask'].data.features.map(f => f.properties.id)")
+    assert mask == ["land", "sea"]
+    assert page.evaluate("__lyr['sdm-mask'][0].paint['fill-color'][3]") == "#d4dadc"  # light sea
     assert page.evaluate("__lyr.sdm[0].paint['raster-opacity']") == 0.55
     leg = page.locator(".sdmleg")
     assert page.evaluate("document.querySelector('#side #sdmbtn + .sdmleg') !== null")
@@ -113,8 +117,8 @@ def test_a_second_pick_takes_the_overlay_and_the_toggle_away(browser, site):
 def test_without_the_range_file_only_the_model_is_drawn(browser, site):
     page = opened(browser, site, "#taxa=1000", range_file=False)
     page.locator("#sdmbtn").click()
-    page.wait_for_function("window.__src && window.__src.sdm")
+    page.wait_for_function("window.__src && window.__src['sdm-mask']")
     page.wait_for_timeout(300)
-    assert sources(page) == ["sdm"] and page.locator(".sdmleg").is_visible()
+    assert sources(page) == ["sdm", "sdm-mask"] and page.locator(".sdmleg").is_visible()
     assert page.errors == []
     page.close()

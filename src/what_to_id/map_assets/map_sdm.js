@@ -1,12 +1,15 @@
 // The modelled range of the one picked taxon: the ECCC 1 km habitat model (META.sdm, sdm_manifest.py) as tiles from
 // the Biodiversite Quebec tiler, under the taxon's iNaturalist range outline, with a legend under the toggle. Offered only for exactly one
-// included pick with a model; the sources are removed when off, so no tiles load then.
-// MapSdm(map,ctx), ctx {META, picks() the taxon picks, TAXA(), cells(name) the range as IdentifyRanges.cells gives it}.
+// included pick with a model; the sources are removed when off, so no tiles load then. A basemap-coloured mask
+// (META.files.sdmmask, fetched when first on) covers the model and its outline outside Canada and the USA.
+// MapSdm(map,ctx), ctx {META, get(url) a data file's bytes, picks() the taxon picks, TAXA(), cells(name) the range as IdentifyRanges.cells gives it}.
 // sync() after the picks change and after the range file arrives.
 var MapSdm=(function(){
 'use strict';
-var TILES='https://tiler2.biodiversite-quebec.ca/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=',
+var dark=matchMedia('(prefers-color-scheme: dark)').matches,
+  TILES='https://tiler2.biodiversite-quebec.ca/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=',
   STYLE='&colormap_name=viridis&rescale=0,99&nodata=255',
+  LAND=dark?'#0e0e0e':'#fafaf8',SEA=dark?'#2c353c':'#d4dadc',  // the Carto basemap's background and water
   VIRIDIS='linear-gradient(to right,#440154,#3b528b,#21918c,#5ec962,#fde725)';
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 // The range's outline: the cell edges no other range cell shares (the grid's vertices are rounded, so shared ones match).
@@ -32,7 +35,7 @@ return function(map,ctx){
     return s?{name:T[r][0],cog:m.cog.replace('{slug}',s)}:null;
   }
   function off(){
-    ['sdm-range','sdm'].forEach(function(id){if(map.getLayer(id))map.removeLayer(id);if(map.getSource(id))map.removeSource(id);});
+    ['sdm-range','sdm-mask','sdm'].forEach(function(id){if(map.getLayer(id))map.removeLayer(id);if(map.getSource(id))map.removeSource(id);});
     KEY=null;leg.hidden=true;
   }
   function draw(t){
@@ -49,6 +52,12 @@ return function(map,ctx){
         'line-color':getComputedStyle(document.documentElement).getPropertyValue('--rlab').trim()||'#3b78c4'}},under);
     }
     KEY=t.cog;leg.hidden=false;
+    if(!map.getSource('sdm-mask'))ctx.get(ctx.META.files.sdmmask).then(function(b){  // the model is 0, not nodata, outside CA and US
+      if(KEY!==t.cog||map.getSource('sdm-mask'))return;  // went off, or another call won
+      map.addSource('sdm-mask',{type:'geojson',data:JSON.parse(new TextDecoder().decode(b))});
+      map.addLayer({id:'sdm-mask',type:'fill',source:'sdm-mask',
+        paint:{'fill-color':['match',['get','id'],'sea',SEA,LAND]}},map.getLayer('sdm-range')?'sdm-range':under);
+    }).catch(function(){});
   }
   function sync(){
     var t=one();

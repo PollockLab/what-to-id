@@ -245,6 +245,8 @@ def test_write_map_and_cli(tmp_path):
         PARKS_NAME,
         meta["observer"],
     ]
+    mask = json.loads((tmp_path / "a" / META_NAME).read_text())["files"]["sdmmask"]
+    names.append(mask)
     assert sorted(p.name for p in paths) == sorted(names)
     pool.to_parquet(tmp_path / "pool.parquet", index=False)
     assert main(["--pool", str(tmp_path / "pool.parquet"), "--out", str(tmp_path / "b")]) == 0
