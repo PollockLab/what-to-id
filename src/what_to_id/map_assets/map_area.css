@@ -9,6 +9,7 @@
 .afile{position:relative}
 .afile input{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden}
 .afile:focus-within{outline:3px solid var(--bar)}
+.adrop{outline:3px dashed var(--bar);outline-offset:-3px}
 .anote{margin:6px 2px 0;font-size:12px;color:var(--muted)}
 .anote[hidden]{display:none}
 .abox{display:block;margin:4px 2px 0;font-size:12px;color:inherit}
@@ -45,10 +46,10 @@
 .alive{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .atoggle{display:none}
 @media (max-width:760px){
-  html:not(.embed) .atoggle{display:inline-flex;align-items:center;border:1px solid var(--line);background:var(--chip);color:var(--ink);
+  html .atoggle{display:inline-flex;align-items:center;border:1px solid var(--line);background:var(--chip);color:var(--ink);
     font:inherit;font-size:12px;padding:3px 9px;min-height:28px;cursor:pointer;border-radius:999px}
-  html:not(.embed) .area:not(.acol) .atoggle{margin-bottom:4px}
-  html:not(.embed) .area.acol>:not(.atoggle){display:none}
+  html .area:not(.acol) .atoggle{margin-bottom:4px}
+  html .area.acol>:not(.atoggle){display:none}
 }
 @media (max-width:479px){
   .apanel{position:fixed;left:8px;right:8px;z-index:10;background:var(--panel);border:1px solid var(--line);

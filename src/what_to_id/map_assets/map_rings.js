@@ -69,6 +69,7 @@ function fromGeoJSON(o){
     if(g.type==='FeatureCollection')(g.features||[]).forEach(walk);
     else if(g.type==='Feature')walk(g.geometry);
     else if(g.type==='GeometryCollection')(g.geometries||[]).forEach(walk);
+    else if(/^(Multi)?(Point|LineString)$/.test(g.type))throw new Error('This file holds a '+g.type+', not a Polygon or MultiPolygon.');
     else if(g.type==='Polygon')add(g.coordinates);
     else if(g.type==='MultiPolygon')(g.coordinates||[]).forEach(add);})(o);
   function add(poly){(poly||[]).forEach(function(ring){var r=[];

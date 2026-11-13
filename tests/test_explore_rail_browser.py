@@ -62,21 +62,18 @@ def test_the_space_controls_stay_clickable_beside_the_open_rail_with_a_filter_on
     frame = map_frame(page)
     frame.locator("#groups > li").nth(2).locator(".gb").click()
     frame.wait_for_function(f"{COUNT}.startsWith('30 ')")
-    page.click("#sbf")  # the area control is in the state bar's Filters sheet, open a message later
-    frame.wait_for_selector("#xsheet .maplibregl-ctrl.area", state="visible")
+    frame.wait_for_selector(".maplibregl-ctrl.area", state="visible")  # Where is on the map
     card = frame.locator(".maplibregl-ctrl.area").bounding_box()
     assert card["x"] >= 280  # beside the rail, not under it
-    frame.get_by_role(
-        "button", name="Draw area", exact=True
-    ).click()  # a real click: nothing covers it
+    frame.get_by_role("button", name="Draw", exact=True).click()  # a real click: nothing covers it
     assert frame.is_visible("[data-a=cancel]")
     frame.click("[data-a=cancel]")
     page.close()
     # a phone with the map pane and its filters sheet shut
     page = open_page(browser, f"{site[0]}/explore.html?view=map", width=390)
     frame = map_frame(page)
-    page.click("#sbf")
-    frame.get_by_role("button", name="Draw area", exact=True).click()
+    frame.get_by_role("button", name="Where", exact=True).click()  # folded on a phone
+    frame.get_by_role("button", name="Draw", exact=True).click()
     assert frame.is_visible("[data-a=cancel]")
     assert page.errors == []
     page.close()
@@ -165,5 +162,42 @@ def test_with_storage_blocked_the_rail_opens_and_folds(browser, site):
     frame.click("#railx")
     frame.locator("#groups > li").nth(2).locator(".gb").click()
     frame.wait_for_function(f"{COUNT}.startsWith('30 ')")
+    assert page.errors == []
+    page.close()
+
+
+DROP = """([name, text]) => {
+  const dt = new DataTransfer();
+  dt.items.add(new File([text], name, {type: 'application/geo+json'}));
+  document.getElementById('map').dispatchEvent(
+    new DragEvent('drop', {dataTransfer: dt, bubbles: true, cancelable: true}));
+}"""
+SQUARE = (
+    '{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":'
+    "[[[-125,48],[-120,48],[-120,52],[-125,52],[-125,48]]]}}"
+)
+
+
+def test_a_dropped_or_uploaded_area_is_one_named_chip_and_a_non_polygon_is_refused(browser, site):
+    page = open_page(browser, f"{site[0]}/explore.html")
+    frame = map_frame(page)
+    note = frame.locator(".anote")
+    idf = next(f for f in page.frames if "identify.html" in f.url)
+    idf.evaluate("window.got = []; addEventListener('message', e => got.push(e.data))")
+    frame.evaluate(DROP, ["wells.geojson", '{"type":"Point","coordinates":[-123,49]}'])
+    note.wait_for(state="visible")
+    assert "Point, not a Polygon or MultiPolygon" in note.text_content()
+    assert "area=" not in frame.evaluate("location.hash")
+    frame.evaluate(DROP, ["park.geojson", SQUARE])
+    idf.wait_for_function("got.some(d => d.type === 'wtid-area' && d.area)")  # synced to Identify
+    frame.wait_for_function("location.hash.includes('area=')")
+    page.wait_for_function("document.querySelectorAll('#sbc li').length === 1")
+    assert page.locator("#sbc li").all_text_contents() == ["park.geojson×"]
+    frame.locator("[data-a=clear]").click()
+    frame.wait_for_function("!location.hash.includes('area=')")
+    frame.locator(".afile input").set_input_files(
+        {"name": "up.geojson", "mimeType": "application/geo+json", "buffer": SQUARE.encode()}
+    )
+    page.wait_for_function("document.getElementById('sbc').textContent.includes('up.geojson')")
     assert page.errors == []
     page.close()

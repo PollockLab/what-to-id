@@ -146,7 +146,7 @@ def test_filters_opens_the_dates_and_the_area_and_closes_the_legend(browser, sit
     frame.wait_for_selector("#xsheet #from", state="visible")  # the frame hears it a message later
     for sel in ("#from", "#to", "#byObs", "#byUp"):
         assert frame.is_visible(f"#xsheet {sel}")
-    assert frame.get_by_role("button", name="Draw area", exact=True).is_visible()
+    assert frame.locator("#xsheet .area").count() == 0  # Where stays on the map
     assert frame.is_hidden("#xsheet .lvleg")
     frame.fill("#from", "2026-09-01")
     frame.dispatch_event("#from", "change")

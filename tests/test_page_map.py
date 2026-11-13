@@ -554,7 +554,7 @@ def test_area_filter_codes_tests_and_reads_polygons():
     # capped at 1500 corners; islets too small to keep drop out and leave their share to the rest
     assert out["simple"][0] == 1 and 1400 <= out["simple"][1] <= 1500
     assert "EPSG:3005" in out["errors"][0] and "not longitude and latitude" in out["errors"][1]
-    assert "no Polygon" in out["errors"][2]
+    assert "not a Polygon or MultiPolygon" in out["errors"][2]
     assert out["multi"] == 2 and out["bad"] == "bad character"
 
 
