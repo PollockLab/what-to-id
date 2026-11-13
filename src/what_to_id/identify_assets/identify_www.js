@@ -1,4 +1,4 @@
-// What, When and Where beside the group control. When writes the map filter's from= (to= cleared, by= kept), Where shows
+// What, When and Where in the search sheet with the group control. When writes the map filter's from= (to= cleared, by= kept), Where shows
 // the hash's area with a clear button and a link to draw one on the map. At risk and Invasive (hash risk=1, inv=1) keep
 // level 3 cards by their suggested species: At risk from the map's META.value list (at_risk_bc_taxa.json, listed in Canada
 // or BC S1-S3), at once; Invasive when iNaturalist marks it introduced in BC, from /v1/taxa/<ids>?preferred_place_id=7085
@@ -45,7 +45,7 @@ return function(ctx){
     var l=el('label','tog'),b=el('input');b.type='checkbox';b.checked=on(k);
     b.onchange=function(){keep(k,b.checked);sync();ctx.redraw();};l.append(b,' '+label);return l;
   }
-  var when=el('select','padd'),where=el('span','rout'),box=$('grp');
+  var when=el('select','padd'),where=el('span','rout');
   when.id='when';when.setAttribute('aria-label','When');
   [['','Any time'],['30','Last 30 days'],['90','Last 90 days'],['c','Custom']].forEach(function(o){when.add(new Option(o[1],o[0]));});
   when.onchange=function(){
@@ -61,20 +61,12 @@ return function(ctx){
     where.replaceChildren(el('span','muted','Where '));
     if(ctx.area()){var x=el('button','padd','Map area ×');x.type='button';x.title='Clear the area';x.onclick=ctx.clear;where.append(x);}
     else{var a=el('a',null,'Anywhere');a.href='explore.html?view=map'+location.hash;a.title='Draw an area on the map';where.append(a);}
-    chips();
-  }
-  function chips(){  // the phone's collapsed Filters row names what is on
-    var f=$('filt');if(!f)return;
-    var on=[].map.call(f.querySelectorAll('input[type=checkbox]:checked'),function(b){return b.parentNode.textContent.trim();});
-    [].forEach.call(f.querySelectorAll('select'),function(s){if(s.value&&s.selectedIndex>0)on.push(s.options[s.selectedIndex].text);});
-    if(ctx.area())on.push('Map area');
-    $('chips').replaceChildren.apply($('chips'),on.map(function(t){return el('span','chip',t);}));
   }
   var w=el('span','rout');w.append(el('span','muted','When '),when);
-  var t=el('span','rout');t.append(toggle('risk','At risk'),' ',toggle('inv','Invasive'),' ',toggle('run','By species'));
-  box.after(t,w,where);
+  // At risk and Invasive are one-tap chips under the search bar; By species, When and Where sit in the sheets
+  var risk_=toggle('risk','At risk'),inv_=toggle('inv','Invasive');risk_.className=inv_.className='tog qchip';
+  $('qchips').append(risk_,inv_);$('frun').append(toggle('run','By species'));$('wwhen').append(w,where);
   where.hidden=parent!==window;  // the split view's map beside it holds the area
-  if($('filt')&&matchMedia('(max-width:540px)').matches)$('filt').open=false;
   sync();
   return {pass:pass,sync:sync,active:function(){return on('risk')||on('inv');}};
 };

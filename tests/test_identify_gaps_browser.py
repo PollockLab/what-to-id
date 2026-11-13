@@ -11,6 +11,7 @@ import numpy as np
 
 from . import test_embeddings_browser as eb
 from . import test_identify_browser as ib
+from .identify_sheets import reveal
 from .test_identify_narrow_browser import rank_plane
 
 browser = eb.browser
@@ -162,6 +163,7 @@ def test_the_default_is_top_5_percent_with_both_sorts_on(browser, site):
 def test_the_last_sort_on_stays_on(browser, site):
     base, _ = site
     page = open_with(browser, base, "&sort=conf")
+    reveal(page, "#sort .seg")
     page.click("#sort button:has-text('Confidence')")
     assert page.get_attribute("#sort button >> nth=4", "aria-checked") == "true"
     assert "sort=conf" in page.evaluate("location.hash")
@@ -200,6 +202,7 @@ def test_the_badge_names_the_gap_and_links_to_the_cell(browser, site):
 def test_the_choices_are_kept_in_the_hash_and_shown_on_level_3_only(browser, site):
     base, _ = site
     page = open_with(browser, base, "")
+    reveal(page, "#sort .seg")
     page.click("#sort button:has-text('Top 25%')")
     page.click("#sort button:has-text('Blitz gaps')")
     hash_ = page.evaluate("location.hash")
@@ -211,7 +214,7 @@ def test_the_choices_are_kept_in_the_hash_and_shown_on_level_3_only(browser, sit
     )
     assert on == ["Top 25%", "Confidence"]
     page.click("#tab1")
-    assert page.locator("#sort").is_hidden()
+    assert page.locator("#sort").get_attribute("hidden") is not None
     assert page.errors == []
 
 

@@ -6,6 +6,7 @@ from urllib.parse import parse_qs, urlparse
 
 from . import test_embeddings_browser as eb
 from . import test_identify_browser as ib
+from .identify_sheets import close, reveal
 
 browser = eb.browser
 site = ib.site
@@ -86,9 +87,11 @@ def test_the_keys_move_open_and_copy_and_the_hint_shows_on_level_3_only(browser,
     assert len(page.evaluate("OPENED")) == 1 and page.evaluate(focused) == ids[1]
     page.keyboard.press("Enter")
     assert len(page.evaluate("OPENED")) == 2 and page.evaluate(focused) == ids[2]
+    reveal(page, "#grpsel")
     page.focus("#grpsel")  # a form field keeps its keys
     page.keyboard.press("j")
     assert page.evaluate("document.activeElement.id") == "grpsel"
+    close(page)
     page.click("#tab1")
     assert page.locator("#keys").is_hidden()
     assert page.errors == []

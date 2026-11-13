@@ -1,0 +1,48 @@
+/* The chrome (identify_shell.js): search pill, chip row, sheets, result line */
+.bar{display:flex;justify-content:center;margin:10px 0 8px}
+.pill{display:flex;align-items:center;gap:0;padding:6px 6px 6px 8px;border:1px solid var(--line);border-radius:999px;background:var(--panel);
+  color:var(--ink);font:inherit;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.08);max-width:100%;min-width:0}
+.pill:hover{box-shadow:0 2px 12px rgba(0,0,0,.16)}
+.seg1{display:flex;flex-direction:column;align-items:flex-start;padding:2px 18px;min-width:0;border-left:1px solid var(--line);text-align:left}
+.seg1:first-child{border-left:0}
+.seg1 small{font-size:11px;font-weight:650}.seg1 b{font-weight:400;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:22ch}
+.pgo{display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:var(--on);color:var(--onink);flex:none}
+.pgo svg,.qchip svg,.shx svg,.chipx svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round}
+.qrow{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:8px;margin:0 0 10px}
+.qchips{display:contents}
+.qchip,.qrow .tog{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:0 14px;border:1px solid var(--line);border-radius:999px;
+  background:var(--panel);color:var(--ink);font:inherit;cursor:pointer;margin:0;white-space:nowrap}
+.qchip:hover,.qrow .tog:hover{border-color:var(--ink)}
+.qrow .tog input{width:16px;height:16px;margin:0;accent-color:var(--on)}
+.qrow .tog:has(input:checked){background:var(--on);color:var(--onink);border-color:var(--on)}
+.fcount{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:var(--on);color:var(--onink);font-size:11px;font-weight:700}
+.vr{width:1px;height:24px;background:var(--line)}
+.chip{display:inline-flex;align-items:center;gap:2px;min-height:34px;padding:0 4px 0 12px;border-radius:999px;background:var(--chip);border:1px solid var(--line)}
+.chipx{display:grid;place-items:center;width:26px;height:26px;padding:0;border:0;border-radius:50%;background:none;color:var(--ink);cursor:pointer}
+.chipx:hover{background:var(--line)}
+.rline{display:flex;align-items:center;gap:8px;margin:4px 0 2px;flex-wrap:wrap}
+.rline b{font-size:15px}.rline .sp1{flex:1}.rline .qchip{min-height:30px;padding:0 10px;border:0}
+.pop{margin:0;inset:auto;position:fixed;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);
+  box-shadow:0 8px 28px rgba(0,0,0,.2);max-width:min(420px,calc(100vw - 32px))}
+.pop .batch{margin:0 0 6px}.pop #cap{margin:0}
+dialog.sheet{padding:0;border:0;border-radius:20px;background:var(--panel);color:var(--ink);width:min(600px,calc(100vw - 32px));max-height:86vh;
+  box-shadow:0 12px 40px rgba(0,0,0,.3)}
+dialog.sheet[open]{display:flex;flex-direction:column}
+dialog.sheet::backdrop{background:rgba(0,0,0,.45)}
+.shead{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 8px}
+.shead h2{margin:0;font-size:22px}
+.shx{display:grid;place-items:center;width:36px;height:36px;padding:0;border:1px solid var(--line);border-radius:50%;background:none;color:var(--ink);cursor:pointer}
+.sbody{overflow:auto;padding:4px 20px 16px;flex:1}
+.sbody h3{font-size:15px;margin:16px 0 8px}
+.ssec:has(>.rout[hidden]){display:none}
+.sbody .srow{display:flex;flex-direction:column;align-items:flex-start;gap:8px;margin:14px 0 0}
+.sbody .srow>span:first-child{font-weight:650;font-size:15px}
+.sbody .ctl{gap:10px 20px;margin:8px 0}
+.sbody .segb{min-height:36px;padding:0 14px}
+.sfoot{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-top:1px solid var(--line)}
+.sfoot .btn{min-height:44px;padding:0 20px;border:0;border-radius:10px;font:inherit;font-weight:650;cursor:pointer}
+.sfoot .lnk{font:inherit;color:var(--ink);background:none;border:0;text-decoration:underline;cursor:pointer;padding:8px 0}
+@media (max-width:600px){
+  .seg1{padding:0 10px}.seg1 small{display:none}.seg1 b{color:var(--ink);font-size:13px;max-width:12ch}.pgo{width:30px;height:30px}
+  .qrow{flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;padding-bottom:2px}
+  dialog.sheet{width:100vw;max-width:100vw;max-height:90vh;margin:auto 0 0;border-radius:20px 20px 0 0}}

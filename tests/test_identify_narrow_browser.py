@@ -13,6 +13,7 @@ from what_to_id import site_files
 
 from . import test_embeddings_browser as eb
 from . import test_identify_browser as ib
+from .identify_sheets import reveal
 from .test_identify_browser import LOOKS
 
 browser = eb.browser
@@ -114,6 +115,7 @@ def test_the_group_control_sets_the_groups_filter(browser, site):
     page = ib.open_identify(browser, base, "#lvl=1")
     page.wait_for_function("__identify.ids().length > 0")
     assert page.locator("#grpsel").input_value() == ""
+    reveal(page, "#grpsel")
     page.select_option("#grpsel", "Aves")
     want = sorted(pts.loc[pts["iconic_taxon"] == "Aves", "id"].tolist())
     page.wait_for_function(f"__identify.ids().length === {len(want)}")
@@ -155,7 +157,9 @@ def test_level_3_has_one_count_line_that_agrees_with_the_tab(browser, site):
     assert page.inner_text("#cap") == (
         f"{cards:,} cards to ID ({records:,} records, Top 5%; up to 3 per suggested species)"
     )
-    assert page.locator("#cap").is_visible() and "records shown" not in page.inner_text("#sort")
+    assert page.inner_text("#count") == f"{cards:,} cards to ID"
+    assert "records shown" not in page.inner_text("#sort")
+    reveal(page, "#sort .seg")
     page.click("#sort button:has-text('All')")
     records = page.evaluate("__identify.total()")[3]
     assert page.inner_text("#tab3 b") == f"{records:,}"
@@ -209,6 +213,7 @@ def test_a_drop_after_show_more_keeps_the_batch_and_the_counts(browser, site):
     page.wait_for_selector("#grid .card")
     page.wait_for_load_state("networkidle")
     assert page.locator("#more").is_visible()  # the fixture lists more than one page
+    reveal(page, "#next")
     page.click("#next")
     assert " · batch 2 of " in page.inner_text("#go")
     before = len(page.evaluate("__identify.view()")[3])

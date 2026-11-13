@@ -17,6 +17,7 @@ from what_to_id.page_map import encode_points, render_map
 
 from . import test_identify_browser as ib
 from .embeddings_fixture import TREE, pool_frame
+from .identify_sheets import reveal
 from .test_page_nav import FORBIDDEN
 
 browser = ib.browser
@@ -103,10 +104,11 @@ def test_the_control_is_hidden_without_an_area(browser, site):
     page = opened(browser, site, "#lvl=1")
     assert page.locator("#rg").is_hidden() and shown(page) == list(range(N))
     set_area(page)
-    page.locator("#rg").wait_for(state="visible")
+    page.wait_for_function("!document.querySelector('#rg').hidden")
+    reveal(page, "#rg .segb")
     assert seg(page).all_inner_texts() == ["All 8", "None yet"] and page.counts == []
     page.evaluate("postMessage({type: 'wtid-area', area: ''}, location.origin)")
-    page.locator("#rg").wait_for(state="hidden")
+    page.wait_for_function("document.querySelector('#rg').hidden")
     assert page.errors == []
 
 
@@ -115,6 +117,8 @@ def test_none_yet_keeps_the_species_without_a_research_grade_record_and_leaves_o
 ):
     page = opened(browser, site, "#lvl=1")
     set_area(page)
+    page.wait_for_function("!document.querySelector('#rg').hidden")
+    reveal(page, "#rg .segb")
     seg(page).nth(1).click()
     page.wait_for_function("__identify.view()[1].length === 5")
     assert shown(page) == [2, 3, 4, 5, 6]  # no 0 (species) or 1 (subspecies), no 7 (genus)

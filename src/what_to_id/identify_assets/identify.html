@@ -71,8 +71,7 @@ ol{list-style:none;margin:8px 0;padding:0;display:grid;gap:10px;
 .ctl{display:flex;flex-wrap:wrap;align-items:center;gap:4px 16px}
 .ctl>.rout{margin:2px 0}.ctl #sort:not([hidden]){display:contents}.ctl .srow{margin:2px 0;gap:4px 6px}
 .ctl .segb{min-height:26px;padding:0 9px}
-.tog{margin-right:10px;white-space:nowrap}#prog.ok progress{accent-color:#2e7d32}.filt>summary{display:none}.chip{display:inline-block;margin-left:6px;padding:0 8px;border-radius:10px;background:var(--chip);border:1px solid var(--line);font-size:.85em}
-@media (max-width:540px){.filt>summary{display:list-item;cursor:pointer;margin:4px 0}}
+.tog{margin-right:10px;white-space:nowrap}#prog.ok progress{accent-color:#2e7d32}
 #sort .segnote{margin:0}
 .hint{color:var(--muted)}.hint summary{cursor:pointer;min-height:24px}.hint .segnote,.hint p{margin:2px 0}
 .card .links{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
@@ -132,6 +131,7 @@ body:not(.bt) #study,.bt #status:not(.err),.bt #unpick,.bt #desc,.bt #kind,.bt .
 .cpbar .copy{font:inherit;font-size:13px;min-height:30px;padding:0 10px;border:1px solid var(--line);border-radius:15px;background:var(--chip);color:var(--ink);cursor:pointer}
 __IDENTIFY_RANGES_CSS__
 __IDENTIFY_UI_CSS__
+__IDENTIFY_SHELL_CSS__
 </style></head><body>
 __SITE_NAV__<main id="main-content">
 <h1>Identify</h1>
@@ -174,12 +174,24 @@ The login goes only to iNaturalist.</p></details>
 <div id="tabs" class="tabs" role="tablist" aria-label="Level"></div>
 <p id="desc" class="muted"></p>
 <div id="kind" class="rout" hidden></div>
-<details id="filt" class="filt" open><summary>Filters <span id="chips"></span></summary>
-<div class="rout usr"><details id="usrbox" hidden></details></div>
-<div class="ctl"><div id="grp" class="rout" hidden><label for="grpsel">What </label><select id="grpsel" class="padd"></select></div>
-<div id="rout" class="rout" hidden></div>
-<div id="sort" class="rout" hidden></div></div>
-<div id="rg" class="rout" hidden></div></details>
+<div id="bar" class="bar"><button type="button" id="pill" class="pill" aria-haspopup="dialog" aria-controls="ssheet">
+<span class="seg1"><small>What</small><b id="pwhat">All groups</b></span><span class="seg1"><small>When</small><b id="pwhen">Any time</b></span>
+<span class="seg1"><small>Where</small><b id="pwhere">Anywhere</b></span><span class="pgo"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M16 16l4 4"/></svg></span></button></div>
+<div id="qrow" class="qrow"><button type="button" id="fbtn" class="qchip" aria-haspopup="dialog" aria-controls="fsheet">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M7 12h10M10 17h4"/></svg> Filters <span id="fcount" class="fcount" hidden></span></button>
+<span class="vr" aria-hidden="true"></span><span id="qchips" class="qchips"></span><span id="chips" class="qchips"></span></div>
+<dialog id="ssheet" class="sheet" aria-labelledby="ssh"><div class="shead"><h2 id="ssh">What, when, where</h2>
+<button type="button" class="shx" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><div class="sbody">
+<div class="ctl"><div id="grp" class="rout" hidden><label for="grpsel">What </label><select id="grpsel" class="padd"></select></div></div>
+<div id="wwhen" class="ctl"></div></div><div class="sfoot"><span></span><button type="button" class="btn sdone">Show <span class="n">0</span> cards</button></div></dialog>
+<dialog id="fsheet" class="sheet" aria-labelledby="fsh"><div class="shead"><h2 id="fsh">Filters</h2>
+<button type="button" class="shx" aria-label="Close filters"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><div class="sbody">
+<section class="ssec"><h3>Range</h3><div id="rout" class="rout" hidden></div></section>
+<section class="ssec"><div id="sort" class="rout" hidden></div></section>
+<section class="ssec"><h3>Research Grade here</h3><div id="rg" class="rout" hidden></div></section>
+<section class="ssec"><h3>By species</h3><div id="frun" class="rout"></div></section>
+<section class="ssec"><h3>User</h3><div class="rout usr"><details id="usrbox" hidden></details></div></section></div>
+<div class="sfoot"><button type="button" id="fclear" class="lnk">Clear all</button><button type="button" class="btn sdone">Show <span class="n">0</span> cards</button></div></dialog>
 <details id="hint" class="rout hint"><summary>Notes and keys</summary><div id="hintbody"></div>
 <p id="keys" hidden>Keys: j next card, k previous, i or Enter Identify (copies the name, opens iNaturalist in one reused tab), c copy the name. Click a card or press Space for the compare panel: j, k, Enter, c, s (skip), u (undo), Esc</p></details>
 <div id="study" role="tabpanel" aria-labelledby="tabb">
@@ -194,10 +206,13 @@ The login goes only to iNaturalist.</p></details>
 </div>
 <div id="panel" role="tabpanel">
 <p id="tip" class="muted" role="note" hidden>Click a card to compare. Enter opens iNat with the name copied, j/k next/prev, s skip, u undo. <button type="button" class="more" aria-label="Dismiss the tip">×</button></p>
-<div id="batch" class="batch" hidden><a id="go" class="btn" target="_blank" rel="noopener"></a>
+<div id="rline" class="rline"><b id="count" aria-live="polite"></b><span class="sp1"></span>
+<button type="button" id="sortb" class="qchip" aria-haspopup="dialog" aria-controls="fsheet">Sort <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></button>
+<button type="button" id="inatb" class="qchip" popovertarget="inatpop" aria-controls="inatpop">Open in iNat <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></button></div>
+<div id="inatpop" popover class="pop"><div id="batch" class="batch" hidden><a id="go" class="btn" target="_blank" rel="noopener"></a>
 <button type="button" id="prev" class="arrow" aria-label="Previous batch">‹</button>
 <button type="button" id="next" class="arrow" aria-label="Next batch">›</button></div>
-<p id="cap" class="muted" data-explain="batch" hidden></p>
+<p id="cap" class="muted" data-explain="batch" hidden></p></div>
 <p id="none" class="muted" hidden>No records at this level here.</p>
 <ol id="grid"></ol>
 <p id="end"><button type="button" id="more" class="more" hidden>Show more</button></p>
@@ -226,4 +241,5 @@ The login goes only to iNaturalist.</p></details>
 <script>__IDENTIFY_WWW__</script>
 <script>__IDENTIFY_PROGRESS__</script>
 <script>__IDENTIFY_APP__</script>
+<script>__IDENTIFY_SHELL__</script>
 </body></html>

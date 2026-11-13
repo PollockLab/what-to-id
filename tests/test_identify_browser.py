@@ -17,6 +17,7 @@ from what_to_id.page_map import decode_points, encode_points, render_map
 
 from . import test_embeddings_browser as eb
 from .embeddings_fixture import TREE, pool_frame
+from .identify_sheets import reveal
 from .test_page_nav import FORBIDDEN
 
 browser = eb.browser
@@ -287,13 +288,13 @@ def test_an_empty_level_hides_its_batch_link_and_points_at_the_levels_that_have_
     page.evaluate("a => postMessage({type: 'wtid-view', area: a}, location.origin)", view)
     page.wait_for_function("__identify.total()[1] === 0 && __identify.total()[5] > 0")
     assert page.evaluate("__identify.level()") == 1
-    assert page.locator("#batch").is_hidden()
+    assert page.locator("#inatb").is_hidden()
     total = page.evaluate("__identify.total()")
     for lv, *_ in page_identify.LEVELS:
         assert ("zero" in tab(page, lv).get_attribute("class")) == (total[lv] == 0)
     page.locator("#none button", has_text="Might be wrong").click()
     assert page.evaluate("__identify.level()") == 5
-    assert page.locator("#none").is_hidden() and page.locator("#batch").is_visible()
+    assert page.locator("#none").is_hidden() and page.locator("#inatb").is_visible()
     assert page.errors == []
 
 
@@ -387,6 +388,7 @@ def test_the_batch_links_cover_the_listed_ids(browser, site):
         page.locator("#cap").inner_text()
         == f"{n:,} cards (up to 3 per species) · first 5 in 3 batches of 200, in the order shown"
     )
+    reveal(page, "#next")
     page.click("#next")
     assert page.locator("#go").inner_text() == "Identify 2 · batch 2 of 3"
     assert page.get_attribute("#go", "href") != first and page.locator("#prev").is_enabled()

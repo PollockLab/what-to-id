@@ -7,6 +7,7 @@ from urllib.parse import parse_qs, urlparse
 
 from . import test_embeddings_browser as eb
 from . import test_identify_browser as ib
+from .identify_sheets import reveal
 
 browser = eb.browser
 site = ib.site
@@ -92,6 +93,7 @@ def test_when_writes_the_map_filters_dates_and_where_links_to_the_map(browser, s
     base, pts = site
     page = open_row(browser, base, "#lvl=3")
     assert page.locator("#when").input_value() == ""
+    reveal(page, "#when")
     page.select_option("#when", "90")
     since = (datetime.now(UTC) - timedelta(days=90)).date().isoformat()
     assert f"from={since}" in page.evaluate("location.hash")
@@ -117,6 +119,7 @@ def test_by_species_runs_each_suggestion_together_under_one_header(browser, site
     heads = page.locator("#grid .sep.run i").all_inner_texts()
     assert heads == blocks and page.locator("#grid .sep.run").first.locator("img").count() == 1
     assert "; all per suggested species)" in page.inner_text("#cap")
+    reveal(page, "#frun input")
     page.get_by_role("checkbox", name="By species").uncheck()
     page.wait_for_function("!document.querySelector('#grid .sep.run')")
     assert page.errors == []
@@ -167,15 +170,16 @@ def test_only_level_3_fetches_the_runner_up_file_after_its_cards(browser, site):
     assert [u for u in got if "why" in u.rsplit("/", 1)[-1]]
 
 
-def test_phones_fold_the_filters_into_one_row_naming_those_on(browser, site):
+def test_phones_name_the_filters_on_as_chips_and_the_dates_in_the_pill(browser, site):
     base, _ = site
     page = browser.new_page(viewport={"width": 390, "height": 800})
     eb.stub_inat(page, None)
     page.goto(f"{base}/identify.html#lvl=3&run=1&from=2026-08-10&to=2026-09-10")
-    page.wait_for_function("document.querySelectorAll('#chips .chip').length === 2")
+    page.wait_for_function("document.querySelectorAll('#chips .chip').length === 1")
     assert not page.locator("#when").is_visible()
-    assert page.locator("#chips .chip").all_inner_texts() == ["By species", "Custom"]
-    page.click("#filt summary")
+    assert page.locator("#chips .chip").all_inner_texts() == ["By species"]
+    assert page.inner_text("#pwhen") == "Custom"
+    page.click("#pill")
     assert page.locator("#when").is_visible()
 
 

@@ -15,6 +15,7 @@ from what_to_id.page_map import encode_points, render_map
 
 from . import test_identify_browser as ib
 from .embeddings_fixture import TREE, pool_frame
+from .identify_sheets import close, reveal
 from .test_identify_first_browser import first_lists
 from .test_page_nav import FORBIDDEN
 
@@ -136,6 +137,7 @@ def test_clear_matches_start_with_far_records_hidden_and_the_segments_filter(bro
     assert shown(page, 1) == [0, 1, 3] and page.evaluate("__identify.total()")[1] == 3
     assert chips(page) == ["In range", "Just outside range", "No range map: range unknown"]
     assert "out=" not in page.url
+    reveal(page, "#rout .segb")
     seg(page).nth(0).click()
     assert shown(page, 1) == [0, 1, 2, 3] and "out=0" in page.url and picked(page) == "All 4"
     assert chips(page) == [
@@ -149,8 +151,10 @@ def test_clear_matches_start_with_far_records_hidden_and_the_segments_filter(bro
     page.reload()
     page.wait_for_function("window.__identify && __identify.ranges()")
     assert shown(page, 1) == [2] and picked(page) == "Only far outside 1"  # kept in the hash
+    reveal(page, "#rout .segb")
     seg(page).nth(1).click()
     assert shown(page, 1) == [0, 1, 3] and "out=" not in page.url
+    close(page)
     page.locator("#tab5").click()  # another level starts at All
     page.locator("#kind .segb", has_text="Odd shots").click()  # the counts follow the kind
     assert shown(page, 5) == [8, 9] and picked(page) == "All 2"
@@ -175,6 +179,7 @@ def test_the_first_lists_leave_out_far_clear_matches_as_the_page_does(browser, s
 
 def test_the_segments_move_with_the_arrow_keys(browser, site):
     page = opened(browser, site, "#lvl=1")
+    reveal(page, "#rout .segb")
     page.locator("#rout .segb[aria-checked=true]").focus()
     page.keyboard.press("ArrowRight")
     assert picked(page) == "Only far outside 1" and "out=1" in page.url and shown(page, 1) == [2]
