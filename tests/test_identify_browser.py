@@ -474,7 +474,8 @@ def test_cards_show_before_the_look_alike_file_and_fill_it_in_where_they_stand(b
     page.route("**/pool-levels-looks.*", lambda r: held.append(r))
     page.goto(f"{base}/identify.html#lvl=3")
     page.wait_for_function("window.__identify")  # the first cards carry their look-alike
-    page.wait_for_selector("#grid .card", state="attached")  # the page is tall enough to scroll
+    # the cards' photos are in, so there is room to scroll
+    page.wait_for_function("document.documentElement.scrollHeight > innerHeight + 40")
     assert page.locator("#grid .card .look").count() == 0
     page.evaluate("scrollTo(0, 40)")
     held[0].continue_()

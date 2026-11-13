@@ -341,6 +341,7 @@ def test_the_panel_loads_the_next_cards_runner_up_ahead(browser, site):
     stub_taxa(page)
     asked = []
     page.on("request", lambda r: asked.append(r.url) if "/v1/taxa?" in r.url else None)
+    page.wait_for_selector("#grid .card .why i", state="attached")  # the runner-up file is in
     rivals = page.evaluate(
         "[...document.querySelectorAll('#grid .card')].slice(0, 4)"
         ".map(c => (c.querySelector('.why i') || {}).textContent)"
