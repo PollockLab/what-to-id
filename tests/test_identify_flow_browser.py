@@ -258,3 +258,15 @@ def test_a_photo_that_fails_leaves_a_blank_box_not_its_alt_text(browser, site):
     img = page.locator("#grid .card .ph img").first
     assert img.evaluate("i => getComputedStyle(i).visibility") == "hidden"
     assert page.errors == []
+
+
+def test_a_first_visit_shows_the_key_tip_until_dismissed(browser, site):
+    base, _ = site
+    page = level_3(browser, base)
+    tip = page.locator("#tip")
+    assert tip.is_visible() and "u undo" in tip.inner_text()
+    tip.locator("button").click()
+    assert not tip.is_visible()
+    page.reload()
+    page.wait_for_selector("#grid .card")
+    assert not page.locator("#tip").is_visible()
