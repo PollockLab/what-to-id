@@ -11,6 +11,7 @@ var p=document.createElement('section'),f=p.appendChild(document.createElement('
   area=document.querySelector('.maplibregl-ctrl.area'),none=document.createElement('p'),open=null,
   side=document.getElementById('side'),NARROW=matchMedia('(max-width:760px)'),ours=false;
 p.id='xsheet';p.className='xsheet';p.hidden=true;p.setAttribute('role','region');
+var wh=f.appendChild(document.createElement('h2'));wh.className='xh';wh.textContent='When';  // What is the rail, above
 f.append(document.getElementById('time'));if(area)f.append(area);
 if(leg)l.append(leg);
 none.className='muted xnone';none.textContent='Each dot takes its group’s colour. Pick one group or taxon to colour its dots by clade.';
