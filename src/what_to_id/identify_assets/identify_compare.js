@@ -101,6 +101,11 @@ return function(ctx){
   }
   function close(){if(!box||box.hidden)return;box.hidden=true;document.body.classList.remove('cpon');
     if(cur&&cur.isConnected){cur.focus({preventScroll:true});cur.scrollIntoView({block:'nearest'});}cur=null;}
+  // the first sentence of iNaturalist's Wikipedia summary as text, at most 140 characters, and the whole summary; null without one
+  function gist(html){
+    var d=html?(new DOMParser().parseFromString(html,'text/html').body.textContent||'').trim():'',s=(/^.*?[.!?](?=\s|$)/.exec(d)||[d])[0];
+    return d?[s.length>140?s.slice(0,139).trimEnd()+'…':s,d]:null;
+  }
   // a reference column: name, photos (the taxon's own, up to 3), its taxon page in the shared iNaturalist tab
   function ref(t,cap){
     var c=el('section','cpref'),h=el('h3'),a=el('a',null,'Taxon page'),ph=el('div','cpph'),ps=(t.taxon_photos||[]).map(function(x){return x.photo;});
@@ -110,7 +115,8 @@ return function(ctx){
     ps.slice(0,3).forEach(function(p){var img=el('img');img.loading='lazy';img.alt=cap+' '+t.name+', reference photo';
       img.src=size(p.url||p.square_url,'medium');img.title='Photo '+(p.attribution||'');ph.appendChild(img);});
     if(!ps.length)ph.append(el('span','muted','No reference photo'));
-    c.append(h,ph,a);return c;
+    var g=gist(t.wikipedia_summary);c.append(h);if(g){var w=el('p','cpsum muted',g[0]);w.title=g[1];c.append(w);}
+    c.append(ph,a);return c;
   }
   // the species and its two closest look-alikes, whole; the same promise for a repeat
   var sims=new Map();

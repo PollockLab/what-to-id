@@ -118,6 +118,9 @@ def stub_taxa(page):
                     {
                         "id": i,
                         "name": f"Taxon {i}",
+                        "wikipedia_summary": f"<b>Taxon {i}</b> is a bee. It flies."
+                        if i != 902
+                        else "A " + "very " * 40 + "long one. More.",
                         "default_photo": {"square_url": photo["url"]},
                         "taxon_photos": [{"photo": photo}, {"photo": photo}],
                     }
@@ -195,6 +198,10 @@ def test_the_compare_panel_fits_a_phone_with_the_species_and_two_similar(browser
         "Similar Taxon 902",
     ]  # the whole record
     assert page.locator("#cprefs .cpref").first.locator("img").count() == 2
+    sums = page.locator("#cprefs .cpref .cpsum")
+    assert sums.nth(1).inner_text() == "Taxon 901 is a bee."  # HTML stripped, first sentence
+    assert len(sums.nth(2).inner_text()) == 140 and sums.nth(2).inner_text().endswith("…")
+    assert sums.nth(2).get_attribute("title").endswith("long one. More.")
     assert "/medium." in page.locator("#cprefs img").first.get_attribute("src")
     box = page.locator("#cpanel").bounding_box()
     assert box["x"] == 0 and box["width"] == 360
