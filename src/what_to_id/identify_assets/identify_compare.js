@@ -186,7 +186,7 @@ return function(ctx){
     obs(li);refs(li);
     box.hidden=false;document.body.classList.add('cpon');li.scrollIntoView({block:'nearest'});
     [].forEach.call(document.querySelectorAll('.card.cur'),function(x){x.classList.remove('cur');});li.classList.add('cur');
-    box.focus({preventScroll:true});box.scrollTop=0;
+    if(!box.contains(document.activeElement)||document.activeElement===box)box.focus({preventScroll:true});box.scrollTop=0;  // a button in use keeps focus; #cplive names the card
   }
   // the cards' request brought the observation: the panel showing it fills in
   function landed(li){if(box&&!box.hidden&&cur===li)obs(li);}

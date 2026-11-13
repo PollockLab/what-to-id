@@ -319,6 +319,9 @@ def test_the_panel_keeps_focus_and_announces_each_card(browser, site):
     cards.nth(0).locator(".title").click()
     page.locator("#cpj").click()
     assert live.text_content().startswith("2 of ")
+    page.focus("#cps")
+    page.keyboard.press("Enter")  # Skip from the keyboard: focus stays on it, the card is announced
+    assert page.evaluate("document.activeElement.id") == "cps" and live.text_content().startswith("3 of ")
     assert page.errors == []
 
 
