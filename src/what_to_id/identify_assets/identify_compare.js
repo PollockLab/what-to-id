@@ -174,7 +174,8 @@ return function(ctx){
     w.href=li.querySelector('.when').href;w.textContent=(o.observed_on||'Date unknown')+' · '+(o.place_guess||'Place unknown');IdentifyFlow.link(w);
     v.append(big);if(ps.length>1)v.append(strip);v.append(w);
   }
-  function open(li){
+  // quiet: the pick came from another pane, so it is not told back
+  function open(li,quiet){
     if(!box)build();
     cur=li;var all=cards(),t=named(li),c=box.querySelector('#cpc'),nm=li.querySelector('.title i');
     var h=box.querySelector('#cphead');h.replaceChildren(el('i',null,nm?nm.textContent:'Record'));
@@ -187,9 +188,18 @@ return function(ctx){
     box.hidden=false;document.body.classList.add('cpon');li.scrollIntoView({block:'nearest'});
     [].forEach.call(document.querySelectorAll('.card.cur'),function(x){x.classList.remove('cur');});li.classList.add('cur');
     if(!box.contains(document.activeElement)||document.activeElement===box)box.focus({preventScroll:true});box.scrollTop=0;  // a button in use keeps focus; #cplive names the card
+    if(!quiet&&parent!==window)parent.postMessage({type:'wtid-record',id:+li.dataset.id},location.origin);  // j, k, Skip and Enter move the map's card too
   }
+  // a record picked in another pane: its card here is ringed and scrolled to, and the open panel moves to it; nothing if it is not drawn
+  function pick(id){
+    var li=id!=null&&document.querySelector('#grid .card[data-id="'+id+'"],#sgrid .card[data-id="'+id+'"]');
+    if(!li||li===cur&&shown())return;
+    if(shown())open(li,true);
+    else{[].forEach.call(document.querySelectorAll('.card.cur'),function(x){x.classList.remove('cur');});li.classList.add('cur');li.scrollIntoView({block:'nearest'});}
+  }
+  function shown(){return box&&!box.hidden?cur:null;}
   // the cards' request brought the observation: the panel showing it fills in
   function landed(li){if(box&&!box.hidden&&cur===li)obs(li);}
-  return {ref:rival,fill:fill,pair:pair,open:open,close:close,landed:landed,shown:function(){return box&&!box.hidden?cur:null;}};
+  return {ref:rival,fill:fill,pair:pair,open:open,close:close,landed:landed,pick:pick,shown:shown};
 };
 })();

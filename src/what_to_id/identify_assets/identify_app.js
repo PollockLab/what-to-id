@@ -133,8 +133,8 @@ function card(i,lv,id){
   li.appendChild(R&&i>=0?R.links(a,i,lv):a);
   li.onmouseenter=li.onfocus=function(){tell('wtid-focus',id);};
   // a click or Space opens the compare panel beside the list
-  li.onclick=function(e){if(!e.target.closest('a,button')){tell('wtid-record',id);if(CMP)CMP.open(li);}};
-  li.onkeydown=function(e){if(e.target===li&&(e.key==='Enter'||e.key===' ')){e.preventDefault();tell('wtid-record',id);if(e.key===' '&&CMP)CMP.open(li);}};
+  li.onclick=function(e){if(!e.target.closest('a,button')){if(CMP)CMP.open(li);else tell('wtid-record',id);}};
+  li.onkeydown=function(e){if(e.target===li&&(e.key==='Enter'||e.key===' ')){e.preventDefault();if(e.key===' '&&CMP)CMP.open(li);else tell('wtid-record',id);}};
   IdentifyFlow.seen(li);
   return li;
 }
@@ -412,6 +412,7 @@ function inbox(){
     if(d.type==='wtid-area'&&typeof d.area==='string'){AREA=d.area;again();}
     else if(d.type==='wtid-view'&&typeof d.area==='string'){if(d.area!==VIEW){VIEW=d.area;soon();}}  // '' is no cut
     else if(d.type==='wtid-keep'&&(d.ids===null||d.ids instanceof Uint32Array)){KEEPIDS=d.ids&&d.ids.slice().sort();again();}
+    else if(d.type==='wtid-record'&&CMP)CMP.pick(d.id);  // the map's or the photo space's pick
     else if(d.type==='wtid-subset'&&(d.ids===null||Array.isArray(d.ids))){SUBIDS=d.ids&&Uint32Array.from(d.ids).sort();again();}  // the photo search's hits
   });
   SYNC=MapFilter.sync({key:key,apply:function(str){if(MF){clearTimeout(TK);TK=setTimeout(function(){take(str,false);},60);}else{PEND=str;again();}},hash:false});
