@@ -71,6 +71,8 @@ ol{list-style:none;margin:8px 0;padding:0;display:grid;gap:10px;
 .ctl{display:flex;flex-wrap:wrap;align-items:center;gap:4px 16px}
 .ctl>.rout{margin:2px 0}.ctl #sort:not([hidden]){display:contents}.ctl .srow{margin:2px 0;gap:4px 6px}
 .ctl .segb{min-height:26px;padding:0 9px}
+.filt>summary{display:none}.chip{display:inline-block;margin-left:6px;padding:0 8px;border-radius:10px;background:var(--chip);border:1px solid var(--line);font-size:.85em}
+@media (max-width:540px){.filt>summary{display:list-item;cursor:pointer;margin:4px 0}}
 #sort .segnote{margin:0}
 .hint{color:var(--muted)}.hint summary{cursor:pointer;min-height:24px}.hint .segnote,.hint p{margin:2px 0}
 .card .links{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
@@ -170,11 +172,12 @@ The login goes only to iNaturalist.</p></details>
 <div id="tabs" class="tabs" role="tablist" aria-label="Level"></div>
 <p id="desc" class="muted"></p>
 <div id="kind" class="rout" hidden></div>
+<details id="filt" class="filt" open><summary>Filters <span id="chips"></span></summary>
 <div class="rout usr"><details id="usrbox" hidden></details></div>
 <div class="ctl"><div id="grp" class="rout" hidden><label for="grpsel">What </label><select id="grpsel" class="padd"></select></div>
 <div id="rout" class="rout" hidden></div>
 <div id="sort" class="rout" hidden></div></div>
-<div id="rg" class="rout" hidden></div>
+<div id="rg" class="rout" hidden></div></details>
 <details id="hint" class="rout hint"><summary>Notes and keys</summary><div id="hintbody"></div>
 <p id="keys" hidden>Keys: j next card, k previous, i or Enter Identify (copies the name, opens iNaturalist in one reused tab), c copy the name. Click a card or press Space for the compare panel: j, k, Enter, c, s (skip), Esc</p></details>
 <div id="study" role="tabpanel" aria-labelledby="tabb">

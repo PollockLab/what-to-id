@@ -61,11 +61,20 @@ return function(ctx){
     where.replaceChildren(el('span','muted','Where '));
     if(ctx.area()){var x=el('button','padd','Map area ×');x.type='button';x.title='Clear the area';x.onclick=ctx.clear;where.append(x);}
     else{var a=el('a',null,'Anywhere');a.href='explore.html?view=map'+location.hash;a.title='Draw an area on the map';where.append(a);}
+    chips();
+  }
+  function chips(){  // the phone's collapsed Filters row names what is on
+    var f=$('filt');if(!f)return;
+    var on=[].map.call(f.querySelectorAll('input[type=checkbox]:checked'),function(b){return b.parentNode.textContent.trim();});
+    [].forEach.call(f.querySelectorAll('select'),function(s){if(s.value&&s.selectedIndex>0)on.push(s.options[s.selectedIndex].text);});
+    if(ctx.area())on.push('Map area');
+    $('chips').replaceChildren.apply($('chips'),on.map(function(t){return el('span','chip',t);}));
   }
   var w=el('span','rout');w.append(el('span','muted','When '),when);
   var t=el('span','rout');t.append(toggle('risk','At risk'),' ',toggle('inv','Invasive'),' ',toggle('run','By species'));
   box.after(t,w,where);
   where.hidden=parent!==window;  // the split view's map beside it holds the area
+  if($('filt')&&matchMedia('(max-width:540px)').matches)$('filt').open=false;
   sync();
   return {pass:pass,sync:sync,active:function(){return on('risk')||on('inv');}};
 };

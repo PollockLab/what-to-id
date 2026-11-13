@@ -68,22 +68,22 @@ def test_at_risk_and_invasive_keep_cards_by_their_suggestions_bc_status(browser,
     base, _ = site
     page = open_row(browser, base, "#lvl=3&conf=all")
     page.wait_for_function(KINDS + "===2")  # Bombus a never reaches level 3 here
-    page.check("text=At risk")
+    page.get_by_role("checkbox", name="At risk").check()
     page.wait_for_function("document.querySelectorAll('#grid .card').length>0")
     page.wait_for_function(
         "[...document.querySelectorAll('#grid .card .look i')].every(e=>e.textContent==='Apis c')"
     )
     assert "risk=1" in page.evaluate("location.hash") and page.asked == []
-    page.check("text=Invasive")
+    page.get_by_role("checkbox", name="Invasive").check()
     page.wait_for_function(KINDS + "===2")
     assert looks(page) == {"Apis c", "Bombus b"}
     assert page.asked and all(
         len(ids) <= 30 and q["preferred_place_id"] == ["7085"] for ids, q in page.asked
     )
-    page.uncheck("text=At risk")
+    page.get_by_role("checkbox", name="At risk").uncheck()
     page.wait_for_function(KINDS + "===1")
     assert looks(page) == {"Bombus b"}
-    page.uncheck("text=Invasive")
+    page.get_by_role("checkbox", name="Invasive").uncheck()
     page.wait_for_function(KINDS + "===2")
     assert "risk=" not in page.evaluate("location.hash") and page.errors == []
 
@@ -117,7 +117,7 @@ def test_by_species_runs_each_suggestion_together_under_one_header(browser, site
     heads = page.locator("#grid .sep.run i").all_inner_texts()
     assert heads == blocks and page.locator("#grid .sep.run").first.locator("img").count() == 1
     assert "; all per suggested species)" in page.inner_text("#cap")
-    page.uncheck("text=By species")
+    page.get_by_role("checkbox", name="By species").uncheck()
     page.wait_for_function("!document.querySelector('#grid .sep.run')")
     assert page.errors == []
 
@@ -165,3 +165,15 @@ def test_only_level_3_fetches_the_runner_up_file_after_its_cards(browser, site):
     page.click("#tab3")
     page.wait_for_selector("#grid .card .why")
     assert [u for u in got if "why" in u.rsplit("/", 1)[-1]]
+
+
+def test_phones_fold_the_filters_into_one_row_naming_those_on(browser, site):
+    base, _ = site
+    page = browser.new_page(viewport={"width": 390, "height": 800})
+    eb.stub_inat(page, None)
+    page.goto(f"{base}/identify.html#lvl=3&run=1&from=2020-01-01")
+    page.wait_for_selector("#chips .chip", state="attached")
+    assert not page.locator("#when").is_visible()
+    assert page.locator("#chips .chip").all_inner_texts() == ["By species", "Custom"]
+    page.click("#filt summary")
+    assert page.locator("#when").is_visible()
