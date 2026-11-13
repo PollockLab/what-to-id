@@ -128,12 +128,13 @@ def totals_site(tmp_path_factory):
     frame["observed_on"] = [d.date().isoformat() for d in day]
     frame["created_at"] = [d.isoformat() + "T00:00:00Z" for d in day]
     server, _ = ib.serve(tmp_path_factory.mktemp("totals-site"), frame, score, totals=raw)
-    yield f"http://127.0.0.1:{server.server_port}"
+    yield f"http://127.0.0.1:{server.server_port}", frame
     server.shutdown()
 
 
 def test_the_when_histogram_has_the_maps_two_layers_and_its_tooltip(browser, totals_site):
-    page = ib.open_identify(browser, totals_site, "#lvl=1", size=(1100, 800))
+    base, frame = totals_site
+    page = ib.open_identify(browser, base, "#lvl=1", size=(1100, 800))
     page.wait_for_function("__identify.ids().length > 0")
     page.click("#bwhen")
     # the light layer is drawn behind the dark one: both of the map's colours land on the canvas
@@ -145,8 +146,15 @@ def test_the_when_histogram_has_the_maps_two_layers_and_its_tooltip(browser, tot
         tip = page.inner_text("#htip")
         if " of " in tip:
             break
-    m = re.fullmatch(r"[A-Z][a-z]+ \d{4}: ([\d,]+) of ([\d,]+) still need an ID \((<1|\d+)%\)", tip)
+    m = re.fullmatch(
+        r"([A-Z][a-z]+ \d{4}): ([\d,]+) of ([\d,]+) still need an ID \((<1|\d+)%\), "
+        r"([\d,]+) in Easy confirms",
+        tip,
+    )
     assert m, tip
-    n, t = (int(g.replace(",", "")) for g in m.groups()[:2])
-    assert 0 < n <= t
+    n, t, tab = (int(g.replace(",", "")) for g in (m[2], m[3], m[5]))
+    assert 0 < n <= t and tab <= n
+    # the dark layer is the map's count: every pool record of the month, at every level
+    month = pd.to_datetime(m[1], format="%B %Y").strftime("%Y-%m")
+    assert n == frame["observed_on"].str.startswith(month).sum()
     assert page.errors == []

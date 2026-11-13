@@ -5,7 +5,8 @@
 // Keys: Left and Right move between the segments, an open panel follows the focus, Tab walks from a segment into its
 // panel, Esc closes it and returns to the segment, a click outside closes it.
 // IdentifyBar(o), o {S, META, mf (MapFilter(META)), nf, taxa(), P(), tf() (the taxon filter), mask(st) (1 per record
-// st keeps at the chosen level), changed() (S changed), where(rings, hash) (the area changed), get(url), map (the map
+// st keeps at the chosen level), all(st) (the same at every level), tab() ({name, has(i)}: the chosen
+// level), changed() (S changed), where(rings, hash) (the area changed), get(url), map (the map
 // page's address), key() (the selection as text), embedded}.
 // Returns update(), called after every selection and level change. Needs map_taxa.js, map_chips.js, map_area.js,
 // group_list.js, map_hist.js, map_time.js, map_only.js and identify_where.js.
@@ -17,7 +18,7 @@ function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=c
 return function(o){
 var S=o.S,META=o.META,MF=o.mf,G=META.groups,LAST=MF.LAST,iso=MF.iso,bar=$('bar'),SH=$('bsheet'),phone=matchMedia('(max-width:760px)'),
   SEG=NAMES.map(function(n){var b=$('b'+n.toLowerCase());return {b:b,p:$('p'+n.toLowerCase()),l:b.querySelector('b')};}),
-  cur=-1,CUM=null,TC,TOT=null,GM=null,A=null,ACC=[];
+  cur=-1,CUM=null,SUB=null,TC,TOT=null,GM=null,A=null,ACC=[];
 SEG[2].b.hidden=o.embedded;  // the split view's map beside it holds the area
 
 // What: the taxon picker and its shortcuts, then the groups list with the groups filter left out of its counts, then the Show only
@@ -37,12 +38,14 @@ function counts(){
 }
 
 // When: the presets, dates and months, and the histograms of the records per day, the dates left out of the selection
+// One pass counts every record that still needs an ID (as the map does) and, in sub, those in the chosen tab
 function cum(){
   if(CUM)return CUM;
-  var P=o.P(),m=o.mask(Object.assign({},S,{lo:0,hi:LAST})),day=S.up?P.up:P.obs,c=new Float64Array(META.days+1),i;
-  for(i=0;i<P.n;i++)if(m[i]&&day[i]!==MF.NO)c[day[i]+1]++;
-  for(i=0;i<META.days;i++)c[i+1]+=c[i];
-  return (CUM=c);
+  var P=o.P(),m=o.all(Object.assign({},S,{lo:0,hi:LAST})),day=S.up?P.up:P.obs,c=new Float64Array(META.days+1),
+    t=new Float64Array(META.days+1),has=o.tab().has,i;
+  for(i=0;i<P.n;i++)if(m[i]&&day[i]!==MF.NO){c[day[i]+1]++;if(has(i))t[day[i]+1]++;}
+  for(i=0;i<META.days;i++){c[i+1]+=c[i];t[i+1]+=t[i];}
+  SUB=t;return (CUM=c);
 }
 // The all-record counts (the map's totals file) load beside the records; the light bars wait for them
 function tc(){
@@ -52,7 +55,7 @@ function tc(){
 if(META.files.totals)o.get(META.files.totals).then(function(b){TOT=JSON.parse(new TextDecoder().decode(b));update();}).catch(function(){});
 var TM=MapTime({S:S,mf:MF,render:o.changed,refilter:o.changed,byObs:$('byObs'),byUp:$('byUp'),presets:$('presets'),from:$('from'),to:$('to'),
   months:$('months'),mclear:$('mclear')});
-var MH=MapHist({S:S,META:META,mf:MF,nf:o.nf,over:$('over'),hist:$('hist'),htip:$('htip'),unit:$('unit'),cum:cum,tc:tc,render:o.changed});
+var MH=MapHist({S:S,META:META,mf:MF,nf:o.nf,over:$('over'),hist:$('hist'),htip:$('htip'),unit:$('unit'),cum:cum,sub:{cum:function(){cum();return SUB;},name:function(){return o.tab().name;}},tc:tc,render:o.changed});
 
 // Where: the live map (identify_where.js), loaded when the panel first opens. Until then, and for a shared link's area, a
 // stand-in for the map (no controls of its own) restores the address's area; the map takes over once it is live.

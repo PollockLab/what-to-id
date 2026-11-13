@@ -2,7 +2,8 @@
 // period in view. Clicking or dragging across bars sets S.lo and S.hi. The filter bar draws them in the map and the
 // Identify page draws them in its When panel. o: S, META, mf (MapFilter(META)), nf, over, hist (the canvases), htip,
 // unit (the caption), cum() (day counts: c[b+1]-c[a] records on days a..b), tc() (the totals, or null), render() (the
-// dates changed), drag() (the dates moved mid-brush: move only the GPU range, optional).
+// dates changed), sub (optional {cum(), name()}: the day counts of a subset, named in the tooltip), drag() (the dates
+// moved mid-brush: move only the GPU range, optional).
 // Returns draw(), total(a,b) and pct(v,t).
 var MapHist=(function(){
 'use strict';
@@ -104,7 +105,7 @@ function brush(cv,get){
     var g=get(),e=st?st.e:g.e,k=binAt(cv,e,ev.offsetX);
     var nk=count(e[k],e[k+1]-1),tk=total(e[k],e[k+1]-1);
     htip.textContent=binLabel(g.u,e[k])+': '+nf.format(nk)+(tk?' of '+nf.format(tk)+' still need an ID ('+
-      pct(nk,tk)+')':'');
+      pct(nk,tk)+')':'')+(o.sub?', '+nf.format(o.sub.cum()[e[k+1]]-o.sub.cum()[e[k]])+' in '+o.sub.name():'');
     // Clamp by the tip's own width so it never pokes past the chart: overflow there adds a page
     // scrollbar, which shrinks the map and shifts its view.
     htip.hidden=false;htip.style.top=(cv.offsetTop-4)+'px';
