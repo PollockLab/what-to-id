@@ -77,14 +77,14 @@ return function(ctx){
     return {row:row,seg:r};
   }
   function build(){
-    var g=$('sort');
-    if(!g)return;
+    var g=$('sort'),o=$('sorto');
+    if(!g||!o)return;
     LSEG=seg('Confidence: ','Confidence','radio',LIMS.map(function(l){return l[1];}),function(j){lim=j;});
     TSEG=seg('Sort: ','Sort','checkbox',['Confidence','Blitz gaps'],function(j){  // the last one on stays on
       if(j===0&&byConf&&!byGaps||j===1&&byGaps&&!byConf)return;
       if(j===0)byConf=!byConf;else byGaps=!byGaps;});
     note=el('span','segnote');
-    g.append(LSEG.row,TSEG.row,note);
+    g.append(LSEG.row);o.append(TSEG.row,note);
   }
   build();
   load();
@@ -109,12 +109,12 @@ return function(ctx){
     // the controls, shown on level 3 only
     draw:function(lv,sel,level){
       if(!LSEG)return;
-      $('sort').hidden=lv!==3;
+      $('sort').hidden=$('sortb').hidden=lv!==3;
       if(lv!==3)return;
       [].forEach.call(LSEG.seg.children,function(x,j){x.setAttribute('aria-checked',String(j===lim));x.tabIndex=j===lim?0:-1;});
       [].forEach.call(TSEG.seg.children,function(x,j){x.setAttribute('aria-checked',String(j?byGaps:byConf));});
       note.textContent=state==='failed'?'The where-to-blitz checklist did not load. Listing by confidence.':state==='load'&&byGaps?
-        'Loading the where-to-blitz checklist…':'';
+        'Loading the where-to-blitz checklist…':byConf&&byGaps?'Both on: confidence and gaps blended.':'';
     }
   };
 };

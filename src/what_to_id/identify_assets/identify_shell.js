@@ -1,4 +1,4 @@
-// The page's chrome around the modules' own controls: the Filters button opens the Range, Confidence, Sort, Research Grade
+// The page's chrome around the modules' own controls: the Filters button opens the Range, Confidence, Research Grade
 // and User controls in a sheet (the search bar, identify_bar.js, holds What, When and Where). Each filter away from its
 // default (its hash key present) shows as a chip with a remove button, and the Filters button counts them. The result
 // line counts the cards from the batch caption (which becomes its title).
@@ -13,7 +13,7 @@ var NS='http://www.w3.org/2000/svg';
 function cross(){var s=document.createElementNS(NS,'svg'),p=document.createElementNS(NS,'path');s.setAttribute('viewBox','0 0 24 24');
   s.setAttribute('aria-hidden','true');p.setAttribute('d','M6 6l12 12M18 6L6 18');s.appendChild(p);return s;}
 // a filter: its hash key, and where its control is (a segmented row)
-var F=[['out','#rout .seg'],['conf','#sort .seg[aria-label=Confidence]'],['sort','#sort .seg[aria-label=Sort]'],['rg','#rg .seg']];
+var F=[['out','#rout .seg'],['conf','#sort .seg[aria-label=Confidence]'],['rg','#rg .seg']];
 function label(f){
   var c=document.querySelector(f[1]);if(!c)return null;
   return c.getAttribute('aria-label')+': '+[].filter.call(c.children,function(b){return b.getAttribute('aria-checked')==='true';})
@@ -31,7 +31,7 @@ function chips(){
   box.replaceChildren.apply(box,a.map(function(f){
     var t=label(f),c=el('span','chip',t+' '),x=el('button','chipx');x.type='button';x.setAttribute('aria-label','Remove '+t);
     x.appendChild(cross());x.onclick=function(){clear(f);chips();$('fbtn').focus();};c.appendChild(x);return c;}));
-  var g=has('run')&&!$('sort').hidden;$('sortb').firstChild.textContent='Sort'+(g?' · grouped':'')+' ';
+  var g=has('run')&&!$('sortb').hidden;$('sortb').firstChild.textContent='Sort'+(g?' · grouped':'')+' ';
   n.hidden=!a.length;n.textContent=a.length;$('fbtn').setAttribute('aria-label','Filters'+(a.length?', '+a.length+' on':''));
 }
 function count(){
@@ -51,11 +51,20 @@ function sheets(){
       var a=f[0],z=f[f.length-1];
       if(e.shiftKey?document.activeElement===a:document.activeElement===z){e.preventDefault();(e.shiftKey?z:a).focus();}});
     [].forEach.call(document.querySelectorAll('[aria-controls="'+d.id+'"]'),function(b){
-      b.onclick=function(){d.showModal();var s=b.id==='sortb'&&$('sort');if(s&&!s.hidden)s.scrollIntoView({block:'nearest'});};});
+      b.onclick=function(){d.showModal();};});
   });
   $('fclear').onclick=function(){on().forEach(clear);chips();};
 }
+// the Sort popover opens under its button; on a phone the CSS makes it a bottom sheet
+function sortpop(){
+  var p=$('sortpop');
+  p.addEventListener('beforetoggle',function(e){
+    if(e.newState!=='open')return;
+    var r=$('sortb').getBoundingClientRect();
+    p.style.setProperty('--pt',r.bottom+6+'px');p.style.setProperty('--pl',Math.max(8,Math.min(r.right-300,innerWidth-308))+'px');});
+}
 function start(){
+  sortpop();
   sheets();chips();count();
   var mo=new MutationObserver(function(){chips();count();});
   ['cap','status'].forEach(function(id){mo.observe($(id),{childList:true,characterData:true,subtree:true});});

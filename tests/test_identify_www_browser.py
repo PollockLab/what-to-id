@@ -117,7 +117,7 @@ def test_by_species_runs_each_suggestion_together_under_one_header(browser, site
     assert heads == blocks and page.locator("#grid .sep.run").first.locator("img").count() == 1
     assert "; all per suggested species)" in page.inner_text("#cap")
     reveal(page, "#frun input")
-    page.get_by_role("checkbox", name="Group by suggested species").uncheck()
+    page.get_by_role("switch", name="Group by suggested species").uncheck()
     page.wait_for_function("!document.querySelector('#grid .sep.run')")
     assert page.errors == []
 
@@ -126,17 +126,18 @@ def test_group_by_species_lives_in_sort_on_level_3_and_is_not_a_filter(browser, 
     base, _ = site
     page = open_row(browser, base, "#lvl=3&conf=all")
     reveal(page, "#frun input")
-    box = page.get_by_role("checkbox", name="Group by suggested species")
+    box = page.get_by_role("switch", name="Group by suggested species")
     box.check()
     page.wait_for_selector("#grid .sep.run", state="attached")
     assert "run=1" in page.evaluate("location.hash")
     assert "species" not in " ".join(page.locator("#chips .chip").all_inner_texts()).lower()
     assert page.inner_text("#fcount") == "1"  # conf=all only
-    assert "grouped" in page.inner_text("#sortb")
+    assert page.text_content("#sorth") == "Sort" and page.text_content("#fsh") == "Filters"
+    assert "grouped" in page.text_content("#sortb")
     page.keyboard.press("Escape")
     page.click("#tab1")
-    page.wait_for_function("document.querySelector('#sort').hidden")
-    assert not page.locator("#frun input").is_visible() and "grouped" not in page.inner_text("#sortb")
+    page.wait_for_function("document.querySelector('#sortb').hidden")
+    assert not page.locator("#frun input").is_visible()
     assert page.errors == []
 
 

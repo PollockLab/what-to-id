@@ -88,7 +88,7 @@ LIMITS = {"1": 0, "5": 1, "25": 2, "all": 3}
 def settle(page):
     """The checklist read (or failed): the controls' second note has stopped saying Loading."""
     page.wait_for_function(
-        "!document.querySelector('#sort .segnote:last-child').textContent.includes('Loading')"
+        "!document.querySelector('#sorto .segnote:last-child').textContent.includes('Loading')"
     )
 
 
@@ -143,7 +143,7 @@ def test_the_confidence_filter_keeps_its_bands_before_sorting(browser, site):
             assert ids and all(band(i) <= lim for i in ids), (value, sort)
             want = sum(1 for i in level3 if band(i) <= lim)
             assert page.inner_text("#tab3 b") == f"{want:,}"  # the tab's count is the filter's
-            assert "records shown" not in page.inner_text("#sort")
+            assert "records shown" not in page.inner_text("#sort") + page.inner_text("#sorto")
             page.close()
 
 
@@ -152,7 +152,7 @@ def test_the_default_is_top_5_percent_with_both_sorts_on(browser, site):
     n3, rank, band = ranks(base, pts)
     page = open_with(browser, base, "")
     on = page.evaluate(
-        "[...document.querySelectorAll('#sort [aria-checked=true]')].map(b => b.textContent)"
+        "[...document.querySelectorAll('#sort [aria-checked=true], #sorto [aria-checked=true]')].map(b => b.textContent)"
     )
     assert on == ["Top 5%", "Confidence", "Blitz gaps"]
     assert all(band(i) <= 1 for i in view(page))
@@ -163,13 +163,13 @@ def test_the_default_is_top_5_percent_with_both_sorts_on(browser, site):
 def test_the_last_sort_on_stays_on(browser, site):
     base, _ = site
     page = open_with(browser, base, "&sort=conf")
-    reveal(page, "#sort .seg")
-    page.click("#sort button:has-text('Confidence')")
-    assert page.get_attribute("#sort button >> nth=4", "aria-checked") == "true"
+    reveal(page, "#sorto .seg")
+    page.click("#sorto button:has-text('Confidence')")
+    assert page.get_attribute("#sorto button >> nth=0", "aria-checked") == "true"
     assert "sort=conf" in page.evaluate("location.hash")
-    page.click("#sort button:has-text('Blitz gaps')")
+    page.click("#sorto button:has-text('Blitz gaps')")
     assert "sort=" not in page.evaluate("location.hash")  # both on again
-    page.click("#sort button:has-text('Confidence')")
+    page.click("#sorto button:has-text('Confidence')")
     assert "sort=gaps" in page.evaluate("location.hash")
     assert page.errors == []
 
@@ -204,17 +204,19 @@ def test_the_choices_are_kept_in_the_hash_and_shown_on_level_3_only(browser, sit
     page = open_with(browser, base, "")
     reveal(page, "#sort .seg")
     page.click("#sort button:has-text('Top 25%')")
-    page.click("#sort button:has-text('Blitz gaps')")
+    page.keyboard.press("Escape")
+    reveal(page, "#sorto .seg")
+    page.click("#sorto button:has-text('Blitz gaps')")
     hash_ = page.evaluate("location.hash")
     assert "conf=25" in hash_ and "sort=conf" in hash_
     page.reload()
     page.wait_for_function("window.__identify && __identify.ids().length > 0")
     on = page.evaluate(
-        "[...document.querySelectorAll('#sort [aria-checked=true]')].map(b => b.textContent)"
+        "[...document.querySelectorAll('#sort [aria-checked=true], #sorto [aria-checked=true]')].map(b => b.textContent)"
     )
     assert on == ["Top 25%", "Confidence"]
     page.click("#tab1")
-    assert page.locator("#sort").get_attribute("hidden") is not None
+    assert page.locator("#sort").get_attribute("hidden") is not None and page.locator("#sortb").is_hidden()
     assert page.errors == []
 
 
@@ -222,7 +224,7 @@ def test_without_the_checklist_level_3_lists_by_confidence_without_errors(browse
     base, pts = site
     page = open_level_3(browser, base, "#lvl=3&conf=all", fail=True)
     page.wait_for_function(
-        "document.querySelector('#sort .segnote:last-child').textContent.includes('did not')"
+        "document.querySelector('#sorto .segnote:last-child').textContent.includes('did not')"
     )
     rank = dict(zip(pts["id"].tolist(), rank_plane(base).tolist(), strict=True))
     got = [rank[i] for i in view(page)]

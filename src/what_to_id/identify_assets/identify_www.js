@@ -40,13 +40,13 @@ return function(ctx){
     return (cache[id]&INV)!==0;
   }
   function toggle(k,label){
-    var l=el('label','tog'),b=el('input');b.type='checkbox';b.checked=on(k);
+    var l=el('label','tog'),b=el('input');b.type='checkbox';if(k==='run')b.setAttribute('role','switch');b.checked=on(k);
     b.onchange=function(){keep(k,b.checked);sync();ctx.redraw();};l.append(b,' '+label);return l;
   }
   function sync(){need=(on('risk')?RISK:0)|(on('inv')?INV:0);}
   // At risk and Invasive are one-tap chips under the search bar; the grouping toggle sits with Sort
   var risk_=toggle('risk','At risk'),inv_=toggle('inv','Invasive');risk_.className=inv_.className='tog qchip';
-  $('qchips').append(risk_,inv_);$('frun').append(toggle('run','Group by suggested species'));
+  $('qchips').append(risk_,inv_);$('frun').append(toggle('run','Group by suggested species'));$('frun').firstChild.className='swt';
   sync();
   return {pass:pass,sync:sync,active:function(){return on('risk')||on('inv');}};
 };
