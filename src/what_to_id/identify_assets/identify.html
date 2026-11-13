@@ -117,9 +117,9 @@ body:not(.bt) #study,.bt #status:not(.err),.bt #unpick,.bt #desc,.bt #kind,.bt .
   background:var(--panel);border-left:1px solid var(--line);box-shadow:-4px 0 16px rgba(0,0,0,.15);padding:8px 12px 0;display:flex;flex-direction:column;gap:8px}
 #cpanel:focus{outline:none}
 @media (min-width:900px){body.cpon main{margin-right:520px}}
-@media (max-width:600px){.cpbig{max-height:38vh}}
 .cptop{display:flex;align-items:center;gap:8px}.cptop h2{flex:1;min-width:0;margin:0;font-size:15px;font-weight:600;overflow-wrap:anywhere}
 .cpbig{width:100%;max-height:min(52vh,480px);object-fit:contain;background:var(--chip);border-radius:6px;display:block}
+@media (max-width:600px){.cpbig{max-height:38vh}}  /* after the base rule, so it wins */
 .cpstrip{display:flex;gap:4px;overflow-x:auto;margin-top:4px}
 .cpthumb{padding:0;border:2px solid transparent;border-radius:4px;background:none;cursor:pointer;width:48px;height:48px;flex:none}
 .cpthumb[aria-pressed=true]{border-color:var(--on)}.cpthumb img{width:100%;height:100%;object-fit:cover;display:block}

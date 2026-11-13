@@ -205,6 +205,9 @@ def test_the_compare_panel_fits_a_phone_with_the_species_and_two_similar(browser
     assert len(sums.nth(2).inner_text()) == 140 and sums.nth(2).inner_text().endswith("…")
     assert sums.nth(2).get_attribute("title").endswith("long one. More.")
     assert "/medium." in page.locator("#cprefs img").first.get_attribute("src")
+    big = page.locator("#cpanel .cpbig")
+    big.wait_for()
+    assert big.evaluate("e => getComputedStyle(e).maxHeight") == f"{0.38 * 740:g}px"  # room for the refs
     box = page.locator("#cpanel").bounding_box()
     assert box["x"] == 0 and box["width"] == 360
     assert page.evaluate("document.querySelector('#cpanel').scrollWidth <= 360")
