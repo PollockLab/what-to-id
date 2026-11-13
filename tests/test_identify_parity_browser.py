@@ -97,7 +97,7 @@ def test_the_what_panel_holds_the_shortcuts_show_only_accuracy_and_projects(brow
     page.locator("#flags button", has_text="Introduced").click()
     page.wait_for_function(f"__identify.ids().length === {int(pts['introduced'].sum())}")
     assert "only=introduced" in page.evaluate("location.hash")
-    assert page.inner_text("#bwhat b") == "introduced to bc"
+    assert page.inner_text("#bwhat b") == "Introduced to BC"
     page.evaluate("a => { a.value = 3; a.dispatchEvent(new Event('input')); }", page.query_selector("#accr"))
     want = pts["introduced"] & (pts["acc_class"] >= 3)
     page.wait_for_function(f"__identify.ids().length === {int(want.sum())}")

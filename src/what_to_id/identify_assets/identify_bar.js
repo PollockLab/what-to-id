@@ -67,7 +67,7 @@ function what(){
   if(inc.length)t.push(many(inc,'groups'));
   if(not.length)t.push('not '+many(not,'groups'));
   if(S.picks.length)t.push(S.picks.length===1?taxon(S.picks[0]):S.picks.length+' taxa');
-  MF.ONLYDEF.forEach(function(d){if(S.only[d[0]])t.push((S.only[d[0]]==='not'?'not ':'')+d[1].toLowerCase());});
+  MF.ONLYDEF.forEach(function(d){if(S.only[d[0]])t.push((S.only[d[0]]==='not'?'not ':'')+d[1]);});
   if(S.acc)t.push(OL.label().toLowerCase()||S.acc);
   return t.join(', ')||'All groups';
 }
