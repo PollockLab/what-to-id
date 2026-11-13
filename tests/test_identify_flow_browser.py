@@ -282,3 +282,27 @@ def test_a_touch_device_tip_has_no_keys(browser, site):
     assert page.inner_text("#tip").startswith("Tap a card to compare. Identify opens iNat")
     assert "undo" not in page.inner_text("#tip")
     ctx.close()
+
+
+def test_the_panel_keeps_focus_and_announces_each_card(browser, site):
+    base, _ = site
+    page = level_3(browser, base)
+    stub_taxa(page)
+    cards = page.locator("#grid .card")
+    label = cards.nth(0).locator(".title i").first.inner_text()
+    look = cards.nth(0).locator(".look i").inner_text()
+    cards.nth(0).locator(".title").click()
+    live = page.locator("#cplive")
+    assert live.get_attribute("aria-live") == "polite"
+    assert live.text_content().endswith(f", {label} to {look}") and live.text_content().startswith("1 of ")
+    inside = "document.getElementById('cpanel').contains(document.activeElement)"
+    for key in ["Tab"] * 12 + ["Shift+Tab"] * 12:
+        page.keyboard.press(key)
+        assert page.evaluate(inside), key
+    page.keyboard.press("Escape")
+    page.keyboard.press("j")  # Esc closed it: j moves on the grid, the panel stays shut
+    assert not page.locator("#cpanel").is_visible()
+    cards.nth(0).locator(".title").click()
+    page.locator("#cpj").click()
+    assert live.text_content().startswith("2 of ")
+    assert page.errors == []

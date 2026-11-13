@@ -68,7 +68,7 @@ return function(ctx){
     box=el('aside');box.id='cpanel';box.setAttribute('role','dialog');box.setAttribute('aria-labelledby','cphead');box.tabIndex=-1;box.hidden=true;
     box.innerHTML='<div class="cptop"><h2 id="cphead"></h2><span id="cpat" class="muted"></span>'+
       '<button type="button" id="cpx" class="arrow" aria-label="Close (Esc)">×</button></div>'+
-      '<div id="cpwhy"></div><div id="cpobs"></div><div id="cprefs"></div>'+
+      '<p id="cplive" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)"></p><div id="cpwhy"></div><div id="cpobs"></div><div id="cprefs"></div>'+
       '<div class="cpbar"><button type="button" id="cpk" class="arrow" aria-label="Previous card (k)" aria-keyshortcuts="k">‹</button>'+
       '<button type="button" id="cpj" class="arrow" aria-label="Next card (j)" aria-keyshortcuts="j">›</button>'+
       '<button type="button" id="cps" class="more" aria-keyshortcuts="s" title="Skip (s)">Skip</button>'+
@@ -84,6 +84,9 @@ return function(ctx){
       a.click();IdentifyFlow.mark(cur,'Opened');go(1);};
     box.addEventListener('keydown',function(e){
       var t=e.target,k=e.key;
+      if(k==='Tab'){  // focus stays in the open panel: Tab and Shift+Tab cycle its controls
+        var f=[].filter.call(box.querySelectorAll('a[href],button'),function(x){return x.offsetParent;}),a=f.indexOf(t);
+        e.preventDefault();if(f.length)f[e.shiftKey?(a<=0?f.length-1:a-1):(a+1)%f.length].focus();return;}
       if(e.metaKey||e.ctrlKey||e.altKey||/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))return;
       if(k==='u'){var u=IdentifyFlow.undo();if(u){e.preventDefault();e.stopPropagation();open(u);}return;}
       var b={Escape:'#cpx',j:'#cpj',k:'#cpk',s:'#cps',c:'#cpc .copy',Enter:t.closest('button,a')?null:'#cpo'}[k];
@@ -169,6 +172,7 @@ return function(ctx){
     var h=box.querySelector('#cphead');h.replaceChildren(el('i',null,nm?nm.textContent:'Record'));
     if(t&&li.dataset.lv!=='1')h.append(' → ',el('i',null,t[0]),'?');
     box.querySelector('#cpat').textContent=(all.indexOf(li)+1)+' of '+all.length+' shown';
+    box.querySelector('#cplive').textContent=(all.indexOf(li)+1)+' of '+all.length+', '+(nm?nm.textContent:'Record')+(t&&li.dataset.lv!=='1'?' to '+t[0]:'');
     c.replaceChildren();if(t)c.append(IdentifyNarrow.copy(t[0]));
     var y=why(li),wy=box.querySelector('#cpwhy');wy.replaceChildren();if(y)wy.append(IdentifyNarrow.why(y[0],y[1]));
     obs(li);refs(li);
