@@ -105,13 +105,13 @@ def test_the_view_chip_and_bar_wording_follow_a_visible_map(split):
     page.wait_for_function(
         "document.getElementById('counts').textContent.includes('in photo space, in map view')"
     )
-    page.click("[data-p='map']")  # the hidden map's view masks nothing
+    page.click("[data-p='map']", modifiers=["Shift"])  # the hidden map's view masks nothing
     right.wait_for_function(
         f"document.getElementById('count').textContent.startsWith('{POOL_N:,}')"
     )
     assert right.locator("#selbar li").count() == 0
     assert "map view" not in page.inner_text("#counts")
-    page.click("[data-p='map']")
+    page.click("[data-p='map']", modifiers=["Shift"])
     right.wait_for_function("document.querySelectorAll('#selbar li').length === 1")
     assert right.locator("#selbar li", has_text="Map view").count() == 1
     page.wait_for_function("document.getElementById('counts').textContent.includes('in map view')")
@@ -146,11 +146,13 @@ def test_a_removed_space_takes_its_lasso_off_the_map(browser, site):
     space.evaluate(
         "parent.postMessage({type: 'wtid-keep', ids: new Uint32Array([0, 1, 2])}, location.origin)"
     )
-    page.click("[data-p='map']")
+    page.click("[data-p='map']", modifiers=["Shift"])
     page.wait_for_function(ok % "map")
-    page.click("[data-p='space']")
+    page.click("[data-p='space']", modifiers=["Shift"])
     page.wait_for_function(ok % "space")
-    page.click("[data-p='map']")  # a new map must not inherit the lasso of the removed space
+    page.click(
+        "[data-p='map']", modifiers=["Shift"]
+    )  # a new map must not inherit the lasso of the removed space
     page.wait_for_function(ok % "map")
     frame = next(f for f in page.frames if "embed=1" in f.url)
     assert all(k is None for k in frame.evaluate("__keep"))
@@ -174,7 +176,9 @@ def test_an_area_sent_before_the_frame_loads_still_arrives(browser, site):
     left = next(f for f in page.frames if "embed=1" in f.url)
     h = left.evaluate(f"MapArea.encode({RING})")
     left.evaluate("h => parent.postMessage({type: 'wtid-area', area: h}, location.origin)", h)
-    page.click("[data-p='space']")  # the second frame is created now, after the message
+    page.click(
+        "[data-p='space']", modifiers=["Shift"]
+    )  # the second frame is created now, after the message
     page.wait_for_function(joined % "#space")
     right = next(f for f in page.frames if "embed=1" in f.url and f is not left)
     right.wait_for_function(  # a count, not the page's opening "Loading", and not the whole pool
@@ -292,7 +296,7 @@ def test_a_hidden_photo_space_takes_its_views_cut_off_the_map(split):
         " __deck.props.onViewStateChange({viewState: {...vs, zoom: vs.zoom + 2}}); }"
     )
     page.wait_for_function("__keep.length === 1")
-    page.click("[data-p='space']")
+    page.click("[data-p='space']", modifiers=["Shift"])
     page.wait_for_function("__keep.length === 2")
     assert page.evaluate("__keep[1]") == {"ids": None, "view": False}
     assert page.errors == []
@@ -469,7 +473,9 @@ def test_with_the_map_shown_the_tree_follows_the_maps_counts_not_the_photo_space
     _post_counts(page, "#space", 5)
     _post_counts(page, "#map", 7)
     tree.locator("#outline .tc", has_text="7 ·").first.wait_for()
-    page.click("[data-p='map']")  # the map hidden, the photo space's counts take over
+    page.click(
+        "[data-p='map']", modifiers=["Shift"]
+    )  # the map hidden, the photo space's counts take over
     tree.locator("#outline .tc", has_text="5 ·").first.wait_for()
     assert root.inner_text().split()[0] == "5"
     assert page.errors == []

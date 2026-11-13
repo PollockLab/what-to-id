@@ -154,7 +154,7 @@ PRESSED = (
 )
 
 
-def test_split_opens_the_map_and_the_tree_and_toggles_each_pane(browser, site):
+def test_split_opens_the_map_and_the_tree_and_shift_click_toggles_each_pane(browser, site):
     page = _split(browser, site, 1280, 800)
     assert page.evaluate(FRAMES) == ["map", "tree"]
     assert page.evaluate(PRESSED) == ["map", "tree"]
@@ -168,7 +168,7 @@ def test_split_opens_the_map_and_the_tree_and_toggles_each_pane(browser, site):
         ("space", ["tree"], "tree-only"),
         ("map", ["map", "tree"], "map-tree"),
     ):
-        page.click(f"[data-p={click}]")
+        page.click(f"[data-p={click}]", modifiers=["Shift"])
         page.wait_for_function(f"{SEEN}.join() === {','.join(panes)!r}")
         assert page.evaluate(PRESSED) == panes
         assert page.evaluate("location.search") == f"?view={view}"
@@ -222,7 +222,7 @@ def test_three_panes_sit_side_by_side_with_the_tree_at_30_percent_and_the_select
     chip = page.frame_locator("#space").locator("#selbar li", has_text="Insecta")
     chip.wait_for(state="attached")  # the peer folds its panel
     assert "groups=Insecta" in page.evaluate("location.hash")
-    page.click("[data-p=map]")
+    page.click("[data-p=map]", modifiers=["Shift"])
     page.wait_for_function(f"{SEEN}.join() === 'space,tree'")
     assert page.locator(".sep").count() == 1  # two panes have the divider between them
     sep, space = (page.locator(x).bounding_box() for x in (".sep", "#space"))

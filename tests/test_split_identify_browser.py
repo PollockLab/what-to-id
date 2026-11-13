@@ -107,14 +107,14 @@ def test_old_views_still_open_their_panes_and_each_pane_toggles(browser, site, p
         "map",
         "space",
     ]
-    page.click("[data-p=identify]")
+    page.click("[data-p=identify]", modifiers=["Shift"])
     frame_of(page, "identify")
     assert page.evaluate("[...document.querySelectorAll('iframe')].map(f => f.id)") == [
         "map",
         "identify",
         "space",
     ]
-    page.click("[data-p=identify]")
+    page.click("[data-p=identify]", modifiers=["Shift"])
     page.wait_for_function("document.getElementById('identify').hidden")
     assert page.errors == []
     page.close()
@@ -288,4 +288,43 @@ def test_what_opens_the_photo_space_full_screen_and_show_cards_returns_with_the_
     page.keyboard.press("Escape")  # Esc leaves too
     page.wait_for_url("**/identify.html*")
     assert page.evaluate("location.hash") == "#lvl=2&conf=all"
+    page.close()
+
+
+def test_a_click_shows_one_pane_shift_click_adds_one_and_side_by_side_restores(browser, site, pts):
+    page = explore(browser, site[0])
+    frame_of(page, "identify")
+    frame_of(page, "map")
+
+    def shown():
+        return page.evaluate(
+            "[...document.querySelectorAll('iframe:not(.rail)')]"
+            ".filter(f => !f.hidden).map(f => f.id)"
+        )
+
+    def width(n):
+        return page.evaluate(f"document.getElementById('{n}').getBoundingClientRect().width")
+
+    page.click("[data-p=identify]")  # a plain click: Identify alone, full width
+    page.wait_for_function("document.getElementById('map').classList.contains('rail')")
+    assert shown() == ["identify"] and width("identify") > 1280 - 290
+    assert page.locator("[data-p=map]").get_attribute("aria-pressed") == "false"
+    assert page.locator("#sbs").get_attribute("aria-pressed") == "false"
+    page.click("[data-p=map]", modifiers=["Shift"])  # shift adds the map beside it
+    page.wait_for_function("!document.getElementById('map').classList.contains('rail')")
+    assert sorted(shown()) == ["identify", "map"]
+    page.click("[data-p=map]")  # a plain click on another pane leaves only that one
+    page.wait_for_function("document.getElementById('identify').hidden")
+    assert (
+        shown() == ["map"]
+        and page.locator("[data-p=identify]").get_attribute("aria-pressed") == "false"
+    )
+    page.click("[data-p=map]")  # the one pane stays
+    assert shown() == ["map"]
+    page.click("#sbs")  # Side by side brings the last mix back
+    page.wait_for_function("!document.getElementById('identify').hidden")
+    assert sorted(shown()) == ["identify", "map"]
+    assert page.locator("#sbs").get_attribute("aria-pressed") == "true"
+    assert page.evaluate("localStorage.getItem('wtid-multi')") in ("identify-map", "map-identify")
+    assert page.errors == []
     page.close()

@@ -43,7 +43,7 @@ def test_alt_arrow_reorders_the_panes_the_link_and_the_next_visit_without_reload
         "space",
         "map",
     ]  # the hidden pane keeps a place
-    page.click("[data-p=space]")
+    page.click("[data-p=space]", modifiers=["Shift"])
     assert page.evaluate(LEFTS) == ["identify", "space", "map"]
     assert "view=identify-space-map" in page.url
     assert "Panes, left to right" in page.text_content("[role=status]")
@@ -83,12 +83,12 @@ def test_a_link_with_its_own_order_lays_the_panes_out_so_and_the_dividers_still_
     page.close()
 
 
-def test_a_click_toggles_a_pane_and_a_drag_reorders_without_toggling(browser, site):
+def test_shift_click_toggles_a_pane_and_a_drag_reorders_without_toggling(browser, site):
     page = open_page(browser, f"{site[0]}/explore.html")
     map_frame(page)
-    page.click("[data-p=space]")
+    page.click("[data-p=space]", modifiers=["Shift"])
     assert page.evaluate(LEFTS) == ["map", "identify", "space"]
-    page.click("[data-p=space]")
+    page.click("[data-p=space]", modifiers=["Shift"])
     assert page.evaluate(LEFTS) == ["map", "identify"]
     box, mbox = (
         page.locator("[data-p=identify]").bounding_box(),

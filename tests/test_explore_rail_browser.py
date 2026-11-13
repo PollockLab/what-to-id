@@ -102,7 +102,7 @@ def test_the_rail_folds_to_a_strip_and_stays_folded(browser, site):
 def test_with_the_map_hidden_the_rail_stays_and_counts_all_of_bc(browser, site):
     page = open_page(browser, f"{site[0]}/explore.html")
     frame = map_frame(page)
-    page.click("[data-p=map]")
+    page.click("[data-p=map]", modifiers=["Shift"])
     page.wait_for_function("document.getElementById('map').classList.contains('rail')")
     frame.wait_for_function("document.documentElement.classList.contains('rail-only')")
     assert page.evaluate(f"({BOX})('map')") == [0, 280] and frame.is_hidden("#map")
@@ -112,7 +112,7 @@ def test_with_the_map_hidden_the_rail_stays_and_counts_all_of_bc(browser, site):
     frame.wait_for_function(f"{COUNT}.startsWith('30 ')")
     page.wait_for_function("location.hash.includes('groups=Aves')")
     assert frame.locator("#groups > li .gc").all_text_contents() == ["170", "100", "30"]
-    page.click("[data-p=map]")  # the map back: In view again, and its canvas
+    page.click("[data-p=map]", modifiers=["Shift"])  # the map back: In view again, and its canvas
     frame.wait_for_function("!document.documentElement.classList.contains('rail-only')")
     assert frame.evaluate("document.querySelectorAll('#scope button')[0].ariaPressed") == "true"
     assert frame.is_visible("#map") and page.evaluate(f"({BOX})('map')")[1] > 600
@@ -123,14 +123,14 @@ def test_with_the_map_hidden_the_rail_stays_and_counts_all_of_bc(browser, site):
 def test_with_the_map_hidden_the_folded_rail_keeps_its_what_tab(browser, site):
     page = open_page(browser, f"{site[0]}/explore.html")
     frame = map_frame(page)
-    page.click("[data-p=map]")
+    page.click("[data-p=map]", modifiers=["Shift"])
     frame.wait_for_function("document.documentElement.classList.contains('rail-only')")
     frame.click("#railx")
-    page.wait_for_function("document.getElementById('map').offsetWidth === 36")
-    # the 36 px frame is a phone-width viewport of its own: the tab must not take the phone rules
-    assert page.evaluate(f"({BOX})('map')") == [0, 36] and frame.is_visible("#railx")
-    frame.click("#railx")
-    page.wait_for_function("document.getElementById('map').offsetWidth === 280")
+    # folded with the map hidden, the rail takes no width; the state bar's Filters opens it again
+    page.wait_for_function("document.getElementById('map').offsetWidth === 0")
+    page.click("#sbf")
+    page.wait_for_function("document.getElementById('map').classList.contains('sheet')")
+    assert frame.is_visible("#railx")
     frame.evaluate("localStorage.removeItem('wtid-rail')")
     assert page.errors == []
     page.close()

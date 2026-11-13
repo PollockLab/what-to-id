@@ -39,9 +39,9 @@ def test_n_panes_have_n_minus_one_dividers_with_good_defaults(browser, pts, site
     assert all(seps.nth(i).get_attribute("aria-valuenow") for i in range(2))
     map_, identify, tree = page.evaluate(WIDTHS)  # the map first, its filter rail leftmost
     assert 320 <= identify <= 440 and tree == pytest.approx(0.3 * 1500, rel=0.08) and map_ > 300
-    page.click("[data-p=tree]")
+    page.click("[data-p=tree]", modifiers=["Shift"])
     assert page.locator(".sep").count() == 1
-    page.click("[data-p=map]")
+    page.click("[data-p=map]", modifiers=["Shift"])
     assert page.locator(".sep").count() == 0
     page.close()
 
@@ -148,10 +148,10 @@ def test_hiding_the_map_clears_the_viewport_in_identify_and_showing_it_replays_i
     page.wait_for_function(
         "/to identify · .*on map, both in view/.test(document.getElementById('counts').textContent)"
     )
-    page.click("[data-p=map]")
+    page.click("[data-p=map]", modifiers=["Shift"])
     page.wait_for_function("got.length === 2")
     assert page.evaluate("got") == ["abc", ""]
-    page.click("[data-p=map]")
+    page.click("[data-p=map]", modifiers=["Shift"])
     page.wait_for_function("got.length === 3")
     assert page.evaluate("got[2]") == "abc"
     page.close()
@@ -177,6 +177,6 @@ def test_a_pane_is_loaded_only_once_shown_and_the_page_has_one_heading(browser, 
     # no frame, so no request, for a pane not shown
     assert page.locator("#space, #tree").count() == 0
     assert page.locator("h1").all_inner_texts() == ["Explore"]
-    page.click("[data-p=tree]")
+    page.click("[data-p=tree]", modifiers=["Shift"])
     assert page.locator("#tree").get_attribute("src")
     page.close()
