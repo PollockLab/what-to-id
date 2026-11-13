@@ -77,7 +77,7 @@ return function(ctx){
     if(matchMedia('(pointer: coarse)').matches)box.querySelector('#cpo').textContent='Identify';  // no Enter key on touch
     box.querySelector('#cpx').onclick=close;
     box.querySelector('#cpk').onclick=function(){go(-1);};box.querySelector('#cpj').onclick=function(){go(1);};
-    box.querySelector('#cps').onclick=function(){IdentifyFlow.mark(cur,'Skipped');go(1);};
+    box.querySelector('#cps').onclick=function(){IdentifyFlow.mark(cur,'Skipped');go(1);var l=box.querySelector('#cplive');if(!box.hidden)l.textContent='Skipped. '+l.textContent;};
     box.querySelector('#cpo').onclick=function(){
       var a=cur.querySelector('a.btn'),t=named(cur),m=box.querySelector('#cpt'),c=navigator.clipboard;if(!a)return;
       if(t&&c&&c.writeText)c.writeText(t[0]).then(function(){m.textContent='Copied '+t[0]+', paste in iNat';clearTimeout(m.t);

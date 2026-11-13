@@ -321,7 +321,9 @@ def test_the_panel_keeps_focus_and_announces_each_card(browser, site):
     assert live.text_content().startswith("2 of ")
     page.focus("#cps")
     page.keyboard.press("Enter")  # Skip from the keyboard: focus stays on it, the card is announced
-    assert page.evaluate("document.activeElement.id") == "cps" and live.text_content().startswith("3 of ")
+    assert page.evaluate("document.activeElement.id") == "cps" and live.text_content().startswith("Skipped. 3 of ")
+    page.locator("#cpj").click()  # only Skip says so
+    assert live.text_content().startswith("4 of ")
     assert page.errors == []
 
 
