@@ -104,6 +104,11 @@ def open_identify(browser, base, hash_="", size=(600, 900), touch=False):
         "response",
         lambda r: page.errors.append(r.url) if r.status >= 400 and ".html" not in r.url else None,
     )
+    # the panel's taxa and look-alike lookups: empty answers, not the live API's 4xx for fake ids
+    page.route(
+        "https://api.inaturalist.org/v1/**",
+        lambda r: r.fulfill(json={"results": []}, headers={"access-control-allow-origin": "*"}),
+    )
     page.calls = eb.stub_inat(page, None)
     page.goto(f"{base}/identify.html{hash_}")
     page.wait_for_function("window.__identify")
@@ -469,6 +474,7 @@ def test_cards_show_before_the_look_alike_file_and_fill_it_in_where_they_stand(b
     page.route("**/pool-levels-looks.*", lambda r: held.append(r))
     page.goto(f"{base}/identify.html#lvl=3")
     page.wait_for_function("window.__identify")  # the first cards carry their look-alike
+    page.wait_for_selector("#grid .card", state="attached")  # the page is tall enough to scroll
     assert page.locator("#grid .card .look").count() == 0
     page.evaluate("scrollTo(0, 40)")
     held[0].continue_()
