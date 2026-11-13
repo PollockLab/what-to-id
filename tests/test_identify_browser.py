@@ -34,6 +34,7 @@ def serve(root, frame, score):
     blobs, meta = encode_points(frame, TREE)
     for name, blob in blobs.items():
         (root / name).write_bytes(blob)
+    meta["value"] = [[953, 2, 5]]  # the at-risk list: Apis c, the www tests' third suggestion
     (root / "map.html").write_text(render_map(meta, freeze=None))
     pts = decode_points(blobs, meta)
     i = np.arange(len(frame))

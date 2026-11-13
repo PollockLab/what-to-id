@@ -1,22 +1,19 @@
 // What, When and Where beside the group control. When writes the map filter's from= (to= cleared, by= kept), Where shows
 // the hash's area with a clear button and a link to draw one on the map. At risk and Invasive (hash risk=1, inv=1) keep
-// level 3 cards whose suggested species iNaturalist lists in BC or Canada (conservation_statuses, iucn 30 or more) or
-// marks introduced in BC, from /v1/taxa/<ids>?preferred_place_id=7085 (30 ids a request; the flattened conservation_status
-// is often wrong), cached by taxon id for a week. A suggestion not yet looked up is hidden until its answer lands.
-// IdentifyWWW(ctx), ctx {sel() the selection string, set(str), area(), clear(), look(i), taxa, redraw()}.
+// level 3 cards by their suggested species: At risk from the map's META.value list (at_risk_bc_taxa.json, listed in Canada
+// or BC S1-S3), at once; Invasive when iNaturalist marks it introduced in BC, from /v1/taxa/<ids>?preferred_place_id=7085
+// (30 ids a request), cached by taxon id for a week. A suggestion not yet looked up is hidden until its answer lands.
+// IdentifyWWW(ctx), ctx {sel() the selection string, set(str), area(), clear(), look(i), taxa(), value (META.value), redraw()}.
 var IdentifyWWW=(function(){
 'use strict';
-var LS='wtid-status',WEEK=7*864e5,RISK=1,INV=2,PLACES=[7085,6712];
+var LS='wtid-status',WEEK=7*864e5,RISK=1,INV=2;
 function $(id){return document.getElementById(id);}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 function iso(ms){return new Date(ms).toISOString().slice(0,10);}
-function flagsOf(t){
-  var r=(t.conservation_statuses||[]).some(function(c){return PLACES.indexOf((c.place||{}).id)>=0&&+c.iucn>=30;}),
-    m=t.establishment_means||{},inv=/introduced|invasive/.test(m.establishment_means||'')&&(!m.place||m.place.id===7085);
-  return (r?RISK:0)|(inv?INV:0);
-}
+function invasive(t){var m=t.establishment_means||{};
+  return /introduced|invasive/.test(m.establishment_means||'')&&(!m.place||m.place.id===7085)?INV:0;}
 return function(ctx){
-  var api=inatGate({gap:1000}),ids=new Map(),cache={},want=new Set(),busy=new Set(),T=0,need=0;
+  var api=inatGate({gap:1000}),ids=new Map(),cache={},want=new Set(),busy=new Set(),T=0,need=0,risk=new Set((ctx.value||[]).map(function(r){return r[0];}));
   try{var c=JSON.parse(localStorage.getItem(LS))||{};if(Date.now()-c.at<WEEK)cache=c.f||{};}catch(e){}
   function on(k){return new RegExp('(^|&)'+k+'=1(&|$)').test(location.hash.slice(1));}
   function keep(k,v){var t=location.hash.slice(1).split('&').filter(function(x){return x&&x.indexOf(k+'=')!==0;});if(v)t.push(k+'=1');
@@ -26,7 +23,7 @@ return function(ctx){
     var todo=[...want].filter(function(id){return !busy.has(id)&&!(id in cache);});want.clear();
     for(var k=0;k<todo.length;k+=30)(function(b){b.forEach(function(id){busy.add(id);});
       api('taxa/'+b.join(',')+'?preferred_place_id=7085').then(function(j){
-        b.forEach(function(id){cache[id]=0;});(j.results||[]).forEach(function(t){cache[t.id]=flagsOf(t);});save();
+        b.forEach(function(id){cache[id]=0;});(j.results||[]).forEach(function(t){cache[t.id]=invasive(t);});save();
       }).catch(function(){b.forEach(function(id){cache[id]=0;});}).then(function(){
         b.forEach(function(id){busy.delete(id);});clearTimeout(T);T=setTimeout(ctx.redraw,300);});})(todo.slice(k,k+30));
   }
@@ -37,9 +34,12 @@ return function(ctx){
   function pass(i){
     if(!need)return true;
     if(!ids.size)ctx.taxa().forEach(function(t){if(t[2])ids.set(t[0],t[2]);});
-    var nm=ctx.look(i),id=ids.get(nm);if(!id){if(nm&&id===undefined)named(nm);return false;}
+    var nm=ctx.look(i),id=ids.get(nm);
+    if(!id){if(nm&&id===undefined)named(nm);return false;}
+    if(need&RISK&&risk.has(id))return true;
+    if(!(need&INV))return false;
     if(!(id in cache)){if(!want.size)setTimeout(ask,0);want.add(id);return false;}
-    return (cache[id]&need)!==0;
+    return (cache[id]&INV)!==0;
   }
   function toggle(k,label){
     var l=el('label','tog'),b=el('input');b.type='checkbox';b.checked=on(k);

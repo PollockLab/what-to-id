@@ -30,7 +30,7 @@ function taken(o){
 // The one count line of level 3: cards drawn, the records behind the tab's count, the filters on (empty tags drop out).
 function line(cards,records,tags,per){
   var nf=new Intl.NumberFormat('en-CA'),t=tags.filter(Boolean);
-  return nf.format(cards)+' cards to ID ('+nf.format(records)+' records'+(t.length?', '+t.join(', '):'')+'; up to '+per+' per suggested species)';
+  return nf.format(cards)+' cards to ID ('+nf.format(records)+' records'+(t.length?', '+t.join(', '):'')+'; '+per+' per suggested species)';
 }
 // Why the suggestion: the runner-up species in the clade and, in words, the margin over it (thousandths of cosine, 255 none).
 function why(name,m){

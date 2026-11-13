@@ -1,6 +1,6 @@
 """Identify's What, When and Where row in Chromium: When writes the map filter's from=, Where
-links to the map, At risk and Invasive keep level 3 cards by their suggestion's BC status.
-iNaturalist is stubbed."""
+links to the map, At risk (from the map's list, no request) and Invasive (iNat's BC status) keep
+level 3 cards by their suggestion. iNaturalist is stubbed."""
 
 from datetime import UTC, datetime, timedelta
 from urllib.parse import parse_qs, urlparse
@@ -73,7 +73,7 @@ def test_at_risk_and_invasive_keep_cards_by_their_suggestions_bc_status(browser,
     page.wait_for_function(
         "[...document.querySelectorAll('#grid .card .look i')].every(e=>e.textContent==='Apis c')"
     )
-    assert "risk=1" in page.evaluate("location.hash")
+    assert "risk=1" in page.evaluate("location.hash") and page.asked == []
     page.check("text=Invasive")
     page.wait_for_function(KINDS + "===2")
     assert looks(page) == {"Apis c", "Bombus b"}
@@ -116,6 +116,7 @@ def test_by_species_runs_each_suggestion_together_under_one_header(browser, site
     assert len(blocks) == len(set(names)) and max(names.count(n) for n in names) > 3
     heads = page.locator("#grid .sep.run i").all_inner_texts()
     assert heads == blocks and page.locator("#grid .sep.run").first.locator("img").count() == 1
+    assert "; all per suggested species)" in page.inner_text("#cap")
     page.uncheck("text=By species")
     page.wait_for_function("!document.querySelector('#grid .sep.run')")
     assert page.errors == []
@@ -149,3 +150,18 @@ def test_progress_counts_cards_opened_today_and_a_logins_improving_ids(browser, 
     page.wait_for_selector("#grid .card .look")
     assert "1 opened today" in page.inner_text("#prog") and len(asked) == 1  # cached
     assert page.errors == []
+
+
+def test_only_level_3_fetches_the_runner_up_file_after_its_cards(browser, site):
+    base, _ = site
+    page = browser.new_page(viewport={"width": 600, "height": 900})
+    eb.stub_inat(page, None)
+    got = []
+    page.on("request", lambda r: got.append(r.url))
+    page.goto(f"{base}/identify.html#lvl=1")
+    page.wait_for_selector("#grid .card")
+    page.wait_for_timeout(500)
+    assert not [u for u in got if "why" in u.rsplit("/", 1)[-1]]
+    page.click("#tab3")
+    page.wait_for_selector("#grid .card .why")
+    assert [u for u in got if "why" in u.rsplit("/", 1)[-1]]

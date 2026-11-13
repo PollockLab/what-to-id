@@ -11,7 +11,7 @@ var MAP=new URL(CFG.mapUrl,location.href).href,nf=new Intl.NumberFormat('en-CA')
 var TAB=[],SUBK=[],NK=1,KIND=null,SUB=null,KF=0,KC=[],UF=null,UON=false,MINE=[],CMP=null,SEEN='wtid-identify-seen',BT=false,ST=null,SK='',IN=IdentifyInat(CFG.oauth);
 // CFG.merge: the kinds (levels) a tab shows, in order; SUBK a kind's place in its tab
 Object.keys(CFG.merge).forEach(function(t){CFG.merge[t].forEach(function(k,j){TAB[k]=+t;SUBK[k]=j;});NK=Math.max(NK,CFG.merge[t].length);});
-var META=null,SYNC=null,MORE=new Map(),TAXA=null,P=null,BYID=null,LEVEL=null,Q=null,LOOKS=null,WHY=null,RK=null,N3=0,GP=null,R=null,MF=null,TF=null,PEND=null,REC=-1,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,ONE='',CACHE=new Map(),FIRST=null,SHOWN,STAY=false,X=null,WW=null;
+var META=null,SYNC=null,MORE=new Map(),TAXA=null,P=null,BYID=null,LEVEL=null,Q=null,LOOKS=null,WHY=null,WHYF=null,RK=null,N3=0,GP=null,R=null,MF=null,TF=null,PEND=null,REC=-1,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,ONE='',CACHE=new Map(),FIRST=null,SHOWN,STAY=false,X=null,WW=null;
 function $(id){return document.getElementById(id);}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 function status(t,err){var s=$('status');s.textContent=t;s.classList.toggle('err',!!err);}  // an error shows on Batches too
@@ -215,10 +215,10 @@ function batch(){
   LINKS=rows.length?IdentifyLinks.batches(rows.map(function(i){return P.id[i];}),true):[];BI=0;
   $('batch').hidden=!rows.length;$('cap').hidden=LV===3?!rows.length:LINKS.length<2;
   ONE=capped?'Identify the first '+nf.format(rows.length)+' of '+nf.format(t):'Identify '+nf.format(rows.length)+' listed';
-  $('cap').textContent=LV===3?IdentifyNarrow.line(t,S.total[3],[GP&&GP.label(),R&&R.label(3)],PER_SPECIES):
+  $('cap').textContent=LV===3?IdentifyNarrow.line(t,S.total[3],[GP&&GP.label(),R&&R.label(3)],RUN()?'all':'up to '+PER_SPECIES):
     nf.format(t)+' cards (up to '+PER_SPECIES+' per species) · '+(capped?'first '+nf.format(rows.length):'all')+
     ' in '+LINKS.length+' batches of '+IdentifyLinks.BATCH+', in the order shown';
-  $('go').title='Up to '+PER_SPECIES+(LV===3?' per suggested species':' per species');
+  $('go').title=(LV===3&&RUN()?'All':'Up to '+PER_SPECIES)+(LV===3?' per suggested species':' per species');
   step(0);
 }
 function step(d){
@@ -243,6 +243,7 @@ function paint(){
   IdentifyFlow.draw(LV);
   empty();
   more();batch();if(!STAY)scrollTo(0,0);STAY=false;
+  if(LV===3&&WHYF)setTimeout(WHYF,0);
 }
 function redraw(){build();counts();paint();}
 function kindName(k){return (CFG.kinds.filter(function(x){return x[0]===k;})[0]||[0,''])[1];}
@@ -425,7 +426,7 @@ async function load(){
   if(CFG.first)get(new URL(CFG.first,MAP)).then(function(b){if(!MF)firstOf(JSON.parse(new TextDecoder().decode(b)));}).catch(function(){});  // optional
   META=await L.fetchMapMeta(MAP,fetch);
   if(!MF)groups(CH.read(new URLSearchParams(sel()).get('groups'),META.groups));
-  WW=IdentifyWWW({sel:function(){return MF?key():sel();},taxa:function(){return TAXA;},look:looksOf,redraw:function(){if(P)redraw();},area:function(){return AREA;},
+  WW=IdentifyWWW({value:META.value,sel:function(){return MF?key():sel();},taxa:function(){return TAXA;},look:looksOf,redraw:function(){if(P)redraw();},area:function(){return AREA;},
     set:function(t){if(MF)take(t,false);else{PEND=t;again();}if(parent===window)history.replaceState(null,'','#'+location.hash.slice(1).split('&')
       .filter(function(x){return x&&!MapFilter.tokens(x);}).concat(t?t.split('&'):[]).join('&'));SYNC.send();},
     clear:function(){AREA='';['area','park','bcpark'].forEach(function(k){keep(k,'');});refresh();}});
@@ -434,8 +435,7 @@ async function load(){
   var shards=Promise.all(META.shards.map(function(s){return get(new URL(s.file,MAP)).then(function(b){return L.decodeShard(b,s.n);});}));
   var lev=file('levels'),lk=file('looks').catch(function(){return null;}),  // optional: cards fill in their look-alike once it lands
     rg=file('range').catch(function(){return null;}),  // optional: no range maps without it
-    rkf=file('rank').catch(function(){return null;}),  // optional: level 3 by score bucket without it
-    wf=file('why').catch(function(){return null;});  // optional: no runner-up line without it
+    rkf=file('rank').catch(function(){return null;});  // optional: level 3 by score bucket without it
   if(!FIRST)status('Downloading the records…');
   var d=await Promise.all([shards,taxa,lev,rkf]);
   P=L.pool(d[0],META.bbox);BYID=byId(P);TAXA=d[1];LOOKS=null;
@@ -455,7 +455,9 @@ async function load(){
   if(PEND!==null){take(PEND,false);PEND=null;}
   $('usrbox').open=!!S.user;
   function retitle(){[].forEach.call($('grid').children,function(li){var t=li.querySelector('.title');if(t&&li.dataset.i)t.replaceWith(title(+li.dataset.i,LV));});}
-  Promise.all([lk,wf]).then(function(b){if(b[0]&&b[1]){WHY=looks(b[1],1);if(LV===3)retitle();}});
+  WHYF=function(){WHYF=null;  // the runner-up file is large and only level 3 shows it: fetched once its first cards are drawn
+    Promise.all([lk,file('why').catch(function(){return null;})]).then(function(b){if(b[0]&&b[1]){WHY=looks(b[1],1);if(LV===3)retitle();}});};
+  if(LV===3&&!BT)setTimeout(WHYF,0);
   lk.then(function(b){if(!b)return;LOOKS=looks(b);
     retitle();
     CMP.fill([].slice.call($('grid').querySelectorAll('.card')));if(BT)paint();
