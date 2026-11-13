@@ -1,0 +1,49 @@
+/* The search bar (identify_bar.js): three segments, each with its own panel; a phone's sheet holds them as accordion sections */
+.bar{position:relative;display:flex;justify-content:center;margin:10px 0 8px}
+.bseg{display:flex;align-items:center;max-width:100%;min-width:0;border:1px solid var(--line);border-radius:999px;background:var(--panel);
+  box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.bar.open .bseg{background:var(--chip);box-shadow:none}
+.seg1{display:flex;flex-direction:column;align-items:flex-start;gap:0;padding:7px 22px;min-width:0;border:0;border-radius:999px;background:none;
+  color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.seg1:disabled{cursor:default}
+.seg1:hover:not(.on):not(:disabled){background:var(--line)}
+.seg1.on{background:var(--panel);box-shadow:0 2px 10px rgba(0,0,0,.2)}
+.seg1 small{font-size:11px;font-weight:650}
+.seg1 b{font-weight:400;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:22ch}
+.bpanel{position:absolute;top:calc(100% + 8px);left:0;z-index:5;box-sizing:border-box;width:min(420px,calc(100vw - 24px));max-height:70vh;overflow:auto;
+  padding:12px 14px;border:1px solid var(--line);border-radius:20px;background:var(--panel);color:var(--ink);box-shadow:var(--shadow);text-align:left}
+#pwhat{width:min(380px,calc(100vw - 24px))}#pwhere{width:min(320px,calc(100vw - 24px))}
+.bpanel .row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:0 0 8px}
+.bpanel #q{box-sizing:border-box;width:100%;font-size:14px;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.bpanel .sugg{z-index:8;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);max-height:240px;overflow:auto}
+.bpanel p{margin:6px 0}
+.bpanel .gbar{margin:8px 0}
+.bpanel .gl{max-height:46vh;overflow:auto}
+.bpanel .chips{display:flex;flex-wrap:wrap;gap:4px}
+.bpanel .chips button,.tseg button{border:1px solid var(--line);background:var(--chip);color:var(--ink);font:inherit;font-size:12px;padding:3px 9px;
+  min-height:28px;cursor:pointer;border-radius:14px}
+.bpanel .chips button[aria-pressed="true"],.tseg button[aria-pressed="true"]{background:var(--on);color:var(--onink);border-color:var(--on)}
+.bpanel .months button{min-width:40px;padding:3px 0}
+.tseg{display:inline-flex}.tseg button{border-radius:0}
+.tseg button:first-child{border-radius:14px 0 0 14px}.tseg button:last-child{border-radius:0 14px 14px 0;border-left:0}
+.bpanel .link{border:0;background:none;color:var(--muted);font:inherit;font-size:12px;text-decoration:underline;cursor:pointer;padding:0 2px;min-height:24px}
+.bpanel .vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.bpanel .area{max-width:none;border:0;box-shadow:none;padding:0;background:none}
+.bpanel .atoggle,.bpanel [data-a="draw"]{display:none!important}  /* drawing needs a map */
+.bpanel .wnote{font-size:12px}
+.bpanel .row:has(#from){font-size:12px}
+.acc{border-top:1px solid var(--line)}
+.acc h3{margin:0;font-size:inherit}
+.ahead{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:56px;padding:0;border:0;background:none;color:var(--ink);font:inherit;
+  font-weight:650;text-align:left;cursor:pointer}
+.ahead b{font-weight:400;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.abody{padding:0 0 12px}
+.abody .bpanel{position:static;width:auto!important;max-height:none;padding:0;border:0;box-shadow:none;border-radius:0;overflow:visible}
+.abody .bpanel .gl{max-height:none}
+.sdone{gap:.3em}  /* flex items drop the blanks between "Show", the count and "cards" */
+@media (max-width:760px){
+  .bseg{width:100%}
+  .seg1{flex:1 1 0;padding:6px 10px}
+  .seg1 b{color:var(--ink);font-size:13px;max-width:12ch}
+  dialog.sheet#bsheet{width:100vw;height:100dvh;max-width:100vw;max-height:100dvh;margin:0;border-radius:0}
+}

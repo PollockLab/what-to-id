@@ -56,16 +56,15 @@ def test_a_filter_off_its_default_shows_a_chip_that_removes_it(browser, site):
     assert page.errors == []
 
 
-def test_the_pill_names_the_search_and_opens_its_sheet(browser, site):
+def test_the_what_segment_names_the_search_and_opens_its_panel(browser, site):
     base, _ = site
     page = ib.open_identify(browser, base, "#lvl=1")
     page.wait_for_function("__identify.ids().length > 0")
-    assert page.get_attribute("#pill", "aria-label").startswith("Search: All groups, ")
-    page.click("#pill")
-    page.select_option("#grpsel", "Aves")
+    assert page.inner_text("#bwhat b") == "All groups"
+    page.click("#bwhat")
+    page.locator("#groups .gb", has_text="Birds").first.click()
     page.wait_for_function("location.hash.includes('groups=Aves')")
-    page.click("#ssheet .sdone")
-    assert page.locator("#ssheet").is_hidden() and page.inner_text("#pwhat") == "Aves"
+    assert page.inner_text("#bwhat b") == "Birds"
     assert page.errors == []
 
 

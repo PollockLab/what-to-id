@@ -114,19 +114,18 @@ def test_the_group_control_sets_the_groups_filter(browser, site):
     base, pts = site
     page = ib.open_identify(browser, base, "#lvl=1")
     page.wait_for_function("__identify.ids().length > 0")
-    assert page.locator("#grpsel").input_value() == ""
-    reveal(page, "#grpsel")
-    page.select_option("#grpsel", "Aves")
+    page.click("#bwhat")
+    page.locator("#groups .gb", has_text="Birds").first.click()
     want = sorted(pts.loc[pts["iconic_taxon"] == "Aves", "id"].tolist())
     page.wait_for_function(f"__identify.ids().length === {len(want)}")
     assert ib.ids(page) == want and "groups=Aves" in page.evaluate("location.hash")
-    page.select_option("#grpsel", "")
+    page.click("#gall")
     page.wait_for_function(f"__identify.ids().length === {len(pts)}")
     assert "groups=" not in page.evaluate("location.hash")
     page.goto(f"{base}/identify.html#lvl=1&groups=Aves,-Insecta")
     page.reload()
     page.wait_for_function("window.__identify && __identify.ids().length > 0")
-    assert page.locator("#grpsel").input_value() == "*"
+    assert page.inner_text("#bwhat b") == "Birds, not Insects"
     assert page.errors == []
 
 

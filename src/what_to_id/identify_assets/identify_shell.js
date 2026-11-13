@@ -1,5 +1,5 @@
-// The page's chrome around the modules' own controls: the search pill opens What, When and Where in a sheet, the Filters
-// button the Range, Confidence, Sort, Research Grade, By species and User controls in another. Each filter away from its
+// The page's chrome around the modules' own controls: the Filters button opens the Range, Confidence, Sort, Research Grade,
+// By species and User controls in a sheet (the search bar, identify_bar.js, holds What, When and Where). Each filter away from its
 // default (its hash key present) shows as a chip with a remove button, and the Filters button counts them. The result
 // line counts the cards from the batch caption (which becomes its title) and holds the batch links in a popover.
 // A help sheet holds the page notes, totals, progress, the level description and the keys.
@@ -35,13 +35,6 @@ function chips(){
     x.appendChild(cross());x.onclick=function(){clear(f);chips();$('fbtn').focus();};c.appendChild(x);return c;}));
   n.hidden=!a.length;n.textContent=a.length;$('fbtn').setAttribute('aria-label','Filters'+(a.length?', '+a.length+' on':''));
 }
-function pill(){
-  var g=$('grpsel'),w=$('when'),x=document.querySelector('#wwhen button');
-  $('pwhat').textContent=g&&g.selectedIndex>=0&&!$('grp').hidden?g.options[g.selectedIndex].text:'All groups';
-  $('pwhen').textContent=w&&w.selectedIndex>=0?w.options[w.selectedIndex].text:'Any time';
-  $('pwhere').textContent=x?'Map area':'Anywhere';
-  $('pill').setAttribute('aria-label','Search: '+$('pwhat').textContent+', '+$('pwhen').textContent+', '+$('pwhere').textContent);
-}
 function count(){
   var cap=$('cap').textContent,m=/^[\d,.\s ]+/.exec(cap),n=$('none').hidden?(m?m[0].trim():''):'0';
   var st=$('status').textContent;  // loading and load errors stay in sight while the totals sit in the help sheet
@@ -53,7 +46,7 @@ function sheets(){
   [].forEach.call(document.querySelectorAll('dialog.sheet'),function(d){
     [].forEach.call(d.querySelectorAll('.shx,.sdone'),function(b){b.onclick=function(){d.close();};});
     d.addEventListener('click',function(e){if(e.target===d)d.close();});  // a click on the backdrop
-    d.addEventListener('close',function(){pill();chips();});
+    d.addEventListener('close',chips);
     d.addEventListener('keydown',function(e){  // Tab wraps inside, where a modal alone would let it out to the browser
       if(e.key!=='Tab')return;
       var f=[].filter.call(d.querySelectorAll('button,select,input,a[href],summary,[tabindex="0"]'),function(x){return x.offsetParent&&!x.disabled;});
@@ -65,12 +58,12 @@ function sheets(){
   $('fclear').onclick=function(){on().forEach(clear);chips();};
 }
 function start(){
-  sheets();pill();chips();count();
-  var mo=new MutationObserver(function(){pill();chips();count();});
+  sheets();chips();count();
+  var mo=new MutationObserver(function(){chips();count();});
   ['cap','status'].forEach(function(id){mo.observe($(id),{childList:true,characterData:true,subtree:true});});
-  ['none','batch','fsheet','ssheet'].forEach(function(id){mo.observe($(id),{attributes:true,subtree:true,attributeFilter:['hidden','aria-checked']});});
-  document.addEventListener('change',function(){pill();chips();});
-  addEventListener('hashchange',function(){pill();chips();});
+  ['none','batch','fsheet'].forEach(function(id){mo.observe($(id),{attributes:true,subtree:true,attributeFilter:['hidden','aria-checked']});});
+  document.addEventListener('change',chips);
+  addEventListener('hashchange',chips);
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
 })();

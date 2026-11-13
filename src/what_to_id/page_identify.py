@@ -65,6 +65,10 @@ SCRIPTS = {
     "__MAP_CHIPS__": HERE / "map_assets" / "map_chips.js",
     "__IDENTIFY_LINKS__": HERE / "map_assets" / "identify_links.js",
     "__MAP_AREA__": HERE / "map_assets" / "map_area.js",
+    "__TAXON_TREE__": HERE / "embeddings_assets" / "taxon_tree.js",
+    "__GROUP_LIST__": HERE / "map_assets" / "group_list.js",
+    "__MAP_HIST__": HERE / "map_assets" / "map_hist.js",
+    "__MAP_TIME__": HERE / "map_assets" / "map_time.js",
     "__MAP_FILTER__": HERE / "map_assets" / "map_filter.js",
     "__EMBEDDINGS_LAYOUT__": HERE / "embeddings_assets" / "embeddings_layout.js",
     "__FETCH_ONCE__": HERE / "site_assets" / "fetch_once.js",
@@ -81,6 +85,7 @@ SCRIPTS = {
     "__IDENTIFY_PROGRESS__": ASSETS / "identify_progress.js",
     "__IDENTIFY_FLOW__": ASSETS / "identify_flow.js",
     "__IDENTIFY_CARD__": ASSETS / "identify_card.js",
+    "__IDENTIFY_BAR__": ASSETS / "identify_bar.js",
     "__IDENTIFY_SHELL__": ASSETS / "identify_shell.js",
     "__IDENTIFY_APP__": ASSETS / "identify_app.js",
 }
@@ -125,8 +130,11 @@ def render(
         "__SITE_CSS__": page_nav.CSS,
         "__SITE_NAV__": page_nav.nav(PAGE_NAME),
         "__IDENTIFY_RANGES_CSS__": (ASSETS / "identify_ranges.css").read_text().rstrip(),
+        "__MAP_AREA_CSS__": (HERE / "map_assets" / "map_area.css").read_text().rstrip(),
+        "__MAP_PANELS_CSS__": (HERE / "map_assets" / "map_panels.css").read_text().rstrip(),
         "__IDENTIFY_UI_CSS__": (ASSETS / "identify_ui.css").read_text().rstrip(),
         "__IDENTIFY_SHELL_CSS__": (ASSETS / "identify_shell.css").read_text().rstrip(),
+        "__IDENTIFY_BAR_CSS__": (ASSETS / "identify_bar.css").read_text().rstrip(),
         "__CONFIG__": json.dumps(
             {
                 "mapUrl": map_url,

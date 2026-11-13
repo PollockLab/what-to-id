@@ -96,7 +96,7 @@ ol{list-style:none;margin:8px 0;padding:0;display:grid;gap:10px;
 button.padd{cursor:pointer;background:var(--chip)}
 #usrbox p{margin:4px 0}
 /* Batches (the study): its box replaces the level's controls and cards */
-body:not(.bt) #study,.bt #status:not(.err),.bt #unpick,.bt #desc,.bt #kind,.bt .usr,.bt #rout,.bt #rg,.bt #grp,.bt #sort,.bt #hint,.bt #panel{display:none!important}
+body:not(.bt) #study,.bt #status:not(.err),.bt #unpick,.bt #desc,.bt #kind,.bt .usr,.bt #rout,.bt #rg,.bt #sort,.bt #hint,.bt #panel{display:none!important}
 .srow{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:8px 0}
 .srow select{font:inherit;min-height:30px;padding:0 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink)}
 .btn:is(button){font:inherit;font-size:13px;font-weight:650;border:0;cursor:pointer}
@@ -130,24 +130,43 @@ body:not(.bt) #study,.bt #status:not(.err),.bt #unpick,.bt #desc,.bt #kind,.bt .
 #cpt{order:1;flex-basis:100%;height:1.4em;line-height:1.4em;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}  /* its own reserved line, so the toast never moves Identify */
 .cpbar .copy{font:inherit;font-size:13px;min-height:30px;padding:0 10px;border:1px solid var(--line);border-radius:15px;background:var(--chip);color:var(--ink);cursor:pointer}
 __IDENTIFY_RANGES_CSS__
+__MAP_AREA_CSS__
+__MAP_PANELS_CSS__
 __IDENTIFY_UI_CSS__
 __IDENTIFY_SHELL_CSS__
+__IDENTIFY_BAR_CSS__
 </style></head><body>
 __SITE_NAV__<main id="main-content">
 <h1>Identify</h1>
 <p><button type="button" id="unpick" class="more" hidden>Clear the species filter</button></p>
 <div id="tabs" class="tabs" role="tablist" aria-label="Level"></div>
 <div id="kind" class="rout" hidden></div>
-<div id="bar" class="bar"><button type="button" id="pill" class="pill" aria-haspopup="dialog" aria-controls="ssheet">
-<span class="seg1"><small>What</small><b id="pwhat">All groups</b></span><span class="seg1"><small>When</small><b id="pwhen">Any time</b></span>
-<span class="seg1"><small>Where</small><b id="pwhere">Anywhere</b></span><span class="pgo"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M16 16l4 4"/></svg></span></button></div>
+<div id="bar" class="bar"><div class="bseg" role="group" aria-label="What, when, where">
+<button type="button" id="bwhat" class="seg1" aria-expanded="false" aria-controls="pwhat" disabled><small>What</small><b>All groups</b></button>
+<div id="pwhat" class="bpanel" role="group" aria-label="What" hidden>
+<div class="picker"><label for="q" class="vh">Find a taxon</label><input id="q" type="search" placeholder="Latin or common name, e.g. Carex" autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="sugg">
+<ul id="sugg" class="sugg" role="listbox" aria-label="Matching taxa" hidden></ul></div><p id="qn" class="muted" aria-live="polite"></p>
+<p id="mine" class="mine" role="status" hidden>Your groups <button type="button" class="link">Show all</button></p>
+<p class="muted"><button type="button" id="gall" class="link">All groups</button> <button type="button" id="gkeep" class="link" hidden></button></p>
+<span id="gbar" class="gbar" role="img" aria-label="No records in view"></span>
+<ul id="groups" class="gl" role="list" aria-label="Taxon groups"></ul></div>
+<button type="button" id="bwhen" class="seg1" aria-expanded="false" aria-controls="pwhen" disabled><small>When</small><b>Any time</b></button>
+<div id="pwhen" class="bpanel" role="group" aria-label="When" hidden>
+<div class="row"><span class="tseg" role="group" aria-label="Date to filter on"><button type="button" id="byObs" aria-pressed="true">Observed</button><button type="button" id="byUp" aria-pressed="false">Uploaded</button></span>
+<span id="presets" class="chips" role="group" aria-label="Periods"></span></div>
+<div class="row"><span class="dates"><input id="from" type="date" aria-label="From"> to <input id="to" type="date" aria-label="To"></span></div>
+<div class="row"><span id="months" class="chips months" role="group" aria-label="Months of the year"></span><button type="button" id="mclear" class="link">Any month</button></div>
+<div class="histwrap"><canvas id="over" role="img" aria-label="Records per year, every year, on a log scale. Click a year to zoom to it."></canvas><p id="unit" class="unit"></p><canvas id="hist" role="img"></canvas><div id="htip" class="htip" hidden></div></div></div>
+<button type="button" id="bwhere" class="seg1" aria-expanded="false" aria-controls="pwhere" disabled><small>Where</small><b>Anywhere</b></button>
+<div id="pwhere" class="bpanel" role="group" aria-label="Where" hidden>
+<p class="muted wnote">Drawing needs the map. <a id="wmap" href="explore.html?view=map">Draw an area on the map</a>, or load a file or find a park here.</p></div>
+</div></div>
 <div id="qrow" class="qrow"><button type="button" id="fbtn" class="qchip" aria-haspopup="dialog" aria-controls="fsheet">
 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M7 12h10M10 17h4"/></svg> Filters <span id="fcount" class="fcount" hidden></span></button>
 <span class="vr" aria-hidden="true"></span><span id="qchips" class="qchips"></span><span id="chips" class="qchips"></span></div>
-<dialog id="ssheet" class="sheet" aria-labelledby="ssh"><div class="shead"><h2 id="ssh">What, when, where</h2>
-<button type="button" class="shx" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><div class="sbody">
-<div class="ctl"><div id="grp" class="rout" hidden><label for="grpsel">What </label><select id="grpsel" class="padd"></select></div></div>
-<div id="wwhen" class="ctl"></div></div><div class="sfoot"><span></span><button type="button" class="btn sdone">Show <span class="n">0</span> cards</button></div></dialog>
+<dialog id="bsheet" class="sheet" aria-labelledby="bsh"><div class="shead"><h2 id="bsh">What, when, where</h2>
+<button type="button" class="shx" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><div class="sbody"></div>
+<div class="sfoot"><span></span><button type="button" class="btn sdone">Show <span class="n">0</span> cards</button></div></dialog>
 <dialog id="fsheet" class="sheet" aria-labelledby="fsh"><div class="shead"><h2 id="fsh">Filters</h2>
 <button type="button" class="shx" aria-label="Close filters"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><div class="sbody">
 <section class="ssec"><h3>Range</h3><div id="rout" class="rout" hidden></div></section>
@@ -228,6 +247,8 @@ The login goes only to iNaturalist.</p></details>
 <script>__MAP_TAXA__</script>
 <script>__MAP_CHIPS__</script>
 <script>__IDENTIFY_LINKS__</script>
+<script>__TAXON_TREE__</script>
+<script>__GROUP_LIST__</script>
 <script>__MAP_AREA__</script>
 <script>__MAP_FILTER__</script>
 <script>__FETCH_ONCE__</script>
@@ -244,6 +265,9 @@ The login goes only to iNaturalist.</p></details>
 <script>__IDENTIFY_CARD__</script>
 <script>__IDENTIFY_GAPS__</script>
 <script>__IDENTIFY_WWW__</script>
+<script>__MAP_HIST__</script>
+<script>__MAP_TIME__</script>
+<script>__IDENTIFY_BAR__</script>
 <script>__IDENTIFY_PROGRESS__</script>
 <script>__IDENTIFY_APP__</script>
 <script>__IDENTIFY_SHELL__</script>

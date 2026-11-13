@@ -11,7 +11,7 @@ var MAP=new URL(CFG.mapUrl,location.href).href,nf=new Intl.NumberFormat('en-CA')
 var CARD=IdentifyCard({ref:function(n){return CMP?CMP.ref(n):Promise.resolve(null);}}),TAB=[],SUBK=[],NK=1,KIND=null,SUB=null,KF=0,KC=[],UF=null,UON=false,MINE=[],CMP=null,SEEN='wtid-identify-seen',BT=false,ST=null,SK='',IN=IdentifyInat(CFG.oauth);
 // CFG.merge: the kinds (levels) a tab shows, in order; SUBK a kind's place in its tab
 Object.keys(CFG.merge).forEach(function(t){CFG.merge[t].forEach(function(k,j){TAB[k]=+t;SUBK[k]=j;});NK=Math.max(NK,CFG.merge[t].length);});
-var META=null,SYNC=null,MORE=new Map(),TAXA=null,P=null,BYID=null,LEVEL=null,Q=null,LOOKS=null,WHY=null,WHYF=null,RK=null,N3=0,GP=null,R=null,MF=null,TF=null,PEND=null,REC=-1,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,ONE='',CACHE=new Map(),FIRST=null,SHOWN,STAY=false,X=null,WW=null;
+var META=null,SYNC=null,MORE=new Map(),TAXA=null,P=null,BYID=null,LEVEL=null,Q=null,LOOKS=null,WHY=null,WHYF=null,RK=null,N3=0,GP=null,R=null,MF=null,TF=null,PEND=null,REC=-1,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,ONE='',CACHE=new Map(),FIRST=null,SHOWN,STAY=false,X=null,WW=null,BAR=null;
 function $(id){return document.getElementById(id);}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 function status(t,err){var s=$('status');s.textContent=t;s.classList.toggle('err',!!err);}  // an error shows on Batches too
@@ -22,16 +22,20 @@ function get(url){return fetchOnce(url).then(L.gunzip,function(e){
 
 // The records the selection keeps, 1 each in SEL: MapFilter.keep for the taxa, the group chips' verdict, MapFilter.rest
 // for the dates, months, show only and accuracy, then the area, the map's viewport, the lasso's ids and the User filter.
-function select(){
-  var n=P.n,i;UF.sync(P);
-  SEL=MF.keep(TF,MF.groupSet(S,TF),P.tax,P.grp,n,new Uint8Array(n));
-  var ok=CH.groupPass(S.groups,META.groups,!!TF.inc);
-  for(i=0;i<n;i++)if(!ok[P.grp[i]])SEL[i]=0;
-  MF.rest(S,P.obs,P.up,P.flags,n,SEL);
+// kept(st) is that for the selection st: the search bar counts with one group or date filter left out.
+function kept(st){
+  var n=P.n,i,out=MF.keep(TF,MF.groupSet(st,TF),P.tax,P.grp,n,new Uint8Array(n));
+  var ok=CH.groupPass(st.groups,META.groups,!!TF.inc);
+  for(i=0;i<n;i++)if(!ok[P.grp[i]])out[i]=0;
+  MF.rest(st,P.obs,P.up,P.flags,n,out);
   var I=SpaceMask.areaIndex(AREA),V=SpaceMask.areaIndex(VIEW),m=[I&&SpaceMask.area(I,P),V&&SpaceMask.area(V,P),KEEPIDS&&SpaceMask.ids(KEEPIDS,P),SUBIDS&&SpaceMask.ids(SUBIDS,P)];
-  m.forEach(function(v){if(v)for(var j=0;j<n;j++)SEL[j]&=v[j];});
-  for(i=0;i<n;i++)if(SEL[i]&&UF.drop(i))SEL[i]=0;
+  m.forEach(function(v){if(v)for(var j=0;j<n;j++)out[j]&=v[j];});
+  for(i=0;i<n;i++)if(out[i]&&UF.drop(i))out[i]=0;
+  return out;
 }
+function select(){UF.sync(P);SEL=kept(S);}
+// kept(st) at the chosen level, as the bar's counts and histograms show it
+function atLevel(st){var m=kept(st);for(var i=0;i<P.n;i++)if(m[i]&&(LV?LEVEL[i]!==LV:!LEVEL[i]))m[i]=0;return m;}
 // Per level the kept records best first: each kind of the tab in CFG.merge's
 // order, then the quantized score (a bucket each), newest (highest id) first within a bucket; then at most PER_SPECIES of any one
 // taxon, none cut when the level holds one taxon only. The kind control (KF) keeps one kind of its tab; KC counts the kinds. MORE: for the first card of a cut taxon, how many records it left out.
@@ -233,6 +237,7 @@ function step(d){
 }
 // Draws the chosen level from its first card; STAY (the records replacing the first list) keeps the cards drawn and the scroll.
 function paint(){
+  if(BAR)BAR.update();
   [].forEach.call($('tabs').children,function(t){var on=BT?!t.dataset.lv:+t.dataset.lv===LV;t.setAttribute('aria-selected',on);t.tabIndex=on?0:-1;});
   if(BT){ST.show();return;}
   var x=CFG.levels.filter(function(l){return l[0]===LV;})[0];
@@ -340,21 +345,9 @@ function refresh(){
   status(nf.format(kept)+(VIEW?' in view':' records')+' · '+nf.format(lev)+' ');
   var why=el('a',null,'in a level');why.href='#about';why.onclick=function(e){e.preventDefault();$('about').open=true;$('about').scrollIntoView({block:'nearest'});};
   $('status').append(why,MORE.size?' · '+PER_SPECIES+' per species':'');
-  counts();groups(S.groups);if(WW)WW.sync();$('unpick').hidden=parent!==window||!S.picks.length;
+  counts();if(WW)WW.sync();$('unpick').hidden=parent!==window||!S.picks.length;
   if(!LV)LV=saved()||first();
   paint();
-}
-// The group control: the hash's groups= (MapFilter's S.groups), one group or all; another mix of groups shows as Mixed.
-function groups(st){
-  var s=$('grpsel'),gs=META.groups,inc=CH.picked(st,gs,'inc'),v=CH.any(st)?inc.length===1&&!CH.picked(st,gs,'not').length?inc[0]:'*':'';
-  if(!s.options.length){s.add(new Option('All groups',''));gs.forEach(function(g){s.add(new Option(g,g));});
-    s.onchange=function(){var w=s.value==='*'?'':s.value,t=w?CH.write(CH.read(w,gs),gs):'';track('group');
-      if(MF){S.groups=CH.read(t,gs);}else PEND=sel().split('&').filter(function(x){return x&&!/^groups=/.test(x);}).concat(t?['groups='+t]:[]).join('&');
-      if(parent===window)keep('groups',t);
-      again();SYNC.send();};
-    $('grp').hidden=false;}
-  if(v==='*'&&!s.querySelector('[value="*"]'))s.add(new Option('Mixed (from the map)','*'));
-  s.value=v;
 }
 // The map's viewport moves often: one refresh once it rests for a moment, on a frame.
 function soon(){clearTimeout(T);T=setTimeout(function(){requestAnimationFrame(again);},100);}
@@ -396,14 +389,20 @@ function take(str,withArea){
   TF=TX.filter(TAXA,S.picks);
   if(P)refresh();
 }
-// The User box changed S or finished a load: standalone its part of the hash follows S, then the split view and the cards.
-function user(){
-  var re=/^(user|umode|umin)=/;
-  if(parent===window)history.replaceState(null,'','#'+location.hash.slice(1).split('&').filter(function(x){return x&&!re.test(x);})
-    .concat(MF.write(S).filter(function(x){return re.test(x);})).join('&'));
-  var on=UF.active()||UF.ranked();if(on&&!UON)track('user-'+UF.flags().replace(/,/g,'-'));UON=on;
-  SYNC.send();refresh();
+// The address with the tokens drop() names replaced by add, standalone only: embedded, the split page holds it.
+function rewrite(drop,add){
+  if(parent===window)history.replaceState(null,'','#'+location.hash.slice(1).split('&').filter(function(x){return x&&!drop(x);}).concat(add).join('&'));
 }
+// The bar or the User box changed S: its part of the address follows S, then the split view and the cards.
+function put(){
+  TF=TX.filter(TAXA,S.picks);rewrite(MapFilter.tokens,MF.write(S).filter(MapFilter.tokens));SYNC.send();refresh();
+}
+function user(){
+  var on=UF.active()||UF.ranked();if(on&&!UON)track('user-'+UF.flags().replace(/,/g,'-'));UON=on;
+  put();
+}
+// The Where panel's area changed: its rings select, its hash keys (area, bcpark, park) are the address's.
+function where(rings,h){AREA=rings;rewrite(function(x){return /^(area|park|bcpark)=/.test(x);},h?[h]:[]);refresh();}
 function key(){return MF?MF.write(S).join('&'):PEND||'';}
 function idsOf(){var out=[];for(var i=0;i<P.n;i++)if(SEL[i])out.push(P.id[i]);return out;}
 function inbox(){
@@ -429,11 +428,7 @@ async function load(){
   status('Reading the map data…');
   if(CFG.first)get(new URL(CFG.first,MAP)).then(function(b){if(!MF)firstOf(JSON.parse(new TextDecoder().decode(b)));}).catch(function(){});  // optional
   META=await L.fetchMapMeta(MAP,fetch);
-  if(!MF)groups(CH.read(new URLSearchParams(sel()).get('groups'),META.groups));
-  WW=IdentifyWWW({value:META.value,sel:function(){return MF?key():sel();},taxa:function(){return TAXA;},look:looksOf,redraw:function(){if(P)redraw();},area:function(){return AREA;},
-    set:function(t){if(MF)take(t,false);else{PEND=t;again();}if(parent===window)history.replaceState(null,'','#'+location.hash.slice(1).split('&')
-      .filter(function(x){return x&&!MapFilter.tokens(x);}).concat(t?t.split('&'):[]).join('&'));SYNC.send();},
-    clear:function(){AREA='';['area','park','bcpark'].forEach(function(k){keep(k,'');});refresh();}});
+  WW=IdentifyWWW({value:META.value,taxa:function(){return TAXA;},look:looksOf,redraw:function(){if(P)redraw();}});
   function file(k){var f=META.files[k];return f?get(new URL(f,MAP)):Promise.reject(new Error('the map lists no '+k+' file'));}
   var taxa=get(new URL(META.taxa,MAP)).then(function(b){return JSON.parse(new TextDecoder().decode(b));});
   var shards=Promise.all(META.shards.map(function(s){return get(new URL(s.file,MAP)).then(function(b){return L.decodeShard(b,s.n);});}));
@@ -454,7 +449,9 @@ async function load(){
   var b=META.bbox;UF=userFilter({S:S,meta:META,get:function(f){return get(new URL(f,MAP));},taxa:function(){return TAXA;},changed:user,
     bounds:function(){return {w:b[0],s:b[1],e:b[2],n:b[3]};}});
   CMP=IdentifyCompare({taxa:TAXA,tax:P.tax,look:looksOf,why:whyOf,obs:function(id){return CACHE.get(id);},more:function(){shown+=LIMIT;more();},lend:CARD.lend});
-  MF=MapFilter(META);
+  MF=MapFilter(META);Object.assign(S,MF.read(new URLSearchParams()));  // the defaults, until the address is read
+  BAR=IdentifyBar({S:S,META:META,mf:MF,nf:nf,taxa:function(){return TAXA;},P:function(){return P;},tf:function(){return TF;},mask:atLevel,changed:put,
+    where:where,get:function(u){return get(new URL(u,MAP));},embedded:parent!==window});
   STAY=!!SHOWN;take(location.hash.slice(1),AREA==='');
   if(PEND!==null){take(PEND,false);PEND=null;}
   $('usrbox').open=!!S.user;

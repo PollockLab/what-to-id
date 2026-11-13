@@ -2,7 +2,6 @@
 links to the map, At risk (from the map's list, no request) and Invasive (iNat's BC status) keep
 level 3 cards by their suggestion. iNaturalist is stubbed."""
 
-from datetime import UTC, datetime, timedelta
 from urllib.parse import parse_qs, urlparse
 
 from . import test_embeddings_browser as eb
@@ -92,21 +91,21 @@ def test_at_risk_and_invasive_keep_cards_by_their_suggestions_bc_status(browser,
 def test_when_writes_the_map_filters_dates_and_where_links_to_the_map(browser, site):
     base, pts = site
     page = open_row(browser, base, "#lvl=3")
-    assert page.locator("#when").input_value() == ""
-    reveal(page, "#when")
-    page.select_option("#when", "90")
-    since = (datetime.now(UTC) - timedelta(days=90)).date().isoformat()
+    page.click("#bwhen")
+    page.locator("#presets button", has_text="Last 30 days").click()
+    since = page.input_value("#from")  # a preset counts back from the data's last day
     assert f"from={since}" in page.evaluate("location.hash")
     want = {i for i, d in zip(pts["id"], ib.day(pts), strict=True) if d.date().isoformat() >= since}
     assert set(page.evaluate("__identify.ids()")) <= want
-    page.select_option("#when", "")
+    page.locator("#presets button", has_text="All dates").click()
     assert "from=" not in page.evaluate("location.hash")
-    link = page.locator("a", has_text="Anywhere")
-    assert link.get_attribute("href").startswith("explore.html?view=map#")
-    page.goto(f"{base}/identify.html#lvl=3&from=2020-01-01&to=2020-02-01")
+    page.keyboard.press("Escape")
+    page.click("#bwhere")
+    assert page.get_attribute("#wmap", "href").startswith("explore.html?view=map")
+    page.goto(f"{base}/identify.html#lvl=3&from=2026-08-05&to=2026-08-20")
     page.reload()
     page.wait_for_function("window.__identify")
-    assert page.locator("#when").input_value() == "c" and page.errors == []
+    assert page.inner_text("#bwhen b") == "2026-08-05 to 2026-08-20" and page.errors == []
 
 
 def test_by_species_runs_each_suggestion_together_under_one_header(browser, site):
@@ -170,17 +169,16 @@ def test_only_level_3_fetches_the_runner_up_file_after_its_cards(browser, site):
     assert [u for u in got if "why" in u.rsplit("/", 1)[-1]]
 
 
-def test_phones_name_the_filters_on_as_chips_and_the_dates_in_the_pill(browser, site):
+def test_phones_name_the_filters_on_as_chips_and_the_dates_in_the_bar(browser, site):
     base, _ = site
     page = browser.new_page(viewport={"width": 390, "height": 800})
     eb.stub_inat(page, None)
     page.goto(f"{base}/identify.html#lvl=3&run=1&from=2026-08-10&to=2026-09-10")
     page.wait_for_function("document.querySelectorAll('#chips .chip').length === 1")
-    assert not page.locator("#when").is_visible()
     assert page.locator("#chips .chip").all_inner_texts() == ["By species"]
-    assert page.inner_text("#pwhen") == "Custom"
-    page.click("#pill")
-    assert page.locator("#when").is_visible()
+    page.wait_for_function(
+        "document.querySelector('#bwhen b').textContent === '2026-08-10 to 2026-09-10'"
+    )
 
 
 def test_ten_improving_ids_turn_the_bar_green_with_the_oauth_link(browser, site):
