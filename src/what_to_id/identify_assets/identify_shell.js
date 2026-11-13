@@ -1,5 +1,5 @@
-// The page's chrome around the modules' own controls: the Filters button opens the Range, Confidence, Sort, Research Grade,
-// By species and User controls in a sheet (the search bar, identify_bar.js, holds What, When and Where). Each filter away from its
+// The page's chrome around the modules' own controls: the Filters button opens the Range, Confidence, Sort, Research Grade
+// and User controls in a sheet (the search bar, identify_bar.js, holds What, When and Where). Each filter away from its
 // default (its hash key present) shows as a chip with a remove button, and the Filters button counts them. The result
 // line counts the cards from the batch caption (which becomes its title).
 // A help sheet holds the page notes, totals, progress, the level description and the keys.
@@ -12,18 +12,16 @@ function has(k){return new RegExp('(^|&)'+k+'=').test(location.hash.slice(1));}
 var NS='http://www.w3.org/2000/svg';
 function cross(){var s=document.createElementNS(NS,'svg'),p=document.createElementNS(NS,'path');s.setAttribute('viewBox','0 0 24 24');
   s.setAttribute('aria-hidden','true');p.setAttribute('d','M6 6l12 12M18 6L6 18');s.appendChild(p);return s;}
-// a filter: its hash key, and where its control is (a segmented row, or the By species box)
-var F=[['out','#rout .seg'],['conf','#sort .seg[aria-label=Confidence]'],['sort','#sort .seg[aria-label=Sort]'],['rg','#rg .seg'],['run','#frun input']];
+// a filter: its hash key, and where its control is (a segmented row)
+var F=[['out','#rout .seg'],['conf','#sort .seg[aria-label=Confidence]'],['sort','#sort .seg[aria-label=Sort]'],['rg','#rg .seg']];
 function label(f){
   var c=document.querySelector(f[1]);if(!c)return null;
-  if(c.tagName==='INPUT')return c.parentNode.textContent.trim();
   return c.getAttribute('aria-label')+': '+[].filter.call(c.children,function(b){return b.getAttribute('aria-checked')==='true';})
     .map(function(b){return b.textContent;}).join(' + ');
 }
-// back to the default: the box unticked, a radio row's options tried in order until the key leaves the hash, a checkbox row all on
+// back to the default: a radio row's options tried in order until the key leaves the hash, a checkbox row all on
 function clear(f){
   var c=document.querySelector(f[1]);if(!c)return;
-  if(c.tagName==='INPUT'){c.click();return;}
   [].some.call(c.children,function(b){
     if(c.getAttribute('role')==='group'?b.getAttribute('aria-checked')==='false':true)b.click();return !has(f[0]);});
 }
@@ -33,6 +31,7 @@ function chips(){
   box.replaceChildren.apply(box,a.map(function(f){
     var t=label(f),c=el('span','chip',t+' '),x=el('button','chipx');x.type='button';x.setAttribute('aria-label','Remove '+t);
     x.appendChild(cross());x.onclick=function(){clear(f);chips();$('fbtn').focus();};c.appendChild(x);return c;}));
+  var g=has('run')&&!$('sort').hidden;$('sortb').firstChild.textContent='Sort'+(g?' · grouped':'')+' ';
   n.hidden=!a.length;n.textContent=a.length;$('fbtn').setAttribute('aria-label','Filters'+(a.length?', '+a.length+' on':''));
 }
 function count(){

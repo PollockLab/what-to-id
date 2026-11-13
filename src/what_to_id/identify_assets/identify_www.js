@@ -1,4 +1,4 @@
-// The At risk, Invasive and By species toggles. At risk and Invasive (hash risk=1, inv=1) keep
+// The At risk, Invasive and Group by suggested species toggles. At risk and Invasive (hash risk=1, inv=1) keep
 // level 3 cards by their suggested species: At risk from the map's META.value list (at_risk_bc_taxa.json, listed in Canada
 // or BC S1-S3), at once; Invasive when iNaturalist marks it introduced in BC, from /v1/taxa/<ids>?preferred_place_id=7085
 // (30 ids a request), cached by taxon id for a week. A suggestion not yet looked up is hidden until its answer lands.
@@ -44,9 +44,9 @@ return function(ctx){
     b.onchange=function(){keep(k,b.checked);sync();ctx.redraw();};l.append(b,' '+label);return l;
   }
   function sync(){need=(on('risk')?RISK:0)|(on('inv')?INV:0);}
-  // At risk and Invasive are one-tap chips under the search bar; By species sits in the Filters sheet
+  // At risk and Invasive are one-tap chips under the search bar; the grouping toggle sits with Sort
   var risk_=toggle('risk','At risk'),inv_=toggle('inv','Invasive');risk_.className=inv_.className='tog qchip';
-  $('qchips').append(risk_,inv_);$('frun').append(toggle('run','By species'));
+  $('qchips').append(risk_,inv_);$('frun').append(toggle('run','Group by suggested species'));
   sync();
   return {pass:pass,sync:sync,active:function(){return on('risk')||on('inv');}};
 };

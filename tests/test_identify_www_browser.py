@@ -117,8 +117,26 @@ def test_by_species_runs_each_suggestion_together_under_one_header(browser, site
     assert heads == blocks and page.locator("#grid .sep.run").first.locator("img").count() == 1
     assert "; all per suggested species)" in page.inner_text("#cap")
     reveal(page, "#frun input")
-    page.get_by_role("checkbox", name="By species").uncheck()
+    page.get_by_role("checkbox", name="Group by suggested species").uncheck()
     page.wait_for_function("!document.querySelector('#grid .sep.run')")
+    assert page.errors == []
+
+
+def test_group_by_species_lives_in_sort_on_level_3_and_is_not_a_filter(browser, site):
+    base, _ = site
+    page = open_row(browser, base, "#lvl=3&conf=all")
+    reveal(page, "#frun input")
+    box = page.get_by_role("checkbox", name="Group by suggested species")
+    box.check()
+    page.wait_for_selector("#grid .sep.run", state="attached")
+    assert "run=1" in page.evaluate("location.hash")
+    assert "species" not in " ".join(page.locator("#chips .chip").all_inner_texts()).lower()
+    assert page.inner_text("#fcount") == "1"  # conf=all only
+    assert "grouped" in page.inner_text("#sortb")
+    page.keyboard.press("Escape")
+    page.click("#tab1")
+    page.wait_for_function("document.querySelector('#sort').hidden")
+    assert not page.locator("#frun input").is_visible() and "grouped" not in page.inner_text("#sortb")
     assert page.errors == []
 
 
@@ -172,8 +190,8 @@ def test_phones_name_the_filters_on_as_chips_and_the_dates_in_the_bar(browser, s
     page = browser.new_page(viewport={"width": 390, "height": 800})
     eb.stub_inat(page, None)
     page.goto(f"{base}/identify.html#lvl=3&run=1&from=2026-08-10&to=2026-09-10")
-    page.wait_for_function("document.querySelectorAll('#chips .chip').length === 1")
-    assert page.locator("#chips .chip").all_inner_texts() == ["By species"]
+    page.wait_for_function("document.querySelector('#sortb').textContent.includes('grouped')")
+    assert page.locator("#chips .chip").count() == 0
     page.wait_for_function(
         "document.querySelector('#bwhen b').textContent === '2026-08-10 to 2026-09-10'"
     )
