@@ -119,3 +119,33 @@ def test_by_species_runs_each_suggestion_together_under_one_header(browser, site
     page.uncheck("text=By species")
     page.wait_for_function("!document.querySelector('#grid .sep.run')")
     assert page.errors == []
+
+
+def test_progress_counts_cards_opened_today_and_a_logins_improving_ids(browser, site):
+    base, _ = site
+    page = browser.new_page(viewport={"width": 600, "height": 900})
+    page.errors = []
+    page.on("pageerror", lambda e: page.errors.append(str(e)))
+    page.add_init_script("window.open = () => ({focus() {}});")
+    eb.stub_inat(page, None)
+    asked = []
+
+    def ids(route):
+        asked.append(parse_qs(urlparse(route.request.url).query))
+        route.fulfill(json={"total_results": 4}, headers={"access-control-allow-origin": "*"})
+
+    page.route("**/v1/identifications?*", ids)
+    page.goto(f"{base}/identify.html#lvl=3&me=someone")
+    page.wait_for_selector("#grid .card .look")
+    page.wait_for_function("document.getElementById('prog').textContent.includes('4/10')")
+    q = asked[0]
+    assert q["user_id"] == ["someone"] and q["category"] == ["improving"]
+    assert q["own_observation"] == ["false"] and q["per_page"] == ["1"]
+    assert "0 opened today" in page.inner_text("#prog")
+    page.keyboard.press("j")
+    page.keyboard.press("i")
+    page.wait_for_function("document.getElementById('prog').textContent.includes('1 opened today')")
+    page.reload()
+    page.wait_for_selector("#grid .card .look")
+    assert "1 opened today" in page.inner_text("#prog") and len(asked) == 1  # cached
+    assert page.errors == []

@@ -78,6 +78,7 @@ SCRIPTS = {
     "__IDENTIFY_NARROW__": ASSETS / "identify_narrow.js",
     "__IDENTIFY_GAPS__": ASSETS / "identify_gaps.js",
     "__IDENTIFY_WWW__": ASSETS / "identify_www.js",
+    "__IDENTIFY_PROGRESS__": ASSETS / "identify_progress.js",
     "__IDENTIFY_FLOW__": ASSETS / "identify_flow.js",
     "__IDENTIFY_APP__": ASSETS / "identify_app.js",
 }

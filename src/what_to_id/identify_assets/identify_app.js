@@ -474,7 +474,7 @@ async function load(){
 }
 var KD=/(?:^|&)kind=(\d)/.exec(location.hash.slice(1));KF=KD&&TAB[+KD[1]]?+KD[1]:0;
 function start(){
-  tabs();inbox();IdentifyFlow.keys({level:function(){return BT?0:LV;},more:function(){shown+=LIMIT;more();}});
+  tabs();inbox();IdentifyProgress($('prog'));IdentifyFlow.keys({level:function(){return BT?0:LV;},more:function(){shown+=LIMIT;more();}});
   if(CFG.study){
     ST=IdentifyStudy.tab({data:CFG.study,draw:drawIds,count:function(t){$('tabb').lastChild.textContent=t;},
       active:function(){return BT;},track:function(n){track('study-'+n);}});

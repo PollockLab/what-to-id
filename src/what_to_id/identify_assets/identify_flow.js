@@ -16,7 +16,8 @@ function link(a,then){
 }
 // a card done with: Opened or Skipped, kept across redraws
 function mark(li,text){
-  text=text||'Opened';DONE.set(li.dataset.id,text);li.classList.add('done');
+  text=text||'Opened';DONE.set(li.dataset.id,text);
+  if(text==='Opened')document.dispatchEvent(new CustomEvent('wtid-opened',{detail:li.dataset.id}));li.classList.add('done');
   var b=li.querySelector('.opened');if(b){if(text==='Opened')b.textContent=text;return;}
   li.insertBefore(el('div','badge opened',text),li.querySelector('.when'));
 }
