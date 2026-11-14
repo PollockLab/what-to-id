@@ -415,6 +415,11 @@ def test_the_batch_links_cover_the_listed_ids(browser, site):
     assert page.get_attribute("#go", "href") != first and page.locator("#prev").is_enabled()
     page.click("#next")
     assert page.locator("#go").inner_text() == "Identify this record on iNaturalist"
+    # one record skips the Identify grid: its own page, at the ID form
+    assert re.fullmatch(
+        r"https://www\.inaturalist\.ca/observations/\d+#comment-id-tabs",
+        page.get_attribute("#go", "href"),
+    )
     assert page.locator("#bn").inner_text() == "Batch 3 of 3"
     assert page.locator("#next").is_disabled()
     assert page.errors == []

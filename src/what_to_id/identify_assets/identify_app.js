@@ -8,6 +8,8 @@
 'use strict';
 var CFG=IDENTIFY_CONFIG,L=EmbeddingsLayout,Meta=AtlasSearchMeta,PER_SPECIES=3,LIMIT=12,STEPS=16,NO_LOOK=65535,NOTAX=65535,LS='wtid-identify-tab',IO=null,T=0,TK=0,AB=null;
 var MAP=new URL(CFG.mapUrl,location.href).href,nf=new Intl.NumberFormat('en-CA'),OBS='https://www.inaturalist.ca/observations/';
+// one record opens its own page at the ID form; iNat's Identify grid would need a click on the tile first
+function one(id){return OBS+id+'#comment-id-tabs';}
 var CARD=IdentifyCard({ref:function(n){return CMP?CMP.ref(n):Promise.resolve(null);}}),TAB=[],SUBK=[],NK=1,KIND=null,SUB=null,KF=0,KC=[],UF=null,UON=false,MINE=[],CMP=null,BT=false,ST=null,SK='',IN=IdentifyInat(CFG.oauth);
 // CFG.merge: the kinds (levels) a tab shows, in order; SUBK a kind's place in its tab
 Object.keys(CFG.merge).forEach(function(t){CFG.merge[t].forEach(function(k,j){TAB[k]=+t;SUBK[k]=j;});NK=Math.max(NK,CFG.merge[t].length);});
@@ -120,7 +122,7 @@ function card(i,lv,id){
   var li=el('li','card'),det=el('div','det'),ph=el('div','ph','Loading photo'),w=el('a','when','Date and place…'),a=el('a','btn','Identify');
   li.dataset.id=id;li.tabIndex=0;
   w.href=OBS+id;IdentifyFlow.link(w);
-  a.href=IdentifyLinks.batches([id])[0].url;a.setAttribute('aria-label','Identify this record on iNaturalist');
+  a.href=one(id);a.setAttribute('aria-label','Identify this record on iNaturalist');
   li.append(CARD.car(ph),i<0?el('div','title'):title(i,lv),w);
   if(i>=0){li.dataset.i=i;li.dataset.lv=lv;}
   if(i>=0&&!BT){
@@ -226,7 +228,7 @@ function batch(){
 function step(d){
   BI=Math.max(0,Math.min(LINKS.length-1,BI+d));
   var b=LINKS[BI];
-  if(b){$('go').href=b.url;$('go').textContent=ONE&&LINKS.length<2?ONE:b.n===1?'Identify this record on iNaturalist':'Identify these '+nf.format(b.n)+' on iNaturalist';}
+  if(b){$('go').href=b.n===1?one(b.lo):b.url;$('go').textContent=ONE&&LINKS.length<2?ONE:b.n===1?'Identify this record on iNaturalist':'Identify these '+nf.format(b.n)+' on iNaturalist';}
   $('bn').textContent=LINKS.length>1?'Batch '+(BI+1)+' of '+LINKS.length:'';
   $('prev').hidden=$('next').hidden=LINKS.length<2;
   $('prev').disabled=BI===0;$('next').disabled=BI>=LINKS.length-1;

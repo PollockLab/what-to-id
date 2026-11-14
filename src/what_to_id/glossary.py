@@ -11,8 +11,9 @@ SURVEY_DAYS_TARGET = 30
 
 GLOSSARY: dict[str, tuple[str, str | None]] = {
     "identify-keys": (
-        "Click or tap a card to compare. On a keyboard, Enter opens iNat with the name copied,"
-        " j and k go to the next and previous card, s skips and u undoes.",
+        "Click or tap a card to compare. On a keyboard, Enter opens iNat with the name copied"
+        " (press i there to suggest an ID), j and k go to the next and previous card, s skips"
+        " and u undoes.",
         None,
     ),
     "needs-id": (
