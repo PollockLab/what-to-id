@@ -181,8 +181,8 @@ return function(ctx){
   function open(li,quiet){
     if(!box)build();
     cur=li;var all=cards(),t=named(li),c=box.querySelector('#cpc'),nm=li.querySelector('.title i');
-    var h=box.querySelector('#cphead');h.replaceChildren(el('i',null,nm?nm.textContent:'Record'));
-    if(t&&li.dataset.lv!=='1')h.append(' → ',el('i',null,t[0]),'?');
+    var h=box.querySelector('#cphead');h.replaceChildren(nm?I18N.nm(nm.textContent):el('i',null,'Record'));
+    if(t&&li.dataset.lv!=='1')h.append(' → ',I18N.nm(t[0]),'?');
     box.querySelector('#cpat').textContent=(all.indexOf(li)+1)+' of '+all.length+' shown';
     box.querySelector('#cplive').textContent=(all.indexOf(li)+1)+' of '+all.length+', '+(nm?nm.textContent:'Record')+(t&&li.dataset.lv!=='1'?' to '+t[0]:'');
     c.replaceChildren();if(t)c.append(IdentifyNarrow.copy(t[0]));

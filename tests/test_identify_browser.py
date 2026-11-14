@@ -256,7 +256,7 @@ def test_the_selection_changes_what_the_cards_show(browser, site):
 
 
 def test_the_page_names_the_narrowing_group_from_one_constant_and_has_the_header():
-    html = page_identify.render()
+    html = page_identify.render().replace((page_identify.ASSETS / "identify_fr.js").read_text(), "")
     assert html.count(page_identify.NARROW_LABEL) == 2  # the config and the About, both from it
     template = (page_identify.ASSETS / page_identify.PAGE_NAME).read_text()
     assert page_identify.NARROW_LABEL not in template

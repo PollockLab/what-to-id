@@ -39,7 +39,7 @@ return function(ctx){
   function row(t,role,i){
     var c=el('section','cpref'),head=el('div','cphead'),h=el('h3'),tools=el('div','cptools'),body=el('div','cprow'),ph=strip(t,role),a,
       g=gist(t.wikipedia_summary),m=el('div','cpmap'),cv=el('canvas'),cap=el('p','cpmapcap');
-    h.append(el('span','muted',role+' '),el('i',null,t.name));if(t.preferred_common_name)h.append(' ',el('span','muted',t.preferred_common_name));
+    h.append(el('span','muted',role+' '),I18N.nm(t.name,t.preferred_common_name));if(t.preferred_common_name&&I18N.names==='both')h.append(' ',el('span','muted',t.preferred_common_name));
     if(t.id){a=el('a',null,T.taxonPage);a.href=TAXON+t.id;ctx.link(a);a.setAttribute('aria-label',T.taxonPageOf(t.name));tools.append(IdentifyNarrow.copy(t.name),a);}
     if(ph[1])tools.prepend(el('span','muted cpn',T.photos(ph[1].childElementCount)));
     body.append(ph[0]);m.append(cv,cap);body.append(m);

@@ -4,7 +4,7 @@
 // IdentifyUnconfirmed(ctx), ctx {P, taxa (the TAXA table), ranks, area() the area string, redraw()}. Needs map_user.js (inatGate, usrPages).
 var IdentifyUnconfirmed=(function(){
 'use strict';
-var CAP=10,PER=500,HINT='Species with no Research Grade record in this area yet. Your ID could be its first.',nf=new Intl.NumberFormat('en-CA');
+var CAP=10,PER=500,HINT='Species with no Research Grade record in this area yet. Your ID could be its first.',nf=new Intl.NumberFormat(I18N.loc);
 function $(id){return document.getElementById(id);}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 // [swlat, swlng, nelat, nelng] of the area's rings, null for none or a string that does not decode

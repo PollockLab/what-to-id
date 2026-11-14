@@ -62,6 +62,9 @@ GOATCOUNTER_SRI = "sha384-nRw6qfbWyJha9LhsOtSb2YJDyZdKvvCFh0fJYlkquSFjUxp9FVNugb
 INAT_CLIENT_ID = ""
 INAT_REDIRECT = "https://pollocklab.github.io/what-to-id/identify.html"
 SCRIPTS = {
+    "__IDENTIFY_FR__": ASSETS / "identify_fr.js",
+    "__IDENTIFY_I18N__": ASSETS / "identify_i18n.js",
+    "__IDENTIFY_SETTINGS__": ASSETS / "identify_settings.js",
     "__ATLAS_SEARCH_META__": HERE / "atlas_search_assets" / "atlas_search_meta.js",
     "__MAP_TAXA__": HERE / "map_assets" / "map_taxa.js",
     "__MAP_CHIPS__": HERE / "map_assets" / "map_chips.js",

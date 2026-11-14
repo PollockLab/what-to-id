@@ -10,7 +10,7 @@ var NS='http://www.w3.org/2000/svg';
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 function svg(d){var s=document.createElementNS(NS,'svg'),p=document.createElementNS(NS,'path');s.setAttribute('viewBox','0 0 24 24');
   s.setAttribute('aria-hidden','true');p.setAttribute('d',d);s.appendChild(p);return s;}
-function txt(li,sel){var e=li.querySelector(sel);return e?e.textContent:'';}
+function txt(li,sel){var e=li.querySelector(sel);return e?I18N.raw(e):'';}  // the English the modules wrote, whatever the page language
 return function(ctx){
   var lent=[];
   // the frames in order: the observation, the proposed species, the runner-up, the label
@@ -53,10 +53,10 @@ return function(ctx){
   function face(li,place){
     var t=li.querySelector('.title'),c=li.querySelector('.car');if(!t||!c)return;
     var label=txt(t,'.name i'),look=txt(t,'.look i'),com=txt(t,'.com'),m=/(close call|fair margin|clear margin)$/.exec(txt(t,'.why')),
-      run=t.querySelector('.why i'),old=t.querySelector('.face'),f=el('div','face'),hl=el('div','hl'),from=el('div','from');
+      run=t.querySelector('.why [data-la]'),old=t.querySelector('.face'),f=el('div','face'),hl=el('div','hl'),from=el('div','from');
     if(place!=null)li.dataset.place=place;place=li.dataset.place||'';
-    hl.appendChild(el('i',null,look||label||'Loading…'));if(look)hl.append('?');
-    from.append(look?'from ':'',look?el('i',null,label):com,(look||com)&&place?' · ':'',place);
+    hl.appendChild(look||label?I18N.nm(look||label):el('i',null,'Loading…'));if(look)hl.append('?');
+    from.append(look?'from ':'',look?I18N.nm(label):I18N.names==='common'?'':com,(look||com&&I18N.names!=='common')&&place?' · ':'',place);
     f.append(hl,from);if(old)old.replaceWith(f);else t.append(f);
     var tg=c.querySelector('.tag');tg.hidden=!m;tg.textContent=m?m[1].charAt(0).toUpperCase()+m[1].slice(1):'';
     var r=c.querySelector('.run');

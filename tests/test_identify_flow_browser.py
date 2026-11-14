@@ -292,7 +292,7 @@ def test_one_help_button_shows_the_keys_on_hover_and_opens_the_help_sheet_on_cli
     page = level_3(browser, base)
     assert page.locator("#tip, #keys1").count() == 0  # no banner, no second "?"
     help_ = page.locator("#helpb")
-    assert help_.is_visible() and page.locator(".rline .qicon").count() == 1
+    assert help_.is_visible() and page.locator(".rline .qicon[aria-haspopup]").count() == 1
     help_.hover()
     pop = page.locator("#explain-pop")
     pop.wait_for(state="visible")

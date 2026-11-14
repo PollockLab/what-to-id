@@ -45,7 +45,7 @@ return function(buf,ctx){
   function has(a,c){return c>=0&&(a[c>>3]>>(c&7))&1;}
   // okm_code back to km, already rounded as the page shows it: a coarser step farther out
   function km(i){var c=OKM[i];return c<50?c:c<=95?50+(c-50)*10:c<=105?500+(c-95)*50:1000+(c-105)*100;}
-  function kmText(i){return km(i).toLocaleString('en');}
+  function kmText(i){return km(i).toLocaleString(I18N.loc);}
   function far(i){return OKM[i]!==NONE&&OKM[i]>=OUT_KM;}
   // the suggested species' range holds the record's cell; an unknown range does not, as the suggestion is unchecked
   function fits(i){var a=bits(ctx.look(i));return !!a&&!!has(a,cellOf(i));}
@@ -305,7 +305,7 @@ return function(buf,ctx){
       SEG.setAttribute('aria-label',lv===3?"Records in the suggested species' range":'Records far outside their range');
       [].forEach.call(SEG.children,function(b,k){
         var o=OPTS[k][0],on=o===S.o;
-        b.textContent=(lv===3?FIT_OPTS[k]:OPTS[k][1])+' '+c[o].toLocaleString('en');
+        b.textContent=(lv===3?FIT_OPTS[k]:OPTS[k][1])+' '+c[o].toLocaleString(I18N.loc);
         b.setAttribute('aria-checked',String(on));b.tabIndex=on?0:-1;
         b.disabled=o===1&&!f&&!on;});
     }

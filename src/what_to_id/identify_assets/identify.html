@@ -164,6 +164,9 @@ __SITE_NAV__<main id="main-content">
 <div class="sfoot"><span></span><button type="button" class="btn sdone">Show <span class="n">0</span> cards</button></div></dialog>
 <div id="sortpop" popover class="pop sortpop" aria-labelledby="sorth"><h2 id="sorth">Prioritize</h2><div id="rout" class="rout qseg" hidden><span class="qlbl">Range</span></div><div id="sorto" class="rout"></div><hr>
 <div id="frun"></div><div id="pfoot"><a class="lnk" href="terms.html#best-match" target="_blank">How this works</a><button type="button" id="pshow" class="segb"></button></div></div>
+<div id="setpop" popover class="pop setpop" aria-labelledby="seth"><h2 id="seth">Settings</h2>
+<fieldset><legend>Language</legend><label class="segb"><input type="radio" name="lang" value="en">English</label><label class="segb"><input type="radio" name="lang" value="fr">Français</label></fieldset>
+<fieldset><legend>Species names</legend><label class="segb"><input type="radio" name="names" value="latin">Latin</label><label class="segb"><input type="radio" name="names" value="common">Common</label><label class="segb"><input type="radio" name="names" value="both">Both</label></fieldset></div>
 <div id="study" role="region" aria-label="Study batches">
 <div class="srow"><label for="sgroup">Group</label><select id="sgroup"></select>
 <button type="button" id="snext" class="btn" aria-keyshortcuts="n" title="Next batch (N)">Next batch</button>
@@ -177,6 +180,7 @@ __SITE_NAV__<main id="main-content">
 <div id="panel" role="tabpanel">
 <div id="rline" class="rline"><b id="count" aria-live="polite"></b><button type="button" id="helpb" class="qchip qicon" data-explain="identify-keys" aria-haspopup="dialog" aria-controls="help" aria-label="About, notes and keys"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.7M12 17h.01"/></svg></button><span id="today" class="today" hidden></span><span class="sp1"></span>
 <button type="button" id="sortb" class="qchip" popovertarget="sortpop" aria-controls="sortpop" hidden>Prioritize <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></button>
+<button type="button" id="setb" class="qchip qicon" popovertarget="setpop" aria-controls="setpop" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/></svg></button>
 </div>
 <div id="batch" class="batch" hidden><a id="go" class="btn" target="_blank" rel="noopener"></a>
 <span class="nav"><button type="button" id="prev" class="arrow" aria-label="Previous batch">‹</button><span id="bn" class="muted"></span>
@@ -229,6 +233,8 @@ The login goes only to iNaturalist.</p></details>
 </div>
 </main>
 <script>var IDENTIFY_CONFIG=__CONFIG__;</script>
+<script>__IDENTIFY_FR__</script>
+<script>__IDENTIFY_I18N__</script>
 <script>__ATLAS_SEARCH_META__</script>
 <script>__MAP_TAXA__</script>
 <script>__MAP_CHIPS__</script>
@@ -266,5 +272,6 @@ The login goes only to iNaturalist.</p></details>
 <script>__IDENTIFY_BAR__</script>
 <script>__IDENTIFY_PROGRESS__</script>
 <script>__IDENTIFY_APP__</script>
+<script>__IDENTIFY_SETTINGS__</script>
 <script>__IDENTIFY_SHELL__</script>
 </body></html>

@@ -73,7 +73,7 @@ function usrPages(get,cap,per){var out=[];
 // without CORS headers, so it reads as a TypeError) or a 5xx is tried again after 5 and 15 gaps, saying so through
 // say; live() false on a queued request drops it unsent. api(path[, live]) gives the parsed JSON.
 function inatGate(o){var cache={},q=Promise.resolve(),last=0,gap=o.gap==null?1000:o.gap,fetcher=o.fetch||function(u){return fetch(u);};
-  return function(path,live){var url='https://api.inaturalist.org/v1/'+path;if(cache[url])return cache[url];
+  return function(path,live){var url=(typeof I18N!=='undefined'?I18N.api:String)('https://api.inaturalist.org/v1/'+path);if(cache[url])return cache[url];
     function wait(ms){return new Promise(function(r){setTimeout(r,Math.max(0,ms));});}
     function go(n){return wait(last+gap-Date.now()).then(function(){last=Date.now();return fetcher(url);})
       .then(function(r){if(r.status===429||r.status>=500)throw new TypeError('busy');if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
@@ -82,7 +82,7 @@ function inatGate(o){var cache={},q=Promise.resolve(),last=0,gap=o.gap==null?100
     var p=cache[url]=q.then(function(){if(live&&!live())throw 0;return go(0);});  // kept while in flight, so a repeat asks nothing
     q=p.catch(function(){delete cache[url];});return p;};}
 function userFilter(o){
-  var S=o.S,META=o.meta,nf=new Intl.NumberFormat('en-CA'),box=document.getElementById('usrbox'),
+  var S=o.S,META=o.meta,nf=new Intl.NumberFormat((typeof I18N!=='undefined'?I18N.loc:'en-CA')),box=document.getElementById('usrbox'),
     api=inatGate({gap:o.gap,fetch:o.fetch,say:function(t){say(t);}}),cur='',bad=0,run=0,id=0,mask=null,ob=null,hide=null,capT=false,capU=false,key=0,Pn=null,
     gen=[],used=0,top=null,fit=null,restored=0,cb={},input,minsel,adj,msg,again,out,sum,note;
   function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;

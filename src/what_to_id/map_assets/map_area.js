@@ -81,7 +81,7 @@ function MapArea(ctx){
   // rings, idx (null until restored), error and rawPlace for an invalid shared place token.
   var map=ctx.map,AREAS=[],VER=0,MASK=null,NOTE='',INVALID='',LINK='',LINKS=[],BOX=null,CAP=0,EVERY=false,INITIAL=true,CHIPS='',UID='apark'+(++MapArea.n),
     mode=false,ended=0,pts=[],cursor=null,ready=false,color=getComputedStyle(document.documentElement)
-      .getPropertyValue('--share').trim()||'#c2410c',nf=new Intl.NumberFormat('en-CA');
+      .getPropertyValue('--share').trim()||'#c2410c',nf=new Intl.NumberFormat((typeof I18N!=='undefined'?I18N.loc:'en-CA'));
   var box=document.createElement('div');box.className='maplibregl-ctrl area';
   box.innerHTML='<button type="button" class="atoggle" aria-expanded="false">Draw area or park</button>'+
     '<div class="abtns"><button type="button" data-a="draw">Draw area</button>'+
