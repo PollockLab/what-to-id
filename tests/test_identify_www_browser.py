@@ -88,6 +88,36 @@ def test_at_risk_and_invasive_keep_cards_by_their_suggestions_bc_status(browser,
     assert "risk=" not in page.evaluate("location.hash") and page.errors == []
 
 
+def test_a_category_tab_shows_one_group_and_keeps_the_order(browser, site):
+    base, _ = site
+    page = open_row(browser, base, "#lvl=3&conf=all")
+    every = page.get_by_role("button", name="All", exact=True)
+    assert every.get_attribute("aria-pressed") == "true"
+    before = page.evaluate("__identify.ids()")
+    tabs = page.locator("#cats .cat")
+    for k in range(1, tabs.count()):
+        tabs.nth(k).click()
+        got = page.evaluate("__identify.ids()")
+        if got and got != before:
+            break
+    tab = tabs.nth(k)
+    assert tab.get_attribute("aria-pressed") == "true"
+    assert page.locator("#cats [aria-pressed=true]").count() == 1
+    assert "groups=" in page.evaluate("location.hash")
+    assert page.inner_text("#bwhat b") == tab.inner_text().strip()
+    kept = [i for i in before if i in set(got)]
+    assert kept == [i for i in got if i in set(kept)]  # a tab filters, it never reorders
+    tab.click()
+    assert page.evaluate("__identify.ids()") == before
+    assert "groups=" not in page.evaluate("location.hash")
+    page.locator("#mix i").first.click()  # a strip segment picks its group like its tab
+    assert page.locator("#cats [aria-pressed=true]").count() == 1
+    assert (
+        page.get_by_role("button", name="All", exact=True).get_attribute("aria-pressed") == "false"
+    )
+    assert "groups=" in page.evaluate("location.hash") and page.errors == []
+
+
 def test_when_writes_the_map_filters_dates(browser, site):
     base, pts = site
     page = open_row(browser, base, "#lvl=3")

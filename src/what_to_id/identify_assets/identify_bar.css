@@ -1,4 +1,35 @@
 /* The search bar (identify_bar.js): three segments, each with its own panel; a phone's sheet holds them as accordion sections */
+/* The life-form row above the bar: one line, centred when it fits and scrolling sideways when not */
+.catrow{display:flex;align-items:stretch;min-height:48px;margin:8px 0 0}
+.cats{flex:1;min-width:0;display:flex;gap:2px;min-height:48px;overflow-x:auto;scrollbar-width:none}
+.cats.over{mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent)}
+.cats::before,.cats::after{content:"";margin:auto}
+.cat{--c:var(--ink);flex:none;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:46px;padding:5px 5px 4px;border:0;border-radius:10px;
+  background:none;color:var(--muted);font:inherit;font-size:11px;line-height:1.2;white-space:nowrap;cursor:pointer}
+.cat svg{width:24px;height:24px;fill:color-mix(in srgb,var(--c) 55%,var(--muted));transition:fill .15s}
+.cat:hover svg,.cat:focus-visible svg,.cat[aria-pressed="true"] svg{fill:var(--c)}
+/* Every record split by group, in the row's order and colours, toned down; a group picked or pointed at takes its full colour */
+.mixrow{display:flex;align-items:center;gap:10px;min-height:15px;margin:4px 0 0}  /* the row's height is held before the records land */
+.mix{flex:1;display:flex;gap:1px;height:6px}
+.mixn{flex:none;color:var(--muted);font-size:11px;line-height:15px;font-variant-numeric:tabular-nums}
+.mix i:first-child{border-radius:3px 0 0 3px}.mix i:last-child{border-radius:0 3px 3px 0}
+.mix i{position:relative;flex:1 0 2px;cursor:pointer;background:color-mix(in srgb,var(--c) 55%,var(--muted));opacity:.7;transition:opacity .15s}
+.mix i.on,.mix i.hot,.mix i:hover{background:var(--c);opacity:1}
+.mix i::before{content:"";position:absolute;inset:-6px 0}
+.mix i:hover::after{content:attr(data-k);position:absolute;bottom:12px;left:50%;transform:translateX(-50%);z-index:3;padding:3px 7px;
+  border-radius:6px;background:var(--ink);color:var(--bg);font:600 11px/1.3 inherit;font-style:normal;white-space:nowrap;pointer-events:none}
+.mix i:first-child:hover::after{left:0;transform:none}.mix i:last-child:hover::after{left:auto;right:0;transform:none}
+.cat.x span{text-decoration:line-through}.cat.x svg{opacity:.35}
+.mix i.x{opacity:.25}
+/* Combine sits outside the scroller so it stays in reach; the tabs fade out at the edge when they scroll */
+.cat.more{margin-left:4px;padding:5px 10px 4px}
+.cat.more:hover,.cat.more[aria-pressed="true"]{background:var(--chip)}
+.cat.more svg{fill:none;stroke:currentColor;stroke-width:1.8}.cat.more circle{fill:var(--bg)}
+.cat.hot{background:var(--chip);color:var(--ink)}.cat.hot svg{fill:var(--c)}
+.cat.z{opacity:.45}
+.cat:hover{background:var(--chip);color:var(--ink)}
+.cat[aria-pressed="true"]{background:var(--chip);color:var(--ink);font-weight:650}
+.cat:focus-visible{outline:2px solid var(--ink);outline-offset:-2px}
 .top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin:12px 0 10px}  /* the bar is the page's primary control; the filter chips sit beside it */
 .bar{position:relative;display:flex;flex:1 1 440px;min-width:0;margin:0}
 .bseg{display:flex;align-items:center;width:100%;min-width:0;border:1px solid var(--line);border-radius:999px;background:var(--panel);
@@ -60,6 +91,8 @@
 .abody .bpanel .gl{max-height:none}
 .sdone{gap:.3em}  /* flex items drop the blanks between "Show", the count and "cards" */
 @media (max-width:760px){
+  .catrow{margin-top:6px}
+  .mixrow{flex-wrap:wrap;row-gap:3px;min-height:24px}.mix{flex-basis:100%}.mixn{margin-left:auto}
   .bseg{flex-wrap:wrap;border-radius:24px}
   .seg1{flex:1 1 45%;padding:8px 12px}
   .seg1 b{font-size:13px}
