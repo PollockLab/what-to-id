@@ -92,6 +92,14 @@ def test_the_kind_control_filters_might_be_wrong_and_keeps_the_kind_in_the_hash(
     page = open_identify(browser, base, "#lvl=5")
     level = dict(zip(pts["id"], pts["level"], strict=True))
     n = {k: int((pts["level"] == k).sum()) for k in ORDER}
+    row = page.locator("#kind")
+    assert (
+        row.get_attribute("aria-label") is None
+        and row.locator("[aria-label]").get_attribute("aria-label") == "Kind of possible error"
+    )
+    assert "Kind:" not in row.inner_text()
+    assert page.locator("#qrow").bounding_box()["y"] < row.bounding_box()["y"]  # below the modes
+    assert row.bounding_box()["y"] < page.locator("#cats").bounding_box()["y"] + 400
     for k, name in page_identify.KINDS:
         assert kind(page, name).inner_text() == f"{name} {n[k]:,}"
     kind(page, "Odd shots").click()
@@ -110,6 +118,26 @@ def test_the_kind_control_filters_might_be_wrong_and_keeps_the_kind_in_the_hash(
     assert "kind=" not in page.evaluate("location.hash")
     tab(page, 1).click()
     assert page.locator("#kind").is_hidden()
+    assert page.locator("#kind").bounding_box() is None  # no gap left in the other modes
+    assert page.errors == []
+
+
+def test_the_help_menu_replaces_the_nav_and_works_from_the_keyboard(browser, site):
+    base, _ = site
+    page = open_identify(browser, base, "#lvl=1")
+    assert page.locator(".site-nav").count() == 0
+    btn = page.locator("#hmbtn")
+    assert btn.inner_text() == "Help" and btn.get_attribute("aria-expanded") == "false"
+    assert page.locator("#hmenu").is_hidden()
+    btn.focus()
+    page.keyboard.press("Enter")
+    assert page.locator("#hmenu").is_visible() and btn.get_attribute("aria-expanded") == "true"
+    shown = page.locator("#hmenu a:visible").all_inner_texts()
+    assert shown[0] == "How it works" and "Methods" not in shown
+    page.keyboard.press("Tab")
+    page.keyboard.press("Escape")
+    assert page.locator("#hmenu").is_hidden()
+    assert page.evaluate("document.activeElement.id") == "hmbtn"
     assert page.errors == []
 
 

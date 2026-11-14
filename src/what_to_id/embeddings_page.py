@@ -25,6 +25,7 @@ SCRIPTS = {
     "__MAP_CHIPS__": HERE / "map_assets" / "map_chips.js",
     "__IDENTIFY_LINKS__": HERE / "map_assets" / "identify_links.js",
     "__SAVED_RECORDS__": HERE / "site_assets" / "saved_records.js",
+    "__MAP_RINGS__": HERE / "map_assets" / "map_rings.js",
     "__MAP_AREA__": HERE / "map_assets" / "map_area.js",
     "__MAP_FILTER__": HERE / "map_assets" / "map_filter.js",
     "__TAXON_TREE__": ASSETS / "taxon_tree.js",
@@ -35,6 +36,7 @@ SCRIPTS = {
     "__EMBEDDINGS_SELECT__": ASSETS / "embeddings_select.js",
     "__LIFE_MAP__": ASSETS / "life_map.js",
     "__LIFE_VIEW__": ASSETS / "life_view.js",
+    "__EMBEDDINGS_CARD_SIZE__": ASSETS / "embeddings_card_size.js",
     "__EMBEDDINGS_APP__": ASSETS / "embeddings_app.js",
 }
 PAGE_NAME = "embeddings.html"

@@ -45,9 +45,8 @@ def test_build_end_to_end(tmp_path, webapp_dir):
     a = pd.read_parquet(out / "assign.parquet")
     b = pd.read_parquet(out / "batches.parquet")
     assert len(a) == 300 and len(b) == 300 and b["id"].is_unique
-    for name in ["index.html", "arm_A.html", "arm_B.html"]:
-        assert (out / "site" / name).exists()
-    assert "recency" not in (out / "site" / "index.html").read_text()
+    assert (out / "site" / "study.json").exists()
+    assert not list((out / "site").glob("arm_*.html"))
 
 
 def test_build_max_batches(tmp_path, webapp_dir):
@@ -210,38 +209,6 @@ def test_build_sinr_scores_requires_id_and_sinr_rel(tmp_path, webapp_dir):
     args += ["--surprise-scores", str(surprise_scores), "--sinr-scores", str(sinr_scores)]
     with pytest.raises(SystemExit, match="sinr_rel"):
         main(args)
-
-
-def test_build_default_design_is_sets(tmp_path, webapp_dir):
-    pool = make_pool(300, seed=5)
-    pool_path = tmp_path / "pool.parquet"
-    pool.to_parquet(pool_path, index=False)
-    out = tmp_path / "out"
-    main(
-        [
-            "build",
-            "--pool",
-            str(pool_path),
-            "--freeze",
-            "2026-09-01",
-            "--d1",
-            "2026-09-15",
-            "--seed",
-            "3",
-            "--batch-size",
-            "25",
-            "--arms",
-            "recency,gap_first",
-            "--webapp-dir",
-            str(webapp_dir),
-            "--out",
-            str(out),
-        ]
-    )
-    d = json.loads((out / "manifest.json").read_text())
-    assert d["design"] == "sets"
-    for name in ["index.html", "arm_A.html", "arm_B.html"]:
-        assert (out / "site" / name).exists()
 
 
 def _keyed_build(pool_path, webapp_dir, out, freeze, log_path):
@@ -407,10 +374,6 @@ def test_novelty_requires_reference(tmp_path, webapp_dir):
             assert 0.0 <= b["cohesion"] <= 1.0
         else:
             assert b["cohesion"] is None
-    label = {v: k for k, v in d["arm_labels"].items()}
-    for lab in label:
-        html = (tmp_path / "o" / "site" / f"arm_{lab}.html").read_text()
-        assert "look-alike 0." in html and "unfamiliar 0." in html and "Look-alike</b>" in html
 
 
 def test_similarity_requires_embeddings(tmp_path, webapp_dir):

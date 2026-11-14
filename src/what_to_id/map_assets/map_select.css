@@ -6,13 +6,13 @@
 .chips button.not,.chips button[aria-pressed="true"].not,
   .schip.not{background:var(--warnbg);color:var(--warn)}
 .chips button.not,.chips button[aria-pressed="true"].not,.schip.not{border:1px dashed var(--warn)}
-.selbar{border:1px solid var(--line);border-radius:8px;padding:4px 8px 8px;background:var(--chip);
+.selbar{border:1px solid var(--line);border-radius:6px;padding:4px 8px 8px;background:var(--chip);
   position:sticky;top:-12px;z-index:3;max-height:40vh;overflow:auto;flex-shrink:0}
 /* folding filter sections; the summary counts what is active inside */
 .sec{border-top:1px solid var(--line);padding:2px 0 4px}
 .sec>summary{cursor:pointer;font-size:12px;font-weight:600;padding:6px 0 4px;list-style-position:inside}
 #usrbox>summary{min-height:24px}
-.sec>summary .n:not(:empty){display:inline-block;margin-left:4px;min-width:18px;padding:0 5px;border-radius:9px;
+.sec>summary .n:not(:empty){display:inline-block;margin-left:4px;min-width:18px;padding:0 5px;border-radius:999px;
   background:var(--on);color:var(--onink);font-size:11px;line-height:16px;text-align:center}
 .sec>*+*{margin-top:4px}
 .sec[hidden]{display:none}
@@ -21,7 +21,7 @@
   padding:3px 2px 3px 0;min-width:0;text-align:left;overflow-wrap:anywhere}
 .selbar .lbl{margin-top:2px}
 .selbar ul{margin:0;padding:0;list-style:none}
-.schip{display:inline-flex;align-items:center;max-width:100%;border:1px solid var(--on);border-radius:13px;
+.schip{display:inline-flex;align-items:center;max-width:100%;border:1px solid var(--on);border-radius:999px;
   background:var(--on);color:var(--onink);font-size:12px;padding-left:9px}
 .schip span{overflow-wrap:anywhere}
 .chips .schip button{border:0;background:none;color:inherit;padding:3px 8px;min-height:26px;min-width:28px}
@@ -33,5 +33,5 @@
 .sugg li{padding:6px 10px;cursor:pointer;min-height:36px}
 .sugg li span{display:block;color:var(--muted);font-size:12px}
 .sugg li[aria-selected="true"]{background:var(--chip)}
-.tag{display:inline-block;margin-left:5px;padding:0 5px;border:1px solid currentColor;border-radius:8px;
+.tag{display:inline-block;margin-left:5px;padding:0 5px;border:1px solid currentColor;border-radius:6px;
   font-size:10px;line-height:14px;white-space:nowrap}

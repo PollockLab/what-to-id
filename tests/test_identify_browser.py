@@ -14,9 +14,11 @@ import pytest
 
 from what_to_id import page_identify, pool_levels, site_files
 from what_to_id.identify import IDENTIFY_COLUMNS
+from what_to_id.map_parks import PARKS_NAME, parks_blob
+from what_to_id.map_points import decode_points, encode_points
 from what_to_id.map_projects import add_projects
 from what_to_id.page_lookalike import site_records
-from what_to_id.page_map import align_totals, decode_points, encode_points, render_map
+from what_to_id.page_map import align_totals, render_map
 
 from . import test_embeddings_browser as eb
 from .embeddings_fixture import TREE, pool_frame
@@ -43,6 +45,7 @@ def serve(root, frame, score, projects=None, totals=None):
         blobs["pool-totals.bin"] = gz
         meta.setdefault("files", {})["totals"] = "pool-totals.bin"
     add_projects(blobs, meta, projects)
+    blobs[PARKS_NAME] = parks_blob()  # the Where suggestions read the park list
     for name, blob in blobs.items():
         (root / name).write_bytes(blob)
     meta["value"] = [[953, 2, 5]]  # the at-risk list: Apis c, the www tests' third suggestion
@@ -253,11 +256,11 @@ def test_the_selection_changes_what_the_cards_show(browser, site):
 
 
 def test_the_page_names_the_narrowing_group_from_one_constant_and_has_the_header():
-    html = page_identify.render()
+    html = page_identify.render().replace((page_identify.ASSETS / "identify_fr.js").read_text(), "")
     assert html.count(page_identify.NARROW_LABEL) == 2  # the config and the About, both from it
     template = (page_identify.ASSETS / page_identify.PAGE_NAME).read_text()
     assert page_identify.NARROW_LABEL not in template
-    assert "<nav" in html
+    assert 'id="hmenu"' in html and "<nav" not in html  # Help replaces the view switcher
     assert not [w for w in FORBIDDEN if w in html.lower()]
 
 

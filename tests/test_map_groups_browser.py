@@ -7,7 +7,8 @@ import threading
 
 import pytest
 
-from what_to_id.page_map import encode_points, render_map
+from what_to_id.map_points import encode_points
+from what_to_id.page_map import render_map
 from what_to_id.taxonomy import PRESETS
 
 from . import test_embeddings_browser as eb

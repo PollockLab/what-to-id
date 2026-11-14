@@ -11,15 +11,22 @@ from importlib.resources import files
 
 import pytest
 
+from what_to_id.map_points import encode_points
 from what_to_id.map_resolved import encode_left
-from what_to_id.page_map import encode_points
 
 from .embeddings_fixture import TREE, pool_frame
 from .test_map_resolved import NOW, log_frame
 
 NODE = shutil.which("node")
 pytestmark = pytest.mark.skipif(NODE is None, reason="node is not installed")
-JS = ("map_taxa.js", "map_chips.js", "map_filter.js", "identify_links.js", "map_area.js")
+JS = (
+    "map_taxa.js",
+    "map_chips.js",
+    "map_filter.js",
+    "identify_links.js",
+    "map_rings.js",
+    "map_area.js",
+)
 RING = [-123.5, 48.5, -122.5, 48.5, -122.5, 49.5, -123.5, 49.5]  # lon, lat of a box round the log
 
 

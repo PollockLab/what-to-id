@@ -66,7 +66,7 @@ function projLabel(s,list){return s.k>=0?list[s.k].title:'project '+s.id;}
 // count (shown) and the most Identify can open (alt, the records that match every other filter).
 // Otherwise any pasted project narrows what Identify opens, which the map count leaves out: fewer.
 // shown is null while the records load.
-function projNote(sel,list,shown,alt){var nf=new Intl.NumberFormat('en-CA'),
+function projNote(sel,list,shown,alt){var nf=new Intl.NumberFormat((typeof I18N!=='undefined'?I18N.loc:'en-CA')),
     p=sel.filter(function(s){return s.k<0;}),pin=p.filter(function(s){return s.st==='inc';});
   if(!p.length)return {more:'',fewer:''};
   var names=function(a){return a.map(function(s){return (s.st==='not'?'not in ':'in ')+projLabel(s,list);}).join(', ');};

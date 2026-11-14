@@ -191,7 +191,7 @@ def test_the_compare_panel_shows_photos_and_works_from_the_keys(browser, site):
     assert page.errors == []
 
 
-def test_the_compare_panel_fits_a_phone_with_the_species_and_two_similar(browser, site):
+def test_the_compare_panel_fits_a_phone_with_the_species_and_three_similar(browser, site):
     base, _ = site
     page = browser.new_page(viewport={"width": 360, "height": 740})
     page.errors = []
@@ -201,11 +201,12 @@ def test_the_compare_panel_fits_a_phone_with_the_species_and_two_similar(browser
     stub_taxa(page)
     page.goto(f"{base}/identify.html#lvl=1")
     page.locator("#grid .card .title").first.click()
-    page.wait_for_function("document.querySelectorAll('#cprefs .cpref').length === 3")
+    page.wait_for_function("document.querySelectorAll('#cprefs .cpref').length === 4")
     h = page.locator("#cprefs .cpref h3").all_inner_texts()
     assert h[0].startswith("Label") and h[1:] == [
         "Similar Taxon 901",
         "Similar Taxon 902",
+        "Similar Taxon 903",
     ]  # the whole record
     assert page.locator("#cprefs .cpref").first.locator("img").count() == 2
     sums = page.locator("#cprefs .cpref .cpsum")
@@ -216,7 +217,7 @@ def test_the_compare_panel_fits_a_phone_with_the_species_and_two_similar(browser
     big = page.locator("#cpanel .cpbig")
     big.wait_for()
     assert (
-        big.evaluate("e => getComputedStyle(e).maxHeight") == f"{0.38 * 740:g}px"
+        big.evaluate("e => getComputedStyle(e).maxHeight") == f"{0.32 * 740:g}px"
     )  # room for the refs
     box = page.locator("#cpanel").bounding_box()
     assert box["x"] == 0 and box["width"] == 360
@@ -291,7 +292,7 @@ def test_one_help_button_shows_the_keys_on_hover_and_opens_the_help_sheet_on_cli
     page = level_3(browser, base)
     assert page.locator("#tip, #keys1").count() == 0  # no banner, no second "?"
     help_ = page.locator("#helpb")
-    assert help_.is_visible() and page.locator(".rline .qicon").count() == 1
+    assert help_.is_visible() and page.locator(".rline .qicon[aria-haspopup]").count() == 1
     help_.hover()
     pop = page.locator("#explain-pop")
     pop.wait_for(state="visible")

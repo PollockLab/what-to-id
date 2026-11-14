@@ -38,7 +38,13 @@ const $=key=>{if(!nodes.has(key))nodes.set(key,new Element());return nodes.get(k
     script = f"const RAW={json.dumps(raw)}, COUNT={count};\n" + script
     script += "\n".join(
         (_ASSETS / name).read_text()
-        for name in ["identify_links.js", "map_taxa.js", "map_step.js", "map_area.js"]
+        for name in [
+            "identify_links.js",
+            "map_taxa.js",
+            "map_step.js",
+            "map_rings.js",
+            "map_area.js",
+        ]
     )
     script += r"""
 var P={n:COUNT,id:Array.from({length:COUNT},(_,i)=>101+i),
@@ -121,7 +127,13 @@ def recovery_html():
     guard = source[source.index("// Guard activation") : source.index("// Zoomed out,")]
     modules = "\n".join(
         (_ASSETS / name).read_text()
-        for name in ["identify_links.js", "map_taxa.js", "map_step.js", "map_area.js"]
+        for name in [
+            "identify_links.js",
+            "map_taxa.js",
+            "map_step.js",
+            "map_rings.js",
+            "map_area.js",
+        ]
     )
     return (
         '<!doctype html><meta charset="utf-8"><a id="identify" target="_blank">Identify these</a>'

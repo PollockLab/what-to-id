@@ -17,7 +17,8 @@ import pytest
 
 from what_to_id import site_files, tree_page
 from what_to_id.embeddings_page import build
-from what_to_id.page_map import encode_points, render_map
+from what_to_id.map_points import encode_points
+from what_to_id.page_map import render_map
 from what_to_id.split_page import build as build_split
 
 from .atlas_index_fixture import FIXTURE_DELTA, FIXTURE_ROWS, write_fixture

@@ -21,7 +21,7 @@ input[type=checkbox]{width:24px;height:24px;margin:0 4px 0 0;vertical-align:midd
 #status{margin:6px 0;font-size:13px}
 .tabs{display:inline-flex;flex-wrap:wrap;gap:2px;padding:3px;border:1px solid var(--line);border-radius:20px;background:var(--panel)}
 .tab{min-width:0;display:flex;align-items:baseline;gap:6px;padding:6px 12px;font:inherit;font-size:13px;line-height:1.2;color:var(--ink);background:none;
-  border:0;border-radius:16px;cursor:pointer;white-space:nowrap}
+  border:0;border-radius:999px;cursor:pointer;white-space:nowrap}
 .tab b{font-size:13px;font-weight:650}
 .tab[aria-selected=true]{background:var(--on);color:var(--onink);border-color:var(--on)}
 .tab.zero:not([aria-selected=true]){opacity:.55}
@@ -36,11 +36,11 @@ input[type=checkbox]{width:24px;height:24px;margin:0 4px 0 0;vertical-align:midd
 .arrow:disabled{opacity:.4;cursor:default}
 ol{list-style:none;margin:8px 0;padding:0;display:grid;gap:10px;
   grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px;
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:6px;
   display:flex;flex-direction:column;gap:4px;min-width:0;cursor:pointer}
 .card:hover{border-color:var(--muted)}
 .card .ph{display:flex;align-items:center;justify-content:center;aspect-ratio:4/3;font-size:12px;
-  border-radius:4px;background:var(--chip);color:var(--muted);overflow:hidden;text-align:center}
+  border-radius:6px;background:var(--chip);color:var(--muted);overflow:hidden;text-align:center}
 .card img{width:100%;height:100%;object-fit:cover;display:block;color:transparent}
 .card .name,.card .com,.card .when{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .card .name{font-size:13px}
@@ -49,7 +49,7 @@ ol{list-style:none;margin:8px 0;padding:0;display:grid;gap:10px;
 .card .look{overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .card .when{display:block;text-decoration:none;min-height:24px;line-height:24px}
 .card .when:hover{text-decoration:underline}
-.btn{display:inline-flex;align-items:center;min-height:30px;padding:0 12px;border-radius:15px;
+.btn{display:inline-flex;align-items:center;min-height:30px;padding:0 12px;border-radius:999px;
   background:var(--on);color:var(--onink);font-size:13px;font-weight:650;text-decoration:none}
 .card .sp{font:inherit;font-size:12px;color:var(--muted);background:none;border:0;padding:0;min-height:24px;text-align:left;cursor:pointer;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -59,7 +59,7 @@ ol{list-style:none;margin:8px 0;padding:0;display:grid;gap:10px;
   border:1px solid var(--line);border-radius:6px;background:var(--chip)}
 #end{text-align:center;margin:8px 0}
 .rout{margin:6px 0;font-size:12px}
-.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:15px;overflow:hidden}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:999px;overflow:hidden}
 .segb{font:inherit;color:var(--ink);cursor:pointer;min-height:30px;padding:0 12px;border:0;background:var(--chip)}
 .segb+.segb{border-left:1px solid var(--line)}
 .segb[aria-checked=true]{background:var(--on);color:var(--onink)}
@@ -68,20 +68,20 @@ ol{list-style:none;margin:8px 0;padding:0;display:grid;gap:10px;
 .ctl{display:flex;flex-wrap:wrap;align-items:center;gap:4px 16px}
 .ctl>.rout{margin:2px 0}.ctl #sort:not([hidden]){display:contents}.ctl .srow{margin:2px 0;gap:4px 6px}
 .ctl .segb{min-height:26px;padding:0 9px}
-.tog{margin-right:10px;white-space:nowrap}#prog.ok progress{accent-color:#2e7d32}
+.tog{margin-right:10px;white-space:nowrap}#prog.ok progress{accent-color:var(--good)}
 #sort .segnote{margin:0}
 .hint{color:var(--muted)}.hint summary{cursor:pointer;min-height:24px}.hint .segnote,.hint p{margin:2px 0}
 .card .links{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
 .card .range{flex:1 1 8em;min-width:0;font-size:12px;color:var(--muted)}
-.card .badge{align-self:flex-start;font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 4px}
+.card .badge{align-self:flex-start;font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:0 4px}
 .sep.top{border-top:0;padding-top:0}
-.sep.run{display:flex;align-items:center;gap:6px;flex-wrap:wrap;color:var(--ink)}.sep.run img{width:56px;height:56px;object-fit:cover;border-radius:4px;background:var(--chip)}.sep.run .rp{display:flex;gap:4px}
+.sep.run{display:flex;align-items:center;gap:6px;flex-wrap:wrap;color:var(--ink)}.sep.run img{width:56px;height:56px;object-fit:cover;border-radius:6px;background:var(--chip)}.sep.run .rp{display:flex;gap:4px}
 .sep{grid-column:1/-1;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:6px}
 .card .kind{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
 .cmp{flex:none;display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:0}
 .cmp figure{margin:0;min-width:0;display:flex;flex-direction:column;gap:1px}
-.cmp a{display:block;border-radius:4px;background:var(--chip)}
-.cmp img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:4px;display:block;color:transparent}
+.cmp a{display:block;border-radius:6px;background:var(--chip)}
+.cmp img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;display:block;color:transparent}
 .cmp img:not([src]),.card .ph img:not([src]){visibility:hidden}
 .cmp figcaption{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #usrbox summary{cursor:pointer;color:var(--muted);min-height:24px}
@@ -103,41 +103,29 @@ body:not(.bt) #study,.bt #status:not(.err),.bt #unpick,.bt #desc,.bt #kind,.bt #
 .card .act{font:inherit;font-size:12px;min-height:24px;padding:0 8px;border:1px solid var(--line);border-radius:12px;
   background:var(--chip);color:var(--ink);cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .card .act:disabled{cursor:default}
-.card .copy{font:inherit;font-size:11px;min-height:24px;margin-left:4px;padding:0 6px;border:1px solid var(--line);border-radius:10px;background:var(--chip);color:var(--ink);cursor:pointer}
+.card .copy{font:inherit;font-size:11px;min-height:24px;margin-left:4px;padding:0 6px;border:1px solid var(--line);border-radius:999px;background:var(--chip);color:var(--ink);cursor:pointer}
 .card .conf,.card .gap,.card .gapx{margin-left:6px;font:inherit;font-size:11px;color:var(--muted);background:none;border:0;padding:0;cursor:pointer;text-decoration:underline dotted}.card .gapw .gap{margin-left:6px}.card .gapx{margin-left:3px;text-decoration:none}
 .card .gap{white-space:nowrap}
 .card .note{font-size:12px;color:var(--muted)}
 .card.done{opacity:.6}.card.cur{outline:2px solid var(--on);outline-offset:1px}
-#cpanel{position:fixed;top:0;right:0;bottom:0;z-index:10;width:min(520px,100%);box-sizing:border-box;overflow:auto;
-  background:var(--panel);border-left:1px solid var(--line);box-shadow:-4px 0 16px rgba(0,0,0,.15);padding:8px 12px 0;display:flex;flex-direction:column;gap:8px}
-#cpanel:focus{outline:none}
-@media (min-width:900px){body.cpon main{margin-right:520px}}
-.cptop{display:flex;align-items:center;gap:8px}.cptop h2{flex:1;min-width:0;margin:0;font-size:15px;font-weight:600;overflow-wrap:anywhere}
-.cpbig{width:100%;max-height:min(52vh,480px);object-fit:contain;background:var(--chip);border-radius:6px;display:block}
-@media (max-width:600px){.cpbig{max-height:38vh}}  /* after the base rule, so it wins */
-.cpstrip{display:flex;gap:4px;overflow-x:auto;margin-top:4px}
-.cpthumb{padding:0;border:2px solid transparent;border-radius:4px;background:none;cursor:pointer;width:48px;height:48px;flex:none}
-.cpthumb[aria-pressed=true]{border-color:var(--on)}.cpthumb img{width:100%;height:100%;object-fit:cover;display:block}
-.cpwhen{display:block;font-size:12px;min-height:24px;line-height:24px}
-#cprefs{display:grid;gap:8px}.cpref h3{font-size:13px;font-weight:600;margin:0 0 2px}
-.cpph{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}.cpph img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:4px;display:block}
-.cpref a{font-size:12px}
-.cpbar{position:sticky;bottom:0;margin-top:auto;display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 0;background:var(--panel);border-top:1px solid var(--line)}
-#cpt{order:1;flex-basis:100%;height:1.4em;line-height:1.4em;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}  /* its own reserved line, so the toast never moves Identify */
-.cpbar .copy{font:inherit;font-size:13px;min-height:30px;padding:0 10px;border:1px solid var(--line);border-radius:15px;background:var(--chip);color:var(--ink);cursor:pointer}
+__IDENTIFY_COMPARE_CSS__
 __IDENTIFY_RANGES_CSS__
 __MAP_AREA_CSS__
 __MAP_PANELS_CSS__
 __IDENTIFY_UI_CSS__
 __IDENTIFY_SHELL_CSS__
 __IDENTIFY_BAR_CSS__
+__IDENTIFY_SUGGEST_CSS__
 </style></head><body>
 __SITE_NAV__<main id="main-content">
+<h1 class="site-vh">Identify</h1>
 <p><button type="button" id="unpick" class="more" hidden>Clear the species filter</button></p>
-<div id="kind" class="rout" hidden></div>
+<div class="catrow"><div id="cats" class="cats" role="group" aria-label="Life forms"></div></div>
+<div class="mixrow"><div id="mix" class="mix" aria-hidden="true"></div><span id="mixn" class="mixn"></span></div>
 <div class="top"><div id="bar" class="bar"><div class="bseg" role="group" aria-label="What, when, where, who">
 <button type="button" id="bwhat" class="seg1" aria-expanded="false" aria-controls="pwhat" disabled><small>What</small><b>All groups</b></button>
 <div id="pwhat" class="bpanel" role="group" aria-label="What" hidden>
+<div id="sgwhat" class="sg"></div>
 <div class="picker"><label for="q" class="vh">Find a taxon</label><input id="q" type="search" placeholder="Latin or common name, e.g. Carex" autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="sugg">
 <ul id="sugg" class="sugg" role="listbox" aria-label="Matching taxa" hidden></ul></div><p id="qn" class="muted" aria-live="polite"></p>
 <div id="cladebox" hidden><div id="clades" class="chips" role="group" aria-label="Taxon shortcuts"></div></div>
@@ -153,27 +141,31 @@ __SITE_NAV__<main id="main-content">
 <details class="sec" id="projbox" open hidden></details></div>
 <button type="button" id="bwhen" class="seg1" aria-expanded="false" aria-controls="pwhen" disabled><small>When</small><b>Any time</b></button>
 <div id="pwhen" class="bpanel" role="group" aria-label="When" hidden>
-<div class="row"><span class="tseg" role="group" aria-label="Date to filter on"><button type="button" id="byObs" aria-pressed="true">Observed</button><button type="button" id="byUp" aria-pressed="false">Uploaded</button></span>
+<div id="sgwhen" class="sg"></div><div class="wmain"><div class="row"><span class="tseg" role="group" aria-label="Date to filter on"><button type="button" id="byObs" aria-pressed="true">Observed</button><button type="button" id="byUp" aria-pressed="false">Uploaded</button></span>
 <span id="presets" class="chips" role="group" aria-label="Periods"></span></div>
 <div class="row"><span class="dates"><input id="from" type="date" aria-label="From"> to <input id="to" type="date" aria-label="To"></span></div>
 <div class="row"><span id="months" class="chips months" role="group" aria-label="Months of the year"></span><button type="button" id="mclear" class="link">Any month</button></div>
-<div class="histwrap"><canvas id="over" role="img" aria-label="Records per year, every year, on a log scale. Click a year to zoom to it."></canvas><p id="unit" class="unit"></p><canvas id="hist" role="img"></canvas><div id="htip" class="htip" hidden></div></div></div>
+<div class="histwrap"><canvas id="over" role="img" aria-label="Records per year, every year, on a log scale. Click a year to zoom to it."></canvas><p id="unit" class="unit"></p><canvas id="hist" role="img"></canvas><div id="htip" class="htip" hidden></div></div></div></div>
 <button type="button" id="bwhere" class="seg1" aria-expanded="false" aria-controls="pwhere" disabled><small>Where</small><b>Anywhere</b></button>
 <div id="pwhere" class="bpanel" role="group" aria-label="Where" hidden>
+<div id="sgwhere" class="sg"></div>
 <div id="wbox" class="wbox"><div class="wfoot"><button type="button" id="wexp" class="btn" aria-expanded="false">Expand map</button></div></div></div>
 <button type="button" id="bwho" class="seg1" aria-expanded="false" aria-controls="pwho" disabled><small>Who</small><b>Anyone</b></button>
-<div id="pwho" class="bpanel" role="group" aria-label="Who" hidden><p id="uload" class="muted" role="status">Loading your filters…</p><details id="usrbox" open hidden></details></div>
+<div id="pwho" class="bpanel" role="group" aria-label="Who" hidden><div id="sgwho" class="sg"></div><p id="uload" class="muted" role="status">Loading your filters…</p><details id="usrbox" open hidden></details></div>
 </div></div>
 <div id="qrow" class="qrow"><div id="tabs" class="tabs" role="tablist" aria-label="Level"></div>
 <span id="qchips" class="qchips"></span>
 <div id="rg" class="rout qseg" hidden></div>
-</div></div>
+</div>
+<div id="kind" class="rout" hidden></div></div>
 
 <dialog id="bsheet" class="sheet" aria-labelledby="bsh"><div class="shead"><h2 id="bsh">What, when, where, who</h2>
 <button type="button" class="shx" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><div class="sbody"></div>
 <div class="sfoot"><span></span><button type="button" class="btn sdone">Show <span class="n">0</span> cards</button></div></dialog>
 <div id="sortpop" popover class="pop sortpop" aria-labelledby="sorth"><h2 id="sorth">Prioritize</h2><div id="rout" class="rout qseg" hidden><span class="qlbl">Range</span></div><div id="sorto" class="rout"></div><hr>
 <div id="frun"></div><div id="pfoot"><a class="lnk" href="terms.html#best-match" target="_blank">How this works</a><button type="button" id="pshow" class="segb"></button></div></div>
+<div id="setpop" popover class="pop setpop" aria-labelledby="seth"><h2 id="seth">Settings</h2>
+<fieldset><legend>Species names</legend><label class="segb"><input type="radio" name="names" value="latin">Latin</label><label class="segb"><input type="radio" name="names" value="common">Common</label><label class="segb"><input type="radio" name="names" value="both">Both</label></fieldset></div>
 <div id="study" role="region" aria-label="Study batches">
 <div class="srow"><label for="sgroup">Group</label><select id="sgroup"></select>
 <button type="button" id="snext" class="btn" aria-keyshortcuts="n" title="Next batch (N)">Next batch</button>
@@ -187,6 +179,7 @@ __SITE_NAV__<main id="main-content">
 <div id="panel" role="tabpanel">
 <div id="rline" class="rline"><b id="count" aria-live="polite"></b><button type="button" id="helpb" class="qchip qicon" data-explain="identify-keys" aria-haspopup="dialog" aria-controls="help" aria-label="About, notes and keys"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.7M12 17h.01"/></svg></button><span id="today" class="today" hidden></span><span class="sp1"></span>
 <button type="button" id="sortb" class="qchip" popovertarget="sortpop" aria-controls="sortpop" hidden>Prioritize <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></button>
+<button type="button" id="setb" class="qchip qicon" popovertarget="setpop" aria-controls="setpop" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/></svg></button>
 </div>
 <div id="batch" class="batch" hidden><a id="go" class="btn" target="_blank" rel="noopener"></a>
 <span class="nav"><button type="button" id="prev" class="arrow" aria-label="Previous batch">‹</button><span id="bn" class="muted"></span>
@@ -239,12 +232,15 @@ The login goes only to iNaturalist.</p></details>
 </div>
 </main>
 <script>var IDENTIFY_CONFIG=__CONFIG__;</script>
+<script>__IDENTIFY_FR__</script>
+<script>__IDENTIFY_I18N__</script>
 <script>__ATLAS_SEARCH_META__</script>
 <script>__MAP_TAXA__</script>
 <script>__MAP_CHIPS__</script>
 <script>__IDENTIFY_LINKS__</script>
 <script>__TAXON_TREE__</script>
 <script>__GROUP_LIST__</script>
+<script>__MAP_RINGS__</script>
 <script>__MAP_AREA__</script>
 <script>__MAP_FILTER__</script>
 <script>__FETCH_ONCE__</script>
@@ -256,6 +252,9 @@ The login goes only to iNaturalist.</p></details>
 <script>__MAP_ONLY__</script>
 <script>__IDENTIFY_ONLY__</script>
 <script>__IDENTIFY_UNCONFIRMED__</script>
+<script>__IDENTIFY_COMPARE_TEXT__</script>
+<script>__IDENTIFY_ZOOM__</script>
+<script>__IDENTIFY_REFS__</script>
 <script>__IDENTIFY_COMPARE__</script>
 <script>__IDENTIFY_STUDY__</script>
 <script>__IDENTIFY_INAT__</script>
@@ -267,8 +266,11 @@ The login goes only to iNaturalist.</p></details>
 <script>__MAP_HIST__</script>
 <script>__MAP_TIME__</script>
 <script>__IDENTIFY_WHERE__</script>
+<script>__GROUP_ICONS__</script>
+<script>__IDENTIFY_SUGGEST__</script>
 <script>__IDENTIFY_BAR__</script>
 <script>__IDENTIFY_PROGRESS__</script>
 <script>__IDENTIFY_APP__</script>
+<script>__IDENTIFY_SETTINGS__</script>
 <script>__IDENTIFY_SHELL__</script>
 </body></html>

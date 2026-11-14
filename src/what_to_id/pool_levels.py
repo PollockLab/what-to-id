@@ -49,6 +49,10 @@ out records far outside). Gzipped JSON ``{"bbox": META.bbox, "taxa": [[latin, co
 the records in it, the cards after the per-species cut, and the first FIRST_ROWS cards as ``[id,
 taxa index (65535 none), looks index (65535 none), how many more of its taxon the cut left out]``.
 
+``pool-taxa-fr.bin`` (``--fr``, the cache `taxonomy --fr` fills): gzipped JSON ``{taxon id: French
+common name}`` for taxa whose French name differs from the English one (META.files.taxa_fr), and
+the first file's ``"fr"`` holds the same for its taxa; Identify reads both in French only.
+
 ``pool-levels-dates.json``: with ``--data-url``,
 ``{"photos": "2026-10-15", "scored": "2026-10-27"}``, the photo download the embeddings came from
 (the date in the identify entry's ``emb`` path, else in ``model.source``) and the day
@@ -72,9 +76,10 @@ import pandas as pd
 
 from what_to_id import site_files
 from what_to_id.identify import MISLABEL, NARROW, NONE, TAXONOMIST, WEIRD
+from what_to_id.map_points import _decode_shard
 from what_to_id.page_identify import DATES_NAME, FIRST_NAME
 from what_to_id.page_lookalike import _fetch, site_records
-from what_to_id.page_map import _decode_shard
+from what_to_id.taxonomy import fr_names, load_fr
 from what_to_id.tree_page import map_meta
 
 OUT_NAME = "pool-levels.bin"
@@ -85,6 +90,7 @@ STEPS = 16
 NO_LOOK = 0xFFFF
 RANGE_NAME = "pool-levels-range.bin"
 RANK_NAME = "pool-levels-rank.bin"
+TAXA_FR_NAME = "pool-taxa-fr.bin"
 NO_BYTE = 0xFF
 NOTAX = 0xFFFF
 FIRST_ROWS = 200  # one iNaturalist batch, IdentifyLinks.MAX_IDS
@@ -305,10 +311,14 @@ def build(
     data_url: str | None = None,
     parquet: str | Path | None = None,
     ranges: str | Path | None = None,
+    fr: str | Path | None = None,
 ) -> dict:
     """Write the files into ``site`` and return the record count per level."""
     site = Path(site)
     ids, tax, rows, _ = site_records(site)
+    names = fr_names(rows, load_fr(fr))
+    gz = gzip.compress(json.dumps(names, ensure_ascii=False).encode(), mtime=0) if names else None
+    site_files.publish(site, "taxa_fr", TAXA_FR_NAME, gz)
     taxon_ids = np.array([r[2] for r in rows] + [-1], dtype=np.int64)
     current = taxon_ids[np.where(tax < len(rows), tax, len(rows))]
     tables, why = None, "no --ranges"
@@ -375,7 +385,7 @@ def build(
         site_files.publish(site, "range", RANGE_NAME, None)
     # level 3 in strict score order, as identify_app.js orders it with the rank file
     key = np.where(level == NARROW, -ranks(level, score), quantize(level, score))
-    first = pack_first(site, ids, tax, rows, level, key, looks, far)
+    first = pack_first(site, ids, tax, rows, level, key, looks, far, names)
     site_files.publish(site, "first", FIRST_NAME, first)
     # the map's Outside usual range chip shows only with the file
     site_files.flag(site, "range", site_files.path(site, "range") is not None)
@@ -384,7 +394,7 @@ def build(
     return {int(lv): int(c) for lv, c in zip(*np.unique(level, return_counts=True), strict=True)}
 
 
-def pack_first(site, ids, tax, taxa, level, q, looks, far) -> bytes:
+def pack_first(site, ids, tax, taxa, level, q, looks, far, names=None) -> bytes:
     """The gzipped first lists (see the module doc), as `build()` in identify_app.js orders them:
     highest `q` (the score bucket, minus the rank for level 3) first, newest id first within
     one, PER_SPECIES of a taxon (of the suggested species on level 3) unless the level holds one
@@ -436,6 +446,8 @@ def pack_first(site, ids, tax, taxa, level, q, looks, far) -> bytes:
                 ]
             )
     head = {"bbox": meta["bbox"], "taxa": [taxa[t][:3] for t in tx], "looks": list(nm), "s": out}
+    if names:
+        head["fr"] = {k: names[k] for k in names.keys() & {str(taxa[t][2]) for t in tx}}
     return gzip.compress(json.dumps(head, separators=(",", ":")).encode(), mtime=0)
 
 
@@ -469,9 +481,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--data-url", help="atlas base URL holding manifest.json and identify.parquet")
     p.add_argument("--parquet", type=Path, help="read this local identify.parquet instead")
     p.add_argument("--ranges", type=Path, help="with --parquet: dir of `level_ranges` output")
+    p.add_argument("--fr", type=Path, help="French names cache (taxonomy --fr): ships them")
     a = p.parse_args(argv)
     try:
-        counts = build(a.out, a.data_url, a.parquet, a.ranges)
+        counts = build(a.out, a.data_url, a.parquet, a.ranges, a.fr)
     except (ValueError, FileNotFoundError, OSError) as exc:
         print(f"pool_levels: {exc}", file=sys.stderr)
         return 1

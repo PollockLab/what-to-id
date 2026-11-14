@@ -33,7 +33,7 @@ from what_to_id.page_order_text import order_name
 
 __all__ = ["METHOD_CSS", "ORDER_DETAIL", "ORDER_TEXT", "method_section"]
 
-_SG = "system-ui,sans-serif"
+_SG = 'system-ui,-apple-system,"Segoe UI",sans-serif'
 
 METHOD_JS = """
 (function() {
@@ -90,7 +90,7 @@ text-transform:uppercase;letter-spacing:.06em;color:var(--acc);margin-bottom:.35
 .how details.method>summary a{{color:var(--acc);margin-left:.5rem;text-decoration:none}}
 .how details.method>summary a:hover{{text-decoration:underline}}
 .how details.method[open]{{padding-bottom:.8rem}}
-.how summary:focus-visible{{outline:2px solid var(--acc);outline-offset:3px}}
+.how summary:focus-visible{{outline:3px solid var(--bar);outline-offset:3px}}
 .how details.order{{margin:.6rem 0;border-top:1px solid var(--line)}}
 .how details.order>summary{{padding:.6rem 0;cursor:pointer;color:var(--acc);
 font-size:.95rem;font-weight:400}}

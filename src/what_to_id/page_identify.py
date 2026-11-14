@@ -62,10 +62,14 @@ GOATCOUNTER_SRI = "sha384-nRw6qfbWyJha9LhsOtSb2YJDyZdKvvCFh0fJYlkquSFjUxp9FVNugb
 INAT_CLIENT_ID = ""
 INAT_REDIRECT = "https://pollocklab.github.io/what-to-id/identify.html"
 SCRIPTS = {
+    "__IDENTIFY_FR__": ASSETS / "identify_fr.js",
+    "__IDENTIFY_I18N__": ASSETS / "identify_i18n.js",
+    "__IDENTIFY_SETTINGS__": ASSETS / "identify_settings.js",
     "__ATLAS_SEARCH_META__": HERE / "atlas_search_assets" / "atlas_search_meta.js",
     "__MAP_TAXA__": HERE / "map_assets" / "map_taxa.js",
     "__MAP_CHIPS__": HERE / "map_assets" / "map_chips.js",
     "__IDENTIFY_LINKS__": HERE / "map_assets" / "identify_links.js",
+    "__MAP_RINGS__": HERE / "map_assets" / "map_rings.js",
     "__MAP_AREA__": HERE / "map_assets" / "map_area.js",
     "__TAXON_TREE__": HERE / "embeddings_assets" / "taxon_tree.js",
     "__GROUP_LIST__": HERE / "map_assets" / "group_list.js",
@@ -81,6 +85,9 @@ SCRIPTS = {
     "__MAP_ONLY__": HERE / "map_assets" / "map_only.js",
     "__IDENTIFY_ONLY__": ASSETS / "identify_only.js",
     "__IDENTIFY_UNCONFIRMED__": ASSETS / "identify_unconfirmed.js",
+    "__IDENTIFY_COMPARE_TEXT__": ASSETS / "identify_compare_text.js",
+    "__IDENTIFY_ZOOM__": ASSETS / "identify_zoom.js",
+    "__IDENTIFY_REFS__": ASSETS / "identify_refs.js",
     "__IDENTIFY_COMPARE__": ASSETS / "identify_compare.js",
     "__IDENTIFY_STUDY__": ASSETS / "identify_study.js",
     "__IDENTIFY_INAT__": ASSETS / "identify_inat.js",
@@ -91,6 +98,8 @@ SCRIPTS = {
     "__IDENTIFY_FLOW__": ASSETS / "identify_flow.js",
     "__IDENTIFY_CARD__": ASSETS / "identify_card.js",
     "__IDENTIFY_WHERE__": ASSETS / "identify_where.js",
+    "__GROUP_ICONS__": ASSETS / "group_icons.js",
+    "__IDENTIFY_SUGGEST__": ASSETS / "identify_suggest.js",
     "__IDENTIFY_BAR__": ASSETS / "identify_bar.js",
     "__IDENTIFY_SHELL__": ASSETS / "identify_shell.js",
     "__IDENTIFY_APP__": ASSETS / "identify_app.js",
@@ -140,14 +149,16 @@ def render(
     )
     for key, value in {
         "__PRELOADS__": preload,
-        "__SITE_CSS__": page_nav.CSS,
-        "__SITE_NAV__": page_nav.nav(PAGE_NAME),
+        "__SITE_CSS__": f"{page_nav.CSS}\n{page_nav.HELP_CSS}",
+        "__SITE_NAV__": page_nav.help_bar(),
         "__IDENTIFY_RANGES_CSS__": (ASSETS / "identify_ranges.css").read_text().rstrip(),
         "__MAP_AREA_CSS__": (HERE / "map_assets" / "map_area.css").read_text().rstrip(),
         "__MAP_PANELS_CSS__": (HERE / "map_assets" / "map_panels.css").read_text().rstrip(),
+        "__IDENTIFY_COMPARE_CSS__": (ASSETS / "identify_compare.css").read_text().rstrip(),
         "__IDENTIFY_UI_CSS__": (ASSETS / "identify_ui.css").read_text().rstrip(),
         "__IDENTIFY_SHELL_CSS__": (ASSETS / "identify_shell.css").read_text().rstrip(),
         "__IDENTIFY_BAR_CSS__": (ASSETS / "identify_bar.css").read_text().rstrip(),
+        "__IDENTIFY_SUGGEST_CSS__": (ASSETS / "identify_suggest.css").read_text().rstrip(),
         "__CONFIG__": json.dumps(
             {
                 "mapUrl": map_url,

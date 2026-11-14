@@ -13,7 +13,8 @@ import pytest
 
 from what_to_id import page_identify, pool_levels
 from what_to_id.identify import IDENTIFY_COLUMNS
-from what_to_id.page_map import encode_points, render_map
+from what_to_id.map_points import encode_points
+from what_to_id.page_map import render_map
 
 from . import test_identify_browser as ib
 from .embeddings_fixture import TREE, pool_frame

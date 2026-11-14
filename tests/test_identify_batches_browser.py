@@ -141,3 +141,16 @@ def test_signed_in_agree_posts_the_id_and_lands_in_the_trace(browser, site):
     assert [(p["id"], p["taxon"], p["user"]) for p in posts] == [(first, 3, 7)]
     assert "test-token" not in page.evaluate("JSON.stringify(localStorage)")
     assert page.errors == []
+
+
+def test_the_search_suggestions_are_hidden_in_the_batches(browser, site):
+    base, _ = site
+    page = open_batches(browser, base)
+    urls = []
+    page.route(
+        "https://api.inaturalist.org/v1/observations/identifiers*",
+        lambda r: (urls.append(r.request.url), r.abort()),
+    )
+    page.wait_for_selector("body.bt")
+    page.wait_for_timeout(300)
+    assert page.locator(".sg:visible").count() == 0 and urls == []  # no top identifiers either

@@ -8,8 +8,8 @@ import pytest
 
 from what_to_id import pool_levels, split_page
 from what_to_id.identify import IDENTIFY_COLUMNS
+from what_to_id.map_points import decode_points, encode_points
 from what_to_id.page_identify import build as build_identify
-from what_to_id.page_map import decode_points, encode_points
 
 from . import test_embeddings_browser as eb
 from . import test_identify_browser as ib

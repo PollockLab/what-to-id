@@ -66,8 +66,10 @@ BAR = (
     '<button type="button" data-p="map">Map</button>'
     '<button type="button" data-p="space" data-explain="photo-space">Photo space</button>'
     f"{TREE_BUTTON}</span>"
-    '<button type="button" class="i" id="i" aria-expanded="false" aria-controls="note" '
-    'aria-label="About this view">i</button>'
+    '<button type="button" class="infob" id="i" aria-expanded="false" aria-controls="note" '
+    'aria-label="About this view"><svg viewBox="0 0 24 24" aria-hidden="true">'
+    '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.7'
+    'M12 17h.01"/></svg></button>'
     '<p class="note" id="note" hidden>Show Identify, the map, the photo space and the taxonomy '
     "in any mix. "
     "The panes share one selection: change a filter in any and the others follow. Dates, months, "

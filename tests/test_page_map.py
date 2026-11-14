@@ -11,24 +11,26 @@ import pytest
 
 from what_to_id.batches import MAX_URL_LEN
 from what_to_id.inat import BC_PLACE_ID
+from what_to_id.map_points import (
+    BYTES_PER_RECORD,
+    NO_DAY,
+    RECENT_DAYS,
+    _decode_shard,
+    decode_points,
+    encode_points,
+    shard_name,
+)
 from what_to_id.page import ARM_WORDS
 from what_to_id.page_map import (
     _ASSETS,
-    BYTES_PER_RECORD,
     MAP_NAME,
-    NO_DAY,
     PARKS_NAME,
-    RECENT_DAYS,
     TOTAL_ONLY,
-    _decode_shard,
     align_totals,
-    decode_points,
-    encode_points,
     fetch_totals,
     main,
     over_totals,
     render_map,
-    shard_name,
     write_map,
 )
 from what_to_id.site_files import META_NAME, hashed, publish
@@ -50,7 +52,7 @@ def _with_extras(pool):
 
 
 def test_encode_round_trips_within_quantization(monkeypatch):
-    monkeypatch.setattr("what_to_id.page_map.SHARD_MAX", 40)
+    monkeypatch.setattr("what_to_id.map_points.SHARD_MAX", 40)
     pool = _with_extras(make_pool(300, seed=3)).sample(frac=1, random_state=0)
     pool["rank"] = np.where(pool["taxon_id"] % 2 == 1, "species", "genus")
     pool["id"] = pool["id"] * 1000 + np.where(pool["id"] % 2 == 1, 0xFFFFFFFF - 10**7, 0)
@@ -129,7 +131,7 @@ def test_recent_records_come_first_and_old_ones_after():
 
 
 def test_older_records_follow_newest_first_in_capped_shards(monkeypatch):
-    monkeypatch.setattr("what_to_id.page_map.SHARD_MAX", 2)
+    monkeypatch.setattr("what_to_id.map_points.SHARD_MAX", 2)
     pool = make_pool(6)
     pool["observed_on"] = ["2001-01-01", "2005-01-01", "2003-01-01", "2004-01-01", "2002-01-01"] + [
         "2026-09-01"
@@ -482,6 +484,8 @@ def test_page_inlines_the_area_filter_before_the_map_script():
     area = (_ASSETS / "map_area.js").read_text()
     assert (_ASSETS / "identify_links.js").read_text() in html
     assert html.index("var IdentifyLinks=") < html.index("var MapArea=")
+    assert (_ASSETS / "map_rings.js").read_text() in html
+    assert html.index("var MapRings=") < html.index("var MapArea=")
     assert area in html and (_ASSETS / "map_area.css").read_text() in html
     assert html.index("var MapArea=") < html.index("var AREA=MapArea(")
     assert "AREA.mask(n)" in html and "h.push(AREA.hash())" in html
@@ -534,7 +538,11 @@ console.log(JSON.stringify(out));
 def test_area_filter_codes_tests_and_reads_polygons():
     js = (
         "var document={};"
-        + ((_ASSETS / "identify_links.js").read_text() + (_ASSETS / "map_area.js").read_text())
+        + (
+            (_ASSETS / "identify_links.js").read_text()
+            + (_ASSETS / "map_rings.js").read_text()
+            + (_ASSETS / "map_area.js").read_text()
+        )
         + _AREA_JS
     )
     run = subprocess.run(["node", "-e", js], capture_output=True, text=True, check=True)
@@ -567,7 +575,11 @@ def test_area_identify_batches_open_every_id_once(n, sizes):
     ids = [9_999_999_999 - (i * 7919) % 1_000_003 * 1000 - i for i in range(n)]
     js = (
         "var document={};"
-        + ((_ASSETS / "identify_links.js").read_text() + (_ASSETS / "map_area.js").read_text())
+        + (
+            (_ASSETS / "identify_links.js").read_text()
+            + (_ASSETS / "map_rings.js").read_text()
+            + (_ASSETS / "map_area.js").read_text()
+        )
         + f"console.log(JSON.stringify(MapArea.batches({json.dumps(ids)})));"
     )
     # on stdin: 10,000 ids pass Linux's 128 KiB limit on one command-line argument
@@ -686,7 +698,11 @@ def test_area_box_link_cuts_to_view_counts_and_pages_like_the_batches():
     js = (
         "var document={};"
         + (_ASSETS / "map_taxa.js").read_text()
-        + ((_ASSETS / "identify_links.js").read_text() + (_ASSETS / "map_area.js").read_text())
+        + (
+            (_ASSETS / "identify_links.js").read_text()
+            + (_ASSETS / "map_rings.js").read_text()
+            + (_ASSETS / "map_area.js").read_text()
+        )
         + f"const P={json.dumps(P)},bb={json.dumps(bb)},ok=i=>i%2===0,A=MapArea;"
         + "const cut=A.boxed({w:0,s:-5,e:5,n:5},bb,P,ok),"
         + "off=A.boxed({w:20,s:20,e:30,n:30},bb,P,ok);"

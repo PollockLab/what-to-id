@@ -7,7 +7,8 @@ import pandas as pd
 import pytest
 
 from what_to_id import taxonomy
-from what_to_id.page_map import encode_points, main
+from what_to_id.map_points import encode_points
+from what_to_id.page_map import main
 from what_to_id.taxonomy import (
     AT_RISK,
     GROUP_TAXA,
@@ -200,3 +201,61 @@ def test_taxonomy_cli_fills_the_cache(tmp_path, monkeypatch):
     path = tmp_path / "tree.json"
     assert taxonomy.main(["--pool", str(tmp_path / "pool.parquet"), "--tree", str(path)]) == 0
     assert load_tree(path) == TREE
+
+
+class FrSession(FakeSession):
+    """FakeSession whose taxa carry French names when asked with locale=fr, as iNaturalist's do."""
+
+    FR = {2: "Plantes", 5: "Sphaigne brune", 6: "Polytric"}
+
+    def get(self, url, params, timeout):
+        out = super().get(url, params, timeout).json()
+        if params.get("locale") == "fr":
+            for t in out["results"]:
+                t["preferred_common_name"] = self.FR.get(
+                    t["id"], t.get("preferred_common_name", "")
+                )
+
+        class R:
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return out
+
+        return R()
+
+
+def test_french_names_round_trip_and_ask_only_what_is_missing(tmp_path, monkeypatch):
+    monkeypatch.setattr(taxonomy, "PER_REQUEST", 2)
+    path = tmp_path / "taxonomy-fr.json"
+    assert taxonomy.load_fr(path) == {} and taxonomy.load_fr(None) == {}
+    s, fr = FrSession(TREE), {}
+    assert taxonomy.update_fr(fr, [2, 5, 6, 99], session=s, sleep=0) == 4
+    assert fr == {
+        2: "Plantes",
+        5: "Sphaigne brune",
+        6: "Polytric",
+        99: "",
+    }  # "" is none, not asked again
+    assert [len(c) for c in s.calls] == [2, 2]
+    taxonomy.save_fr(fr, path)
+    assert taxonomy.load_fr(path) == fr and not (tmp_path / "taxonomy-fr.json.tmp").exists()
+    s.calls.clear()
+    assert taxonomy.update_fr(fr, [2, 5, 99], session=s, sleep=0) == 0 and s.calls == []
+
+
+def test_fetch_fr_refuses_more_than_one_request():
+    with pytest.raises(ValueError, match="at most"):
+        taxonomy.fetch_fr(range(taxonomy.PER_REQUEST + 1), session=FrSession(TREE))
+
+
+def test_taxonomy_cli_caches_french_names_only_with_fr(tmp_path, monkeypatch):
+    _pool([5, 6]).to_parquet(tmp_path / "pool.parquet")
+    monkeypatch.setattr(taxonomy, "make_session", lambda: FrSession(TREE))
+    monkeypatch.setattr(taxonomy, "SLEEP", 0)
+    args = ["--pool", str(tmp_path / "pool.parquet"), "--tree", str(tmp_path / "tree.json")]
+    assert taxonomy.main(args) == 0 and not (tmp_path / "fr.json").exists()
+    assert taxonomy.main([*args, "--fr", str(tmp_path / "fr.json")]) == 0
+    fr = taxonomy.load_fr(tmp_path / "fr.json")
+    assert fr[5] == "Sphaigne brune" and fr[2] == "Plantes" and set(fr) == set(TREE)

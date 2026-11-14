@@ -7,7 +7,7 @@
 (function(){
 'use strict';
 var CFG=IDENTIFY_CONFIG,L=EmbeddingsLayout,Meta=AtlasSearchMeta,PER_SPECIES=3,LIMIT=12,STEPS=16,NO_LOOK=65535,NOTAX=65535,LS='wtid-identify-tab',IO=null,T=0,TK=0,AB=null;
-var MAP=new URL(CFG.mapUrl,location.href).href,nf=new Intl.NumberFormat('en-CA'),OBS='https://www.inaturalist.ca/observations/';
+var MAP=new URL(CFG.mapUrl,location.href).href,nf=I18N.nf,OBS='https://www.inaturalist.ca/observations/';
 // one record opens its own page at the ID form; iNat's Identify grid would need a click on the tile first
 function one(id){return OBS+id+'#comment-id-tabs';}
 var CARD=IdentifyCard({ref:function(n){return CMP?CMP.ref(n):Promise.resolve(null);}}),TAB=[],SUBK=[],NK=1,KIND=null,SUB=null,KF=0,KC=[],UF=null,UON=false,MINE=[],CMP=null,BT=false,ST=null,SK='',IN=IdentifyInat(CFG.oauth);
@@ -145,14 +145,14 @@ function card(i,lv,id){
 function photos(lis){
   var ids=lis.map(function(li){return +li.dataset.id;});
   var sig=AB&&AB.signal;
-  Meta.fetchObservations(ids,function(u){return fetch(u,{signal:sig});},CACHE).then(function(){
+  Meta.fetchObservations(ids,function(u){return fetch(I18N.api(u),{signal:sig});},CACHE).then(function(){
     lis.forEach(function(li){
       if(!li.isConnected)return;
       var o=CACHE.get(+li.dataset.id);
       if(!o||o.quality_grade!=='needs_id'){li.remove();return;}
       var p=o.photos&&o.photos[0],ph=li.querySelector('.ph'),w=li.querySelector('.when'),t=o.taxon;
       if(!li.dataset.i){var nm=el('div','name');nm.appendChild(el('i',null,t?t.name:'Unidentified'));
-        li.querySelector('.title').replaceChildren(nm);if(t&&t.preferred_common_name)nm.after(el('div','com',t.preferred_common_name));}
+        li.querySelector('.title').replaceChildren(nm);if(t&&t.preferred_common_name&&I18N.names!=='latin')nm.after(el('div','com',t.preferred_common_name));}
       ph.textContent='';
       if(p){var img=el('img');img.loading='lazy';img.onerror=function(){img.removeAttribute('src');};img.alt='Photo of '+li.querySelector('i').textContent;
         img.src=String(p.url).replace('/square.','/medium.');ph.appendChild(img);}else ph.textContent='No photo on iNaturalist now';
@@ -261,7 +261,7 @@ function kindName(k){return (CFG.kinds.filter(function(x){return x[0]===k;})[0]|
 function kinds(){
   var box=$('kind'),ks=CFG.merge[LV];
   box.hidden=!ks;box.textContent='';if(!ks)return;
-  var g=el('div','seg');g.setAttribute('role','radiogroup');g.setAttribute('aria-label','Kind');
+  var g=el('div','seg');g.setAttribute('role','radiogroup');g.setAttribute('aria-label','Kind of possible error');
   [[0,'All']].concat(ks.map(function(k){return [k,kindName(k)];})).forEach(function(x){
     var b=el('button','segb',x[1]+' '+nf.format(x[0]?KC[x[0]]||0:S.total[LV]||0)),on=KF===x[0]||(!x[0]&&TAB[KF]!==LV);
     b.type='button';if(KX[x[0]])b.dataset.explain=KX[x[0]];b.setAttribute('role','radio');b.setAttribute('aria-checked',String(on));b.tabIndex=on?0:-1;
@@ -270,7 +270,7 @@ function kinds(){
   g.onkeydown=function(e){var d={ArrowLeft:-1,ArrowRight:1}[e.key],all=[].slice.call(g.children),at=all.indexOf(document.activeElement);
     if(!d||at<0)return;e.preventDefault();all[(at+d+all.length)%all.length].click();
     var c=$('kind').querySelector('[aria-checked=true]');if(c)c.focus();};  // the click drew the control again
-  box.append(el('span',null,'Kind: '),g);
+  box.append(g);
 }
 function counts(){
   [].forEach.call($('tabs').querySelectorAll('[data-lv]'),function(t){var n=S.total[+t.dataset.lv]||0,w=+t.dataset.lv===3&&GP&&RKW&&!RK&&GP.label();t.lastChild.textContent=w?'':nf.format(n);t.classList.toggle('zero',!n&&!w);});
@@ -359,7 +359,7 @@ function firstOf(F){
   Object.keys(F.s).forEach(function(k){var s=F.s[k];s.rows=s.rows.map(function(r,lv){
     var out=r.map(function(x){var i=id.length;id.push(x[0]);tax.push(x[1]);lk.push(x[2]);if(x[3])MORE.set(i,x[3]);return i;});
     out.n=s.n[lv];return out;});});
-  F.P={id:id,tax:tax,n:id.length};TAXA=F.taxa;LOOKS={names:F.looks,lo:lk,hi:new Uint8Array(id.length)};  // lo holds the whole index
+  F.P={id:id,tax:tax,n:id.length};TAXA=I18N.taxa(F.taxa,F.fr);LOOKS={names:F.looks,lo:lk,hi:new Uint8Array(id.length)};  // lo holds the whole index
   FIRST=F;early();
 }
 // The first list of the selection while the records load, when it is one built (no filter or one group) with no area, lasso,
@@ -432,7 +432,7 @@ async function load(){
   WW=IdentifyWWW({value:META.value,taxa:function(){return TAXA;},look:looksOf,redraw:function(){if(P)redraw();}});
   function file(k){var f=META.files[k];return f?get(new URL(f,MAP)):Promise.reject(new Error('the map lists no '+k+' file'));}
   await drawn_;
-  var taxa=get(new URL(META.taxa,MAP)).then(function(b){return JSON.parse(new TextDecoder().decode(b));});
+  var taxa=Promise.all([get(new URL(META.taxa,MAP)),I18N.lang==='fr'&&META.files.taxa_fr?file('taxa_fr').catch(function(){return null;}):null]).then(function(r){return I18N.taxa(JSON.parse(new TextDecoder().decode(r[0])),r[1]&&JSON.parse(new TextDecoder().decode(r[1])));});
   var shards=Promise.all(META.shards.map(function(s){return get(new URL(s.file,MAP)).then(function(b){return L.decodeShard(b,s.n);});}));
   var lev=file('levels'),lkp=null,rkp=null,rg=file('range').catch(function(){return null;});  // optional: no range maps without it
   function lk(){return lkp||(lkp=file('looks').catch(function(){return null;}));}function rk(){return rkp||(rkp=file('rank').catch(function(){return null;}).then(function(b){RKW=false;return b;}));}  // optional: level 3 by score bucket without it
@@ -455,10 +455,10 @@ async function load(){
   // Not yet identified by me asks iNaturalist within the pool's extent: Identify has no map viewport of its own
   var b=META.bbox;UF=userFilter({S:S,meta:META,get:function(f){return get(new URL(f,MAP));},taxa:function(){return TAXA;},changed:user,
     bounds:function(){return {w:b[0],s:b[1],e:b[2],n:b[3]};}});
-  CMP=IdentifyCompare({taxa:TAXA,tax:P.tax,look:looksOf,why:whyOf,obs:function(id){return CACHE.get(id);},more:function(){shown+=LIMIT;more();},lend:CARD.lend});
+  CMP=IdentifyCompare({taxa:TAXA,tax:P.tax,look:looksOf,why:whyOf,obs:function(id){return CACHE.get(id);},range:function(){return R;},more:function(){shown+=LIMIT;more();},lend:CARD.lend});
   MF=MapFilter(META);Object.assign(S,MF.read(new URLSearchParams()));  // the defaults, until the address is read
   OX=IdentifyOnly({META:META,mf:MF,P:function(){return P;},taxa:function(){return TAXA;},range:function(){return R;},rewrite:rewrite,changed:refresh,embedded:parent!==window,get:function(f){return get(new URL(f,MAP));}});
-  BAR=IdentifyBar({S:S,META:META,mf:MF,nf:nf,taxa:function(){return TAXA;},P:function(){return P;},tf:function(){return TF;},mask:atLevel,all:kept,tab:function(){var l=CFG.levels.filter(function(x){return x[0]===LV;})[0];return {name:l?l[1]:'',has:function(i){return LV?LEVEL[i]===LV:LEVEL[i]>0;}};},changed:put,blocked:function(){return !!(AREA||VIEW||KEEPIDS||SUBIDS||PIDS||UF.active());},
+  BAR=IdentifyBar({rewrite:rewrite,S:S,META:META,mf:MF,nf:nf,taxa:function(){return TAXA;},P:function(){return P;},tf:function(){return TF;},mask:atLevel,all:kept,tab:function(){var l=CFG.levels.filter(function(x){return x[0]===LV;})[0];return {name:l?l[1]:'',has:function(i){return LV?LEVEL[i]===LV:LEVEL[i]>0;}};},changed:put,blocked:function(){return !!(AREA||VIEW||KEEPIDS||SUBIDS||PIDS||UF.active());},
     where:where,get:function(u){return get(new URL(u,MAP));},map:MAP,key:key,embedded:parent!==window});
   RKF=function(){if(RK||rkp)return;LKF();Promise.all([rk(),lk()]).then(function(d){if(rank(d[0]))LV===3?redraw(true):(build(),counts());});};
   LKF=function(){if(lkp)return;lk().then(function(b){if(!b)return;LOOKS=looks(b);retitle();

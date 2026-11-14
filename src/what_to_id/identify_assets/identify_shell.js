@@ -13,11 +13,11 @@ function labels(){
   $('uload').hidden=!$('usrbox').hidden;
 }
 function count(){
-  var cap=$('cap').textContent,m=/^[\d,.\s ]+/.exec(cap),n=$('none').hidden?(m?m[0].trim():''):'0';
-  var st=$('status').textContent;  // loading and load errors stay in sight while the totals sit in the help sheet
+  var cap=I18N.raw($('cap')),m=/^[\d,.\s ]+/.exec(cap),n=$('none').hidden?(m?m[0].trim():''):'0';
+  var st=I18N.raw($('status'));  // loading and load errors stay in sight while the totals sit in the help sheet
   // the heading relates its cards to the tab's records: "22,902 cards · 3 per species of 324,594 records"
   var tb=document.querySelector('[role=tab][aria-selected=true] b'),pr=/up to (\d+) per/.exec(cap),rel=tb&&tb.textContent?(pr?' · '+pr[1]+' per species':'')+' of '+tb.textContent+' records':'';
-  $('count').textContent=n?n+' cards':/^(Loading|Could not)/.test(st)?st:'';$('count').title=cap;
+  $('count').textContent=n?n+' cards':/^(Loading|Could not)/.test(st)?st:'';$('count').title=cap;  // raw English, translated when it lands
   if(n&&rel){var r=document.createElement('span');r.className='rel';r.textContent=rel;$('count').appendChild(r);}  // a phone keeps the short heading
   $('pshow').textContent=n?'Show '+n+' cards':'Close';
   [].forEach.call(document.querySelectorAll('.sdone .n'),function(s){s.textContent=n||'0';});
@@ -35,10 +35,10 @@ function sheets(){
       b.onclick=function(){d.showModal();};});
   });
 }
-// the Sort and You popovers open under their buttons, the You one right-aligned; on a phone the CSS makes them bottom sheets
+// the Sort and Settings popovers open under their buttons, the Settings one right-aligned; on a phone the CSS makes them bottom sheets
 function popovers(){
   $('pshow').onclick=function(){$('sortpop').hidePopover();};
-  [['sortpop','sortb',420]].forEach(function(x){
+  [['sortpop','sortb',420],['setpop','setb',280]].forEach(function(x){
     var p=$(x[0]),b=$(x[1]);
     p.addEventListener('beforetoggle',function(e){
       if(e.newState!=='open')return;

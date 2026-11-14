@@ -29,13 +29,13 @@ function taken(o){
 }
 // The one count line of level 3: cards drawn, the records behind the tab's count, the filters on (empty tags drop out).
 function line(cards,records,tags,per){
-  var nf=new Intl.NumberFormat('en-CA'),t=tags.filter(Boolean);
+  var nf=new Intl.NumberFormat(I18N.loc),t=tags.filter(Boolean);
   return nf.format(cards)+' cards to ID ('+nf.format(records)+' records'+(t.length?', '+t.join(', '):'')+'; '+per+' per suggested species)';
 }
 // Why the suggestion: the runner-up species in the clade and, in words, the margin over it (thousandths of cosine, 255 none).
 function why(name,m){
   var d=el('div','why'),w=m===255?'':m<10?', close call':m<40?', fair margin':', clear margin';
-  d.append('vs ',el('i',null,name),w);
+  d.append('vs ',I18N.nm(name),w);
   d.title='Second best: '+name+(m===255?'':'. Margin '+(m/1000).toFixed(3)+' cosine; under 0.010 a close call, under 0.040 fair, else clear');
   return d;
 }
@@ -48,7 +48,7 @@ function runs(rows,key){
 // A run's header: the species, its card count and up to three of its reference photos (ref(name) gives the taxon).
 function head(name,n,ref){
   var li=el('li','sep run'),p=el('span','rp');
-  li.append(el('i',null,name),' · '+n+(n===1?' card':' cards'),p);
+  li.append(I18N.nm(name),' · '+n+(n===1?' card':' cards'),p);
   ref(name).then(function(t){var ps=t&&t.taxon_photos?t.taxon_photos.map(function(x){return x.photo;}):t&&t.default_photo?[t.default_photo]:[];
     ps.slice(0,3).forEach(function(x){var im=el('img');im.alt='';im.loading='lazy';im.src=String(x.url||x.square_url).replace('/square.','/small.');p.append(im);});});
   return li;

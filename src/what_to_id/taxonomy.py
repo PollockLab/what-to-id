@@ -122,6 +122,49 @@ def fetch_taxa(ids: Iterable[int], *, session=None) -> dict[int, list]:
     return out
 
 
+def load_fr(path: Path | str | None) -> dict[int, str]:
+    """The cached French common names, keyed by taxon id ("" for a taxon with none)."""
+    if path is None or not Path(path).exists():
+        return {}
+    return {int(k): v for k, v in json.loads(Path(path).read_text())["fr"].items()}
+
+
+def save_fr(fr: dict[int, str], path: Path | str) -> None:
+    path = Path(path)
+    tmp = path.with_name(path.name + ".tmp")
+    body = {"fr": {str(k): fr[k] for k in sorted(fr)}}
+    tmp.write_text(json.dumps(body, ensure_ascii=False, separators=(",", ":")))
+    tmp.replace(path)
+
+
+def fetch_fr(ids: Iterable[int], *, session=None) -> dict[int, str]:
+    """The French common name of each of at most PER_REQUEST ids ("" when iNaturalist has none;
+    it may fall back to the English name, which the page's own fallback makes harmless)."""
+    ids = sorted({int(i) for i in ids})
+    if len(ids) > PER_REQUEST:
+        raise ValueError(f"at most {PER_REQUEST} ids a request, got {len(ids)}")
+    session = session or make_session()
+    params = {"id": ",".join(map(str, ids)), "per_page": PER_REQUEST, "locale": "fr"}
+    r = session.get(TAXA_API, params=params, timeout=TIMEOUT)
+    r.raise_for_status()
+    got = {int(t["id"]): t.get("preferred_common_name") or "" for t in r.json()["results"]}
+    return {i: got.get(i, "") for i in ids}
+
+
+def update_fr(fr: dict[int, str], ids: Iterable[int], *, session=None, sleep=SLEEP) -> int:
+    """Add the French names of the taxa in ``ids`` the cache lacks; returns how many it asked.
+
+    shortcut: a name once cached (or "" for none) is never refreshed, drop the cache to refetch.
+    """
+    session = session or make_session()
+    need = sorted({int(i) for i in ids} - set(fr))
+    for start in range(0, len(need), PER_REQUEST):
+        if sleep and start:
+            time.sleep(sleep)
+        fr.update(fetch_fr(need[start : start + PER_REQUEST], session=session))
+    return len(need)
+
+
 def missing_ancestors(tree: dict[int, list]) -> set[int]:
     """Parents named in the tree that it does not hold yet."""
     return {v[0] for v in tree.values() if v[0] is not None and v[0] not in tree}
@@ -219,6 +262,7 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Fill the taxon tree cache for a pool's taxa.")
     ap.add_argument("--pool", required=True, type=Path)
     ap.add_argument("--tree", required=True, type=Path, help="JSON cache, created if missing")
+    ap.add_argument("--fr", type=Path, help="JSON cache of French common names, created if missing")
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     ids = pd.read_parquet(a.pool, columns=["taxon_id"])["taxon_id"].dropna().astype(int)
@@ -229,8 +273,24 @@ def main(argv: list[str] | None = None) -> int:
         save_tree(tree, a.tree)
     lacking = len(set(ids) - set(tree)) + len(missing_ancestors(tree))
     log.info("tree holds %d taxa, %d new; %d still missing", len(tree), added, lacking)
+    if a.fr:
+        fr = load_fr(a.fr)
+        try:
+            asked = update_fr(fr, set(tree) | set(ids))
+        finally:
+            save_fr(fr, a.fr)
+        log.info("French names: %d taxa, %d asked", len(fr), asked)
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+def fr_names(rows: list[list], fr: dict[int, str]) -> dict[str, str]:
+    """{taxon id: French name} for the taxa rows whose French name is there and not the English."""
+    return {
+        str(r[2]): fr[r[2]]
+        for r in rows
+        if fr.get(r[2]) and fr[r[2]].casefold() != str(r[1]).casefold()
+    }

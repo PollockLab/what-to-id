@@ -26,7 +26,7 @@ def test_encode_rings_codes_as_the_page_does():
     js = (
         "var document={};"
         + (_ASSETS / "identify_links.js").read_text()
-        + (_ASSETS / "map_area.js").read_text()
+        + (_ASSETS / "map_rings.js").read_text() + (_ASSETS / "map_area.js").read_text()
         + f"console.log(JSON.stringify([MapArea.encode({json.dumps(rings)}),"
         + f"MapArea.decode({json.dumps(encode_rings(rings))})]));"
     )  # fmt: skip

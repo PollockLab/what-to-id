@@ -8,6 +8,7 @@
 // its popover (chip(i,lv)); it has no #rout, so no segmented control.
 var IdentifyRanges=(function(){
 'use strict';
+var LOC=typeof I18N==='undefined'?'en':I18N.loc;  // the map page shares this file without the translator
 // OUT_KM: a res-4 cell is ~22 km across, so under 50 km is cell-edge noise, not a range outlier.
 var OUT_KM=50,NONE=255,KX=Math.cos(54*Math.PI/180),NEITHER='Outside both ranges: maybe neither.',
   REFS=[['Vancouver',-123120,49280],['Prince George',-122750,53920]],
@@ -45,7 +46,7 @@ return function(buf,ctx){
   function has(a,c){return c>=0&&(a[c>>3]>>(c&7))&1;}
   // okm_code back to km, already rounded as the page shows it: a coarser step farther out
   function km(i){var c=OKM[i];return c<50?c:c<=95?50+(c-50)*10:c<=105?500+(c-95)*50:1000+(c-105)*100;}
-  function kmText(i){return km(i).toLocaleString('en');}
+  function kmText(i){return km(i).toLocaleString(LOC);}
   function far(i){return OKM[i]!==NONE&&OKM[i]>=OUT_KM;}
   // the suggested species' range holds the record's cell; an unknown range does not, as the suggestion is unchecked
   function fits(i){var a=bits(ctx.look(i));return !!a&&!!has(a,cellOf(i));}
@@ -105,15 +106,16 @@ return function(buf,ctx){
     return{aria:'Range map: this record is '+(la?'inside':'outside')+' the range of '+a+
       (t?', '+(lb?'inside':'outside')+' the range of '+b:'')+(cap.length?'. '+cap.join(' '):''),cap:cap.join(' ')};
   }
-  function drawMap(cv,i,lv){
-    var r=cv.getBoundingClientRect(),dpr=window.devicePixelRatio||1,B=box(),b=two(i,lv);
+  // only: one species' range alone (the compare panel's small maps), without the reference towns
+  function drawMap(cv,i,lv,only){
+    var r=cv.getBoundingClientRect(),dpr=window.devicePixelRatio||1,B=box(),b=only?null:two(i,lv);
     if(!r.width)return;
     cv.width=Math.round(r.width*dpr);cv.height=Math.round(r.height*dpr);
     var g=cv.getContext('2d'),st=getComputedStyle(cv),pad=2*dpr,k=(cv.width-2*pad)/B.w;
     function X(v){return pad+(v-B.x0)*KX*k;}
     function Y(v){return cv.height-pad-(v-B.y0)*k;}
     function col(c){return st.getPropertyValue(c);}
-    var A=bits(ctx.name(i)),L=b?bits(b):A;
+    var A=bits(only||ctx.name(i)),L=b?bits(b):A;
     g.lineWidth=dpr*.5;g.lineJoin='round';
     D.grid.forEach(function(p,c){
       var a=has(A,c),l=has(L,c);
@@ -125,12 +127,13 @@ return function(buf,ctx){
     outline().forEach(function(e){g.moveTo(X(e[1]),Y(e[2]));g.lineTo(X(e[3]),Y(e[4]));});g.stroke();
     var px=X(P.lonlat[2*i]*1000),py=Y(P.lonlat[2*i+1]*1000);
     g.font=10*dpr+'px system-ui,sans-serif';g.textBaseline='middle';g.fillStyle=col('--muted');
-    REFS.forEach(function(x){
+    if(!only)REFS.forEach(function(x){
       var rx=X(x[1]),ry=Y(x[2]);
       g.beginPath();g.arc(rx,ry,2*dpr,0,7);g.fill();
       if(Math.hypot(rx-px,ry-py)>15*dpr)g.fillText(x[0],rx+4*dpr,ry);});
-    g.beginPath();g.arc(px,py,5*dpr,0,7);g.fillStyle='#fff';g.fill();
-    g.beginPath();g.arc(px,py,3.2*dpr,0,7);g.fillStyle='#111';g.fill();
+    var u=only?.8:1;
+    g.beginPath();g.arc(px,py,5*u*dpr,0,7);g.fillStyle='#fff';g.fill();
+    g.beginPath();g.arc(px,py,3.2*u*dpr,0,7);g.fillStyle='#111';g.fill();
   }
   // The chip on a card: the verdict in a few words.
   function verdict(i,lv){
@@ -264,6 +267,8 @@ return function(buf,ctx){
     // the chip alone, or null when the label's range is unknown; close drops its popover
     chip:function(i,lv){return bits(ctx.name(i))?chip(i,lv):null;},
     close:function(){closePop(false);},
+    // one name's range alone on cv, with the record's point: {inside} whether the record's cell is in it, null when its range is unknown
+    mini:function(cv,i,name){var a=bits(name);if(!a)return null;cv.style.aspectRatio=box().w+'/'+box().h;drawMap(cv,i,0,name);return {inside:!!has(a,cellOf(i))};},
     // a name's range cells as a GeoJSON MultiPolygon in degrees (the grid holds lon/lat times 1000), null when unknown
     cells:function(name){
       var a=bits(name),m=[];
@@ -301,7 +306,7 @@ return function(buf,ctx){
       SEG.setAttribute('aria-label',lv===3?"Records in the suggested species' range":'Records far outside their range');
       [].forEach.call(SEG.children,function(b,k){
         var o=OPTS[k][0],on=o===S.o;
-        b.textContent=(lv===3?FIT_OPTS[k]:OPTS[k][1])+' '+c[o].toLocaleString('en');
+        b.textContent=(lv===3?FIT_OPTS[k]:OPTS[k][1])+' '+c[o].toLocaleString(LOC);
         b.setAttribute('aria-checked',String(on));b.tabIndex=on?0:-1;
         b.disabled=o===1&&!f&&!on;});
     }

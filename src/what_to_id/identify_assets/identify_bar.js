@@ -6,10 +6,10 @@
 // panel, Esc closes it and returns to the segment, a click outside closes it.
 // IdentifyBar(o), o {S, META, mf (MapFilter(META)), nf, taxa(), P(), tf() (the taxon filter), mask(st) (1 per record
 // st keeps at the chosen level), all(st) (the same at every level), tab() ({name, has(i)}: the chosen
-// level), changed() (S changed), where(rings, hash) (the area changed), get(url), map (the map
+// level), changed() (S changed), rewrite(drop, add) (the address's tokens), where(rings, hash) (the area changed), get(url), map (the map
 // page's address), key() (the selection as text), embedded}.
 // Returns update(), called after every selection and level change. Needs map_taxa.js, map_chips.js, map_area.js,
-// group_list.js, map_hist.js, map_time.js, map_only.js and identify_where.js.
+// group_list.js, map_hist.js, map_time.js, map_only.js, identify_where.js and identify_suggest.js.
 var IdentifyBar=(function(){
 'use strict';
 var NAMES=['What','When','Where','Who'];
@@ -30,11 +30,58 @@ var GL=GroupList({box:$('groups'),bar:$('gbar'),keep:$('gkeep'),mine:$('mine'),S
 var CL=MapOnly.clades({S:S,box:$('clades'),wrap:$('cladebox'),pk:PK,presets:META.presets||[],refilter:o.changed}),
   OL=MapOnly({S:S,META:META,mf:MF,box:$('flagbox'),flags:$('flags'),acclbl:$('acclbl'),acc:$('acc'),accr:$('accr'),refilter:o.changed});
 $('gall').onclick=function(){S.groups={};GL.show();o.changed();};
-function counts(){
+function tally(){
   var P=o.P(),c=new Uint32Array(G.length),i;
   GM=o.mask(Object.assign({},S,{groups:{}}));
   for(i=0;i<P.n;i++)if(GM[i])c[P.grp[i]]++;
-  GL.set(c);
+  if(!ALLC){ALLC=new Uint32Array(G.length);for(i=0;i<P.n;i++)ALLC[P.grp[i]]++;}
+  cats(c);return c;
+}
+function counts(){GL.set(tally());}
+// The life-form row above the bar: All, then one tab per group, largest first and the catch-alls last, then Combine. A tab is the group's icon
+// (iNaturalist's, group_icons.js) in its map colour, toned down; the strip under the row is every record on the page split
+// by group in the same order and colours, whatever is filtered, and a group picked or pointed at takes its full colour in
+// both. A tab or its segment shows its group alone and a second click clears it. Several groups, or leaving one out, are
+// the What panel's: Combine opens it and names how many it picked, and the row lights every group picked, strikes those left out.
+var CATS=null,MORE=null,REST=/^(Animalia|Unknown)$/,ALLC=null,NS='http://www.w3.org/2000/svg';
+function cat(g,j){
+  var b=el('button','cat'),v=document.createElementNS(NS,'svg'),p=document.createElementNS(NS,'path');
+  b.type='button';v.setAttribute('viewBox','0 0 512 512');v.setAttribute('aria-hidden','true');
+  p.setAttribute('d',GROUP_ICONS[g||'All']||GROUP_ICONS.Unknown);p.setAttribute('transform','translate(0 480) scale(1 -1)');v.appendChild(p);
+  if(g)b.style.setProperty('--c','rgb('+MapFilter.color(g,j).join(',')+')');
+  b.append(v,el('span',null,g?short(g):'All'));
+  if(g){
+    var s=el('i');s.style.flexGrow=ALLC[j];s.dataset.k=short(g);s.style.setProperty('--c',b.style.getPropertyValue('--c'));
+    $('mix').appendChild(s);
+    s.onmouseenter=function(){b.classList.add('hot');};s.onmouseleave=function(){b.classList.remove('hot');};
+    b.onmouseenter=b.onfocus=function(){s.classList.add('hot');};
+    b.onmouseleave=b.onblur=function(){s.classList.remove('hot');};
+  }
+  b.onclick=function(){var only=g&&S.groups[g]==='inc'&&Object.keys(S.groups).length===1;S.groups={};if(g&&!only)S.groups[g]='inc';o.changed();};
+  if(s)s.onclick=b.onclick;
+  $('cats').appendChild(b);return {g:g,j:j,b:b,s:s};
+}
+function cats(c){
+  var all=o.P().n||1;
+  if(!CATS){
+    CATS=[cat(null,-1)].concat(G.map(function(g,k){return k;}).sort(function(a,b){return REST.test(G[a])-REST.test(G[b])||ALLC[b]-ALLC[a]||a-b;}).map(function(k){return cat(G[k],k);}));
+    MORE=el('button','cat more');MORE.type='button';MORE.setAttribute('aria-controls','pwhat');
+    MORE.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2.4"/><circle cx="15" cy="17" r="2.4"/></svg><span></span>';
+    MORE.onclick=function(){$('bwhat').click();};$('cats').after(MORE);  // outside the scroller, always in reach
+    $('mixn').textContent=o.nf.format(all)+' records to identify';
+    var over=function(){var c=$('cats');c.classList.toggle('over',c.scrollWidth>c.clientWidth+1);};over();addEventListener('resize',over);
+  }
+  var picked=Object.keys(S.groups),multi=picked.length>1||picked.some(function(g){return S.groups[g]==='not';});
+  MORE.lastChild.textContent=multi?picked.length+' groups':'Combine';MORE.setAttribute('aria-pressed',String(multi));
+  MORE.title=multi?'Picked in What: '+picked.map(function(g){return (S.groups[g]==='not'?'not ':'')+short(g);}).join(', '):'Pick several groups, or leave some out, in What';
+  CATS.forEach(function(t){
+    var n=t.g?c[t.j]:0;
+    t.b.setAttribute('aria-pressed',String(t.g?S.groups[t.g]==='inc':!CH.any(S.groups)));
+    if(!t.g)return;
+    t.b.classList.toggle('z',!n);t.b.classList.toggle('x',S.groups[t.g]==='not');
+    t.s.classList.toggle('on',S.groups[t.g]==='inc');t.s.classList.toggle('x',S.groups[t.g]==='not');
+    t.b.title=(META.names[t.g]||t.g)+': '+o.nf.format(ALLC[t.j])+' of '+o.nf.format(all)+' records ('+
+      (ALLC[t.j]/all*100).toFixed(1)+'%), '+o.nf.format(n)+' in view';});
 }
 
 // When: the presets, dates and months, and the histograms of the records per day, the dates left out of the selection
@@ -55,6 +102,8 @@ function tc(){
 if(META.files.totals)o.get(META.files.totals).then(function(b){TOT=JSON.parse(new TextDecoder().decode(b));update();}).catch(function(){});
 var TM=MapTime({S:S,mf:MF,render:o.changed,refilter:o.changed,byObs:$('byObs'),byUp:$('byUp'),presets:$('presets'),from:$('from'),to:$('to'),
   months:$('months'),mclear:$('mclear')});
+var SG=IdentifySuggest({S:S,META:META,mf:MF,nf:o.nf,P:o.P,taxa:o.taxa,allc:function(){return ALLC;},short:short,tm:TM,changed:o.changed,rewrite:o.rewrite,
+  area:function(rings,h,l){LBL=l;o.where(rings,h);if(W)W.reset();},get:o.get,embedded:o.embedded});
 var MH=MapHist({S:S,META:META,mf:MF,nf:o.nf,over:$('over'),hist:$('hist'),htip:$('htip'),unit:$('unit'),cum:cum,sub:{cum:function(){cum();return SUB;},name:function(){return o.tab().name;}},tc:tc,render:o.changed});
 
 // Where: the live map (identify_where.js), loaded when the panel first opens. Until then, and for a shared link's area, a
@@ -107,8 +156,8 @@ function fill(k){
   if(!visible(k))return;
   if(k===0){counts();if(XL)xl();}
   else if(k===1)MH.draw();
-  else if(k===2){if(W)W.show();}
-  else [].forEach.call(SEG[3].p.querySelectorAll('details details'),function(d){d.open=true;});  // Who: the threshold sits in a closed Adjust
+  else if(k===2){if(W)W.show();SG.where();}
+  else{SG.who();[].forEach.call(SEG[3].p.querySelectorAll('details details'),function(d){d.open=true;});}  // Who: the threshold sits in a closed Adjust
 }
 function place(k){
   var r=SEG[k].b.getBoundingClientRect(),b=bar.getBoundingClientRect(),p=SEG[k].p;
@@ -170,7 +219,8 @@ function update(){
   CUM=null;TC=undefined;if(W)W.sync();
   var w=[what(),when(),where(),who()];
   SEG.forEach(function(s,k){s.l.textContent=w[k];ACC[k].h.lastChild.textContent=w[k];});
-  GL.show();TM.update();OL.show();CL.show();
+  GL.show();TM.update();OL.show();CL.show();SG.update();
+  if(!visible(0))tally();  // the open What panel counts for itself (fill)
   SEG.forEach(function(s,k){if(!s.b.hidden)fill(k);});
 }
 return {update:update};

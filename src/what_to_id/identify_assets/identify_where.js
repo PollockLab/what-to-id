@@ -4,7 +4,7 @@
 // return; Esc returns too.
 // IdentifyWhere(o), o {box (#wbox: the foot with the Expand button), url (the map page), key() (the selection as text),
 // set(area, hash, label) (the area changed), done() (back to the cards), leave() (Esc in the map's frame
-// with it small: close the panel)}. Returns {show(), sync(), live()}.
+// with it small: close the panel)}. Returns {show(), reset(), sync(), live()}.
 var IdentifyWhere=(function(){
 'use strict';
 return function(o){
@@ -35,6 +35,7 @@ return function(o){
       f.addEventListener('load',function(){ok=true;sync();});
       o.box.insertBefore(f,o.box.firstChild);
     },
+    reset:function(){if(f){f.remove();f=null;ok=false;}this.show();},  // reload the map from the address, for a suggested area
     sync:sync,
     live:function(){return ok;}
   };

@@ -21,7 +21,8 @@ PAGE_NAME = "blind.html"
 OBS_URL = "https://www.inaturalist.ca/observations/"
 
 CSS = """
-body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,sans-serif}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,
+"Segoe UI",sans-serif}
 header,main,footer{max-width:640px;margin:0 auto;padding:12px 16px}
 header{display:flex;justify-content:space-between;align-items:center;gap:8px}
 footer{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;border-top:1px solid var(--line)}

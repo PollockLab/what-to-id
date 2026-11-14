@@ -13,7 +13,8 @@ import pytest
 from what_to_id import page_lookalike, site_files
 from what_to_id.atlas_index_io import VERSION
 from what_to_id.atlas_neighbors import write_neighbor_records
-from what_to_id.page_map import encode_points, render_map
+from what_to_id.map_points import encode_points
+from what_to_id.page_map import render_map
 
 from .embeddings_fixture import pool_frame
 

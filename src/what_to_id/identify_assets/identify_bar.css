@@ -1,28 +1,59 @@
 /* The search bar (identify_bar.js): three segments, each with its own panel; a phone's sheet holds them as accordion sections */
+/* The life-form row above the bar: one line, centred when it fits and scrolling sideways when not */
+.catrow{display:flex;align-items:stretch;min-height:48px;margin:8px 0 0}
+.cats{flex:1;min-width:0;display:flex;gap:2px;min-height:48px;overflow-x:auto;scrollbar-width:none}
+.cats.over{mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent)}
+.cats::before,.cats::after{content:"";margin:auto}
+.cat{--c:var(--ink);flex:none;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:46px;padding:5px 5px 4px;border:0;border-radius:12px;
+  background:none;color:var(--muted);font:inherit;font-size:11px;line-height:1.2;white-space:nowrap;cursor:pointer}
+.cat svg{width:24px;height:24px;fill:color-mix(in srgb,var(--c) 50%,var(--muted));transition:fill .15s}
+.cat:hover svg,.cat:focus-visible svg,.cat[aria-pressed="true"] svg{fill:var(--c)}
+/* Every record split by group, in the row's order and colours, toned down; a group picked or pointed at takes its full colour */
+.mixrow{display:flex;align-items:center;gap:10px;min-height:15px;margin:4px 0 0}  /* the row's height is held before the records land */
+.mix{flex:1;display:flex;gap:1px;height:6px}
+.mixn{flex:none;color:var(--muted);font-size:11px;line-height:15px;font-variant-numeric:tabular-nums}
+.mix i:first-child{border-radius:6px 0 0 6px}.mix i:last-child{border-radius:0 6px 6px 0}
+.mix i{position:relative;flex:1 0 2px;cursor:pointer;background:color-mix(in srgb,var(--c) 50%,var(--muted));opacity:.7;transition:opacity .15s}
+.mix i.on,.mix i.hot,.mix i:hover{background:var(--c);opacity:1}
+.mix i::before{content:"";position:absolute;inset:-6px 0}
+.mix i:hover::after{content:attr(data-k);position:absolute;bottom:12px;left:50%;transform:translateX(-50%);z-index:3;padding:3px 7px;
+  border-radius:6px;background:var(--ink);color:var(--bg);font:600 11px/1.3 inherit;font-style:normal;white-space:nowrap;pointer-events:none}
+.mix i:first-child:hover::after{left:0;transform:none}.mix i:last-child:hover::after{left:auto;right:0;transform:none}
+.cat.x span{text-decoration:line-through}.cat.x svg{opacity:.35}
+.mix i.x{opacity:.25}
+/* Combine sits outside the scroller so it stays in reach; the tabs fade out at the edge when they scroll */
+.cat.more{margin-left:4px;padding:5px 10px 4px}
+.cat.more:hover,.cat.more[aria-pressed="true"]{background:var(--chip)}
+.cat.more svg{fill:none;stroke:currentColor;stroke-width:1.8}.cat.more circle{fill:var(--bg)}
+.cat.hot{background:var(--chip);color:var(--ink)}.cat.hot svg{fill:var(--c)}
+.cat.z{opacity:.45}
+.cat:hover{background:var(--chip);color:var(--ink)}
+.cat[aria-pressed="true"]{background:var(--chip);color:var(--ink);font-weight:650}
+.cat:focus-visible{outline:3px solid var(--bar);outline-offset:-2px}
 .top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin:12px 0 10px}  /* the bar is the page's primary control; the filter chips sit beside it */
 .bar{position:relative;display:flex;flex:1 1 440px;min-width:0;margin:0}
 .bseg{display:flex;align-items:center;width:100%;min-width:0;border:1px solid var(--line);border-radius:999px;background:var(--panel);
-  box-shadow:0 3px 12px rgba(0,0,0,.1)}
+  box-shadow:var(--shadow)}
 .bar.open .bseg{background:var(--chip);box-shadow:none}
 .seg1{display:flex;flex:1 1 0;flex-direction:column;align-items:flex-start;gap:1px;padding:11px 26px;min-width:0;border:0;border-radius:999px;background:none;
   color:var(--ink);font:inherit;text-align:left;cursor:pointer}
 .seg1:disabled{cursor:default}
 .seg1:hover:not(.on):not(:disabled){background:var(--line)}
-.seg1.on{background:var(--panel);box-shadow:0 2px 10px rgba(0,0,0,.2)}
+.seg1.on{background:var(--panel);box-shadow:var(--shadow)}
 .seg1 small{font-size:12px;font-weight:650}
 .seg1 b{font-weight:400;font-size:15px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .bpanel{position:absolute;top:calc(100% + 8px);left:0;z-index:5;box-sizing:border-box;width:min(420px,calc(100vw - 24px));max-height:70vh;overflow:auto;
   padding:12px 14px;border:1px solid var(--line);border-radius:20px;background:var(--panel);color:var(--ink);box-shadow:var(--shadow);text-align:left}
 #pwhat{width:min(380px,calc(100vw - 24px))}#pwhere{width:min(440px,calc(100vw - 24px))}
 .bpanel .row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:0 0 8px}
-.bpanel #q{box-sizing:border-box;width:100%;font-size:14px;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
-.bpanel .sugg{z-index:8;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);max-height:240px;overflow:auto}
+.bpanel #q{box-sizing:border-box;width:100%;font-size:14px;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+.bpanel .sugg{z-index:8;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);max-height:240px;overflow:auto}
 .bpanel p{margin:6px 0}
 .bpanel .gbar{margin:8px 0}
 .bpanel .gl{max-height:46vh;overflow:auto}
 .bpanel .chips{display:flex;flex-wrap:wrap;gap:4px}
 .bpanel .chips button,.tseg button{border:1px solid var(--line);background:var(--chip);color:var(--ink);font:inherit;font-size:12px;padding:3px 9px;
-  min-height:28px;cursor:pointer;border-radius:14px}
+  min-height:28px;cursor:pointer;border-radius:999px}
 .bpanel .chips button[aria-pressed="true"],.tseg button[aria-pressed="true"]{background:var(--on);color:var(--onink);border-color:var(--on)}
 .bpanel .chips button.not,.bpanel .chips button[aria-pressed="true"].not{background:var(--warnbg);color:var(--warn);border:1px dashed var(--warn)}
 .bpanel .lbl{display:flex;align-items:center;margin:8px 0 4px;font-size:12px;font-weight:600}
@@ -34,11 +65,11 @@
 .bpanel .accticks .on{color:var(--ink);font-weight:600}
 .bpanel .sec{border-top:1px solid var(--line);margin-top:8px;padding:2px 0}
 .bpanel .sec>summary{cursor:pointer;font-size:12px;font-weight:600;padding:6px 0 4px}
-.bpanel .prow{display:flex;flex-wrap:wrap;gap:4px}.bpanel .prow label,.bpanel .sec .muted{flex:0 0 100%;font-size:12px;margin:0}.bpanel .padd{font:inherit;font-size:12px;padding:3px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.bpanel .prow{display:flex;flex-wrap:wrap;gap:4px}.bpanel .prow label,.bpanel .sec .muted{flex:0 0 100%;font-size:12px;margin:0}.bpanel .padd{font:inherit;font-size:12px;padding:3px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
 .bpanel .prow input.padd{flex:1;min-width:0}.bpanel .tag{margin-left:5px;font-size:10px;opacity:.8}
 .bpanel .months button{min-width:40px;padding:3px 0}
 .tseg{display:inline-flex}.tseg button{border-radius:0}
-.tseg button:first-child{border-radius:14px 0 0 14px}.tseg button:last-child{border-radius:0 14px 14px 0;border-left:0}
+.tseg button:first-child{border-radius:999px 0 0 999px}.tseg button:last-child{border-radius:0 999px 999px 0;border-left:0}
 .bpanel .link{border:0;background:none;color:var(--muted);font:inherit;font-size:12px;text-decoration:underline;cursor:pointer;padding:0 2px;min-height:24px}
 .bpanel .vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .bpanel .row:has(#from){font-size:12px}
@@ -60,7 +91,9 @@
 .abody .bpanel .gl{max-height:none}
 .sdone{gap:.3em}  /* flex items drop the blanks between "Show", the count and "cards" */
 @media (max-width:760px){
-  .bseg{flex-wrap:wrap;border-radius:24px}
+  .catrow{margin-top:6px}
+  .mixrow{flex-wrap:wrap;row-gap:3px;min-height:24px}.mix{flex-basis:100%}.mixn{margin-left:auto}
+  .bseg{flex-wrap:wrap;border-radius:999px}
   .seg1{flex:1 1 45%;padding:8px 12px}
   .seg1 b{font-size:13px}
   dialog.sheet#bsheet{width:100vw;height:100dvh;max-width:100vw;max-height:100dvh;margin:0;border-radius:0}

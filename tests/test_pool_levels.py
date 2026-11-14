@@ -8,9 +8,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from what_to_id import page_identify, pool_levels, site_files
+from what_to_id import page_identify, pool_levels, site_files, taxonomy
 from what_to_id.identify import IDENTIFY_COLUMNS
-from what_to_id.page_map import decode_points, encode_points, render_map
+from what_to_id.map_points import decode_points, encode_points
+from what_to_id.page_map import render_map
 
 from .embeddings_fixture import TREE, pool_frame
 
@@ -245,7 +246,11 @@ def test_the_build_lines_the_ranges_up_with_the_site_and_skips_them_when_absent(
 
 
 def flags(site):
-    return site_files.read_meta((site / site_files.MAP_NAME).read_text())["flags"]
+    return flags_meta(site)["flags"]
+
+
+def flags_meta(site):
+    return site_files.read_meta((site / site_files.MAP_NAME).read_text())
 
 
 def test_the_manifest_names_the_range_tables_or_the_levels_go_out_alone(tmp_path, monkeypatch):
@@ -291,7 +296,9 @@ def test_the_scoring_dates_fall_back_to_the_model_source_and_skip_what_is_not_a_
     assert pool_levels.scoring_dates(model) == {"photos": "2026-10-15", "scored": None}
     bad = {"identify": {"built_at": "soon", "emb": "E.npy"}}
     assert pool_levels.scoring_dates(bad) == {"photos": None, "scored": None}
-    html = page_identify.render(dates=None)
+    html = page_identify.render(dates=None).replace(
+        (page_identify.ASSETS / "identify_fr.js").read_text(), ""
+    )
     assert "Photos downloaded" not in html and "last photo download" in html
     assert "__" not in html.split("<details", 1)[1].split("</details>", 1)[0]
 
@@ -304,3 +311,35 @@ def test_the_might_be_wrong_levels_show_their_lowest_score_first_and_the_others_
     assert q[1] > q[0]
     assert q[2] > q[3] and q[5] > q[4]  # odd shots and might be mislabelled: lowest first
     assert q[6] > q[7]  # clear matches: highest own first
+
+
+def test_french_names_ship_only_where_they_differ_and_only_with_a_cache(tmp_path):
+    rows = [
+        ["Apis a", "Honey Bee", 11],
+        ["Apis b", "Bumble", 12],
+        ["Apis c", "", 13],
+        ["Apis d", "x", 14],
+    ]
+    fr = {11: "Abeille domestique", 12: "bumble", 13: "Abeille c", 14: ""}
+    assert taxonomy.fr_names(rows, fr) == {"11": "Abeille domestique", "13": "Abeille c"}
+    assert taxonomy.fr_names(rows, {}) == {}
+    site, points = write_site(tmp_path)
+    scored_frame(points).to_parquet(tmp_path / "identify.parquet")
+    args = ["--out", str(site), "--parquet", str(tmp_path / "identify.parquet")]
+    assert pool_levels.main(args) == 0
+    assert site_files.path(site, "taxa_fr") is None  # no cache: the page stays English
+    first = json.loads(gzip.decompress(site_files.path(site, "first").read_bytes()))
+    assert "fr" not in first
+    ids = [t[2] for t in first["taxa"]]
+    pool_taxa = json.loads(gzip.decompress((site / flags_meta(site)["taxa"]).read_bytes()))
+    taxa_fr = {t[2]: f"fr {t[0]}" for t in pool_taxa}
+    taxa_fr[ids[0]] = pool_taxa[[t[2] for t in pool_taxa].index(ids[0])][1]  # same as the English
+    cache = tmp_path / "taxonomy-fr.json"
+    taxonomy.save_fr(taxa_fr, cache)
+    assert pool_levels.main([*args, "--fr", str(cache)]) == 0
+    got = json.loads(gzip.decompress(site_files.path(site, "taxa_fr").read_bytes()))
+    assert str(ids[0]) not in got and got[str(ids[1])] == taxa_fr[ids[1]]  # not where it matches
+    first = json.loads(gzip.decompress(site_files.path(site, "first").read_bytes()))
+    assert set(first["fr"]) <= set(got) and first["fr"][str(ids[1])] == taxa_fr[ids[1]]
+    assert pool_levels.main(args) == 0  # a later build without the cache drops the stale file
+    assert site_files.path(site, "taxa_fr") is None

@@ -15,7 +15,8 @@ import pytest
 
 from what_to_id import site_files
 from what_to_id.embeddings_page import build
-from what_to_id.page_map import _decode_shard, encode_points, render_map
+from what_to_id.map_points import _decode_shard, encode_points
+from what_to_id.page_map import render_map
 from what_to_id.split_page import build as build_split
 
 from . import test_embeddings_browser as eb

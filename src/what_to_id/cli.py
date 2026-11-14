@@ -33,7 +33,6 @@ from what_to_id.manifest import (
     utc_now_iso,
     write_manifest,
 )
-from what_to_id.page import write_site
 from what_to_id.page_map import write_map
 from what_to_id.page_rotation import write_study
 from what_to_id.served_log import append_served, served_rows
@@ -249,10 +248,7 @@ def build(args: argparse.Namespace) -> Path:
     assign_df.to_parquet(out / "assign.parquet", index=False)
     batches_df.to_parquet(out / "batches.parquet", index=False)
     write_map(out / "site", pool, freeze=args.freeze)
-    if args.design == "rotation":
-        write_study(out / "site", m)
-    else:
-        write_site(out / "site", m, batches_df, pool=pool)
+    write_study(out / "site", m)
     if args.served_log:
         rows = served_rows(batches_df, labels, pool, args.freeze)
         total = append_served(args.served_log, rows)
@@ -302,10 +298,9 @@ def make_parser() -> argparse.ArgumentParser:
     )
     b.add_argument(
         "--design",
-        choices=["sets", "rotation"],
-        default="sets",
-        help="'sets' (default) pages one list per browser; 'rotation' cycles every identifier "
-        "through all lists",
+        choices=["rotation"],
+        default="rotation",
+        help="'rotation' cycles every identifier through all lists",
     )
     b.add_argument(
         "--key-env",

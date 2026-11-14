@@ -8,7 +8,8 @@ import numpy as np
 import pytest
 
 from what_to_id import page_nav, split_page, tree_page
-from what_to_id.page_map import encode_points, render_map
+from what_to_id.map_points import encode_points
+from what_to_id.page_map import render_map
 
 from .embeddings_fixture import TREE, pool_frame
 
