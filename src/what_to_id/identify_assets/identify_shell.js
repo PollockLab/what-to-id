@@ -9,13 +9,16 @@
 function $(id){return document.getElementById(id);}
 function has(k){return new RegExp('(^|&)'+k+'=').test(location.hash.slice(1));}
 function labels(){
-  var g=has('run')&&!$('sortb').hidden;$('sortb').firstChild.textContent='Prioritize'+(g?' · grouped':'')+' ';
+  var g=has('run')&&!$('sortb').hidden;$('sortb').firstChild.textContent='Prioritize'+(g?' · grouped':'')+(has('out')?' · range':'')+' ';
   $('uload').hidden=!$('usrbox').hidden;
 }
 function count(){
   var cap=$('cap').textContent,m=/^[\d,.\s ]+/.exec(cap),n=$('none').hidden?(m?m[0].trim():''):'0';
   var st=$('status').textContent;  // loading and load errors stay in sight while the totals sit in the help sheet
-  $('count').textContent=n?n+' cards to ID':/^(Loading|Could not)/.test(st)?st:'';$('count').title=cap;
+  // the heading relates its cards to the tab's records: "22,902 cards · 3 per species of 324,594 records"
+  var tb=document.querySelector('[role=tab][aria-selected=true] b'),pr=/up to (\d+) per/.exec(cap),rel=tb&&tb.textContent?(pr?' · '+pr[1]+' per species':'')+' of '+tb.textContent+' records':'';
+  $('count').textContent=n?n+' cards':/^(Loading|Could not)/.test(st)?st:'';$('count').title=cap;
+  if(n&&rel){var r=document.createElement('span');r.className='rel';r.textContent=rel;$('count').appendChild(r);}  // a phone keeps the short heading
   [].forEach.call(document.querySelectorAll('.sdone .n'),function(s){s.textContent=n||'0';});
 }
 function sheets(){

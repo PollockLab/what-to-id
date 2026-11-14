@@ -8,7 +8,7 @@
 .qseg .qlbl{font-weight:650}
 .qseg .srow{margin:0}.qseg .segnote{display:inline;margin:0}
 .qseg .segb{min-height:30px}
-.qchips{display:contents}
+.qchips{display:inline-flex;gap:8px}  /* wraps with the tabs as one unit, never one chip alone */
 .qchip,.qrow .tog{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:0 14px;border:1px solid var(--line);border-radius:999px;
   background:var(--panel);color:var(--ink);font:inherit;cursor:pointer;margin:0;white-space:nowrap}
 .qchip:hover,.qrow .tog:hover{border-color:var(--ink)}
@@ -46,6 +46,6 @@ dialog.sheet::backdrop{background:rgba(0,0,0,.45)}
 .sfoot .btn{min-height:44px;padding:0 20px;border:0;border-radius:10px;font:inherit;font-weight:650;cursor:pointer}
 .sfoot .lnk{font:inherit;color:var(--ink);background:none;border:0;text-decoration:underline;cursor:pointer;padding:8px 0}
 @media (max-width:600px){
-  .rline{gap:2px;flex-wrap:wrap}.rline .qchip{padding:0 6px}.today{order:9;flex-basis:100%}
+  .rline{gap:2px;flex-wrap:wrap}.rline .rel{display:none}.rline .qchip{padding:0 6px}.today{order:9;flex-basis:100%}
   #sortpop{inset:auto 0 0 0;box-sizing:border-box;width:100vw;max-width:100vw;border-radius:20px 20px 0 0;padding:16px 20px 24px}
   dialog.sheet{width:100vw;max-width:100vw;max-height:90vh;margin:auto 0 0;border-radius:20px 20px 0 0}}

@@ -169,3 +169,30 @@ def test_the_who_ticks_wait_for_a_user_name_and_say_so(browser, site):
     page.wait_for_function("document.getElementById('usrhint').hidden")
     assert page.inner_text("#usrbox form > label:has(#usrtaxa)").strip() == "Only @JDoe's genera"
     assert page.is_enabled("#usrtaxa") and page.errors == []
+
+
+def test_the_heading_relates_its_cards_to_the_tabs_records(browser, site):
+    base, _ = site
+    page = ib.open_identify(browser, base, size=(1280, 800))
+    page.wait_for_selector("#grid .card")
+    cards = len(page.evaluate("__identify.view()")[1])
+    records = page.evaluate("__identify.total()")[1]
+    assert page.inner_text("#count") == f"{cards:,} cards · 3 per species of {records:,} records"
+    assert page.errors == []
+
+
+def test_the_chips_wrap_as_one_unit_and_range_lives_in_prioritize(browser, site):
+    base, _ = site
+    page = ib.open_identify(browser, base, "#lvl=3", size=(1280, 800))
+    assert page.locator(".qrow > #rout, #qrow #rout").count() == 0  # no Range row on the bar
+    assert page.evaluate("document.getElementById('rout').closest('#sortpop') !== null")
+    tops = page.evaluate(
+        "[...document.querySelectorAll('#qchips .qchip, #qchips .tog')].map(e => e.offsetTop)"
+    )
+    assert len(set(tops)) == 1  # the chips never split across rows
+    page.close()
+    page = ib.open_identify(browser, base, "#lvl=1&out=1", size=(375, 800))
+    assert "range" in page.inner_text("#sortb")  # a non-default range shows on the button
+    tops = page.evaluate("[...document.querySelectorAll('#qchips .tog')].map(e => e.offsetTop)")
+    assert len(set(tops)) == 1 and page.evaluate("document.documentElement.scrollWidth <= 375")
+    assert page.errors == []

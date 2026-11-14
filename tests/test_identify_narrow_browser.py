@@ -158,7 +158,7 @@ def test_level_3_has_one_count_line_that_agrees_with_the_tab(browser, site):
     assert page.inner_text("#cap") == (
         f"{cards:,} cards to ID ({records:,} records, Top 5%; up to 3 per suggested species)"
     )
-    assert page.inner_text("#count") == f"{cards:,} cards to ID"
+    assert page.inner_text("#count") == f"{cards:,} cards"  # a phone keeps the short heading
     reveal(page, "#ptop")
     page.evaluate(
         "() => { const e = document.getElementById('ptop'); e.value = 100;"
