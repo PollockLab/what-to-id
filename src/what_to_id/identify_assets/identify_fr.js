@@ -131,7 +131,7 @@ var words={
 "Location is blocked for this site. Allow it in the browser, or draw an area below.":"La localisation est bloquée pour ce site. Autorisez-la dans le navigateur, ou tracez une zone ci-dessous.",
 "Your location is not available. Draw an area below instead.":"Votre position n'est pas disponible. Tracez plutôt une zone ci-dessous.",
 "You seem to be outside this map’s area.":"Vous semblez être hors de la zone de cette carte.",
-"Suggested places":"Lieux suggérés","Loading parks…":"Chargement des parcs…","The park list did not load.":"La liste des parcs n'a pas pu être chargée.",
+"Top identifiers here:":"Principaux identificateurs ici :","Suggested places":"Lieux suggérés","Loading parks…":"Chargement des parcs…","The park list did not load.":"La liste des parcs n'a pas pu être chargée.",
 "Your progress":"Votre progression","Nothing opened yet today.":"Rien d'ouvert pour l'instant aujourd'hui.","Not yet by me":"Pas encore par moi",
 "Leave out what you identified":"Exclure ce que vous avez identifié","Type your iNaturalist login below first.":"Saisissez d'abord votre identifiant iNaturalist ci-dessous.",
 "Untick “my observations” below first.":"Décochez d'abord « mes observations » ci-dessous.","Nobody has looked":"Personne n'a regardé",
