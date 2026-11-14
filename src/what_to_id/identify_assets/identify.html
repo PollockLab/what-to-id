@@ -108,23 +108,7 @@ body:not(.bt) #study,.bt #status:not(.err),.bt #unpick,.bt #desc,.bt #kind,.bt #
 .card .gap{white-space:nowrap}
 .card .note{font-size:12px;color:var(--muted)}
 .card.done{opacity:.6}.card.cur{outline:2px solid var(--on);outline-offset:1px}
-#cpanel{position:fixed;top:0;right:0;bottom:0;z-index:10;width:min(520px,100%);box-sizing:border-box;overflow:auto;
-  background:var(--panel);border-left:1px solid var(--line);box-shadow:-4px 0 16px rgba(0,0,0,.15);padding:8px 12px 0;display:flex;flex-direction:column;gap:8px}
-#cpanel:focus{outline:none}
-@media (min-width:900px){body.cpon main{margin-right:520px}}
-.cptop{display:flex;align-items:center;gap:8px}.cptop h2{flex:1;min-width:0;margin:0;font-size:15px;font-weight:600;overflow-wrap:anywhere}
-.cpbig{width:100%;max-height:min(52vh,480px);object-fit:contain;background:var(--chip);border-radius:6px;display:block}
-@media (max-width:600px){.cpbig{max-height:38vh}}  /* after the base rule, so it wins */
-.cpstrip{display:flex;gap:4px;overflow-x:auto;margin-top:4px}
-.cpthumb{padding:0;border:2px solid transparent;border-radius:4px;background:none;cursor:pointer;width:48px;height:48px;flex:none}
-.cpthumb[aria-pressed=true]{border-color:var(--on)}.cpthumb img{width:100%;height:100%;object-fit:cover;display:block}
-.cpwhen{display:block;font-size:12px;min-height:24px;line-height:24px}
-#cprefs{display:grid;gap:8px}.cpref h3{font-size:13px;font-weight:600;margin:0 0 2px}
-.cpph{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}.cpph img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:4px;display:block}
-.cpref a{font-size:12px}
-.cpbar{position:sticky;bottom:0;margin-top:auto;display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 0;background:var(--panel);border-top:1px solid var(--line)}
-#cpt{order:1;flex-basis:100%;height:1.4em;line-height:1.4em;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}  /* its own reserved line, so the toast never moves Identify */
-.cpbar .copy{font:inherit;font-size:13px;min-height:30px;padding:0 10px;border:1px solid var(--line);border-radius:15px;background:var(--chip);color:var(--ink);cursor:pointer}
+__IDENTIFY_COMPARE_CSS__
 __IDENTIFY_RANGES_CSS__
 __MAP_AREA_CSS__
 __MAP_PANELS_CSS__
@@ -258,6 +242,9 @@ The login goes only to iNaturalist.</p></details>
 <script>__MAP_ONLY__</script>
 <script>__IDENTIFY_ONLY__</script>
 <script>__IDENTIFY_UNCONFIRMED__</script>
+<script>__IDENTIFY_COMPARE_TEXT__</script>
+<script>__IDENTIFY_ZOOM__</script>
+<script>__IDENTIFY_REFS__</script>
 <script>__IDENTIFY_COMPARE__</script>
 <script>__IDENTIFY_STUDY__</script>
 <script>__IDENTIFY_INAT__</script>

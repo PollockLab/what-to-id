@@ -105,15 +105,16 @@ return function(buf,ctx){
     return{aria:'Range map: this record is '+(la?'inside':'outside')+' the range of '+a+
       (t?', '+(lb?'inside':'outside')+' the range of '+b:'')+(cap.length?'. '+cap.join(' '):''),cap:cap.join(' ')};
   }
-  function drawMap(cv,i,lv){
-    var r=cv.getBoundingClientRect(),dpr=window.devicePixelRatio||1,B=box(),b=two(i,lv);
+  // only: one species' range alone (the compare panel's small maps), without the reference towns
+  function drawMap(cv,i,lv,only){
+    var r=cv.getBoundingClientRect(),dpr=window.devicePixelRatio||1,B=box(),b=only?null:two(i,lv);
     if(!r.width)return;
     cv.width=Math.round(r.width*dpr);cv.height=Math.round(r.height*dpr);
     var g=cv.getContext('2d'),st=getComputedStyle(cv),pad=2*dpr,k=(cv.width-2*pad)/B.w;
     function X(v){return pad+(v-B.x0)*KX*k;}
     function Y(v){return cv.height-pad-(v-B.y0)*k;}
     function col(c){return st.getPropertyValue(c);}
-    var A=bits(ctx.name(i)),L=b?bits(b):A;
+    var A=bits(only||ctx.name(i)),L=b?bits(b):A;
     g.lineWidth=dpr*.5;g.lineJoin='round';
     D.grid.forEach(function(p,c){
       var a=has(A,c),l=has(L,c);
@@ -125,12 +126,13 @@ return function(buf,ctx){
     outline().forEach(function(e){g.moveTo(X(e[1]),Y(e[2]));g.lineTo(X(e[3]),Y(e[4]));});g.stroke();
     var px=X(P.lonlat[2*i]*1000),py=Y(P.lonlat[2*i+1]*1000);
     g.font=10*dpr+'px system-ui,sans-serif';g.textBaseline='middle';g.fillStyle=col('--muted');
-    REFS.forEach(function(x){
+    if(!only)REFS.forEach(function(x){
       var rx=X(x[1]),ry=Y(x[2]);
       g.beginPath();g.arc(rx,ry,2*dpr,0,7);g.fill();
       if(Math.hypot(rx-px,ry-py)>15*dpr)g.fillText(x[0],rx+4*dpr,ry);});
-    g.beginPath();g.arc(px,py,5*dpr,0,7);g.fillStyle='#fff';g.fill();
-    g.beginPath();g.arc(px,py,3.2*dpr,0,7);g.fillStyle='#111';g.fill();
+    var u=only?.8:1;
+    g.beginPath();g.arc(px,py,5*u*dpr,0,7);g.fillStyle='#fff';g.fill();
+    g.beginPath();g.arc(px,py,3.2*u*dpr,0,7);g.fillStyle='#111';g.fill();
   }
   // The chip on a card: the verdict in a few words.
   function verdict(i,lv){
@@ -264,6 +266,8 @@ return function(buf,ctx){
     // the chip alone, or null when the label's range is unknown; close drops its popover
     chip:function(i,lv){return bits(ctx.name(i))?chip(i,lv):null;},
     close:function(){closePop(false);},
+    // one name's range alone on cv, with the record's point: {inside} whether the record's cell is in it, null when its range is unknown
+    mini:function(cv,i,name){var a=bits(name);if(!a)return null;cv.style.aspectRatio=box().w+'/'+box().h;drawMap(cv,i,0,name);return {inside:!!has(a,cellOf(i))};},
     // a name's range cells as a GeoJSON MultiPolygon in degrees (the grid holds lon/lat times 1000), null when unknown
     cells:function(name){
       var a=bits(name),m=[];
