@@ -1,5 +1,6 @@
 """The Food web page in Chromium (the four stages: question, matrix, evidence search, network)."""
 
+import csv
 import json
 import re
 from pathlib import Path
@@ -254,6 +255,7 @@ def test_the_question_modes_chips_and_keys_work_without_blocking(browser, base):
         "X eats Y",
     ]  # named by their longer labels
     page.locator("#try .chip").first.click()
+    page.wait_for_selector("#sent input")  # the chip's question has painted, not the survey's cards
     page.wait_for_function("document.querySelectorAll('#cards li').length>0")
     for k in "123":
         page.keyboard.press(k)
@@ -295,6 +297,72 @@ def test_export_is_a_csv_of_the_annotations(browser, base):
     assert rows[0] == "observation_id,url,predator,prey,answer,date"
     assert len(rows) == 3 and rows[1].startswith('"0","https://www.inaturalist.org/observations/0"')
     assert '"Strix varia","Mus musculus","yes"' in rows[1] and rows[2].split(",")[4] == '"no"'
+    assert page.errors == []
+
+
+def _network_export(page):
+    with page.expect_download() as d:
+        page.click("#exportnet")
+    text = Path(d.value.path()).read_text()
+    head = [r for r in text.splitlines() if r.startswith("# ")]
+    rows = list(csv.DictReader(r for r in text.splitlines() if not r.startswith("# ")))
+    return head, rows
+
+
+def test_export_network_is_a_tidy_csv_that_matches_the_confirmed_network(browser, base):
+    page = open_page(browser, base + "#q=eats&x=Strix varia")
+    head, rows = _network_export(page)
+    assert [h.split(":")[0] for h in head] == ["# question", "# metaweb", "# date", "# budget_used"]
+    assert head[0] == "# question: What does Barred Owl eat?" and "test" in head[1]
+    assert head[3] == "# budget_used: 10 of 30 photos for this question"
+    assert list(rows[0]) == [
+        "predator",
+        "predator_taxon_id",
+        "prey",
+        "prey_taxon_id",
+        "status",
+        "shows_it",
+        "not_visible",
+        "cant_tell",
+        "shows_it_observation_ids",
+        "prior_records",
+        "metaweb_p",
+    ]
+    draw_all(page)
+    card = page.locator("#cards li", has_text="Description mentions “myodes”")
+    card.locator("button", has_text="Shows it").click()
+    card.locator(".which button", has_text="Confirm").click()
+    page.locator("#cards li:not(.done)").first.locator("button", has_text="Not visible").click()
+    _, rows = _network_export(page)
+    by = {(r["predator"], r["prey"]): r for r in rows}
+    mine = by["Strix varia", "Myodes"]
+    assert (mine["status"], mine["shows_it"], mine["shows_it_observation_ids"]) == (
+        "confirmed_here",
+        "1",
+        "502",
+    )
+    assert by["Strix varia", "Mus musculus"]["status"] == "photographed_before"
+    assert (
+        by["Strix varia", "Mus musculus"]["prior_records"] == "2"
+    )  # the Eating and the Eaten by record
+    assert by["Strix varia", "Mus musculus"]["prey_taxon_id"] == "3"
+    assert (
+        by["Strix", "Myodes"]["prey_taxon_id"] == "" and by["Strix", "Myodes"]["metaweb_p"] == "0.5"
+    )
+    assert by["Strix", "Mus musculus domesticus"]["status"] in ("not_searched", "nothing_found")
+    assert sum(r["not_visible"] != "0" for r in rows) == 1
+    shown = {"new": set(), "before": set()}  # the lines of the network, by the prey they end on
+    for kind in shown:
+        for t in page.eval_on_selector_all(
+            f"#net line.e.{kind} title", "e=>e.map(x=>x.textContent)"
+        ):
+            shown[kind].add(re.match(r".* eats (.*): ", t).group(1))
+    label = {"Mus musculus": "House Mouse", "Mus musculus domesticus": "House Mouse"}
+    for kind, status in (("new", "confirmed_here"), ("before", "photographed_before")):
+        assert {label.get(r["prey"], r["prey"]) for r in rows if r["status"] == status} >= shown[
+            kind
+        ]
+        assert len(shown[kind]) >= 1
     assert page.errors == []
 
 

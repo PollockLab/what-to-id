@@ -21,7 +21,8 @@ __SITE_NAV__
 <section class="st3" aria-labelledby="s3"><h2 id="s3"><span>3</span>Evidence search</h2>
 <p id="cand" aria-live="polite">Loading.</p>
 <div class="bar"><button type="button" class="btn" id="draw" disabled>Draw ten</button>
-<button type="button" class="btn quiet" id="export">Export annotations (CSV)</button></div>
+<button type="button" class="btn quiet" id="export">Export annotations (CSV)</button>
+<button type="button" class="btn quiet" id="exportnet">Export network (CSV)</button></div>
 <div class="meter"><div class="mbar" id="mbar" role="progressbar" aria-label="Budget used" aria-valuemin="0" aria-valuenow="0" aria-valuemax="30"><i id="mfill"></i></div>
 <div class="mrow"><span id="used"></span><label>of <input id="budget" type="number" min="0" max="500" step="5" value="30" aria-label="Budget, photos to draw"> photos</label></div></div>
 <p class="keys muted"><kbd>1</kbd> shows it <kbd>2</kbd> not visible <kbd>3</kbd> can’t tell <kbd>j</kbd> <kbd>k</kbd> move. Saved in this browser.</p>
@@ -32,7 +33,8 @@ __SITE_NAV__
 </div>
 <details class="how"><summary>How this is made</summary>
 <p id="src"></p>
-<p>A card’s rank is the pair’s p in the metaweb times the evidence: the field names the pair, the field names a coarse ancestor of one animal, the description, tags or field text mention a candidate prey, or they only talk about food. Cards link out to iNaturalist; add the prey as the Eating field there if the photo shows it.</p></details>
+<p>A card’s rank is the pair’s p in the metaweb times the evidence: the field names the pair, the field names a coarse ancestor of one animal, the description, tags or field text mention a candidate prey, or they only talk about food. Cards link out to iNaturalist; add the prey as the Eating field there if the photo shows it.</p>
+<p>Export network: a CSV for an ecology pipeline, with <code># key: value</code> header lines (question, metaweb, date, budget used; read it with comment="#"), then one row per predator-prey pair of the question. Columns: <code>predator</code>, <code>predator_taxon_id</code>, <code>prey</code>, <code>prey_taxon_id</code> (blank when no observation names the taxon), <code>status</code> (<code>confirmed_here</code> first photograph, <code>photographed_before</code>, <code>nothing_found</code> searched without a confirmed mark, <code>not_searched</code>), <code>shows_it</code>, <code>not_visible</code>, <code>cant_tell</code> (marks for the pair), <code>shows_it_observation_ids</code> (separated by ;), <code>prior_records</code> (observations whose field names the pair), <code>metaweb_p</code>.</p></details>
 </main>
 <script>var EATING_CONFIG=__CONFIG__;</script>
 <script>__EATING_PICKER_JS__</script>

@@ -12,11 +12,13 @@ function is(a,m){return !!a&&!!m&&(a===m||m.indexOf(' ')<0&&genus(a)===m);}
 function hit(a,m){return is(a,m)||within(a,m);}
 // x: a name asked about, which may be a clade, m: a metaweb name
 function cov(x,m){return is(x,m)||within(m,x);}
-var M=null,names=null,ids=null,ALL=null,R={all:[],text:[]};
+var M=null,names=null,ids=null,tid=null,ALL=null,R={all:[],text:[]};
 function pl(n,w){return n+' '+w+(n===1?'':'s');}
 // common name by Latin name (the metaweb's, then the observations'), and Latin name by taxon id
 function common(M,O){var c=new Map(Object.entries(M.common||{}));O.forEach(function(o){if(o.t[2])c.set(o.t[0],o.t[2]);});return c;}
 function idsOf(O){var m=new Map();O.forEach(function(o){m.set(String(o.t[1]),o.t[0]);if(o.f)m.set(String(o.f[1]),o.f[0]);});return m;}
+// iNaturalist taxon id by Latin name, '' when no observation names the taxon (the metaweb carries no ids)
+function taxonId(n){return tid.get(n)||'';}
 function label(n){return names.get(n)||n;}
 // a hash value (Latin name, common name or taxon id) as a Latin name the data knows, or null
 function find(v,pool){
@@ -48,13 +50,13 @@ function preds(y){if(!PD.has(y))PD.set(y,M.pairs.filter(function(q){return cov(y
 // the stand-in's p = 1 - 0.5^records as the records it counts
 function words(p){return p<0.6?'one record':p<0.8?'two records':'three or more records';}
 function init(metaweb,file,text){
-  M=metaweb;PY.clear();PD.clear();var O=file.obs,T=(text&&text.obs)||[];R.all=O.map(roles);R.text=T.map(roles);names=common(M,O.concat(T));ids=idsOf(O.concat(T));ALL=new Map();
+  M=metaweb;PY.clear();PD.clear();var O=file.obs,T=(text&&text.obs)||[];R.all=O.map(roles);R.text=T.map(roles);names=common(M,O.concat(T));ids=idsOf(O.concat(T));tid=new Map();O.concat(T).forEach(function(o){tid.set(o.t[0],o.t[1]);if(o.f)tid.set(o.f[0],o.f[1]);});ALL=new Map();
   M.pairs.forEach(function(x){ALL.set(x[0],1);ALL.set(x[1],1);});Object.keys(M.parent||{}).forEach(function(n){ALL.set(n,1);ALL.set(M.parent[n],1);});
   O.concat(T).forEach(function(o){ALL.set(o.t[0],1);if(o.f)ALL.set(o.f[0],1);});
 }
 // the page's "How this is made" note
 function how(file,text){return 'Pairs: '+M.source+'. '+M.rule+'. Photographed before: '+pl(file.n.obs,'observation')+' with the Eating or Eaten by field (fetched '+file.fetched+'), '+file.n.named+' name a taxon in the field.'+
   (text?' Searched for food: '+pl(text.n,'observation')+' of a metaweb predator whose description or tags say eating, eats, ate, feeding, prey or caught, or are tagged predation, eating or feeding. Comments cannot be searched through the iNaturalist API, so they are not read.':' The description and tag search was not available.');}
-return {init:init,el:el,pl:pl,label:label,find:find,hit:hit,cov:cov,within:within,open:open,p:p,seen:seen,preys:preys,preds:preds,words:words,how:how,
+return {init:init,taxonId:taxonId,el:el,pl:pl,label:label,find:find,hit:hit,cov:cov,within:within,open:open,p:p,seen:seen,preys:preys,preds:preds,words:words,how:how,
   R:R,M:function(){return M;},all:function(){return ALL;}};
 })();

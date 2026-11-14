@@ -109,10 +109,11 @@ function bary(Ls,Rs,E0){
   var nl=[],nr=[];lo.forEach(function(v,i){nl[v]=i;});ro.forEach(function(v,i){nr[v]=i;});
   return {L:lo.map(function(i){return Ls[i];}),R:ro.map(function(i){return Rs[i];}),E:E0.map(function(e){return [nl[e[0]],nr[e[1]],e[2]];})};
 }
+// the pairs with a photograph: the field names them to species, or the reader confirmed them here
+function pairsOf(){var m=new Map();E.R.all.forEach(function(r){if(r.pred&&r.prey&&r.pred.indexOf(' ')>0&&r.prey.indexOf(' ')>0)m.set(r.pred+'|'+r.prey,[r.pred,r.prey]);});
+  L.pairs().forEach(function(q){m.set(q[0]+'|'+q[1],q);});return Array.from(m.values());}
 function network(h){
   var note=$('netnote'),hid=0,tail='',desc;
-  function pairsOf(){var m=new Map();E.R.all.forEach(function(r){if(r.pred&&r.prey&&r.pred.indexOf(' ')>0&&r.prey.indexOf(' ')>0)m.set(r.pred+'|'+r.prey,[r.pred,r.prey]);});
-    L.pairs().forEach(function(q){m.set(q[0]+'|'+q[1],q);});return Array.from(m.values());}
   function link(ls,rs){var out=[];ls.forEach(function(a,i){rs.forEach(function(b,j){var st=L.state(a,b);if(st)out.push([i,j,st]);});});return out;}
   function count(es){var b=es.filter(function(e){return e[e.length-1]==='before';}).length;return E.pl(b,'pair')+' photographed before, '+(es.length-b)+' confirmed here.';}
   if(h.q==='eats'||h.q==='eaten'){
@@ -146,6 +147,27 @@ function network(h){
   if(!L0.length||!R0.length){$('net').replaceChildren(el('p','muted','No pair has a photograph yet. Mark what you see in the cards and it appears here.'));return;}
   drawNet(L0,R0,E0,note.textContent,nm);
 }
+// the network as a tidy CSV: `# key: value` header lines (pandas comment='#'), then one row per pair of the question, the metaweb's
+// and the photographed ones. Status: confirmed_here, photographed_before, nothing_found (searched, no yes) or not_searched.
+var STATUS={new:'confirmed_here',before:'photographed_before'};
+function netCsv(h){
+  var q=function(v){return '"'+String(v==null?'':v).replace(/"/g,'""')+'"';},m=new Map(),b=L.budget(),mk=L.marks(),
+    ask=h.q==='eats'?'What does '+label(h.x)+' eat?':h.q==='eaten'?'What eats '+label(h.y)+'?':h.q==='does'?'Does '+label(h.x)+' eat '+label(h.y)+'?':'What evidence is there for the BC food web?';
+  function add(a,c){m.set(a+'|'+c,[a,c]);}
+  if(h.q==='does')add(h.x,h.y);
+  else{M.pairs.filter(function(r){return h.q==='eats'?E.cov(h.x,r[0]):h.q==='eaten'?E.cov(h.y,r[1]):true;}).forEach(function(r){add(r[0],r[1]);});
+    pairsOf().filter(function(r){return h.q==='eats'?E.hit(r[0],h.x):h.q==='eaten'?E.hit(r[1],h.y):true;}).forEach(function(r){add(r[0],r[1]);});}
+  var rows=Array.from(m.values()).sort(function(a,c){return a[0]<c[0]?-1:a[0]>c[0]?1:a[1]<c[1]?-1:a[1]>c[1]?1:0;}).map(function(r){
+    var yes=mk.filter(function(a){return a.v==='yes'&&E.hit(a.pred,r[0])&&E.hit(a.prey,r[1]);}),ex=function(v){return mk.filter(function(a){return a.v===v&&a.ask&&a.ask[0]===r[0]&&a.ask[1]===r[1];}).length;},
+      before=E.R.all.filter(function(x){return x.pred&&x.prey&&E.hit(x.pred,r[0])&&E.hit(x.prey,r[1]);}).length;
+    return [q(r[0]),E.taxonId(r[0]),q(r[1]),E.taxonId(r[1]),STATUS[L.state(r[0],r[1])]||(L.searched(r[0],r[1])?'nothing_found':'not_searched'),yes.length,ex('no'),ex('unsure'),
+      q(yes.map(function(a){return a.id;}).join(';')),before,E.p(r[0],r[1])].join(',');});
+  return ['# question: '+ask,'# metaweb: '+M.source+'; '+M.rule,'# date: '+new Date().toISOString().slice(0,10),'# budget_used: '+b.used+' of '+b.total+' photos for this question',
+    'predator,predator_taxon_id,prey,prey_taxon_id,status,shows_it,not_visible,cant_tell,shows_it_observation_ids,prior_records,metaweb_p'].concat(rows).join('\n')+'\n';
+}
+function exportNet(){
+  var u=URL.createObjectURL(new Blob([netCsv(resolve(hash()))],{type:'text/csv'})),a=el('a');a.href=u;a.download='food-web-network.csv';document.body.append(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u);},1000);
+}
 function sentence(h){
   var b=$('sent'),pn=Array.from(new Set(M.pairs.map(function(x){return x[0];}))).sort(),yn=Array.from(new Set(M.pairs.map(function(x){return x[1];}))).sort();
   b.replaceChildren();
@@ -167,7 +189,7 @@ window.addEventListener('hashchange',paint);
 function get(u,soft){return fetch(u).then(function(r){if(!r.ok)throw new Error(u+' '+r.status);return r.json();}).catch(function(e){if(soft)return null;throw e;});}
 // the 1.4 MB food-word file loads after the first paint; the evidence stage fills in when it lands
 Promise.all([get(C.metaweb),get(C.obs)]).then(function(d){
-  E.init(d[0],d[1],null);M=E.M();ALL=E.all();L.init(E,again);$('src').textContent=E.how(d[1],d[2]);
+  E.init(d[0],d[1],null);M=E.M();ALL=E.all();L.init(E,again);$('exportnet').onclick=exportNet;$('src').textContent=E.how(d[1],d[2]);
   var ms=$('modes');MODES.forEach(function(x,i){var b=el('button',null,x[1]);b.type='button';b.setAttribute('role','radio');b.dataset.q=x[0];b.setAttribute('aria-label',x[2]);b.title=x[2];
     b.onclick=function(){go(x[0]?{q:x[0]}:{});};b.onkeydown=function(e){var j=e.key==='ArrowRight'||e.key==='ArrowDown'?1:e.key==='ArrowLeft'||e.key==='ArrowUp'?-1:0;
       if(j){e.preventDefault();var n=ms.children[(i+j+MODES.length)%MODES.length];n.focus();n.click();}};ms.append(b);});

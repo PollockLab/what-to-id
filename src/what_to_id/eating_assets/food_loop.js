@@ -81,7 +81,7 @@ function focus(i,quiet){
   if(deck[i]&&!quiet)deck[i].li.scrollIntoView({block:'nearest',behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'});
 }
 function put(c,v,pred,prey){
-  var a={v:v,on:new Date().toISOString().slice(0,10)};if(pred){a.pred=pred;a.prey=prey;}
+  var a={v:v,on:new Date().toISOString().slice(0,10),ask:[c.e.pred,c.e.prey]};if(pred){a.pred=pred;a.prey=prey;}
   S.ann[c.r.o.id]=a;save();status(c);change();next();
 }
 // Shows it on a card whose field does not name the pair: which animal, from the candidates (or any in the metaweb)
@@ -135,6 +135,13 @@ function draw(auto){
 // the budget is per question: asking resets it. The first ten are drawn when the question has a species (or on the first load, so the
 // survey is not empty), once the food-word file has settled. Switching to the survey draws nothing: pick a species or press Draw ten.
 function ask(q){Q=q;deck=[];cur=-1;$('cards').replaceChildren();meter();if(!ready)return;var a=!!(q.x||q.y)||!booted;booted=true;if(a)draw(true);}
+// what the network export needs: every mark (yes carries its pair, any mark the pair its card asked about), the pairs drawn, the budget
+function marks(){return Object.keys(S.ann).filter(function(i){return S.ann[i];}).map(function(i){var a=S.ann[i];return {id:i,v:a.v,pred:a.pred,prey:a.prey,ask:a.ask};});}
+function searched(pred,prey){
+  var m=function(p){return p&&p[0]===pred&&p[1]===prey;};
+  return deck.some(function(c){return c.e.pred===pred&&c.e.prey===prey;})||marks().some(function(a){return m(a.ask);});
+}
+function budget(){return {used:deck.length,total:S.budget};}
 function csv(){
   var q=function(v){return '"'+String(v==null?'':v).replace(/"/g,'""')+'"';};
   return ['observation_id,url,predator,prey,answer,date'].concat(Object.keys(S.ann).map(function(i){var a=S.ann[i]||{};
@@ -158,5 +165,5 @@ function init(core,onChange){
   });
 }
 function go(){ready=true;}
-return {init:init,reload:reload,go:go,ask:ask,state:state,pairs:pairs,csv:csv,entries:entries,S:S};
+return {init:init,reload:reload,go:go,ask:ask,state:state,pairs:pairs,marks:marks,searched:searched,budget:budget,csv:csv,entries:entries,S:S};
 })();
