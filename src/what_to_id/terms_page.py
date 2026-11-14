@@ -26,10 +26,10 @@ LABELS = {
     "research-grade": "Research Grade",
     "globi": "GloBI",
     "match-n": "Match number",
-    "observer-filter": "Only records I observed",
-    "my-taxa": "Only my genera",
+    "observer-filter": "Only records the user observed",
+    "my-taxa": "Only the user's genera",
     "my-taxa-first": "Your genera first",
-    "not-identified-by-me": "Hide records I identified",
+    "not-identified-by-me": "Hide records the user identified",
     "all-of-bc": "All of BC",
     **{
         "level-" + re.sub("[^a-z]+", "-", name.lower()).strip("-"): name

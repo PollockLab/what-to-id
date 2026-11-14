@@ -10,9 +10,7 @@ function $(id){return document.getElementById(id);}
 function has(k){return new RegExp('(^|&)'+k+'=').test(location.hash.slice(1));}
 function labels(){
   var g=has('run')&&!$('sortb').hidden;$('sortb').firstChild.textContent='Prioritize'+(g?' · grouped':'')+' ';
-  var u=$('usrname'),b=$('usrbox');
-  $('ubtn').textContent=u&&u.value?'@'+u.value:'You';  // the box is the user filter's: its name, once one is set
-  $('uload').hidden=!b.hidden;
+  $('uload').hidden=!$('usrbox').hidden;
 }
 function count(){
   var cap=$('cap').textContent,m=/^[\d,.\s ]+/.exec(cap),n=$('none').hidden?(m?m[0].trim():''):'0';
@@ -35,7 +33,7 @@ function sheets(){
 }
 // the Sort and You popovers open under their buttons, the You one right-aligned; on a phone the CSS makes them bottom sheets
 function popovers(){
-  [['sortpop','sortb',300],['upop','ubtn',340]].forEach(function(x){
+  [['sortpop','sortb',300]].forEach(function(x){
     var p=$(x[0]),b=$(x[1]);
     p.addEventListener('beforetoggle',function(e){
       if(e.newState!=='open')return;

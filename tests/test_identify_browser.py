@@ -90,6 +90,9 @@ def panel(page, card):
     return page.locator("#cpanel")
 
 
+WTB = "https://pollocklab.github.io/where-to-blitz/**"
+
+
 def open_identify(browser, base, hash_="", size=(600, 900), touch=False):
     view = {"width": size[0], "height": size[1]}
     page = (
@@ -99,6 +102,7 @@ def open_identify(browser, base, hash_="", size=(600, 900), touch=False):
     )
     page.errors = []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
+    page.route(WTB, lambda r: r.abort())  # no live checklist: every gap stays 0 unless stubbed
     # the header's links to the site's other pages are not in this fixture's site
     page.on(
         "response",

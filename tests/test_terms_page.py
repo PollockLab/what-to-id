@@ -30,9 +30,9 @@ def test_labels_read_id_as_ID_and_match_the_page():
     assert terms_page.label("share-needing-id") == "Share needing ID"
     assert terms_page.label("identified-to-rank") == "Identified to rank"
     # the user filter's tick labels on the map
-    assert terms_page.label("not-identified-by-me") == "Hide records I identified"
-    assert terms_page.label("my-taxa") == "Only my genera"
-    assert terms_page.label("observer-filter") == "Only records I observed"
+    assert terms_page.label("not-identified-by-me") == "Hide records the user identified"
+    assert terms_page.label("my-taxa") == "Only the user's genera"
+    assert terms_page.label("observer-filter") == "Only records the user observed"
 
 
 def test_every_more_link_targets_an_anchor():

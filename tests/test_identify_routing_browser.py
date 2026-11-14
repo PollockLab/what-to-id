@@ -36,6 +36,7 @@ def counted(browser, base, hash_=""):
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     page.add_init_script("window.EV = []; window.goatcounter = {count: o => EV.push(o)};")
     eb.stub_inat(page, None)
+    page.route(ib.WTB, lambda r: r.abort())  # no live checklist
 
     def api(route):
         u = urlparse(route.request.url)
@@ -157,7 +158,7 @@ def test_a_login_typed_on_identify_goes_to_the_hash(browser, site):
     base, _ = site
     page = counted(browser, base, "#lvl=1")
     n = len(page.evaluate("__identify.ids()"))
-    page.click("#ubtn")
+    page.click("#bwho")
     page.fill("#usrname", "JDoe")
     page.press("#usrname", "Enter")
     page.wait_for_function("__identify.user()")
@@ -181,7 +182,7 @@ def test_combined_ticks_count_as_one_event_and_the_login_is_kept_for_the_map(bro
     page.wait_for_function("EV.some(e => e.path === 'identify/user-taxa-unid')")
     page.close()
     page = counted(browser, base, "#lvl=1")
-    page.click("#ubtn")
+    page.click("#bwho")
     page.fill("#usrname", "JDoe")
     page.press("#usrname", "Enter")
     page.wait_for_function("__identify.user()")

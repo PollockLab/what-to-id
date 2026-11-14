@@ -87,7 +87,7 @@ GLOSSARY: dict[str, tuple[str, str | None]] = {
     "introduced": ("A species that is not native to BC.", None),
     "threatened": ("A species with a threatened status.", None),
     "observer-filter": (
-        "Keeps only the records this user observed. Off while Hide records I identified is ticked.",
+        "Keeps only the records this user observed. Off while Hide records the user identified is ticked.",
         None,
     ),
     "my-taxa-first": (

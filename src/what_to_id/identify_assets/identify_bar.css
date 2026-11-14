@@ -60,7 +60,8 @@
 .abody .bpanel .gl{max-height:none}
 .sdone{gap:.3em}  /* flex items drop the blanks between "Show", the count and "cards" */
 @media (max-width:760px){
-  .seg1{padding:8px 12px}
+  .bseg{flex-wrap:wrap;border-radius:24px}
+  .seg1{flex:1 1 45%;padding:8px 12px}
   .seg1 b{font-size:13px}
   dialog.sheet#bsheet{width:100vw;height:100dvh;max-width:100vw;max-height:100dvh;margin:0;border-radius:0}
 }

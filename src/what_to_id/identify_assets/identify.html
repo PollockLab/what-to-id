@@ -134,7 +134,7 @@ __IDENTIFY_BAR_CSS__
 __SITE_NAV__<main id="main-content">
 <p><button type="button" id="unpick" class="more" hidden>Clear the species filter</button></p>
 <div id="kind" class="rout" hidden></div>
-<div class="top"><div id="bar" class="bar"><div class="bseg" role="group" aria-label="What, when, where">
+<div class="top"><div id="bar" class="bar"><div class="bseg" role="group" aria-label="What, when, where, who">
 <button type="button" id="bwhat" class="seg1" aria-expanded="false" aria-controls="pwhat" disabled><small>What</small><b>All groups</b></button>
 <div id="pwhat" class="bpanel" role="group" aria-label="What" hidden>
 <div class="picker"><label for="q" class="vh">Find a taxon</label><input id="q" type="search" placeholder="Latin or common name, e.g. Carex" autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="sugg">
@@ -159,19 +159,18 @@ __SITE_NAV__<main id="main-content">
 <button type="button" id="bwhere" class="seg1" aria-expanded="false" aria-controls="pwhere" disabled><small>Where</small><b>Anywhere</b></button>
 <div id="pwhere" class="bpanel" role="group" aria-label="Where" hidden>
 <div id="wbox" class="wbox"><div class="wfoot"><button type="button" id="wexp" class="btn" aria-expanded="false">Expand map</button></div></div></div>
+<button type="button" id="bwho" class="seg1" aria-expanded="false" aria-controls="pwho" disabled><small>Who</small><b>Anyone</b></button>
+<div id="pwho" class="bpanel" role="group" aria-label="Who" hidden><p id="uload" class="muted" role="status">Loading your filters…</p><details id="usrbox" open hidden></details></div>
 </div></div>
-<button type="button" id="ubtn" class="qchip ubtn" popovertarget="upop" aria-controls="upop">You</button>
 <div id="qrow" class="qrow"><div id="tabs" class="tabs" role="tablist" aria-label="Level"></div>
 <span id="qchips" class="qchips"></span>
 <div id="rout" class="rout qseg" hidden><span class="qlbl">Range</span></div>
 <div id="rg" class="rout qseg" hidden></div>
 </div></div>
 
-<dialog id="bsheet" class="sheet" aria-labelledby="bsh"><div class="shead"><h2 id="bsh">What, when, where</h2>
+<dialog id="bsheet" class="sheet" aria-labelledby="bsh"><div class="shead"><h2 id="bsh">What, when, where, who</h2>
 <button type="button" class="shx" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><div class="sbody"></div>
 <div class="sfoot"><span></span><button type="button" class="btn sdone">Show <span class="n">0</span> cards</button></div></dialog>
-<div id="upop" popover class="pop upop" aria-label="Your iNaturalist filters"><p id="uload" class="muted" role="status">Loading your filters…</p>
-<details id="usrbox" open hidden></details></div>
 <div id="sortpop" popover class="pop sortpop" aria-labelledby="sorth"><h2 id="sorth">Prioritize</h2><div id="sorto" class="rout"></div><hr>
 <div id="frun"></div><p class="segnote">Cards with the same suggested species sit together</p></div>
 <div id="study" role="region" aria-label="Study batches">
@@ -230,7 +229,7 @@ __PHOTO_DOWNLOAD__ (most were added after it); or its label changed after scorin
 cut-off, and a test of the levels against later corrections.</p>
 <p>The User box is the map's: with an iNaturalist login it lists first the records in the user's genera, those holding
 about 80% of their identifications in BC (Adjust sets a number of IDs per genus instead), then a line, then the rest; the map dims the rest.
-Ticks narrow it: Only my genera, Hide records I identified, or Only records I observed. The login is kept on this device for a day.
+Ticks narrow it, once a user name is entered: Only @login's genera, Hide records @login identified, or Only records @login observed. The login is kept on this device for a day.
 The login goes only to iNaturalist.</p></details>
 </div></dialog>
 <p id="none" class="muted" hidden>No records at this level here.</p>

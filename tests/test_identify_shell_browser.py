@@ -42,23 +42,41 @@ def test_no_filter_heading_is_ever_visible_without_its_control(browser, site):
     assert page.errors == []
 
 
-def test_the_you_popover_holds_the_login_threshold_and_the_three_ticks(browser, site):
+def test_the_who_segment_holds_the_login_threshold_and_the_three_ticks(browser, site):
     base, _ = site
     page = ib.open_identify(browser, base, "#lvl=1&user=12345&umin=20")
-    assert page.inner_text("#ubtn") in ("You", "@12345")
-    page.click("#ubtn")
+    assert page.inner_text("#bwho small") == "Who"
+    page.wait_for_function("document.querySelector('#bwho b').textContent === '@12345'")
+    page.click("#bwho")
     page.wait_for_selector("#usrbox", state="visible")
     assert page.locator("#uload").is_hidden()
     assert page.locator("#usrname").is_visible()
     assert page.locator("#usrbox select[aria-label='Fewest IDs in a genus']").is_visible()
     labels = page.locator("#usrbox form > label:has(input[type=checkbox])").all_inner_texts()
     assert [t.strip() for t in labels] == [
-        "Only my genera",
-        "Hide records I identified",
-        "Only records I observed",
+        "Only @12345's genera",
+        "Hide records @12345 identified",
+        "Only records @12345 observed",
     ]
-    page.locator("#usrbox label", has_text="Only my genera").click()
+    page.locator("#usrbox label", has_text="Only @12345's genera").click()
     page.wait_for_function("location.hash.includes('umode=')")
+    page.wait_for_function(
+        "document.querySelector('#bwho b').textContent.startsWith('@12345 \u00b7 ')"
+    )
+    assert page.locator("#ubtn, #upop").count() == 0
+    assert page.errors == []
+
+
+def test_who_says_anyone_without_a_user_and_the_bar_wraps_on_a_phone(browser, site):
+    base, _ = site
+    page = ib.open_identify(browser, base, "#lvl=1")
+    assert page.inner_text("#bwho b") == "Anyone"
+    page.set_viewport_size({"width": 375, "height": 800})
+    assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+    tops = page.evaluate(
+        "[...document.querySelectorAll('#bar .seg1')].map(e => e.getBoundingClientRect().top)"
+    )
+    assert len(tops) == 4 and len(set(tops)) == 2  # a 2x2 grid
     assert page.errors == []
 
 
@@ -134,3 +152,20 @@ def test_the_batch_button_opens_the_next_batch_by_keyboard(browser, site):
     page.keyboard.press("Tab")
     assert page.evaluate("document.activeElement.id") == "prev"
     assert page.errors == []
+
+
+def test_the_who_ticks_wait_for_a_user_name_and_say_so(browser, site):
+    base, _ = site
+    page = ib.open_identify(browser, base, "#lvl=1")
+    page.click("#bwho")
+    page.wait_for_selector("#usrbox", state="visible")
+    assert page.inner_text("#usrhint") == "Enter a user name first"
+    for box in ("taxa", "unid", "observer"):
+        assert page.is_disabled(f"#usr{box}")
+    assert "user" in page.inner_text("#usrbox form")  # the labels name the user, not "I" or "my"
+    assert "my genera" not in page.inner_text("#usrbox form").lower()
+    page.fill("#usrname", "JDoe")
+    page.press("#usrname", "Enter")
+    page.wait_for_function("document.getElementById('usrhint').hidden")
+    assert page.inner_text("#usrbox form > label:has(#usrtaxa)").strip() == "Only @JDoe's genera"
+    assert page.is_enabled("#usrtaxa") and page.errors == []
