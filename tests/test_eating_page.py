@@ -175,8 +175,26 @@ def test_shows_it_asks_which_prey_and_a_confirmed_pair_turns_its_edge_green(brow
     assert stored["ann"]["502"]["v"] == "yes" and stored["ann"]["502"]["prey"] == "Myodes"
     page.reload()
     page.wait_for_function("window.__food && window.__text")
-    assert page.locator("#net line.e.new").count() == 1 and page.inner_text("#used") == "16 used"
+    assert page.locator("#net line.e.new").count() == 1 and page.inner_text("#used") == "10 used"
     assert page.errors == []
+
+
+def test_switching_to_the_survey_draws_nothing_and_each_question_has_its_own_budget(browser, base):
+    page = open_page(browser, base + "#q=eats&x=Strix varia")
+    assert page.inner_text("#used") == "10 used"
+    page.get_by_role("radio", name="What evidence is there for the BC food web?").click()
+    page.wait_for_function("document.querySelectorAll('#cards li').length==0")
+    assert page.inner_text("#used") == "0 used"
+    assert "Pick a species" in page.inner_text("#cand") and page.locator("#draw").is_enabled()
+    page.evaluate("location.hash='#q=eats&x=Strix varia'")
+    page.wait_for_function("document.querySelectorAll('#cards li').length==10")
+    assert page.inner_text("#used") == "10 used" and "No more" not in page.inner_text("#cand")
+    assert page.errors == []
+
+
+def test_the_survey_draws_its_first_ten_on_load_only(browser, base):
+    page = open_page(browser, base)
+    assert page.locator("#cards li").count() > 0 and page.inner_text("#used") != "0 used"
 
 
 def test_a_confirmed_mark_hands_off_to_inaturalist_with_a_copyable_name(browser, base):

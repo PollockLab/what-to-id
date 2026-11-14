@@ -1,16 +1,16 @@
 // The evidence search of the Food web page: "Draw ten" pulls the ten most promising BC observations for the question, each with the
 // pair it may show and why it was drawn, and the reader marks it Shows it (and which animal), Not visible or Can't tell. Annotations,
-// the budget and the observations already drawn live in localStorage only (one key, read defensively); nothing goes to iNaturalist.
+// the budget and the annotations live in localStorage only (one key, read defensively); nothing goes to iNaturalist.
 // Rank = the pair's p in the metaweb x the evidence: 4 the field names the pair, 3 it names a coarse ancestor of one animal, 2 the
 // description, tags or field text mention a candidate (common or Latin name), 1 they only talk about food or the field is empty.
 // FoodLoop.init(E, onChange); FoodLoop.ask({x, y}) when the question changes; FoodLoop.state(pred, prey) is 'before', 'new' or ''.
 var FoodLoop=(function(){
 'use strict';
 var KEY='wtid-loop',OBS='https://www.inaturalist.org/observations/',TEN=10,$=function(id){return document.getElementById(id);};
-var S={budget:30,drawn:[],ann:{}},E=null,Q={x:null,y:null},ITEMS=[],deck=[],cur=-1,change=function(){},TOK=new Map(),ready=false;
+var S={budget:30,ann:{}},E=null,Q={x:null,y:null},ITEMS=[],deck=[],cur=-1,change=function(){},TOK=new Map(),ready=false,booted=false;
 function load(){
   try{var v=JSON.parse(localStorage.getItem(KEY)),b=Number(v&&v.budget);
-    if(v&&typeof v==='object'){S.budget=isFinite(b)&&b>=0?Math.floor(b):30;S.drawn=Array.isArray(v.drawn)?v.drawn:[];S.ann=v.ann&&typeof v.ann==='object'&&!Array.isArray(v.ann)?v.ann:{};}}catch(e){}
+    if(v&&typeof v==='object'){S.budget=isFinite(b)&&b>=0?Math.floor(b):30;S.ann=v.ann&&typeof v.ann==='object'&&!Array.isArray(v.ann)?v.ann:{};}}catch(e){}
 }
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
 function lc(s){return String(s||'').toLowerCase();}
@@ -37,9 +37,9 @@ function entries(r){
 }
 function score(e){return Math.max(E.p(e.pred,e.prey),0.1)*e.tier;}
 function ok(e){return (!Q.x||E.hit(e.pred,Q.x))&&(!Q.y||E.hit(e.prey,Q.y));}
-// the records for the question not yet drawn, best first, each with its best pair
+// the records for the question not yet drawn or answered, best first, each with its best pair
 function ranked(){
-  var seen=new Set(S.drawn),out=[];
+  var seen=new Set(deck.map(function(c){return c.r.o.id;}).concat(Object.keys(S.ann).map(Number))),out=[];
   ITEMS.forEach(function(it){
     if(seen.has(it.r.o.id))return;
     var b=null;it.es.forEach(function(e){if(ok(e)&&(!b||score(e)>score(b)))b=e;});
@@ -59,12 +59,12 @@ function photo(o,a){
 }
 function pairText(e){return E.label(e.pred)+(e.tier===4?' eats ':' may be eating ')+E.label(e.prey);}
 function meter(){
-  var used=S.drawn.length,left=S.budget-used,n=ranked().length,bar=$('mbar');
+  var used=deck.length,left=S.budget-used,n=ranked().length,bar=$('mbar');
   $('budget').value=S.budget;$('used').textContent=used+' used';
   $('mfill').style.width=(S.budget?Math.min(100,used/S.budget*100):100)+'%';bar.setAttribute('aria-valuenow',used);bar.setAttribute('aria-valuemax',S.budget);
   bar.setAttribute('aria-valuetext',used+' of '+S.budget+' photos');bar.classList.toggle('full',left<=0);
   $('draw').textContent=deck.length?'Draw ten more':'Draw ten';$('draw').disabled=left<=0||!n||!ready;
-  $('cand').textContent=!ready?E.pl(n,'candidate observation')+' so far. Searching descriptions and tags.':left<=0?'Budget spent. Raise it to draw more.':n?E.pl(n,'candidate observation')+' for this question.':'No more observations for this question.';
+  $('cand').textContent=!ready?E.pl(n,'candidate observation')+' so far. Searching descriptions and tags.':left<=0?'Budget spent. Raise it to draw more.':n?E.pl(n,'candidate observation')+(deck.length||Q.x||Q.y?' for this question.':' across the whole web. Pick a species in the question to draw its photos, or draw ten from all of them.'):'No more observations for this question.';
 }
 function status(c){
   var a=S.ann[c.r.o.id],li=c.li,s=li.querySelector('.res');
@@ -127,13 +127,14 @@ function card(c){
   status(c);return li;
 }
 function draw(auto){
-  var n=Math.min(TEN,S.budget-S.drawn.length);if(n<=0)return;
+  var n=Math.min(TEN,S.budget-deck.length);if(n<=0)return;
   var got=ranked().slice(0,n),ul=$('cards'),first=deck.length;
-  got.forEach(function(c){S.drawn.push(c.r.o.id);deck.push(c);ul.append(card(c));});
+  got.forEach(function(c){deck.push(c);ul.append(card(c));});
   save();meter();if(got.length)focus(first,auto===true);
 }
-// the first ten are drawn as the question is asked, once the food-word file has settled, so the stage is never empty
-function ask(q){Q=q;deck=[];cur=-1;$('cards').replaceChildren();meter();if(ready)draw(true);}
+// the budget is per question: asking resets it. The first ten are drawn when the question has a species (or on the first load, so the
+// survey is not empty), once the food-word file has settled. Switching to the survey draws nothing: pick a species or press Draw ten.
+function ask(q){Q=q;deck=[];cur=-1;$('cards').replaceChildren();meter();if(!ready)return;var a=!!(q.x||q.y)||!booted;booted=true;if(a)draw(true);}
 function csv(){
   var q=function(v){return '"'+String(v==null?'':v).replace(/"/g,'""')+'"';};
   return ['observation_id,url,predator,prey,answer,date'].concat(Object.keys(S.ann).map(function(i){var a=S.ann[i]||{};
