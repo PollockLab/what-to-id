@@ -1,4 +1,4 @@
-// The Identify search bar: What, When and Where, each opening its own panel under its segment. The panels are the map's
+// The Identify search bar: What, When, Where and Who, each opening its own panel under its segment. The panels are the map's
 // controls, shared: the taxon picker and groups list (What), the dates, months and histograms (When) and the area
 // live map and its area tools (Where). A change writes S and calls changed(), so the cards follow at once. A phone (760px
 // and under) opens one full-screen sheet with the three panels as accordion sections, one open at a time.
@@ -12,7 +12,7 @@
 // group_list.js, map_hist.js, map_time.js, map_only.js and identify_where.js.
 var IdentifyBar=(function(){
 'use strict';
-var NAMES=['What','When','Where'];
+var NAMES=['What','When','Where','Who'];
 function $(id){return document.getElementById(id);}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 return function(o){
@@ -87,15 +87,28 @@ function when(){
   for(i=0;i<12;i++)m+=S.months>>i&1;
   return [S.up?'Uploaded':'',p&&S.lo===0?'Any time':p?p.el.textContent:iso(S.lo)+' to '+iso(S.hi),m?m+' months':''].filter(Boolean).join(' · ');
 }
+// the identifier the cards fit: Anyone, or @login and what is ticked
+var TICKS={taxa:'my genera',unid:'not by me',observer:'my observations',first:'my genera first'};
+function who(){
+  if(!S.user)return 'Anyone';
+  var t=(S.umode||'').split(',').filter(function(k){return TICKS[k];}).map(function(k){return TICKS[k];});
+  return '@'+S.user+(t.length?' \u00b7 '+t.join(', '):'');
+}
 function where(){var t=A&&A.term();return LBL!==null?LBL||'Anywhere':t?t.label:'Anywhere';}
 
 // The panels: the open one is raised under its segment, the rest of the bar greyed
 function visible(k){return SEG[k].p.offsetParent!==null;}
+// What's links to the full-screen photo space and taxonomy (explore.html), with the selection in the address
+var XL=$('xlinks');
+function xl(){['xspace','xtree'].forEach(function(id){var a=$(id);a.href=a.getAttribute('href').split('#')[0]+location.hash;});}
+if(XL&&!o.embedded)fetch('explore.html',{method:'HEAD'}).then(function(r){XL.hidden=!r.ok;}).catch(function(){});
+if(XL)XL.addEventListener('click',xl,true);
 function fill(k){
   if(!visible(k))return;
-  if(k===0)counts();
+  if(k===0){counts();if(XL)xl();}
   else if(k===1)MH.draw();
-  else if(W)W.show();
+  else if(k===2){if(W)W.show();}
+  else [].forEach.call(SEG[3].p.querySelectorAll('details details'),function(d){d.open=true;});  // Who: the threshold sits in a closed Adjust
 }
 function place(k){
   var r=SEG[k].b.getBoundingClientRect(),b=bar.getBoundingClientRect(),p=SEG[k].p;
@@ -155,7 +168,7 @@ SEG.forEach(function(s){s.b.disabled=false;});
 // After every selection or level change: the words, the controls, and the open panel's numbers
 function update(){
   CUM=null;TC=undefined;if(W)W.sync();
-  var w=[what(),when(),where()];
+  var w=[what(),when(),where(),who()];
   SEG.forEach(function(s,k){s.l.textContent=w[k];ACC[k].h.lastChild.textContent=w[k];});
   GL.show();TM.update();OL.show();CL.show();
   SEG.forEach(function(s,k){if(!s.b.hidden)fill(k);});

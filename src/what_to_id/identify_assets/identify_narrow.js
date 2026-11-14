@@ -17,10 +17,10 @@ function band(r,n){
   var p=(r+1)/n;
   return p<=0.01?0:p<=0.05?1:p<=0.25?2:3;
 }
-// "Top 1%" and so on from the record's place r (0 first) among n, else ''.
+// "Best 1%" and so on from the record's place r (0 first) among n, else ''.
 function conf(r,n){
   if(!n||r==null)return '';
-  return ['Top 1%','Top 5%','Top 25%',''][band(r,n)];
+  return ['Best 1%','Best 5%','Best 25%',''][band(r,n)];
 }
 // An observation (iNaturalist API v1) already at species or below, or with a current ID at species or below.
 function taken(o){

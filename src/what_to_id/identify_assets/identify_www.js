@@ -39,6 +39,14 @@ return function(ctx){
     if(!(id in cache)){if(!want.size)setTimeout(ask,0);want.add(id);return false;}
     return (cache[id]&INV)!==0;
   }
+  // 1 at risk | 2 invasive for the record's suggestion, whatever the filters say; inv asks iNaturalist for the ones not yet read
+  function flag(i,inv){
+    if(!ids.size)ctx.taxa().forEach(function(t){if(t[2])ids.set(t[0],t[2]);});
+    var id=ids.get(ctx.look(i)),f=id&&risk.has(id)?1:0;
+    if(!id||!inv)return f;
+    if(id in cache)return f|cache[id]&INV;
+    if(!want.size)setTimeout(ask,0);want.add(id);return f;
+  }
   function toggle(k,label){
     var l=el('label','tog'),b=el('input');b.type='checkbox';if(k==='run')b.setAttribute('role','switch');b.checked=on(k);
     b.onchange=function(){keep(k,b.checked);sync();ctx.redraw();};l.append(b,' '+label);return l;
@@ -48,6 +56,6 @@ return function(ctx){
   var risk_=toggle('risk','At risk'),inv_=toggle('inv','Invasive');risk_.className=inv_.className='tog qchip';
   $('qchips').append(risk_,inv_);$('frun').append(toggle('run','Group by suggested species'));$('frun').firstChild.className='swt';
   sync();
-  return {pass:pass,sync:sync,active:function(){return on('risk')||on('inv');}};
+  return {pass:pass,flag:flag,sync:sync,active:function(){return on('risk')||on('inv');}};
 };
 })();

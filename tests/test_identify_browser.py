@@ -90,6 +90,9 @@ def panel(page, card):
     return page.locator("#cpanel")
 
 
+WTB = "https://pollocklab.github.io/where-to-blitz/**"
+
+
 def open_identify(browser, base, hash_="", size=(600, 900), touch=False):
     view = {"width": size[0], "height": size[1]}
     page = (
@@ -99,6 +102,7 @@ def open_identify(browser, base, hash_="", size=(600, 900), touch=False):
     )
     page.errors = []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
+    page.route(WTB, lambda r: r.abort())  # no live checklist: every gap stays 0 unless stubbed
     # the header's links to the site's other pages are not in this fixture's site
     page.on(
         "response",
@@ -351,7 +355,8 @@ def test_the_tabs_switch_the_cards_and_their_counts_are_the_totals(browser, site
 
 def test_a_card_posts_its_record_on_click_and_focus_on_hover(browser, site):
     base, _ = site
-    page, frame = wrapped(browser, base, "#lvl=1")
+    # sort=conf: the default order moves the cards once the survey layer arrives
+    page, frame = wrapped(browser, base, "#lvl=1&sort=conf")
     frame.wait_for_selector("#grid .card")
     first = frame.locator("#grid .card").first
     rid = int(first.get_attribute("data-id"))
@@ -411,6 +416,11 @@ def test_the_batch_links_cover_the_listed_ids(browser, site):
     assert page.get_attribute("#go", "href") != first and page.locator("#prev").is_enabled()
     page.click("#next")
     assert page.locator("#go").inner_text() == "Identify this record on iNaturalist"
+    # one record skips the Identify grid: its own page, at the ID form
+    assert re.fullmatch(
+        r"https://www\.inaturalist\.ca/observations/\d+#comment-id-tabs",
+        page.get_attribute("#go", "href"),
+    )
     assert page.locator("#bn").inner_text() == "Batch 3 of 3"
     assert page.locator("#next").is_disabled()
     assert page.errors == []

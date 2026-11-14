@@ -35,8 +35,8 @@ def test_level_3_lists_strictly_by_rank_and_labels_the_top(browser, site):
     got = [rank[i] for i in page.evaluate("__identify.view()")[3]]
     assert got == sorted(got) and len(set(got)) == len(got) and got[0] == 0
     first = page.locator("#grid .card").first
-    assert first.locator(".conf").inner_text() == "Top 1%"
-    assert page.locator("#grid .card .conf", has_text="Top").count() >= 1
+    assert first.locator(".conf").inner_text() == "Best 1%"
+    assert page.locator("#grid .card .conf", has_text="Best").count() >= 1
     assert page.errors == []
 
 
@@ -156,12 +156,18 @@ def test_level_3_has_one_count_line_that_agrees_with_the_tab(browser, site):
     records = page.evaluate("__identify.total()")[3]
     assert page.inner_text("#tab3 b") == f"{records:,}"
     assert page.inner_text("#cap") == (
-        f"{cards:,} cards to ID ({records:,} records, Top 5%; up to 3 per suggested species)"
+        f"{cards:,} cards to ID ({records:,} records, Best 5%; up to 3 per suggested species)"
     )
-    assert page.inner_text("#count") == f"{cards:,} cards to ID"
-    assert "records shown" not in page.inner_text("#sort")
-    reveal(page, "#sort .seg")
-    page.click("#sort button:has-text('All')")
+    assert page.inner_text("#count") == f"{cards:,} cards"  # a phone keeps the short heading
+    reveal(page, "#ptop")
+    page.evaluate(
+        "() => { const e = document.getElementById('ptop'); e.value = 100;"
+        " e.dispatchEvent(new Event('input', {bubbles: true})); }"
+    )
+    page.wait_for_function(
+        "location.hash.includes('conf=all')"
+        " && !document.getElementById('cap').textContent.includes('Best')"
+    )
     records = page.evaluate("__identify.total()")[3]
     assert page.inner_text("#tab3 b") == f"{records:,}"
     assert f"({records:,} records; up to 3 per suggested species)" in page.inner_text("#cap")

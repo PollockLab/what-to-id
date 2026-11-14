@@ -209,7 +209,7 @@ def test_an_old_link_with_a_login_alone_still_opens_on_observer(browser, site):
     shown(page, N // 2)
     assert checked(page) == ["observer"]
     assert "umode" not in page.evaluate("location.hash")
-    assert page.inner_text("#usrbox > summary") == "User: 10 · Only records I observed"
+    assert page.inner_text("#usrbox > summary") == "User: 10 · Only records @10 observed"
     # an observer's own ID counts as one, so Hide is off while Observed is ticked
     assert page.is_disabled("#usrunid") and page.get_attribute("#usrunid", "title")
     page.close()
@@ -310,7 +310,7 @@ def test_a_user_with_no_genus_at_five_keeps_nothing_and_says_so(browser, site):
     shown(page, 0)
     text = (
         "42 has fewer than 5 IDs in any BC genus yet. "
-        "Try Only records I observed or Hide records I identified."
+        "Try Only records @42 observed or Hide records @42 identified."
     )
     assert page.inner_text("#usrbox p") == text and page.inner_text("#idnote") == text
     assert page.errors == []
@@ -358,7 +358,7 @@ def test_the_box_names_the_user_and_ticks_and_the_dimming_when_collapsed(browser
     page = open_map(browser, site, "#user=42&umode=taxa,unid")
     shown(page, N - 3)
     assert page.inner_text("#usrbox > summary") == (
-        "User: 42 · Only my genera, Hide records I identified"
+        "User: 42 · Only @42's genera, Hide records @42 identified"
     )
     page.close()
 

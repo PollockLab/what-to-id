@@ -1,5 +1,5 @@
 // Identify's Where panel: the live map, loaded bare (map.html?embed=1&bare=1) the first time Where opens, with the area tools
-// the map has (Draw area, Load GeoJSON, Find BC parks). The map holds the same filters through the address and wtid-selection;
+// the map has (Draw area, Load GeoJSON, Find parks). The map holds the same filters through the address and wtid-selection;
 // the area it draws or picks comes back as wtid-area. Expand map grows it to the whole window with a Show N cards button to
 // return; Esc returns too.
 // IdentifyWhere(o), o {box (#wbox: the foot with the Expand button), url (the map page), key() (the selection as text),

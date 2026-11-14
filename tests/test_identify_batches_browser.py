@@ -1,5 +1,6 @@
-"""The Batches tab: Identify opens on the study's batches, Next batch serves them in turn,
-each served batch and posted ID lands in the browser's trace, and #record= opens the levels."""
+"""The study batches: #lvl=b opens them (Identify opens on Easy confirms), Next batch serves
+them in turn, each served batch and posted ID lands in the browser's trace, and #record=
+opens the levels."""
 
 import json
 
@@ -33,7 +34,7 @@ def site(tmp_path_factory):
     server.shutdown()
 
 
-def open_batches(browser, base, hash_="", signed_in=False, size=(600, 900)):
+def open_batches(browser, base, hash_="#lvl=b", signed_in=False, size=(600, 900)):
     page = browser.new_page(viewport={"width": size[0], "height": size[1]})
     page.errors, page.posts = [], []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
@@ -79,7 +80,7 @@ def cards(page):
     )
 
 
-def test_identify_opens_on_batches_and_next_batch_serves_each_in_turn(browser, site):
+def test_lvl_b_opens_the_batches_and_next_batch_serves_each_in_turn(browser, site):
     base, lists = site
     page = open_batches(browser, base)
     assert page.evaluate("document.body.classList.contains('bt')")
@@ -102,6 +103,18 @@ def test_identify_opens_on_batches_and_next_batch_serves_each_in_turn(browser, s
     assert page.get_attribute("a[href='terms.html#study']", "target") == "_blank"
     text = page.inner_text("body").lower()
     assert not [w for w in WORDS if w in text]
+    assert page.errors == []
+
+
+def test_the_default_is_easy_confirms_and_the_mode_control_has_no_batches(browser, site):
+    base, _ = site
+    page = open_batches(browser, base, "")
+    assert not page.evaluate("document.body.classList.contains('bt')")
+    assert page.evaluate("__identify.level()") == 1
+    page.wait_for_selector("#grid .card")  # cards at once, no group to pick
+    assert [t.get_attribute("id") for t in page.get_by_role("tab").all()][0] == "tab1"
+    assert page.locator("#tabb").count() == 0
+    assert served(page) == []
     assert page.errors == []
 
 

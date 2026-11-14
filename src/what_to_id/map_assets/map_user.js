@@ -10,8 +10,10 @@
 // Everything but the observer file comes from api.inaturalist.org in the browser, one request at a
 // time and at least a second apart, and is kept for the session. Without a user nothing is filtered.
 var USR_CAP={taxa:5,unid:25},USR_PER={taxa:500,unid:200},USR_MINS=[5,20,50,100],USR_AUTO=0.8,USR_DAY=864e5,
-  USR_LOGIN='wtid.user',USR_HIDE='wtid.uhide',USR_FLAGS=[['taxa','Only my genera','my-taxa'],
-    ['unid','Hide records I identified','not-identified-by-me'],['observer','Only records I observed','observer-filter']];
+  USR_LOGIN='wtid.user',USR_HIDE='wtid.uhide',USR_FLAGS=[['taxa',function(u){return 'Only '+u+"'s genera";},'my-taxa'],
+    ['unid',function(u){return 'Hide records '+u+' identified';},'not-identified-by-me'],
+    ['observer',function(u){return 'Only records '+u+' observed';},'observer-filter']];
+function usrWho(S){return S.user?'@'+S.user:'the user';}  // the tick labels name the entered user
 // {id} for a user number, {login} for a login, null for anything else.
 // A profile link (any iNaturalist network host) or a leading @ is taken for the login or number it holds.
 function usrParse(s){s=String(s||'').trim();
@@ -82,7 +84,7 @@ function inatGate(o){var cache={},q=Promise.resolve(),last=0,gap=o.gap==null?100
 function userFilter(o){
   var S=o.S,META=o.meta,nf=new Intl.NumberFormat('en-CA'),box=document.getElementById('usrbox'),
     api=inatGate({gap:o.gap,fetch:o.fetch,say:function(t){say(t);}}),cur='',bad=0,run=0,id=0,mask=null,ob=null,hide=null,capT=false,capU=false,key=0,Pn=null,
-    gen=[],used=0,top=null,fit=null,restored=0,cb={},input,minsel,adj,msg,again,out,sum;
+    gen=[],used=0,top=null,fit=null,restored=0,cb={},input,minsel,adj,msg,again,out,sum,note;
   function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;
     if(text!=null)e.textContent=text;return e;}
   // with no umode an old link's single mode: Observed, or Only my genera without an observer file
@@ -97,7 +99,7 @@ function userFilter(o){
     if(!fit||fit.n!==n)fit=Object.assign({n:n},usrFit(o.taxa(),META.ranks,gen.map(function(e){return e[0];}),
       Pn?Pn.tax:[],META.max_url-1500));return fit;}
   function head(){var n=gen.length;
-    return !n?S.user+' has fewer than '+USR_MINS[0]+' IDs in any BC genus yet. Try '+(META.observer?'Only records I observed or ':'')+'Hide records I identified.':
+    return !n?S.user+' has fewer than '+USR_MINS[0]+' IDs in any BC genus yet. Try '+(META.observer?USR_FLAGS[2][1](usrWho(S))+' or ':'')+USR_FLAGS[1][1](usrWho(S))+'.':
       top?'Your top '+(n===1?'genus':nf.format(n)+' genera')+', '+Math.round(100*top.n/top.total)+'% of your '+nf.format(top.total)+' IDs in BC.':
       'Genera where '+S.user+' has at least '+used+' IDs in BC ('+nf.format(n)+(n===1?' genus':' genera')+')'+(used<min()?'; none reach '+min()+' yet.':'.');}
   function dim(){return ranked()?' Other records are listed last on Identify and dimmed on the map.':'';}
@@ -134,9 +136,12 @@ function userFilter(o){
     .catch(function(e){if(e===0)return;bad=1;mask=ob=hide=null;key++;
       say(e instanceof TypeError?'Could not reach iNaturalist.':e.message);o.changed();});}
   // Hide and Observed together would leave almost nothing, as an observer's own ID counts as an identification
-  function excl(){var why='Off while the other is ticked: your own records carry your own ID.';
-    cb.observer.disabled=!META.observer||cb.unid.checked;cb.unid.disabled=cb.observer.checked;
-    cb.observer.title=!META.observer?'This map has no observer file.':cb.unid.checked?why:'';cb.unid.title=cb.observer.checked?why:'';}
+  function excl(){var why="Off while the other is ticked: a user's own records carry their own ID.",no=!S.user,hint='Enter a user name first';
+    cb.taxa.disabled=no;cb.taxa.title=no?hint:'';
+    cb.observer.disabled=no||!META.observer||cb.unid.checked;cb.unid.disabled=no||cb.observer.checked;
+    cb.observer.title=no?hint:!META.observer?'This map has no observer file.':cb.unid.checked?why:'';cb.unid.title=no?hint:cb.observer.checked?why:'';
+    if(note)note.hidden=!no;
+    USR_FLAGS.forEach(function(m){cb[m[0]].parentNode.lastChild.textContent=' '+m[1](usrWho(S));});}
   // what a typed login starts on: nothing ticked but Hide, if it was last left ticked
   function defaults(){cb.taxa.checked=cb.observer.checked=false;cb.unid.checked=usrStore(USR_HIDE)==='1';excl();}
   // an unparseable entry is not written to the hash; a failed lookup is tried again on the next apply
@@ -152,12 +157,13 @@ function userFilter(o){
     input=f.appendChild(el('input','padd'));input.id=lab.htmlFor='usrname';input.type='text';
     input.placeholder='Login or number';input.autocomplete='off';input.spellcheck=false;
     USR_FLAGS.forEach(function(m){var l=f.appendChild(el('label')),c=l.appendChild(el('input'));
-      c.type='checkbox';c.id='usr'+m[0];c.dataset.explain=m[2];l.append(' '+m[1]);cb[m[0]]=c;
+      c.type='checkbox';c.id='usr'+m[0];c.dataset.explain=m[2];l.append(' '+m[1](usrWho(S)));cb[m[0]]=c;
       c.onchange=function(){if(m[0]==='unid')usrStore(USR_HIDE,c.checked?'1':'0');excl();apply();};});
+    note=f.appendChild(el('span','muted','Enter a user name first'));note.id='usrhint';
     defaults();
     adj=f.appendChild(el('details'));adj.appendChild(el('summary',null,'Adjust'));
     minsel=adj.appendChild(el('select'));minsel.setAttribute('aria-label','Fewest IDs in a genus');
-    [[0,'Automatic ('+100*USR_AUTO+'% of my IDs)']].concat(USR_MINS.map(function(v){return [v,v+'+ of my IDs per genus'];})).forEach(function(v){
+    [[0,'Automatic ('+100*USR_AUTO+'% of their IDs)']].concat(USR_MINS.map(function(v){return [v,v+'+ of their IDs per genus'];})).forEach(function(v){
       var op=minsel.appendChild(el('option',null,v[1]));op.value=v[0];});
     again=f.appendChild(el('button','padd','Reload for this view'));again.type='button';again.hidden=true;
     again.onclick=function(){cur='';o.changed();};
@@ -174,9 +180,10 @@ function userFilter(o){
         if(!S.user&&r&&usrParse(r.user)&&Date.now()-r.t<USR_DAY){S.user=String(r.user);S.umode=pick(usrStore(USR_HIDE)==='1'?['unid']:[]);
           if(box)box.open=true;}}
       if(input){if(document.activeElement!==input)input.value=S.user;
-        if(S.user){USR_FLAGS.forEach(function(m){cb[m[0]].checked=has(m[0]);});excl();}
+        if(S.user)USR_FLAGS.forEach(function(m){cb[m[0]].checked=has(m[0]);});
+        excl();
         minsel.value=min();adj.hidden=!S.user;again.hidden=!o.again||!has('unid')||!S.user;out.hidden=!S.user;
-        sum.textContent=S.user?'User: '+S.user+' · '+(USR_FLAGS.filter(function(m){return has(m[0]);}).map(function(m){return m[1];}).join(', ')||'Your genera first'):'User';}
+        sum.textContent=S.user?'User: '+S.user+' · '+(USR_FLAGS.filter(function(m){return has(m[0]);}).map(function(m){return m[1](usrWho(S));}).join(', ')||'Your genera first'):'User';}
       start();},
     drop:function(i){if(!id)return false;var t=Pn.tax[i];
       return !!(mask&&has('taxa')&&!(t<mask.length&&mask[t]===1)||ob&&i<ob.length&&ob[i]!==id||hide&&hide.has(Pn.id[i]));},

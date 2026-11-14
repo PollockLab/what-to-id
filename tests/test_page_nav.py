@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from what_to_id import page_nav
-from what_to_id.page_nav import BLITZ, CSS, PAGES, nav
+from what_to_id.page_nav import BLITZ, CSS, PAGES, SITE, nav
 
 FORBIDDEN = ("similarity", "novelty", "surprise", "recency", "gap first", "gap_first")
 
@@ -22,25 +22,29 @@ def test_exactly_one_current_page(current):
     assert re.search(rf'href="{current}" aria-current="page"', html)
 
 
-@pytest.mark.parametrize("current", ["map.html", "embeddings.html", "tree.html", "search.html"])
-def test_the_pages_inside_explore_mark_explore(current):
+@pytest.mark.parametrize(
+    "current", ["explore.html", "map.html", "embeddings.html", "tree.html", "search.html"]
+)
+def test_the_pages_inside_explore_mark_identify(current):
     html = nav(current)
     assert html.count('aria-current="page"') == 1
-    assert re.search(r'href="explore.html" aria-current="page"', html)
+    assert re.search(r'href="identify.html" aria-current="page"', html)
     assert "Photo space<" not in html and ">Map<" not in html and ">Taxonomy<" not in html
 
 
-def test_the_tabs_are_explore_look_alikes_methods_and_blitz():
-    assert [label for _, label in PAGES] == ["Explore", "Confused pairs", "Methods"]
-    assert "study.html" not in nav("identify.html") and ">Where to Blitz" in nav("identify.html")
+def test_the_tabs_are_identify_look_alikes_methods_and_the_site_link():
+    assert [label for _, label in PAGES] == ["Identify", "Confused pairs", "Methods"]
+    assert "study.html" not in nav("identify.html")
+    assert ">openbiodiversity.ca" in nav("identify.html")
+    assert "Where to Blitz" not in nav("identify.html")
 
 
 def test_available_drops_pages_that_were_not_built():
-    # without the split page the Explore tab opens the map
+    # without the split page the Identify tab opens the map
     html = nav("map.html", {"terms.html", "map.html"})
     hrefs = [h for h, _ in _links(html)]
     assert hrefs == ["map.html", "terms.html"]
-    assert BLITZ in html
+    assert SITE[0] in html
     # the page you are on stays even when the set forgets it
     assert 'href="confusion.html" aria-current="page"' in nav("confusion.html", {"terms.html"})
 
@@ -51,9 +55,10 @@ def test_unknown_availability_is_probed_by_the_page():
 
 
 def test_external_link_opens_a_new_tab_and_says_so():
-    link = re.search(rf'<a [^>]*href="{re.escape(BLITZ)}"[^>]*>.*?</a>', nav("map.html")).group()
+    link = re.search(rf'<a [^>]*href="{re.escape(SITE[0])}"[^>]*>.*?</a>', nav("map.html")).group()
     assert 'target="_blank"' in link and 'rel="noopener"' in link
-    assert "Where to Blitz" in link and "↗" in link and "opens in a new tab" in link
+    assert '<img class="site-mark" src="data:image/png;base64,' in link and 'alt="">' in link
+    assert SITE[1] in link and "↗" in link and "opens in a new tab" in link
 
 
 def test_skip_link_keeps_the_hash():
@@ -63,7 +68,7 @@ def test_skip_link_keeps_the_hash():
 
 def test_base_prefixes_the_links():
     html = nav("terms.html", base="https://x.test/app/")
-    assert 'href="https://x.test/app/explore.html"' in html
+    assert 'href="https://x.test/app/identify.html"' in html
     assert 'href="https://x.test/app/terms.html" aria-current="page"' in html
 
 
@@ -112,45 +117,43 @@ def _href(pg, view):
     return pg.get_attribute(f".site-nav [data-view={view}]", "href")
 
 
-def test_explore_tab_on_the_map_page_carries_the_record_and_the_selection(browser):
+def test_identify_tab_on_the_map_page_carries_the_record_and_the_selection(browser):
     pg = _open(
         browser, "map.html", "#record=42&groups=Insecta,-Aves&acc=100&at=9.5/49.123456/-123.987654"
     )
-    assert pg.get_attribute(".site-nav [aria-current=page]", "href").startswith("explore.html")
+    assert pg.get_attribute(".site-nav [aria-current=page]", "href").startswith("identify.html")
     assert pg.locator(".site-nav a").first.bounding_box()["height"] >= 44
-    assert _href(pg, "explore") == "explore.html#id=42&groups=Insecta,-Aves&acc=100"
-    assert _href(pg, "blitz") == BLITZ + "?at=49.123,-123.988"
+    assert _href(pg, "explore") == "identify.html#id=42&groups=Insecta,-Aves&acc=100"
     # replaceState fires no event: the next hover reads the new hash
     pg.evaluate("history.replaceState(null,'','#at=9.5/50.5/-120.25')")
-    assert _href(pg, "explore") == "explore.html"
-    assert _href(pg, "blitz") == BLITZ + "?at=50.500,-120.250"
+    pg.hover(".site-nav a[href='terms.html']")  # the mouse moves, so the nav reads the hash again
+    assert _href(pg, "explore") == "identify.html"
 
 
-def test_explore_tab_carries_taxa_and_leaves_the_camera(browser):
+def test_identify_tab_carries_taxa_and_leaves_the_camera(browser):
     pg = _open(browser, "map.html", "#taxa=311249,-64615&months=6&area=abc&at=9/49/-123")
-    assert _href(pg, "explore") == "explore.html#taxa=311249,-64615&months=6&area=abc"
+    assert _href(pg, "explore") == "identify.html#taxa=311249,-64615&months=6&area=abc"
     pg = _open(browser, "embeddings.html", "#groups=-Aves")
-    assert _href(pg, "explore") == "explore.html#groups=-Aves"
+    assert _href(pg, "explore") == "identify.html#groups=-Aves"
 
 
-def test_photo_search_explore_tab_opens_the_chosen_record(browser):
+def test_photo_search_identify_tab_opens_the_chosen_record(browser):
     pg = _open(browser, "search.html", "#id=7")
-    assert _href(pg, "explore") == "explore.html#id=7"
+    assert _href(pg, "explore") == "identify.html#id=7"
     pg.focus(".site-skip")
     pg.keyboard.press("Enter")
     assert pg.evaluate("location.hash") == "#id=7"
     assert pg.evaluate("document.activeElement.id") == "main-content"
 
 
-def test_explore_tab_falls_back_to_the_map_when_the_split_page_is_missing(browser):
+def test_identify_tab_falls_back_to_the_map_when_the_split_page_is_missing(browser):
     pg = browser.new_page()
     html = PAGE % (CSS, nav("map.html"))
     pg.route("http://site.test/map.html", lambda r: r.fulfill(body=html, content_type="text/html"))
-    pg.route("http://site.test/explore.html", lambda r: r.fulfill(status=404, body=""))
+    pg.route("http://site.test/identify.html", lambda r: r.fulfill(status=404, body=""))
     pg.route("http://site.test/search.html", lambda r: r.fulfill(status=404, body=""))
     pg.goto("http://site.test/map.html#groups=-Aves")
     pg.wait_for_selector('.site-nav a[href="map.html"]')
-    assert _href(pg, "blitz").startswith(BLITZ)
     assert pg.get_attribute(".site-nav [aria-current=page]", "href") == "map.html"
 
 
@@ -167,7 +170,7 @@ def test_shell_is_one_short_row_on_a_phone(browser):
     assert pg.evaluate("document.documentElement.scrollWidth") <= 390
 
 
-def test_blitz_is_a_secondary_link_hidden_on_phones_and_kept_on_methods():
+def test_the_site_link_is_secondary_hidden_on_phones_and_where_to_blitz_stays_on_methods():
     from what_to_id import terms_page
 
     assert ".site-nav .ext{margin-left:auto" in CSS

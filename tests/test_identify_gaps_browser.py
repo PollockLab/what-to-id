@@ -1,6 +1,7 @@
-"""Identify's level 3 Sort control: the Blitz gaps order (confidence band, then gap tier, then rank)
-against the Confidence order, the gap badge, the hash and the fall back when the where-to-blitz
-checklist does not load. iNaturalist and where-to-blitz are stubbed."""
+"""Identify's Prioritize popover: the filters (Best x%, survey days range), the weighted
+prioritizers, the base order, the badges as shortcuts, the hash and the fall back when the
+where-to-blitz checklist does not load. The old sort= and conf= links order as before. iNaturalist
+and where-to-blitz are stubbed."""
 
 import json
 import re
@@ -11,7 +12,6 @@ import numpy as np
 
 from . import test_embeddings_browser as eb
 from . import test_identify_browser as ib
-from .identify_sheets import reveal
 from .test_identify_narrow_browser import rank_plane
 
 browser = eb.browser
@@ -85,11 +85,19 @@ def view(page):
 LIMITS = {"1": 0, "5": 1, "25": 2, "all": 3}
 
 
-def settle(page):
-    """The checklist read (or failed): the controls' second note has stopped saying Loading."""
-    page.wait_for_function(
-        "!document.querySelector('#sorto .segnote:last-child').textContent.includes('Loading')"
+def slide(page, sel, value):
+    """Drag a range input to value: an input event for the live order, a change for the release."""
+    page.eval_on_selector(
+        sel,
+        "(e, v) => { e.value = v; e.dispatchEvent(new Event('input', {bubbles: true}));"
+        " e.dispatchEvent(new Event('change', {bubbles: true})); }",
+        value,
     )
+
+
+def settle(page):
+    """The checklist read (or failed): the summary has stopped saying it is reading."""
+    page.wait_for_function("!document.getElementById('psum').textContent.includes('reading')")
 
 
 def open_with(browser, base, hash_, fail=False):
@@ -109,7 +117,6 @@ def test_each_sort_state_orders_level_3_as_it_says(browser, site):
     base, pts = site
     n3, rank, band = ranks(base, pts)
     keys = {
-        "": lambda i, t: (band(i) - t, band(i), rank[i]),  # the blend
         "&sort=conf": lambda i, t: (rank[i],),
         "&sort=gaps": lambda i, t: (-t, rank[i]),
         "&sort=conf,gaps": lambda i, t: (band(i) - t, band(i), rank[i]),
@@ -121,9 +128,7 @@ def test_each_sort_state_orders_level_3_as_it_says(browser, site):
         assert [key(i, tier[i]) for i in ids] == sorted(key(i, tier[i]) for i in ids), sort
         assert page.errors == []
         page.close()
-    page = open_with(
-        browser, base, "&conf=all"
-    )  # the blend lets a gap outrank a lit record of the next band up
+    page = open_with(browser, base, "&conf=all&sort=conf,gaps")  # the blend lets a gap outrank
     # over every level 3 record: the cap by suggestion leaves this fixture (3 look-alikes) a handful
     ids = sorted(pts["id"][pts["level"] == 3].tolist(), key=lambda i: rank[i])
     tier = {i: page.evaluate(f"__identify.gap({i})") for i in ids}
@@ -132,46 +137,129 @@ def test_each_sort_state_orders_level_3_as_it_says(browser, site):
     assert any(a[0] > b[0] for a, b in zip(blend, blend[1:], strict=False))
 
 
-def test_the_confidence_filter_keeps_its_bands_before_sorting(browser, site):
+def test_all_prioritizers_off_orders_by_the_base_newest_first(browser, site):
+    base, _ = site
+    for hash_, newest in (
+        ("&pri=none", True),
+        ("&pri=none&base=new", True),
+        ("&pri=none&base=old", False),
+    ):
+        page = open_with(browser, base, "&conf=all" + hash_)
+        ids = view(page)
+        assert len(ids) > 3 and ids == sorted(ids, reverse=newest), hash_  # id is newest first
+        # Newest is a preset, oldest is Custom
+        assert page.eval_on_selector("#psum", "e => e.hidden") == newest
+        assert page.inner_text("#sortb").strip().startswith("Newest" if newest else "Custom")
+        assert page.errors == []
+        page.close()
+    page = open_with(browser, base, "&conf=all&pri=none&base=rand:7")
+    first = view(page)
+    page.close()
+    page = open_with(browser, base, "&conf=all&pri=none&base=rand:7")
+    assert view(page) == first and first != sorted(first, reverse=True)  # the seed fixes it
+    assert page.errors == []
+
+
+def test_the_confidence_filter_keeps_its_top_percent_before_ordering(browser, site):
     base, pts = site
     n3, rank, band = ranks(base, pts)
     level3 = pts["id"][pts["level"] == 3].tolist()
-    for value, lim in LIMITS.items():
+    for value, pct in {"1": 1, "5": 5, "10": 10, "25": 25, "60": 60, "all": 100}.items():
         for sort in ("&sort=conf", "&sort=gaps", ""):
             page = open_with(browser, base, f"&conf={value}{sort}")
             ids = view(page)
-            assert ids and all(band(i) <= lim for i in ids), (value, sort)
-            want = sum(1 for i in level3 if band(i) <= lim)
+            assert ids and all((rank[i] + 1) / n3 <= pct / 100 for i in ids), (value, sort)
+            want = sum(1 for i in level3 if (rank[i] + 1) / n3 <= pct / 100)
             assert page.inner_text("#tab3 b") == f"{want:,}"  # the tab's count is the filter's
-            assert "records shown" not in page.inner_text("#sort") + page.inner_text("#sorto")
             page.close()
 
 
-def test_the_default_is_top_5_percent_with_both_sorts_on(browser, site):
+def test_the_default_is_top_5_percent_with_confidence_and_gaps_blended(browser, site):
     base, pts = site
     n3, rank, band = ranks(base, pts)
     page = open_with(browser, base, "")
-    on = page.evaluate(
-        "[...document.querySelectorAll('#sort [aria-checked=true], #sorto [aria-checked=true]')]"
-        ".map(b => b.textContent)"
-    )
-    assert on == ["Top 5%", "Confidence", "Blitz gaps"]
+    assert page.input_value("#ptop") == "5" and page.input_value("#pw-conf") == "40"
+    assert page.input_value("#pw-gap") == "100" and page.input_value("#pw-risk") == "60"
+    assert page.inner_text("#sortb").strip().startswith("Blitz the gap")
     assert all(band(i) <= 1 for i in view(page))
-    assert page.evaluate("location.hash") == "#lvl=3"
-    page.close()
+    assert page.evaluate("location.hash") == "#lvl=3"  # a default link stays as it is
+    assert page.locator("#preset").is_hidden()
+    assert page.errors == []
 
 
-def test_the_last_sort_on_stays_on(browser, site):
+def test_the_top_slider_changes_the_count_and_the_hash(browser, site):
     base, _ = site
-    page = open_with(browser, base, "&sort=conf")
-    reveal(page, "#sorto .seg")
-    page.click("#sorto button:has-text('Confidence')")
-    assert page.get_attribute("#sorto button >> nth=0", "aria-checked") == "true"
-    assert "sort=conf" in page.evaluate("location.hash")
-    page.click("#sorto button:has-text('Blitz gaps')")
-    assert "sort=" not in page.evaluate("location.hash")  # both on again
-    page.click("#sorto button:has-text('Confidence')")
-    assert "sort=gaps" in page.evaluate("location.hash")
+    page = open_with(browser, base, "")
+    before = page.inner_text("#tab3 b")
+    page.click("#sortb")
+    page.focus("#ptop")
+    for _ in range(20):
+        page.keyboard.press("ArrowRight")
+    page.wait_for_function("location.hash.includes('conf=25')")
+    page.wait_for_function(f"document.querySelector('#tab3 b').textContent !== '{before}'")
+    assert page.is_visible("#preset")
+    page.click("#preset")  # back to the defaults
+    page.wait_for_function("location.hash === '#lvl=3'")
+    page.wait_for_function(f"document.querySelector('#tab3 b').textContent === '{before}'")
+    assert page.input_value("#ptop") == "5"
+    assert page.errors == []
+
+
+def test_the_gap_badge_applies_the_ceiling_on_every_level(browser, site):
+    base, _ = site
+    page = open_with(browser, base, "")
+    page.wait_for_selector("#grid .card button.gap", state="attached")
+    page.locator(
+        "#grid .card:has(button.gap) .ph"
+    ).first.click()  # the badges show in the compare panel
+    badge = page.locator("#cpdet button.gap")
+    days = int(re.search(r"(\d+)/30 days", badge.inner_text()).group(1))
+    badge.click()
+    page.wait_for_function(f"location.hash.includes('gap=0-{days}')")
+    page.wait_for_function(
+        f"document.getElementById('cap').textContent.includes('survey days 0-{days}')"
+    )
+    page.wait_for_selector("#grid .card")
+    texts = page.locator("#grid .card button.gap").all_inner_texts()
+    got = [int(re.search(r"(\d+)/30 days", t).group(1)) for t in texts]
+    assert got and max(got) <= days and page.locator("#grid .card").count() >= len(got)
+    page.click("#tab1")  # the ceiling holds on the other levels too
+    page.wait_for_selector("#grid .card")
+    assert f"gap=0-{days}" in page.evaluate("location.hash")
+    page.click("#sortb")
+    assert page.is_visible("#pgl") and page.is_hidden("#ptop")  # Best x% needs the level 3 rank
+    assert page.errors == []
+
+
+def test_the_confidence_badge_keeps_its_band(browser, site):
+    base, _ = site
+    page = open_with(browser, base, "&conf=25")
+    page.locator("#grid .card:has(button.conf) .ph").first.click()
+    badge = page.locator("#cpdet button.conf")
+    n = badge.inner_text().removeprefix("Best ").removesuffix("%")
+    badge.click()
+    if n == "5":
+        page.wait_for_function("!location.hash.includes('conf=')")
+    else:
+        page.wait_for_function(f"location.hash.includes('conf={n}')")
+    assert page.errors == []
+
+
+def test_blitz_gaps_order_every_level_not_only_level_3(browser, site):
+    base, _ = site
+    page = open_level_3(browser, base, "#lvl=1&pri=gap:3")
+    settle(page)
+    page.wait_for_selector("#grid .card")
+    ids = page.evaluate("__identify.view()")[1]
+    tiers = [page.evaluate(f"__identify.gap({i})") for i in ids]
+    assert tiers[0] == 2 and tiers == sorted(tiers, reverse=True)
+    page.close()
+    page = open_level_3(browser, base, "#lvl=1&pri=conf:3")  # by confidence alone it is not
+    settle(page)
+    page.wait_for_selector("#grid .card")
+    ids = page.evaluate("__identify.view()")[1]
+    tiers = [page.evaluate(f"__identify.gap({i})") for i in ids]
+    assert tiers != sorted(tiers, reverse=True)
     assert page.errors == []
 
 
@@ -186,52 +274,214 @@ def test_the_badge_names_the_gap_and_links_to_the_cell(browser, site):
         assert badge.count() == (1 if tier else 0)  # nothing on a lit cell
         if tier:
             seen[tier] = badge.inner_text()
-            href = badge.get_attribute("href")
+            href = card.locator("a.gapx").get_attribute("href")
             assert re.match(
                 r"https://pollocklab\.github\.io/where-to-blitz/\?at=4\d\.\d+,-12\d\.\d+&", href
             )
             assert "&res=25000&g=" in href and href.endswith("&goal=cl")
-    assert seen == {2: "Gap 4/30", 1: "Gap 22/30"}  # compact, one line
-    big = page.locator("#grid .card .gap", has_text="Gap 4/30").first
-    assert big.get_attribute("aria-label") == "Blitz gap: 4 of 30 observer-days in this 25 km cell"
-    assert "30 make a checklist" in big.get_attribute("title")
+    assert seen == {2: "4/30 days", 1: "22/30 days"}  # compact, one line
+    big = page.locator("#grid .card .gap", has_text="4/30 days").first
+    label = big.get_attribute("aria-label")
+    assert "Survey days: 4 of 30 observer-days in this 25 km cell" in label
     assert big.evaluate("e => getComputedStyle(e).whiteSpace") == "nowrap"
-    assert page.locator("#grid .card .conf", has_text="Top").count() >= 1
+    assert page.locator("#grid .card .conf", has_text="Best").count() >= 1
     assert page.errors == []
 
 
-def test_the_choices_are_kept_in_the_hash_and_shown_on_level_3_only(browser, site):
+def test_the_choices_are_kept_in_the_hash_and_survive_a_reload(browser, site):
     base, _ = site
     page = open_with(browser, base, "")
-    reveal(page, "#sort .seg")
-    page.click("#sort button:has-text('Top 25%')")
-    page.keyboard.press("Escape")
-    reveal(page, "#sorto .seg")
-    page.click("#sorto button:has-text('Blitz gaps')")
+    page.click("#sortb")
+    slide(page, "#pw-conf", 100)
+    slide(page, "#pw-gap", 0)
+    slide(page, "#pw-risk", 60)
+    page.select_option("#pbase", "old")
     hash_ = page.evaluate("location.hash")
-    assert "conf=25" in hash_ and "sort=conf" in hash_
+    assert "pri=conf:100,risk:60" in hash_ and "base=old" in hash_
     page.reload()
     page.wait_for_function("window.__identify && __identify.ids().length > 0")
-    on = page.evaluate(
-        "[...document.querySelectorAll('#sort [aria-checked=true], #sorto [aria-checked=true]')]"
-        ".map(b => b.textContent)"
-    )
-    assert on == ["Top 25%", "Confidence"]
-    page.click("#tab1")
-    assert (
-        page.locator("#sort").get_attribute("hidden") is not None
-        and page.locator("#sortb").is_hidden()
-    )
+    assert [page.input_value(f"#pw-{k}") for k in ("conf", "gap", "risk")] == ["100", "0", "60"]
+    assert page.input_value("#pbase") == "old"
+    page.click("#tab1")  # at risk is a level 3 matter
+    assert page.locator("#pw-risk").evaluate("e => e.closest('.pw').hidden")
     assert page.errors == []
 
 
 def test_without_the_checklist_level_3_lists_by_confidence_without_errors(browser, site):
     base, pts = site
     page = open_level_3(browser, base, "#lvl=3&conf=all", fail=True)
-    page.wait_for_function(
-        "document.querySelector('#sorto .segnote:last-child').textContent.includes('did not')"
-    )
+    page.wait_for_function("document.getElementById('psum').textContent.includes('did not')")
     rank = dict(zip(pts["id"].tolist(), rank_plane(base).tolist(), strict=True))
     got = [rank[i] for i in view(page)]
     assert got == sorted(got) and page.locator("#grid .gap").count() == 0
     assert page.errors == []
+
+
+def test_a_slider_sets_its_weight_in_the_hash_and_the_row_order_follows_on_release(browser, site):
+    base, _ = site
+    page = open_with(browser, base, "&pri=none")
+    page.click("#sortb")
+    page.eval_on_selector(
+        "#pw-gap",
+        "e => { e.value = 70; e.dispatchEvent(new Event('input', {bubbles: true})); }",
+    )
+    assert page.get_attribute("#pw-gap", "aria-valuetext") == "Survey gap 70%"
+    rows = "[...document.querySelectorAll('#sorto .pw:not([hidden]) input')].map(e => e.id)"
+    assert page.evaluate(rows)[0] == "pw-conf"  # a drag does not reorder the rows under the hand
+    page.eval_on_selector("#pw-gap", "e => e.dispatchEvent(new Event('change', {bubbles: true}))")
+    page.wait_for_function("location.hash.includes('pri=gap:70')")
+    assert page.evaluate(rows)[0] == "pw-gap"  # the release sorts them, heaviest first
+    page.wait_for_function("document.getElementById('sortb').textContent.includes('Custom')")
+    assert page.errors == []
+
+
+def test_a_preset_chip_sets_the_weights_and_is_marked(browser, site):
+    base, _ = site
+    page = open_with(browser, base, "")
+    page.click("#sortb")
+    page.click("#sorto .pchip[data-preset=quick]")
+    page.wait_for_function("document.getElementById('sortb').textContent.includes('Quick wins')")
+    assert [page.input_value(f"#pw-{k}") for k in ("conf", "gap", "risk")] == ["100", "0", "0"]
+    assert page.get_attribute("#sorto .pchip[data-preset=quick]", "aria-pressed") == "true"
+    assert page.eval_on_selector("#psum", "e => e.hidden")  # the sentence is for Custom only
+    page.click("#sorto .pchip[data-preset=blitz]")
+    page.wait_for_function("document.getElementById('pw-gap').value === '100'")
+    assert page.input_value("#pw-gap") == "100" and page.input_value("#pw-risk") == "60"
+    assert page.errors == []
+
+
+ORDER = "[...document.querySelectorAll('#sorto .pw:not([hidden]) input')].map(e => e.id)"
+
+
+def test_a_handle_moves_its_row_with_the_arrow_keys_and_keeps_focus(browser, site):
+    base, _ = site
+    page = open_with(browser, base, "&pri=conf:40,gap:100")
+    page.click("#sortb")
+    handle = "#sorto .pw:has(#pw-conf) .pgrip"
+    assert page.get_attribute(handle, "aria-label") == "Move Match, position 2 of 4"
+    page.focus(handle)
+    page.keyboard.press("ArrowUp")
+    page.wait_for_function("document.getElementById('pw-conf').value === '100'")
+    assert page.input_value("#pw-conf") == "100" and page.input_value("#pw-gap") == "40"
+    assert page.evaluate(ORDER)[0] == "pw-conf"
+    assert page.evaluate("document.activeElement.getAttribute('aria-label')") == (
+        "Move Match, position 1 of 4"
+    )
+    assert "Match moved to position 1 of 4" in page.inner_text("#sorto .vh")
+    assert "pri=conf:100,gap:40" in page.evaluate("location.hash")
+    assert page.eval_on_selector("#psum", "e => e.textContent").startswith("Best matches first")
+    assert page.query_selector("#sorto .pw button[aria-label$=' up']") is None
+    assert page.errors == []
+
+
+def test_dragging_a_handle_reorders_the_rows_and_sets_weights_that_hold_the_order(browser, site):
+    base, _ = site
+    page = open_with(browser, base, "&pri=conf:40,gap:100,risk:60")
+    page.click("#sortb")
+    assert page.evaluate(ORDER)[:3] == ["pw-gap", "pw-risk", "pw-conf"]
+    h = page.locator("#sorto .pw:has(#pw-conf) .pgrip").bounding_box()
+    t = page.locator("#sorto .pw:has(#pw-gap)").bounding_box()
+    page.mouse.move(h["x"] + h["width"] / 2, h["y"] + h["height"] / 2)
+    page.mouse.down()
+    page.mouse.move(h["x"] + 4, t["y"] + 2, steps=6)
+    assert page.query_selector("#sorto .pw.pdrag") is not None
+    assert page.is_visible("#sorto .pdrop")
+    page.mouse.up()
+    page.wait_for_function("location.hash.includes('pri=')")
+    page.wait_for_function("document.querySelector('#sorto .pw input').id === 'pw-conf'")
+    assert page.evaluate(ORDER)[:3] == ["pw-conf", "pw-gap", "pw-risk"]
+    w = [int(page.input_value(f"#pw-{k}")) for k in ("conf", "gap", "risk")]
+    assert w[0] > w[1] > w[2]
+    assert page.query_selector("#sorto .pw.pdrag") is None and not page.is_visible("#sorto .pdrop")
+    assert page.errors == []
+
+
+def test_the_rows_fit_at_390(browser, site):
+    base, _ = site
+    page = browser.new_page(viewport={"width": 390, "height": 800})
+    eb.stub_inat(page, None)
+    stub_checklist(page)
+    page.goto(f"{base}/identify.html#lvl=3")
+    page.wait_for_function("window.__identify && __identify.ids().length > 0")
+    settle(page)
+    page.click("#sortb")
+    assert page.eval_on_selector("#sortpop", "e => e.scrollWidth <= e.clientWidth + 1")
+
+
+def test_old_pri_values_read_as_levels_and_legacy_links_keep_their_hash(browser, site):
+    base, _ = site
+    page = open_with(browser, base, "&pri=conf:3,gap:1")
+    assert page.input_value("#pw-conf") == "100" and page.input_value("#pw-gap") == "33"
+    page.close()
+    page = open_with(browser, base, "&sort=conf")
+    page.click("#sortb")
+    assert page.evaluate("location.hash") == "#lvl=3&sort=conf"
+    page.close()
+    page = open_with(browser, base, "&gap=12")  # the old ceiling is the range 0-12
+    page.click("#sortb")
+    assert page.input_value("#pgh") == "12" and page.input_value("#pgl") == "0"
+    assert page.errors == []
+
+
+def test_the_labelled_terms_open_a_toggletip_on_click_and_on_keyboard(browser, site):
+    base, _ = site
+    page = open_with(browser, base, "")
+    page.click("#sortb")
+    for term, text in (("Match", "ranked among"), ("Survey gap", "Observer-days")):
+        trigger = page.locator("#sorto [data-explain]", has_text=term).first
+        trigger.click()
+        assert page.is_visible("#explain-pop") and text in page.inner_text("#explain-pop")
+        page.keyboard.press("Escape")
+        assert page.is_hidden("#explain-pop")
+        trigger.focus()
+        page.keyboard.press("Enter")
+        assert page.is_visible("#explain-pop")
+        page.keyboard.press("Escape")
+    assert page.errors == []
+
+
+def test_no_control_wraps_or_overflows_at_375(browser, site):
+    base, _ = site
+    for hash_ in ("", "&pri=gap:100,risk:60,conf:40"):
+        page = browser.new_page(viewport={"width": 375, "height": 800})
+        page.errors = []
+        eb.stub_inat(page, None)
+        stub_checklist(page)
+        page.goto(f"{base}/identify.html#lvl=3{hash_}")
+        page.wait_for_function("window.__identify && __identify.ids().length > 0")
+        settle(page)
+        page.click("#sortb")
+        bad = page.evaluate(
+            "() => { const p = document.getElementById('sortpop'), out = [];"
+            " p.querySelectorAll('.pw, .pchip, .prow2, #pfoot, .pdual').forEach(e => {"
+            "  const r = e.getBoundingClientRect();"
+            "  if (e.scrollWidth > e.clientWidth + 1 || r.right > innerWidth + 1)"
+            "   out.push(e.className); });"
+            " p.querySelectorAll('.pw label, .pw span[data-explain], .pchip').forEach(e => {"
+            "  if (e.getBoundingClientRect().height > 44) out.push('wrap ' + e.textContent); });"
+            " if (p.scrollWidth > p.clientWidth + 1) out.push('sheet');"
+            " return out; }"
+        )
+        assert bad == [], bad
+        page.close()
+
+
+def test_a_high_survey_gap_score_means_few_observer_days(browser, site):
+    base, _ = site
+    page = open_level_3(browser, base, "#lvl=1&pri=gap:100")  # the continuous path
+    settle(page)
+    page.wait_for_selector("#grid .card")
+    ids = page.evaluate("__identify.view()")[1]
+    tiers = [page.evaluate(f"__identify.gap({i})") for i in ids]  # 2 under 15 days, 0 at 30 or more
+    assert tiers[0] == 2 and tiers == sorted(tiers, reverse=True)  # fewest days first, not most
+    assert page.errors == []
+
+
+def test_the_default_order_is_the_blitz_the_gap_preset(browser, site):
+    base, _ = site
+    page = open_with(browser, base, "")
+    default = view(page)
+    page.close()
+    page = open_with(browser, base, "&pri=gap:100,risk:60,conf:40")
+    assert len(default) > 3 and view(page) == default
+    assert page.inner_text("#sortb").strip().startswith("Blitz the gap")

@@ -4,55 +4,79 @@ cards, and the batch links sit in a popover. iNaturalist is stubbed."""
 
 from . import test_embeddings_browser as eb
 from . import test_identify_browser as ib
-from .identify_sheets import close, reveal
+from .identify_sheets import close
 
 browser = eb.browser
 site = ib.site
 
 
-def test_the_filters_sheet_holds_focus_closes_on_escape_and_counts_cards(browser, site):
+def test_the_modes_sit_on_the_bar_row_with_their_counts(browser, site):
     base, _ = site
-    page = ib.open_identify(browser, base, "#lvl=3")
-    page.wait_for_selector("#grid .card")
-    n = page.inner_text("#count").split(" ")[0]
-    assert page.inner_text("#count").endswith(" cards to ID")
-    page.click("#fbtn")
-    sheet = page.locator("#fsheet")
-    assert sheet.is_visible()
-    inside = "document.activeElement.closest('#fsheet') !== null"
-    assert page.evaluate(inside), page.evaluate("document.activeElement.outerHTML.slice(0, 200)")
-    for _ in range(30):  # Tab cycles inside the modal
-        page.keyboard.press("Tab")
-        assert page.evaluate(inside)
-    assert page.text_content("#fsheet .sdone") == f"Show {n} cards"
-    close(page)
-    assert sheet.is_hidden()
-    assert page.evaluate("document.activeElement.id") == "fbtn"  # focus returns to the opener
+    page = ib.open_identify(browser, base)
+    assert page.locator("#fbtn, #fsheet, #chips").count() == 0  # no Filters sheet any more
+    tabs = page.get_by_role("tab")
+    assert (
+        tabs.first.is_visible() and page.evaluate("__identify.level()") == 1
+    )  # Easy confirms by default
+    total = page.evaluate("__identify.total()")
+    assert " ".join(tabs.first.inner_text().split()) == f"Easy confirms {total[1]:,}"
+    top = page.locator(".top")
+    assert top.locator("#bar").is_visible() and top.locator("#tabs").is_visible()
+    assert top.locator("#qchips label").count() == 2  # At risk and Invasive
+    assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
     assert page.errors == []
 
 
-def test_a_filter_off_its_default_shows_a_chip_that_removes_it(browser, site):
+def test_no_filter_heading_is_ever_visible_without_its_control(browser, site):
     base, _ = site
-    page = ib.open_identify(browser, base, "#lvl=3")
-    page.wait_for_selector("#grid .card")
-    assert page.locator("#chips .chip").count() == 0 and page.locator("#fcount").is_hidden()
-    reveal(page, "#sort .seg")
-    page.click("#sort button:has-text('All')")
-    page.wait_for_function("location.hash.includes('conf=')")
-    close(page)
-    chip = page.locator("#chips .chip")
-    assert chip.count() == 1 and page.inner_text("#fcount") == "1"
-    assert page.get_attribute("#fbtn", "aria-label") == "Filters, 1 on"
-    x = chip.locator(".chipx")
-    assert x.get_attribute("aria-label").startswith("Remove Confidence")
-    x.click()
-    page.wait_for_function("!location.hash.includes('conf=')")
-    assert page.locator("#chips .chip").count() == 0
-    reveal(page, "#sort .seg")  # Clear all does the same for every filter
-    page.click("#sort button:has-text('All')")
-    page.wait_for_function("location.hash.includes('conf=')")
-    page.click("#fclear")
-    page.wait_for_function("!location.hash.includes('conf=')")
+    page = ib.open_identify(browser, base)
+    for lv in (1, 5, 3):
+        ib.tab(page, lv).click()
+        page.wait_for_selector("#grid .card")
+        empty = page.evaluate(
+            """() => [...document.querySelectorAll('.top .qseg')].filter(e => e.offsetParent
+            && !e.querySelector('button,input,select')).map(e => e.id)"""
+        )
+        assert empty == [], (lv, empty)
+        assert page.locator("#fsh, .ssec, .ssec h3").count() == 0
+    assert page.errors == []
+
+
+def test_the_who_segment_holds_the_login_threshold_and_the_three_ticks(browser, site):
+    base, _ = site
+    page = ib.open_identify(browser, base, "#lvl=1&user=12345&umin=20")
+    assert page.inner_text("#bwho small") == "Who"
+    page.wait_for_function("document.querySelector('#bwho b').textContent === '@12345'")
+    page.click("#bwho")
+    page.wait_for_selector("#usrbox", state="visible")
+    assert page.locator("#uload").is_hidden()
+    assert page.locator("#usrname").is_visible()
+    assert page.locator("#usrbox select[aria-label='Fewest IDs in a genus']").is_visible()
+    labels = page.locator("#usrbox form > label:has(input[type=checkbox])").all_inner_texts()
+    assert [t.strip() for t in labels] == [
+        "Only @12345's genera",
+        "Hide records @12345 identified",
+        "Only records @12345 observed",
+    ]
+    page.locator("#usrbox label", has_text="Only @12345's genera").click()
+    page.wait_for_function("location.hash.includes('umode=')")
+    page.wait_for_function(
+        "document.querySelector('#bwho b').textContent.startsWith('@12345 \u00b7 ')"
+    )
+    assert page.locator("#ubtn, #upop").count() == 0
+    assert page.errors == []
+
+
+def test_who_says_anyone_without_a_user_and_the_bar_wraps_on_a_phone(browser, site):
+    base, _ = site
+    page = ib.open_identify(browser, base, "#lvl=1")
+    assert page.inner_text("#bwho b") == "Anyone"
+    page.set_viewport_size({"width": 375, "height": 800})
+    assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+    tops = page.evaluate(
+        "[...document.querySelectorAll('#bar .seg1')].map(e => e.getBoundingClientRect().top)"
+    )
+    assert len(tops) == 4 and len(set(tops)) == 2  # a 2x2 grid
     assert page.errors == []
 
 
@@ -127,4 +151,48 @@ def test_the_batch_button_opens_the_next_batch_by_keyboard(browser, site):
     page.focus("#go")  # Tab order: button, then the arrows, all keyboard reachable
     page.keyboard.press("Tab")
     assert page.evaluate("document.activeElement.id") == "prev"
+    assert page.errors == []
+
+
+def test_the_who_ticks_wait_for_a_user_name_and_say_so(browser, site):
+    base, _ = site
+    page = ib.open_identify(browser, base, "#lvl=1")
+    page.click("#bwho")
+    page.wait_for_selector("#usrbox", state="visible")
+    assert page.inner_text("#usrhint") == "Enter a user name first"
+    for box in ("taxa", "unid", "observer"):
+        assert page.is_disabled(f"#usr{box}")
+    assert "user" in page.inner_text("#usrbox form")  # the labels name the user, not "I" or "my"
+    assert "my genera" not in page.inner_text("#usrbox form").lower()
+    page.fill("#usrname", "JDoe")
+    page.press("#usrname", "Enter")
+    page.wait_for_function("document.getElementById('usrhint').hidden")
+    assert page.inner_text("#usrbox form > label:has(#usrtaxa)").strip() == "Only @JDoe's genera"
+    assert page.is_enabled("#usrtaxa") and page.errors == []
+
+
+def test_the_heading_relates_its_cards_to_the_tabs_records(browser, site):
+    base, _ = site
+    page = ib.open_identify(browser, base, size=(1280, 800))
+    page.wait_for_selector("#grid .card")
+    cards = len(page.evaluate("__identify.view()")[1])
+    records = page.evaluate("__identify.total()")[1]
+    assert page.inner_text("#count") == f"{cards:,} cards · 3 per species of {records:,} records"
+    assert page.errors == []
+
+
+def test_the_chips_wrap_as_one_unit_and_range_lives_in_prioritize(browser, site):
+    base, _ = site
+    page = ib.open_identify(browser, base, "#lvl=3", size=(1280, 800))
+    assert page.locator(".qrow > #rout, #qrow #rout").count() == 0  # no Range row on the bar
+    assert page.evaluate("document.getElementById('rout').closest('#sortpop') !== null")
+    tops = page.evaluate(
+        "[...document.querySelectorAll('#qchips .qchip, #qchips .tog')].map(e => e.offsetTop)"
+    )
+    assert len(set(tops)) == 1  # the chips never split across rows
+    page.close()
+    page = ib.open_identify(browser, base, "#lvl=1&out=1", size=(375, 800))
+    assert "range" in page.inner_text("#sortb")  # a non-default range shows on the button
+    tops = page.evaluate("[...document.querySelectorAll('#qchips .tog')].map(e => e.offsetTop)")
+    assert len(set(tops)) == 1 and page.evaluate("document.documentElement.scrollWidth <= 375")
     assert page.errors == []

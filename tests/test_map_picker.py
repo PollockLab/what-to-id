@@ -246,6 +246,8 @@ def test_removing_a_chip_unticks_its_row_and_selected_parks_come_first(browser):
     assert _state(pg)["ticked"] == ["Joffre Lakes Park"]
     pg.click(".ahdr button")
     _chips(pg, 0)
+    head = pg.eval_on_selector(".ahdr", "e => e.firstChild.textContent")
+    assert head == "0 selected"  # no dangling separator
     assert _state(pg)["ticked"] == [] and _state(pg)["hash"] == "" and pg.errors == []
 
 

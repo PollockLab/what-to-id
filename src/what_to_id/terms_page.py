@@ -26,11 +26,12 @@ LABELS = {
     "research-grade": "Research Grade",
     "globi": "GloBI",
     "match-n": "Match number",
-    "observer-filter": "Only records I observed",
-    "my-taxa": "Only my genera",
+    "observer-filter": "Only records the user observed",
+    "my-taxa": "Only the user's genera",
     "my-taxa-first": "Your genera first",
-    "not-identified-by-me": "Hide records I identified",
+    "not-identified-by-me": "Hide records the user identified",
     "all-of-bc": "All of BC",
+    "best-match": "Best match",
     **{
         "level-" + re.sub("[^a-z]+", "-", name.lower()).strip("-"): name
         for _, name, _ in page_identify.LEVELS
@@ -39,6 +40,7 @@ LABELS = {
 GROUPS = {
     "Records": [
         *("needs-id", "research-grade", "left-needs-id", "batch", "identify-only"),
+        "identify-keys",
         *("location-hidden", "location-uncertain", "location-accuracy"),
         *("observed", "uploaded", "introduced", "threatened", "agreeing-ids"),
     ],
@@ -59,6 +61,7 @@ GROUPS = {
         *("photo-space", "taxonomy", "confused-pairs", "closest-matches", "match-n", "cosine"),
         *("clade", "globi", "backlog-per-identifier", "share-needing-id", "identified-to-rank"),
     ],
+    "Prioritize": ["best-match", "survey-days"],
 }
 CSS = """
 body{margin:0;background:var(--bg);color:var(--ink);

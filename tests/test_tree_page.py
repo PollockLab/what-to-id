@@ -26,7 +26,7 @@ def test_build_inlines_everything_and_copies_the_map_meta(tmp_path):
     html = tree_page.build(tmp_path).read_text()
     assert not re.findall(r"__[A-Z_]+__", html)
     assert "<script src=" not in html
-    assert 'href="explore.html" aria-current="page"' in html
+    assert 'href="identify.html" aria-current="page"' in html
     cfg = json.loads(re.search(r"var CFG=(.*?);</script>", html).group(1))
     assert cfg["meta"]["taxa"] == meta["taxa"] and cfg["mapUrl"] == "map.html"
     assert cfg["meta"]["group_ids"] == meta["group_ids"]

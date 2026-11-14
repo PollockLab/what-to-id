@@ -6,7 +6,16 @@ Every sentence restates wording already on the site or in the repo: no new facts
 only, no imports, as page_nav runs on a bare python3.
 """
 
+# where-to-blitz rule of thumb for a complete checklist; identify_gaps.js LIT0 repeats it
+SURVEY_DAYS_TARGET = 30
+
 GLOSSARY: dict[str, tuple[str, str | None]] = {
+    "identify-keys": (
+        "Click or tap a card to compare. On a keyboard, Enter opens iNat with the name copied"
+        " (press i there to suggest an ID), j and k go to the next and previous card, s skips"
+        " and u undoes.",
+        None,
+    ),
     "needs-id": (
         "A record on iNaturalist that still needs an ID. It stops needing one once it becomes"
         " Research Grade or casual.",
@@ -82,7 +91,8 @@ GLOSSARY: dict[str, tuple[str, str | None]] = {
     "introduced": ("A species that is not native to BC.", None),
     "threatened": ("A species with a threatened status.", None),
     "observer-filter": (
-        "Keeps only the records this user observed. Off while Hide records I identified is ticked.",
+        "Keeps only the records this user observed. "
+        "Off while Hide records the user identified is ticked.",
         None,
     ),
     "my-taxa-first": (
@@ -178,6 +188,17 @@ GLOSSARY: dict[str, tuple[str, str | None]] = {
     ),
     "identified-to-rank": (
         "Records whose ID stops at this taxon and goes no further down.",
+        None,
+    ),
+    # survey-days restates where-to-blitz (observer-day in its METHODOLOGY.md, the rule of thumb of
+    # about 30 for a complete checklist in its popup); best-match is new
+    "survey-days": (
+        "Observer-days in the 25 km cell, one person recording on one day, where about"
+        f" {SURVEY_DAYS_TARGET} make a complete checklist.",
+        None,
+    ),
+    "best-match": (
+        "How closely the photo points to one species, ranked among all records of this level.",
         None,
     ),
 }
