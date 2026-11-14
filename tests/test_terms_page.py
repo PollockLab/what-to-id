@@ -41,6 +41,9 @@ def test_every_more_link_targets_an_anchor():
     hrefs = {k: v[2] for k, v in json.loads(data).items()}
     assert hrefs.keys() == GLOSSARY.keys()
     for key, href in hrefs.items():
+        if key in page_nav.MORE_LINKS:  # another site's page explains it
+            assert href == page_nav.MORE_LINKS[key], key
+            continue
         page, _, frag = href.partition("#")
         assert page == "terms.html" and frag in ids, key
     assert "target='_blank'" in (SRC / "site_assets/explain.js").read_text()

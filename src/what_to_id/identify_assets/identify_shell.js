@@ -9,7 +9,7 @@
 function $(id){return document.getElementById(id);}
 function has(k){return new RegExp('(^|&)'+k+'=').test(location.hash.slice(1));}
 function labels(){
-  var g=has('run')&&!$('sortb').hidden;$('sortb').firstChild.textContent='Prioritize'+(g?' · grouped':'')+(has('out')?' · range':'')+' ';
+  var g=has('run')&&!$('sortb').hidden;$('sortb').firstChild.textContent=($('sortb').dataset.name||'Prioritize')+(g?' · grouped':'')+(has('out')?' · range':'')+' ';
   $('uload').hidden=!$('usrbox').hidden;
 }
 function count(){
@@ -19,6 +19,7 @@ function count(){
   var tb=document.querySelector('[role=tab][aria-selected=true] b'),pr=/up to (\d+) per/.exec(cap),rel=tb&&tb.textContent?(pr?' · '+pr[1]+' per species':'')+' of '+tb.textContent+' records':'';
   $('count').textContent=n?n+' cards':/^(Loading|Could not)/.test(st)?st:'';$('count').title=cap;
   if(n&&rel){var r=document.createElement('span');r.className='rel';r.textContent=rel;$('count').appendChild(r);}  // a phone keeps the short heading
+  $('pshow').textContent=n?'Show '+n+' cards':'Close';
   [].forEach.call(document.querySelectorAll('.sdone .n'),function(s){s.textContent=n||'0';});
 }
 function sheets(){
@@ -36,6 +37,7 @@ function sheets(){
 }
 // the Sort and You popovers open under their buttons, the You one right-aligned; on a phone the CSS makes them bottom sheets
 function popovers(){
+  $('pshow').onclick=function(){$('sortpop').hidePopover();};
   [['sortpop','sortb',300]].forEach(function(x){
     var p=$(x[0]),b=$(x[1]);
     p.addEventListener('beforetoggle',function(e){

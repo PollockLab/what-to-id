@@ -41,7 +41,7 @@ function atLevel(st){var m=kept(st);for(var i=0;i<P.n;i++)if(m[i]&&(LV?LEVEL[i]!
 // taxon, none cut when the level holds one taxon only. The kind control (KF) keeps one kind of its tab; KC counts the kinds. MORE: for the first card of a cut taxon, how many records it left out.
 // With the range file (R), a level's records also pass its outside-its-range chip.
 // Each level's slice is then ordered by GP.sort: the weighted prioritizers (confidence, blitz gap, at risk, invasive, outside range), then the finer
-// confidence order or the base order (newest first by default). The filters (GP.pass) drop level 3 records outside the Top x% and cells over the gap ceiling.
+// confidence order or the base order (newest first by default). The filters (GP.pass) drop level 3 records outside the Best x% and cells outside the survey days range.
 // Rows in ascending id: each shard's rows are id-sorted, so a merge of the shards.
 function byId(P){
   var s=P.start,k=s.length-1,pos=s.slice(0,k),out=new Uint32Array(P.n),t,j,b;
@@ -472,6 +472,7 @@ async function load(){
   GP=IdentifyGaps({P:P,groups:META.groups,keep:function(i){return LEVEL[i]>0;},band:function(i){return IdentifyNarrow.band(RK[i],N3);},
     pct:function(i){return RK?(RK[i]+1)/N3:null;},hasRank:function(){return !!RK;},
     conf:function(i,lv){return RK&&lv===3?3-IdentifyNarrow.band(RK[i],N3):Q[i]*3/(STEPS-1);},
+    cont:function(i,lv){return RK&&lv===3?1-RK[i]/N3:Q[i]/(STEPS-1);},
     fine:function(i,lv){return RK&&lv===3?-RK[i]:Q[i];},
     flag:function(i,inv){return WW?WW.flag(i,inv):0;},hasOut:function(){return !!R;},out:function(i){return R?R.outside()[i]:0;},
     redraw:redraw});  // a failed or missing checklist leaves every gap at 0

@@ -31,6 +31,7 @@ LABELS = {
     "my-taxa-first": "Your genera first",
     "not-identified-by-me": "Hide records the user identified",
     "all-of-bc": "All of BC",
+    "best-match": "Best match",
     **{
         "level-" + re.sub("[^a-z]+", "-", name.lower()).strip("-"): name
         for _, name, _ in page_identify.LEVELS
@@ -60,6 +61,7 @@ GROUPS = {
         *("photo-space", "taxonomy", "confused-pairs", "closest-matches", "match-n", "cosine"),
         *("clade", "globi", "backlog-per-identifier", "share-needing-id", "identified-to-rank"),
     ],
+    "Prioritize": ["best-match", "survey-days"],
 }
 CSS = """
 body{margin:0;background:var(--bg);color:var(--ink);

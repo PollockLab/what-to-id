@@ -6,6 +6,9 @@ Every sentence restates wording already on the site or in the repo: no new facts
 only, no imports, as page_nav runs on a bare python3.
 """
 
+# where-to-blitz rule of thumb for a complete checklist; identify_gaps.js LIT0 repeats it
+SURVEY_DAYS_TARGET = 30
+
 GLOSSARY: dict[str, tuple[str, str | None]] = {
     "identify-keys": (
         "Click or tap a card to compare. On a keyboard, Enter opens iNat with the name copied,"
@@ -184,6 +187,17 @@ GLOSSARY: dict[str, tuple[str, str | None]] = {
     ),
     "identified-to-rank": (
         "Records whose ID stops at this taxon and goes no further down.",
+        None,
+    ),
+    # survey-days restates where-to-blitz (observer-day in its METHODOLOGY.md, the rule of thumb of
+    # about 30 for a complete checklist in its popup); best-match is new
+    "survey-days": (
+        "Observer-days in the 25 km cell, one person recording on one day, where about"
+        f" {SURVEY_DAYS_TARGET} make a complete checklist.",
+        None,
+    ),
+    "best-match": (
+        "How closely the photo points to one species, ranked among all records of this level.",
         None,
     ),
 }

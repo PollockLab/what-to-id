@@ -1,4 +1,4 @@
-"""Identify's Prioritize popover: the filters (Top x%, blitz gap ceiling), the weighted
+"""Identify's Prioritize popover: the filters (Best x%, survey days range), the weighted
 prioritizers, the base order, the badges as shortcuts, the hash and the fall back when the
 where-to-blitz checklist does not load. The old sort= and conf= links order as before. iNaturalist
 and where-to-blitz are stubbed."""
@@ -85,6 +85,16 @@ def view(page):
 LIMITS = {"1": 0, "5": 1, "25": 2, "all": 3}
 
 
+def slide(page, sel, value):
+    """Drag a range input to value: an input event for the live order, a change for the release."""
+    page.eval_on_selector(
+        sel,
+        "(e, v) => { e.value = v; e.dispatchEvent(new Event('input', {bubbles: true}));"
+        " e.dispatchEvent(new Event('change', {bubbles: true})); }",
+        value,
+    )
+
+
 def settle(page):
     """The checklist read (or failed): the summary has stopped saying it is reading."""
     page.wait_for_function("!document.getElementById('psum').textContent.includes('reading')")
@@ -111,9 +121,6 @@ def test_each_sort_state_orders_level_3_as_it_says(browser, site):
         "&sort=conf": lambda i, t: (rank[i],),
         "&sort=gaps": lambda i, t: (-t, rank[i]),
         "&sort=conf,gaps": lambda i, t: (band(i) - t, band(i), rank[i]),
-        "&pri=conf:1,gap:1": lambda i, t: (band(i) - t, band(i), rank[i]),
-        "&pri=conf:3": lambda i, t: (rank[i],),
-        "&pri=gap:2": lambda i, t: (-t, rank[i]),
     }
     for sort, key in keys.items():
         page = open_with(browser, base, "&conf=all" + sort)
@@ -141,8 +148,9 @@ def test_all_prioritizers_off_orders_by_the_base_newest_first(browser, site):
         page = open_with(browser, base, "&conf=all" + hash_)
         ids = view(page)
         assert len(ids) > 3 and ids == sorted(ids, reverse=newest), hash_  # id is newest first
-        want = "Newest first (no prioritizers)" if newest else "Oldest first (no prioritizers)"
-        assert page.inner_text("#psum") == want
+        # Newest is a preset, oldest is Custom
+        assert page.eval_on_selector("#psum", "e => e.hidden") == newest
+        assert page.inner_text("#sortb").strip().startswith("Newest" if newest else "Custom")
         assert page.errors == []
         page.close()
     page = open_with(browser, base, "&conf=all&pri=none&base=rand:7")
@@ -171,9 +179,9 @@ def test_the_default_is_top_5_percent_with_confidence_and_gaps_blended(browser, 
     base, pts = site
     n3, rank, band = ranks(base, pts)
     page = open_with(browser, base, "")
-    assert page.input_value("#ptop") == "5" and page.input_value("#pw-conf") == "1"
-    assert page.input_value("#pw-gap") == "1" and page.input_value("#pw-risk") == "0"
-    assert page.inner_text("#psum") == "Most confident first, then biggest blitz gaps"
+    assert page.input_value("#ptop") == "5" and page.input_value("#pw-conf") == "40"
+    assert page.input_value("#pw-gap") == "100" and page.input_value("#pw-risk") == "60"
+    assert page.inner_text("#sortb").strip().startswith("Blitz the gap")
     assert all(band(i) <= 1 for i in view(page))
     assert page.evaluate("location.hash") == "#lvl=3"  # a default link stays as it is
     assert page.locator("#preset").is_hidden()
@@ -206,21 +214,21 @@ def test_the_gap_badge_applies_the_ceiling_on_every_level(browser, site):
         "#grid .card:has(button.gap) .ph"
     ).first.click()  # the badges show in the compare panel
     badge = page.locator("#cpdet button.gap")
-    days = int(re.search(r"Gap (\d+)/", badge.inner_text()).group(1))
+    days = int(re.search(r"(\d+)/30 days", badge.inner_text()).group(1))
     badge.click()
-    page.wait_for_function(f"location.hash.includes('gap={days}')")
+    page.wait_for_function(f"location.hash.includes('gap=0-{days}')")
     page.wait_for_selector("#grid .card")
     texts = page.locator("#grid .card button.gap").all_inner_texts()
-    got = [int(re.search(r"Gap (\d+)/", t).group(1)) for t in texts]
+    got = [int(re.search(r"(\d+)/30 days", t).group(1)) for t in texts]
     assert got and max(got) <= days and page.locator("#grid .card").count() >= len(got)
     page.wait_for_function(
-        f"document.getElementById('cap').textContent.includes('gap {days} days or fewer')"
+        f"document.getElementById('cap').textContent.includes('survey days 0-{days}')"
     )
     page.click("#tab1")  # the ceiling holds on the other levels too
     page.wait_for_selector("#grid .card")
-    assert f"gap={days}" in page.evaluate("location.hash")
+    assert f"gap=0-{days}" in page.evaluate("location.hash")
     page.click("#sortb")
-    assert page.is_visible("#pgap") and page.is_hidden("#ptop")  # Top x% needs the level 3 rank
+    assert page.is_visible("#pgl") and page.is_hidden("#ptop")  # Best x% needs the level 3 rank
     assert page.errors == []
 
 
@@ -229,7 +237,7 @@ def test_the_confidence_badge_keeps_its_band(browser, site):
     page = open_with(browser, base, "&conf=25")
     page.locator("#grid .card:has(button.conf) .ph").first.click()
     badge = page.locator("#cpdet button.conf")
-    n = badge.inner_text().removeprefix("Top ").removesuffix("%")
+    n = badge.inner_text().removeprefix("Best ").removesuffix("%")
     badge.click()
     if n == "5":
         page.wait_for_function("!location.hash.includes('conf=')")
@@ -272,11 +280,12 @@ def test_the_badge_names_the_gap_and_links_to_the_cell(browser, site):
                 r"https://pollocklab\.github\.io/where-to-blitz/\?at=4\d\.\d+,-12\d\.\d+&", href
             )
             assert "&res=25000&g=" in href and href.endswith("&goal=cl")
-    assert seen == {2: "Gap 4/30", 1: "Gap 22/30"}  # compact, one line
-    big = page.locator("#grid .card .gap", has_text="Gap 4/30").first
-    assert "Blitz gap: 4 of 30 observer-days in this 25 km cell" in big.get_attribute("aria-label")
+    assert seen == {2: "4/30 days", 1: "22/30 days"}  # compact, one line
+    big = page.locator("#grid .card .gap", has_text="4/30 days").first
+    label = big.get_attribute("aria-label")
+    assert "Survey days: 4 of 30 observer-days in this 25 km cell" in label
     assert big.evaluate("e => getComputedStyle(e).whiteSpace") == "nowrap"
-    assert page.locator("#grid .card .conf", has_text="Top").count() >= 1
+    assert page.locator("#grid .card .conf", has_text="Best").count() >= 1
     assert page.errors == []
 
 
@@ -284,18 +293,18 @@ def test_the_choices_are_kept_in_the_hash_and_survive_a_reload(browser, site):
     base, _ = site
     page = open_with(browser, base, "")
     page.click("#sortb")
-    page.select_option("#pw-conf", "3")
-    page.select_option("#pw-gap", "0")
-    page.select_option("#pw-risk", "2")
+    slide(page, "#pw-conf", 100)
+    slide(page, "#pw-gap", 0)
+    slide(page, "#pw-risk", 60)
     page.select_option("#pbase", "old")
     hash_ = page.evaluate("location.hash")
-    assert "pri=conf:3,risk:2" in hash_ and "base=old" in hash_
+    assert "pri=conf:100,risk:60" in hash_ and "base=old" in hash_
     page.reload()
     page.wait_for_function("window.__identify && __identify.ids().length > 0")
-    assert [page.input_value(f"#pw-{k}") for k in ("conf", "gap", "risk")] == ["3", "0", "2"]
+    assert [page.input_value(f"#pw-{k}") for k in ("conf", "gap", "risk")] == ["100", "0", "60"]
     assert page.input_value("#pbase") == "old"
     page.click("#tab1")  # at risk is a level 3 matter
-    assert page.locator("#pw-risk").evaluate("e => e.closest('.prow2').hidden")
+    assert page.locator("#pw-risk").evaluate("e => e.closest('.pw').hidden")
     assert page.errors == []
 
 
@@ -307,3 +316,105 @@ def test_without_the_checklist_level_3_lists_by_confidence_without_errors(browse
     got = [rank[i] for i in view(page)]
     assert got == sorted(got) and page.locator("#grid .gap").count() == 0
     assert page.errors == []
+
+
+def test_a_slider_sets_its_weight_in_the_hash_and_the_row_order_follows_on_release(browser, site):
+    base, _ = site
+    page = open_with(browser, base, "&pri=none")
+    page.click("#sortb")
+    page.eval_on_selector(
+        "#pw-gap",
+        "e => { e.value = 70; e.dispatchEvent(new Event('input', {bubbles: true})); }",
+    )
+    assert page.get_attribute("#pw-gap", "aria-valuetext") == "Survey gap 70%"
+    rows = "[...document.querySelectorAll('#sorto .pw:not([hidden]) input')].map(e => e.id)"
+    assert page.evaluate(rows)[0] == "pw-conf"  # a drag does not reorder the rows under the hand
+    page.eval_on_selector("#pw-gap", "e => e.dispatchEvent(new Event('change', {bubbles: true}))")
+    page.wait_for_function("location.hash.includes('pri=gap:70')")
+    assert page.evaluate(rows)[0] == "pw-gap"  # the release sorts them, heaviest first
+    page.wait_for_function("document.getElementById('sortb').textContent.includes('Custom')")
+    assert page.errors == []
+
+
+def test_a_preset_chip_sets_the_weights_and_is_marked(browser, site):
+    base, _ = site
+    page = open_with(browser, base, "")
+    page.click("#sortb")
+    page.click("#sorto .pchip[data-preset=quick]")
+    page.wait_for_function("document.getElementById('sortb').textContent.includes('Quick wins')")
+    assert [page.input_value(f"#pw-{k}") for k in ("conf", "gap", "risk")] == ["100", "0", "0"]
+    assert page.get_attribute("#sorto .pchip[data-preset=quick]", "aria-pressed") == "true"
+    assert page.eval_on_selector("#psum", "e => e.hidden")  # the sentence is for Custom only
+    page.click("#sorto .pchip[data-preset=blitz]")
+    page.wait_for_function("document.getElementById('pw-gap').value === '100'")
+    assert page.input_value("#pw-gap") == "100" and page.input_value("#pw-risk") == "60"
+    assert page.errors == []
+
+
+def test_move_up_swaps_the_weights_of_neighbouring_rows(browser, site):
+    base, _ = site
+    page = open_with(browser, base, "&pri=conf:40,gap:100")
+    page.click("#sortb")
+    page.click("#sorto .pw:has(#pw-conf) button[aria-label='Move Match up']")
+    page.wait_for_function("document.getElementById('pw-conf').value === '100'")
+    assert page.input_value("#pw-conf") == "100" and page.input_value("#pw-gap") == "40"
+    assert page.evaluate("document.querySelector('#sorto .pw input').id") == "pw-conf"
+    assert page.errors == []
+
+
+def test_old_pri_values_read_as_levels_and_legacy_links_keep_their_hash(browser, site):
+    base, _ = site
+    page = open_with(browser, base, "&pri=conf:3,gap:1")
+    assert page.input_value("#pw-conf") == "100" and page.input_value("#pw-gap") == "33"
+    page.close()
+    page = open_with(browser, base, "&sort=conf")
+    page.click("#sortb")
+    assert page.evaluate("location.hash") == "#lvl=3&sort=conf"
+    page.close()
+    page = open_with(browser, base, "&gap=12")  # the old ceiling is the range 0-12
+    page.click("#sortb")
+    assert page.input_value("#pgh") == "12" and page.input_value("#pgl") == "0"
+    assert page.errors == []
+
+
+def test_the_labelled_terms_open_a_toggletip_on_click_and_on_keyboard(browser, site):
+    base, _ = site
+    page = open_with(browser, base, "")
+    page.click("#sortb")
+    for term, text in (("Match", "ranked among"), ("Survey gap", "Observer-days")):
+        trigger = page.locator("#sorto [data-explain]", has_text=term).first
+        trigger.click()
+        assert page.is_visible("#explain-pop") and text in page.inner_text("#explain-pop")
+        page.keyboard.press("Escape")
+        assert page.is_hidden("#explain-pop")
+        trigger.focus()
+        page.keyboard.press("Enter")
+        assert page.is_visible("#explain-pop")
+        page.keyboard.press("Escape")
+    assert page.errors == []
+
+
+def test_no_control_wraps_or_overflows_at_375(browser, site):
+    base, _ = site
+    for hash_ in ("", "&pri=gap:100,risk:60,conf:40"):
+        page = browser.new_page(viewport={"width": 375, "height": 800})
+        page.errors = []
+        eb.stub_inat(page, None)
+        stub_checklist(page)
+        page.goto(f"{base}/identify.html#lvl=3{hash_}")
+        page.wait_for_function("window.__identify && __identify.ids().length > 0")
+        settle(page)
+        page.click("#sortb")
+        bad = page.evaluate(
+            "() => { const p = document.getElementById('sortpop'), out = [];"
+            " p.querySelectorAll('.pw, .pchip, .prow2, #pfoot, .pdual').forEach(e => {"
+            "  const r = e.getBoundingClientRect();"
+            "  if (e.scrollWidth > e.clientWidth + 1 || r.right > innerWidth + 1)"
+            "   out.push(e.className); });"
+            " p.querySelectorAll('.pw label, .pw span[data-explain], .pchip').forEach(e => {"
+            "  if (e.getBoundingClientRect().height > 44) out.push('wrap ' + e.textContent); });"
+            " if (p.scrollWidth > p.clientWidth + 1) out.push('sheet');"
+            " return out; }"
+        )
+        assert bad == [], bad
+        page.close()

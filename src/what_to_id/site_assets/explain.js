@@ -29,7 +29,8 @@ function prep(){
     x.setAttribute('role','button');if(!x.hasAttribute('tabindex'))x.tabIndex=0;
     x.setAttribute('aria-expanded','false');x.setAttribute('aria-controls','explain-pop');});
 }
-pop=el('div','xpop');pop.id='explain-pop';pop.setAttribute('role','dialog');pop.hidden=true;pop.tabIndex=-1;
+pop=el('div','xpop');pop.id='explain-pop';pop.setAttribute('role','dialog');pop.popover='manual';pop.hidden=true;  // the top layer, so it also shows over an open popover
+pop.tabIndex=-1;
 var X=el('button','xx','×');X.type='button';X.setAttribute('aria-label','Close');
 X.onclick=function(){close(true);};
 var more=el('a','xmore','More →');more.target='_blank';more.rel='noopener';
@@ -43,7 +44,7 @@ function open(x,p,kb){
   pop.children[1].textContent=g[0];
   pop.children[2].textContent=g[1]||'';pop.children[2].hidden=!g[1];
   if(g[2])more.href=g[2];else more.removeAttribute('href');more.hidden=!g[2];
-  ax(x,'true');pop.hidden=false;
+  ax(x,'true');pop.hidden=false;if(!pop.matches(':popover-open'))pop.showPopover();
   if(innerWidth>=600||hover()){var r=x.getBoundingClientRect(),w=pop.offsetWidth,h=pop.offsetHeight;
     pop.style.left=Math.max(8,Math.min(r.left,innerWidth-w-8))+'px';
     pop.style.top=Math.max(8,Math.min(r.bottom+h+12>innerHeight&&r.top>h+12?r.top-h-6:r.bottom+6,innerHeight-h-8))+'px';}
@@ -53,7 +54,7 @@ function open(x,p,kb){
 function close(refocus){
   clearTimeout(t);
   if(pop.hidden)return;
-  pop.hidden=true;ax(cur,'false');
+  pop.hidden=true;if(pop.matches(':popover-open'))pop.hidePopover();ax(cur,'false');
   if(refocus)cur.focus();
   cur=null;
 }
@@ -81,7 +82,7 @@ document.addEventListener('click',function(e){
 // capture on window: Esc closes only the popover, not the panel or sheet it opened over
 window.addEventListener('keydown',function(e){
   if(e.key!=='Escape'||pop.hidden)return;
-  e.stopPropagation();var a=document.activeElement;close(a===cur||pop.contains(a));},true);
+  e.stopPropagation();e.preventDefault();var a=document.activeElement;close(a===cur||pop.contains(a));},true);
 document.addEventListener('keydown',function(e){
   var x=(e.key==='Enter'||e.key===' ')&&trig(e);if(!x||ctl(x))return;
   e.preventDefault();

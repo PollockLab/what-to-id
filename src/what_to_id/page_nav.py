@@ -28,6 +28,8 @@ PAGES = (
 OPTIONAL = {"confusion.html"}
 EXPLORE = "identify.html"
 BLITZ = "https://pollocklab.github.io/where-to-blitz/"
+# a term another site explains better links there instead of to terms.html
+MORE_LINKS = {"survey-days": BLITZ}
 
 CSS = """
 :root{--bg:#fbfbf9;--panel:#fff;--ink:#1d1d1b;--muted:#5f5e58;--line:#dcdbd3;--dot:42,120,214;
@@ -116,7 +118,7 @@ _EXPLAIN = Path(__file__).parent / "site_assets"
 
 def explain() -> str:
     """The toggletips' style, the glossary as JSON and the script, for the end of the header."""
-    linked = {k: (d, u, f"terms.html#{k}") for k, (d, u) in GLOSSARY.items()}
+    linked = {k: (d, u, MORE_LINKS.get(k, f"terms.html#{k}")) for k, (d, u) in GLOSSARY.items()}
     data = json.dumps(linked, separators=(",", ":")).replace("<", "\\u003c")
     return (
         f"<style>{(_EXPLAIN / 'explain.css').read_text().strip()}</style>\n"
