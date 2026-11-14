@@ -194,12 +194,17 @@ def render(
     )
     body = (
         '<h1 class="vh">How it works</h1>\n'
+        '<h2 id="about">What to ID</h2>\n'
+        "<p>What to ID helps iNaturalist identifiers choose which records that need an ID to work "
+        "on next. The identifying happens in iNaturalist: this site only orders the records and "
+        "links to them. Batches is part of a study on whether the order records are served in "
+        "changes how much gets identified, and what.</p>\n"
+        f"<h2>How each view works</h2>\n{how}\n"
         '<h2 id="glossary">Glossary</h2>\n'
         '<div id="find" hidden><label for="find-q">Find a term</label>'
         '<input id="find-q" type="search" autocomplete="off">'
         '<p id="find-n" role="status"></p></div>\n'
         f'<div id="glossary-list">{chr(10).join(terms)}</div>\n'
-        f"<h2>How each view works</h2>\n{how}\n"
         f"{STUDY}\n{fold}\n"
         f'<h2 id="methods">Methods</h2>\n{terms_methods.render(manifest, data_url)}\n'
         f'<p>Planning a bioblitz? See <a href="{page_nav.BLITZ}" target="_blank" rel="noopener">'

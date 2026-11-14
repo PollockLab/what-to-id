@@ -25,6 +25,7 @@ def test_toc_lists_every_h2_and_a_click_marks_and_scrolls(browser, tmp_path):
     page = _page(browser, tmp_path)
     h2s = page.eval_on_selector_all("main h2", "els => els.map(e => e.id)")
     links = page.eval_on_selector_all("#toc a", "els => els.map(e => e.getAttribute('href'))")
+    assert h2s[:3] == ["about", "how-each-view-works", "glossary"]
     assert h2s and all(f"#{i}" in links for i in h2s)
     assert page.is_visible("#toc a") and not page.is_visible("#toc summary")
     assert page.locator("#toc [aria-current]").count() <= 1
