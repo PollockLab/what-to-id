@@ -282,6 +282,10 @@ HELP_CSS = """
   justify-content:space-between;gap:8px;min-height:44px;
   font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
 .appbar .site-brand{color:var(--ink)}
+.bl{display:flex;align-items:baseline;flex-wrap:wrap;column-gap:12px;min-width:0}
+.lng{font-size:12px;color:var(--muted)}
+.lng a{color:var(--muted);text-decoration:underline;display:inline-block;padding:11px 2px}
+.lng a:not([href]){text-decoration:none;color:var(--ink)}
 .hm{position:relative}
 .hm>button{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 10px;
   font:inherit;color:var(--ink);background:none;border:0;border-radius:6px;cursor:pointer}
@@ -323,8 +327,11 @@ def help_bar(base: str = "") -> str:
     )
     return (
         f'<a class="site-skip" href="#main-content" {_SKIP}>Skip to content</a>\n'
-        f'<div class="appbar"><a class="site-brand" href="{escape(base)}index.html">'
+        f'<div class="appbar"><div class="bl">'
+        f'<a class="site-brand" href="{escape(base)}index.html">'
         'What to ID<span class="site-bc">\u00a0· BC</span></a>'
+        '<span class="lng"><a lang="fr" href="#fr">Français</a><span aria-hidden="true"> | </span>'
+        '<a lang="en" href="#en">English</a></span></div>'
         f'<div class="hm"><button type="button" id="hmbtn" aria-expanded="false" '
         f'aria-controls="hmenu">{icon}Help</button>'
         f'<ul id="hmenu" aria-label="Help" hidden>{items}</ul></div></div>\n'

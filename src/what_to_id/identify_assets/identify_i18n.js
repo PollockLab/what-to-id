@@ -70,6 +70,6 @@ function nm(la,com){
   var c=names==='common'&&(com||CM.get(la)),e=document.createElement(c?'span':'i');
   e.className=c?'cn':'';e.textContent=c||la;e.dataset.la=la;return e;
 }
-function set(k,v){put(k==='lang'?LK:NK,v);try{sessionStorage.setItem('wtid-set','1');}catch(e){}location.reload();}
+function set(k,v){put(k==='lang'?LK:NK,v);try{sessionStorage.setItem('wtid-set',k==='lang'?'lang':'1');}catch(e){}location.reload();}
 return {lang:lang,loc:loc,names:names,nf:new Intl.NumberFormat(loc),tr:tr,raw:raw,api:api,taxa:taxa,nm:nm,set:set};
 })();
