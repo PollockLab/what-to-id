@@ -154,7 +154,13 @@ return {rest:rest,ACCDEF:ACCDEF,accClass:accClass,accOut:accOut,MONTH:MONTH,ONLY
 // hues, each at least 2:1 against both the light and the dark page.
 MapFilter.PAL=[[0,114,178],[213,94,0],[0,158,115],[190,160,0],[204,121,167],[86,180,233],[230,70,70],[120,60,170],[110,110,110],[160,60,40],[150,130,200],[40,120,60],[140,200,50],[70,90,220],[255,140,100],[0,190,190]];
 MapFilter.BY={Actinopterygii:[0,150,200],Amphibia:[0,190,150],Animalia:[120,120,120],Arachnida:[210,40,40],Aves:[50,90,220],Chromista:[190,160,0],Fungi:[150,90,50],Insecta:[240,130,0],Mammalia:[150,60,170],Mollusca:[230,110,160],Plantae:[40,160,60],Protozoa:[120,185,30],Reptilia:[90,110,0],Unknown:[160,160,160]};
-MapFilter.color=function(name,i){return MapFilter.BY[name]||MapFilter.PAL[i%MapFilter.PAL.length];};
+// The dark page takes a lighter shade of the same hue (BYD, PALD: only the ones that fall under 3:1 against #2c2c2a, the lightest dark surface).
+MapFilter.BYD={Animalia:[121,121,121],Arachnida:[224,57,53],Aves:[67,111,243],Fungi:[168,106,66],Mammalia:[174,84,194],Reptilia:[110,131,36]};
+MapFilter.PALD={0:[30,128,193],7:[153,94,206],8:[122,122,122],9:[194,90,69],11:[58,137,76],13:[85,109,241]};
+MapFilter.dark=function(){if(typeof document==='undefined')return false;var t=document.documentElement.getAttribute('data-theme');return t?t==='dark':matchMedia('(prefers-color-scheme: dark)').matches;};
+MapFilter.color=function(name,i){var d=MapFilter.dark(),c=MapFilter.BY[name];
+  if(c)return d&&MapFilter.BYD[name]||c;
+  i%=MapFilter.PAL.length;return d&&MapFilter.PALD[i]||MapFilter.PAL[i];};
 // The hash tokens a selection is made of, as one string.
 MapFilter.tokens=function(hash){return hash.replace(/^#/,'').split('&').filter(function(t){
   return /^(by|from|to|months|groups|only|acc|taxa|user|umode|umin)=/.test(t);}).join('&');};

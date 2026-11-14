@@ -21,7 +21,7 @@ input[type=checkbox]{width:24px;height:24px;margin:0 4px 0 0;vertical-align:midd
 #status{margin:6px 0;font-size:13px}
 .tabs{display:inline-flex;flex-wrap:wrap;gap:2px;padding:3px;border:1px solid var(--line);border-radius:20px;background:var(--panel)}
 .tab{min-width:0;display:flex;align-items:baseline;gap:6px;padding:6px 12px;font:inherit;font-size:13px;line-height:1.2;color:var(--ink);background:none;
-  border:0;border-radius:16px;cursor:pointer;white-space:nowrap}
+  border:0;border-radius:999px;cursor:pointer;white-space:nowrap}
 .tab b{font-size:13px;font-weight:650}
 .tab[aria-selected=true]{background:var(--on);color:var(--onink);border-color:var(--on)}
 .tab.zero:not([aria-selected=true]){opacity:.55}
@@ -36,11 +36,11 @@ input[type=checkbox]{width:24px;height:24px;margin:0 4px 0 0;vertical-align:midd
 .arrow:disabled{opacity:.4;cursor:default}
 ol{list-style:none;margin:8px 0;padding:0;display:grid;gap:10px;
   grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px;
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:6px;
   display:flex;flex-direction:column;gap:4px;min-width:0;cursor:pointer}
 .card:hover{border-color:var(--muted)}
 .card .ph{display:flex;align-items:center;justify-content:center;aspect-ratio:4/3;font-size:12px;
-  border-radius:4px;background:var(--chip);color:var(--muted);overflow:hidden;text-align:center}
+  border-radius:6px;background:var(--chip);color:var(--muted);overflow:hidden;text-align:center}
 .card img{width:100%;height:100%;object-fit:cover;display:block;color:transparent}
 .card .name,.card .com,.card .when{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .card .name{font-size:13px}
@@ -49,7 +49,7 @@ ol{list-style:none;margin:8px 0;padding:0;display:grid;gap:10px;
 .card .look{overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .card .when{display:block;text-decoration:none;min-height:24px;line-height:24px}
 .card .when:hover{text-decoration:underline}
-.btn{display:inline-flex;align-items:center;min-height:30px;padding:0 12px;border-radius:15px;
+.btn{display:inline-flex;align-items:center;min-height:30px;padding:0 12px;border-radius:999px;
   background:var(--on);color:var(--onink);font-size:13px;font-weight:650;text-decoration:none}
 .card .sp{font:inherit;font-size:12px;color:var(--muted);background:none;border:0;padding:0;min-height:24px;text-align:left;cursor:pointer;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -59,7 +59,7 @@ ol{list-style:none;margin:8px 0;padding:0;display:grid;gap:10px;
   border:1px solid var(--line);border-radius:6px;background:var(--chip)}
 #end{text-align:center;margin:8px 0}
 .rout{margin:6px 0;font-size:12px}
-.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:15px;overflow:hidden}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:999px;overflow:hidden}
 .segb{font:inherit;color:var(--ink);cursor:pointer;min-height:30px;padding:0 12px;border:0;background:var(--chip)}
 .segb+.segb{border-left:1px solid var(--line)}
 .segb[aria-checked=true]{background:var(--on);color:var(--onink)}
@@ -68,20 +68,20 @@ ol{list-style:none;margin:8px 0;padding:0;display:grid;gap:10px;
 .ctl{display:flex;flex-wrap:wrap;align-items:center;gap:4px 16px}
 .ctl>.rout{margin:2px 0}.ctl #sort:not([hidden]){display:contents}.ctl .srow{margin:2px 0;gap:4px 6px}
 .ctl .segb{min-height:26px;padding:0 9px}
-.tog{margin-right:10px;white-space:nowrap}#prog.ok progress{accent-color:#2e7d32}
+.tog{margin-right:10px;white-space:nowrap}#prog.ok progress{accent-color:var(--good)}
 #sort .segnote{margin:0}
 .hint{color:var(--muted)}.hint summary{cursor:pointer;min-height:24px}.hint .segnote,.hint p{margin:2px 0}
 .card .links{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
 .card .range{flex:1 1 8em;min-width:0;font-size:12px;color:var(--muted)}
-.card .badge{align-self:flex-start;font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 4px}
+.card .badge{align-self:flex-start;font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:0 4px}
 .sep.top{border-top:0;padding-top:0}
-.sep.run{display:flex;align-items:center;gap:6px;flex-wrap:wrap;color:var(--ink)}.sep.run img{width:56px;height:56px;object-fit:cover;border-radius:4px;background:var(--chip)}.sep.run .rp{display:flex;gap:4px}
+.sep.run{display:flex;align-items:center;gap:6px;flex-wrap:wrap;color:var(--ink)}.sep.run img{width:56px;height:56px;object-fit:cover;border-radius:6px;background:var(--chip)}.sep.run .rp{display:flex;gap:4px}
 .sep{grid-column:1/-1;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:6px}
 .card .kind{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
 .cmp{flex:none;display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:0}
 .cmp figure{margin:0;min-width:0;display:flex;flex-direction:column;gap:1px}
-.cmp a{display:block;border-radius:4px;background:var(--chip)}
-.cmp img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:4px;display:block;color:transparent}
+.cmp a{display:block;border-radius:6px;background:var(--chip)}
+.cmp img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;display:block;color:transparent}
 .cmp img:not([src]),.card .ph img:not([src]){visibility:hidden}
 .cmp figcaption{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #usrbox summary{cursor:pointer;color:var(--muted);min-height:24px}
@@ -103,7 +103,7 @@ body:not(.bt) #study,.bt #status:not(.err),.bt #unpick,.bt #desc,.bt #kind,.bt #
 .card .act{font:inherit;font-size:12px;min-height:24px;padding:0 8px;border:1px solid var(--line);border-radius:12px;
   background:var(--chip);color:var(--ink);cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .card .act:disabled{cursor:default}
-.card .copy{font:inherit;font-size:11px;min-height:24px;margin-left:4px;padding:0 6px;border:1px solid var(--line);border-radius:10px;background:var(--chip);color:var(--ink);cursor:pointer}
+.card .copy{font:inherit;font-size:11px;min-height:24px;margin-left:4px;padding:0 6px;border:1px solid var(--line);border-radius:999px;background:var(--chip);color:var(--ink);cursor:pointer}
 .card .conf,.card .gap,.card .gapx{margin-left:6px;font:inherit;font-size:11px;color:var(--muted);background:none;border:0;padding:0;cursor:pointer;text-decoration:underline dotted}.card .gapw .gap{margin-left:6px}.card .gapx{margin-left:3px;text-decoration:none}
 .card .gap{white-space:nowrap}
 .card .note{font-size:12px;color:var(--muted)}
@@ -117,6 +117,7 @@ __IDENTIFY_SHELL_CSS__
 __IDENTIFY_BAR_CSS__
 </style></head><body>
 __SITE_NAV__<main id="main-content">
+<h1 class="site-vh">Identify</h1>
 <p><button type="button" id="unpick" class="more" hidden>Clear the species filter</button></p>
 <div class="catrow"><div id="cats" class="cats" role="group" aria-label="Life forms"></div></div>
 <div class="mixrow"><div id="mix" class="mix" aria-hidden="true"></div><span id="mixn" class="mixn"></span></div>
