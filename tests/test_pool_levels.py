@@ -55,7 +55,7 @@ def test_the_pack_round_trips_identify_parquet_in_shard_order(tmp_path):
         pool_levels.main(["--out", str(site), "--parquet", str(tmp_path / "identify.parquet")]) == 0
     )
     level, q = pool_levels.unpack(site_files.path(site, "levels").read_bytes())
-    looks = pool_levels.unpack_looks(site_files.path(site, "looks").read_bytes(), N)
+    looks = pool_levels.unpack_looks(site_files.path(site, "looks").read_bytes(), level)
     assert len(level) == len(q) == len(looks) == N
     row = df.set_index("id")
     for i, pid in enumerate(points["id"]):
@@ -75,7 +75,7 @@ def test_the_why_file_holds_level_3_runner_ups_per_suggestion_and_their_margin()
     runner = np.array(["C", None, "D", "D", "C", "C", "D"], dtype=object)
     margin = np.array([0.0284, 0.01, 0.2, 2.0, 0.1, np.nan, 0.004])
     blob = pool_levels.pack_why(level, looks, runner, margin)
-    shown = pool_levels.unpack_looks(pool_levels.pack_looks(level, looks), 7)
+    shown = pool_levels.unpack_looks(pool_levels.pack_looks(level, looks), level)
     got = pool_levels.unpack_why(blob, shown)
     assert [g and g[0] for g in got] == ["C", None, None, "D", None, "C", "D"]
     assert [g and g[1] for g in got] == pytest.approx([0.03, None, None, 1.27, None, None, 0.005])
@@ -95,9 +95,23 @@ def test_the_score_steps_rank_within_a_level_and_weird_shows_the_lowest_first():
 def test_the_rank_file_orders_level_3_by_score_highest_first_and_leaves_the_rest_0():
     level = np.array([3, 3, 3, 1, 0, 3], np.int8)
     score = np.array([0.2, 0.9, 0.5, 0.7, np.nan, np.nan], np.float32)
-    rank = np.frombuffer(gzip.decompress(pool_levels.pack_rank(level, score)), "<u4")
-    assert rank.tolist() == [2, 0, 1, 0, 0, 3]
+    blob = pool_levels.pack_rank(level, score)
+    assert len(gzip.decompress(blob)) == 4 * 4  # level 3's four records only
+    assert pool_levels.unpack_rank(blob, level).tolist() == [2, 0, 1, 0, 0, 3]
     assert len(gzip.decompress(pool_levels.pack_rank(level[:0], score[:0]))) == 0
+
+
+def test_the_rank_and_looks_files_hold_only_their_records_at_the_edges():
+    for level in (
+        np.array([1, 4, 0], np.int8),
+        np.full(300, 3, np.int8),
+    ):  # no level 3, all level 3
+        score = np.random.default_rng(1).normal(size=len(level)).astype(np.float32)
+        got = pool_levels.unpack_rank(pool_levels.pack_rank(level, score), level)
+        assert got.tolist() == np.where(level == 3, pool_levels.ranks(level, score), 0).tolist()
+        looks = np.array([f"S{i % 7}" for i in range(len(level))], dtype=object)
+        want = [f"S{i % 7}" if lv == 3 else None for i, lv in enumerate(level)]
+        assert pool_levels.unpack_looks(pool_levels.pack_looks(level, looks), level) == want
 
 
 def test_a_build_without_a_table_says_so(tmp_path):
@@ -110,7 +124,7 @@ def test_packing_nothing_and_a_record_without_levels():
     level, q = pool_levels.unpack(pool_levels.pack(np.zeros(0, np.int8), np.zeros(0, np.float32)))
     assert len(level) == len(q) == 0
     blob = pool_levels.pack_looks(np.zeros(3, np.int8), np.full(3, "x", dtype=object))
-    assert pool_levels.unpack_looks(blob, 3) == [None] * 3
+    assert pool_levels.unpack_looks(blob, np.zeros(3, np.int8)) == [None] * 3
 
 
 def test_three_million_records_fit_the_levels_budget():

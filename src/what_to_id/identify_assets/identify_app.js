@@ -417,12 +417,12 @@ function inbox(){
   SYNC=MapFilter.sync({key:key,apply:function(str){if(MF){clearTimeout(TK);TK=setTimeout(function(){take(str,false);},60);}else{PEND=str;again();}},hash:false});
   addEventListener('hashchange',function(){if(MF)take(location.hash.slice(1),true);else again();});
 }
-// the look-alike file, or (why) the runner-up file: the same header and two planes of n bytes
+// the look-alike file (planes of one entry per level 2, 3, 5 record, expanded to all n by KIND), or (why) the runner-up file (planes of n)
 function looks(buf,why){
-  var dv=new DataView(buf),size=dv.getUint32(0,true),n=P.n,h;
-  if(buf.byteLength!==4+size+2*n)throw new Error('the '+(why?'runner-up':'look-alike')+' file holds '+buf.byteLength+' bytes, expected '+(4+size+2*n));
-  h=JSON.parse(new TextDecoder().decode(new Uint8Array(buf,4,size)));
-  return {names:h.names,runners:h.runners,lo:new Uint8Array(buf,4+size,n),hi:new Uint8Array(buf,4+size+n,n)};
+  var dv=new DataView(buf),size=dv.getUint32(0,true),n=P.n,m=n,j,k=0,h,lo,hi,o=4+size,w=function(j){return KIND[j]===2||KIND[j]===3||KIND[j]===5;};if(!why){m=0;for(j=0;j<n;j++)if(w(j))m++;}
+  if(buf.byteLength!==o+2*m)throw new Error('the '+(why?'runner-up':'look-alike')+' file holds '+buf.byteLength+' bytes, expected '+(o+2*m));
+  h=JSON.parse(new TextDecoder().decode(new Uint8Array(buf,4,size)));lo=new Uint8Array(buf,o,m);hi=new Uint8Array(buf,o+m,m);if(!why){var l=new Uint8Array(n).fill(255),u=new Uint8Array(n).fill(255);for(j=0;j<n;j++)if(w(j)){l[j]=lo[k];u[j]=hi[k++];}lo=l;hi=u;}
+  return {names:h.names,runners:h.runners,lo:lo,hi:hi};
 }
 async function load(){
   status('Reading the map data…');
@@ -436,7 +436,7 @@ async function load(){
   var shards=Promise.all(META.shards.map(function(s){return get(new URL(s.file,MAP)).then(function(b){return L.decodeShard(b,s.n);});}));
   var lev=file('levels'),lkp=null,rkp=null,rg=file('range').catch(function(){return null;});  // optional: no range maps without it
   function lk(){return lkp||(lkp=file('looks').catch(function(){return null;}));}function rk(){return rkp||(rkp=file('rank').catch(function(){return null;}).then(function(b){RKW=false;return b;}));}  // optional: level 3 by score bucket without it
-  function rank(b){if(!b||b.byteLength!==4*P.n)return false;RK=new Uint32Array(b);N3=0;for(var j=0;j<P.n;j++)if(KIND[j]===3)N3++;return true;}
+  function rank(b){var m=0,j,k=0,r;for(j=0;j<P.n;j++)if(KIND[j]===3)m++;if(!b||b.byteLength!==4*m)return false;b=new Uint8Array(b);r=new Uint32Array(P.n);for(j=0;j<P.n;j++)if(KIND[j]===3){r[j]=(b[k]|b[m+k]<<8|b[2*m+k]<<16|b[3*m+k]<<24)>>>0;k++;}RK=r;N3=m;return true;}  // byte planes of the level-3 records only
   if(!FIRST)status('Downloading the records…');
   var d=await Promise.all([shards,taxa,lev,saved()===3?rk():null]);  // level 3 opens on its rank
   P=L.pool(d[0],META.bbox);BYID=byId(P);TAXA=d[1];LOOKS=null;
