@@ -16,7 +16,7 @@ pytestmark = pytest.mark.skipif(NODE is None, reason="node is not installed")
 def evaluate(expression, include_map=False):
     script = (ASSETS / "identify_links.js").read_text()
     if include_map:
-        script += (ASSETS / "map_area.js").read_text()
+        script += (ASSETS / "map_rings.js").read_text() + (ASSETS / "map_area.js").read_text()
     script += f"\nconsole.log(JSON.stringify({expression}));"
     result = subprocess.run([NODE], input=script, capture_output=True, text=True, check=True)
     return json.loads(result.stdout)

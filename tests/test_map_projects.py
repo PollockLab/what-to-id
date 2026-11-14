@@ -470,7 +470,7 @@ def test_map_posts_its_viewport_as_a_clamped_ring_and_nothing_for_the_world():
     source = (ASSETS / "map.js").read_text()
     start = source.index("function view()")
     body = source[start : source.index("map.once('load',view)", start)]
-    area = (ASSETS / "map_area.js").read_text()
+    area = (ASSETS / "map_rings.js").read_text()
     enc = area[area.index("var Q=1e4") : area.index("function decode(")]
     harness = (
         "const window={},location={origin:'o'},sent=[],IdentifyLinks={BATCH:1};"

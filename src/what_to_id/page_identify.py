@@ -66,6 +66,7 @@ SCRIPTS = {
     "__MAP_TAXA__": HERE / "map_assets" / "map_taxa.js",
     "__MAP_CHIPS__": HERE / "map_assets" / "map_chips.js",
     "__IDENTIFY_LINKS__": HERE / "map_assets" / "identify_links.js",
+    "__MAP_RINGS__": HERE / "map_assets" / "map_rings.js",
     "__MAP_AREA__": HERE / "map_assets" / "map_area.js",
     "__TAXON_TREE__": HERE / "embeddings_assets" / "taxon_tree.js",
     "__GROUP_LIST__": HERE / "map_assets" / "group_list.js",

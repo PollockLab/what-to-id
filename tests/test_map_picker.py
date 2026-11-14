@@ -22,7 +22,11 @@ def _row(key, name, kind=0, place=0, bb=(-123.2, 49.2, -123.1, 49.3), alt=""):
 
 def node(body: str, rows: list):
     js = (
-        ((_ASSETS / "identify_links.js").read_text() + (_ASSETS / "map_area.js").read_text())
+        (
+            (_ASSETS / "identify_links.js").read_text()
+            + (_ASSETS / "map_rings.js").read_text()
+            + (_ASSETS / "map_area.js").read_text()
+        )
         + f"\nvar K={json.dumps(KINDS)},R={json.dumps(rows)};"
         + "var P=R.map(function(r){return MapArea.entry(r,K);});"
         + f"process.stdout.write(JSON.stringify((function(){{{body}}})()));"
@@ -140,7 +144,11 @@ def _page(browser, frag=""):
         (_ASSETS / "map.css").read_text()
         + (_ASSETS / "map_select.css").read_text()
         + (_ASSETS / "map_area.css").read_text(),
-        ((_ASSETS / "identify_links.js").read_text() + (_ASSETS / "map_area.js").read_text()),
+        (
+            (_ASSETS / "identify_links.js").read_text()
+            + (_ASSETS / "map_rings.js").read_text()
+            + (_ASSETS / "map_area.js").read_text()
+        ),
         json.dumps(PARKS),
         json.dumps(KINDS),
     )

@@ -19,7 +19,14 @@ from .test_map_resolved import NOW, log_frame
 
 NODE = shutil.which("node")
 pytestmark = pytest.mark.skipif(NODE is None, reason="node is not installed")
-JS = ("map_taxa.js", "map_chips.js", "map_filter.js", "identify_links.js", "map_area.js")
+JS = (
+    "map_taxa.js",
+    "map_chips.js",
+    "map_filter.js",
+    "identify_links.js",
+    "map_rings.js",
+    "map_area.js",
+)
 RING = [-123.5, 48.5, -122.5, 48.5, -122.5, 49.5, -123.5, 49.5]  # lon, lat of a box round the log
 
 
