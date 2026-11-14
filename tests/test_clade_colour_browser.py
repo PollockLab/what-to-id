@@ -6,7 +6,8 @@ import numpy as np
 import pytest
 
 from what_to_id import tree_page
-from what_to_id.page_map import encode_points, render_map
+from what_to_id.map_points import encode_points
+from what_to_id.page_map import render_map
 
 from . import test_embeddings_browser as eb
 from . import test_explore_home_browser as eh

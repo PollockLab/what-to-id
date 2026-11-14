@@ -36,7 +36,7 @@ from what_to_id import host_pairs, site_files
 from what_to_id.atlas_index_io import read_manifest
 from what_to_id.atlas_neighbors import merge_neighbors, record_dtype
 from what_to_id.inat import USER_AGENT
-from what_to_id.page_map import _decode_shard
+from what_to_id.map_points import _decode_shard
 
 OUT_NAME = "pool-lookalike.bin"
 RANKS = ("kingdom", "phylum", "class", "order", "family")

@@ -10,7 +10,8 @@ import pytest
 from what_to_id import map_resolved as mr
 from what_to_id import site_files
 from what_to_id.inat import COLUMNS, EXTRA_COLUMNS
-from what_to_id.page_map import NO_DAY, encode_points, write_map
+from what_to_id.map_points import NO_DAY, encode_points
+from what_to_id.page_map import write_map
 from what_to_id.taxonomy import NO_TAXON
 
 from .embeddings_fixture import TREE, pool_frame

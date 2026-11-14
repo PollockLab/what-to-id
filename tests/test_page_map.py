@@ -11,24 +11,26 @@ import pytest
 
 from what_to_id.batches import MAX_URL_LEN
 from what_to_id.inat import BC_PLACE_ID
+from what_to_id.map_points import (
+    BYTES_PER_RECORD,
+    NO_DAY,
+    RECENT_DAYS,
+    _decode_shard,
+    decode_points,
+    encode_points,
+    shard_name,
+)
 from what_to_id.page import ARM_WORDS
 from what_to_id.page_map import (
     _ASSETS,
-    BYTES_PER_RECORD,
     MAP_NAME,
-    NO_DAY,
     PARKS_NAME,
-    RECENT_DAYS,
     TOTAL_ONLY,
-    _decode_shard,
     align_totals,
-    decode_points,
-    encode_points,
     fetch_totals,
     main,
     over_totals,
     render_map,
-    shard_name,
     write_map,
 )
 from what_to_id.site_files import META_NAME, hashed, publish
@@ -50,7 +52,7 @@ def _with_extras(pool):
 
 
 def test_encode_round_trips_within_quantization(monkeypatch):
-    monkeypatch.setattr("what_to_id.page_map.SHARD_MAX", 40)
+    monkeypatch.setattr("what_to_id.map_points.SHARD_MAX", 40)
     pool = _with_extras(make_pool(300, seed=3)).sample(frac=1, random_state=0)
     pool["rank"] = np.where(pool["taxon_id"] % 2 == 1, "species", "genus")
     pool["id"] = pool["id"] * 1000 + np.where(pool["id"] % 2 == 1, 0xFFFFFFFF - 10**7, 0)
@@ -129,7 +131,7 @@ def test_recent_records_come_first_and_old_ones_after():
 
 
 def test_older_records_follow_newest_first_in_capped_shards(monkeypatch):
-    monkeypatch.setattr("what_to_id.page_map.SHARD_MAX", 2)
+    monkeypatch.setattr("what_to_id.map_points.SHARD_MAX", 2)
     pool = make_pool(6)
     pool["observed_on"] = ["2001-01-01", "2005-01-01", "2003-01-01", "2004-01-01", "2002-01-01"] + [
         "2026-09-01"

@@ -7,7 +7,8 @@ import pandas as pd
 import pytest
 
 from what_to_id import taxonomy
-from what_to_id.page_map import encode_points, main
+from what_to_id.map_points import encode_points
+from what_to_id.page_map import main
 from what_to_id.taxonomy import (
     AT_RISK,
     GROUP_TAXA,

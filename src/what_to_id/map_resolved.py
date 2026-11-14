@@ -37,7 +37,7 @@ import pandas as pd
 
 from what_to_id import site_files
 from what_to_id.inat import BC_PLACE_ID, PER_PAGE, SLEEP, _frame, _results, flatten, make_session
-from what_to_id.page_map import DAY_FLOOR, EARLY_OBS, EARLY_UP, NO_DAY, _dates, _flags, _gz
+from what_to_id.map_points import DAY_FLOOR, EARLY_OBS, EARLY_UP, NO_DAY, _dates, _flags, _gz
 from what_to_id.taxonomy import NO_TAXON, load_tree, taxa_table
 
 NAME = "pool-resolved.bin"

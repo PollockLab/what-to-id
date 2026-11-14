@@ -6,7 +6,8 @@ import numpy as np
 import pandas as pd
 
 from what_to_id.map_observer import OBSERVER_NAME, decode_observer
-from what_to_id.page_map import _decode_shard, encode_points, render_map
+from what_to_id.map_points import _decode_shard, encode_points
+from what_to_id.page_map import render_map
 from what_to_id.site_files import hashed
 
 from .conftest import make_pool
@@ -19,7 +20,7 @@ def shard_ids(blobs, meta):
 
 
 def test_the_file_holds_four_bytes_a_record_in_shard_order(monkeypatch):
-    monkeypatch.setattr("what_to_id.page_map.SHARD_MAX", 40)
+    monkeypatch.setattr("what_to_id.map_points.SHARD_MAX", 40)
     pool = make_pool(300, seed=3).sample(frac=1, random_state=0)
     pool["observed_on"] = (
         pd.Timestamp("2026-08-31") - pd.to_timedelta(np.arange(len(pool)) * 7, "D")

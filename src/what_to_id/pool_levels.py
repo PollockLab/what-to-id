@@ -72,9 +72,9 @@ import pandas as pd
 
 from what_to_id import site_files
 from what_to_id.identify import MISLABEL, NARROW, NONE, TAXONOMIST, WEIRD
+from what_to_id.map_points import _decode_shard
 from what_to_id.page_identify import DATES_NAME, FIRST_NAME
 from what_to_id.page_lookalike import _fetch, site_records
-from what_to_id.page_map import _decode_shard
 from what_to_id.tree_page import map_meta
 
 OUT_NAME = "pool-levels.bin"

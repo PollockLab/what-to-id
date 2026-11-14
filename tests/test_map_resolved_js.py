@@ -11,8 +11,8 @@ from importlib.resources import files
 
 import pytest
 
+from what_to_id.map_points import encode_points
 from what_to_id.map_resolved import encode_left
-from what_to_id.page_map import encode_points
 
 from .embeddings_fixture import TREE, pool_frame
 from .test_map_resolved import NOW, log_frame
