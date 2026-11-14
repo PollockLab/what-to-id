@@ -134,7 +134,7 @@ def meta_files(base):
         return site_files.read_meta(r.read().decode())["files"]
 
 
-def test_the_bulk_files_wait_for_the_first_card_and_rank_and_looks_for_their_levels(browser, site):
+def test_the_bulk_files_wait_for_the_first_card_and_looks_for_their_levels(browser, site):
     base, pts = site
     files = meta_files(base)
     page = browser.new_page(viewport={"width": 380, "height": 800})
@@ -146,13 +146,15 @@ def test_the_bulk_files_wait_for_the_first_card_and_rank_and_looks_for_their_lev
     page.wait_for_function("window.__identify")
     page.wait_for_load_state("networkidle")
     names = [n for n, _ in seen]
-    assert files["first"] in names and files["rank"] not in names and files["looks"] not in names
+    assert files["first"] in names and files["looks"] not in names
     shards = [n for n, up in seen if re.fullmatch(r"pool-\d+\.\w+\.bin", n)]
     assert shards and all(up for n, up in seen if n in shards + [files["levels"]])
+    # the rank follows the records in the background, so level 3's count shows
+    assert all(up for n, up in seen if n == files["rank"])
+    page.wait_for_function("/\\d/.test(document.querySelector('#tab3').lastChild.textContent)")
     # the preloads are the page's own downloads: one request each
     assert names.count(files["first"]) == 1 and names.count("map-meta.json") == 1
-    page.click("#tab3")  # level 3 fetches its rank and look-alikes, and its strict order follows
-    page.wait_for_function(f"performance.getEntriesByName('{base}/{files['rank']}').length")
+    page.click("#tab3")  # level 3 fetches its look-alikes, and its strict order follows
     page.wait_for_selector("#grid .card .conf", state="attached")
     rank = dict(zip(pts["id"].tolist(), nb.rank_plane(base).tolist(), strict=True))
     got = [rank[i] for i in page.evaluate("__identify.view()")[3]]
