@@ -418,3 +418,14 @@ def test_no_control_wraps_or_overflows_at_375(browser, site):
         )
         assert bad == [], bad
         page.close()
+
+
+def test_a_high_survey_gap_score_means_few_observer_days(browser, site):
+    base, _ = site
+    page = open_level_3(browser, base, "#lvl=1&pri=gap:100")  # the continuous path
+    settle(page)
+    page.wait_for_selector("#grid .card")
+    ids = page.evaluate("__identify.view()")[1]
+    tiers = [page.evaluate(f"__identify.gap({i})") for i in ids]  # 2 under 15 days, 0 at 30 or more
+    assert tiers[0] == 2 and tiers == sorted(tiers, reverse=True)  # fewest days first, not most
+    assert page.errors == []
