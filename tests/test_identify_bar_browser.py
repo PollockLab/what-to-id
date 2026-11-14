@@ -15,7 +15,7 @@ from .embeddings_fixture import GROUPS
 
 browser = eb.browser
 site = ib.site
-PANELS = {"#bwhat": "#pwhat", "#bwhen": "#pwhen", "#bwhere": "#pwhere"}
+PANELS = {"#bwhat": "#pwhat", "#bwhen": "#pwhen", "#bwhere": "#pwhere", "#bwho": "#pwho"}
 
 # the canvas holds a pixel of the light layer's colour, --total in the light scheme
 LIGHT_BAR = """() => {
@@ -88,7 +88,11 @@ def test_escape_returns_to_the_segment_and_the_arrows_move_the_open_panel(browse
     assert page.evaluate("document.activeElement.id") == "bwhen" and shown(page) == ["#pwhen"]
     page.keyboard.press("ArrowRight")
     assert shown(page) == ["#pwhere"]
+    page.keyboard.press("ArrowRight")
+    assert page.evaluate("document.activeElement.id") == "bwho" and shown(page) == ["#pwho"]
     page.keyboard.press("ArrowRight")  # the last segment stays
+    assert page.evaluate("document.activeElement.id") == "bwho"
+    page.keyboard.press("ArrowLeft")
     assert page.evaluate("document.activeElement.id") == "bwhere"
     page.keyboard.press("Tab")
     assert page.evaluate("!!document.activeElement.closest('#pwhere')")  # the map's frame

@@ -130,11 +130,12 @@ def test_group_by_species_lives_in_sort_on_level_3_and_is_not_a_filter(browser, 
     box.check()
     page.wait_for_selector("#grid .sep.run", state="attached")
     assert "run=1" in page.evaluate("location.hash")
-    assert page.text_content("#sorth") == "Sort"
+    assert page.text_content("#sorth") == "Prioritize"
     assert "grouped" in page.text_content("#sortb")
     page.keyboard.press("Escape")
     page.click("#tab1")
-    page.wait_for_function("document.querySelector('#sortb').hidden")
+    page.wait_for_function("__identify.level() === 1")
+    # Prioritize stays on every mode, the grouping is level 3 only
     assert not page.locator("#frun input").is_visible()
     assert page.errors == []
 

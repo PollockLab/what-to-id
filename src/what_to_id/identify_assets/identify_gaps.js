@@ -59,7 +59,7 @@ function read(){
     base:bm?bm[1]||'rand':'new',seed:bm&&bm[2]?+bm[2]:1,explicit:!!bm};
 }
 var F=function(ctx){
-  var P=ctx.P,st=read(),state='load',tier=null,days=null,names=null,UI=null,T=0;
+  var P=ctx.P,st=read(),state='load',settle,ready=new Promise(function(r){settle=r;}),tier=null,days=null,names=null,UI=null,T=0;
   function alloff(){return !KEYS.some(function(k){return st.w[k]>0;});}
   function isdef(){return st.top===5&&st.gap==null&&!st.explicit&&KEYS.every(function(k){return st.w[k]===DEFAULT[k];});}
   function load(){
@@ -82,7 +82,7 @@ var F=function(ctx){
           dy[i]=d;tr[i]=d>=lit?0:d<lit/2?2:1;nm[i]=[g,lit];
         }
         tier=tr;days=dy;names=nm;state='ready';});
-    }).catch(function(){state='failed';}).then(function(){ctx.redraw(true);});
+    }).catch(function(){state='failed';}).then(function(){ctx.redraw(true);settle();});
   }
   // the hash holds only what differs from the defaults
   function hash(){
@@ -150,6 +150,7 @@ var F=function(ctx){
   build();
   load();
   return {
+    ready:ready,  // settles once the checklist has loaded or failed and the redraw is done
     // a record the filters keep: level 3's Top x% and every level's blitz gap ceiling
     pass:function(i,kind){
       if(kind===3&&st.top<100){var p=ctx.pct(i);if(p!=null&&p>st.top/100)return false;}

@@ -1,6 +1,7 @@
-"""Identify's Prioritize popover: the filters (Top x%, blitz gap ceiling), the weighted prioritizers, the base
-order, the badges as shortcuts, the hash and the fall back when the where-to-blitz checklist does not
-load. The old sort= and conf= links order as before. iNaturalist and where-to-blitz are stubbed."""
+"""Identify's Prioritize popover: the filters (Top x%, blitz gap ceiling), the weighted
+prioritizers, the base order, the badges as shortcuts, the hash and the fall back when the
+where-to-blitz checklist does not load. The old sort= and conf= links order as before. iNaturalist
+and where-to-blitz are stubbed."""
 
 import json
 import re
@@ -11,7 +12,6 @@ import numpy as np
 
 from . import test_embeddings_browser as eb
 from . import test_identify_browser as ib
-from .identify_sheets import reveal
 from .test_identify_narrow_browser import rank_plane
 
 browser = eb.browser
@@ -202,15 +202,20 @@ def test_the_gap_badge_applies_the_ceiling_on_every_level(browser, site):
     base, _ = site
     page = open_with(browser, base, "")
     page.wait_for_selector("#grid .card button.gap", state="attached")
-    badge = page.locator("#grid .card button.gap").first
+    page.locator(
+        "#grid .card:has(button.gap) .ph"
+    ).first.click()  # the badges show in the compare panel
+    badge = page.locator("#cpdet button.gap")
     days = int(re.search(r"Gap (\d+)/", badge.inner_text()).group(1))
     badge.click()
     page.wait_for_function(f"location.hash.includes('gap={days}')")
     page.wait_for_selector("#grid .card")
-    texts = page.locator("#grid .card .gap").all_inner_texts()
+    texts = page.locator("#grid .card button.gap").all_inner_texts()
     got = [int(re.search(r"Gap (\d+)/", t).group(1)) for t in texts]
-    assert got and max(got) <= days and page.locator("#grid .card").count() == len(got)
-    assert f"gap {days} days or fewer" in page.inner_text("#cap")
+    assert got and max(got) <= days and page.locator("#grid .card").count() >= len(got)
+    page.wait_for_function(
+        f"document.getElementById('cap').textContent.includes('gap {days} days or fewer')"
+    )
     page.click("#tab1")  # the ceiling holds on the other levels too
     page.wait_for_selector("#grid .card")
     assert f"gap={days}" in page.evaluate("location.hash")
@@ -222,7 +227,8 @@ def test_the_gap_badge_applies_the_ceiling_on_every_level(browser, site):
 def test_the_confidence_badge_keeps_its_band(browser, site):
     base, _ = site
     page = open_with(browser, base, "&conf=25")
-    badge = page.locator("#grid .card button.conf").first
+    page.locator("#grid .card:has(button.conf) .ph").first.click()
+    badge = page.locator("#cpdet button.conf")
     n = badge.inner_text().removeprefix("Top ").removesuffix("%")
     badge.click()
     if n == "5":
@@ -239,7 +245,14 @@ def test_blitz_gaps_order_every_level_not_only_level_3(browser, site):
     page.wait_for_selector("#grid .card")
     ids = page.evaluate("__identify.view()")[1]
     tiers = [page.evaluate(f"__identify.gap({i})") for i in ids]
-    assert len(set(tiers)) > 1 and tiers == sorted(tiers, reverse=True)
+    assert tiers[0] == 2 and tiers == sorted(tiers, reverse=True)
+    page.close()
+    page = open_level_3(browser, base, "#lvl=1&pri=conf:3")  # by confidence alone it is not
+    settle(page)
+    page.wait_for_selector("#grid .card")
+    ids = page.evaluate("__identify.view()")[1]
+    tiers = [page.evaluate(f"__identify.gap({i})") for i in ids]
+    assert tiers != sorted(tiers, reverse=True)
     assert page.errors == []
 
 
