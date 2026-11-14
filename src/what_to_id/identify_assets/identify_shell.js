@@ -9,7 +9,7 @@
 function $(id){return document.getElementById(id);}
 function has(k){return new RegExp('(^|&)'+k+'=').test(location.hash.slice(1));}
 function labels(){
-  var g=has('run')&&!$('sortb').hidden;$('sortb').firstChild.textContent='Sort'+(g?' · grouped':'')+' ';
+  var g=has('run')&&!$('sortb').hidden;$('sortb').firstChild.textContent='Prioritize'+(g?' · grouped':'')+' ';
   var u=$('usrname'),b=$('usrbox');
   $('ubtn').textContent=u&&u.value?'@'+u.value:'You';  // the box is the user filter's: its name, once one is set
   $('uload').hidden=!b.hidden;

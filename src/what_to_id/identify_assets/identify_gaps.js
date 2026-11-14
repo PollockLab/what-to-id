@@ -1,13 +1,19 @@
-// Level 3 controls and blitz gaps. The confidence filter keeps the Top 1%, 5% (the default), 25% or all of the level by its rank
-// band (hash conf=1|5|25|all); the sort toggles Confidence and Blitz gaps, both on by default (hash sort=conf or sort=gaps, absent for both,
-// the last one on cannot be turned off): both is the blend (band minus gap tier, then band, then rank), Confidence strict rank, Blitz gaps
-// the gap tier then rank. Gaps come from where-to-blitz's checklist layer (one 25 km PNG per group, read at run time): a record in a cell
-// short of the 30 observer-days of a checklist gets a gap tier (2 under half, 1 under 30, 0 lit or no data) and a badge.
-// IdentifyGaps(ctx), ctx {P, groups (META.groups), keep(i) the records to read, band(i) 0..3, redraw(late) with late true when records arrived}. A failed load leaves every gap at 0.
+// Prioritize: how the cards of every level are ordered and cut. Two filters: the confidence band (Top x% of level 3 by its rank, hash conf=1..100,
+// all or 100 for everything) and the blitz gap ceiling (observer-days of a cell at most N, hash gap=0..30, absent off). Five prioritizers, each with a
+// weight 0 (off) to 3, add up to one score (hash pri=conf:2,gap:1, pri=none for all off, absent conf:1,gap:1; the old sort=conf and sort=gaps still read):
+// Confidence (level 3 by its rank, else the score bucket), Blitz gap (tier 2 under half, 1 under 30, 0 lit or no data), At risk, Invasive, Outside range.
+// Ties go to the confidence order when base= is absent and a prioritizer is on, else to the base order (hash base=new|old|rand:<seed>, Newest by default).
+// Gaps come from where-to-blitz's checklist layer (one 25 km PNG per group, read at run time) for every record of every level. A failed load leaves every gap at 0.
+// IdentifyGaps(ctx), ctx {P, groups (META.groups), keep(i) the records to read, pct(i) the place of a level 3 record in its level 0..1, band(i) 0..3,
+// hasRank(), conf(i,lv) and fine(i,lv) the confidence score 0..3 and its finer order (higher better), flag(i,inv) 1 at risk | 2 invasive, hasOut(), out(i) 1 far
+// outside its range, redraw(late) with late true when records arrived}. IdentifyGaps.compare(o) is the pure comparator.
 var IdentifyGaps=(function(){
 'use strict';
 var BASE='https://pollocklab.github.io/where-to-blitz/',DIR=BASE+'cluster_results/checklist/',RES='25000',ALL='All biodiversity',
-  LIMS=[['1','Top 1%'],['5','Top 5%'],['25','Top 25%'],['all','All']];
+  KEYS=['conf','gap','risk','inv','out'],WORDS=['Off','Low','Medium','High'],DEFAULT={conf:1,gap:1,risk:0,inv:0,out:0},
+  NAMES={conf:['Confidence','most confident'],gap:['Blitz gap','biggest blitz gaps'],risk:['At risk','at-risk species'],inv:['Invasive','invasive species'],
+    out:['Outside range','records outside their range']},
+  BASES={new:'newest first',old:'oldest first',rand:'random order'},NODAYS=65535;
 function $(id){return document.getElementById(id);}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 // where-to-blitz's Lambert azimuthal equal area (WGS 84, centre 45N 100W) forward: [x, y] metres of lat, lon in degrees
@@ -29,11 +35,33 @@ function png(url){
       var x=c.getContext('2d',{willReadFrequently:true});x.drawImage(im,0,0);
       return {w:im.width,h:im.height,d:x.getImageData(0,0,im.width,im.height).data};});
 }
-return function(ctx){
-  var P=ctx.P,h=location.hash.slice(1),sm=/(?:^|&)sort=([\w,]*)/.exec(h),cm=/(?:^|&)conf=(\w+)/.exec(h),
-    list=sm?sm[1].split(','):['conf','gaps'],byConf=list.indexOf('conf')>=0,byGaps=list.indexOf('gaps')>=0,
-    lim=Math.max(0,LIMS.map(function(l){return l[0];}).indexOf(cm?cm[1]:'5')),state='load',tier=null,days=null,names=null,LSEG,TSEG,note;
-  if(!byConf&&!byGaps)byConf=byGaps=true;
+// A comparator that leaves the best last: o {key (the groups of the level's order), score, fine (or null), base 'new'|'old'|'rand', seed, id}, arrays by record.
+function compare(o){
+  function rnd(i){var x=(o.id[i]^o.seed)>>>0;x=Math.imul(x^x>>>16,0x45d9f3b)>>>0;x=Math.imul(x^x>>>16,0x45d9f3b)>>>0;return (x^x>>>16)>>>0;}
+  return function(x,y){
+    return o.key[x]-o.key[y]||o.score[x]-o.score[y]||(o.fine?o.fine[x]-o.fine[y]:0)||
+      (o.base==='old'?o.id[y]-o.id[x]:o.base==='rand'?rnd(x)-rnd(y):o.id[x]-o.id[y]);};
+}
+// the state in the hash: top (conf=), gap (gap=), w (pri=, else the old sort=), base and seed (base=)
+function read(){
+  var h=location.hash.slice(1),w=Object.assign({},DEFAULT);
+  function m(k){var r=new RegExp('(?:^|&)'+k+'=([^&]*)').exec(h);return r?decodeURIComponent(r[1]):null;}
+  var c=m('conf'),g=m('gap'),p=m('pri'),s=m('sort'),b=m('base'),top=c==='all'?100:Math.round(+c);
+  if(p!=null){
+    KEYS.forEach(function(k){w[k]=0;});
+    p.split(',').forEach(function(t){var kv=t.split(':');if(kv[0] in w)w[kv[0]]=Math.max(0,Math.min(3,Math.round(+kv[1])||0));});
+  }else if(s!=null){
+    var l=s.split(',');
+    if(l.indexOf('conf')<0||l.indexOf('gaps')<0){w.conf=+(l.indexOf('conf')>=0);w.gap=+(l.indexOf('gaps')>=0);}
+  }
+  var bm=b&&/^(?:(new|old)|rand:(\d+))$/.exec(b);
+  return {top:top>=1&&top<=100?top:5,gap:g!=null&&g!==''&&isFinite(g)?Math.max(0,Math.min(30,Math.round(+g))):null,w:w,
+    base:bm?bm[1]||'rand':'new',seed:bm&&bm[2]?+bm[2]:1,explicit:!!bm};
+}
+var F=function(ctx){
+  var P=ctx.P,st=read(),state='load',tier=null,days=null,names=null,UI=null,T=0;
+  function alloff(){return !KEYS.some(function(k){return st.w[k]>0;});}
+  function isdef(){return st.top===5&&st.gap==null&&!st.explicit&&KEYS.every(function(k){return st.w[k]===DEFAULT[k];});}
   function load(){
     json(DIR+'checklist.json').then(function(j){
       var t=j&&j.schema_version===3&&j.tiers&&j.tiers[RES],L=t&&t.lattice,lit=j&&j.rule_of_thumb_units;
@@ -42,7 +70,7 @@ return function(ctx){
       for(var i=0;i<P.n;i++)if(ctx.keep(i)&&used.indexOf(gs[P.grp[i]])<0)used.push(gs[P.grp[i]]);
       return Promise.all(used.map(function(g){return png(DIR+t.groups[g].png).then(function(v){
         if(v.w!==L.ncol||v.h!==L.nrow)throw new Error('lattice mismatch');pic[g]=v;});})).then(function(){
-        var tr=new Uint8Array(P.n),dy=new Uint16Array(P.n).fill(65535),nm=[];
+        var tr=new Uint8Array(P.n),dy=new Uint16Array(P.n).fill(NODAYS),nm=[];
         for(i=0;i<P.n;i++){
           if(!ctx.keep(i))continue;
           var g=gs[P.grp[i]],v=pic[g],f=fwd(P.lonlat[2*i+1],P.lonlat[2*i]),
@@ -56,66 +84,122 @@ return function(ctx){
         tier=tr;days=dy;names=nm;state='ready';});
     }).catch(function(){state='failed';}).then(function(){ctx.redraw(true);});
   }
+  // the hash holds only what differs from the defaults
   function hash(){
-    var t=location.hash.slice(1).split('&').filter(function(x){return x&&!/^(sort|conf)=/.test(x);});
-    if(!(byConf&&byGaps))t.push('sort='+(byConf?'conf':'gaps'));
-    if(lim!==1)t.push('conf='+LIMS[lim][0]);
+    var t=location.hash.slice(1).split('&').filter(function(x){return x&&!/^(sort|conf|gap|pri|base)=/.test(x);});
+    if(st.top!==5)t.push('conf='+(st.top===100?'all':st.top));
+    if(st.gap!=null)t.push('gap='+st.gap);
+    if(!KEYS.every(function(k){return st.w[k]===DEFAULT[k];}))
+      t.push('pri='+(alloff()?'none':KEYS.filter(function(k){return st.w[k];}).map(function(k){return k+':'+st.w[k];}).join(',')));
+    if(st.explicit)t.push('base='+(st.base==='rand'?'rand:'+st.seed:st.base));
     history.replaceState(null,'','#'+t.join('&'));
   }
-  // a radio-like row of buttons (kind 'radio', one on) or checkbox-like (kind 'checkbox', each on or off); arrow keys move between them
-  function seg(label,name,kind,labels,click){
-    var r=el('div','seg');r.setAttribute('role',kind==='radio'?'radiogroup':'group');r.setAttribute('aria-label',name);
-    labels.forEach(function(x,j){
-      var b=el('button','segb',x);b.type='button';b.setAttribute('role',kind);b.onclick=function(){click(j);hash();ctx.redraw();};
-      r.appendChild(b);});
-    r.onkeydown=function(e){
-      var k=['ArrowLeft','ArrowUp','ArrowRight','ArrowDown'].indexOf(e.key),all=[].slice.call(r.children),at=all.indexOf(document.activeElement);
-      if(k<0||at<0)return;e.preventDefault();
-      all[(at+(k%4<2?-1:1)+all.length)%all.length].focus();
-    };
-    var row=el('div','srow');row.append(el('span',null,label),r);
-    return {row:row,seg:r};
+  // the hash at once, the redraw after wait ms (a slider drags on without redrawing every step)
+  function change(wait){
+    hash();clearTimeout(T);
+    T=setTimeout(function(){ctx.redraw();},wait||0);
   }
+  function applies(k,lv){return k==='risk'||k==='inv'?lv===3:k==='out'?!!ctx.hasOut():true;}
+  function score(i,lv){
+    var w=st.w,s=0;
+    if(w.conf)s+=w.conf*ctx.conf(i,lv);
+    if(w.gap&&tier)s+=w.gap*tier[i];
+    if(lv===3&&(w.risk||w.inv)){var f=ctx.flag(i,!!w.inv);s+=w.risk*(f&1)+w.inv*(f>>1&1);}
+    if(w.out&&ctx.hasOut())s+=w.out*ctx.out(i);
+    return s;
+  }
+  function summary(lv){
+    var on=KEYS.filter(function(k){return st.w[k]&&applies(k,lv);}).sort(function(a,b){return st.w[b]-st.w[a];}),base=BASES[st.base];
+    if(!on.length)return base[0].toUpperCase()+base.slice(1)+' (no prioritizers)';
+    var t=on.map(function(k){return NAMES[k][1];}),r=t[0][0].toUpperCase()+t[0].slice(1)+' first'+t.slice(1).map(function(x){return ', then '+x;}).join('');
+    return st.explicit?r+', then '+base:r;
+  }
+  function slider(id,min,max,txt){
+    var r=el('div','prow2'),l=el('label'),i=el('input'),b=el('b');
+    l.htmlFor=id;i.type='range';i.id=id;i.min=min;i.max=max;i.step=1;l.append(txt+' ',b);r.append(l,i);
+    return {row:r,input:i,out:b};
+  }
+  // the filters and prioritizers in #sorto; draw hides the ones a level has no data for
   function build(){
-    var g=$('sort'),o=$('sorto');
-    if(!g||!o)return;
-    LSEG=seg('Confidence: ','Confidence','radio',LIMS.map(function(l){return l[1];}),function(j){lim=j;});
-    TSEG=seg('Sort: ','Sort','checkbox',['Confidence','Blitz gaps'],function(j){  // the last one on stays on
-      if(j===0&&byConf&&!byGaps||j===1&&byGaps&&!byConf)return;
-      if(j===0)byConf=!byConf;else byGaps=!byGaps;});
-    note=el('span','segnote');
-    g.append(LSEG.row);o.append(TSEG.row,note);
+    var o=$('sorto');
+    if(!o)return;
+    var sum=el('p','segnote'),top=slider('ptop',1,100,'Top'),gp=slider('pgap',0,31,'Blitz gap at most'),dl=el('datalist'),sel={},rows={};
+    sum.id='psum';sum.setAttribute('aria-live','polite');
+    dl.id='ptl';[1,5,25,100].forEach(function(v){var x=el('option');x.value=v;dl.appendChild(x);});
+    top.input.setAttribute('list','ptl');
+    top.input.oninput=function(){st.top=+top.input.value;change(150);};
+    gp.input.oninput=function(){st.gap=+gp.input.value>30?null:+gp.input.value;change(150);};
+    var pr=el('div','pgrp'),fl=el('div','pgrp');
+    pr.appendChild(el('p','phead','Prioritize'));fl.append(el('p','phead','Filters'),top.row,dl,gp.row);
+    KEYS.forEach(function(k){
+      var r=el('div','prow2'),l=el('label',null,NAMES[k][0]),s=el('select');
+      l.htmlFor=s.id='pw-'+k;
+      WORDS.forEach(function(x,j){var op=el('option',null,x);op.value=j;s.appendChild(op);});
+      s.onchange=function(){st.w[k]=+s.value;change();};
+      r.append(l,s);sel[k]=s;rows[k]=r;pr.appendChild(r);});
+    var bs=el('select'),br=el('div','prow2'),bl=el('label',null,'Then by'),sh=el('button','lnk','Shuffle'),rs=el('button','lnk','Reset to defaults');
+    bl.htmlFor=bs.id='pbase';sh.type=rs.type='button';rs.id='preset';
+    [['new','Newest first'],['old','Oldest first'],['rand','Random']].forEach(function(x){var op=el('option',null,x[1]);op.value=x[0];bs.appendChild(op);});
+    bs.onchange=function(){st.base=bs.value;st.explicit=true;if(st.base==='rand')st.seed=1+Math.floor(Math.random()*1e6);change();};
+    sh.onclick=function(){st.seed=1+Math.floor(Math.random()*1e6);change();};
+    rs.onclick=function(){st=Object.assign(read(),{top:5,gap:null,w:Object.assign({},DEFAULT),base:'new',explicit:false});change();};
+    br.append(bl,bs,sh);
+    o.append(sum,fl,pr,br,rs);
+    UI={sum:sum,top:top,gap:gp,sel:sel,rows:rows,base:bs,shuffle:sh,reset:rs};
   }
   build();
   load();
   return {
-    // how level 3 is ordered: 0 strict rank, 1 the blend, 2 gap tier then rank (the blends need the checklist read)
-    mode:function(){return byGaps&&state==='ready'?byConf?1:2:0;},
-    // a record the confidence filter keeps
-    pass:function(i){return ctx.band(i)<=lim;},
+    // a record the filters keep: level 3's Top x% and every level's blitz gap ceiling
+    pass:function(i,kind){
+      if(kind===3&&st.top<100){var p=ctx.pct(i);if(p!=null&&p>st.top/100)return false;}
+      return st.gap==null||state!=='ready'||days[i]<=st.gap;
+    },
     // 0 lit or no data, 1 a gap, 2 a big gap
     tier:function(i){return tier?tier[i]:0;},
-    // the gap badge of a record in a gap, else null: a link to where-to-blitz at the record's cell
+    // orders a level's records (a typed-array slice), the best last, under key (the groups of the level's order) and the prioritizers
+    sort:function(ord,lv,key){
+      var sc=new Float64Array(P.n),fn=null,k,i,fine=st.w.conf>0||!st.explicit&&!alloff();
+      for(k=0;k<ord.length;k++)sc[ord[k]]=score(ord[k],lv);
+      if(fine){fn=new Float64Array(P.n);for(k=0;k<ord.length;k++){i=ord[k];fn[i]=ctx.fine(i,lv);}}
+      ord.sort(compare({key:key,score:sc,fine:fn,base:st.base,seed:st.seed,id:P.id}));
+    },
+    // the gap badge of a record in a gap, else null: the badge keeps the cells with that many days or fewer, the arrow opens where-to-blitz at the cell
     badge:function(i){
       var t=tier?tier[i]:0;
       if(!t)return null;
-      var a=el('a','gap','Gap '+days[i]+'/'+names[i][1]),full='Blitz gap: '+days[i]+' of '+names[i][1]+' observer-days in this 25 km cell';
+      var w=el('span','gapw'),b=el('button','gap','Gap '+days[i]+'/'+names[i][1]),a=el('a','gapx','↗'),
+        full='Blitz gap: '+days[i]+' of '+names[i][1]+' observer-days in this 25 km cell';
+      b.type='button';b.title=full+'. Click to keep cells with '+days[i]+' or fewer';b.setAttribute('aria-label',full+'. Keep cells with '+days[i]+' or fewer');
+      b.onclick=function(){st.gap=days[i];change();};
       a.href=BASE+'?at='+P.lonlat[2*i+1].toFixed(3)+','+P.lonlat[2*i].toFixed(3)+'&res='+RES+'&g='+encodeURIComponent(names[i][0])+'&goal=cl';
-      a.target='_blank';a.rel='noopener';a.title=full+'; '+names[i][1]+' make a checklist (where-to-blitz)';a.setAttribute('aria-label',full);
-      return a;
+      a.target='_blank';a.rel='noopener';a.title=names[i][1]+' make a checklist (where-to-blitz)';a.setAttribute('aria-label','Open this cell in where-to-blitz');
+      w.append(b,a);return w;
     },
-    // the confidence filter's name for the count line, '' for all
-    label:function(){return lim===3?'':LIMS[lim][1];},
-    // the controls, shown on level 3 only
-    draw:function(lv,sel,level){
-      if(!LSEG)return;
-      $('sort').hidden=$('sortb').hidden=lv!==3;
-      if(lv!==3)return;
-      [].forEach.call(LSEG.seg.children,function(x,j){x.setAttribute('aria-checked',String(j===lim));x.tabIndex=j===lim?0:-1;});
-      [].forEach.call(TSEG.seg.children,function(x,j){x.setAttribute('aria-checked',String(j?byGaps:byConf));});
-      note.textContent=state==='failed'?'The where-to-blitz checklist did not load. Listing by confidence.':state==='load'&&byGaps?
-        'Loading the where-to-blitz checklist…':byConf&&byGaps?'Both on: confidence and gaps blended.':'';
+    // a level 3 record's "Top 1%" badge: a click keeps that band
+    confBadge:function(i,text){
+      var b=el('button','conf',text),n=[1,5,25][ctx.band(i)];
+      b.type='button';b.title='Click to keep the Top '+n+'%';b.onclick=function(){st.top=n;change();};
+      return b;
+    },
+    // the filters' names for the count line
+    label:function(){return st.top<100?'Top '+st.top+'%':'';},
+    gaplabel:function(){return st.gap!=null&&state==='ready'?'gap '+st.gap+' days or fewer':'';},
+    // the controls and the summary line, for level lv
+    draw:function(lv){
+      if(!UI)return;
+      UI.top.row.hidden=!(lv===3&&ctx.hasRank());UI.top.input.value=st.top;UI.top.out.textContent=st.top+'%';
+      var any=st.gap==null;
+      UI.gap.input.value=any?31:st.gap;UI.gap.out.textContent=any?'(any)':st.gap+' observer-days';
+      UI.gap.input.setAttribute('aria-valuetext',any?'any':st.gap+' observer-days');
+      KEYS.forEach(function(k){UI.rows[k].hidden=!applies(k,lv);UI.sel[k].value=st.w[k];});
+      UI.base.value=st.base;UI.shuffle.hidden=st.base!=='rand';UI.reset.hidden=isdef();
+      UI.sum.textContent=summary(lv)+(state==='load'&&(st.w.gap||st.gap!=null)?' (reading the where-to-blitz checklist…)':
+        state==='failed'?'. The where-to-blitz checklist did not load, so gaps are ignored.':'');
+      $('sortb').hidden=false;
     }
   };
 };
+F.compare=compare;
+return F;
 })();

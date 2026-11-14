@@ -26,8 +26,8 @@
 .pop{margin:0;inset:auto;position:fixed;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);
   box-shadow:0 8px 28px rgba(0,0,0,.2);max-width:min(420px,calc(100vw - 32px))}
 .qchip[hidden]{display:none}
-.sortpop{width:300px;top:var(--pt,auto);left:var(--pl,auto)}.sortpop h2{margin:0 0 8px;font-size:18px}.sortpop hr{border:0;border-top:1px solid var(--line);margin:12px 0}
-.sortpop .segnote{margin:6px 0 0}.sortpop #sorto{margin:0;font-size:13px}.sortpop .segb{min-height:36px;padding:0 14px}
+.sortpop{width:320px;max-height:min(80vh,640px);overflow:auto;top:var(--pt,auto);left:var(--pl,auto)}.sortpop h2{margin:0 0 8px;font-size:18px}.sortpop hr{border:0;border-top:1px solid var(--line);margin:12px 0}
+.sortpop .segnote{margin:6px 0 0}.sortpop .phead{margin:12px 0 4px;font-weight:650;font-size:13px;color:var(--muted)}.sortpop .prow2{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:36px}.sortpop .prow2 input[type=range]{flex:1 1 120px;min-width:0}.sortpop .prow2 label{flex:none}.sortpop select{font:inherit;min-height:32px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);padding:0 6px}.sortpop #psum{font-weight:650;color:var(--ink);margin:0 0 4px}.sortpop .lnk{font:inherit;color:var(--ink);background:none;border:0;text-decoration:underline;cursor:pointer;min-height:32px}.sortpop #sorto{margin:0;font-size:13px}.sortpop .segb{min-height:36px;padding:0 14px}
 .swt{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-direction:row-reverse;font-weight:650;cursor:pointer}
 .swt input{appearance:none;flex:none;width:40px;height:24px;margin:0;border-radius:12px;background:var(--line);position:relative;cursor:pointer}
 .swt input::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--panel);transition:left .12s}

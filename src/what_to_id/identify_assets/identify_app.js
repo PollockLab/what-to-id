@@ -40,8 +40,8 @@ function atLevel(st){var m=kept(st);for(var i=0;i<P.n;i++)if(m[i]&&(LV?LEVEL[i]!
 // order, then the quantized score (a bucket each), newest (highest id) first within a bucket; then at most PER_SPECIES of any one
 // taxon, none cut when the level holds one taxon only. The kind control (KF) keeps one kind of its tab; KC counts the kinds. MORE: for the first card of a cut taxon, how many records it left out.
 // With the range file (R), a level's records also pass its outside-its-range chip.
-// Level 3 with the rank file (RK) goes by it instead, strictly by score, the id never deciding; with Blitz gaps on (GP.mode()) by
-// the blend of band and gap tier (GP.mode(): 1 band minus tier, then band; 2 tier only), then score. The confidence filter (GP.pass) drops level 3 records outside its bands.
+// Each level's slice is then ordered by GP.sort: the weighted prioritizers (confidence, blitz gap, at risk, invasive, outside range), then the finer
+// confidence order or the base order (newest first by default). The filters (GP.pass) drop level 3 records outside the Top x% and cells over the gap ceiling.
 // Rows in ascending id: each shard's rows are id-sorted, so a merge of the shards.
 function byId(P){
   var s=P.start,k=s.length-1,pos=s.slice(0,k),out=new Uint32Array(P.n),t,j,b;
@@ -51,19 +51,15 @@ function byId(P){
 // What the per-species cap counts: the record's label, but on level 3 the suggested species (the label is a coarse rank there).
 function ck(i,lv){var v=lv===3&&LOOKS?LOOKS.lo[i]|LOOKS.hi[i]<<8:NO_LOOK;return v===NO_LOOK?P.tax[i]:v;}
 function RUN(){return /(^|&)run=1(&|$)/.test(location.hash.slice(1));}
-function on(i){return SEL[i]&&LEVEL[i]&&(!R||R.pass(i,LEVEL[i]))&&(!X||X.pass(i))&&(!GP||KIND[i]!==3||GP.pass(i))&&(!WW||KIND[i]!==3||WW.pass(i));}
+function on(i){return SEL[i]&&LEVEL[i]&&(!R||R.pass(i,LEVEL[i]))&&(!X||X.pass(i))&&(!GP||GP.pass(i,KIND[i]))&&(!WW||KIND[i]!==3||WW.pass(i));}
 // Under My taxa first the user's genera lead each level, each kind in turn, then the rest; MINE: how many cards they are, -1 without the mode.
 function build(){
   var n=P.n,W=2*NK*STEPS,c=new Uint32Array(6*W+1),key=new Uint16Array(n),rk=UF.ranked(),i,k,lv;
-  for(i=0;i<n;i++)if(on(i)){key[i]=LEVEL[i]*W+(rk&&UF.mine(i)?NK*STEPS:0)+(NK-1-SUB[i])*STEPS+(RK&&LEVEL[i]===3?0:Q[i]);c[key[i]+1]++;}
+  for(i=0;i<n;i++)if(on(i)){key[i]=LEVEL[i]*W+(rk&&UF.mine(i)?NK*STEPS:0)+(NK-1-SUB[i])*STEPS;c[key[i]+1]++;}
   for(k=1;k<c.length;k++)c[k]+=c[k-1];
   var at=c.slice(),order=new Int32Array(c[c.length-1]);
   for(k=0;k<n;k++){i=BYID[k];if(on(i))order[at[key[i]]++]=i;}
-  var gm=RK&&GP?GP.mode():0;
-  function bd(i){return IdentifyNarrow.band(RK[i],N3);}
-  function pr(i){return (gm===1?bd(i):0)-GP.tier(i);}  // the lower the better
-  if(RK)order.subarray(c[3*W],c[4*W]).sort(function(x,y){  // the best last, as the cut reads from the end
-    return key[x]-key[y]||gm&&(pr(y)-pr(x)||gm===1&&bd(y)-bd(x))||RK[y]-RK[x];});
+  if(GP)for(lv=1;lv<=5;lv++)GP.sort(order.subarray(c[lv*W],c[(lv+1)*W]),lv,key);  // the best last, as the cut reads from the end
   var out=[],total=[];MORE.clear();KC=[];
   for(lv=1;lv<=5;lv++){
     // the cut is per kind, so a merged tab lists each kind's level list in turn, as pool_levels writes them
@@ -97,7 +93,7 @@ function title(i,lv){
   box.appendChild(nm);
   if(t&&t[1])box.appendChild(el('div','com',t[1]));
   if(lv===3&&lk)l.append('Probably ',el('i',null,lk));
-  if(lv===3&&lk&&!BT){var g=el('div','sugg'),cf=RK&&IdentifyNarrow.conf(RK[i],N3);g.appendChild(IdentifyNarrow.copy(lk));if(cf)g.appendChild(el('span','conf',cf));var gp=GP&&GP.badge(i);if(gp)g.appendChild(gp);}
+  if(lv===3&&lk&&!BT){var g=el('div','sugg'),cf=RK&&IdentifyNarrow.conf(RK[i],N3);g.appendChild(IdentifyNarrow.copy(lk));if(cf)g.appendChild(GP?GP.confBadge(i,cf):el('span','conf',cf));var gp=GP&&GP.badge(i);if(gp)g.appendChild(gp);}
   else if((lv===2||lv===5)&&lk)l.append('Looks more like ',el('i',null,lk));
   if(l.firstChild)box.appendChild(l);
   if(g){var y=whyOf(i);if(y)box.appendChild(IdentifyNarrow.why(y[0],y[1]));box.appendChild(g);}
@@ -221,7 +217,7 @@ function batch(){
   LINKS=rows.length?IdentifyLinks.batches(rows.map(function(i){return P.id[i];}),true):[];BI=0;
   $('batch').hidden=!rows.length;
   ONE=capped?'Identify the first '+nf.format(rows.length)+' on iNaturalist':null;
-  $('cap').textContent=LV===3?IdentifyNarrow.line(t,S.total[3],[GP&&GP.label(),R&&R.label(3)],RUN()?'all':'up to '+PER_SPECIES):
+  $('cap').textContent=LV===3?IdentifyNarrow.line(t,S.total[3],[GP&&GP.label(),GP&&GP.gaplabel(),R&&R.label(3)],RUN()?'all':'up to '+PER_SPECIES):
     nf.format(t)+' cards (up to '+PER_SPECIES+' per species) · '+(capped?'first '+nf.format(rows.length):'all')+
     ' in '+LINKS.length+' batches of '+IdentifyLinks.BATCH+', in the order shown';
   $('go').title=(LV===3&&RUN()?'All':'Up to '+PER_SPECIES)+(LV===3?' per suggested species':' per species');
@@ -248,7 +244,7 @@ function paint(){
   var kf=KF&&TAB[KF]===LV;  // the controls count the chosen kind, as the cards show it
   if(R)R.draw(kf?KF:LV,SEL,kf?KIND:LEVEL);
   if(X)X.draw(kf?KF:LV,SEL,kf?KIND:LEVEL);
-  if(GP)GP.draw(LV,SEL,LEVEL);
+  if(GP)GP.draw(LV);
   IdentifyFlow.draw(LV);
   empty();
   more();batch();scrollTo(0,STAY?y:0);STAY=false;
@@ -441,8 +437,12 @@ async function load(){
   if(raw.length!==P.n)throw new Error('the levels file holds '+raw.length+' records, the map '+P.n);
   LEVEL=raw.map(function(v){return TAB[v&15]||v&15;});KIND=raw.map(function(v){return v&15;});SUB=raw.map(function(v){return SUBK[v&15]||0;});Q=raw.map(function(v){return v>>4;});
   if(d[3]&&d[3].byteLength===4*P.n){RK=new Uint32Array(d[3]);N3=0;for(var j=0;j<P.n;j++)if(KIND[j]===3)N3++;}
-  if(RK)GP=IdentifyGaps({P:P,groups:META.groups,keep:function(i){return KIND[i]===3;},band:function(i){return IdentifyNarrow.band(RK[i],N3);},
-    redraw:function(late){if(LV===3)redraw(late);else build();}});  // optional: without it, the order by confidence; another level is not redrawn (an open range popover stays)
+  GP=IdentifyGaps({P:P,groups:META.groups,keep:function(i){return LEVEL[i]>0;},band:function(i){return IdentifyNarrow.band(RK[i],N3);},
+    pct:function(i){return RK?(RK[i]+1)/N3:null;},hasRank:function(){return !!RK;},
+    conf:function(i,lv){return RK&&lv===3?3-IdentifyNarrow.band(RK[i],N3):Q[i]*3/(STEPS-1);},
+    fine:function(i,lv){return RK&&lv===3?-RK[i]:Q[i];},
+    flag:function(i,inv){return WW?WW.flag(i,inv):0;},hasOut:function(){return !!R;},out:function(i){return R?R.outside()[i]:0;},
+    redraw:redraw});  // a failed or missing checklist leaves every gap at 0
   X=IdentifyUnconfirmed({P:P,taxa:TAXA,ranks:META.ranks,area:function(){return AREA;},redraw:redraw});
   // Not yet identified by me asks iNaturalist within the pool's extent: Identify has no map viewport of its own
   var b=META.bbox;UF=userFilter({S:S,meta:META,get:function(f){return get(new URL(f,MAP));},taxa:function(){return TAXA;},changed:user,
