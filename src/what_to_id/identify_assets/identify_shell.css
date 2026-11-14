@@ -49,3 +49,16 @@ dialog.sheet::backdrop{background:rgba(0,0,0,.45)}
   .rline{gap:2px;flex-wrap:wrap}.rline .rel{display:none}.rline .qchip{padding:0 6px}.today{order:9;flex-basis:100%}
   #sortpop{inset:auto 0 0 0;box-sizing:border-box;width:100vw;max-width:100vw;border-radius:20px 20px 0 0;padding:16px 20px 24px}
   dialog.sheet{width:100vw;max-width:100vw;max-height:90vh;margin:auto 0 0;border-radius:20px 20px 0 0}}
+
+/* Start here: a row of mission cards that scrolls inside itself; the chip names the active mission */
+.missions{flex:1 1 100%;min-width:0;margin:2px 0 6px}.missions[hidden]{display:none}
+.mlbl{font-size:13px;font-weight:650;margin:0 0 4px}
+.mrow{display:flex;gap:8px;margin:0;padding:2px 2px 6px;list-style:none;overflow-x:auto;scroll-snap-type:x proximity;overscroll-behavior-x:contain}
+.mrow>li{flex:none;display:flex;width:210px;scroll-snap-align:start}
+.mcard{display:grid;align-content:start;gap:2px;width:100%;padding:0 0 8px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);font:inherit;text-align:left;cursor:pointer;overflow:hidden}
+.mcard:hover{border-color:var(--ink)}
+.mph{display:block;aspect-ratio:16/7;background:var(--chip);overflow:hidden}.mph img{display:block;width:100%;height:100%;object-fit:cover}
+.mtitle{padding:4px 10px 0;font-size:13px;font-weight:650;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.mmeta{padding:0 10px;font-size:12px;color:var(--muted)}
+.mchip{display:inline-flex;align-items:center;gap:4px;min-width:0;font-size:13px;color:var(--muted)}.mchip[hidden]{display:none}
+.mchip .mk{font-weight:650;color:var(--ink)}.mchip .mx{min-width:28px;min-height:28px;border:1px solid var(--line);border-radius:999px;background:none;color:var(--ink);font:inherit;cursor:pointer}
