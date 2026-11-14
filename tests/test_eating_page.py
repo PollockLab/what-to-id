@@ -205,9 +205,10 @@ def test_a_confirmed_mark_hands_off_to_inaturalist_with_a_copyable_name(browser,
     page = open_page(browser, base + "#q=eats&x=Strix varia", stub)
     draw_all(page)
     card = page.locator("#cards li", has_text="Description mentions “myodes”")
-    assert not card.locator(".hand").is_visible()
+    assert not card.locator(".hand").is_visible() and card.locator("a.open").is_visible()
     card.locator("button", has_text="Shows it").click()
     card.locator(".which button", has_text="Confirm").click()
+    assert card.locator(".hand").is_visible() and not card.locator("a.open").is_visible()
     link = card.locator(".hand a")
     assert link.inner_text() == "Add Eating = Myodes on iNaturalist"
     assert link.get_attribute("href") == "https://www.inaturalist.org/observations/502"

@@ -71,7 +71,7 @@ function status(c){
   [].forEach.call(li.querySelectorAll('.mk button'),function(b){b.setAttribute('aria-pressed',String(!!a&&b.dataset.v===a.v));});
   s.textContent=!a?'':a.v==='yes'?'Shows it'+(a.pred&&a.prey?': '+pairText({pred:a.pred,prey:a.prey,tier:4}).replace(' eats ',' eating '):''):a.v==='no'?'Not visible':'Can’t tell';
   li.classList.toggle('done',!!a);
-  var h=li.querySelector('.hand'),y=!!a&&a.v==='yes'&&!!a.pred&&!!a.prey;h.hidden=!y;
+  var h=li.querySelector('.hand'),y=!!a&&a.v==='yes'&&!!a.pred&&!!a.prey;h.hidden=!y;li.querySelector('a.open').hidden=y;  // one link to the observation: the hand-off, else the plain one
   if(y){var by=c.r.o.k==='by',n=E.label(by?a.pred:a.prey),f=by?'Eaten by':'Eating';h.dataset.name=n;
     h.querySelector('a').textContent='Add '+f+' = '+n+' on iNaturalist';h.querySelector('.hint').textContent='On the observation, open Observation fields, pick '+f+', enter '+(by?'the predator':'the prey')+'.';h.querySelector('.cp').textContent='Copy';}
 }
