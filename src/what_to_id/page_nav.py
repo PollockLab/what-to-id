@@ -16,19 +16,20 @@ from pathlib import Path
 
 from what_to_id.glossary import GLOSSARY
 
-# (file, label), one tab per job: Identify, Confused pairs (confusion.html), then Methods.
+# (file, label), one tab per job: Identify, Confused pairs (confusion.html), Food web, then Methods.
 # Identify holds the map, the photo space and the taxonomy behind its What and Where panels, as
 # the full-screen explore.html; that page and map.html, embeddings.html, tree.html and
 # search.html keep their URLs and mark Identify as current. Without identify.html the Identify
-# tab falls back to the map. Confused pairs exists only
-# when the atlas manifest lists its table. The brand links to index.html, a copy of the landing
+# tab falls back to the map. Confused pairs exists only when the atlas manifest lists its table,
+# and Food web only when its page was built. The brand links to index.html, a copy of the landing
 # page.
 PAGES = (
     ("identify.html", "Identify"),
     ("confusion.html", "Confused pairs"),
+    ("food-web.html", "Food web"),
     ("terms.html", "How it works"),
 )
-OPTIONAL = {"confusion.html"}
+OPTIONAL = {"confusion.html", "food-web.html"}
 EXPLORE = "identify.html"
 BLITZ = "https://pollocklab.github.io/where-to-blitz/"
 SITE = ("https://openbiodiversity.ca/", "openbiodiversity.ca")  # the top-right link
@@ -293,7 +294,9 @@ def nav(
         elif page == EXPLORE:
             attrs += f' data-view="explore" data-fallback="{escape(base)}map.html"'
         if page in OPTIONAL:
-            attrs += ' data-optional data-view="group"'
+            attrs += " data-optional"
+        if page == "confusion.html":
+            attrs += ' data-view="group"'
         attrs += f' data-base="{escape(href)}"'
         links.append(f'<a href="{escape(href)}"{attrs}>{escape(label)}</a>')
     links.append(
