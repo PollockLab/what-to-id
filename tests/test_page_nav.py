@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from what_to_id import page_nav
-from what_to_id.page_nav import BLITZ, CSS, PAGES, nav
+from what_to_id.page_nav import BLITZ, CSS, PAGES, SITE, nav
 
 FORBIDDEN = ("similarity", "novelty", "surprise", "recency", "gap first", "gap_first")
 
@@ -32,9 +32,11 @@ def test_the_pages_inside_explore_mark_identify(current):
     assert "Photo space<" not in html and ">Map<" not in html and ">Taxonomy<" not in html
 
 
-def test_the_tabs_are_identify_look_alikes_methods_and_blitz():
+def test_the_tabs_are_identify_look_alikes_methods_and_the_site_link():
     assert [label for _, label in PAGES] == ["Identify", "Confused pairs", "Methods"]
-    assert "study.html" not in nav("identify.html") and ">Where to Blitz" in nav("identify.html")
+    assert "study.html" not in nav("identify.html")
+    assert ">openbiodiversity.ca" in nav("identify.html")
+    assert "Where to Blitz" not in nav("identify.html")
 
 
 def test_available_drops_pages_that_were_not_built():
@@ -42,7 +44,7 @@ def test_available_drops_pages_that_were_not_built():
     html = nav("map.html", {"terms.html", "map.html"})
     hrefs = [h for h, _ in _links(html)]
     assert hrefs == ["map.html", "terms.html"]
-    assert BLITZ in html
+    assert SITE[0] in html
     # the page you are on stays even when the set forgets it
     assert 'href="confusion.html" aria-current="page"' in nav("confusion.html", {"terms.html"})
 
@@ -53,9 +55,9 @@ def test_unknown_availability_is_probed_by_the_page():
 
 
 def test_external_link_opens_a_new_tab_and_says_so():
-    link = re.search(rf'<a [^>]*href="{re.escape(BLITZ)}"[^>]*>.*?</a>', nav("map.html")).group()
+    link = re.search(rf'<a [^>]*href="{re.escape(SITE[0])}"[^>]*>.*?</a>', nav("map.html")).group()
     assert 'target="_blank"' in link and 'rel="noopener"' in link
-    assert "Where to Blitz" in link and "↗" in link and "opens in a new tab" in link
+    assert SITE[1] in link and "↗" in link and "opens in a new tab" in link
 
 
 def test_skip_link_keeps_the_hash():
@@ -121,11 +123,10 @@ def test_identify_tab_on_the_map_page_carries_the_record_and_the_selection(brows
     assert pg.get_attribute(".site-nav [aria-current=page]", "href").startswith("identify.html")
     assert pg.locator(".site-nav a").first.bounding_box()["height"] >= 44
     assert _href(pg, "explore") == "identify.html#id=42&groups=Insecta,-Aves&acc=100"
-    assert _href(pg, "blitz") == BLITZ + "?at=49.123,-123.988"
     # replaceState fires no event: the next hover reads the new hash
     pg.evaluate("history.replaceState(null,'','#at=9.5/50.5/-120.25')")
+    pg.hover(".site-nav a[href='terms.html']")  # the mouse moves, so the nav reads the hash again
     assert _href(pg, "explore") == "identify.html"
-    assert _href(pg, "blitz") == BLITZ + "?at=50.500,-120.250"
 
 
 def test_identify_tab_carries_taxa_and_leaves_the_camera(browser):
@@ -152,7 +153,6 @@ def test_identify_tab_falls_back_to_the_map_when_the_split_page_is_missing(brows
     pg.route("http://site.test/search.html", lambda r: r.fulfill(status=404, body=""))
     pg.goto("http://site.test/map.html#groups=-Aves")
     pg.wait_for_selector('.site-nav a[href="map.html"]')
-    assert _href(pg, "blitz").startswith(BLITZ)
     assert pg.get_attribute(".site-nav [aria-current=page]", "href") == "map.html"
 
 
@@ -169,7 +169,7 @@ def test_shell_is_one_short_row_on_a_phone(browser):
     assert pg.evaluate("document.documentElement.scrollWidth") <= 390
 
 
-def test_blitz_is_a_secondary_link_hidden_on_phones_and_kept_on_methods():
+def test_the_site_link_is_secondary_hidden_on_phones_and_where_to_blitz_stays_on_methods():
     from what_to_id import terms_page
 
     assert ".site-nav .ext{margin-left:auto" in CSS

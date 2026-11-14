@@ -28,6 +28,7 @@ PAGES = (
 OPTIONAL = {"confusion.html"}
 EXPLORE = "identify.html"
 BLITZ = "https://pollocklab.github.io/where-to-blitz/"
+SITE = ("https://openbiodiversity.ca/", "openbiodiversity.ca")  # the top-right link
 # a term another site explains better links there instead of to terms.html
 MORE_LINKS = {"survey-days": BLITZ}
 
@@ -77,17 +78,16 @@ white-space:nowrap}
 """.strip()
 
 # Points the switcher at what is open. Reads the hash the pages already write: the map keeps
-# record= and at=zoom/lat/lon, the photo pages keep id=; the selection (groups, taxa, dates) goes
+# record=, the photo pages keep id=; the selection (groups, taxa, dates) goes
 # to the map and the photo space as written. One group (g= on Confused pairs, a lone picked
 # groups= on Explore) travels between the two. Rewrites on hover, focus, touch and click
 # because history.replaceState fires no event.
 JS = """
 (function(){var n=document.querySelector('.site-nav');if(!n)return;
 function ctx(){var h=new URLSearchParams(location.hash.slice(1)),
-at=(h.get('at')||'').split('/').map(Number);
-var ok=at.length===3&&at.every(isFinite),gs=(h.get('groups')||'').split(',');
+gs=(h.get('groups')||'').split(',');
 return{grp:h.get('g')||(gs.length===1&&/^[^-]/.test(gs[0])?gs[0]:''),rec:+(h.get('record')||h.get('id'))||0,
-lat:ok?at[1]:null,lon:ok?at[2]:null,sel:location.hash.slice(1).split('&').filter(function(t){
+sel:location.hash.slice(1).split('&').filter(function(t){
 return /^(by|from|to|months|groups|only|acc|taxa|area|park|bcpark|projects)=/.test(t);})};}
 function h0(sel){return sel.some(function(t){return t.indexOf('groups=')===0;});}
 function sync(){var c=ctx();n.querySelectorAll('a[data-view]').forEach(function(a){
@@ -97,7 +97,6 @@ if(v==='explore'){var p=[];if(c.rec)p.push('id='+c.rec);p=p.concat(c.sel);
 if(c.grp&&!h0(c.sel))p.push('groups='+encodeURIComponent(c.grp));
 if(p.length)u=b+'#'+p.join('&');}
 else if(v==='group'&&c.grp)u=b+'#g='+encodeURIComponent(c.grp);
-else if(v==='blitz'&&c.lat!==null)u=b+'?at='+c.lat.toFixed(3)+','+c.lon.toFixed(3);
 a.href=u;});}
 ['mouseover','focusin','touchstart',
 'click'].forEach(function(e){n.addEventListener(e,sync,true);});
@@ -163,8 +162,8 @@ def nav(
         attrs += f' data-base="{escape(href)}"'
         links.append(f'<a href="{escape(href)}"{attrs}>{escape(label)}</a>')
     links.append(
-        f'<a class="ext" href="{BLITZ}" target="_blank" rel="noopener" data-view="blitz" '
-        f'data-base="{BLITZ}">Where to Blitz\u00a0<span aria-hidden="true">\u2197</span>'
+        f'<a class="ext" href="{SITE[0]}" target="_blank" rel="noopener">'
+        f'{SITE[1]}\u00a0<span aria-hidden="true">\u2197</span>'
         '<span class="site-vh"> (opens in a new tab)</span></a>'
     )
     flags = " data-probe" if available is None else ""
