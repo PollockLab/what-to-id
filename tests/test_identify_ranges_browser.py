@@ -167,6 +167,9 @@ def test_clear_matches_start_with_far_records_hidden_and_the_segments_filter(bro
 def test_the_first_lists_leave_out_far_clear_matches_as_the_page_does(browser, site):
     first = first_lists(site)[""]
     page = opened(browser, site, "#lvl=1&conf=all&sort=conf")  # level 3 as the first list holds it
+    page.click("#tab3")  # its rank and look-alikes load when it is first shown
+    page.wait_for_load_state("networkidle")
+    page.click("#tab1")
     view = page.evaluate("__identify.view()")
     assert [r[0] // 1000 - 1 for r in first["rows"][1]] == [3, 1, 0]  # no 2: 1,234 km outside
     total = page.evaluate("__identify.total()")

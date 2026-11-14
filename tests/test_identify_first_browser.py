@@ -12,6 +12,7 @@ from what_to_id import page_identify, site_files
 
 from . import test_embeddings_browser as eb
 from . import test_identify_browser as ib
+from . import test_identify_narrow_browser as nb
 
 browser = eb.browser
 site = ib.site
@@ -29,8 +30,13 @@ def first_lists(base):
 def test_the_first_lists_are_the_lists_the_page_builds(browser, site, hash_):
     base, _ = site
     want = first_lists(base)[hash_[1:]]
-    # level 3 as the first list holds it: every band, by rank
-    page = open_identify(browser, base, hash_ + ("&" if hash_ else "#") + "conf=all&sort=conf")
+    # level 3 as the first list holds it: every band, by rank (level 3 opens on its rank file)
+    page = open_identify(
+        browser, base, hash_ + ("&" if hash_ else "#") + "conf=all&sort=conf&lvl=3"
+    )
+    page.wait_for_load_state(
+        "networkidle"
+    )  # the look-alikes land after the records: level 3's cap reads them
     view, total = page.evaluate("__identify.view()"), page.evaluate("__identify.total()")
     for lv in (1, 3):
         assert total[lv] == want["total"][lv]
@@ -108,4 +114,53 @@ def test_a_species_picked_from_a_first_card_shows_once_the_records_land(browser,
     page.wait_for_function("window.__identify")
     taxon = dict(zip(pts["id"], pts["taxon_id"], strict=True))
     assert {taxon[i] for i in page.evaluate("__identify.view()[1]")} == {taxon[rid]}
+    assert page.errors == []
+
+
+def watch(page):
+    """Each request's file name and whether a first card was in the DOM when it started."""
+    seen = []
+    page.on(
+        "request",
+        lambda r: seen.append(
+            (r.url.rsplit("/", 1)[-1], page.evaluate("!!document.querySelector('#grid .card')"))
+        ),
+    )
+    return seen
+
+
+def meta_files(base):
+    with urllib.request.urlopen(f"{base}/{site_files.MAP_NAME}") as r:
+        return site_files.read_meta(r.read().decode())["files"]
+
+
+def test_the_bulk_files_wait_for_the_first_card(browser, site):
+    base, pts = site
+    files = meta_files(base)
+    page = browser.new_page(viewport={"width": 380, "height": 800})
+    page.errors = []
+    page.on("pageerror", lambda e: page.errors.append(str(e)))
+    eb.stub_inat(page, None)
+    seen = watch(page)
+    page.goto(f"{base}/identify.html#lvl=1&sort=conf&conf=all")
+    page.wait_for_function("window.__identify")
+    page.wait_for_load_state("networkidle")
+    names = [n for n, _ in seen]
+    assert files["first"] in names
+    shards = [n for n, up in seen if re.fullmatch(r"pool-\d+\.\w+\.bin", n)]
+    bulk = shards + [files["levels"], files["rank"], files["looks"]]
+    assert shards and all(up for n, up in seen if n in bulk)
+    # the rank and look-alikes follow the records in the background: level 3's count reads both
+    tab3 = "document.querySelector('#tab3').lastChild.textContent"
+    page.wait_for_function(f"/\\d/.test({tab3})")
+    other = open_identify(browser, base, "#lvl=3&sort=conf&conf=all")
+    other.wait_for_load_state("networkidle")
+    assert page.evaluate(tab3) == other.evaluate(tab3) != "0"
+    # the preloads are the page's own downloads: one request each
+    assert names.count(files["first"]) == 1 and names.count("map-meta.json") == 1
+    page.click("#tab3")  # strict rank order on level 3
+    page.wait_for_selector("#grid .card .conf", state="attached")
+    rank = dict(zip(pts["id"].tolist(), nb.rank_plane(base).tolist(), strict=True))
+    got = [rank[i] for i in page.evaluate("__identify.view()")[3]]
+    assert got == sorted(got) and got[0] == 0  # strict rank order once it lands
     assert page.errors == []

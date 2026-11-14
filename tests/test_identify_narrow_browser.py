@@ -2,14 +2,12 @@
 button and a confidence label on each card, a mark on records that already have a species, the
 group control and the batch caption. iNaturalist is stubbed."""
 
-import gzip
 import urllib.request
 from urllib.parse import parse_qs, urlparse
 
-import numpy as np
 import pandas as pd
 
-from what_to_id import site_files
+from what_to_id import pool_levels, site_files
 
 from . import test_embeddings_browser as eb
 from . import test_identify_browser as ib
@@ -23,8 +21,10 @@ site = ib.site
 def rank_plane(base):
     with urllib.request.urlopen(f"{base}/{site_files.MAP_NAME}") as r:
         meta = site_files.read_meta(r.read().decode())
+    with urllib.request.urlopen(f"{base}/{meta['files']['levels']}") as r:
+        level, _ = pool_levels.unpack(r.read())
     with urllib.request.urlopen(f"{base}/{meta['files']['rank']}") as r:
-        return np.frombuffer(gzip.decompress(r.read()), "<u4")
+        return pool_levels.unpack_rank(r.read(), level)  # dense: 0 off level 3
 
 
 def test_level_3_lists_strictly_by_rank_and_labels_the_top(browser, site):
@@ -99,6 +99,8 @@ def test_a_record_with_a_species_id_is_dropped(browser, site):
         "(l => l.length && l.every(e => e.dataset.id % 2))"
         "([...document.querySelectorAll('#grid .card')])"
     )
+    page.wait_for_function("window.__identify")  # the records load after the first cards
+    page.wait_for_load_state("networkidle")
     assert calls and all(len(c) <= 200 for c in calls)  # the photos' own requests, none added
     view = page.evaluate("__identify.view()")[3]
     assert view and all(i % 2 for i in view)  # dropped from the list, not only the grid

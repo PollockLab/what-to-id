@@ -14,13 +14,15 @@ record's score quantized to 16 steps within its level, 15 for the record to show
 highest score, the lowest for weird and mislabel). A record missing from identify.parquet, or
 whose label changed since it was scored, is level 0.
 
-``pool-levels-rank.bin``: gzip of n uint32 LE, each level-3 record's place in its level by score,
-0 the highest (shown first), so level 3 lists in strict score order; 0 for the other records.
+``pool-levels-rank.bin``: gzip of four byte planes (LE bytes 0 to 3) of m uint32, one per level-3
+record in record order (m the count of level 3), its place in its level by score, 0 the highest
+(shown first), so level 3 lists in strict score order.
 
 ``pool-levels-looks.bin``: the look-alike species of the taxonomist, narrow and mislabel records,
 apart so the levels load first. A uint32 LE length and that many bytes of JSON
 ``{"names": [...]}``, then two planes of n bytes (low byte, high byte) of indexes into
-``names``, 65535 for none; all gzipped.
+``names``, 65535 for none, one entry per record of level 2, 3 or 5 in record order (not n); all
+gzipped.
 
 ``pool-levels-why.bin``: for narrow records, the runner-up species (identify.parquet's
 ``runner_up``, the second best in the clade) and ``score2``, the margin over it. A uint32 LE length
@@ -115,9 +117,17 @@ def quantize(level: np.ndarray, score: np.ndarray) -> np.ndarray:
 
 
 def pack_rank(level: np.ndarray, score: np.ndarray) -> bytes:
-    """The gzipped rank file: each level-3 record's place in its level, 0 elsewhere."""
-    plane = np.where(level == NARROW, ranks(level, score), 0).astype("<u4")
-    return gzip.compress(plane.tobytes(), mtime=0)
+    """The gzipped rank file: each level-3 record's place in its level, as four byte planes."""
+    plane = ranks(level, score)[level == NARROW].astype("<u4")
+    return gzip.compress(plane.view(np.uint8).reshape(-1, 4).T.tobytes(), mtime=0)
+
+
+def unpack_rank(blob: bytes, level: np.ndarray) -> np.ndarray:
+    """The rank per record of a rank file, 0 for the records not level 3."""
+    raw = np.frombuffer(gzip.decompress(blob), np.uint8)
+    out = np.zeros(len(level), np.int64)
+    out[level == NARROW] = raw.reshape(4, -1).T.copy().view("<u4").ravel()
+    return out
 
 
 def pack(level: np.ndarray, score: np.ndarray) -> bytes:
@@ -139,18 +149,23 @@ def pack_looks(level: np.ndarray, looks: np.ndarray) -> bytes:
         raise ValueError(f"{len(names)} look-alike names do not fit 16 bits")
     idx = np.full(len(level), NO_LOOK, np.uint16)
     idx[keep] = code
+    idx = idx[np.isin(level, (TAXONOMIST, NARROW, MISLABEL))]
     head = json.dumps({"names": names.tolist()}, separators=(",", ":")).encode()
     planes = idx.view(np.uint8).reshape(-1, 2).T.tobytes()
     return gzip.compress(len(head).to_bytes(4, "little") + head + planes, mtime=0)
 
 
-def unpack_looks(blob: bytes, n: int) -> list[str | None]:
+def unpack_looks(blob: bytes, level: np.ndarray) -> list[str | None]:
     """The look-alike name per record of a looks file, None for none."""
     raw = gzip.decompress(blob)
     size = int.from_bytes(raw[:4], "little")
     names = json.loads(raw[4 : 4 + size])["names"]
-    planes = np.frombuffer(raw, np.uint8, 2 * n, 4 + size).reshape(2, n)
-    idx = planes[0].astype(np.uint16) | planes[1].astype(np.uint16) << 8
+    m = int(np.isin(level, (TAXONOMIST, NARROW, MISLABEL)).sum())
+    planes = np.frombuffer(raw, np.uint8, 2 * m, 4 + size).reshape(2, m)
+    idx = np.full(len(level), NO_LOOK, np.uint16)
+    idx[np.isin(level, (TAXONOMIST, NARROW, MISLABEL))] = (
+        planes[0] | planes[1].astype(np.uint16) << 8
+    )
     return [None if i == NO_LOOK else names[i] for i in idx]
 
 
