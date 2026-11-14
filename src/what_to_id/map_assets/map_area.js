@@ -187,7 +187,7 @@ function MapArea(ctx){
     '<button type="button" data-a="cancel" hidden>Cancel</button><button type="button" data-a="clear" '+
     'hidden>Clear area</button></div><div class="apark"><div class="acombo"><input type="text" '+
     'role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="'+UID+'" placeholder='+
-    '"Find BC parks" aria-label="BC parks and protected areas" autocomplete="off" spellcheck="false">'+
+    '"Find parks" aria-label="BC parks and protected areas" autocomplete="off" spellcheck="false">'+
     '<button type="button" class="atog" tabindex="-1" aria-label="Show the parks" aria-controls="'+UID+'">'+
     '▾</button></div><div class="apanel" hidden><div class="ahdr"><span></span><button type="button">'+
     'Clear all</button></div><div class="alist" id="'+UID+'" role="listbox" aria-multiselectable="true" '+
@@ -363,7 +363,7 @@ function MapArea(ctx){
         h.id=UID+'g'+i;h.setAttribute('role','presentation');to.setAttribute('role','group');
         to.setAttribute('aria-labelledby',h.id);}
       g.rows.forEach(function(r){to.appendChild(option(r));});});
-    more.textContent=o.n?'Keep typing to narrow: '+parksN(o.more)+' more.':'No BC park matches.';
+    more.textContent=o.n?'Keep typing to narrow: '+parksN(o.more)+' more.':'No park matches.';
     more.hidden=o.n&&!o.more;ACT=-1;active();sync();return o;}
   function sync(){if(!OPEN)return;var n=parked().length;
     ROWS.forEach(function(r){r.li.setAttribute('aria-selected',picked(r.p));});
@@ -378,15 +378,15 @@ function MapArea(ctx){
   function open(){if(OPEN||mode)return;OPEN=true;panel.hidden=false;q.setAttribute('aria-expanded','true');
     panel.style.top=matchMedia('(max-width:479px)').matches?q.getBoundingClientRect().bottom+4+'px':'';
     if(PARKS){render();return;}
-    list.textContent='';more.textContent='Loading the list of BC parks.';more.hidden=false;
+    list.textContent='';more.textContent='Loading the list of parks.';more.hidden=false;
     parks().then(function(){if(OPEN)render();})
-      .catch(function(){more.textContent='Could not load the list of BC parks.';});}
+      .catch(function(){more.textContent='Could not load the list of parks.';});}
   function close(){if(!OPEN)return;OPEN=false;panel.hidden=true;q.setAttribute('aria-expanded','false');
     ACT=-1;q.removeAttribute('aria-activedescendant');}
   q.onfocus=open;q.onclick=open;
   q.oninput=function(){if(!OPEN)open();else if(PARKS)render();clearTimeout(LT);
     LT=setTimeout(function(){if(OPEN&&PARKS){var o=listing(PARKS,q.value,picked,inView);
-      say(o.n?parksN(o.n)+(q.value.trim()?' match.':'.'):'No BC park matches.');}},600);};
+      say(o.n?parksN(o.n)+(q.value.trim()?' match.':'.'):'No park matches.');}},600);};
   q.onkeydown=function(e){var k=e.key,n=ROWS.length,ps;
     if(k==='ArrowDown'||k==='ArrowUp'){e.preventDefault();if(!OPEN){open();return;}
       if(n){ACT=k==='ArrowDown'?Math.min(ACT+1,n-1):Math.max(ACT-1,0);active();}}
