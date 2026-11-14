@@ -35,6 +35,7 @@ SCRIPTS = {
     "__EMBEDDINGS_SELECT__": ASSETS / "embeddings_select.js",
     "__LIFE_MAP__": ASSETS / "life_map.js",
     "__LIFE_VIEW__": ASSETS / "life_view.js",
+    "__EMBEDDINGS_CARD_SIZE__": ASSETS / "embeddings_card_size.js",
     "__EMBEDDINGS_APP__": ASSETS / "embeddings_app.js",
 }
 PAGE_NAME = "embeddings.html"
