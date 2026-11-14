@@ -181,6 +181,13 @@ def tab(page, lv):
     return page.locator(f"#tab{lv}")
 
 
+def warm_level_3(page):
+    """Level 3 loads its rank and look-alikes when first shown: visit it, then back to level 1."""
+    tab(page, 3).click()
+    page.wait_for_load_state("networkidle")
+    tab(page, 1).click()
+
+
 def kind(page, name):
     return page.locator("#kind .segb", has_text=re.compile(f"^{name} "))
 
@@ -191,6 +198,7 @@ ORDER = [k for k, _ in page_identify.KINDS]  # Might be wrong lists its kinds in
 def test_cards_follow_the_chosen_level_with_a_few_per_species_and_photos_in_batches(browser, site):
     base, pts = site
     page = open_identify(browser, base, "#lvl=1", (380, 500))
+    warm_level_3(page)
     page.wait_for_function("document.querySelectorAll('.card .ph img').length > 0")
     shown = page.evaluate("__identify.view()")
     level = dict(zip(pts["id"], pts["level"], strict=True))
@@ -300,6 +308,7 @@ def test_an_empty_level_hides_its_batch_link_and_points_at_the_levels_that_have_
 ):
     base, pts = site
     page = open_identify(browser, base)
+    warm_level_3(page)
     k = int(np.flatnonzero(pts["level"] == 4)[0])
     x, y, d = float(pts["lon"][k]), float(pts["lat"][k]), 1e-4
     view = page.evaluate(
@@ -321,6 +330,7 @@ def test_an_empty_level_hides_its_batch_link_and_points_at_the_levels_that_have_
 def test_the_tabs_switch_the_cards_and_their_counts_are_the_totals(browser, site):
     base, pts = site
     page = open_identify(browser, base)
+    warm_level_3(page)
     total = page.evaluate("__identify.total()")
     assert page.evaluate("__identify.level()") == 1  # a first visit opens on Easy confirms
     assert page.get_by_role("tab", selected=True).count() == 1

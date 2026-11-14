@@ -99,6 +99,8 @@ def test_a_record_with_a_species_id_is_dropped(browser, site):
         "(l => l.length && l.every(e => e.dataset.id % 2))"
         "([...document.querySelectorAll('#grid .card')])"
     )
+    page.wait_for_function("window.__identify")  # the records load after the first cards
+    page.wait_for_load_state("networkidle")
     assert calls and all(len(c) <= 200 for c in calls)  # the photos' own requests, none added
     view = page.evaluate("__identify.view()")[3]
     assert view and all(i % 2 for i in view)  # dropped from the list, not only the grid

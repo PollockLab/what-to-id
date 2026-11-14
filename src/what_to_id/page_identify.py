@@ -14,10 +14,12 @@ as cards.
 from __future__ import annotations
 
 import argparse
+import html as htmllib
 import json
 import re
 from datetime import date
 from pathlib import Path
+from urllib.parse import urljoin
 
 from what_to_id import page_nav, site_files
 from what_to_id.page_rotation import read_study
@@ -130,7 +132,14 @@ def render(
     if scored:
         when = f"{when}, scored on {scored}" if when else f"Scored on {scored}"
     html = (ASSETS / PAGE_NAME).read_text()
+    # the page fetches these same origin with default credentials: as=fetch crossorigin matches
+    preload = "".join(
+        f'<link rel="preload" as="fetch" crossorigin href="{htmllib.escape(urljoin(map_url, f))}">'
+        for f in (site_files.META_NAME, first)
+        if f
+    )
     for key, value in {
+        "__PRELOADS__": preload,
         "__SITE_CSS__": page_nav.CSS,
         "__SITE_NAV__": page_nav.nav(PAGE_NAME),
         "__IDENTIFY_RANGES_CSS__": (ASSETS / "identify_ranges.css").read_text().rstrip(),

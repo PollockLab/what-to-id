@@ -14,6 +14,7 @@ var CARD=IdentifyCard({ref:function(n){return CMP?CMP.ref(n):Promise.resolve(nul
 // CFG.merge: the kinds (levels) a tab shows, in order; SUBK a kind's place in its tab
 Object.keys(CFG.merge).forEach(function(t){CFG.merge[t].forEach(function(k,j){TAB[k]=+t;SUBK[k]=j;});NK=Math.max(NK,CFG.merge[t].length);});
 var META=null,SYNC=null,MORE=new Map(),TAXA=null,P=null,BYID=null,LEVEL=null,Q=null,LOOKS=null,WHY=null,WHYF=null,RK=null,N3=0,GP=null,R=null,MF=null,TF=null,PEND=null,OX=null,PIDS=null,REC=-1,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,ONE='',CACHE=new Map(),FIRST=null,SHOWN,STAY=false,X=null,WW=null,BAR=null;
+var RKF=function(){},LKF=RKF,RKW=true;  // fetch rank (level 3) / look-alikes (levels 2, 3, 5, Batches, Compare) once; level 3's count waits for the rank under Best x%
 function $(id){return document.getElementById(id);}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 function status(t,err){var s=$('status');s.textContent=t;s.classList.toggle('err',!!err);}  // an error shows on Batches too
@@ -237,7 +238,7 @@ function step(d){
 function paint(){
   if(BAR)BAR.update();
   [].forEach.call($('tabs').children,function(t){var on=BT?!t.dataset.lv:+t.dataset.lv===LV;t.setAttribute('aria-selected',on);t.tabIndex=on?0:-1;});
-  if(BT){ST.show();return;}
+  if(BT){LKF();ST.show();return;}
   var x=CFG.levels.filter(function(l){return l[0]===LV;})[0];
   $('desc').textContent=x[2];kinds();$('panel').setAttribute('aria-labelledby','tab'+LV);
   var y=scrollY;  // a layout between the clear and the redraw clamps the scroll to the empty page
@@ -251,6 +252,8 @@ function paint(){
   empty();
   more();batch();scrollTo(0,STAY?y:0);STAY=false;
   if(LV===3&&WHYF)setTimeout(WHYF,0);
+  if(LV===2||LV===3||LV===5)LKF();  // only these show a look-alike; level 3's order is by rank
+  if(LV===3)RKF();
 }
 function redraw(late){if(late===true)STAY=true;build();counts();paint();}  // late: records that arrived, not a choice, keep the scroll
 function kindName(k){return (CFG.kinds.filter(function(x){return x[0]===k;})[0]||[0,''])[1];}
@@ -270,7 +273,7 @@ function kinds(){
   box.append(el('span',null,'Kind: '),g);
 }
 function counts(){
-  [].forEach.call($('tabs').querySelectorAll('[data-lv]'),function(t){var n=S.total[+t.dataset.lv]||0;t.lastChild.textContent=nf.format(n);t.classList.toggle('zero',!n);});
+  [].forEach.call($('tabs').querySelectorAll('[data-lv]'),function(t){var n=S.total[+t.dataset.lv]||0,w=+t.dataset.lv===3&&GP&&RKW&&!RK&&GP.label();t.lastChild.textContent=w?'':nf.format(n);t.classList.toggle('zero',!n&&!w);});
 }
 // An empty level here points at the levels that do have records, rather than a dead end.
 function empty(){
@@ -423,22 +426,24 @@ function looks(buf,why){
 }
 async function load(){
   status('Reading the map data…');
-  if(CFG.first)get(new URL(CFG.first,MAP)).then(function(b){if(!MF)firstOf(JSON.parse(new TextDecoder().decode(b)));}).catch(function(){});  // optional
+  var drawn_=new Promise(function(ok){if(!CFG.first)return ok();setTimeout(ok,2000);  // the bulk files wait for the first cards' paint, or 2 s
+    get(new URL(CFG.first,MAP)).then(function(b){if(!MF)firstOf(JSON.parse(new TextDecoder().decode(b)));}).catch(function(){}).then(ok);});  // optional
   META=await L.fetchMapMeta(MAP,fetch);
   WW=IdentifyWWW({value:META.value,taxa:function(){return TAXA;},look:looksOf,redraw:function(){if(P)redraw();}});
   function file(k){var f=META.files[k];return f?get(new URL(f,MAP)):Promise.reject(new Error('the map lists no '+k+' file'));}
+  await drawn_;
   var taxa=get(new URL(META.taxa,MAP)).then(function(b){return JSON.parse(new TextDecoder().decode(b));});
   var shards=Promise.all(META.shards.map(function(s){return get(new URL(s.file,MAP)).then(function(b){return L.decodeShard(b,s.n);});}));
-  var lev=file('levels'),lk=file('looks').catch(function(){return null;}),  // optional: cards fill in their look-alike once it lands
-    rg=file('range').catch(function(){return null;}),  // optional: no range maps without it
-    rkf=file('rank').catch(function(){return null;});  // optional: level 3 by score bucket without it
+  var lev=file('levels'),lkp=null,rkp=null,rg=file('range').catch(function(){return null;});  // optional: no range maps without it
+  function lk(){return lkp||(lkp=file('looks').catch(function(){return null;}));}function rk(){return rkp||(rkp=file('rank').catch(function(){return null;}).then(function(b){RKW=false;return b;}));}  // optional: level 3 by score bucket without it
+  function rank(b){if(!b||b.byteLength!==4*P.n)return false;RK=new Uint32Array(b);N3=0;for(var j=0;j<P.n;j++)if(KIND[j]===3)N3++;return true;}
   if(!FIRST)status('Downloading the records…');
-  var d=await Promise.all([shards,taxa,lev,rkf]);
+  var d=await Promise.all([shards,taxa,lev,saved()===3?rk():null]);  // level 3 opens on its rank
   P=L.pool(d[0],META.bbox);BYID=byId(P);TAXA=d[1];LOOKS=null;
   var raw=new Uint8Array(d[2]);
   if(raw.length!==P.n)throw new Error('the levels file holds '+raw.length+' records, the map '+P.n);
   LEVEL=raw.map(function(v){return TAB[v&15]||v&15;});KIND=raw.map(function(v){return v&15;});SUB=raw.map(function(v){return SUBK[v&15]||0;});Q=raw.map(function(v){return v>>4;});
-  if(d[3]&&d[3].byteLength===4*P.n){RK=new Uint32Array(d[3]);N3=0;for(var j=0;j<P.n;j++)if(KIND[j]===3)N3++;}
+  rank(d[3]);
   GP=IdentifyGaps({P:P,groups:META.groups,keep:function(i){return LEVEL[i]>0;},band:function(i){return IdentifyNarrow.band(RK[i],N3);},
     pct:function(i){return RK?(RK[i]+1)/N3:null;},hasRank:function(){return !!RK;},
     conf:function(i,lv){return RK&&lv===3?3-IdentifyNarrow.band(RK[i],N3):Q[i]*3/(STEPS-1);},
@@ -455,16 +460,17 @@ async function load(){
   OX=IdentifyOnly({META:META,mf:MF,P:function(){return P;},taxa:function(){return TAXA;},range:function(){return R;},rewrite:rewrite,changed:refresh,embedded:parent!==window,get:function(f){return get(new URL(f,MAP));}});
   BAR=IdentifyBar({S:S,META:META,mf:MF,nf:nf,taxa:function(){return TAXA;},P:function(){return P;},tf:function(){return TF;},mask:atLevel,all:kept,tab:function(){var l=CFG.levels.filter(function(x){return x[0]===LV;})[0];return {name:l?l[1]:'',has:function(i){return LV?LEVEL[i]===LV:LEVEL[i]>0;}};},changed:put,blocked:function(){return !!(AREA||VIEW||KEEPIDS||SUBIDS||PIDS||UF.active());},
     where:where,get:function(u){return get(new URL(u,MAP));},map:MAP,key:key,embedded:parent!==window});
+  RKF=function(){if(RK||rkp)return;rk().then(function(b){if(rank(b))redraw(true);});};
+  LKF=function(){if(lkp)return;lk().then(function(b){if(!b)return;LOOKS=looks(b);retitle();
+    var cs=[].slice.call($('grid').querySelectorAll('.card'));CMP.fill(cs);cs.forEach(CARD.paint);if(BT)paint();
+    if(LV===3){STAY=true;redraw();}else build();});};  // level 3's cap reads the suggestions
+  var co=CMP.open;CMP.open=function(){LKF();return co.apply(this,arguments);};if(WW.active())LKF();
   STAY=!!SHOWN;take(location.hash.slice(1),AREA==='');
   if(PEND!==null){take(PEND,false);PEND=null;}
   function retitle(){[].forEach.call($('grid').children,function(li){var t=li.querySelector('.title');if(t&&li.dataset.i){t.replaceWith(title(+li.dataset.i,LV));CARD.face(li);}});}
   WHYF=function(){WHYF=null;  // the runner-up file is large and only level 3 shows it: fetched once its first cards are drawn
-    Promise.all([lk,file('why').catch(function(){return null;})]).then(function(b){if(b[0]&&b[1]){WHY=looks(b[1],1);if(LV===3)retitle();}});};
+    Promise.all([lk(),file('why').catch(function(){return null;})]).then(function(b){if(b[0]&&b[1]){WHY=looks(b[1],1);if(LV===3)retitle();}});};
   if(LV===3&&!BT)setTimeout(WHYF,0);
-  lk.then(function(b){if(!b)return;LOOKS=looks(b);
-    retitle();
-    var cs=[].slice.call($('grid').querySelectorAll('.card'));CMP.fill(cs);cs.forEach(CARD.paint);if(BT)paint();
-    if(LV===3){STAY=true;redraw();}else build();});  // level 3's cap reads the suggestions
   rg.then(function(b){if(!b)return;
     R=IdentifyRanges(b,{P:P,sdm:META.sdm,name:function(i){return P.tax[i]!==NOTAX&&TAXA[P.tax[i]]?TAXA[P.tax[i]][0]:null;},look:looksOf,redraw:redraw});
     // #record=<id> (the map's token): its level, its card first, its range popover open
