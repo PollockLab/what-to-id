@@ -134,7 +134,7 @@ def meta_files(base):
         return site_files.read_meta(r.read().decode())["files"]
 
 
-def test_the_bulk_files_wait_for_the_first_card_and_looks_for_their_levels(browser, site):
+def test_the_bulk_files_wait_for_the_first_card(browser, site):
     base, pts = site
     files = meta_files(base)
     page = browser.new_page(viewport={"width": 380, "height": 800})
@@ -146,18 +146,21 @@ def test_the_bulk_files_wait_for_the_first_card_and_looks_for_their_levels(brows
     page.wait_for_function("window.__identify")
     page.wait_for_load_state("networkidle")
     names = [n for n, _ in seen]
-    assert files["first"] in names and files["looks"] not in names
+    assert files["first"] in names
     shards = [n for n, up in seen if re.fullmatch(r"pool-\d+\.\w+\.bin", n)]
-    assert shards and all(up for n, up in seen if n in shards + [files["levels"]])
-    # the rank follows the records in the background, so level 3's count shows
-    assert all(up for n, up in seen if n == files["rank"])
-    page.wait_for_function("/\\d/.test(document.querySelector('#tab3').lastChild.textContent)")
+    bulk = shards + [files["levels"], files["rank"], files["looks"]]
+    assert shards and all(up for n, up in seen if n in bulk)
+    # the rank and look-alikes follow the records in the background: level 3's count reads both
+    tab3 = "document.querySelector('#tab3').lastChild.textContent"
+    page.wait_for_function(f"/\\d/.test({tab3})")
+    other = open_identify(browser, base, "#lvl=3&sort=conf&conf=all")
+    other.wait_for_load_state("networkidle")
+    assert page.evaluate(tab3) == other.evaluate(tab3) != "0"
     # the preloads are the page's own downloads: one request each
     assert names.count(files["first"]) == 1 and names.count("map-meta.json") == 1
-    page.click("#tab3")  # level 3 fetches its look-alikes, and its strict order follows
+    page.click("#tab3")  # strict rank order on level 3
     page.wait_for_selector("#grid .card .conf", state="attached")
     rank = dict(zip(pts["id"].tolist(), nb.rank_plane(base).tolist(), strict=True))
     got = [rank[i] for i in page.evaluate("__identify.view()")[3]]
     assert got == sorted(got) and got[0] == 0  # strict rank order once it lands
-    assert files["looks"] in [n for n, _ in seen]
     assert page.errors == []
