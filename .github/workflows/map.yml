@@ -96,6 +96,7 @@ jobs:
           mkdir -p state
           gh release download "$STATE_TAG" -D state -p pool.parquet --clobber || true
           gh release download "$STATE_TAG" -D state -p taxonomy.json --clobber || echo "no taxonomy.json yet; this run starts it"
+          gh release download "$STATE_TAG" -D state -p taxonomy-fr.json --clobber || echo "no taxonomy-fr.json yet; this run starts it"
           test -s state/pool.parquet || { echo "::error::no pool.parquet on the $STATE_TAG release; seed it first"; exit 1; }
           # a missing sync.json would restart from MAP_SINCE, so only allow that on the first run
           if ! gh release download "$STATE_TAG" -D state -p sync.json --clobber && [ -z "${MAP_SINCE:-}" ]; then
@@ -122,7 +123,7 @@ jobs:
       - name: Add new taxa to the taxon tree
         id: tree
         continue-on-error: true
-        run: python -m what_to_id.taxonomy --pool state/pool.parquet --tree state/taxonomy.json
+        run: python -m what_to_id.taxonomy --pool state/pool.parquet --tree state/taxonomy.json --fr state/taxonomy-fr.json
       - name: Warn that the tree update failed
         if: steps.tree.outcome == 'failure'
         run: echo "::warning::taxon tree update failed; building with the tree as it was"
@@ -204,7 +205,9 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "$ATLAS_HF_REPO" ]; then echo "no ATLAS_HF_REPO; no Identify page"; exit 0; fi
-          python -m what_to_id.pool_levels --out _site \
+          fr=()
+          if [ -s state/taxonomy-fr.json ]; then fr=(--fr state/taxonomy-fr.json); fi
+          python -m what_to_id.pool_levels --out _site "${fr[@]}" \
             --data-url "https://huggingface.co/datasets/${ATLAS_HF_REPO}/resolve/main/"
           study=()
           if [ -s state/study.json ]; then study=(--study state/study.json); fi
@@ -269,6 +272,9 @@ jobs:
           gh release upload "$STATE_TAG" state/sync.json --clobber
           if [ -s state/taxonomy.json ]; then
             gh release upload "$STATE_TAG" state/taxonomy.json --clobber || echo "::warning::could not save taxonomy.json"
+          fi
+          if [ -s state/taxonomy-fr.json ]; then
+            gh release upload "$STATE_TAG" state/taxonomy-fr.json --clobber || echo "::warning::could not save taxonomy-fr.json"
           fi
           if [ -s state/projects.bin ]; then
             gh release upload "$STATE_TAG" state/projects.bin --clobber || echo "::warning::could not save projects.bin"
