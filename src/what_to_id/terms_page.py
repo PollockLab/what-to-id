@@ -86,10 +86,6 @@ dt:target{background:var(--chip);outline:2px solid var(--bar)}
     + "\n"
     + TOC_CSS.strip()
 )
-LEDE = (
-    "What the words on the other pages mean, how each view is made, and the study and methods "
-    "behind the order of the records."
-)
 # Linked from the Batches tab on Identify: what the study changes, records and asks.
 STUDY = """<h2 id="study">The study behind Batches</h2>
 <p>The Batches tab on Identify comes from a research study of which records to show identifiers
@@ -197,7 +193,7 @@ def render(
         f'<section id="{i}"><h3>{escape(h)}</h3>\n{body}</section>' for i, h, body in views(dates)
     )
     body = (
-        f'<h1>How it works</h1>\n<p class="lede">{LEDE}</p>\n'
+        '<h1 class="vh">How it works</h1>\n'
         '<h2 id="glossary">Glossary</h2>\n'
         '<div id="find" hidden><label for="find-q">Find a term</label>'
         '<input id="find-q" type="search" autocomplete="off">'

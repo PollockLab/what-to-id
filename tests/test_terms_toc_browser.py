@@ -53,7 +53,8 @@ def test_phone_collapses_the_contents_and_old_anchors_resolve(browser, tmp_path)
     page = _page(browser, tmp_path, width=390)
     assert page.eval_on_selector("#toc", "e => e.open") is False
     top = page.eval_on_selector("#toc", "e => e.getBoundingClientRect().top")
-    assert top >= page.eval_on_selector(".lede", "e => e.getBoundingClientRect().bottom")
+    assert page.text_content("h1") == "How it works"
+    assert page.locator("h1 + #toc").count() == 1
     assert top < page.eval_on_selector("#glossary", "e => e.getBoundingClientRect().top")
     assert page.is_visible("#toc summary") and not page.is_visible("#toc a")
     ids = set(page.eval_on_selector_all("[id]", "els => els.map(e => e.id)"))
