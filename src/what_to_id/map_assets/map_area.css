@@ -1,14 +1,14 @@
 .area{max-width:min(240px,calc(100vw - 80px));background:var(--panel);color:var(--ink);
-  border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);padding:6px}
+  border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px}
 .abtns{display:flex;flex-wrap:wrap;gap:4px}
 .abtns button,.afile{border:1px solid var(--line);background:var(--chip);color:var(--ink);font:inherit;
-  font-size:12px;padding:3px 9px;min-height:28px;cursor:pointer;border-radius:13px;display:inline-flex;
+  font-size:12px;padding:3px 9px;min-height:28px;cursor:pointer;border-radius:999px;display:inline-flex;
   align-items:center}
 .abtns button[hidden],.afile[hidden]{display:none}
 .abtns button:disabled{opacity:.5;cursor:default}
 .afile{position:relative}
 .afile input{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden}
-.afile:focus-within{outline:2px solid var(--bar)}
+.afile:focus-within{outline:3px solid var(--bar)}
 .anote{margin:6px 2px 0;font-size:12px;color:var(--muted)}
 .anote[hidden]{display:none}
 .abox{display:block;margin:4px 2px 0;font-size:12px;color:inherit}
@@ -17,7 +17,7 @@
 .apark[hidden]{display:none}
 .acombo{position:relative}
 .acombo input{width:100%;box-sizing:border-box;font:inherit;font-size:12px;padding:4px 28px 4px 8px;min-height:28px;
-  border:1px solid var(--line);border-radius:13px;background:var(--panel);color:var(--ink)}
+  border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--ink)}
 .atog{position:absolute;right:2px;top:50%;transform:translateY(-50%);border:0;background:none;color:var(--muted);
   font:inherit;font-size:13px;width:24px;height:24px;cursor:pointer;border-radius:12px}
 .atog:hover{background:var(--chip)}
@@ -30,7 +30,7 @@
 .alist .ahead{display:block;color:var(--muted);font-weight:600;padding:6px 6px 2px}
 .alist [role=option]{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:4px 6px;border-radius:6px;cursor:pointer}
 .alist [role=option]:hover{background:var(--chip)}
-.alist [role=option].aact{background:var(--chip);outline:2px solid var(--bar);outline-offset:-2px}
+.alist [role=option].aact{background:var(--chip);outline:3px solid var(--bar);outline-offset:-2px}
 .acheck{flex:none;width:12px;height:12px;border:1.5px solid var(--muted);border-radius:3px;box-sizing:border-box;
   display:inline-flex;align-items:center;justify-content:center;font-size:10px;line-height:1}
 [aria-selected=true]>.acheck{background:var(--bar);border-color:var(--bar);color:var(--onink)}
@@ -46,13 +46,13 @@
 .atoggle{display:none}
 @media (max-width:760px){
   html:not(.embed) .atoggle{display:inline-flex;align-items:center;border:1px solid var(--line);background:var(--chip);color:var(--ink);
-    font:inherit;font-size:12px;padding:3px 9px;min-height:28px;cursor:pointer;border-radius:13px}
+    font:inherit;font-size:12px;padding:3px 9px;min-height:28px;cursor:pointer;border-radius:999px}
   html:not(.embed) .area:not(.acol) .atoggle{margin-bottom:4px}
   html:not(.embed) .area.acol>:not(.atoggle){display:none}
 }
 @media (max-width:479px){
   .apanel{position:fixed;left:8px;right:8px;z-index:10;background:var(--panel);border:1px solid var(--line);
-    border-radius:8px;box-shadow:var(--shadow);padding:4px;max-height:50vh;display:flex;flex-direction:column}
+    border-radius:12px;box-shadow:var(--shadow);padding:4px;max-height:50vh;display:flex;flex-direction:column}
   .alist{max-height:none;flex:1;min-height:0}
   .alist [role=option],.ahdr button{min-height:44px}
   .acombo input{min-height:44px;font-size:16px}
@@ -61,7 +61,7 @@
 .achips{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
 .achips[hidden]{display:none}
 .achip{display:inline-flex;align-items:center;gap:2px;max-width:100%;font-size:12px;padding:2px 2px 2px 9px;
-  border:1px solid var(--line);border-radius:13px;background:var(--chip);color:var(--ink)}
+  border:1px solid var(--line);border-radius:999px;background:var(--chip);color:var(--ink)}
 .achip.aload{opacity:.6}
 .achip button{border:0;background:none;color:inherit;font:inherit;font-size:14px;line-height:1;cursor:pointer;
   min-width:24px;min-height:24px;border-radius:12px}

@@ -1,12 +1,12 @@
 /* Shared by the map and the Identify page: the groups list, the date inputs and the histograms */
 /* the groups list: a row per group, its count and share, the share as a bar under the row */
-.gbar{display:flex;height:5px;margin:5px 0 0;border-radius:3px;overflow:hidden;background:var(--line)}
+.gbar{display:flex;height:5px;margin:5px 0 0;border-radius:6px;overflow:hidden;background:var(--line)}
 .gbar i{display:block;height:100%;min-width:1px}
 .gl,.gl ul{list-style:none;margin:0;padding:0}
 .gl .gr{position:relative;display:flex;flex-wrap:wrap;align-items:center;min-height:28px}
 .gl .gw{display:contents}
 .gl .gt{order:-1;width:24px;min-height:24px;margin:0;padding:0;border:0;background:none;color:var(--muted);cursor:pointer;flex:none}
-.gl .gb{flex:1;min-width:0;display:flex;align-items:center;gap:6px;height:28px;padding:0 4px 2px;border:0;border-radius:4px;
+.gl .gb{flex:1;min-width:0;display:flex;align-items:center;gap:6px;height:28px;padding:0 4px 2px;border:0;border-radius:6px;
   background:linear-gradient(var(--bar),var(--bar)) no-repeat 0 100%/var(--s,0) 2px;color:var(--ink);font:inherit;font-size:13px;
   text-align:left;cursor:pointer}
 .gl .gb:hover{background-color:var(--chip)}
@@ -17,7 +17,7 @@
 .gl .gp{flex:0 0 42px}
 .gl .not .nm{text-decoration:line-through}
 .gl .z{opacity:.55}
-.gl .gx{flex:none;margin-left:2px;border:1px solid var(--line);border-radius:10px;background:var(--chip);color:var(--ink);
+.gl .gx{flex:none;margin-left:2px;border:1px solid var(--line);border-radius:999px;background:var(--chip);color:var(--ink);
   font:inherit;font-size:11px;min-height:24px;padding:1px 6px;cursor:pointer}
 /* with a pointer it shows over the share on hover or focus, so it takes no room from the names */
 @media (hover:hover){.gl .gx:not([aria-pressed="true"]){position:absolute;right:0;top:4px;opacity:0;box-shadow:0 0 0 4px var(--panel)}
@@ -30,7 +30,7 @@
 .gl .gs ul ul{margin-left:12px;border-left:1px solid var(--line)}
 .gl .tn{display:flex;align-items:center;gap:2px;min-height:26px}
 .gl .tw{flex:0 0 24px;min-height:24px;padding:0;border:0;background:none;color:var(--muted);text-align:center;cursor:pointer}
-.gl .tl{flex:1;min-width:0;border:0;border-radius:4px;background:none;color:var(--ink);font:inherit;font-size:12px;
+.gl .tl{flex:1;min-width:0;border:0;border-radius:6px;background:none;color:var(--ink);font:inherit;font-size:12px;
   text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:2px 4px;cursor:pointer}
 .gl .tl:hover{background:var(--chip)}
 .gl .tl[aria-pressed="true"]{background:var(--on);color:var(--onink)}

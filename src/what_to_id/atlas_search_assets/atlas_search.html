@@ -15,26 +15,26 @@ h1{font-size:18px;margin:0}
 h2{font-size:15px;margin:0}
 .sub,.hint,.muted{color:var(--muted);margin:0;font-size:12px}
 a{color:inherit}
-:focus-visible{outline:2px solid var(--bar);outline-offset:2px}
+:focus-visible{outline:3px solid var(--bar);outline-offset:2px}
 form.search{display:flex;gap:8px;margin:12px 0 4px}
 .search input{flex:1 1 auto;min-width:0;font:inherit;font-size:16px;padding:8px 10px;border:1px solid var(--line);
   border-radius:6px;background:var(--panel);color:var(--ink)}
 button,.btn{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--chip);color:var(--ink);
-  padding:6px 12px;border-radius:14px;cursor:pointer;text-decoration:none;display:inline-block}
+  padding:6px 12px;border-radius:999px;cursor:pointer;text-decoration:none;display:inline-block}
 button.primary,.btn.primary{background:var(--on);color:var(--onink);border-color:var(--on);font-weight:600}
 button:disabled{opacity:.5;cursor:default}
 .vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .examples{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
-.note{margin:8px 0;padding:8px 10px;border-radius:8px;background:var(--warnbg);color:var(--warn);font-size:13px}
+.note{margin:8px 0;padding:8px 10px;border-radius:12px;background:var(--warnbg);color:var(--warn);font-size:13px}
 .note[hidden]{display:none}
-.filter{border:1px solid var(--line);border-radius:8px;padding:4px 10px 8px;margin:8px 0;background:var(--panel)}
+.filter{border:1px solid var(--line);border-radius:6px;padding:4px 10px 8px;margin:8px 0;background:var(--panel)}
 .filter summary{cursor:pointer;font-size:12px;font-weight:600;padding:4px 0}
 .filter .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px}
 .filter input{font:inherit;font-size:16px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;
   background:var(--bg);color:var(--ink);min-width:0;flex:1 1 160px}
 .sugg{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
 .chips{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
-.chip{display:inline-flex;align-items:center;border:1px solid var(--on);border-radius:13px;background:var(--on);
+.chip{display:inline-flex;align-items:center;border:1px solid var(--on);border-radius:999px;background:var(--on);
   color:var(--onink);font-size:12px;padding-left:9px}
 .chip.not{background:var(--warnbg);color:var(--warn);border:1px dashed var(--warn)}
 .chip button{border:0;background:none;color:inherit;padding:3px 8px;border-radius:0}
@@ -42,7 +42,7 @@ button:disabled{opacity:.5;cursor:default}
 .bar h2{flex:1 1 220px}
 .bar .actions{display:flex;flex-wrap:wrap;gap:6px}
 .grid{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
-.card{border:1px solid var(--line);border-radius:8px;background:var(--panel);overflow:hidden;display:flex;flex-direction:column}
+.card{border:1px solid var(--line);border-radius:12px;background:var(--panel);overflow:hidden;display:flex;flex-direction:column}
 .card .photo{display:block;aspect-ratio:1;background:var(--chip)}
 .card img{width:100%;height:100%;object-fit:cover;display:block}
 .card .body{padding:6px 8px 8px;display:flex;flex-direction:column;gap:2px;font-size:12px;flex:1}
