@@ -355,7 +355,8 @@ def test_the_tabs_switch_the_cards_and_their_counts_are_the_totals(browser, site
 
 def test_a_card_posts_its_record_on_click_and_focus_on_hover(browser, site):
     base, _ = site
-    page, frame = wrapped(browser, base, "#lvl=1")
+    # sort=conf: the default order moves the cards once the survey layer arrives
+    page, frame = wrapped(browser, base, "#lvl=1&sort=conf")
     frame.wait_for_selector("#grid .card")
     first = frame.locator("#grid .card").first
     rid = int(first.get_attribute("data-id"))
