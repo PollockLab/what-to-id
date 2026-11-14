@@ -62,7 +62,7 @@ var words={
 "Automatic (80% of their IDs)":"Automatique (80 % de leurs identifications)",
 // when
 "Observed":"Observées","Uploaded":"Téléversées","Date to filter on":"Date de filtrage","Periods":"Périodes","Months of the year":"Mois de l'année",
-"From":"Du","To":"Au","to":"au","Any month":"Tous les mois","Last 30 days":"30 derniers jours","Last 12 months":"12 derniers mois","This year":"Cette année",
+"From":"Du","To":"Au","to":"au","Any month":"Tous les mois","Last 7 days":"7 derniers jours","Last 30 days":"30 derniers jours","Last 12 months":"12 derniers mois","This year":"Cette année",
 "Records per year, every year, on a log scale. Click a year to zoom to it.":"Observations par année, toutes les années, à l'échelle logarithmique. Cliquez sur une année pour l'agrandir.",
 "Expand map":"Agrandir la carte","Jan":"janv.","Feb":"févr.","Mar":"mars","Apr":"avr.","May":"mai","Jun":"juin","Jul":"juill.","Aug":"août","Sep":"sept.","Oct":"oct.","Nov":"nov.","Dec":"déc.",
 "January":"janvier","February":"février","March":"mars","April":"avril","June":"juin","July":"juillet","August":"août","September":"septembre",
