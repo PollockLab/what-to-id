@@ -119,6 +119,8 @@ MAP_JS = (
     "level_colour.js",
     "map_card.js",
     "map_sdm.js",
+    "map_shard.js",
+    "map_stale.js",
     "map.js",
     "map_rail.js",
     "map_sheet.js",
