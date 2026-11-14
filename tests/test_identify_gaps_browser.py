@@ -17,6 +17,10 @@ from .test_identify_narrow_browser import rank_plane
 browser = eb.browser
 site = ib.site
 
+SHOTS = (
+    "/private/tmp/claude-503/-Users-w-Documents-Github-nosync/"
+    "ead84ba1-faad-4b13-8938-7e1161b3fa12/scratchpad"
+)
 DIR = "https://pollocklab.github.io/where-to-blitz/cluster_results/checklist/"
 LATTICE = {"ncol": 220, "nrow": 181, "res_m": 25000, "x0": -2150000, "y1": 4300000}
 
@@ -216,13 +220,13 @@ def test_the_gap_badge_applies_the_ceiling_on_every_level(browser, site):
     days = int(re.search(r"(\d+)/30 days", badge.inner_text()).group(1))
     badge.click()
     page.wait_for_function(f"location.hash.includes('gap=0-{days}')")
+    page.wait_for_function(
+        f"document.getElementById('cap').textContent.includes('survey days 0-{days}')"
+    )
     page.wait_for_selector("#grid .card")
     texts = page.locator("#grid .card button.gap").all_inner_texts()
     got = [int(re.search(r"(\d+)/30 days", t).group(1)) for t in texts]
     assert got and max(got) <= days and page.locator("#grid .card").count() >= len(got)
-    page.wait_for_function(
-        f"document.getElementById('cap').textContent.includes('survey days 0-{days}')"
-    )
     page.click("#tab1")  # the ceiling holds on the other levels too
     page.wait_for_selector("#grid .card")
     assert f"gap=0-{days}" in page.evaluate("location.hash")
@@ -350,15 +354,65 @@ def test_a_preset_chip_sets_the_weights_and_is_marked(browser, site):
     assert page.errors == []
 
 
-def test_move_up_swaps_the_weights_of_neighbouring_rows(browser, site):
+ORDER = "[...document.querySelectorAll('#sorto .pw:not([hidden]) input')].map(e => e.id)"
+
+
+def test_a_handle_moves_its_row_with_the_arrow_keys_and_keeps_focus(browser, site):
     base, _ = site
     page = open_with(browser, base, "&pri=conf:40,gap:100")
     page.click("#sortb")
-    page.click("#sorto .pw:has(#pw-conf) button[aria-label='Move Match up']")
+    handle = "#sorto .pw:has(#pw-conf) .pgrip"
+    assert page.get_attribute(handle, "aria-label") == "Move Match, position 2 of 4"
+    page.focus(handle)
+    page.keyboard.press("ArrowUp")
     page.wait_for_function("document.getElementById('pw-conf').value === '100'")
     assert page.input_value("#pw-conf") == "100" and page.input_value("#pw-gap") == "40"
-    assert page.evaluate("document.querySelector('#sorto .pw input').id") == "pw-conf"
+    assert page.evaluate(ORDER)[0] == "pw-conf"
+    assert page.evaluate("document.activeElement.getAttribute('aria-label')") == (
+        "Move Match, position 1 of 4"
+    )
+    assert "Match moved to position 1 of 4" in page.inner_text("#sorto .vh")
+    assert "pri=conf:100,gap:40" in page.evaluate("location.hash")
+    assert page.eval_on_selector("#psum", "e => e.textContent").startswith("Best matches first")
+    assert page.query_selector("#sorto .pw button[aria-label$=' up']") is None
     assert page.errors == []
+
+
+def test_dragging_a_handle_reorders_the_rows_and_sets_weights_that_hold_the_order(browser, site):
+    base, _ = site
+    page = open_with(browser, base, "&pri=conf:40,gap:100,risk:60")
+    page.click("#sortb")
+    assert page.evaluate(ORDER)[:3] == ["pw-gap", "pw-risk", "pw-conf"]
+    h = page.locator("#sorto .pw:has(#pw-conf) .pgrip").bounding_box()
+    t = page.locator("#sorto .pw:has(#pw-gap)").bounding_box()
+    page.mouse.move(h["x"] + h["width"] / 2, h["y"] + h["height"] / 2)
+    page.mouse.down()
+    page.mouse.move(h["x"] + 4, t["y"] + 2, steps=6)
+    assert page.query_selector("#sorto .pw.pdrag") is not None
+    assert page.is_visible("#sorto .pdrop")
+    page.screenshot(path=f"{SHOTS}/dragrows-middrag.png")
+    page.mouse.up()
+    page.wait_for_function("location.hash.includes('pri=')")
+    page.wait_for_function("document.querySelector('#sorto .pw input').id === 'pw-conf'")
+    assert page.evaluate(ORDER)[:3] == ["pw-conf", "pw-gap", "pw-risk"]
+    w = [int(page.input_value(f"#pw-{k}")) for k in ("conf", "gap", "risk")]
+    assert w[0] > w[1] > w[2]
+    assert page.query_selector("#sorto .pw.pdrag") is None and not page.is_visible("#sorto .pdrop")
+    page.screenshot(path=f"{SHOTS}/dragrows-idle.png")
+    assert page.errors == []
+
+
+def test_the_rows_fit_at_390(browser, site):
+    base, _ = site
+    page = browser.new_page(viewport={"width": 390, "height": 800})
+    eb.stub_inat(page, None)
+    stub_checklist(page)
+    page.goto(f"{base}/identify.html#lvl=3")
+    page.wait_for_function("window.__identify && __identify.ids().length > 0")
+    settle(page)
+    page.click("#sortb")
+    assert page.eval_on_selector("#sortpop", "e => e.scrollWidth <= e.clientWidth + 1")
+    page.screenshot(path=f"{SHOTS}/dragrows-390.png")
 
 
 def test_old_pri_values_read_as_levels_and_legacy_links_keep_their_hash(browser, site):
