@@ -8,6 +8,7 @@
 // its popover (chip(i,lv)); it has no #rout, so no segmented control.
 var IdentifyRanges=(function(){
 'use strict';
+var LOC=typeof I18N==='undefined'?'en':I18N.loc;  // the map page shares this file without the translator
 // OUT_KM: a res-4 cell is ~22 km across, so under 50 km is cell-edge noise, not a range outlier.
 var OUT_KM=50,NONE=255,KX=Math.cos(54*Math.PI/180),NEITHER='Outside both ranges: maybe neither.',
   REFS=[['Vancouver',-123120,49280],['Prince George',-122750,53920]],
@@ -45,7 +46,7 @@ return function(buf,ctx){
   function has(a,c){return c>=0&&(a[c>>3]>>(c&7))&1;}
   // okm_code back to km, already rounded as the page shows it: a coarser step farther out
   function km(i){var c=OKM[i];return c<50?c:c<=95?50+(c-50)*10:c<=105?500+(c-95)*50:1000+(c-105)*100;}
-  function kmText(i){return km(i).toLocaleString(I18N.loc);}
+  function kmText(i){return km(i).toLocaleString(LOC);}
   function far(i){return OKM[i]!==NONE&&OKM[i]>=OUT_KM;}
   // the suggested species' range holds the record's cell; an unknown range does not, as the suggestion is unchecked
   function fits(i){var a=bits(ctx.look(i));return !!a&&!!has(a,cellOf(i));}
@@ -305,7 +306,7 @@ return function(buf,ctx){
       SEG.setAttribute('aria-label',lv===3?"Records in the suggested species' range":'Records far outside their range');
       [].forEach.call(SEG.children,function(b,k){
         var o=OPTS[k][0],on=o===S.o;
-        b.textContent=(lv===3?FIT_OPTS[k]:OPTS[k][1])+' '+c[o].toLocaleString(I18N.loc);
+        b.textContent=(lv===3?FIT_OPTS[k]:OPTS[k][1])+' '+c[o].toLocaleString(LOC);
         b.setAttribute('aria-checked',String(on));b.tabIndex=on?0:-1;
         b.disabled=o===1&&!f&&!on;});
     }
