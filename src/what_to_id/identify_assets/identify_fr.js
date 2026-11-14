@@ -123,7 +123,19 @@ var words={
 "gives the model, every cut-off, and a test of the levels against later corrections.":"donne le modèle, chaque seuil, et un test des niveaux par rapport aux corrections ultérieures.",
 "The User box is the map's: with an iNaturalist login it lists first the records in the user's genera, those holding about 80% of their identifications in BC (Adjust sets a number of IDs per genus instead), then a line, then the rest; the map dims the rest. Ticks narrow it, once a user name is entered: Only @login's genera, Hide records @login identified, or Only records @login observed. The login is kept on this device for a day. The login goes only to iNaturalist.":"La boîte Utilisateur est celle de la carte : avec un identifiant iNaturalist, elle liste d'abord les observations dans les genres de l'utilisateur, ceux qui détiennent environ 80 % de ses identifications en C.-B. (Ajuster fixe plutôt un nombre d'identifications par genre), puis une ligne, puis le reste; la carte atténue le reste. Des cases les restreignent, une fois un nom d'utilisateur saisi : Seulement les genres de @identifiant, Masquer les observations identifiées par @identifiant, ou Seulement les observations de @identifiant. L'identifiant est conservé sur cet appareil pendant un jour. L'identifiant n'est envoyé qu'à iNaturalist.",
 "With a login, the records inside the user's genera come first and the rest are dimmed on the map: by default the genera holding about 80% of their identifications in BC, or under Adjust those with a set number of IDs. Nothing is hidden by this; the iNaturalist link still leaves out records they identified.":"Avec un identifiant, les observations dans les genres de l'utilisateur viennent en premier et le reste est atténué sur la carte : par défaut les genres détenant environ 80 % de ses identifications en C.-B., ou, sous Ajuster, ceux ayant un nombre fixe d'identifications. Rien n'est masqué par ce réglage; le lien iNaturalist exclut quand même les observations qu'il a identifiées.",
-"Use it when you want to confirm many in one go.":"Utilisez-le pour en confirmer plusieurs d'un coup.","Group by suggested species":"Regrouper par espèce suggérée"
+"Use it when you want to confirm many in one go.":"Utilisez-le pour en confirmer plusieurs d'un coup.","Group by suggested species":"Regrouper par espèce suggérée",
+// one-tap suggestions (identify_suggest.js)
+"Recently used":"Utilisés récemment","Biggest backlogs":"Plus gros arriérés","Blitz targets":"Cibles du blitz","Suggestions":"Suggestions","Quick picks":"Choix rapides",
+"Since your last visit":"Depuis votre dernière visite","Every record":"Toutes les observations","Near you":"Près de vous","Near me":"Près de moi",
+"Within 50 km of where you are":"À moins de 50 km de votre position","Finding where you are…":"Recherche de votre position…",
+"Location is blocked for this site. Allow it in the browser, or draw an area below.":"La localisation est bloquée pour ce site. Autorisez-la dans le navigateur, ou tracez une zone ci-dessous.",
+"Your location is not available. Draw an area below instead.":"Votre position n'est pas disponible. Tracez plutôt une zone ci-dessous.",
+"You seem to be outside this map’s area.":"Vous semblez être hors de la zone de cette carte.",
+"Suggested places":"Lieux suggérés","Loading parks…":"Chargement des parcs…","The park list did not load.":"La liste des parcs n'a pas pu être chargée.",
+"Your progress":"Votre progression","Nothing opened yet today.":"Rien d'ouvert pour l'instant aujourd'hui.","Not yet by me":"Pas encore par moi",
+"Leave out what you identified":"Exclure ce que vous avez identifié","Type your iNaturalist login below first.":"Saisissez d'abord votre identifiant iNaturalist ci-dessous.",
+"Untick “my observations” below first.":"Décochez d'abord « mes observations » ci-dessous.","Nobody has looked":"Personne n'a regardé",
+"No one but the observer has identified it":"Seul l'observateur l'a identifiée","Needs a second opinion":"Demande un deuxième avis","One ID, and nobody agrees yet":"Une identification, et personne n'est encore d'accord"
 };
 var rules=[
 // the About text with its scoring dates, and the "no level" rule with the photo download
@@ -141,6 +153,11 @@ R('all in # batches of #, in the order shown',function(m,n,k){return 'tous en '+
 R('first # in # batches of #, in the order shown',function(m,a,n,k){return 'les '+a+' premiers en '+n+' '+pl(n,'lot','lots')+' de '+k+", dans l'ordre affiché";}),
 R('# cards to ID \\(# records((?:, [^;]+)?); (up to|all) # per suggested species\\)',function(m,c,r,t,u,k){
   return c+' '+pl(c,'carte','cartes')+' à identifier ('+r+' '+pl(r,'observation','observations')+t.replace('Best ','meilleurs ').replace('in range',"dans l'aire")+'; '+(u==='all'?'toutes':"jusqu'à "+k)+' par espèce suggérée)';}),
+R('# records waiting',function(m,n){return n+' '+pl(n,'observation en attente','observations en attente');}),
+R('Up to # records waiting',function(m,n){return "Jusqu'à "+n+' '+pl(n,'observation en attente','observations en attente');}),
+R('# threatened or introduced',function(m,n){return n+' '+pl(n,'menacée ou introduite','menacées ou introduites');}),
+R('From (\\d{4}-\\d\\d-\\d\\d)','Depuis le $1'),
+R('# of 10 improving IDs in 30 days',function(m,n){return n+' sur 10 identifications améliorantes en 30 jours';}),
 R('# opened today',function(m,n){return n+' '+pl(n,'ouverte','ouvertes')+" aujourd'hui";}),
 R('# records to identify','$1 observations à identifier'),
 R('# of #, (.+?)(?: to (.+))?',function(m,a,b,n,t){return a+' sur '+b+', '+n+(t?' vers '+t:'');}),
