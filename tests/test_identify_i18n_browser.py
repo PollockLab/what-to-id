@@ -84,7 +84,7 @@ def test_french_changes_the_text_and_lang_and_survives_a_reload(browser, site):
 def test_a_french_browser_opens_in_french_and_a_missing_name_falls_back(browser, site):
     page = browser.new_context(locale="fr-CA").new_page()
     page.goto(f"{site}/identify.html")
-    page.wait_for_function("window.__identify && __identify.ids().length > 0")
+    page.wait_for_selector("#grid .card .title .com", state="attached")  # ids() leads the draw
     assert page.evaluate("document.documentElement.lang") == "fr"
     # a species with no French name keeps its English one, and with neither its Latin name shows
     fr = page.evaluate(
