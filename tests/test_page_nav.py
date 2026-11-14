@@ -57,6 +57,7 @@ def test_unknown_availability_is_probed_by_the_page():
 def test_external_link_opens_a_new_tab_and_says_so():
     link = re.search(rf'<a [^>]*href="{re.escape(SITE[0])}"[^>]*>.*?</a>', nav("map.html")).group()
     assert 'target="_blank"' in link and 'rel="noopener"' in link
+    assert '<img class="site-mark" src="data:image/png;base64,' in link and 'alt="">' in link
     assert SITE[1] in link and "↗" in link and "opens in a new tab" in link
 
 
