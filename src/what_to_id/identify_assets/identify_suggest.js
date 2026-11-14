@@ -2,7 +2,7 @@
 // filters that already exist (the same address keys), so a suggestion can be undone with the filter it set. Hidden in Batches.
 // IdentifySuggest(o), o {S, META, mf, nf, P(), taxa(), allc() (records per group), short(g), tm (MapTime), changed(), rewrite(drop, add),
 // area(rings, hash, label) (the area changed, the map reloads), get(url), embedded}. Returns update(), after every change.
-// where() starts the park list's fetch, called when Where opens. Needs group_icons.js, map_area.js (the park list's address and MapArea.encode) and the panels' #sgwhat, #sgwhen, #sgwhere, #sgwho.
+// where() starts the park list's fetch, called when Where opens; who() fetches the top identifiers, called when Who opens. Needs group_icons.js, map_area.js (the park list's address and MapArea.encode) and the panels' #sgwhat, #sgwhen, #sgwhere, #sgwho.
 var IdentifySuggest=(function(){
 'use strict';
 // Every English string, in one place for the translation file to take over; {n} and {d} are filled in.
@@ -17,7 +17,8 @@ var T={
   who:'Your progress',opened:'{n} opened today',improving:'{n} of 10 improving IDs in 30 days',none:'Nothing opened yet today.',
   mine:'Not yet by me',mineSub:'Leave out what you identified',mineNeed:'Type your iNaturalist login below first.',
   mineExcl:'Untick “my observations” below first.',nobody:'Nobody has looked',nobodySub:'No one but the observer has identified it',
-  second:'Needs a second opinion',secondSub:'One ID, and nobody agrees yet'
+  second:'Needs a second opinion',secondSub:'One ID, and nobody agrees yet',
+  ids:'Top identifiers here',newTab:' (opens in a new tab)'
 };
 var NS='http://www.w3.org/2000/svg',R=50,PTS=64,KM=111.195,STORE={recent:'wtid-recent',visit:'wtid-lastvisit',opened:'wtid-opened',improving:'wtid-improving'},
   ICON={
@@ -43,7 +44,7 @@ function circle(lon,lat){
 }
 return function(o){
 var S=o.S,META=o.META,MF=o.mf,G=META.groups,box={},bt=function(){return document.body.classList.contains('bt');},
-  rows={what:[],when:[],where:[],who:[]},msg={where:'',who:''},PN=null,PS=0,BLZ=null,seen=null,prev=null,LV=null;
+  rows={what:[],when:[],where:[],who:[]},msg={where:'',who:''},PN=null,PS=0,IDS={},BLZ=null,seen=null,prev=null,LV=null;
 ['what','when','where','who'].forEach(function(k){box[k]=document.getElementById('sg'+k);});
 var hasFlags=META.flags.indexOf('threatened')>=0||META.flags.indexOf('introduced')>=0;
 
@@ -149,7 +150,16 @@ function whereRows(){
   return out;
 }
 
-// Who: the progress so far, then the three chips
+// Who: the progress so far, the top identifiers for the What taxon (read-only, one fetch per taxon a session), then the three chips
+function taxonKey(){var p=S.picks.filter(function(x){return !x.not;})[0];return p?String(p.id):'';}
+function who(){
+  var k=taxonKey();
+  if(bt()||k in IDS)return;
+  IDS[k]=[];  // an error leaves it empty, and the line hidden
+  fetch('https://api.inaturalist.org/v1/observations/identifiers?place_id='+META.place_id+(k?'&taxon_id='+k:'')+'&per_page=5')
+    .then(function(r){if(!r.ok)throw 0;return r.json();})
+    .then(function(j){IDS[k]=j.results.filter(function(x){return x.user&&x.user.login;}).slice(0,5);draw();}).catch(function(){});
+}
 function look(){var m=/(?:^|&)look=(nobody|second)(?:&|$)/.exec(location.hash.slice(1));return m&&m[1];}
 function setLook(v){
   o.rewrite(function(x){return /^look=/.test(x);},look()===v?[]:['look='+v]);o.changed();
@@ -168,7 +178,7 @@ function whoRows(){
   var r=[mine()];
   if(!o.embedded)r.push({k:'y:nobody',i:'eye',t:T.nobody,s:T.nobodySub,on:look()==='nobody',fn:function(){setLook('nobody');}},
     {k:'y:second',i:'two',t:T.second,s:T.secondSub,on:look()==='second',fn:function(){setLook('second');}});
-  return [{h:T.who,line:progress(),rows:r}];
+  return [{h:T.who,line:progress(),ids:IDS[taxonKey()],rows:r}];
 }
 
 // Drawing: the rows are rebuilt and the focused one found again by its key
@@ -192,7 +202,13 @@ function section(secs,k){
     var u=el('ul','sgl'),head=el('p','sgh',s.h);
     id='sgh-'+k+j;head.id=id;u.setAttribute('aria-labelledby',id);u.setAttribute('role','list');
     s.rows.forEach(function(r){u.appendChild(row(r));});
-    b.append(head);if(s.line)b.append(el('p','sgn muted',s.line));b.append(u);
+    b.append(head);if(s.line)b.append(el('p','sgn muted',s.line));
+    if(s.ids&&s.ids.length){var q=el('p','sgn muted',T.ids+': ');
+      s.ids.forEach(function(x){var a=el('a','sga',x.user.login+' ('+o.nf.format(x.count)+')');
+        a.href='https://www.inaturalist.org/people/'+encodeURIComponent(x.user.login);a.target='_blank';a.rel='noopener';a.dataset.k='i:'+x.user.login;
+        a.append(el('span','vh',T.newTab));q.append(a);});
+      b.append(q);}
+    b.append(u);
   });
   if(msg[k]){var m=el('p','sgm',msg[k]);m.setAttribute('role','status');b.append(m);}
   else if(k==='where'){var q=el('p','sgm muted',PS===3?T.placesFail:PS!==1?'':T.placesLoad);q.setAttribute('role','status');b.append(q);}
@@ -207,6 +223,6 @@ function update(){
   if(LV===null){visit();LV=true;}
   msg.who='';note();draw();
 }
-return {update:update,where:parks};
+return {update:update,where:parks,who:who};
 };
 })();

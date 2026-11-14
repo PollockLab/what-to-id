@@ -182,3 +182,61 @@ def test_a_suggestion_leaves_the_served_order_alone(browser, site):
     flat = lambda v: [i for r in v if r for i in r]  # noqa: E731
     seen = set(flat(full))
     assert [i for i in flat(after) if i in seen] == [i for i in flat(full) if i in kept]
+
+
+IDENT = "https://api.inaturalist.org/v1/observations/identifiers*"
+
+
+def stub_identifiers(page, status=200):
+    urls = []
+
+    def route(r):
+        urls.append(r.request.url)
+        body = {"results": [{"user": {"login": f"user{i}"}, "count": 50 - i} for i in range(5)]}
+        r.fulfill(status=status, json=body, headers={"access-control-allow-origin": "*"})
+
+    page.route(IDENT, route)
+    return urls
+
+
+def open_who(browser, base, hash_="", status=200):
+    page = ib.open_identify(browser, base, hash_, size=WIDE)
+    urls = stub_identifiers(page, status)
+    blank_map(page)
+    page.wait_for_function("__identify.ids().length > 0")
+    page.click("#bwho")
+    page.wait_for_selector("#sgwho .sgr")
+    return page, urls
+
+
+def test_who_lists_the_top_identifiers_as_profile_links(browser, site):
+    base, _ = site
+    page, urls = open_who(browser, base)
+    page.wait_for_selector("#sgwho a.sga")
+    links = page.locator("#sgwho a.sga")
+    assert links.count() == 5 and links.first.inner_text().startswith("user0 (50)")
+    assert links.first.get_attribute("href") == "https://www.inaturalist.org/people/user0"
+    assert links.first.get_attribute("target") == "_blank"
+    assert "noopener" in links.first.get_attribute("rel")
+    assert len(urls) == 1 and "per_page=5" in urls[0] and "taxon_id" not in urls[0]
+    links.first.focus()
+    assert "look=" not in hash_(page) and page.errors == []
+
+
+def test_the_top_identifiers_are_asked_per_what_taxon_once(browser, site):
+    base, _ = site
+    page, urls = open_who(browser, base, "#taxa=900")
+    page.wait_for_selector("#sgwho a.sga")
+    assert len(urls) == 1 and "taxon_id=900" in urls[0]
+    page.click("#bwho")
+    page.click("#bwho")
+    page.wait_for_selector("#sgwho a.sga")
+    assert len(urls) == 1
+
+
+def test_the_top_identifiers_hide_when_the_fetch_fails(browser, site):
+    base, _ = site
+    page, urls = open_who(browser, base, status=500)
+    page.wait_for_timeout(300)
+    assert len(urls) == 1 and page.locator("#sgwho a.sga").count() == 0
+    assert page.locator("#sgwho .sgr").count() > 0

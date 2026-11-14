@@ -157,7 +157,7 @@ function fill(k){
   if(k===0){counts();if(XL)xl();}
   else if(k===1)MH.draw();
   else if(k===2){if(W)W.show();SG.where();}
-  else [].forEach.call(SEG[3].p.querySelectorAll('details details'),function(d){d.open=true;});  // Who: the threshold sits in a closed Adjust
+  else{SG.who();[].forEach.call(SEG[3].p.querySelectorAll('details details'),function(d){d.open=true;});}  // Who: the threshold sits in a closed Adjust
 }
 function place(k){
   var r=SEG[k].b.getBoundingClientRect(),b=bar.getBoundingClientRect(),p=SEG[k].p;

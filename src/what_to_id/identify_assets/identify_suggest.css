@@ -4,6 +4,8 @@
 .sgh{margin:8px 0 4px;font-size:12px;font-weight:650;color:var(--muted)}
 .sgn,.sgm{margin:2px 0 6px;font-size:12px}
 .sgm:empty{display:none}
+.sga{display:inline-block;min-height:24px;line-height:24px;margin-right:10px;color:var(--ink);text-decoration:underline}
+.sga:focus-visible{outline:3px solid var(--bar);outline-offset:1px}
 .sgl{list-style:none;margin:0 0 6px;padding:0;display:flex;flex-direction:column;gap:2px}
 .sgr{display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;min-height:48px;padding:6px 8px;border:1px solid transparent;border-radius:12px;
   background:none;color:var(--ink);font:inherit;text-align:left;cursor:pointer}
