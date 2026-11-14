@@ -280,7 +280,8 @@ def test_a_photo_that_fails_leaves_a_blank_box_not_its_alt_text(browser, site):
     )
     # a late redraw (the look-alikes landing) can swap the card, so wait for its photo to fail too
     page.wait_for_function(
-        "getComputedStyle(document.querySelector('#grid .card .ph img')).visibility === 'hidden'"
+        "(i => !!i && getComputedStyle(i).visibility === 'hidden')"
+        "(document.querySelector('#grid .card .ph img'))"
     )
     assert page.errors == []
 
