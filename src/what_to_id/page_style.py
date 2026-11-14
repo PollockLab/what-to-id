@@ -1,18 +1,18 @@
 """Inline stylesheet and script for the identifier pages. Kept out of page.py for length.
 
 Colours come from page_nav.CSS (light and dark); the names below alias them for these pages. One
-system font stack, action green, uppercase section labels, pills and chips, literal arrows, no
-gradients, no icons, no animation beyond border and brightness on hover.
+system font stack, the ink pill button, uppercase section labels, pills and chips, literal
+arrows, no gradients, no icons, no animation beyond border and brightness on hover.
 """
 
 CSS = """
-:root{--mut:var(--muted);--acc:var(--bar);--gd:#22c55e;--gold:#f0a000;--card:var(--panel);
+:root{--mut:var(--muted);--acc:var(--bar);--gd:var(--good);--gold:#f0a000;--card:var(--panel);
 --cink:var(--ink);--cmut:var(--muted);--line2:var(--line);--inset:var(--chip);--acc-ink:var(--ink);
 --gd-ink:var(--bar);--gold-ink:var(--warn)}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,
 "Segoe UI",sans-serif}
-main{max-width:64rem;margin:0 auto;padding:1.4rem 1rem 4rem}
+main{max-width:1100px;margin:0 auto;padding:1.4rem 1rem 4rem}
 h1{font-size:1.5rem;line-height:1.16;font-weight:700;margin:.2rem 0 .2rem}
 h1 a{color:var(--acc);text-decoration:underline;text-decoration-thickness:1px;
 text-underline-offset:3px}
@@ -47,7 +47,7 @@ td a{color:var(--gd-ink)}
 tbody tr:last-child td,tbody tr:last-child th{border-bottom:0}
 .groupnav{display:flex;flex-wrap:wrap;gap:.35rem;margin:1rem 0 .5rem}
 .groupnav a{color:var(--ink);text-decoration:none;font-size:.85rem;font-weight:500;
-padding:.25rem .7rem;border:1px solid var(--line);border-radius:14px;background:var(--panel);
+padding:.25rem .7rem;border:1px solid var(--line);border-radius:999px;background:var(--panel);
 transition:border-color .12s}
 .groupnav a:hover{border-color:var(--acc)}
 ul.batches{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:.45rem}
@@ -64,11 +64,9 @@ white-space:nowrap}
 .facts{color:var(--cmut);font-size:.88rem}
 .thumbs{display:flex;gap:.25rem}
 .thumbs img{width:44px;height:44px;object-fit:cover;border-radius:6px;background:var(--inset)}
-.btn{display:inline-block;padding:.45rem .85rem;background:var(--gd);color:#062a12;
-border-radius:8px;text-decoration:none;font-weight:700;white-space:nowrap;
-transition:filter .12s}
-.btn::after{content:" \\2192"}
-.btn:hover{filter:brightness(1.08)}
+.btn{display:inline-flex;align-items:center;min-height:30px;padding:0 12px;background:var(--on);
+color:var(--onink);border-radius:999px;text-decoration:none;font-size:13px;font-weight:650;
+white-space:nowrap}
 .prov{margin-top:3rem;color:var(--mut);font-size:.82rem}
 p.yourset{display:flex;align-items:center;gap:.7rem;margin:1.2rem 0 0;font-size:1.02rem}
 p.yourset .swap{color:var(--mut);font-size:.88rem}

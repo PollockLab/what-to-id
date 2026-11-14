@@ -119,16 +119,17 @@ MORE_LINKS = {"survey-days": BLITZ}
 CSS = """
 :root{--bg:#fbfbf9;--panel:#fff;--ink:#1d1d1b;--muted:#5f5e58;--line:#dcdbd3;--dot:42,120,214;
   --bar:#206dcb;--total:#d5e3f5;--share:#c2410c;--chip:#f0efe9;--on:#1d1d1b;--onink:#fff;
---warn:#8a4b00;--warnbg:#fdf0dc;
+--warn:#8a4b00;--warnbg:#fdf0dc;--good:#1a7f37;
   --shadow:0 4px 16px rgba(0,0,0,.18)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1a1a19;--panel:#222220;
   --ink:#fff;--muted:#c3c2b7;--line:#3a3a37;--dot:57,135,229;--bar:#529aeb;--total:#2b3a4d;
 --share:#fb923c;--chip:#2c2c2a;--on:#fff;
-  --onink:#1a1a19;--warn:#ffc27a;--warnbg:#3a2a14;--shadow:0 4px 16px rgba(0,0,0,.5)}}
+  --onink:#1a1a19;--warn:#ffc27a;--warnbg:#3a2a14;--good:#57d17a;
+  --shadow:0 4px 16px rgba(0,0,0,.5)}}
 :root[data-theme="dark"]{--bg:#1a1a19;--panel:#222220;--ink:#fff;--muted:#c3c2b7;--line:#3a3a37;
   --dot:57,135,229;--bar:#529aeb;--total:#2b3a4d;--share:#fb923c;--chip:#2c2c2a;--on:#fff;
 --onink:#1a1a19;--warn:#ffc27a;
-  --warnbg:#3a2a14;--shadow:0 4px 16px rgba(0,0,0,.5)}
+  --warnbg:#3a2a14;--good:#57d17a;--shadow:0 4px 16px rgba(0,0,0,.5)}
 :focus-visible{outline:3px solid var(--bar);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){*,::before,::after{
   transition-duration:.01ms!important;animation-duration:.01ms!important;
@@ -151,6 +152,12 @@ color:var(--muted);
 .site-nav a:hover{color:var(--ink);background:var(--chip)}
 .site-nav a[aria-current="page"]{color:var(--ink);font-weight:650;border-bottom-color:var(--on)}
 .site-nav .ext{margin-left:auto;font-size:.875em}
+.infob{display:inline-flex;align-items:center;justify-content:center;flex:none;width:28px;
+height:28px;padding:0;border:1px solid var(--line);border-radius:999px;background:var(--panel);
+color:var(--ink);cursor:pointer}
+.infob:hover{border-color:var(--ink)}
+.infob svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;
+stroke-linecap:round}
 .site-mark{height:16px;width:auto;margin-right:6px;vertical-align:middle}
 @media (max-width:480px){.site-nav .ext{display:none}}
 .site-vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);
@@ -281,7 +288,7 @@ HELP_CSS = """
 .hm>button:hover,.hm>button[aria-expanded=true]{background:var(--chip)}
 .hm svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
 .hm ul{position:absolute;right:0;top:100%;z-index:60;margin:0;padding:4px;list-style:none;
-  min-width:11em;background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  min-width:11em;background:var(--panel);border:1px solid var(--line);border-radius:12px;
   box-shadow:var(--shadow)}
 .hm li a{display:flex;align-items:center;min-height:44px;padding:0 12px;border-radius:6px;
   color:var(--ink);text-decoration:none;white-space:nowrap}
