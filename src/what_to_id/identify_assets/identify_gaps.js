@@ -2,7 +2,7 @@
 // survey days range (observer-days of a cell, hash gap=lo-hi, the old gap=n reads 0-n, absent or 0-30 off). Five prioritizers each carry a weight 0 (off) to 100 and
 // add up to one score of weight x metric 0..1 (hash pri=conf:70,gap:100, pri=none for all off): Match (level 3 by its rank percentile, else the score bucket), Survey gap
 // (1 - observer-days/30, 0 without data), At risk, Invasive and Out of range (0 or 1). The old pri values 0..3 read as 0, 33, 67, 100.
-// A link without pri= keeps the tiered order it always had (hash sort=conf, sort=gaps and the default blend of the confidence band and the gap tier).
+// A link without pri= starts from the Blitz the gap preset; an old sort=conf or sort=gaps link keeps the tiered order it always had (the confidence band and the gap tier).
 // Presets are sets of weights. Ties go to the confidence order when base= is absent and a prioritizer is on, else to the base order (hash base=new|old|rand:<seed>).
 // Gaps come from where-to-blitz's checklist layer (one 25 km PNG per group, read at run time) for every record of every level. A failed load leaves every gap at 0.
 // IdentifyGaps(ctx), ctx {P, groups (META.groups), keep(i) the records to read, pct(i) the place of a level 3 record in its level 0..1, band(i) 0..3,
@@ -11,11 +11,11 @@
 var IdentifyGaps=(function(){
 'use strict';
 var BASE='https://pollocklab.github.io/where-to-blitz/',DIR=BASE+'cluster_results/checklist/',RES='25000',ALL='All biodiversity',
-  KEYS=['conf','gap','risk','inv','out'],LEG=[0,33,67,100],DEFAULT={conf:1,gap:1,risk:0,inv:0,out:0},LIT0=30,
+  KEYS=['conf','gap','risk','inv','out'],LEG=[0,33,67,100],DEFAULT={conf:40,gap:100,risk:60,inv:0,out:0},LEGACY={conf:1,gap:1,risk:0,inv:0,out:0},LIT0=30,
   NAMES={conf:['Match','best matches'],gap:['Survey gap','biggest survey gaps'],risk:['At risk','at-risk species'],inv:['Invasive','invasive species'],
     out:['Out of range','records out of range']},
   EXPLAIN={conf:'best-match',gap:'survey-days'},
-  PRESETS=[['blitz','Blitz the gap',{gap:100,risk:60,conf:40}],['quick','Quick wins',{conf:100}],['surprise','Surprises',{out:100,conf:40}],['newest','Newest',{}]],
+  PRESETS=[['blitz','Blitz the gap',{gap:100,risk:60,conf:40}],['quick','Quick wins',{conf:100}],['unusual','Unusual',{out:100,conf:40}],['newest','Newest',{}]],
   BASES={new:'newest first',old:'oldest first',rand:'random order'},NODAYS=65535;
 function $(id){return document.getElementById(id);}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
@@ -45,9 +45,9 @@ function compare(o){
     return o.key[x]-o.key[y]||o.score[x]-o.score[y]||(o.fine?o.fine[x]-o.fine[y]:0)||
       (o.base==='old'?o.id[y]-o.id[x]:o.base==='rand'?rnd(x)-rnd(y):o.id[x]-o.id[y]);};
 }
-// the state in the hash: top (conf=), gap (gap=), w (pri=, else the old sort=), base and seed (base=). legacy: no pri=, so w holds the old 0..3 levels.
+// the state in the hash: top (conf=), gap (gap=), w (pri=, else the Blitz the gap weights), base and seed (base=). legacy: an old sort= link, so w holds the old 0..3 levels.
 function read(){
-  var h=location.hash.slice(1),w=Object.assign({},DEFAULT),legacy=true;
+  var h=location.hash.slice(1),w=Object.assign({},DEFAULT),legacy=false;
   function m(k){var r=new RegExp('(?:^|&)'+k+'=([^&]*)').exec(h);return r?decodeURIComponent(r[1]):null;}
   var c=m('conf'),g=m('gap'),p=m('pri'),s=m('sort'),b=m('base'),top=c==='all'?100:Math.round(+c);
   if(p!=null){
@@ -57,7 +57,7 @@ function read(){
     var old=KEYS.every(function(k){return !(k in v)||v[k]<=3;});  // 0..3 are the old levels
     KEYS.forEach(function(k){if(k in v)w[k]=old?LEG[v[k]]:v[k];});
   }else if(s!=null){
-    var l=s.split(',');
+    var l=s.split(',');w=Object.assign({},LEGACY);legacy=true;
     if(l.indexOf('conf')<0||l.indexOf('gaps')<0){w.conf=+(l.indexOf('conf')>=0);w.gap=+(l.indexOf('gaps')>=0);}
   }
   var bm=b&&/^(?:(new|old)|rand:(\d+))$/.exec(b),gm=g&&/^(\d+)(?:-(\d+))?$/.exec(g),gap=null;
@@ -68,13 +68,11 @@ function read(){
 var F=function(ctx){
   var P=ctx.P,st=read(),state='load',settle,ready=new Promise(function(r){settle=r;}),tier=null,days=null,names=null,LIT=LIT0,UI=null,T=0;
   function alloff(){return !KEYS.some(function(k){return st.w[k]>0;});}
-  // the weight as the sliders show it, 0..100; the landing default shows as the Blitz the gap preset
-  function disp(k){return isdef()?PRESETS[0][2][k]||0:st.legacy?LEG[st.w[k]]:st.w[k];}
+  function disp(k){return st.legacy?LEG[st.w[k]]:st.w[k];}  // the weight as the sliders show it, 0..100
   function toNew(){if(st.legacy){KEYS.forEach(function(k){st.w[k]=disp(k);});st.legacy=false;st.sort=null;}}  // a touched slider leaves the old tiered order
-  function isdef(){return st.top===5&&st.gap==null&&!st.explicit&&st.legacy&&KEYS.every(function(k){return st.w[k]===DEFAULT[k];});}
-  // the preset the weights are, null for Custom; the old default blend counts as Blitz the gap
+  function isdef(){return st.top===5&&st.gap==null&&!st.explicit&&!st.legacy&&KEYS.every(function(k){return st.w[k]===DEFAULT[k];});}
+  // the preset the weights are, null for Custom
   function preset(){
-    if(isdef())return 'blitz';
     var hit=PRESETS.filter(function(x){return !st.legacy&&KEYS.every(function(k){return st.w[k]===(x[2][k]||0);})&&(x[0]!=='newest'||st.base==='new');})[0];
     return hit?hit[0]:null;
   }
@@ -106,7 +104,7 @@ var F=function(ctx){
     if(st.top!==5)t.push('conf='+(st.top===100?'all':st.top));
     if(st.gap)t.push('gap='+st.gap[0]+'-'+st.gap[1]);
     if(st.legacy){if(st.sort)t.push('sort='+st.sort);}
-    else t.push('pri='+(alloff()?'none':KEYS.filter(function(k){return st.w[k];}).map(function(k){return k+':'+Math.max(4,st.w[k]);}).join(',')));
+    else if(!KEYS.every(function(k){return st.w[k]===DEFAULT[k];}))t.push('pri='+(alloff()?'none':KEYS.filter(function(k){return st.w[k];}).map(function(k){return k+':'+Math.max(4,st.w[k]);}).join(',')));
     if(st.explicit)t.push('base='+(st.base==='rand'?'rand:'+st.seed:st.base));
     history.replaceState(null,'','#'+t.join('&'));
   }
@@ -174,7 +172,7 @@ var F=function(ctx){
     [['new','newest'],['old','oldest'],['rand','random']].forEach(function(x){var op=el('option',null,x[1]);op.value=x[0];bs.appendChild(op);});
     bs.onchange=function(){st.base=bs.value;st.explicit=true;if(st.base==='rand')st.seed=1+Math.floor(Math.random()*1e6);change();};
     sh.onclick=function(){st.seed=1+Math.floor(Math.random()*1e6);change();};
-    rs.onclick=function(){st=Object.assign(read(),{top:5,gap:null,w:Object.assign({},DEFAULT),legacy:true,sort:null,base:'new',explicit:false});change();};
+    rs.onclick=function(){st=Object.assign(read(),{top:5,gap:null,w:Object.assign({},DEFAULT),legacy:false,sort:null,base:'new',explicit:false});change();};
     br.append(bl,bs,sh);
     var top=slider('ptop',1,100,'Best','best-match'),dual=el('div','prow2 pdl'),dl=el('span'),gv=el('b'),lo=el('input'),hi=el('input'),box2=el('div','pdual'),cap=el('div','pcap');
     top.input.oninput=function(){st.top=+top.input.value;change(150);};

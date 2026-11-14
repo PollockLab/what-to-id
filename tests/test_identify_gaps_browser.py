@@ -117,7 +117,6 @@ def test_each_sort_state_orders_level_3_as_it_says(browser, site):
     base, pts = site
     n3, rank, band = ranks(base, pts)
     keys = {
-        "": lambda i, t: (band(i) - t, band(i), rank[i]),  # the blend
         "&sort=conf": lambda i, t: (rank[i],),
         "&sort=gaps": lambda i, t: (-t, rank[i]),
         "&sort=conf,gaps": lambda i, t: (band(i) - t, band(i), rank[i]),
@@ -129,7 +128,7 @@ def test_each_sort_state_orders_level_3_as_it_says(browser, site):
         assert [key(i, tier[i]) for i in ids] == sorted(key(i, tier[i]) for i in ids), sort
         assert page.errors == []
         page.close()
-    page = open_with(browser, base, "&conf=all")  # the blend lets a gap outrank a lit record
+    page = open_with(browser, base, "&conf=all&sort=conf,gaps")  # the blend lets a gap outrank
     # over every level 3 record: the cap by suggestion leaves this fixture (3 look-alikes) a handful
     ids = sorted(pts["id"][pts["level"] == 3].tolist(), key=lambda i: rank[i])
     tier = {i: page.evaluate(f"__identify.gap({i})") for i in ids}
@@ -429,3 +428,13 @@ def test_a_high_survey_gap_score_means_few_observer_days(browser, site):
     tiers = [page.evaluate(f"__identify.gap({i})") for i in ids]  # 2 under 15 days, 0 at 30 or more
     assert tiers[0] == 2 and tiers == sorted(tiers, reverse=True)  # fewest days first, not most
     assert page.errors == []
+
+
+def test_the_default_order_is_the_blitz_the_gap_preset(browser, site):
+    base, _ = site
+    page = open_with(browser, base, "")
+    default = view(page)
+    page.close()
+    page = open_with(browser, base, "&pri=gap:100,risk:60,conf:40")
+    assert len(default) > 3 and view(page) == default
+    assert page.inner_text("#sortb").strip().startswith("Blitz the gap")
