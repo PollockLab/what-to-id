@@ -17,27 +17,22 @@ body{display:flex;flex-direction:column}
 .counts{color:var(--muted)}
 .counts b{color:var(--ink);font-weight:650;font-variant-numeric:tabular-nums}
 #sf{position:relative;display:inline-flex;gap:6px;flex:0 1 auto;min-width:0}
-#sg{position:absolute;left:0;top:100%;z-index:40;width:max(100%,320px);max-width:calc(100vw - 24px);margin:4px 0 0;padding:4px 0;list-style:none;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);white-space:normal}
+#sg{position:absolute;left:0;top:100%;z-index:40;width:max(100%,320px);max-width:calc(100vw - 24px);margin:4px 0 0;padding:4px 0;list-style:none;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);white-space:normal}
 #sg[hidden]{display:none}
 #sg li{padding:6px 10px;cursor:pointer;min-height:36px}
 #sg li span{display:block;color:var(--muted);font-size:12px}
 #sg li i{float:right;margin-left:8px;font-style:normal;font-size:11px;color:var(--muted)}
 #sg li[aria-selected="true"]{background:var(--chip)}
-#sq{font:inherit;font-size:13px;width:min(230px,30vw);min-width:120px;flex:0 1 auto;min-height:28px;padding:0 10px;border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--ink)}
-#sf button{font:inherit;font-size:12px;min-height:28px;padding:0 11px;border:1px solid var(--line);border-radius:14px;background:var(--chip);color:var(--ink);cursor:pointer}
-.seg{display:inline-flex}
-.seg button,.xbar .i{font:inherit;font-size:12px;min-height:28px;padding:0 11px;border:1px solid var(--line);background:var(--chip);color:var(--ink);cursor:pointer}
-.xbar .back{display:inline-flex;align-items:center;font-size:12px;min-height:28px;padding:0 11px;border:1px solid var(--line);border-radius:14px;background:var(--chip);color:var(--ink);text-decoration:none;white-space:nowrap}
+#sq{font:inherit;font-size:13px;width:min(230px,30vw);min-width:120px;flex:0 1 auto;min-height:28px;padding:0 10px;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--ink)}
+#sf button{font:inherit;font-size:12px;min-height:28px;padding:0 11px;border:1px solid var(--line);border-radius:999px;background:var(--chip);color:var(--ink);cursor:pointer}
+.seg{display:inline-flex;gap:2px;padding:3px;border:1px solid var(--line);border-radius:20px;background:var(--panel)}
+.seg button{font:inherit;font-size:12px;min-height:28px;padding:0 11px;border:0;border-radius:999px;background:none;color:var(--ink);cursor:pointer}
+.xbar .back{display:inline-flex;align-items:center;font-size:12px;min-height:28px;padding:0 11px;border:1px solid var(--line);border-radius:999px;background:var(--chip);color:var(--ink);text-decoration:none;white-space:nowrap}
 .seg button{touch-action:none}
 .seg button.dr{position:relative;z-index:2;box-shadow:var(--shadow);cursor:grabbing}
-.seg button:first-child{border-radius:14px 0 0 14px}
-.seg button:last-child{border-radius:0 14px 14px 0}
-.seg button+button{border-left:0}
-.seg button[aria-pressed="true"]{background:var(--on);color:var(--onink);border-color:var(--on);font-weight:650}
-.seg button[aria-pressed="true"]+button[aria-pressed="true"]{border-left:1px solid var(--bg)}  /* shown panes stay told apart */
-.xbar .i{border-radius:50%;width:28px;padding:0;font-style:italic;font-weight:700;font-family:Georgia,serif}
+.seg button[aria-pressed="true"]{background:var(--on);color:var(--onink);font-weight:650}
 .note{position:absolute;z-index:30;top:100%;right:16px;width:min(380px,calc(100vw - 24px));margin:6px 0 0;padding:10px 12px;
-  background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);font-size:12px;color:var(--muted);white-space:normal}
+  background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);font-size:12px;color:var(--muted);white-space:normal}
 .note[hidden]{display:none}
 #main-content{flex:1 1 0;min-height:0;display:flex;overflow-x:auto;margin-bottom:calc(56px + env(safe-area-inset-bottom,0px))}  /* the state bar's band: it covers no pane's controls */
 #main-content iframe{flex:1 1 0;min-width:0;height:100%;border:0;background:var(--bg)}
@@ -56,10 +51,10 @@ body{display:flex;flex-direction:column}
 .sbn:empty{display:none}
 .sbc{display:flex;gap:4px;margin:0;padding:0;list-style:none;min-width:0;overflow-x:auto;scrollbar-width:none}
 .sbc:empty{display:none}
-.sbc li{display:inline-flex;align-items:center;flex:none;min-height:28px;padding:0 2px 0 10px;border-radius:14px;background:var(--chip);color:var(--ink)}
+.sbc li{display:inline-flex;align-items:center;flex:none;min-height:28px;padding:0 2px 0 10px;border-radius:999px;background:var(--chip);color:var(--ink)}
 .sbc button{width:24px;height:24px;padding:0;border:0;border-radius:50%;background:none;color:var(--muted);font:inherit;font-size:14px;cursor:pointer}
 .sbc button:hover{color:var(--ink);background:var(--line)}
-.sbar>button{flex:none;font:inherit;font-size:12px;min-height:28px;padding:0 12px;border:1px solid var(--line);border-radius:14px;background:var(--chip);color:var(--ink);cursor:pointer}
+.sbar>button{flex:none;font:inherit;font-size:12px;min-height:28px;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:var(--chip);color:var(--ink);cursor:pointer}
 .sbar>button[aria-expanded="true"]{background:var(--on);color:var(--onink);border-color:var(--on);font-weight:650}
 #main-content #tree{min-width:260px}
 #main-content.drag iframe{pointer-events:none}
@@ -70,7 +65,7 @@ body{display:flex;flex-direction:column}
 /* a phone: the pane switch on its own row, wide targets, then the search, then the counts */
 @media (max-width:800px){.xbar{flex:1 1 100%;margin:0 0 6px;flex-wrap:wrap;white-space:normal}
   .seg{flex:1 1 0;order:-1;max-width:420px}.seg button{flex:1 1 0;min-height:36px;padding:0 6px}
-  .xbar .i{order:-1;width:36px;min-height:36px}
+  .xbar .infob{order:-1;width:36px;height:36px}
   #sf{flex:1 1 100%}#sq{flex:1 1 0;width:auto;min-height:36px}#sf button{min-height:36px}}
 </style>
 </head>
