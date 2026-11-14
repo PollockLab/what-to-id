@@ -96,6 +96,7 @@ SCRIPTS = {
     "__IDENTIFY_CARD__": ASSETS / "identify_card.js",
     "__IDENTIFY_WHERE__": ASSETS / "identify_where.js",
     "__GROUP_ICONS__": ASSETS / "group_icons.js",
+    "__IDENTIFY_SUGGEST__": ASSETS / "identify_suggest.js",
     "__IDENTIFY_BAR__": ASSETS / "identify_bar.js",
     "__IDENTIFY_SHELL__": ASSETS / "identify_shell.js",
     "__IDENTIFY_APP__": ASSETS / "identify_app.js",
@@ -154,6 +155,7 @@ def render(
         "__IDENTIFY_UI_CSS__": (ASSETS / "identify_ui.css").read_text().rstrip(),
         "__IDENTIFY_SHELL_CSS__": (ASSETS / "identify_shell.css").read_text().rstrip(),
         "__IDENTIFY_BAR_CSS__": (ASSETS / "identify_bar.css").read_text().rstrip(),
+        "__IDENTIFY_SUGGEST_CSS__": (ASSETS / "identify_suggest.css").read_text().rstrip(),
         "__CONFIG__": json.dumps(
             {
                 "mapUrl": map_url,

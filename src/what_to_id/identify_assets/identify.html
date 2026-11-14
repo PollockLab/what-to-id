@@ -115,6 +115,7 @@ __MAP_PANELS_CSS__
 __IDENTIFY_UI_CSS__
 __IDENTIFY_SHELL_CSS__
 __IDENTIFY_BAR_CSS__
+__IDENTIFY_SUGGEST_CSS__
 </style></head><body>
 __SITE_NAV__<main id="main-content">
 <h1 class="site-vh">Identify</h1>
@@ -124,6 +125,7 @@ __SITE_NAV__<main id="main-content">
 <div class="top"><div id="bar" class="bar"><div class="bseg" role="group" aria-label="What, when, where, who">
 <button type="button" id="bwhat" class="seg1" aria-expanded="false" aria-controls="pwhat" disabled><small>What</small><b>All groups</b></button>
 <div id="pwhat" class="bpanel" role="group" aria-label="What" hidden>
+<div id="sgwhat" class="sg"></div>
 <div class="picker"><label for="q" class="vh">Find a taxon</label><input id="q" type="search" placeholder="Latin or common name, e.g. Carex" autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="sugg">
 <ul id="sugg" class="sugg" role="listbox" aria-label="Matching taxa" hidden></ul></div><p id="qn" class="muted" aria-live="polite"></p>
 <div id="cladebox" hidden><div id="clades" class="chips" role="group" aria-label="Taxon shortcuts"></div></div>
@@ -139,16 +141,17 @@ __SITE_NAV__<main id="main-content">
 <details class="sec" id="projbox" open hidden></details></div>
 <button type="button" id="bwhen" class="seg1" aria-expanded="false" aria-controls="pwhen" disabled><small>When</small><b>Any time</b></button>
 <div id="pwhen" class="bpanel" role="group" aria-label="When" hidden>
-<div class="row"><span class="tseg" role="group" aria-label="Date to filter on"><button type="button" id="byObs" aria-pressed="true">Observed</button><button type="button" id="byUp" aria-pressed="false">Uploaded</button></span>
+<div id="sgwhen" class="sg"></div><div class="wmain"><div class="row"><span class="tseg" role="group" aria-label="Date to filter on"><button type="button" id="byObs" aria-pressed="true">Observed</button><button type="button" id="byUp" aria-pressed="false">Uploaded</button></span>
 <span id="presets" class="chips" role="group" aria-label="Periods"></span></div>
 <div class="row"><span class="dates"><input id="from" type="date" aria-label="From"> to <input id="to" type="date" aria-label="To"></span></div>
 <div class="row"><span id="months" class="chips months" role="group" aria-label="Months of the year"></span><button type="button" id="mclear" class="link">Any month</button></div>
-<div class="histwrap"><canvas id="over" role="img" aria-label="Records per year, every year, on a log scale. Click a year to zoom to it."></canvas><p id="unit" class="unit"></p><canvas id="hist" role="img"></canvas><div id="htip" class="htip" hidden></div></div></div>
+<div class="histwrap"><canvas id="over" role="img" aria-label="Records per year, every year, on a log scale. Click a year to zoom to it."></canvas><p id="unit" class="unit"></p><canvas id="hist" role="img"></canvas><div id="htip" class="htip" hidden></div></div></div></div>
 <button type="button" id="bwhere" class="seg1" aria-expanded="false" aria-controls="pwhere" disabled><small>Where</small><b>Anywhere</b></button>
 <div id="pwhere" class="bpanel" role="group" aria-label="Where" hidden>
+<div id="sgwhere" class="sg"></div>
 <div id="wbox" class="wbox"><div class="wfoot"><button type="button" id="wexp" class="btn" aria-expanded="false">Expand map</button></div></div></div>
 <button type="button" id="bwho" class="seg1" aria-expanded="false" aria-controls="pwho" disabled><small>Who</small><b>Anyone</b></button>
-<div id="pwho" class="bpanel" role="group" aria-label="Who" hidden><p id="uload" class="muted" role="status">Loading your filters…</p><details id="usrbox" open hidden></details></div>
+<div id="pwho" class="bpanel" role="group" aria-label="Who" hidden><div id="sgwho" class="sg"></div><p id="uload" class="muted" role="status">Loading your filters…</p><details id="usrbox" open hidden></details></div>
 </div></div>
 <div id="qrow" class="qrow"><div id="tabs" class="tabs" role="tablist" aria-label="Level"></div>
 <span id="qchips" class="qchips"></span>
@@ -259,6 +262,7 @@ The login goes only to iNaturalist.</p></details>
 <script>__MAP_TIME__</script>
 <script>__IDENTIFY_WHERE__</script>
 <script>__GROUP_ICONS__</script>
+<script>__IDENTIFY_SUGGEST__</script>
 <script>__IDENTIFY_BAR__</script>
 <script>__IDENTIFY_PROGRESS__</script>
 <script>__IDENTIFY_APP__</script>

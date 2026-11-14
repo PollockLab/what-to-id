@@ -1,0 +1,27 @@
+/* The suggestions at the top of each search panel (identify_suggest.js): a list of rows, each an icon tile, a title and a muted line */
+.sg{margin:0 0 10px}.sg:empty{display:none}
+.bt .sg{display:none}
+.sgh{margin:8px 0 4px;font-size:12px;font-weight:650;color:var(--muted)}
+.sgn,.sgm{margin:2px 0 6px;font-size:12px}
+.sgm:empty{display:none}
+.sgl{list-style:none;margin:0 0 6px;padding:0;display:flex;flex-direction:column;gap:2px}
+.sgr{display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;min-height:48px;padding:6px 8px;border:1px solid transparent;border-radius:12px;
+  background:none;color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.sgr:hover{background:var(--chip)}
+.sgr[aria-pressed="true"]{background:var(--chip);border-color:var(--on)}
+.sgr[aria-disabled="true"]{opacity:.55}
+.sgr:focus-visible{outline:3px solid var(--bar);outline-offset:-2px}
+.sgi{--c:var(--ink);flex:none;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:6px;background:var(--chip);color:var(--muted)}
+.sgr:hover .sgi,.sgr[aria-pressed="true"] .sgi{background:var(--panel);color:var(--ink)}
+.sgi svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.sgi.grp svg{fill:color-mix(in srgb,var(--c) 50%,var(--muted));stroke:none;transition:fill .15s}
+.sgr:hover .sgi.grp svg,.sgr:focus-visible .sgi.grp svg,.sgr[aria-pressed="true"] .sgi.grp svg{fill:var(--c)}
+.sgx{display:flex;flex-direction:column;min-width:0}
+.sgt2{font-size:14px;font-weight:600;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sgs{font-size:12px;line-height:1.3;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* When: the quick picks sit in a column beside the dates and histograms on a wide screen, and stack on a phone */
+@media(min-width:761px){
+  #pwhen{width:min(700px,calc(100vw - 24px));display:grid;grid-template-columns:230px minmax(0,1fr);gap:0 16px;align-items:start}
+  #pwhen .sg{margin:0}
+  #pwhen .wmain{min-width:0}
+}

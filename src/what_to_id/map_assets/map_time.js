@@ -8,6 +8,7 @@ var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'
 function MapTime(o){
 var S=o.S,MF=o.mf,LAST=MF.LAST,MONTH=MF.MONTH,iso=MF.iso,dayOf=MF.dayOf,clamp=MF.clamp,from=o.from,to=o.to;
 var PRESETS=[
+  ['Last 7 days',function(){return [clamp(LAST-6),LAST];}],
   ['Last 30 days',function(){return [clamp(LAST-29),LAST];}],
   ['Last 12 months',function(){return [clamp(LAST-364),LAST];}],
   ['This year',function(){return [clamp(dayOf(iso(LAST).slice(0,4)+'-01-01')),LAST];}],

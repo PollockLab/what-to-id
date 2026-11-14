@@ -6,10 +6,10 @@
 // panel, Esc closes it and returns to the segment, a click outside closes it.
 // IdentifyBar(o), o {S, META, mf (MapFilter(META)), nf, taxa(), P(), tf() (the taxon filter), mask(st) (1 per record
 // st keeps at the chosen level), all(st) (the same at every level), tab() ({name, has(i)}: the chosen
-// level), changed() (S changed), where(rings, hash) (the area changed), get(url), map (the map
+// level), changed() (S changed), rewrite(drop, add) (the address's tokens), where(rings, hash) (the area changed), get(url), map (the map
 // page's address), key() (the selection as text), embedded}.
 // Returns update(), called after every selection and level change. Needs map_taxa.js, map_chips.js, map_area.js,
-// group_list.js, map_hist.js, map_time.js, map_only.js and identify_where.js.
+// group_list.js, map_hist.js, map_time.js, map_only.js, identify_where.js and identify_suggest.js.
 var IdentifyBar=(function(){
 'use strict';
 var NAMES=['What','When','Where','Who'];
@@ -102,6 +102,8 @@ function tc(){
 if(META.files.totals)o.get(META.files.totals).then(function(b){TOT=JSON.parse(new TextDecoder().decode(b));update();}).catch(function(){});
 var TM=MapTime({S:S,mf:MF,render:o.changed,refilter:o.changed,byObs:$('byObs'),byUp:$('byUp'),presets:$('presets'),from:$('from'),to:$('to'),
   months:$('months'),mclear:$('mclear')});
+var SG=IdentifySuggest({S:S,META:META,mf:MF,nf:o.nf,P:o.P,taxa:o.taxa,allc:function(){return ALLC;},short:short,tm:TM,changed:o.changed,rewrite:o.rewrite,
+  area:function(rings,h,l){LBL=l;o.where(rings,h);if(W)W.reset();},get:o.get,embedded:o.embedded});
 var MH=MapHist({S:S,META:META,mf:MF,nf:o.nf,over:$('over'),hist:$('hist'),htip:$('htip'),unit:$('unit'),cum:cum,sub:{cum:function(){cum();return SUB;},name:function(){return o.tab().name;}},tc:tc,render:o.changed});
 
 // Where: the live map (identify_where.js), loaded when the panel first opens. Until then, and for a shared link's area, a
@@ -154,7 +156,7 @@ function fill(k){
   if(!visible(k))return;
   if(k===0){counts();if(XL)xl();}
   else if(k===1)MH.draw();
-  else if(k===2){if(W)W.show();}
+  else if(k===2){if(W)W.show();SG.where();}
   else [].forEach.call(SEG[3].p.querySelectorAll('details details'),function(d){d.open=true;});  // Who: the threshold sits in a closed Adjust
 }
 function place(k){
@@ -217,7 +219,7 @@ function update(){
   CUM=null;TC=undefined;if(W)W.sync();
   var w=[what(),when(),where(),who()];
   SEG.forEach(function(s,k){s.l.textContent=w[k];ACC[k].h.lastChild.textContent=w[k];});
-  GL.show();TM.update();OL.show();CL.show();
+  GL.show();TM.update();OL.show();CL.show();SG.update();
   if(!visible(0))tally();  // the open What panel counts for itself (fill)
   SEG.forEach(function(s,k){if(!s.b.hidden)fill(k);});
 }

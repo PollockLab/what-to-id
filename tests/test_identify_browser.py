@@ -14,6 +14,7 @@ import pytest
 
 from what_to_id import page_identify, pool_levels, site_files
 from what_to_id.identify import IDENTIFY_COLUMNS
+from what_to_id.map_parks import PARKS_NAME, parks_blob
 from what_to_id.map_points import decode_points, encode_points
 from what_to_id.map_projects import add_projects
 from what_to_id.page_lookalike import site_records
@@ -44,6 +45,7 @@ def serve(root, frame, score, projects=None, totals=None):
         blobs["pool-totals.bin"] = gz
         meta.setdefault("files", {})["totals"] = "pool-totals.bin"
     add_projects(blobs, meta, projects)
+    blobs[PARKS_NAME] = parks_blob()  # the Where suggestions read the park list
     for name, blob in blobs.items():
         (root / name).write_bytes(blob)
     meta["value"] = [[953, 2, 5]]  # the at-risk list: Apis c, the www tests' third suggestion
