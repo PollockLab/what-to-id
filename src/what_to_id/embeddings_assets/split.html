@@ -10,6 +10,8 @@ __SITE_CSS__
 html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
 body{display:flex;flex-direction:column}
 .site-shell{flex-wrap:wrap;position:relative}
+/* above a phone the bar shrinks (the search box narrows) rather than wrapping under the nav on wider fonts */
+@media (min-width:801px){.site-shell{flex-wrap:nowrap}}
 .site-nav{flex:0 1 auto}
 /* the bar needs the row: the secondary Where to Blitz link would leave 1280 px about 1 % to spare, less with wider Linux fonts */
 @media (max-width:1439px){.site-nav .ext{display:none}}

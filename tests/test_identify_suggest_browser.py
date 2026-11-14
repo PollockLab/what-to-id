@@ -173,6 +173,7 @@ def test_a_suggestion_leaves_the_served_order_alone(browser, site):
     base, pts = site
     page = ib.open_identify(browser, base, "#lvl=1", size=WIDE)
     page.wait_for_function("__identify.ids().length > 0")
+    page.wait_for_load_state("networkidle")  # the rank and look files re-cut level 3
     full = page.evaluate("__identify.view()")
     page.click("#bwho")
     page.wait_for_selector("#sgwho .sgr")
