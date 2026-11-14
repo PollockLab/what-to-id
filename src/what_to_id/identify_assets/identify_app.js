@@ -261,7 +261,7 @@ function kindName(k){return (CFG.kinds.filter(function(x){return x[0]===k;})[0]|
 function kinds(){
   var box=$('kind'),ks=CFG.merge[LV];
   box.hidden=!ks;box.textContent='';if(!ks)return;
-  var g=el('div','seg');g.setAttribute('role','radiogroup');g.setAttribute('aria-label','Kind');
+  var g=el('div','seg');g.setAttribute('role','radiogroup');g.setAttribute('aria-label','Kind of possible error');
   [[0,'All']].concat(ks.map(function(k){return [k,kindName(k)];})).forEach(function(x){
     var b=el('button','segb',x[1]+' '+nf.format(x[0]?KC[x[0]]||0:S.total[LV]||0)),on=KF===x[0]||(!x[0]&&TAB[KF]!==LV);
     b.type='button';if(KX[x[0]])b.dataset.explain=KX[x[0]];b.setAttribute('role','radio');b.setAttribute('aria-checked',String(on));b.tabIndex=on?0:-1;
@@ -270,7 +270,7 @@ function kinds(){
   g.onkeydown=function(e){var d={ArrowLeft:-1,ArrowRight:1}[e.key],all=[].slice.call(g.children),at=all.indexOf(document.activeElement);
     if(!d||at<0)return;e.preventDefault();all[(at+d+all.length)%all.length].click();
     var c=$('kind').querySelector('[aria-checked=true]');if(c)c.focus();};  // the click drew the control again
-  box.append(el('span',null,'Kind: '),g);
+  box.append(g);
 }
 function counts(){
   [].forEach.call($('tabs').querySelectorAll('[data-lv]'),function(t){var n=S.total[+t.dataset.lv]||0,w=+t.dataset.lv===3&&GP&&RKW&&!RK&&GP.label();t.lastChild.textContent=w?'':nf.format(n);t.classList.toggle('zero',!n&&!w);});

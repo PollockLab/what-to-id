@@ -144,8 +144,8 @@ def render(
     )
     for key, value in {
         "__PRELOADS__": preload,
-        "__SITE_CSS__": page_nav.CSS,
-        "__SITE_NAV__": page_nav.nav(PAGE_NAME),
+        "__SITE_CSS__": f"{page_nav.CSS}\n{page_nav.HELP_CSS}",
+        "__SITE_NAV__": page_nav.help_bar(),
         "__IDENTIFY_RANGES_CSS__": (ASSETS / "identify_ranges.css").read_text().rstrip(),
         "__MAP_AREA_CSS__": (HERE / "map_assets" / "map_area.css").read_text().rstrip(),
         "__MAP_PANELS_CSS__": (HERE / "map_assets" / "map_panels.css").read_text().rstrip(),

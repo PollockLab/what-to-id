@@ -4,6 +4,8 @@
 :root[data-theme="dark"]{--good:#57d17a}
 .qchip svg,.shx svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round}
 .qrow{flex:1 1 100%;display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0}
+#kind{flex:1 1 100%;margin:-4px 0 0;font-size:12px}#kind:not([hidden]){min-height:28px}  /* a quieter row of the Might be wrong tab; its height is kept so the cards do not move */
+#kind .segb{min-height:26px;padding:0 10px}#kind .segb:not([aria-checked=true]){color:var(--muted)}
 .qseg{display:inline-flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:13px}
 .qseg .qlbl{font-weight:650}
 .qseg .srow{margin:0}.qseg .segnote{display:inline;margin:0}

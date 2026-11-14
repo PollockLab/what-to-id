@@ -260,3 +260,66 @@ def nav(
         f'<nav class="site-nav" aria-label="Views"{flags}>{"".join(links)}</nav>{extra}</div>\n'
         f"<script>{JS}</script>\n" + explain()
     )
+
+
+# Identify is the whole app, so it swaps the view switcher for a wordmark and a Help menu that
+# reaches the other pages. Confused pairs drops out when it answers 404, Explore shows only when
+# it answers (the same HEAD check the switcher uses).
+HELP_LINKS = (
+    ("terms.html", "How it works", ""),
+    ("confusion.html", "Confused pairs", " data-drop"),
+    ("explore.html", "Explore", " data-show hidden"),
+)
+HELP_CSS = """
+.appbar{max-width:1100px;margin:0 auto;padding:0 12px;display:flex;align-items:center;
+  justify-content:space-between;gap:8px;min-height:44px;
+  font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+.appbar .site-brand{color:var(--ink)}
+.hm{position:relative}
+.hm>button{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 10px;
+  font:inherit;color:var(--ink);background:none;border:0;border-radius:6px;cursor:pointer}
+.hm>button:hover,.hm>button[aria-expanded=true]{background:var(--chip)}
+.hm svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.hm ul{position:absolute;right:0;top:100%;z-index:60;margin:0;padding:4px;list-style:none;
+  min-width:11em;background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  box-shadow:var(--shadow)}
+.hm li a{display:flex;align-items:center;min-height:44px;padding:0 12px;border-radius:6px;
+  color:var(--ink);text-decoration:none;white-space:nowrap}
+.hm li a:hover{background:var(--chip)}
+.hm [hidden]{display:none!important}
+.embed .appbar{display:none}
+""".strip()
+HELP_JS = """
+(function(){var b=document.getElementById('hmbtn'),m=document.getElementById('hmenu');if(!b)return;
+function set(o){m.hidden=!o;b.setAttribute('aria-expanded',String(o));}
+b.onclick=function(){set(m.hidden);};
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!m.hidden){set(false);b.focus();}});
+document.addEventListener('click',function(e){if(!m.hidden&&!b.parentNode.contains(e.target))set(false);});
+m.addEventListener('focusout',function(e){if(e.relatedTarget&&!b.parentNode.contains(e.relatedTarget))set(false);});
+m.querySelectorAll('a[data-drop],a[data-show]').forEach(function(a){
+fetch(a.getAttribute('href'),{method:'HEAD'}).then(function(r){
+if(r.ok)a.parentNode.hidden=false;else if(a.hasAttribute('data-drop'))a.parentNode.remove();
+}).catch(function(){});});})();
+""".strip()
+
+
+def help_bar(base: str = "") -> str:
+    """Skip link, wordmark and the Help menu, for the page that is the whole app (Identify)."""
+    items = "".join(
+        f"<li{' hidden' if 'hidden' in flags else ''}>"
+        f'<a href="{escape(base + page)}"{flags.replace(" hidden", "")}>{label}</a></li>'
+        for page, label, flags in HELP_LINKS
+    )
+    icon = (
+        '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/>'
+        '<path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7M12 17h.01"/></svg>'
+    )
+    return (
+        f'<a class="site-skip" href="#main-content" {_SKIP}>Skip to content</a>\n'
+        f'<div class="appbar"><a class="site-brand" href="{escape(base)}index.html">'
+        'What to ID<span class="site-bc">\u00a0· BC</span></a>'
+        f'<div class="hm"><button type="button" id="hmbtn" aria-expanded="false" '
+        f'aria-controls="hmenu">{icon}Help</button>'
+        f'<ul id="hmenu" aria-label="Help" hidden>{items}</ul></div></div>\n'
+        f"<script>{HELP_JS}</script>\n" + explain()
+    )
