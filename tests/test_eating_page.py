@@ -164,7 +164,6 @@ def test_shows_it_asks_which_prey_and_a_confirmed_pair_turns_its_edge_green(brow
         card.locator(".which").is_visible()
         and card.locator(".which input").input_value() == "Myodes"
     )
-    assert card.locator(".which a").inner_text() == "Add it as Eating on iNaturalist"
     card.locator(".which button", has_text="Confirm").click()
     assert (
         page.locator("#net line.e.new").count() == 1
@@ -178,6 +177,76 @@ def test_shows_it_asks_which_prey_and_a_confirmed_pair_turns_its_edge_green(brow
     page.wait_for_function("window.__food && window.__text")
     assert page.locator("#net line.e.new").count() == 1 and page.inner_text("#used") == "16 used"
     assert page.errors == []
+
+
+def test_a_confirmed_mark_hands_off_to_inaturalist_with_a_copyable_name(browser, base):
+    stub = (
+        "Object.defineProperty(navigator,'clipboard',{configurable:true,"
+        "value:{writeText:t=>window.__fail?Promise.reject():(window.__c=t,Promise.resolve())}})"
+    )
+    page = open_page(browser, base + "#q=eats&x=Strix varia", stub)
+    draw_all(page)
+    card = page.locator("#cards li", has_text="Description mentions “myodes”")
+    assert not card.locator(".hand").is_visible()
+    card.locator("button", has_text="Shows it").click()
+    card.locator(".which button", has_text="Confirm").click()
+    link = card.locator(".hand a")
+    assert link.inner_text() == "Add Eating = Myodes on iNaturalist"
+    assert link.get_attribute("href") == "https://www.inaturalist.org/observations/502"
+    assert link.get_attribute("target") == "_blank" and "noopener" in link.get_attribute("rel")
+    assert "pick Eating" in card.locator(".hand .hint").inner_text()
+    assert card.locator(".hand .cs").get_attribute("aria-live") == "polite"
+    card.locator(".hand .cp").click()
+    assert (
+        card.locator(".hand .cs").inner_text() == "Copied"
+        and page.evaluate("window.__c") == "Myodes"
+    )
+    page.evaluate(
+        "Object.defineProperty(navigator,'clipboard',{value:{writeText:()=>Promise.reject()}})"
+    )
+    card.locator(".hand .cp").click()
+    assert card.locator(".hand .cs").inner_text() == "Copy failed"
+    stored = json.loads(page.evaluate("localStorage.getItem('wtid-loop')"))
+    assert stored["ann"]["502"]["v"] == "yes"
+    assert page.errors == []
+
+
+def test_the_eaten_by_field_is_handed_off_when_the_unknown_is_the_predator(browser, base):
+    page = open_page(browser, base + "#q=eaten&y=Mus musculus")
+    card = page.locator("#cards li", has=page.locator("a[href$='/observations/99']"))
+    card.locator("button", has_text="Shows it").click()
+    assert card.locator(".hand a").inner_text() == "Add Eaten by = Barred Owl on iNaturalist"
+    assert "pick Eaten by" in card.locator(".hand .hint").inner_text()
+    assert page.errors == []
+
+
+def test_the_question_modes_chips_and_keys_work_without_blocking(browser, base):
+    page = open_page(browser, base)
+    page.evaluate(
+        "window.__worst=0;let l=performance.now();"
+        "setInterval(()=>{const n=performance.now();"
+        "window.__worst=Math.max(window.__worst,n-l-50);l=n},50)"
+    )
+    modes = page.get_by_role("radio")
+    assert modes.all_inner_texts() == [
+        "Survey",
+        "X eats",
+        "eats Y",
+        "X eats Y",
+    ]  # named by their longer labels
+    page.locator("#try .chip").first.click()
+    page.wait_for_function("document.querySelectorAll('#cards li').length>0")
+    for k in "123":
+        page.keyboard.press(k)
+    assert page.locator("#cards li.done").count() == 3
+    for name in [
+        "What does X eat?",
+        "What eats Y?",
+        "Does X eat Y?",
+        "What evidence is there for the BC food web?",
+    ]:
+        page.get_by_role("radio", name=name).click()
+    assert page.evaluate("window.__worst") < 1000 and page.errors == []
 
 
 def test_keys_annotate_and_move_the_current_card(browser, base):

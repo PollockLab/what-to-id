@@ -71,6 +71,9 @@ function status(c){
   [].forEach.call(li.querySelectorAll('.mk button'),function(b){b.setAttribute('aria-pressed',String(!!a&&b.dataset.v===a.v));});
   s.textContent=!a?'':a.v==='yes'?'Shows it'+(a.pred&&a.prey?': '+pairText({pred:a.pred,prey:a.prey,tier:4}).replace(' eats ',' eating '):''):a.v==='no'?'Not visible':'Can’t tell';
   li.classList.toggle('done',!!a);
+  var h=li.querySelector('.hand'),y=!!a&&a.v==='yes'&&!!a.pred&&!!a.prey;h.hidden=!y;
+  if(y){var by=c.r.o.k==='by',n=E.label(by?a.pred:a.prey),f=by?'Eaten by':'Eating';h.dataset.name=n;
+    h.querySelector('a').textContent='Add '+f+' = '+n+' on iNaturalist';h.querySelector('.hint').textContent='On the observation, open Observation fields, pick '+f+', enter '+(by?'the predator':'the prey')+'.';h.querySelector('.cp').textContent='Copy';}
 }
 function next(){for(var k=1;k<=deck.length;k++){var i=(cur+k)%deck.length;if(!S.ann[deck[i].r.o.id]){focus(i);return;}}}
 function focus(i,quiet){
@@ -109,12 +112,17 @@ function card(c){
     E.el('p','evl',E.pl(o.np||1,'photo')+(o.c?' · '+E.pl(o.c,'comment'):'')+' · '+(o.on||'Date unknown')+' · '+(o.at||'Place unknown')));
   [['yes','Shows it','1'],['no','Not visible','2'],['unsure','Can’t tell','3']].forEach(function(x){
     var k=E.el('button',null,x[1]+' ');k.type='button';k.dataset.v=x[0];k.setAttribute('aria-pressed','false');k.append(E.el('kbd',null,x[2]));k.onclick=function(){focus(deck.indexOf(c));mark(c,x[0]);};b.append(k);});
-  var w=E.el('div','which'),pk=E.el('div','pk'),all=E.el('button','lnk all','Not in this list'),ok=E.el('button','ok','Confirm'),
-    add=E.el('a',null,'Add it as '+(o.k==='by'?'Eaten by':'Eating')+' on iNaturalist');
-  w.hidden=true;all.type=ok.type='button';add.href=OBS+o.id;add.target='_blank';add.rel='noopener';
-  w.append(E.el('span','lab','Which '+(o.k==='by'?'predator':'prey')+'?'),pk,ok,all,add);
+  var w=E.el('div','which'),pk=E.el('div','pk'),all=E.el('button','lnk all','Not in this list'),ok=E.el('button','ok','Confirm');
+  w.hidden=true;all.type=ok.type='button';
+  w.append(E.el('span','lab','Which '+(o.k==='by'?'predator':'prey')+'?'),pk,ok,all);
+  // the hand-off: the page never writes to iNaturalist, so a confirmed mark sends the reader to add the field there
+  var hd=E.el('div','hand'),ha=E.el('a'),cp=E.el('button','cp','Copy'),cs=E.el('span','cs');
+  hd.hidden=true;ha.href=OBS+o.id;ha.target='_blank';ha.rel='noopener';cp.type='button';cs.setAttribute('aria-live','polite');
+  cp.onclick=function(){var t=hd.dataset.name;
+    (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(function(){cs.textContent='Copied';},function(){cs.textContent='Copy failed';});};
+  hd.append(ha,cp,cs,E.el('p','hint evl'));
   var go=E.el('a','open','Open on iNaturalist');go.href=OBS+o.id;go.target='_blank';go.rel='noopener';
-  d.append(b,w,E.el('p','res'),go);li.append(a,d);
+  d.append(b,w,E.el('p','res'),hd,go);li.append(a,d);
   li.onclick=function(){if(cur!==deck.indexOf(c))focus(deck.indexOf(c));};
   status(c);return li;
 }
