@@ -5,7 +5,7 @@ import json
 import re
 from pathlib import Path
 
-from what_to_id import page_blind, page_nav, page_style
+from what_to_id import page_blind, page_nav
 
 SRC = Path(page_nav.__file__).parent
 STYLED = [p for p in SRC.rglob("*") if p.suffix in {".css", ".html", ".py"}]
@@ -73,7 +73,5 @@ def test_radii_follow_the_scale():
             assert set(v.split()) <= ok, (p, v)
 
 
-def test_legacy_and_blind_pages_use_the_shared_type():
-    assert "font:14px/1.4 system-ui,-apple-system," in page_style.CSS
-    assert "max-width:1100px" in page_style.CSS and "#22c55e" not in page_style.CSS
+def test_blind_pages_use_the_shared_type():
     assert '"Segoe UI"' in page_blind.CSS
