@@ -23,7 +23,7 @@ from what_to_id.glossary import GLOSSARY
 PAGES = (
     ("identify.html", "Identify"),
     ("confusion.html", "Confused pairs"),
-    ("terms.html", "Methods"),
+    ("terms.html", "How it works"),
 )
 OPTIONAL = {"confusion.html"}
 EXPLORE = "identify.html"

@@ -33,7 +33,7 @@ def test_the_pages_inside_explore_mark_identify(current):
 
 
 def test_the_tabs_are_identify_look_alikes_methods_and_the_site_link():
-    assert [label for _, label in PAGES] == ["Identify", "Confused pairs", "Methods"]
+    assert [label for _, label in PAGES] == ["Identify", "Confused pairs", "How it works"]
     assert "study.html" not in nav("identify.html")
     assert ">openbiodiversity.ca" in nav("identify.html")
     assert "Where to Blitz" not in nav("identify.html")

@@ -20,6 +20,8 @@ from what_to_id.page_method import METHOD_CSS, METHOD_JS
 from what_to_id.page_rotation import read_study
 
 HERE = Path(__file__).parent
+TOC_CSS = (HERE / "terms_assets/toc.css").read_text()
+TOC_JS = (HERE / "terms_assets/toc.js").read_text()
 PAGE_NAME = "terms.html"
 # Labels the key does not give, after "id" is read as "ID". Levels use the Identify names.
 LABELS = {
@@ -63,7 +65,8 @@ GROUPS = {
     ],
     "Prioritize": ["best-match", "survey-days"],
 }
-CSS = """
+CSS = (
+    """
 body{margin:0;background:var(--bg);color:var(--ink);
   font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
 main{max-width:55ch;margin:0 auto;padding:16px}  /* about 75 characters a line */
@@ -80,6 +83,13 @@ table.eval th,table.eval td{border-bottom:1px solid var(--line);padding:4px 8px;
 dt:target{background:var(--chip);outline:2px solid var(--bar)}
 .how{--mut:var(--muted);--acc:var(--bar)}
 """.strip()
+    + "\n"
+    + TOC_CSS.strip()
+)
+LEDE = (
+    "What the words on the other pages mean, how each view is made, and the study and methods "
+    "behind the order of the records."
+)
 # Linked from the Batches tab on Identify: what the study changes, records and asks.
 STUDY = """<h2 id="study">The study behind Batches</h2>
 <p>The Batches tab on Identify comes from a research study of which records to show identifiers
@@ -96,6 +106,33 @@ or switch to another tab at any time.</p>"""
 
 def label(key: str) -> str:
     return LABELS.get(key) or re.sub(r"\bid(s?)\b", r"ID\1", key.replace("-", " ").capitalize())
+
+
+def index(body: str) -> tuple[str, str]:
+    """(body, toc): every h2 and h3 gets an id (existing ones kept) and a hover anchor link."""
+    seen = set(re.findall(r'\bid="([^"]+)"', body))
+    entries = []
+
+    def head(m: re.Match) -> str:
+        tag, attrs, inner = m.groups()
+        text = re.sub(r"<[^>]+>", "", inner)
+        found = re.search(r'id="([^"]+)"', attrs)
+        slug = found.group(1) if found else re.sub("[^a-z0-9]+", "-", text.lower()).strip("-")
+        while not found and slug in seen:
+            slug += "-section"
+        seen.add(slug)
+        entries.append((int(tag[1]) - 2, slug, text))
+        link = f'<a class="anc" href="#{slug}" aria-label="Link to {escape(text)}">#</a>'
+        return f'<{tag} id="{slug}">{inner}{link}</{tag}>'
+
+    body = re.sub(r"<(h[23])((?: id=\"[^\"]+\")?)>(.*?)</\1>", head, body, flags=re.S)
+    items, depth = "<ol>", 0  # an h3 list nests inside the h2 entry before it
+    for i, (level, slug, text) in enumerate(entries):
+        if i:
+            items += "<ol>" if level > depth else "</li></ol></li>" if level < depth else "</li>"
+        depth = level
+        items += f'<li><a href="#{slug}">{text}</a>'
+    return body, items + "</li></ol>" * (depth + 1)
 
 
 def _cut(source: str, pattern: str) -> str:
@@ -159,18 +196,29 @@ def render(
     how = "\n".join(
         f'<section id="{i}"><h3>{escape(h)}</h3>\n{body}</section>' for i, h, body in views(dates)
     )
-    return (
-        '<!doctype html><html lang="en"><head><meta charset="utf-8">\n'
-        '<meta name="viewport" content="width=device-width,initial-scale=1">\n'
-        f"<title>How it works</title>\n<style>\n{page_nav.CSS}\n{CSS}\n</style></head><body>\n"
-        f'{page_nav.nav(PAGE_NAME)}<main id="main-content">\n<h1>How it works</h1>\n'
-        f"<h2>Terms</h2>\n{chr(10).join(terms)}\n<h2>How each view works</h2>\n{how}\n"
+    body = (
+        f'<h1>How it works</h1>\n<p class="lede">{LEDE}</p>\n'
+        '<h2 id="glossary">Glossary</h2>\n'
+        '<div id="find" hidden><label for="find-q">Find a term</label>'
+        '<input id="find-q" type="search" autocomplete="off">'
+        '<p id="find-n" role="status"></p></div>\n'
+        f'<div id="glossary-list">{chr(10).join(terms)}</div>\n'
+        f"<h2>How each view works</h2>\n{how}\n"
         f"{STUDY}\n{fold}\n"
         f'<h2 id="methods">Methods</h2>\n{terms_methods.render(manifest, data_url)}\n'
         f'<p>Planning a bioblitz? See <a href="{page_nav.BLITZ}" target="_blank" rel="noopener">'
         'Where to Blitz\u00a0<span aria-hidden="true">\u2197</span>'
         '<span class="site-vh"> (opens in a new tab)</span></a>.</p>\n'
-        "</main></body></html>\n"
+    )
+    body, toc = index(body)
+    return (
+        '<!doctype html><html lang="en"><head><meta charset="utf-8">\n'
+        '<meta name="viewport" content="width=device-width,initial-scale=1">\n'
+        f"<title>How it works</title>\n<style>\n{page_nav.CSS}\n{CSS}\n</style></head><body>\n"
+        f'{page_nav.nav(PAGE_NAME)}<div class="doc">\n'
+        f'<details id="toc"><summary>On this page</summary><nav aria-label="On this page">{toc}'
+        f'</nav></details>\n<main id="main-content">\n{body}</main></div>\n'
+        f"<script>{TOC_JS}</script></body></html>\n"
     )
 
 
