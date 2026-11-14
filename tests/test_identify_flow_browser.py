@@ -283,12 +283,12 @@ def test_a_photo_that_fails_leaves_a_blank_box_not_its_alt_text(browser, site):
     assert page.errors == []
 
 
-def test_the_keys_help_is_a_toggletip_on_hover_and_click_and_the_banner_is_gone(browser, site):
+def test_one_help_button_shows_the_keys_on_hover_and_opens_the_help_sheet_on_click(browser, site):
     base, _ = site
     page = level_3(browser, base)
-    assert page.locator("#tip").count() == 0
-    help_ = page.locator("#keys1")
-    assert help_.is_visible()
+    assert page.locator("#tip, #keys1").count() == 0  # no banner, no second "?"
+    help_ = page.locator("#helpb")
+    assert help_.is_visible() and page.locator(".rline .qicon").count() == 1
     help_.hover()
     pop = page.locator("#explain-pop")
     pop.wait_for(state="visible")
@@ -296,9 +296,7 @@ def test_the_keys_help_is_a_toggletip_on_hover_and_click_and_the_banner_is_gone(
     page.keyboard.press("Escape")
     assert pop.is_hidden()
     help_.click()
-    assert pop.is_visible() and "Enter opens iNat" in pop.inner_text()
-    page.mouse.click(5, 400)
-    assert pop.is_hidden()
+    assert page.locator("#help").is_visible()
     assert page.errors == []
 
 
