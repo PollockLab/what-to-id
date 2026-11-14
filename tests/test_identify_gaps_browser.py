@@ -17,10 +17,6 @@ from .test_identify_narrow_browser import rank_plane
 browser = eb.browser
 site = ib.site
 
-SHOTS = (
-    "/private/tmp/claude-503/-Users-w-Documents-Github-nosync/"
-    "ead84ba1-faad-4b13-8938-7e1161b3fa12/scratchpad"
-)
 DIR = "https://pollocklab.github.io/where-to-blitz/cluster_results/checklist/"
 LATTICE = {"ncol": 220, "nrow": 181, "res_m": 25000, "x0": -2150000, "y1": 4300000}
 
@@ -390,7 +386,6 @@ def test_dragging_a_handle_reorders_the_rows_and_sets_weights_that_hold_the_orde
     page.mouse.move(h["x"] + 4, t["y"] + 2, steps=6)
     assert page.query_selector("#sorto .pw.pdrag") is not None
     assert page.is_visible("#sorto .pdrop")
-    page.screenshot(path=f"{SHOTS}/dragrows-middrag.png")
     page.mouse.up()
     page.wait_for_function("location.hash.includes('pri=')")
     page.wait_for_function("document.querySelector('#sorto .pw input').id === 'pw-conf'")
@@ -398,7 +393,6 @@ def test_dragging_a_handle_reorders_the_rows_and_sets_weights_that_hold_the_orde
     w = [int(page.input_value(f"#pw-{k}")) for k in ("conf", "gap", "risk")]
     assert w[0] > w[1] > w[2]
     assert page.query_selector("#sorto .pw.pdrag") is None and not page.is_visible("#sorto .pdrop")
-    page.screenshot(path=f"{SHOTS}/dragrows-idle.png")
     assert page.errors == []
 
 
@@ -412,7 +406,6 @@ def test_the_rows_fit_at_390(browser, site):
     settle(page)
     page.click("#sortb")
     assert page.eval_on_selector("#sortpop", "e => e.scrollWidth <= e.clientWidth + 1")
-    page.screenshot(path=f"{SHOTS}/dragrows-390.png")
 
 
 def test_old_pri_values_read_as_levels_and_legacy_links_keep_their_hash(browser, site):
