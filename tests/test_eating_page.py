@@ -44,16 +44,16 @@ def test_the_survey_is_the_default_and_lists_pairs_in_the_matrix_and_network(bro
 
 def test_the_sentence_builder_updates_the_hash_and_the_slots(browser, base):
     page = open_page(browser, base)
-    page.click("#modes button:has-text('What does X eat?')")
+    page.click("#modes [data-q=eats]")
     page.wait_for_function("location.hash.includes('x=Strix')")
     assert (
         page.inner_text("#sent").startswith("What does")
         and page.locator("#sent input").input_value() == "Barred Owl"
     )
-    page.click("#modes button:has-text('What eats Y?')")
+    page.click("#modes [data-q=eaten]")
     page.wait_for_function("document.getElementById('sent').textContent.startsWith('What eats')")
     assert page.locator("#sent input").count() == 1
-    page.click("#modes button:has-text('Does X eat Y?')")
+    page.click("#modes [data-q=does]")
     page.locator("#sent input").nth(1).wait_for()
     assert page.locator("#sent input").count() == 2 and page.inner_text("#sent").startswith("Does")
     assert page.locator("#modes [aria-checked=true]").count() == 1 and page.errors == []
@@ -74,7 +74,6 @@ def test_a_matrix_cell_click_asks_does_x_eat_y_and_highlights_the_cell(browser, 
 def draw_all(page):
     page.fill("#budget", "50")
     page.press("#budget", "Tab")
-    page.click("#draw")
     page.click("#draw")
 
 
@@ -114,12 +113,9 @@ def test_a_blank_zero_or_unknown_taxon_falls_back_to_a_default_and_never_shows_z
 
 def test_draw_ten_returns_at_most_ten_ranked_cards_and_spends_the_budget(browser, base):
     page = open_page(browser, base + "#q=eats&x=Strix varia")
-    assert (
-        page.inner_text("#cand").startswith("16 candidate observations")
-        and page.locator("#cards li").count() == 0
-    )
-    page.click("#draw")
+    assert page.inner_text("#cand").startswith("6 candidate observations")  # 16, ten already drawn
     assert page.locator("#cards li").count() == 10 and page.inner_text("#used") == "10 used"
+    assert page.get_attribute("#mbar", "aria-valuenow") == "10"
     assert page.inner_text("#draw") == "Draw ten more"
     first = page.locator("#cards li").first
     assert (
@@ -151,7 +147,6 @@ def test_why_drawn_names_the_text_that_mentions_a_candidate(browser, base):
     assert "Description mentions “mouse”" in why and "Description mentions “myodes”" in why
     assert "The field names Mus, not a species" in why
     page = open_page(browser, base + "#q=eaten&y=Myodes")
-    page.click("#draw")
     assert page.locator("#cards li").count() >= 1
     assert page.errors == []
 
@@ -187,7 +182,6 @@ def test_shows_it_asks_which_prey_and_a_confirmed_pair_turns_its_edge_green(brow
 
 def test_keys_annotate_and_move_the_current_card(browser, base):
     page = open_page(browser, base + "#q=eats&x=Strix varia")
-    page.click("#draw")
     cards = page.locator("#cards li")
     assert "cur" in cards.nth(0).get_attribute("class")
     page.keyboard.press("2")
@@ -205,7 +199,6 @@ def test_keys_annotate_and_move_the_current_card(browser, base):
 
 def test_export_is_a_csv_of_the_annotations(browser, base):
     page = open_page(browser, base + "#q=eats&x=Strix varia")
-    page.click("#draw")
     page.keyboard.press("1")  # a field-named pair: no question, the pair is the answer
     page.keyboard.press("2")
     with page.expect_download() as d:
@@ -229,15 +222,13 @@ def test_export_is_a_csv_of_the_annotations(browser, base):
 )
 def test_the_page_survives_unreadable_or_unwritable_storage(browser, base, init):
     page = open_page(browser, base + "#q=eats&x=Strix varia", init)
-    assert page.inner_text("#used") == "0 used" and page.input_value("#budget") == "30"
-    page.click("#draw")
+    assert page.input_value("#budget") == "30" and page.locator("#cards li").count() >= 1
     page.keyboard.press("2")
     assert page.locator("#cards .res", has_text="Not visible").count() == 1 and page.errors == []
 
 
 def test_a_photo_that_does_not_load_leaves_a_link_not_alt_text(browser, base):
     page = open_page(browser, base + "#q=eats&x=Strix varia")
-    page.click("#draw")
     page.evaluate("document.querySelector('#cards img').dispatchEvent(new Event('error'))")
     assert (
         page.locator("#cards li").first.locator(".nophoto").inner_text() == "Photo not shown here"
@@ -321,6 +312,39 @@ def test_the_page_paints_before_the_food_word_file_arrives(browser, base):
     page.wait_for_function("window.__food")
     page.wait_for_selector("#mx table")
     assert page.evaluate("!window.__text") and page.inner_text("#cand").startswith("13 candidate")
+    assert page.locator("#cards li").count() == 0  # nothing is drawn from a partial search
     held[0].continue_()
     page.wait_for_function("window.__text")
-    assert page.inner_text("#cand").startswith("16 candidate observations")
+    assert page.locator("#cards li").count() == 10 and page.inner_text("#draw") == "Draw ten more"
+    assert page.inner_text("#cand").startswith("6 candidate observations")
+
+
+def test_the_food_word_file_does_not_block_the_main_thread(browser, base):
+    page = browser.new_page()
+    held = []
+    page.route("**/foodweb-text.json", lambda route: held.append(route))
+    page.goto(base)
+    page.wait_for_function("window.__food")
+    held[0].continue_()
+    worst = page.evaluate(
+        """async () => {
+            let worst = 0, last = performance.now();
+            while (!window.__text) {
+                await new Promise(r => setTimeout(r, 0));
+                const now = performance.now();
+                worst = Math.max(worst, now - last);
+                last = now;
+            }
+            return worst;
+        }"""
+    )
+    assert worst < 1000
+    assert page.evaluate("1") == 1
+
+
+def test_the_matrix_has_a_legend_and_full_names_are_reachable(browser, base):
+    page = open_page(browser, base + "#q=eats&x=Strix varia")
+    assert "photographed in BC" in page.inner_text("#mxkey")
+    assert page.get_attribute("#mx", "tabindex") == "0"
+    assert page.locator("#mx th button").first.get_attribute("title")
+    assert page.locator("#mx th.v button").first.inner_text() in ("House Mouse", "Myodes")

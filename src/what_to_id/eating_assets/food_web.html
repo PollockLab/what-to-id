@@ -10,22 +10,24 @@ __SITE_NAV__
 <h1>Food web in BC</h1>
 <p class="lead">Which predator-prey pairs are documented in BC, and which photos could show a new one. Draw the most promising photos for a question, mark what you can see, and watch the network fill in. Nothing is written to iNaturalist.</p>
 <div class="flow">
-<section aria-labelledby="s1"><h2 id="s1"><span>1</span>Question</h2>
+<section class="st1" aria-labelledby="s1"><h2 id="s1"><span>1</span>Question</h2>
 <div class="seg" id="modes" role="radiogroup" aria-label="Kind of question"></div>
 <p class="sent" id="sent" aria-live="polite"></p>
-<p class="try">Try: <span id="try"></span></p></section>
-<section aria-labelledby="s2"><h2 id="s2"><span>2</span>Predicted web</h2>
-<p class="muted">Predicted from the expert food web (GloBI stand-in). Blue: the pair is in the metaweb, darker for more records. Green outline: photographed in BC. Click a cell to ask about that pair.</p>
-<div class="mx" id="mx"></div></section>
-<section aria-labelledby="s3"><h2 id="s3"><span>3</span>Evidence search</h2>
+<div class="try" id="tryw" hidden><p id="tryh">For example</p><div id="try" role="group" aria-labelledby="tryh"></div></div></section>
+<section class="st2" aria-labelledby="s2"><h2 id="s2"><span>2</span>Predicted web</h2>
+<p class="muted">Predicted from the expert food web (GloBI stand-in). Click a cell to ask about that pair, or a name to ask what it eats or what eats it.</p>
+<div class="mx" id="mx" tabindex="0" role="region" aria-label="Predicted food web, scrolls sideways"></div>
+<div class="key" id="mxkey"><span><i class="sw a"></i><i class="sw b"></i><i class="sw c"></i>one, two, three or more records</span><span><i class="sw ev"></i>photographed in BC</span><span><i class="sw"></i>no pair</span></div></section>
+<section class="st3" aria-labelledby="s3"><h2 id="s3"><span>3</span>Evidence search</h2>
 <p id="cand" aria-live="polite">Loading.</p>
 <div class="bar"><button type="button" class="btn" id="draw" disabled>Draw ten</button>
-<label>Budget <input id="budget" type="number" min="0" max="500" step="5" value="30"></label><span id="used"></span>
 <button type="button" class="btn quiet" id="export">Export annotations (CSV)</button></div>
-<p class="muted">Keys: 1 shows it, 2 not visible, 3 can’t tell, j and k move between photos. Annotations stay in this browser.</p>
+<div class="meter"><div class="mbar" id="mbar" role="progressbar" aria-label="Budget used" aria-valuemin="0" aria-valuenow="0" aria-valuemax="30"><i id="mfill"></i></div>
+<div class="mrow"><span id="used"></span><label>of <input id="budget" type="number" min="0" max="500" step="5" value="30" aria-label="Budget, photos to draw"> photos</label></div></div>
+<p class="keys muted"><kbd>1</kbd> shows it <kbd>2</kbd> not visible <kbd>3</kbd> can’t tell <kbd>j</kbd> <kbd>k</kbd> move. Saved in this browser.</p>
 <ul class="cards" id="cards"></ul></section>
-<section aria-labelledby="s4"><h2 id="s4"><span>4</span>Confirmed network</h2>
-<div class="key"><span><i class="g"></i>first photograph, confirmed here</span><span><i></i>photographed before</span><span>no line: nothing found</span></div>
+<section class="st4" aria-labelledby="s4"><h2 id="s4"><span>4</span>Confirmed network</h2>
+<div class="key"><span><i class="g"></i>first photograph, confirmed here</span><span><i></i>photographed before</span><span><i class="none"></i>nothing found</span></div>
 <div id="net"></div><p id="netnote" aria-live="polite"></p></section>
 </div>
 <details class="how"><summary>How this is made</summary>

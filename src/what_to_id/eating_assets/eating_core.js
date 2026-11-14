@@ -27,7 +27,9 @@ function find(v,pool){
   return hit;
 }
 // whether Latin name n is clade or lies below it, by the metaweb's parent table, else by genus
-function within(n,clade){
+var WI=new Map(),PP=new Map();
+function within(n,clade){var k=n+'|'+clade;if(!WI.has(k))WI.set(k,within0(n,clade));return WI.get(k);}
+function within0(n,clade){
   var g=genus(n);
   for(var k=0;n&&k<40;k++,n=M.parent&&M.parent[n])if(n===clade)return true;
   return clade.indexOf(' ')<0&&g===clade;
@@ -35,15 +37,18 @@ function within(n,clade){
 function roles(o){return o.k==='by'?{o:o,pred:o.f?o.f[0]:null,prey:o.t[0]}:{o:o,pred:o.t[0],prey:o.f?o.f[0]:null};}
 // the animal is unresolved when unnamed or named above species
 function open(x,side){var n=x[side];return !n||n.indexOf(' ')<0;}
-function p(pred,prey){var b=0;M.pairs.forEach(function(q){if(cov(pred,q[0])&&cov(prey,q[1])&&q[2]>b)b=q[2];});return b;}
+function p(pred,prey){var k=pred+'|'+prey;if(!PP.has(k))PP.set(k,p0(pred,prey));return PP.get(k);}
+function p0(pred,prey){var b=0;M.pairs.forEach(function(q){if(cov(pred,q[0])&&cov(prey,q[1])&&q[2]>b)b=q[2];});return b;}
 // photographed before: a feeding observation's field names the pair to species
 function seen(pred,prey){return R.all.some(function(x){return x.pred&&x.prey&&hit(x.pred,pred)&&hit(x.prey,prey);});}
-function preys(x){return M.pairs.filter(function(q){return cov(x,q[0]);}).sort(function(a,b){return b[2]-a[2];});}
-function preds(y){return M.pairs.filter(function(q){return cov(y,q[1]);}).sort(function(a,b){return b[2]-a[2];});}
+var PY=new Map(),PD=new Map();
+// memoised: the evidence loop asks once per record, thousands of times
+function preys(x){if(!PY.has(x))PY.set(x,M.pairs.filter(function(q){return cov(x,q[0]);}).sort(function(a,b){return b[2]-a[2];}));return PY.get(x);}
+function preds(y){if(!PD.has(y))PD.set(y,M.pairs.filter(function(q){return cov(y,q[1]);}).sort(function(a,b){return b[2]-a[2];}));return PD.get(y);}
 // the stand-in's p = 1 - 0.5^records as the records it counts
 function words(p){return p<0.6?'one record':p<0.8?'two records':'three or more records';}
 function init(metaweb,file,text){
-  M=metaweb;var O=file.obs,T=(text&&text.obs)||[];R.all=O.map(roles);R.text=T.map(roles);names=common(M,O.concat(T));ids=idsOf(O.concat(T));ALL=new Map();
+  M=metaweb;PY.clear();PD.clear();var O=file.obs,T=(text&&text.obs)||[];R.all=O.map(roles);R.text=T.map(roles);names=common(M,O.concat(T));ids=idsOf(O.concat(T));ALL=new Map();
   M.pairs.forEach(function(x){ALL.set(x[0],1);ALL.set(x[1],1);});Object.keys(M.parent||{}).forEach(function(n){ALL.set(n,1);ALL.set(M.parent[n],1);});
   O.concat(T).forEach(function(o){ALL.set(o.t[0],1);if(o.f)ALL.set(o.f[0],1);});
 }

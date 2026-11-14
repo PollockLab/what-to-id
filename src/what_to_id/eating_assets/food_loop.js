@@ -7,7 +7,7 @@
 var FoodLoop=(function(){
 'use strict';
 var KEY='wtid-loop',OBS='https://www.inaturalist.org/observations/',TEN=10,$=function(id){return document.getElementById(id);};
-var S={budget:30,drawn:[],ann:{}},E=null,Q={x:null,y:null},ITEMS=[],deck=[],cur=-1,change=function(){},TOK=new Map();
+var S={budget:30,drawn:[],ann:{}},E=null,Q={x:null,y:null},ITEMS=[],deck=[],cur=-1,change=function(){},TOK=new Map(),ready=false;
 function load(){
   try{var v=JSON.parse(localStorage.getItem(KEY)),b=Number(v&&v.budget);
     if(v&&typeof v==='object'){S.budget=isFinite(b)&&b>=0?Math.floor(b):30;S.drawn=Array.isArray(v.drawn)?v.drawn:[];S.ann=v.ann&&typeof v.ann==='object'&&!Array.isArray(v.ann)?v.ann:{};}}catch(e){}
@@ -29,7 +29,7 @@ function entries(r){
   if(named&&!E.open(r,eat?'prey':'pred')){add(named,4,'The field names the pair');return out;}
   if(named){all.filter(function(n){return E.within(n,named);}).forEach(function(n){add(n,3,'The field names '+E.label(named)+', not a species');});return out;}
   var src=[['Description',o.d],['Tags',(o.g||[]).join(' ')],['The field text',o.x]].filter(function(s){return s[1];});
-  src.forEach(function(s){all.forEach(function(n){var t=tokens(n).filter(function(k){return mention(lc(s[1]),k);})[0];
+  src.forEach(function(s){var low=lc(s[1]);all.forEach(function(n){var t=tokens(n).filter(function(k){return mention(low,k);})[0];
     if(t)add(n,2,s[0]+(s[0]==='Tags'?' mention ':' mentions ')+'“'+t+'”');});});
   if(out.length)return out;
   all.forEach(function(n){add(n,1,o.k==='text'?'Description or tags mention food':'The '+(eat?'Eating':'Eaten by')+' field '+(o.x?'has text, no taxon':'is empty'));});
@@ -59,10 +59,12 @@ function photo(o,a){
 }
 function pairText(e){return E.label(e.pred)+(e.tier===4?' eats ':' may be eating ')+E.label(e.prey);}
 function meter(){
-  var used=S.drawn.length,left=S.budget-used,n=ranked().length;
+  var used=S.drawn.length,left=S.budget-used,n=ranked().length,bar=$('mbar');
   $('budget').value=S.budget;$('used').textContent=used+' used';
-  $('draw').textContent=used?'Draw ten more':'Draw ten';$('draw').disabled=left<=0||!n;
-  $('cand').textContent=left<=0?'Budget spent. Raise it to draw more.':n?E.pl(n,'candidate observation')+' for this question.':'No more observations for this question.';
+  $('mfill').style.width=(S.budget?Math.min(100,used/S.budget*100):100)+'%';bar.setAttribute('aria-valuenow',used);bar.setAttribute('aria-valuemax',S.budget);
+  bar.setAttribute('aria-valuetext',used+' of '+S.budget+' photos');bar.classList.toggle('full',left<=0);
+  $('draw').textContent=deck.length?'Draw ten more':'Draw ten';$('draw').disabled=left<=0||!n||!ready;
+  $('cand').textContent=!ready?E.pl(n,'candidate observation')+' so far. Searching descriptions and tags.':left<=0?'Budget spent. Raise it to draw more.':n?E.pl(n,'candidate observation')+' for this question.':'No more observations for this question.';
 }
 function status(c){
   var a=S.ann[c.r.o.id],li=c.li,s=li.querySelector('.res');
@@ -71,9 +73,9 @@ function status(c){
   li.classList.toggle('done',!!a);
 }
 function next(){for(var k=1;k<=deck.length;k++){var i=(cur+k)%deck.length;if(!S.ann[deck[i].r.o.id]){focus(i);return;}}}
-function focus(i){
+function focus(i,quiet){
   cur=i;deck.forEach(function(c,j){c.li.classList.toggle('cur',j===i);});
-  if(deck[i])deck[i].li.scrollIntoView({block:'nearest',behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'});
+  if(deck[i]&&!quiet)deck[i].li.scrollIntoView({block:'nearest',behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'});
 }
 function put(c,v,pred,prey){
   var a={v:v,on:new Date().toISOString().slice(0,10)};if(pred){a.pred=pred;a.prey=prey;}
@@ -116,13 +118,14 @@ function card(c){
   li.onclick=function(){if(cur!==deck.indexOf(c))focus(deck.indexOf(c));};
   status(c);return li;
 }
-function draw(){
+function draw(auto){
   var n=Math.min(TEN,S.budget-S.drawn.length);if(n<=0)return;
   var got=ranked().slice(0,n),ul=$('cards'),first=deck.length;
   got.forEach(function(c){S.drawn.push(c.r.o.id);deck.push(c);ul.append(card(c));});
-  save();meter();if(got.length)focus(first);
+  save();meter();if(got.length)focus(first,auto===true);
 }
-function ask(q){Q=q;deck=[];cur=-1;$('cards').replaceChildren();meter();}
+// the first ten are drawn as the question is asked, once the food-word file has settled, so the stage is never empty
+function ask(q){Q=q;deck=[];cur=-1;$('cards').replaceChildren();meter();if(ready)draw(true);}
 function csv(){
   var q=function(v){return '"'+String(v==null?'':v).replace(/"/g,'""')+'"';};
   return ['observation_id,url,predator,prey,answer,date'].concat(Object.keys(S.ann).map(function(i){var a=S.ann[i]||{};
@@ -137,7 +140,7 @@ function reload(){
 function init(core,onChange){
   E=core;change=onChange;load();
   reload();
-  $('draw').onclick=draw;$('export').onclick=exportCsv;
+  $('draw').onclick=function(){draw();};$('export').onclick=exportCsv;
   $('budget').onchange=function(){var b=Math.floor(Number(this.value));S.budget=isFinite(b)&&b>=0?b:S.budget;save();meter();};
   document.addEventListener('keydown',function(e){
     var t=e.target;if(e.ctrlKey||e.metaKey||e.altKey||/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)||!deck.length)return;
@@ -145,5 +148,6 @@ function init(core,onChange){
     var v={1:'yes',2:'no',3:'unsure'}[e.key];if(v&&cur>=0){e.preventDefault();mark(deck[cur],v);}
   });
 }
-return {init:init,reload:reload,ask:ask,state:state,pairs:pairs,csv:csv,entries:entries,S:S};
+function go(){ready=true;}
+return {init:init,reload:reload,go:go,ask:ask,state:state,pairs:pairs,csv:csv,entries:entries,S:S};
 })();
