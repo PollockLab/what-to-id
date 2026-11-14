@@ -49,8 +49,11 @@ SCRIPTS = {
 # One toggle per pane; a phone holds one pane, so there a toggle picks it.
 IDENTIFY_BUTTON = '<button type="button" data-p="identify">Identify</button>'
 TREE_BUTTON = '<button type="button" data-p="tree" data-explain="taxonomy">Taxonomy</button>'
+BACK = '<a id="xback" class="back" href="identify.html">Show cards</a>'
 BAR = (
-    '<div class="xbar" id="xbar"><span class="counts" id="counts" aria-live="polite"></span>'
+    '<div class="xbar" id="xbar">'
+    + BACK
+    + '<span class="counts" id="counts" aria-live="polite"></span>'
     '<form id="sf" role="search"><input id="sq" type="search" aria-label="Search taxa and photos" '
     'role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="sg" '
     'autocomplete="off" spellcheck="false" '
@@ -92,7 +95,7 @@ def build(
     # explore.html is written last, so an optional page missing here is missing from the site
     pages = {p for p, _ in page_nav.PAGES if p not in page_nav.OPTIONAL or (out / p).exists()}
     bar = BAR if has_tree else BAR.replace(TREE_BUTTON, "")
-    bar = bar if has_identify else bar.replace(IDENTIFY_BUTTON, "")
+    bar = bar if has_identify else bar.replace(IDENTIFY_BUTTON, "").replace(BACK, "")
     for key, value in {
         "__SITE_CSS__": page_nav.CSS,
         "__SITE_NAV__": page_nav.nav(PAGE_NAME, pages, extra=bar),

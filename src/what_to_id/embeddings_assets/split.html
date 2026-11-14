@@ -27,6 +27,7 @@ body{display:flex;flex-direction:column}
 #sf button{font:inherit;font-size:12px;min-height:28px;padding:0 11px;border:1px solid var(--line);border-radius:14px;background:var(--chip);color:var(--ink);cursor:pointer}
 .seg{display:inline-flex}
 .seg button,.xbar .i{font:inherit;font-size:12px;min-height:28px;padding:0 11px;border:1px solid var(--line);background:var(--chip);color:var(--ink);cursor:pointer}
+.xbar .back{display:inline-flex;align-items:center;font-size:12px;min-height:28px;padding:0 11px;border:1px solid var(--line);border-radius:14px;background:var(--chip);color:var(--ink);text-decoration:none;white-space:nowrap}
 .seg button{touch-action:none}
 .seg button.dr{position:relative;z-index:2;box-shadow:var(--shadow);cursor:grabbing}
 .seg button:first-child{border-radius:14px 0 0 14px}
@@ -176,6 +177,15 @@ document.getElementById('xbar').addEventListener('click',function(e){
   url();});
 function url(){history.replaceState(null,'','?view='+serialize(order.filter(function(n){return view.indexOf(n)>=0;}))+
   (qs?'&q='+encodeURIComponent(qs):'')+location.hash);}
+// back to the cards: where the viewer came from with its filters intact, else Identify with the shared selection
+var back=document.getElementById('xback');
+function toCards(e){var r=document.referrer;
+  if(r&&new URL(r).origin===location.origin&&/\/identify\.html$/.test(new URL(r).pathname)&&history.length>1){e.preventDefault();history.back();}
+  else back.href=FILES.identify+location.hash;}
+if(back){back.addEventListener('click',toCards);
+  // Esc leaves too, unless it is closing something: a sheet, the note or a menu
+  addEventListener('keydown',function(e){if(e.key!=='Escape'||/^(INPUT|TEXTAREA|SELECT)$/.test((e.target||{}).tagName||''))return;
+    if(document.querySelector('#xsheet:not([hidden]),#note:not([hidden]),[aria-expanded="true"]'))return;toCards(e);if(!e.defaultPrevented)location.href=FILES.identify+location.hash;},true);}
 var i=document.getElementById('i'),note=document.getElementById('note');
 i.addEventListener('click',function(){note.hidden=!note.hidden;i.setAttribute('aria-expanded',!note.hidden);});
 addEventListener('keydown',function(e){if(e.key==='Escape'&&!note.hidden)i.click();});

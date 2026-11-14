@@ -13,20 +13,20 @@ from pathlib import Path
 
 from what_to_id.glossary import GLOSSARY
 
-# (file, label), one tab per job: Explore, Confused pairs (confusion.html), then Methods.
-# Explore is explore.html: Identify, the map, the photo space and the tree side by side; the pages
-# map.html, embeddings.html, tree.html and search.html keep their URLs and mark Explore as
-# current, as Explore's panes and its search box hold them. Without explore.html (a site built
-# without the photo space) the Explore tab falls back to the map. Confused pairs exists only
+# (file, label), one tab per job: Identify, Confused pairs (confusion.html), then Methods.
+# Identify holds the map, the photo space and the taxonomy behind its What and Where panels, as
+# the full-screen explore.html; that page and map.html, embeddings.html, tree.html and
+# search.html keep their URLs and mark Identify as current. Without identify.html the Identify
+# tab falls back to the map. Confused pairs exists only
 # when the atlas manifest lists its table. The brand links to index.html, a copy of the landing
 # page.
 PAGES = (
-    ("explore.html", "Explore"),
+    ("identify.html", "Identify"),
     ("confusion.html", "Confused pairs"),
     ("terms.html", "Methods"),
 )
 OPTIONAL = {"confusion.html"}
-EXPLORE = "explore.html"
+EXPLORE = "identify.html"
 BLITZ = "https://pollocklab.github.io/where-to-blitz/"
 
 CSS = """
@@ -125,7 +125,7 @@ def explain() -> str:
     )
 
 
-_EXPLORE_OF = ("map.html", "embeddings.html", "tree.html", "search.html")
+_EXPLORE_OF = ("explore.html", "map.html", "embeddings.html", "tree.html", "search.html")
 _SKIP = (
     "onclick=\"event.preventDefault();var m=document.getElementById('main-content')"
     "||document.querySelector('main');m.tabIndex=-1;m.focus()\""

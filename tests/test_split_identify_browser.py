@@ -12,6 +12,7 @@ from what_to_id.page_identify import build as build_identify
 from what_to_id.page_map import decode_points, encode_points
 
 from . import test_embeddings_browser as eb
+from . import test_identify_browser as ib
 from .embeddings_fixture import TREE, pool_frame
 from .test_embeddings_browser import POOL_N, TOTAL, stub_inat
 
@@ -58,6 +59,7 @@ def explore(browser, base, query="", width=1280):
     page.errors = []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     stub_inat(page, None)
+    page.route(ib.WTB, lambda r: r.abort())  # no live checklist: the card order stays put
     page.goto(f"{base}/explore.html{query}")
     return page
 
@@ -261,4 +263,28 @@ def test_a_record_picked_in_another_pane_rings_its_card_and_moves_the_open_panel
     left.evaluate("parent.postMessage({type: 'wtid-record', id: 1}, location.origin)")  # not drawn
     assert ident.evaluate("document.querySelector('.card.cur').dataset.id") == str(c)
     assert page.errors == []
+    page.close()
+
+
+def test_what_opens_the_photo_space_full_screen_and_show_cards_returns_with_the_filters(
+    browser, site, pts
+):
+    page = browser.new_page(viewport={"width": 1280, "height": 900})
+    stub_inat(page, None)
+    page.goto(f"{site[0]}/identify.html#lvl=2&conf=all")
+    page.click("#bwhat")
+    page.wait_for_selector("#xlinks:not([hidden])")
+    page.click("#xspace")
+    page.wait_for_url("**/explore.html?view=space*")
+    assert "lvl=2" in page.evaluate("location.hash")  # the filters travel in the address
+    assert page.get_attribute("#xback", "href").startswith("identify.html")
+    page.click("#xback")
+    page.wait_for_url("**/identify.html*")
+    assert page.evaluate("location.hash") == "#lvl=2&conf=all"  # back to the same address
+    page.click("#bwhat")
+    page.click("#xtree")
+    page.wait_for_url("**/explore.html?view=tree*")
+    page.keyboard.press("Escape")  # Esc leaves too
+    page.wait_for_url("**/identify.html*")
+    assert page.evaluate("location.hash") == "#lvl=2&conf=all"
     page.close()

@@ -98,9 +98,14 @@ function where(){var t=A&&A.term();return LBL!==null?LBL||'Anywhere':t?t.label:'
 
 // The panels: the open one is raised under its segment, the rest of the bar greyed
 function visible(k){return SEG[k].p.offsetParent!==null;}
+// What's links to the full-screen photo space and taxonomy (explore.html), with the selection in the address
+var XL=$('xlinks');
+function xl(){['xspace','xtree'].forEach(function(id){var a=$(id);a.href=a.getAttribute('href').split('#')[0]+location.hash;});}
+if(XL&&!o.embedded)fetch('explore.html',{method:'HEAD'}).then(function(r){XL.hidden=!r.ok;}).catch(function(){});
+if(XL)XL.addEventListener('click',xl,true);
 function fill(k){
   if(!visible(k))return;
-  if(k===0)counts();
+  if(k===0){counts();if(XL)xl();}
   else if(k===1)MH.draw();
   else if(k===2){if(W)W.show();}
   else [].forEach.call(SEG[3].p.querySelectorAll('details details'),function(d){d.open=true;});  // Who: the threshold sits in a closed Adjust
