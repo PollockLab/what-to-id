@@ -52,6 +52,9 @@ def test_filter_hides_non_matching_terms_and_empty_groups(browser, tmp_path):
 def test_phone_collapses_the_contents_and_old_anchors_resolve(browser, tmp_path):
     page = _page(browser, tmp_path, width=390)
     assert page.eval_on_selector("#toc", "e => e.open") is False
+    top = page.eval_on_selector("#toc", "e => e.getBoundingClientRect().top")
+    assert top >= page.eval_on_selector(".lede", "e => e.getBoundingClientRect().bottom")
+    assert top < page.eval_on_selector("#glossary", "e => e.getBoundingClientRect().top")
     assert page.is_visible("#toc summary") and not page.is_visible("#toc a")
     ids = set(page.eval_on_selector_all("[id]", "els => els.map(e => e.id)"))
     assert set(OLD_IDS) <= ids

@@ -1,7 +1,9 @@
 (function(){
 var toc=document.getElementById('toc'),links=[].slice.call(toc.querySelectorAll('a'));
 var wide=matchMedia('(min-width:1100px)');
-function fit(){toc.open=wide.matches;}
+var main=document.querySelector('main');
+function fit(){toc.open=wide.matches;  // phone: contents sit under the lede, wide: left column
+  if(wide.matches)main.before(toc);else main.querySelector('.lede').after(toc);}
 fit();wide.addEventListener('change',fit);
 var by={};links.forEach(function(a){by[a.getAttribute('href').slice(1)]=a;});
 var heads=[].slice.call(document.querySelectorAll('main :is(h2,h3)')).filter(function(h){return by[h.id];});
