@@ -11,7 +11,7 @@ var MAP=new URL(CFG.mapUrl,location.href).href,nf=new Intl.NumberFormat('en-CA')
 var CARD=IdentifyCard({ref:function(n){return CMP?CMP.ref(n):Promise.resolve(null);}}),TAB=[],SUBK=[],NK=1,KIND=null,SUB=null,KF=0,KC=[],UF=null,UON=false,MINE=[],CMP=null,BT=false,ST=null,SK='',IN=IdentifyInat(CFG.oauth);
 // CFG.merge: the kinds (levels) a tab shows, in order; SUBK a kind's place in its tab
 Object.keys(CFG.merge).forEach(function(t){CFG.merge[t].forEach(function(k,j){TAB[k]=+t;SUBK[k]=j;});NK=Math.max(NK,CFG.merge[t].length);});
-var META=null,SYNC=null,MORE=new Map(),TAXA=null,P=null,BYID=null,LEVEL=null,Q=null,LOOKS=null,WHY=null,WHYF=null,RK=null,N3=0,GP=null,R=null,MF=null,TF=null,PEND=null,OX=null,PIDS=null,REC=-1,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,ONE='',CACHE=new Map(),FIRST=null,SHOWN,STAY=false,X=null,WW=null,BAR=null,MS=null,ACT=null;
+var META=null,SYNC=null,MORE=new Map(),TAXA=null,P=null,BYID=null,LEVEL=null,Q=null,LOOKS=null,WHY=null,WHYF=null,RK=null,N3=0,GP=null,R=null,MF=null,TF=null,PEND=null,OX=null,PIDS=null,REC=-1,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,ONE='',CACHE=new Map(),FIRST=null,SHOWN,STAY=false,X=null,WW=null,BAR=null;
 function $(id){return document.getElementById(id);}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 function status(t,err){var s=$('status');s.textContent=t;s.classList.toggle('err',!!err);}  // an error shows on Batches too
@@ -248,39 +248,7 @@ function paint(){
   IdentifyFlow.draw(LV);
   empty();
   more();batch();scrollTo(0,STAY?y:0);STAY=false;
-  strip();
   if(LV===3&&WHYF)setTimeout(WHYF,0);
-}
-// Start here: the cards of the current mode in play, as identify_missions.js reads them. A mission is applied as plain hash filters (its group, its cell as the
-// area, the mode), so the link is shareable; ACT holds it and the address before it, which the chip's x restores.
-function missionRows(){
-  var r={n:0,idx:[],g:[],cell:[],sp:[],score:[],risk:[]},kf=KF&&TAB[KF]===LV?KF:0;
-  for(var i=0;i<P.n;i++){
-    if(LEVEL[i]!==LV||!on(i)||kf&&KIND[i]!==kf)continue;
-    var c=GP.cell(i);if(c<0)continue;
-    r.idx.push(i);r.g.push(P.grp[i]);r.cell.push(c);r.sp.push(SUB[i]*65536+ck(i,LV));r.score.push(GP.mission(i,LV));r.risk.push(GP.atRisk(i,LV)?1:0);r.n++;
-  }
-  return r;
-}
-function tabName(){var l=CFG.levels.filter(function(x){return x[0]===LV;})[0];return l?l[1]:'';}
-function strip(){
-  var b=$('mchip');
-  if(ACT&&!(new RegExp('(^|&)area='+ACT.area+'(&|$)').test(location.hash.slice(1))))ACT=null;  // another area or group replaced the mission
-  if(!MS||!GP||BT||!GP.loaded()||ACT||!P){if(MS)MS.hide();}
-  else MS.update(LV+'|'+(S.total||[]).join()+'|'+location.hash.slice(1).replace(/(^|&)record=[^&]*/,''));
-  b.hidden=!ACT;b.textContent='';
-  if(!ACT)return;
-  var x=el('button','mx','×');x.type='button';x.setAttribute('aria-label','End the mission and return to the previous selection');
-  x.onclick=function(){var p=ACT.prev;ACT=null;location.hash=p;};
-  b.append('Mission: '+ACT.title+' · ',el('span','mk',IdentifyFlow.marked(ACT.ids)+' of '+ACT.ids.length+' marked'),' ',x);
-  if(ACT.go){ACT.go=false;$('rline').scrollIntoView({block:'start'});}
-}
-function mission(m){
-  var g=META.groups[m.g],a=MapArea.encode([GP.ring(m.first)]),prev=location.hash.slice(1),
-    t=prev.split('&').filter(function(x){return x&&!/^(groups|area|park|bcpark|record|lvl)=/.test(x);});
-  t.push('lvl='+LV,'groups='+CH.write(Object.fromEntries([[g,'inc']]),META.groups),'area='+a);
-  ACT={prev:prev,area:a,title:m.title,ids:m.rows.map(function(i){return P.id[i];}),go:true};
-  location.hash=t.join('&');
 }
 function redraw(late){if(late===true)STAY=true;build();counts();paint();}  // late: records that arrived, not a choice, keep the scroll
 function kindName(k){return (CFG.kinds.filter(function(x){return x[0]===k;})[0]||[0,''])[1];}
@@ -485,10 +453,6 @@ async function load(){
   OX=IdentifyOnly({META:META,mf:MF,P:function(){return P;},taxa:function(){return TAXA;},range:function(){return R;},rewrite:rewrite,changed:refresh,embedded:parent!==window,get:function(f){return get(new URL(f,MAP));}});
   BAR=IdentifyBar({S:S,META:META,mf:MF,nf:nf,taxa:function(){return TAXA;},P:function(){return P;},tf:function(){return TF;},mask:atLevel,all:kept,tab:function(){var l=CFG.levels.filter(function(x){return x[0]===LV;})[0];return {name:l?l[1]:'',has:function(i){return LV?LEVEL[i]===LV:LEVEL[i]>0;}};},changed:put,blocked:function(){return !!(AREA||VIEW||KEEPIDS||SUBIDS||PIDS||UF.active());},
     where:where,get:function(u){return get(new URL(u,MAP));},map:MAP,key:key,embedded:parent!==window});
-  MS=IdentifyMissions({box:$('missions'),names:function(g){return META.groups[g];},mode:tabName,lit:function(){return GP.lit();},records:missionRows,
-    cap:function(){return LV===3&&RUN()?Infinity:PER_SPECIES;},days:function(i){return GP.days(i);},onpick:mission,embedded:parent!==window,
-    obs:function(rows){var ids=rows.map(function(i){return P.id[i];});return Meta.fetchObservations(ids,function(u){return fetch(u);},CACHE).then(function(){return ids.map(function(id){return CACHE.get(id);});});}});
-  document.addEventListener('wtid-marked',strip);
   STAY=!!SHOWN;take(location.hash.slice(1),AREA==='');
   if(PEND!==null){take(PEND,false);PEND=null;}
   function retitle(){[].forEach.call($('grid').children,function(li){var t=li.querySelector('.title');if(t&&li.dataset.i){t.replaceWith(title(+li.dataset.i,LV));CARD.face(li);}});}
@@ -510,7 +474,7 @@ async function load(){
     GP.ready.then(function(){var li=REC>=0&&document.querySelector('.card[data-id="'+P.id[REC]+'"]'),c=li&&li.querySelector('.rchip');
       if(c){if(CMP)CMP.open(li);c.click();}});});
   window.__identify={ids:idsOf,view:function(){return view.map(function(r){return r&&Array.from(r.map(function(i){return P.id[i];}));});},
-    total:function(){return S.total;},levelled:function(){var n=0;for(var i=0;i<P.n;i++)if(SEL[i]&&LEVEL[i])n++;return n;},level:function(){return LV;},rows:function(){var r=missionRows();r.id=r.idx.map(function(i){return P.id[i];});return r;},score:function(id){var i=find(id);return GP&&i>=0?GP.mission(i,LV):0;},gap:function(id){var i=find(id);return GP&&i>=0?GP.tier(i):0;},kind:function(){return KF;},kinds:function(){return KC.slice();},user:function(){return UF.active()||UF.ranked();},mine:function(){return MINE[LV];},ranges:function(){return !!R;},refresh:function(){var t=performance.now();select();build();return performance.now()-t;}};
+    total:function(){return S.total;},levelled:function(){var n=0;for(var i=0;i<P.n;i++)if(SEL[i]&&LEVEL[i])n++;return n;},level:function(){return LV;},gap:function(id){var i=find(id);return GP&&i>=0?GP.tier(i):0;},kind:function(){return KF;},kinds:function(){return KC.slice();},user:function(){return UF.active()||UF.ranked();},mine:function(){return MINE[LV];},ranges:function(){return !!R;},refresh:function(){var t=performance.now();select();build();return performance.now()-t;}};
 }
 var KD=/(?:^|&)kind=(\d)/.exec(location.hash.slice(1));KF=KD&&TAB[+KD[1]]?+KD[1]:0;
 function start(){

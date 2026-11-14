@@ -29,16 +29,6 @@ var fwd=(function(){
     var lam=lon*RAD-L0,sb=q(Math.sin(lat*RAD))/QP,cb=Math.sqrt(1-sb*sb),b=Math.sqrt(2/(1+SB1*sb+CB1*cb*Math.cos(lam)));
     return [A*RQ*DD*b*cb*Math.sin(lam),A*RQ/DD*b*(CB1*sb-SB1*cb*Math.cos(lam))];};
 })();
-// the inverse of fwd by Newton steps from a nearby lat, lon: [lon, lat]
-function inv(x,y,la,lo){
-  for(var k=0;k<8;k++){
-    var f=fwd(la,lo),ex=x-f[0],ey=y-f[1],h=1e-5,a=fwd(la+h,lo),b=fwd(la,lo+h),
-      j11=(b[0]-f[0])/h,j12=(a[0]-f[0])/h,j21=(b[1]-f[1])/h,j22=(a[1]-f[1])/h,d=j11*j22-j12*j21;
-    if(Math.abs(ex)+Math.abs(ey)<0.01)break;
-    lo+=(ex*j22-ey*j12)/d;la+=(j11*ey-j21*ex)/d;
-  }
-  return [lo,la];
-}
 function json(url){return fetch(url).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();});}
 // a PNG's pixels as {w, h, d} RGBA; the cells that matter are opaque, so premultiplying costs nothing
 function png(url){
@@ -76,7 +66,7 @@ function read(){
     base:bm?bm[1]||'rand':'new',seed:bm&&bm[2]?+bm[2]:1,explicit:!!bm};
 }
 var F=function(ctx){
-  var P=ctx.P,st=read(),state='load',settle,ready=new Promise(function(r){settle=r;}),tier=null,days=null,names=null,cells=null,LAT=null,LIT=LIT0,UI=null,T=0;
+  var P=ctx.P,st=read(),state='load',settle,ready=new Promise(function(r){settle=r;}),tier=null,days=null,names=null,LIT=LIT0,UI=null,T=0;
   function alloff(){return !KEYS.some(function(k){return st.w[k]>0;});}
   // the weight as the sliders show it, 0..100; the landing default shows as the Blitz the gap preset
   function disp(k){return isdef()?PRESETS[0][2][k]||0:st.legacy?LEG[st.w[k]]:st.w[k];}
@@ -96,7 +86,7 @@ var F=function(ctx){
       for(var i=0;i<P.n;i++)if(ctx.keep(i)&&used.indexOf(gs[P.grp[i]])<0)used.push(gs[P.grp[i]]);
       return Promise.all(used.map(function(g){return png(DIR+t.groups[g].png).then(function(v){
         if(v.w!==L.ncol||v.h!==L.nrow)throw new Error('lattice mismatch');pic[g]=v;});})).then(function(){
-        var tr=new Uint8Array(P.n),dy=new Uint16Array(P.n).fill(NODAYS),nm=[],cl=new Int32Array(P.n).fill(-1);
+        var tr=new Uint8Array(P.n),dy=new Uint16Array(P.n).fill(NODAYS),nm=[];
         for(i=0;i<P.n;i++){
           if(!ctx.keep(i))continue;
           var g=gs[P.grp[i]],v=pic[g],f=fwd(P.lonlat[2*i+1],P.lonlat[2*i]),
@@ -105,9 +95,9 @@ var F=function(ctx){
           var k=(row*v.w+col)*4,a=v.d[k+3];
           if(a<32)continue;  // outside Canada: no data
           var d=a<128?0:v.d[k+1]*256+v.d[k+2];  // a Canadian cell without a record of the group has no observer-days
-          dy[i]=d;tr[i]=d>=lit?0:d<lit/2?2:1;nm[i]=[g,lit];cl[i]=row*v.w+col;
+          dy[i]=d;tr[i]=d>=lit?0:d<lit/2?2:1;nm[i]=[g,lit];
         }
-        tier=tr;days=dy;names=nm;cells=cl;LAT=L;LIT=lit;state='ready';});
+        tier=tr;days=dy;names=nm;state='ready';});
     }).catch(function(){state='failed';}).then(function(){ctx.redraw(true);settle();});
   }
   // the hash holds only what differs from the defaults; a legacy link keeps its sort= and its tiers until a weight is touched (pri= values under 4 would read as the old levels, so they are written as 4)
@@ -231,20 +221,6 @@ var F=function(ctx){
       var d=days[i];
       return d!==NODAYS&&d>=st.gap[0]&&(st.gap[1]>=LIT||d<=st.gap[1]);
     },
-    // the 25 km cell of a record (its lattice index, -1 without data), its observer-days, the cell's lit count, and the cell as a flat lon, lat ring
-    cell:function(i){return cells?cells[i]:-1;},
-    days:function(i){return days?days[i]:NODAYS;},
-    lit:function(){return LIT;},
-    ring:function(i){
-      var c=cells[i],L=LAT,x=L.x0+(c%L.ncol)*L.res_m,y=L.y1-Math.floor(c/L.ncol)*L.res_m,s=L.res_m,out=[],q=8,k,
-        C=[[x,y,s/q,0],[x+s,y,0,-s/q],[x+s,y-s,-s/q,0],[x,y-s,0,s/q]];
-      C.forEach(function(e){for(k=0;k<q;k++){var p=inv(e[0]+e[2]*k,e[1]+e[3]*k,P.lonlat[2*i+1],P.lonlat[2*i]);out.push(p[0],p[1]);}});
-      return out;
-    },
-    // a mission's score for a record at level lv: the gap tier, then at risk (level 3), then confidence, under the default Blitz the gap weights
-    mission:function(i,lv){return 100*(tier?tier[i]:0)+(lv===3?10*(ctx.flag(i,false)&1):0)+ctx.conf(i,lv);},
-    atRisk:function(i,lv){return lv===3&&(ctx.flag(i,false)&1)===1;},
-    loaded:function(){return state==='ready';},
     // 0 lit or no data, 1 a gap, 2 a big gap
     tier:function(i){return tier?tier[i]:0;},
     // orders a level's records (a typed-array slice), the best last, under key (the groups of the level's order) and the prioritizers

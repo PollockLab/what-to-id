@@ -16,7 +16,7 @@ function link(a,then){
 }
 // a card done with: Opened or Skipped, kept across redraws
 function mark(li,text){
-  text=text||'Opened';DONE.set(li.dataset.id,text);LAST=li;document.dispatchEvent(new CustomEvent('wtid-marked'));
+  text=text||'Opened';DONE.set(li.dataset.id,text);LAST=li;
   if(text==='Opened')document.dispatchEvent(new CustomEvent('wtid-opened',{detail:li.dataset.id}));li.classList.add('done');
   var b=li.querySelector('.opened');if(b){if(text==='Opened')b.textContent=text;return;}
   li.insertBefore(el('div','badge opened',text),li.querySelector('.when'));
@@ -30,14 +30,12 @@ function next(li){
 function undo(){
   var li=LAST;LAST=null;if(!li)return null;
   if(DONE.get(li.dataset.id)==='Opened')document.dispatchEvent(new CustomEvent('wtid-unopened',{detail:li.dataset.id}));
-  DONE.delete(li.dataset.id);li.classList.remove('done');var b=li.querySelector('.opened');if(b)b.remove();document.dispatchEvent(new CustomEvent('wtid-marked'));
+  DONE.delete(li.dataset.id);li.classList.remove('done');var b=li.querySelector('.opened');if(b)b.remove();
   return li;
 }
 function seen(li){if(DONE.has(li.dataset.id))mark(li,DONE.get(li.dataset.id));}
 return {
   link:link,mark:mark,seen:seen,undo:undo,
-  // how many of these record ids are marked Opened or Skipped
-  marked:function(ids){return ids.filter(function(id){return DONE.has(String(id));}).length;},
   // the Identify link of a level 3 card
   identify:function(a,li){
     link(a,function(){var c=li.querySelector('.copy');if(c)c.click();mark(li);next(li);});
