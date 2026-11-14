@@ -367,7 +367,7 @@ function MapArea(ctx){
     more.hidden=o.n&&!o.more;ACT=-1;active();sync();return o;}
   function sync(){if(!OPEN)return;var n=parked().length;
     ROWS.forEach(function(r){r.li.setAttribute('aria-selected',picked(r.p));});
-    hdr.firstChild.textContent=nf.format(n)+' selected · ';hdr.lastChild.hidden=!n;}
+    hdr.firstChild.textContent=nf.format(n)+' selected'+(n?' · ':'');hdr.lastChild.hidden=!n;}
   function active(){ROWS.forEach(function(r,i){r.li.classList.toggle('aact',i===ACT);});
     if(ACT<0){q.removeAttribute('aria-activedescendant');return;}
     q.setAttribute('aria-activedescendant',ROWS[ACT].li.id);ROWS[ACT].li.scrollIntoView({block:'nearest'});}
