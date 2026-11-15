@@ -161,6 +161,7 @@ R('# of 10 improving IDs in 30 days',function(m,n){return n+' sur 10 identificat
 [/^(\S+) on iNaturalist$/,'$1 sur iNaturalist'],
 R('# opened today',function(m,n){return n+' '+pl(n,'ouverte','ouvertes')+" aujourd'hui";}),
 R('# records to identify','$1 observations à identifier'),
+R('# of # BC records with photos need an ID',"$1 des $2 observations avec photos de la C.-B. attendent une identification"),
 R('# of #, (.+?)(?: to (.+))?',function(m,a,b,n,t){return a+' sur '+b+', '+n+(t?' vers '+t:'');}),
 R('# of # shown','$1 sur $2 affichées'),R('# of #','$1 sur $2'),
 R('Batch # of #','Lot $1 sur $2'),R('Photo # of #','Photo $1 sur $2'),R('Observation photo # of #',"Photo de l'observation $1 sur $2"),R('Unknown, (.+)',function(m,n){return 'Inconnu, '+n;}),

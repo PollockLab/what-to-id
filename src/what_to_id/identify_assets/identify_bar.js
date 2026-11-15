@@ -90,6 +90,9 @@ function cats(c){
       t.b.onclick=function(){var only=g&&S.groups[g]==='inc'&&Object.keys(S.groups).length===1;S.groups={};if(g&&!only)S.groups[g]='inc';o.changed();};
       if(t.s)t.s.onclick=t.b.onclick;});
   }
+  // Explore's framing once the map's totals file is in (one row per group over the map's months): the records to identify among every BC record with photos
+  var t=TOT&&TOT.obs.reduce(function(a,r){return r.reduce(function(x,v){return x+v;},a);},0);
+  $('mixn').textContent=o.nf.format(all)+(t?' of '+o.nf.format(Math.max(all,t))+' BC records with photos need an ID':' records to identify');
   var picked=Object.keys(S.groups),multi=picked.length>1||picked.some(function(g){return S.groups[g]==='not';});
   MORE.lastChild.textContent=multi?picked.length+' groups':'Combine';MORE.setAttribute('aria-pressed',String(multi));
   MORE.title=multi?'Picked in What: '+picked.map(function(g){return (S.groups[g]==='not'?'not ':'')+short(g);}).join(', '):'Pick several groups, or leave some out, in What';

@@ -181,3 +181,23 @@ def test_the_when_histogram_has_the_maps_two_layers_and_its_tooltip(browser, tot
     month = pd.to_datetime(m[1], format="%B %Y").strftime("%Y-%m")
     assert n == frame["observed_on"].str.startswith(month).sum()
     assert page.errors == []
+
+
+def test_the_top_line_frames_the_records_to_identify_among_every_bc_record(browser, totals_site):
+    base, frame = totals_site
+    page = ib.open_identify(browser, base, "#lvl=1", size=(1100, 800))
+    page.wait_for_function("document.getElementById('mixn').textContent.includes(' of ')")
+    # every month of the totals up to the map's last folds in: 10**4 per group a month
+    months = pd.period_range("2023-01", frame["observed_on"].max()[:7], freq="M")
+    want = (
+        f"{len(frame):,} of {10**4 * len(GROUPS) * len(months):,} BC records with photos need an ID"
+    )
+    assert page.inner_text("#mixn") == want and page.errors == []
+
+
+def test_without_the_totals_the_top_line_counts_the_records_to_identify(browser, site):
+    base, pts = site
+    page = ib.open_identify(browser, base, "#lvl=1", size=(1100, 800))
+    page.wait_for_function("__identify.ids().length > 0")
+    page.wait_for_load_state("networkidle")
+    assert page.inner_text("#mixn") == f"{len(pts):,} records to identify" and page.errors == []
