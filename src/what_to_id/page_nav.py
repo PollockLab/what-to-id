@@ -131,6 +131,7 @@ CSS = """
 --onink:#1a1a19;--warn:#ffc27a;
   --warnbg:#3a2a14;--good:#57d17a;--shadow:0 4px 16px rgba(0,0,0,.5)}
 :focus-visible{outline:3px solid var(--bar);outline-offset:2px}
+::placeholder{color:var(--muted);opacity:1}  /* the browser's grey is under 4.5:1 on dark panels */
 @media (prefers-reduced-motion:reduce){*,::before,::after{
   transition-duration:.01ms!important;animation-duration:.01ms!important;
   scroll-behavior:auto!important}}
