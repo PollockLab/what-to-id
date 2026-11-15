@@ -341,6 +341,7 @@ def test_the_tabs_switch_the_cards_and_their_counts_are_the_totals(browser, site
         "tab1",
         "tab5",
         "tab3",
+        "tab6",
     ]
     for lv, label, _ in page_identify.LEVELS:
         cut = " · best 5%" if lv == 3 else ""  # level 3 names its Best x% cut

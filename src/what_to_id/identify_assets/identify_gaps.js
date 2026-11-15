@@ -301,5 +301,6 @@ var F=function(ctx){
   };
 };
 F.compare=compare;
+F.label=function(){var t=read().top;return t<100?'Best '+t+'%':'';};  // the hash's cut, before the records (and the instance) land
 return F;
 })();
