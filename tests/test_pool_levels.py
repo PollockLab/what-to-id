@@ -278,11 +278,12 @@ def test_the_manifest_names_the_range_tables_or_the_levels_go_out_alone(tmp_path
     assert json.loads((site / pool_levels.DATES_NAME).read_text()) == {
         "photos": None,
         "scored": None,
+        "updated": None,
     }
     entry.update(built_at="2026-10-27T05:11:17Z", emb="/scratch/bulk-2026-10-15/completed/E.npy")
     pool_levels.build(site, data_url="https://x/")
     dates = json.loads((site / pool_levels.DATES_NAME).read_text())
-    assert dates == {"photos": "2026-10-15", "scored": "2026-10-27"}
+    assert dates == {"photos": "2026-10-15", "scored": "2026-10-27", "updated": None}
     page_identify.build(site)
     about = (site / page_identify.PAGE_NAME).read_text()
     assert "Photos downloaded on 15 October 2026, scored on 27 October 2026." in about
@@ -293,9 +294,15 @@ def test_the_manifest_names_the_range_tables_or_the_levels_go_out_alone(tmp_path
 
 def test_the_scoring_dates_fall_back_to_the_model_source_and_skip_what_is_not_a_date():
     model = {"model": {"source": "bulk-2026-10-15/completed"}}
-    assert pool_levels.scoring_dates(model) == {"photos": "2026-10-15", "scored": None}
+    assert pool_levels.scoring_dates(model) == {
+        "photos": "2026-10-15",
+        "scored": None,
+        "updated": None,
+    }
     bad = {"identify": {"built_at": "soon", "emb": "E.npy"}}
-    assert pool_levels.scoring_dates(bad) == {"photos": None, "scored": None}
+    assert pool_levels.scoring_dates(bad) == {"photos": None, "scored": None, "updated": None}
+    daily = {"identify": {"built_at": "2026-11-12T22:31:58Z", "delta_at": "2026-11-15T23:51:28Z"}}
+    assert pool_levels.scoring_dates(daily)["updated"] == "2026-11-15"
     html = page_identify.render(dates=None).replace(
         (page_identify.ASSETS / "identify_fr.js").read_text(), ""
     )

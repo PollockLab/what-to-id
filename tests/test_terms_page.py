@@ -81,6 +81,11 @@ def test_identify_dates_flow_through(tmp_path):
     )
     html = terms_page.build(tmp_path).read_text()
     assert "Photos downloaded on 2 January 2026, scored on 3 February 2026." in html
+    (tmp_path / page_identify.DATES_NAME).write_text(
+        json.dumps({"photos": "2026-01-02", "scored": "2026-02-03", "updated": "2026-02-09"})
+    )
+    html = terms_page.build(tmp_path).read_text()
+    assert "3 February 2026. Updated daily with new records, last on 9 February 2026." in html
 
 
 def test_methods_tab_everywhere():
