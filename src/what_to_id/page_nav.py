@@ -237,10 +237,11 @@ def nav(
     With `available=None` the page cannot know which optional pages exist, so the script drops
     the ones that answer 404. `base` prefixes the links of a page served from another folder.
     `extra` is html placed at the end of the header row (the split page's view switch and counts).
-    `menu` swaps the switcher for Identify's Help menu, so Explore's header reads as Identify's.
+    `menu` swaps the switcher for Identify's Help menu (without `current`), so every header reads
+    as Identify's.
     """
     if menu:
-        skip = {"explore.html"} | (OPTIONAL - (available or OPTIONAL))
+        skip = {current} | (OPTIONAL - (available or OPTIONAL))
         return (
             f'<a class="site-skip" href="#main-content" {_SKIP}>Skip to content</a>\n'
             f'<div class="site-shell"><a class="site-brand" href="{escape(base)}index.html">'
@@ -297,6 +298,7 @@ HELP_CSS = """
 .lng a{color:var(--muted);text-decoration:underline;display:inline-block;padding:11px 2px}
 .lng a:not([href]){text-decoration:none;color:var(--ink)}
 .hm{position:relative}
+.site-shell>.hm{margin-left:auto}  /* a header with no bar between: Help keeps to the right */
 .hm>button{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 10px;
   font:inherit;color:var(--ink);background:none;border:0;border-radius:6px;cursor:pointer}
 .hm>button:hover,.hm>button[aria-expanded=true]{background:var(--chip)}

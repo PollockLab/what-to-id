@@ -3,6 +3,7 @@ in the hash, a view applies the ones it can and names the rest as held, and the 
 Identify brings them all home."""
 
 import re
+import shutil
 from urllib.parse import urljoin
 
 import pytest
@@ -31,6 +32,7 @@ def views(site, pts, tmp_path_factory):
     page_confusion.build(root, None, pq, rq)
     terms_page.build(root)
     atlas_search_page.build(root)
+    shutil.copy(root / "identify.html", root / "index.html")  # the deploy's landing page
     return site[0]
 
 
@@ -105,13 +107,13 @@ def test_a_view_opened_from_identify_has_its_filters_and_brings_them_back(
     if path == "explore.html":  # the panes open with the filters they apply
         srcs = page.eval_on_selector_all("iframe", "l => l.map(f => f.src)")
         assert srcs and all(carries(u, ["groups=Aves", "months=6"]) for u in srcs), srcs
-    back = page.locator(".site-shell a[href^='identify.html']")
+    # the way back: Explore's Show cards, elsewhere the wordmark
+    sel = ".site-shell a[href^='identify.html']" if path == "explore.html" else ".site-brand"
     page.wait_for_function(
-        "w => w.every(t => document.querySelector(\".site-shell a[href^='identify.html']\")"
-        ".getAttribute('href').includes(t))",
-        arg=want,
+        "([s, w]) => w.every(t => document.querySelector(s).getAttribute('href').includes(t))",
+        arg=[sel, want],
     )
-    back.click()
+    page.locator(sel).click()
     page.wait_for_function("window.__identify")
     assert page.evaluate("__identify.level()") == 3 and carries(page.url, want), page.url
     assert page.errors == []
