@@ -13,7 +13,7 @@ function one(id){return OBS+id+'#comment-id-tabs';}
 var CARD=IdentifyCard({ref:function(n){return CMP?CMP.ref(n):Promise.resolve(null);}}),TAB=[],SUBK=[],NK=1,KIND=null,SUB=null,KF=0,KC=[],UF=null,UON=false,MINE=[],CMP=null,BT=false,ST=null,SK='',IN=IdentifyInat(CFG.oauth);
 // CFG.merge: the kinds (levels) a tab shows, in order; SUBK a kind's place in its tab
 Object.keys(CFG.merge).forEach(function(t){CFG.merge[t].forEach(function(k,j){TAB[k]=+t;SUBK[k]=j;});NK=Math.max(NK,CFG.merge[t].length);});
-var META=null,SYNC=null,MORE=new Map(),TAXA=null,P=null,BYID=null,LEVEL=null,Q=null,LOOKS=null,WHY=null,WHYF=null,RK=null,N3=0,GP=null,R=null,MF=null,TF=null,PEND=null,OX=null,PIDS=null,REC=-1,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,ONE='',CACHE=new Map(),FIRST=null,SHOWN,STAY=false,X=null,WW=null,BAR=null;
+var META=null,SYNC=null,MORE=new Map(),TAXA=null,P=null,BYID=null,LEVEL=null,Q=null,LOOKS=null,WHY=null,WHYF=null,RK=null,N3=0,GP=null,R=null,MF=null,TF=null,PEND=null,OX=null,PIDS=null,REC=-1,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,ONE='',CACHE=new Map(),KEPT=[],PT=0,GO=false,FIRST=null,SHOWN,STAY=false,X=null,WW=null,BAR=null;
 var RKF=function(){},LKF=RKF,RKW=true;  // fetch rank (level 3) / look-alikes (levels 2, 3, 5, Batches, Compare) once; level 3's count waits for the rank under Best x%
 function $(id){return document.getElementById(id);}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
@@ -117,14 +117,14 @@ function pick(picks){
   if(parent===window)keep('taxa',TX.write(picks));  // embedded, the split page holds the address
   again();SYNC.send();
 }
-// i<0: a batch record the pool does not hold, its name filled in with its photo
-function card(i,lv,id){
+// i<0: a batch record the pool does not hold, its name filled in with its photo; old: the card drawn for it before, kept with its photo
+function card(i,lv,id,old){
   id=i<0?id:P.id[i];
-  var li=el('li','card'),det=el('div','det'),ph=el('div','ph','Loading photo'),w=el('a','when','Date and place…'),a=el('a','btn','Identify');
+  var li=old||el('li','card'),det=el('div','det'),w=el('a','when','Date and place…'),a=el('a','btn','Identify'),o=CACHE.get(id);
   li.dataset.id=id;li.tabIndex=0;
   w.href=OBS+id;IdentifyFlow.link(w);
   a.href=one(id);a.setAttribute('aria-label','Identify this record on iNaturalist');
-  li.append(CARD.car(ph),i<0?el('div','title'):title(i,lv),w);
+  li.replaceChildren(old?old.querySelector('.car'):CARD.car(el('div','ph','Loading photo')),i<0?el('div','title'):title(i,lv),w);
   if(i>=0){li.dataset.i=i;li.dataset.lv=lv;}
   if(i>=0&&!BT){
     if(KIND&&CFG.merge[lv]&&!KF)li.insertBefore(el('div','kind',kindName(KIND[i])),w);
@@ -138,31 +138,27 @@ function card(i,lv,id){
   // a click or Space opens the compare panel beside the list
   li.onclick=function(e){if(!e.target.closest('a,button')){if(CMP)CMP.open(li);else tell('wtid-record',id);}};
   li.onkeydown=function(e){if(e.target===li&&(e.key==='Enter'||e.key===' ')){e.preventDefault();if(e.key===' '&&CMP)CMP.open(li);else tell('wtid-record',id);}};
-  IdentifyFlow.seen(li);CARD.face(li);CARD.keys(li);
+  IdentifyFlow.seen(li);CARD.face(li);if(!old)CARD.keys(li);
+  if(!CARD.gone(li,o))fill(li,o);  // fetched already: no wait, no flash
   return li;
 }
-// Fills the photos of the cards just drawn; a record that left Needs ID or iNaturalist since the pool was built drops out.
+// Fills the photos of the cards just drawn (a record gone drops out); a card whose photo is already on its way (a kept card) waits for that one.
 function photos(lis){
-  var ids=lis.map(function(li){return +li.dataset.id;});
-  var sig=AB&&AB.signal;
-  Meta.fetchObservations(ids,function(u){return fetch(I18N.api(u),{signal:sig});},CACHE).then(function(){
-    lis.forEach(function(li){
-      if(!li.isConnected)return;
-      var o=CACHE.get(+li.dataset.id);
-      if(!o||o.quality_grade!=='needs_id'){li.remove();return;}
-      var p=o.photos&&o.photos[0],ph=li.querySelector('.ph'),w=li.querySelector('.when'),t=o.taxon;
-      if(!li.dataset.i){var nm=el('div','name');nm.appendChild(el('i',null,t?t.name:'Unidentified'));
-        li.querySelector('.title').replaceChildren(nm);if(t&&t.preferred_common_name&&I18N.names!=='latin')nm.after(el('div','com',t.preferred_common_name));}
-      ph.textContent='';
-      if(p){var img=el('img');img.loading='lazy';img.onerror=function(){img.removeAttribute('src');};img.alt='Photo of '+li.querySelector('i').textContent;
-        img.src=String(p.url).replace('/square.','/medium.');ph.appendChild(img);}else ph.textContent='No photo on iNaturalist now';
-      w.textContent=(o.observed_on||'Date unknown')+' · '+(o.place_guess||'Place unknown');w.title=w.textContent;CARD.face(li,o.place_guess||'');
-      // level 3: an ID at species there would not be the first, so not an improving one
-      if(li.dataset.lv==='3'&&IdentifyNarrow.taken(o)){li.remove();drop(+li.dataset.i);return;}
-      if(IN.user()&&t&&t.id&&!li.querySelector('.acts'))acts(li,t);
-      if(CMP)CMP.landed(li);
-    });
-  }).catch(function(e){if(!(sig&&sig.aborted))status('Could not load the photos: '+e.message,1);});
+  var sig=AB&&AB.signal;lis=lis.filter(function(li){return !(li.w&&!li.w.aborted);});lis.forEach(function(li){li.w=sig;});
+  Meta.fetchObservations(lis.map(function(li){return +li.dataset.id;}),function(u){return fetch(I18N.api(u),{signal:sig});},CACHE).then(function(){lis.forEach(function(li){
+    if(!li.isConnected)return;var o=CACHE.get(+li.dataset.id),g=CARD.gone(li,o);if(!g)fill(li,o);else{li.remove();if(g>1)drop(+li.dataset.i);}});
+  }).catch(function(e){if(!(sig&&sig.aborted))status('Could not load the photos: '+e.message,1);}).then(function(){lis.forEach(function(li){li.w=null;});});
+}
+// A card's photo, date and place (and a batch record's name) from its observation; a photo already shown stays.
+function fill(li,o){
+  var ph=li.querySelector('.ph'),w=li.querySelector('.when'),t=o.taxon,u=CARD.med(o),img=ph.querySelector('img');
+  if(!li.dataset.i){var nm=el('div','name');nm.appendChild(el('i',null,t?t.name:'Unidentified'));
+    li.querySelector('.title').replaceChildren(nm);if(t&&t.preferred_common_name&&I18N.names!=='latin')nm.after(el('div','com',t.preferred_common_name));}
+  if(!img||img.getAttribute('src')!==u){ph.textContent='';img=u&&el('img');
+    if(img){img.loading='lazy';img.onerror=function(){img.removeAttribute('src');};img.src=u;ph.appendChild(img);}else ph.textContent='No photo on iNaturalist now';}if(img)img.alt='Photo of '+li.querySelector('i').textContent;
+  w.textContent=(o.observed_on||'Date unknown')+' · '+(o.place_guess||'Place unknown');w.title=w.textContent;CARD.face(li,o.place_guess||'');
+  if(IN.user()&&t&&t.id&&!li.querySelector('.acts'))acts(li,t);
+  if(CMP)CMP.landed(li);
 }
 // a removed card leaves the list, so the caption, Show more and the batches count only cards that can show
 function drop(i){var r=view[LV],k=r&&Array.isArray(r)?r.indexOf(i):-1;if(k<0)return;r.splice(k,1);if(r.n)r.n--;if(k<drawn)drawn--;
@@ -207,8 +203,8 @@ function more(){
   var rows=view[LV]||[],ol=$('grid'),to=Math.min(rows.length,shown),lis=[],b=$('more');
   if(!drawn&&MINE[LV]>0)ol.appendChild(sep(MINE[LV],1));
   for(var j=drawn;j<to;j++){if(j===MINE[LV])ol.appendChild(sep(j));
-    if(rows.size&&CMP&&looksOf(rows[j])!==(j?looksOf(rows[j-1]):null))ol.appendChild(IdentifyNarrow.head(looksOf(rows[j]),rows.size.get(looksOf(rows[j])),CMP.ref));var li=card(rows[j],LV);ol.appendChild(li);lis.push(li);}
-  drawn=to;
+    if(rows.size&&CMP&&looksOf(rows[j])!==(j?looksOf(rows[j-1]):null))ol.appendChild(IdentifyNarrow.head(looksOf(rows[j]),rows.size.get(looksOf(rows[j])),CMP.ref));var li=card(rows[j],LV,0,KEPT[j]);if(!KEPT[j])ol.appendChild(li);lis.push(li);}
+  drawn=to;KEPT=[];
   b.hidden=rows.length<=to;b.textContent='Show more ('+nf.format(rows.length-to)+' left)';
   if(lis.length){photos(lis);if(CMP&&LOOKS){CMP.fill(lis);lis.forEach(CARD.paint);}}
   if(IO&&!b.hidden){IO.unobserve(b);IO.observe(b);}  // observe again: a tall pane may still show it
@@ -241,16 +237,20 @@ function paint(){
   if(BT){LKF();ST.show();return;}
   var x=CFG.levels.filter(function(l){return l[0]===LV;})[0];
   $('desc').textContent=x[2];kinds();$('panel').setAttribute('aria-labelledby','tab'+LV);
-  var y=scrollY;  // a layout between the clear and the redraw clamps the scroll to the empty page
-  if(AB)AB.abort();AB=new AbortController();  // the cards redrawn below replace those whose photos are still loading
-  $('grid').textContent='';shown=STAY?Math.max(LIMIT,drawn):LIMIT;drawn=0;
+  var y=scrollY,cs=[].slice.call($('grid').children),rows=view[LV]||[],k=0,m=0,t=++PT;shown=STAY?Math.max(LIMIT,drawn):LIMIT;
+  // the cards that lead the new list as they led the drawn one keep their nodes and photos (more() draws them again); the rest go, the last after the redraw (never an empty grid)
+  if(!(MINE[LV]>=0)&&!rows.size)while(k<cs.length&&k<rows.length&&k<shown&&cs[k].dataset.i&&+cs[k].dataset.id===P.id[rows[k]])k++;
+  cs.forEach(function(c,j){if(c.getBoundingClientRect().top<innerHeight)m=j+1;});  // late (STAY), a card on screen with its photo waits for the new one's (not the #record= card's list)
+  if(STAY&&!GO&&REC<0&&k<m&&cs.slice(k,m).some(function(c){return c.querySelector('.ph img');})){STAY=false;CARD.ahead(rows.slice(0,shown).map(function(r){return P.id[r];}),m,CACHE,4000).then(function(){if(t===PT){GO=STAY=true;paint();}});return;}
+  if(!k){if(AB)AB.abort();AB=new AbortController();}GO=false;  // the photos still loading for cards that go
+  var old=cs.slice(k),last=old.pop();old.forEach(function(c){c.remove();});KEPT=cs.slice(0,k);drawn=0;
   var kf=KF&&TAB[KF]===LV;  // the controls count the chosen kind, as the cards show it
   if(R)R.draw(kf?KF:LV,SEL,kf?KIND:LEVEL);
   if(X)X.draw(kf?KF:LV,SEL,kf?KIND:LEVEL);
   if(GP)GP.draw(LV);
   IdentifyFlow.draw(LV);
   empty();
-  more();batch();scrollTo(0,STAY?y:0);STAY=false;
+  more();if(last)last.remove();batch();scrollTo(0,STAY?y:0);STAY=false;
   if(LV===3&&WHYF)setTimeout(WHYF,0);
   if(LV===2||LV===3||LV===5)LKF();  // only these show a look-alike; level 3's order is by rank
   if(LV===3)RKF();

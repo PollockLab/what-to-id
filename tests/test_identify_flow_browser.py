@@ -233,18 +233,19 @@ def test_the_panel_asks_for_its_observation_when_the_cards_have_not_got_it(brows
     page.add_init_script(STUBS)
     eb.stub_inat(page, None)
     stub_taxa(page)
-    held = []
+    held, clicked = [], []
 
-    def hold(route):  # the cards' request, many ids, hangs; the panel's own one id goes through
-        if "%2C" in route.request.url or "," in route.request.url:
-            held.append(route)
-        else:
+    def hold(route):  # the cards' requests hang; the panel's own goes through
+        if clicked:
             route.fallback()
+        else:
+            held.append(route)
 
     page.route("https://api.inaturalist.org/v1/observations*", hold)
     page.goto(f"{base}/identify.html#lvl=3")
     page.wait_for_selector("#grid .card .copy", state="attached")
     assert page.locator("#grid .card .ph img").count() == 0 and held
+    clicked.append(1)
     page.locator("#grid .card .title").first.click()
     page.wait_for_selector("#cpobs .cpbig")
     assert "Vancouver" in page.inner_text("#cpobs .cpwhen")

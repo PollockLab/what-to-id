@@ -76,6 +76,14 @@ return function(ctx){
     li.addEventListener('keydown',function(e){var d={ArrowLeft:-1,ArrowRight:1}[e.key],c=li.querySelector('.car');
       if(e.target===li&&d&&c&&frames(c).length>1){e.preventDefault();flip(c,d);}});
   }
-  return {car:car,face:face,lend:lend,keys:keys,paint:function(li){var c=li.querySelector('.car');if(c)show(c,+c.dataset.at);}};
+  // A record that left Needs ID or iNaturalist since the pool was built: 1; on level 3, one with an ID at species (an ID there would not be the first, so not an improving one): 2.
+  function gone(li,o){return !o||o.quality_grade!=='needs_id'?1:li.dataset.lv==='3'&&IdentifyNarrow.taken(o)?2:0;}
+  function med(o){var p=o.photos&&o.photos[0];return p&&String(p.url).replace('/square.','/medium.');}
+  // a late list's photos at hand before it replaces the cards on screen: the observations of ids into cache, the photos of the first n decoded; ms at most
+  function ahead(ids,n,cache,ms){
+    return Promise.race([new Promise(function(ok){setTimeout(ok,ms);}),AtlasSearchMeta.fetchObservations(ids,function(u){return fetch(I18N.api(u));},cache).then(function(){
+      return Promise.all(ids.slice(0,n).map(function(id){var o=cache.get(id),u=o&&med(o),img=new Image();if(u){img.src=u;return img.decode().catch(function(){});}}));})]).catch(function(){});
+  }
+  return {car:car,face:face,lend:lend,keys:keys,gone:gone,med:med,ahead:ahead,paint:function(li){var c=li.querySelector('.car');if(c)show(c,+c.dataset.at);}};
 };
 })();
