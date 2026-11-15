@@ -93,7 +93,7 @@ ol{list-style:none;margin:8px 0;padding:0;display:grid;gap:10px;
 button.padd{cursor:pointer;background:var(--chip)}
 #usrbox p{margin:4px 0}
 /* Batches (the study): its box replaces the level's controls and cards */
-body:not(.bt) #study,.bt #status:not(.err),.bt #unpick,.bt #desc,.bt #kind,.bt #rout,.bt #rg,.bt #sort,.bt #hint,.bt #panel,.bt #tab6,.bt #gscope,.bt #xmap{display:none!important}
+body:not(.bt) #study,.bt #status:not(.err),.bt #unpick,.bt #desc,.bt #kind,.bt #rout,.bt #rg,.bt #sort,.bt #hint,.bt #panel,.bt #tab6,.bt #gscope,.bt #xmap,.bt #fclear{display:none!important}
 .srow{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:8px 0}
 .srow select{font:inherit;min-height:30px;padding:0 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink)}
 .btn:is(button){font:inherit;font-size:13px;font-weight:650;border:0;cursor:pointer}
@@ -155,6 +155,7 @@ __SITE_NAV__<main id="main-content">
 <button type="button" id="bwho" class="seg1" aria-expanded="false" aria-controls="pwho" disabled><small>Who</small><b>Anyone</b></button>
 <div id="pwho" class="bpanel" role="group" aria-label="Who" hidden><div id="sgwho" class="sg"></div><p id="uload" class="muted" role="status">Loading your filters…</p><details id="usrbox" open hidden></details></div>
 </div></div>
+<button type="button" id="fclear" class="fclear" aria-label="Clear filters: What, When, Where, Who, At risk, Invasive and Best x%" hidden>Clear filters</button>
 <div id="qrow" class="qrow"><div id="tabs" class="tabs" role="tablist" aria-label="Level"></div>
 <span id="qchips" class="qchips"></span>
 <div id="rg" class="rout qseg" hidden></div>

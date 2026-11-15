@@ -164,3 +164,10 @@ def test_the_search_suggestions_are_hidden_in_the_batches(browser, site):
     page.wait_for_selector("body.bt")
     page.wait_for_timeout(300)
     assert page.locator(".sg:visible").count() == 0 and urls == []  # no top identifiers either
+
+
+def test_batches_show_no_clear_filters(browser, site):
+    base, _ = site
+    page = open_batches(browser, base, "#lvl=b&months=6")
+    page.wait_for_function("window.__identify")
+    assert page.locator("#fclear").count() == 1 and page.locator("#fclear").is_hidden()

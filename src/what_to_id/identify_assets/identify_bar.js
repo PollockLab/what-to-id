@@ -54,6 +54,8 @@ var S=o.S,META=o.META,MF=o.mf,G=META.groups,LAST=MF.LAST,iso=MF.iso,bar=$('bar')
   SEG=NAMES.map(function(n){var b=$('b'+n.toLowerCase());return {b:b,p:$('p'+n.toLowerCase()),l:b.querySelector('b')};}),
   cur=-1,CUM=null,SUB=null,TC,TOT=null,GM=null,A=null,ACC=[];
 SEG[2].b.hidden=o.embedded;  // the split view's map beside it holds the area
+// Clear filters: the address without them, read back by the hashchange; the focus goes to What. Explore has its own.
+var FC=$('fclear');if(o.embedded)FC.remove();else WtidCarry.clear(FC,function(t){location.hash=t.join('&');LBL=null;A.clear();if(W.live())W.reset();SEG[0].b.focus();});
 
 // What: the taxon picker and its shortcuts, then the groups list with the groups filter left out of its counts, then the Show only
 // chips and the location accuracy (the projects box is the app's, identify_only.js)

@@ -413,7 +413,7 @@ function inbox(){
     else if(d.type==='wtid-subset'&&(d.ids===null||Array.isArray(d.ids))){SUBIDS=d.ids&&Uint32Array.from(d.ids).sort();again();}  // the photo search's hits
   });
   SYNC=MapFilter.sync({key:key,apply:function(str){if(MF){clearTimeout(TK);TK=setTimeout(function(){take(str,false);},60);}else{PEND=str;again();}},hash:false});
-  addEventListener('hashchange',function(){if(MF)take(location.hash.slice(1),true);else again();});
+  addEventListener('hashchange',function(){if(GP)GP.reread();if(WW)WW.sync();if(MF)take(location.hash.slice(1),true);else again();});  // a new address (Clear filters, back) sets every filter
 }
 // the look-alike file (planes of one entry per level 2, 3, 5 record, expanded to all n by KIND), or (why) the runner-up file (planes of n)
 function looks(buf,why){

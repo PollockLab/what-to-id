@@ -11,6 +11,8 @@ var KEYS=['by','from','to','months','groups','only','acc','taxa','user','umode',
     user:'Who',umode:'Who',umin:'Who',area:'Where',park:'Where',bcpark:'Where',projects:'Where',risk:'At risk',
     inv:'Invasive',lvl:'Identify tab',kind:'Identify tab',conf:'Best x%',gap:'Survey gaps',pri:'Order',
     base:'Order',rg:'Unconfirmed',look:'Look-alikes'},
+  // Clear filters drops these; Identify's tab and its order stay
+  CLEAR=KEYS.filter(function(k){return ['lvl','kind','pri','base','gap','look'].indexOf(k)<0;}),BTN=[],
   SS='wtid-filters',anchors=!!document.querySelector('[data-anchors]'),OWN=null,sent=null,T=0;
 function key(t){return t.split('=')[0];}
 function take(h){return String(h||'').replace(/^#/,'').split('&').filter(function(t){
@@ -39,6 +41,7 @@ function sweep(){
   if(!anchors)try{sessionStorage.setItem(SS,f.join('&'));}catch(e){}
   document.querySelectorAll('a[href]').forEach(function(a){link(a,f);});
   if(parent!==window&&f.join('&')!==sent){sent=f.join('&');parent.postMessage({type:'wtid-carry',tokens:f},location.origin);}
+  var d=f.some(function(t){return CLEAR.indexOf(key(t))>=0;});BTN.forEach(function(b){b.hidden=!d;});
   note(f);}
 function soon(){if(!T)T=setTimeout(sweep,30);}
 // every write of the address, by any view, and every link drawn later
@@ -51,5 +54,8 @@ function start(){sweep();new MutationObserver(soon).observe(document.body,{child
 if(document.body)start();else addEventListener('DOMContentLoaded',start);
 return {KEYS:KEYS,NAME:NAME,take:take,held:held,sweep:sweep,link:function(a){link(a,now());},
   // a view that does not apply every filter names the keys it does (or a function of them), for the note
-  own:function(o){OWN=o;soon();}};
+  own:function(o){OWN=o;soon();},
+  // a Clear filters button: shown while a filter is set; a click hands go() the address without them
+  clear:function(b,go){BTN.push(b);soon();b.addEventListener('click',function(){
+    go(location.hash.slice(1).split('&').filter(function(t){return t&&CLEAR.indexOf(key(t))<0;}));});}};
 })();

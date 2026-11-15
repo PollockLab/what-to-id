@@ -74,7 +74,7 @@ body{display:flex;flex-direction:column}
 <body>
 __SITE_NAV__
 <main id="main-content" tabindex="-1"><h1 class="site-vh">Explore</h1></main>
-<div class="sbar" id="sbar" role="region" aria-label="Your selection"><span class="sbn" id="sbn" aria-live="polite"></span><ul class="sbc" id="sbc" aria-label="Active filters"></ul><button type="button" id="sbl" aria-expanded="false" aria-controls="map">Legend</button><button type="button" id="sbf" aria-expanded="false" aria-controls="map">When &amp; where</button></div>
+<div class="sbar" id="sbar" role="region" aria-label="Your selection"><span class="sbn" id="sbn" aria-live="polite"></span><ul class="sbc" id="sbc" aria-label="Active filters"></ul><button type="button" id="sbx" aria-label="Clear filters: What, When, Where, Who, At risk, Invasive and Best x%" hidden>Clear filters</button><button type="button" id="sbl" aria-expanded="false" aria-controls="map">Legend</button><button type="button" id="sbf" aria-expanded="false" aria-controls="map">When &amp; where</button></div>
 <script>
 __MAP_FILTER__
 __STATE_BAR__
@@ -276,6 +276,12 @@ addEventListener('message',function(e){
 });
 WtidCarry.own(function(){var k=MapFilter.KEYS;
   Object.keys(OWNF).forEach(function(n){if(n==='map'?frames.map:visible(n))k=k.concat(OWNF[n]);});return k;});  // the map's rail keeps its area
+// Clear filters (carry.js): the address without them, each pane made again on it; the focus stays on the bar
+WtidCarry.clear(document.getElementById('sbx'),function(t){
+  last=MapFilter.tokens(t.join('&'));rest=rest.filter(function(x){return t.indexOf(x)>=0||!WtidCarry.take(x).length;});
+  ['wtid-area','wtid-projects','wtid-keep','wtid-matches'].forEach(function(k){delete late[k];});addr();
+  var v=view;SB.close();Object.keys(frames).forEach(function(n){frames[n].remove();delete frames[n];});view=null;setView(v);
+  document.getElementById('sbf').focus();});
 // The photo space's view tokens (life=look, clade=), kept for a reload, a shared link and a frame made later.
 addEventListener('message',function(e){
   var d=e.data;

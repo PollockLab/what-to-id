@@ -35,7 +35,7 @@ var words={
 "Browse the same selection full screen:":"Parcourir la même sélection en plein écran :","in photo space":"dans l'espace des photos",
 "in the taxonomy":"dans la taxonomie","Location accuracy":"Précision de la localisation","Any location accuracy":"Toute précision de localisation",
 "No accuracy reported for the location. Click to pick.":"Aucune précision signalée pour la localisation. Cliquez pour choisir.",
-"Any":"Peu importe","Known":"Connue","Unknown only":"Inconnue seulement","Leave out":"Exclure","Clear the species filter":"Effacer le filtre d'espèce",
+"Any":"Peu importe","Known":"Connue","Unknown only":"Inconnue seulement","Leave out":"Exclure","Clear the species filter":"Effacer le filtre d'espèce","Clear filters":"Effacer les filtres","Clear filters: What, When, Where, Who, At risk, Invasive and Best x%":"Effacer les filtres : Quoi, Quand, Où, Qui, À risque, Envahissantes et Meilleurs x %",
 "Reload for this view":"Recharger pour cette vue","No records in view":"Aucune observation en vue","Loading your filters…":"Chargement de vos filtres…",
 "Amphibians":"Amphibiens","Birds":"Oiseaux","Fish":"Poissons","Insects":"Insectes","Mammals":"Mammifères","Molluscs":"Mollusques","Plants":"Plantes",
 "Reptiles":"Reptiles","Other animals":"Autres animaux","Spiders and allies":"Araignées et apparentés","Kelp and allies":"Varech et apparentés",

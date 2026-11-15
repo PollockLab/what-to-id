@@ -147,3 +147,23 @@ def test_every_link_to_another_view_carries_the_filters(browser, views, path):
     hrefs = [h for h in hrefs if not re.search(r"#[^=&]+$", h)]
     assert hrefs and all(carries(h, want) for h in hrefs), hrefs
     assert page.errors == []
+
+
+def test_clear_filters_on_explore_drops_them_from_the_address_and_every_pane(browser, views):
+    area = "area=" + identify(browser, views)[1][-1].split("=", 1)[1]
+    page = opened(browser, f"{views}/explore.html#" + "&".join([*F, area]))  # Identify and the map
+    page.wait_for_load_state("networkidle")
+    button = page.locator("#sbx")
+    button.wait_for(state="visible")
+    assert button.get_attribute("aria-label").startswith("Clear filters")
+    button.focus()
+    page.keyboard.press("Enter")
+    page.wait_for_function("!/groups=|months=|risk=|conf=|area=/.test(location.hash)")
+    button.wait_for(state="hidden")
+    assert "lvl=3" in page.url and page.evaluate("document.activeElement.id") == "sbf"
+    srcs = page.eval_on_selector_all("iframe", "l => l.map(f => f.src)")
+    assert srcs and not [u for u in srcs if re.search(r"groups=|months=|risk=|area=", u)], srcs
+    pane = "document.getElementById('identify').contentWindow"
+    page.wait_for_function(f"{pane}.__identify && {pane}.__identify.level() === 3")
+    assert note(page) == ""
+    assert page.errors == []

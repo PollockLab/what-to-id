@@ -240,6 +240,7 @@ var F=function(ctx){
   load();
   return {
     ready:ready,  // settles once the checklist has loaded or failed and the redraw is done
+    reread:function(){st=read();if(UI)show();},  // the address changed under it (Clear filters, back)
     // a record the filters keep: level 3's Best x% and every level's survey days range
     pass:function(i,kind,all){
       if(kind===3&&st.top<100&&!all){var p=ctx.pct(i);if(p!=null&&p>st.top/100)return false;}
