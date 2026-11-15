@@ -7,13 +7,13 @@ var IdentifySuggest=(function(){
 'use strict';
 // Every English string, in one place for the translation file to take over; {n} and {d} are filled in.
 var T={
-  what:'Suggested',recent:'Recently used',recentSub:'Recently used',backlog:'Biggest backlogs',backlogSub:'{n} records waiting',
+  what:'Suggested',recent:'Recently used',recentSub:'Recently used',backlog:'Biggest backlogs',backlogSub:'{n} of the records to identify',
   blitz:'Blitz targets',blitzSub:'{n} threatened or introduced',lists:'Suggestions',
   when:'Quick picks',visit:'Since your last visit',visitSub:'From {d}',allSub:'Every record',rangeSub:'{a} to {b}',
   where:'Near you',near:'Near me',nearSub:'Within 50 km of where you are',nearWait:'Finding where you are…',
   denied:'Location is blocked for this site. Allow it in the browser, or draw an area below.',
   unavailable:'Your location is not available. Draw an area below instead.',outside:'You seem to be outside this map’s area.',
-  places:'Suggested places',placesSub:'Up to {n} records waiting',placesLoad:'Loading parks…',placesFail:'The park list did not load.',
+  places:'Suggested places',placesSub:'Up to {n} of the records to identify',placesLoad:'Loading parks…',placesFail:'The park list did not load.',
   who:'Your progress',opened:'{n} opened today',improving:'{n} of 10 improving IDs in 30 days',none:'Nothing opened yet today.',
   mine:'Not yet by me',mineSub:'Leave out what you identified',mineNeed:'Type your iNaturalist login below first.',
   mineExcl:'Untick “my observations” below first.',nobody:'Nobody has looked',nobodySub:'No one but the observer has identified it',

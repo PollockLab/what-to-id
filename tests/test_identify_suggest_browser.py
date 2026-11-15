@@ -2,6 +2,7 @@
 address key the full filter writes, and Near me acts only on a tap. iNaturalist is stubbed."""
 
 import os
+import re
 
 import numpy as np
 import pytest
@@ -63,6 +64,8 @@ def test_a_backlog_row_sets_the_groups_key_and_a_second_tap_clears_it(browser, s
     page = opened(browser, base, "what")
     first = page.locator("#sgwhat .sgr[data-k^='b:']").first
     g = first.get_attribute("data-k")[2:]
+    n = int((pts["iconic_taxon"] == g).sum())  # the top bar's denominator: every record to identify
+    assert f"{n:,} of the records to identify" in first.inner_text()
     first.click()
     assert f"groups={g}" in hash_(page)
     assert ib.ids(page) == sorted(pts["id"][pts["iconic_taxon"] == g].tolist())
@@ -142,7 +145,7 @@ def test_a_suggested_park_sets_bcpark(browser, site):
     page = opened(browser, base, "where")
     page.wait_for_selector("#sgwhere .sgr[data-k^='p:']")
     park = page.locator("#sgwhere .sgr[data-k^='p:']").first
-    assert "Up to" in park.inner_text()
+    assert re.search(r"Up to [\d,]+ of the records to identify", park.inner_text())
     key = park.get_attribute("data-k")[2:]
     park.click()
     assert f"bcpark={key}" in hash_(page)
