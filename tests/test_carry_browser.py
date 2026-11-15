@@ -105,9 +105,9 @@ def test_a_view_opened_from_identify_has_its_filters_and_brings_them_back(
     if path == "explore.html":  # the panes open with the filters they apply
         srcs = page.eval_on_selector_all("iframe", "l => l.map(f => f.src)")
         assert srcs and all(carries(u, ["groups=Aves", "months=6"]) for u in srcs), srcs
-    back = page.locator(".site-nav a[href^='identify.html']")
+    back = page.locator(".site-shell a[href^='identify.html']")
     page.wait_for_function(
-        "w => w.every(t => document.querySelector(\".site-nav a[href^='identify.html']\")"
+        "w => w.every(t => document.querySelector(\".site-shell a[href^='identify.html']\")"
         ".getAttribute('href').includes(t))",
         arg=want,
     )
