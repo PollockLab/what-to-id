@@ -143,6 +143,7 @@ def test_the_hash_selection_reaches_identify_on_load(browser, site, pts):
 def test_the_maps_area_and_a_lasso_reach_identify(browser, site, pts):
     page = explore(browser, site[0])
     ident, left = frame_of(page, "identify"), frame_of(page, "map")
+    ident.wait_for_function("window.__identify")  # an area posted earlier is lost
     west = float(np.median(pts["lon"]))
     inside = pts["lon"] > west
     ring = [west, 48, -122, 48, -122, 50, west, 50]

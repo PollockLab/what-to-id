@@ -1,6 +1,9 @@
 """Identify's one-tap suggestions at the top of each search panel in Chromium: each applies the
 address key the full filter writes, and Near me acts only on a tap. iNaturalist is stubbed."""
 
+import os
+import re
+
 import numpy as np
 import pytest
 
@@ -12,6 +15,7 @@ from .test_identify_bar_browser import blank_map
 browser = eb.browser
 N = ib.N
 WIDE = (1440, 900)
+SHOT = os.environ.get("WTID_SHOT")
 GEO = """(code) => {
   navigator.geolocation.getCurrentPosition = (ok, err) => {
     if (code) err({code}); else ok({coords: {longitude: -123, latitude: 49}});
@@ -60,6 +64,8 @@ def test_a_backlog_row_sets_the_groups_key_and_a_second_tap_clears_it(browser, s
     page = opened(browser, base, "what")
     first = page.locator("#sgwhat .sgr[data-k^='b:']").first
     g = first.get_attribute("data-k")[2:]
+    n = int((pts["iconic_taxon"] == g).sum())  # the top bar's denominator: every record to identify
+    assert f"{n:,} of the records to identify" in first.inner_text()
     first.click()
     assert f"groups={g}" in hash_(page)
     assert ib.ids(page) == sorted(pts["id"][pts["iconic_taxon"] == g].tolist())
@@ -139,10 +145,41 @@ def test_a_suggested_park_sets_bcpark(browser, site):
     page = opened(browser, base, "where")
     page.wait_for_selector("#sgwhere .sgr[data-k^='p:']")
     park = page.locator("#sgwhere .sgr[data-k^='p:']").first
-    assert "Up to" in park.inner_text()
+    assert re.search(r"Up to [\d,]+ to identify", park.inner_text())
     key = park.get_attribute("data-k")[2:]
     park.click()
     assert f"bcpark={key}" in hash_(page)
+
+
+def test_where_puts_the_map_first_with_three_suggestions_and_an_explore_link(browser, site):
+    base, _ = site
+    page = ib.open_identify(browser, base, "", size=WIDE)
+    page.route(  # the fixture's site has no Explore page: a blank one stands in
+        "**/explore.html*", lambda r: r.fulfill(body="<!doctype html>", content_type="text/html")
+    )
+    page.reload()
+    page.wait_for_function("window.__identify && __identify.ids().length > 0")
+    blank_map(page)
+    page.click("#bwhere")
+    page.wait_for_selector("#sgwhere .sgr[data-k^='p:']")
+    assert page.evaluate(  # the map, then the suggestions
+        "!!(document.getElementById('wbox').compareDocumentPosition("
+        "document.getElementById('sgwhere')) & Node.DOCUMENT_POSITION_FOLLOWING)"
+    )
+    assert page.locator("#sgwhere .sgr").count() == 3  # Near me and two parks
+    park = page.locator("#sgwhere .sgr[data-k^='p:']").first
+    key = park.get_attribute("data-k")[2:]
+    park.click()
+    page.wait_for_function(f"location.hash.includes('bcpark={key}')")
+    link = page.get_by_role("link", name="Open in Explore")
+    page.wait_for_function(
+        f"document.getElementById('xmap').href.includes('bcpark={key}')"
+    )  # follows the area once the panel redraws
+    href = link.get_attribute("href")
+    assert href.startswith("explore.html?view=map#") and f"bcpark={key}" in href
+    page.click("#wexp")  # the expanded map keeps the link in reach
+    assert link.is_visible() and page.get_attribute("#wexp", "aria-expanded") == "true"
+    assert page.errors == []
 
 
 def test_the_who_chips_keep_the_records_with_that_many_outside_ids(browser, site):
@@ -210,28 +247,46 @@ def open_who(browser, base, hash_="", status=200):
     return page, urls
 
 
-def test_who_lists_the_top_identifiers_as_profile_links(browser, site):
+def test_who_lists_the_top_identifiers_as_buttons_with_profile_links(browser, site):
     base, _ = site
     page, urls = open_who(browser, base)
-    page.wait_for_selector("#sgwho a.sga")
-    links = page.locator("#sgwho a.sga")
-    assert links.count() == 5 and links.first.inner_text().startswith("user0 (50)")
-    assert links.first.get_attribute("href") == "https://www.inaturalist.org/people/user0"
-    assert links.first.get_attribute("target") == "_blank"
-    assert "noopener" in links.first.get_attribute("rel")
+    page.wait_for_selector("#sgwho button.sga")
+    names = page.locator("#sgwho button.sga")
+    assert names.count() == 5 and names.first.inner_text().startswith("user0 (50)")
+    link = page.get_by_role("link", name="user0 on iNaturalist")
+    assert link.get_attribute("href") == "https://www.inaturalist.org/people/user0"
+    assert link.get_attribute("target") == "_blank"
+    assert "noopener" in link.get_attribute("rel")
     assert len(urls) == 1 and "per_page=5" in urls[0] and "taxon_id" not in urls[0]
-    links.first.focus()
+    assert page.get_by_text("Top identifiers here, tap to see their genera").count() == 1
+    names.first.focus()
     assert "look=" not in hash_(page) and page.errors == []
+
+
+def test_tapping_an_identifier_fills_the_login_and_ticks_only_their_genera(browser, site):
+    base, _ = site
+    page, _ = open_who(browser, base)
+    page.wait_for_selector("#sgwho button.sga")
+    page.route("https://api.inaturalist.org/v1/users/autocomplete*", lambda r: r.abort())
+    page.locator("#sgwho button.sga").first.click()
+    page.wait_for_function("document.getElementById('usrname').value === 'user0'")
+    page.wait_for_function("document.getElementById('usrtaxa').checked")
+    # Only the genera is the default tick, so the address carries no umode
+    page.wait_for_function("location.hash.includes('user=user0')")
+    assert "user=user0" in hash_(page) and page.locator("#usrtaxa").is_checked()
+    assert page.get_by_role("link", name="user0 on iNaturalist").count() == 1
+    page.screenshot(path=SHOT, clip=page.locator("#pwho").bounding_box()) if SHOT else None
+    assert page.errors == []
 
 
 def test_the_top_identifiers_are_asked_per_what_taxon_once(browser, site):
     base, _ = site
     page, urls = open_who(browser, base, "#taxa=900")
-    page.wait_for_selector("#sgwho a.sga")
+    page.wait_for_selector("#sgwho button.sga")
     assert len(urls) == 1 and "taxon_id=900" in urls[0]
     page.click("#bwho")
     page.click("#bwho")
-    page.wait_for_selector("#sgwho a.sga")
+    page.wait_for_selector("#sgwho button.sga")
     assert len(urls) == 1
 
 
@@ -239,5 +294,5 @@ def test_the_top_identifiers_hide_when_the_fetch_fails(browser, site):
     base, _ = site
     page, urls = open_who(browser, base, status=500)
     page.wait_for_timeout(300)
-    assert len(urls) == 1 and page.locator("#sgwho a.sga").count() == 0
+    assert len(urls) == 1 and page.locator("#sgwho button.sga").count() == 0
     assert page.locator("#sgwho .sgr").count() > 0

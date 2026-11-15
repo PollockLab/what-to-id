@@ -26,7 +26,7 @@
 .cat.more:hover,.cat.more[aria-pressed="true"]{background:var(--chip)}
 .cat.more svg{fill:none;stroke:currentColor;stroke-width:1.8}.cat.more circle{fill:var(--bg)}
 .cat.hot{background:var(--chip);color:var(--ink)}.cat.hot svg{fill:var(--c)}
-.cat.z{opacity:.45}
+.cat.z{opacity:.45}.cat:disabled{cursor:default}
 .cat:hover{background:var(--chip);color:var(--ink)}
 .cat[aria-pressed="true"]{background:var(--chip);color:var(--ink);font-weight:650}
 .cat:focus-visible{outline:3px solid var(--bar);outline-offset:-2px}
@@ -50,6 +50,7 @@
 .bpanel .sugg{z-index:8;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);max-height:240px;overflow:auto}
 .bpanel p{margin:6px 0}
 .bpanel .gbar{margin:8px 0}
+.bpanel .gscope{margin:8px 0 0;font-size:12px}.gscope:empty{display:none}
 .bpanel .gl{max-height:46vh;overflow:auto}
 .bpanel .chips{display:flex;flex-wrap:wrap;gap:4px}
 .bpanel .chips button,.tseg button{border:1px solid var(--line);background:var(--chip);color:var(--ink);font:inherit;font-size:12px;padding:3px 9px;
@@ -75,7 +76,14 @@
 .bpanel .row:has(#from){font-size:12px}
 .wbox{display:flex;flex-direction:column;gap:8px}  /* Where: the map, then its Expand button */
 .wbox iframe{width:100%;height:min(380px,50vh);border:1px solid var(--line);border-radius:12px;background:var(--bg)}
-.wfoot{display:flex;justify-content:flex-end}
+.wfoot{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}
+.wfoot .alt{background:var(--panel);color:var(--ink);border:1px solid var(--line)}  /* Open in Explore, beside Expand map */
+/* Identify (not Batches) on a wide screen: a larger map first, the suggestions in a column beside it */
+@media(min-width:761px){
+  body:not(.bt) #pwhere:has(#sgwhere:not(:empty)){width:min(860px,calc(100vw - 24px));display:grid;grid-template-columns:minmax(0,1fr) 230px;gap:0 16px;align-items:start}
+  body:not(.bt) #pwhere .wbox:not(.big) iframe{height:min(520px,56vh)}
+  #pwhere .sg{margin:0}
+}
 .wbox.big{position:fixed;inset:0;z-index:60;gap:0;background:var(--bg)}  /* the whole window; Show N cards floats at the foot */
 .wbox.big iframe{flex:1;height:auto;border:0;border-radius:0}
 .wbox.big .wfoot{position:absolute;left:0;right:0;bottom:calc(40px + env(safe-area-inset-bottom,0px));justify-content:center;pointer-events:none}

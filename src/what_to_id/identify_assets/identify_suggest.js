@@ -7,18 +7,18 @@ var IdentifySuggest=(function(){
 'use strict';
 // Every English string, in one place for the translation file to take over; {n} and {d} are filled in.
 var T={
-  what:'Suggested',recent:'Recently used',recentSub:'Recently used',backlog:'Biggest backlogs',backlogSub:'{n} records waiting',
+  what:'Suggested',recent:'Recently used',recentSub:'Recently used',backlog:'Biggest backlogs',backlogSub:'{n} of the records to identify',
   blitz:'Blitz targets',blitzSub:'{n} threatened or introduced',lists:'Suggestions',
   when:'Quick picks',visit:'Since your last visit',visitSub:'From {d}',allSub:'Every record',rangeSub:'{a} to {b}',
-  where:'Near you',near:'Near me',nearSub:'Within 50 km of where you are',nearWait:'Finding where you are…',
+  near:'Near me',nearSub:'Within 50 km of where you are',nearWait:'Finding where you are…',
   denied:'Location is blocked for this site. Allow it in the browser, or draw an area below.',
   unavailable:'Your location is not available. Draw an area below instead.',outside:'You seem to be outside this map’s area.',
-  places:'Suggested places',placesSub:'Up to {n} records waiting',placesLoad:'Loading parks…',placesFail:'The park list did not load.',
+  places:'Suggested places',placesSub:'Up to {n} to identify',placesLoad:'Loading parks…',placesFail:'The park list did not load.',
   who:'Your progress',opened:'{n} opened today',improving:'{n} of 10 improving IDs in 30 days',none:'Nothing opened yet today.',
   mine:'Not yet by me',mineSub:'Leave out what you identified',mineNeed:'Type your iNaturalist login below first.',
   mineExcl:'Untick “my observations” below first.',nobody:'Nobody has looked',nobodySub:'No one but the observer has identified it',
   second:'Needs a second opinion',secondSub:'One ID, and nobody agrees yet',
-  ids:'Top identifiers here',newTab:' (opens in a new tab)'
+  ids:'Top identifiers here, tap to see their genera',onInat:'{u} on iNaturalist',newTab:' (opens in a new tab)'
 };
 var NS='http://www.w3.org/2000/svg',R=50,PTS=64,KM=111.195,STORE={recent:'wtid-recent',visit:'wtid-lastvisit',opened:'wtid-opened',improving:'wtid-improving'},
   ICON={
@@ -112,7 +112,7 @@ function whenRows(){
   return [{h:T.when,rows:r}];
 }
 
-// Where: Near me on tap, and the parks with the most records waiting. A park's boundary comes from the map, which reloads.
+// Where: Near me on tap, and the two parks with the most records to identify, under the map. A park's boundary comes from the map, which reloads.
 function near(){
   if(bt())return;
   var g=navigator.geolocation;
@@ -137,17 +137,16 @@ function parks(){
       var lo=P.lonlat[2*i],la=P.lonlat[2*i+1],cs=cell[Math.floor(lo*4)+','+Math.floor(la*4)]||[];
       cs.forEach(function(r){var b=r[4];if(lo>=b[0]&&lo<=b[2]&&la>=b[1]&&la<=b[3])c[r[0]]=(c[r[0]]||0)+1;});
     }
-    PN=list.filter(function(r){return c[r[0]]>0;}).sort(function(a,b){return c[b[0]]-c[a[0]]||(a[1]<b[1]?-1:1);}).slice(0,5)
+    PN=list.filter(function(r){return c[r[0]]>0;}).sort(function(a,b){return c[b[0]]-c[a[0]]||(a[1]<b[1]?-1:1);}).slice(0,2)
       .map(function(r){return {key:r[0],name:r[1],n:c[r[0]]};});
     PS=2;draw();
   }).catch(function(){PS=3;draw();});
 }
 function whereRows(){
-  var h=location.hash,k=/(?:^|&)bcpark=([^&]*)/.exec(h),out=[{h:T.where,rows:[{k:'n:near',i:'near',t:T.near,s:T.nearSub,on:false,fn:near}]}];
-  if(PN&&PN.length)out.push({h:T.places,rows:PN.map(function(p){
+  var h=location.hash,k=/(?:^|&)bcpark=([^&]*)/.exec(h);
+  return [{h:T.places,rows:[{k:'n:near',i:'near',t:T.near,s:T.nearSub,on:false,fn:near}].concat((PN||[]).map(function(p){
     return {k:'p:'+p.key,i:'park',t:p.name,s:fmt(T.placesSub,{n:o.nf.format(p.n)}),on:!!k&&decodeURIComponent(k[1])===p.key,
-      fn:function(){o.area('','bcpark='+encodeURIComponent(p.key),p.name);}};})});
-  return out;
+      fn:function(){o.area('','bcpark='+encodeURIComponent(p.key),p.name);}};}))}];
 }
 
 // Who: the progress so far, the top identifiers for the What taxon (read-only, one fetch per taxon a session), then the three chips
@@ -159,6 +158,11 @@ function who(){
   fetch('https://api.inaturalist.org/v1/observations/identifiers?place_id='+META.place_id+(k?'&taxon_id='+k:'')+'&per_page=5')
     .then(function(r){if(!r.ok)throw 0;return r.json();})
     .then(function(j){IDS[k]=j.results.filter(function(x){return x.user&&x.user.login;}).slice(0,5);draw();}).catch(function(){});
+}
+// Tapping an identifier fills the User box and ticks "Only the user's genera", as if typed and ticked
+function strengths(l){
+  var i=document.getElementById('usrname'),c=document.getElementById('usrtaxa');if(!i||!c)return;
+  i.value=l;c.checked=true;c.dispatchEvent(new Event('change'));
 }
 function look(){var m=/(?:^|&)look=(nobody|second)(?:&|$)/.exec(location.hash.slice(1));return m&&m[1];}
 function setLook(v){
@@ -203,11 +207,13 @@ function section(secs,k){
     id='sgh-'+k+j;head.id=id;u.setAttribute('aria-labelledby',id);u.setAttribute('role','list');
     s.rows.forEach(function(r){u.appendChild(row(r));});
     b.append(head);if(s.line)b.append(el('p','sgn muted',s.line));
-    if(s.ids&&s.ids.length){var q=el('p','sgn muted',T.ids+': ');
-      s.ids.forEach(function(x){var a=el('a','sga',x.user.login+' ('+o.nf.format(x.count)+')');
-        a.href='https://www.inaturalist.org/people/'+encodeURIComponent(x.user.login);a.target='_blank';a.rel='noopener';a.dataset.k='i:'+x.user.login;
-        a.append(el('span','vh',T.newTab));q.append(a);});
-      b.append(q);}
+    if(s.ids&&s.ids.length){var q=el('p','sgh',T.ids),w=el('ul','sgl sgids');q.id=id+'i';w.setAttribute('aria-labelledby',q.id);w.setAttribute('role','list');
+      s.ids.forEach(function(x){var l=x.user.login,li=el('li'),n=el('button','sga',l+' ('+o.nf.format(x.count)+')'),a=el('a','sgp'),t=fmt(T.onInat,{u:l});
+        n.type='button';n.dataset.k='i:'+l;n.onclick=function(){strengths(l);};
+        a.href='https://www.inaturalist.org/people/'+encodeURIComponent(l);a.target='_blank';a.rel='noopener';
+        a.setAttribute('aria-label',t);a.title=t+T.newTab;a.appendChild(svg('<path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6"/>'));
+        li.append(n,a);w.append(li);});
+      b.append(q,w);}
     b.append(u);
   });
   if(msg[k]){var m=el('p','sgm',msg[k]);m.setAttribute('role','status');b.append(m);}

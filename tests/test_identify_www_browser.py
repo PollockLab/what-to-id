@@ -91,6 +91,7 @@ def test_at_risk_and_invasive_keep_cards_by_their_suggestions_bc_status(browser,
 def test_a_category_tab_shows_one_group_and_keeps_the_order(browser, site):
     base, _ = site
     page = open_row(browser, base, "#lvl=3&conf=all")
+    page.wait_for_function("window.__identify")  # the icon row draws before the full records
     every = page.get_by_role("button", name="All", exact=True)
     assert every.get_attribute("aria-pressed") == "true"
     before = page.evaluate("__identify.ids()")

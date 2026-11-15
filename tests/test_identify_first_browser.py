@@ -19,11 +19,15 @@ site = ib.site
 open_identify = ib.open_identify
 
 
-def first_lists(base):
+def first_file(base):
     with urllib.request.urlopen(f"{base}/{site_files.MAP_NAME}") as r:
         name = site_files.read_meta(r.read().decode())["files"]["first"]
     with urllib.request.urlopen(f"{base}/{name}") as r:
-        return json.loads(gzip.decompress(r.read()))["s"]
+        return json.loads(gzip.decompress(r.read()))
+
+
+def first_lists(base):
+    return first_file(base)["s"]
 
 
 @pytest.mark.parametrize("hash_", ["", "#groups=Aves"])
@@ -60,20 +64,26 @@ def cards(page):
 
 def test_the_first_cards_show_before_the_records_and_stay_when_they_land(browser, site):
     base, _ = site
-    first = first_lists(base)
+    head = first_file(base)
+    first = head["s"]
     page = browser.new_page(viewport={"width": 380, "height": 800})
     page.errors = []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     eb.stub_inat(page, None)
     held = []
     page.route(re.compile(r"/pool-\d+\.\w+\.bin"), lambda r: held.append(r))
-    page.goto(f"{base}/identify.html#lvl=1")
-    page.wait_for_selector("#grid .card .ph img")
+    with page.expect_request(re.compile(r"/pool-\d+\.\w+\.bin")):  # after the first row's photos
+        page.goto(f"{base}/identify.html#lvl=1")
     early = cards(page)
     assert [c[0] for c in early] == [r[0] for r in first[""]["rows"][1][:12]]
     assert any(c[2] for c in early)  # a cut species offers the rest of its records
     assert "loading all" in page.locator("#status").inner_text()
     assert page.evaluate("window.__identify") is None and held
+    # the life-form row comes with the first cards (the first file's group totals)
+    row = "[...document.querySelectorAll('#cats .cat')].map(b => [b.textContent, b.ariaPressed])"
+    tabs = page.evaluate(row)
+    assert len(tabs) == len(head["groups"]) + 1 and tabs[0] == ["All", "true"]
+    assert page.locator("#cats .cat:disabled").count() == len(tabs)
     page.evaluate("location.hash = 'groups=Aves&lvl=1'")  # another first list
     aves = first["groups=Aves"]["rows"][1][0][0]
     page.wait_for_function(f"+document.querySelector('#grid .card').dataset.id === {aves}")
@@ -91,6 +101,7 @@ def test_the_first_cards_show_before_the_records_and_stay_when_they_land(browser
         r.continue_()
     page.wait_for_function("window.__identify")
     page.wait_for_selector("#grid .card .ph img")
+    assert page.evaluate(row) == tabs and page.locator("#cats .cat:disabled").count() == 0
     assert cards(page) == drawn and page.evaluate("scrollY") == y  # the same cards, where they were
     assert page.locator("#status").inner_text().startswith("2,100 ")
     assert page.errors == []
@@ -104,7 +115,8 @@ def test_a_species_picked_from_a_first_card_shows_once_the_records_land(browser,
     eb.stub_inat(page, None)
     held = []
     page.route(re.compile(r"/pool-\d+\.\w+\.bin"), lambda r: held.append(r))
-    page.goto(f"{base}/identify.html#lvl=1")
+    with page.expect_request(re.compile(r"/pool-\d+\.\w+\.bin")):  # after the first row's photos
+        page.goto(f"{base}/identify.html#lvl=1")
     link = page.locator("#grid .card .sp").first
     rid = int(link.locator("xpath=ancestor::li[1]").get_attribute("data-id"))
     link.click()
@@ -163,4 +175,52 @@ def test_the_bulk_files_wait_for_the_first_card(browser, site):
     rank = dict(zip(pts["id"].tolist(), nb.rank_plane(base).tolist(), strict=True))
     got = [rank[i] for i in page.evaluate("__identify.view()")[3]]
     assert got == sorted(got) and got[0] == 0  # strict rank order once it lands
+    assert page.errors == []
+
+
+def test_a_second_visit_paints_the_kept_photos_before_inaturalist_answers(browser, site):
+    base, _ = site
+    ctx = browser.new_context(viewport={"width": 380, "height": 800})
+    page = ctx.new_page()
+    eb.stub_inat(page, None)
+    page.goto(f"{base}/identify.html#lvl=1")
+    page.wait_for_function("localStorage.getItem('wtid-identify-obs')")
+    first = int(page.locator("#grid .card").first.get_attribute("data-id"))
+    page.close()
+    page = ctx.new_page()
+    page.errors = []
+    page.on("pageerror", lambda e: page.errors.append(str(e)))
+    eb.stub_inat(page, first)  # it left Needs ID since the last visit
+    held = []
+    page.route("https://api.inaturalist.org/v1/observations*", lambda r: held.append(r))
+    page.goto(f"{base}/identify.html#lvl=1")
+    page.wait_for_selector("#grid .card .ph img")
+    assert held and int(page.locator("#grid .card").first.get_attribute("data-id")) == first
+    # the first row (two columns at this width) loads at once and first
+    imgs = "[...document.querySelectorAll('#grid .card .ph img')].slice(0, 3)"
+    got = page.evaluate(f"{imgs}.map(i => [i.loading, i.fetchPriority])")
+    assert got == [["eager", "high"], ["eager", "high"], ["lazy", "auto"]]
+    for r in held:
+        r.fallback()
+    page.wait_for_function(f"!document.querySelector('#grid .card[data-id=\"{first}\"]')")
+    assert page.errors == []
+    ctx.close()
+
+
+def test_the_bulk_files_wait_for_the_first_rows_photos(browser, site):
+    base, _ = site
+    page = browser.new_page(viewport={"width": 380, "height": 800})
+    page.errors = []
+    page.on("pageerror", lambda e: page.errors.append(str(e)))
+    eb.stub_inat(page, None)
+    held = []
+    page.route("https://static.inaturalist.org/**", lambda r: held.append(r))
+    seen = watch(page)
+    page.goto(f"{base}/identify.html#lvl=1")
+    page.wait_for_selector("#grid .card .ph img")
+    page.wait_for_timeout(500)
+    assert held and not [n for n, _ in seen if re.fullmatch(r"pool-\d+\.\w+\.bin", n)]
+    for r in held:
+        r.fallback()
+    page.wait_for_function("window.__identify")
     assert page.errors == []

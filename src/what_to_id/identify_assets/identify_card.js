@@ -76,6 +76,35 @@ return function(ctx){
     li.addEventListener('keydown',function(e){var d={ArrowLeft:-1,ArrowRight:1}[e.key],c=li.querySelector('.car');
       if(e.target===li&&d&&c&&frames(c).length>1){e.preventDefault();flip(c,d);}});
   }
-  return {car:car,face:face,lend:lend,keys:keys,paint:function(li){var c=li.querySelector('.car');if(c)show(c,+c.dataset.at);}};
+  // A record that left Needs ID or iNaturalist since the pool was built: 1; on level 3, one with an ID at species (an ID there would not be the first, so not an improving one): 2.
+  function gone(li,o){return !o||o.quality_grade!=='needs_id'?1:li.dataset.lv==='3'&&IdentifyNarrow.taken(o)?2:0;}
+  function med(o){var p=o.photos&&o.photos[0];return p&&String(p.url).replace('/square.','/medium.');}
+  // a late list's photos at hand before it replaces the cards on screen: the observations of ids into cache, the photos of the first n decoded; ms at most
+  function ahead(ids,n,cache,ms){
+    return Promise.race([new Promise(function(ok){setTimeout(ok,ms);}),AtlasSearchMeta.fetchObservations(ids,function(u){return fetch(I18N.api(u));},cache).then(function(){
+      return Promise.all(ids.slice(0,n).map(function(id){var o=cache.get(id),u=o&&med(o),img=new Image();if(u){img.src=u;return img.decode().catch(function(){});}}));})]).catch(function(){});
+  }
+  // iNaturalist's answer for the first cards, kept a day from the last visit so their photos paint before it answers again
+  // (the fetch still checks each); entries marked s. The grid's first 24, then those kept before and fetched again, 48 at most.
+  var SK='wtid-identify-obs',KEPT=null;
+  function kept(){if(!KEPT){KEPT={};try{var s=JSON.parse(localStorage.getItem(SK));if(s&&Date.now()-s.t<864e5)s.o.forEach(function(o){KEPT[o.id]=o;});}catch(e){}}return KEPT;}
+  function keep(grid,cache){
+    var o=[],ids=[].slice.call(grid.querySelectorAll('.card'),0,24).map(function(c){return +c.dataset.id;}).concat(Object.keys(kept()).map(Number));
+    ids.forEach(function(id){var x=cache.get(id),t=x&&x.taxon;if(!x||x.quality_grade!=='needs_id'||o.length>=48||o.some(function(y){return y.id===id;}))return;
+      o.push({s:1,id:id,quality_grade:x.quality_grade,observed_on:x.observed_on,place_guess:x.place_guess,photos:med(x)?[{url:x.photos[0].url}]:[],
+        taxon:t&&{id:t.id,name:t.name,preferred_common_name:t.preferred_common_name,rank_level:t.rank_level},
+        identifications:(x.identifications||[]).map(function(d){return {current:d.current,taxon:d.taxon&&{rank_level:d.taxon.rank_level}};})});});
+    KEPT={};o.forEach(function(x){KEPT[x.id]=x;});try{localStorage.setItem(SK,JSON.stringify({t:Date.now(),o:o}));}catch(e){}
+  }
+  // the first row's photos load at once and first, the rest as they near the screen
+  function hi(img,e){img.fetchPriority=e?'high':'auto';img.loading=e?'eager':'lazy';}
+  function eager(li){li.e=1;var i=li.querySelector('.ph img');if(i)hi(i,1);}
+  // resolves once the first row's photos are in or failed, or their fetch did (at once with no first row drawn), ms at most, 4 s while
+  // iNaturalist has not answered: the bulk downloads wait for it
+  function row(ms){var g=document.getElementById('grid'),t0=Date.now(),t,iv;return new Promise(function(ok){
+    function done(){clearTimeout(t);clearInterval(iv);g.removeEventListener('load',f,true);g.removeEventListener('error',f,true);ok();}
+    function f(){if([].every.call(g.querySelectorAll('.card'),function(li){var i=li.querySelector('.ph img');return !li.e||(i?i.complete:!li.w||Date.now()-t0>4e3);}))done();}
+    t=setTimeout(done,ms);iv=setInterval(f,100);g.addEventListener('load',f,true);g.addEventListener('error',f,true);f();});}  // a fetch's end has no event: polled
+  return {car:car,face:face,lend:lend,keys:keys,gone:gone,med:med,ahead:ahead,kept:kept,keep:keep,hi:hi,eager:eager,row:row,paint:function(li){var c=li.querySelector('.car');if(c)show(c,+c.dataset.at);}};
 };
 })();
