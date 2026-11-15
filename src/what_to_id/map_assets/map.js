@@ -37,8 +37,9 @@ function sel(){
   var h=MF.write(S);
   if(AREA.hash())h.push(AREA.hash());if(PJ.hash())h.push(PJ.hash());
   return h;}
+var MAPKEYS=MapFilter.KEYS.concat(MapFilter.WHERE);WtidCarry.own(MAPKEYS);
 function writeHash(){SYNC.send();clearTimeout(hashTimer);hashTimer=setTimeout(function(){
-  var h=sel().concat(RS.hash());
+  var h=sel().concat(RS.hash(),WtidCarry.held(MAPKEYS));  // Identify's filters, held
   if(P.n&&SEL>=0)h.push('record='+P.id[SEL]);else if(S.rec)h.push('record='+S.rec);
   var c=map.getCenter();h.push('at='+map.getZoom().toFixed(1)+'/'+c.lat.toFixed(3)+'/'+
     c.lng.toFixed(3));

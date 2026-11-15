@@ -209,7 +209,7 @@ function pick(c){
 // Setting the hash is the navigation: back/forward and shared links all arrive through start().
 function go(state){
   if(state)state=Object.assign({},state,{include:S.include,exclude:S.exclude});
-  var h=Meta.toHash(state);
+  var h=[Meta.toHash(state).slice(1)].concat(WtidCarry.held([])).filter(Boolean).join('&');h=h&&'#'+h;  // the filters ride along, held
   if(h===location.hash||(!h&&!location.hash))start(state);else location.hash=h;
 }
 
@@ -267,5 +267,6 @@ window.addEventListener('hashchange',function(){
   var s=Meta.parseHash(location.hash);
   if(!same(s,S.state))start(s);else{setFilters(s);render();}
 });
+WtidCarry.own([]);  // a photo search is not filtered: the filters are held for the other views
 start(Meta.parseHash(location.hash));
 })();

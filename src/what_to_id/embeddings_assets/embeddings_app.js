@@ -10,7 +10,7 @@ var DATA=new URL(CFG.dataUrl,location.href).href.replace(/\/*$/,'/');
 var MAP=new URL(CFG.mapUrl,location.href).href;
 var S={idx:null,P:null,META:null,TAXA:null,groups:{},picks:[],split:[],extra:[],keep:null,sel:-1,nbr:[],thin:false,cache:new Map(),run:0,deck:null,vs:null,PD:null,ring:null,lasso:null,lassoV:0};
 
-var MF=null,TF=null,TR=null,PASS=['park','bcpark','projects'],MAPONLY={park:'Park',bcpark:'BC park',projects:'Projects'},
+var MF=null,TF=null,TR=null,MAPONLY={park:'Park',bcpark:'BC park',projects:'Projects'},
   AREA_IN=null,VIEW_IN=null;
 function $(id){return document.getElementById(id);}
 var X=SpaceSelect(S,$,picked,layers),areaIndex=X.areaIndex,viewBox=X.viewBox,areaMask=X.areaMask,projMask=X.projMask,lasso=X.lasso,lassoDrag=X.lassoDrag,moved=function(){X.moved();LV.moved();};
@@ -176,7 +176,7 @@ function items(){
   if(S.subset)out.push({label:'Photo search: "'+S.subLabel+'" ('+S.subset.size+')',
     remove:function(){parent.postMessage({type:'wtid-subset',ids:null},location.origin);}});
   S.extra.forEach(function(t){var k=t.split('=')[0];
-    out.push({label:MAPONLY[k]+': '+decodeURIComponent(t.slice(k.length+1)).replace(/,/g,', '),tag:'map only',
+    out.push({label:(MAPONLY[k]||WtidCarry.NAME[k])+': '+decodeURIComponent(t.slice(k.length+1)).replace(/,/g,', '),tag:MAPONLY[k]?'map only':'held',
       remove:function(){S.extra=S.extra.filter(function(x){return x!==t;});picked();}});});
   return out;
 }
@@ -221,7 +221,7 @@ function chips(){
   Object.assign(S,MF.read(new URLSearchParams(location.hash.slice(1))));
   if(AREA_IN!==null)S.area=AREA_IN;
   if(VIEW_IN!==null)S.view=VIEW_IN;
-  S.extra=location.hash.slice(1).split('&').filter(function(t){return PASS.indexOf(t.split('=')[0])>=0;});
+  S.extra=WtidCarry.held(MapFilter.KEYS.concat('area'));  // the filters left to the map and Identify go back untouched
   TF=TX.filter(S.TAXA,S.picks);S.baseKey=null;applyBase();
   TR=S.TAXA&&TT.make({T:S.TAXA,tax:S.P.tax,grp:S.P.grp,n:S.P.n,groups:S.META.groups.length,ranks:S.META.ranks,
     nf:nf,box:$('tree'),label:gname,pass:function(){return S.base;},onOpen:function(){TR.render();},

@@ -162,34 +162,29 @@ stroke-linecap:round}
 @media (max-width:480px){.site-nav .ext{display:none}}
 .site-vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);
 white-space:nowrap}
-.embed .site-shell,.embed .site-skip{display:none}
+.embed .site-shell,.embed .site-skip,.embed .site-held{display:none}
+.site-held{max-width:1100px;margin:4px auto;padding:0 12px;font-size:13px;color:var(--muted)}
 @media (max-width:640px){.site-shell{padding:0 8px;gap:0 8px}.site-nav a{padding:0 9px}
 .site-nav{--fade:linear-gradient(90deg,transparent,#000 16px,#000 calc(100% - 16px),transparent);
 -webkit-mask-image:var(--fade);mask-image:var(--fade)}}
 @media (max-width:480px){.site-bc{display:none}}
 """.strip()
 
-# Points the switcher at what is open. Reads the hash the pages already write: the map keeps
-# record=, the photo pages keep id=; the selection (groups, taxa, dates) goes
-# to the map and the photo space as written. One group (g= on Confused pairs, a lone picked
-# groups= on Explore) travels between the two. Rewrites on hover, focus, touch and click
-# because history.replaceState fires no event.
+# Points the switcher at what is open: the map keeps record=, the photo pages keep id=. One group
+# (g= on Confused pairs, a lone picked groups= on Explore) travels between the two. The filters ride
+# every link through carry.js. Rewrites on hover, focus, touch and click because
+# history.replaceState fires no event.
 JS = """
 (function(){var n=document.querySelector('.site-nav');if(!n)return;
 function ctx(){var h=new URLSearchParams(location.hash.slice(1)),
 gs=(h.get('groups')||'').split(',');
 return{grp:h.get('g')||(gs.length===1&&/^[^-]/.test(gs[0])?gs[0]:''),rec:+(h.get('record')||h.get('id'))||0,
-sel:location.hash.slice(1).split('&').filter(function(t){
-return /^(by|from|to|months|groups|only|acc|taxa|area|park|bcpark|projects)=/.test(t);})};}
-function h0(sel){return sel.some(function(t){return t.indexOf('groups=')===0;});}
+g0:h.has('groups')};}
 function sync(){var c=ctx();n.querySelectorAll('a[data-view]').forEach(function(a){
-var b=a.dataset.base,v=a.dataset.view,u=b;
-if(a.hasAttribute('aria-current')&&v!=='explore')return;
-if(v==='explore'){var p=[];if(c.rec)p.push('id='+c.rec);p=p.concat(c.sel);
-if(c.grp&&!h0(c.sel))p.push('groups='+encodeURIComponent(c.grp));
-if(p.length)u=b+'#'+p.join('&');}
-else if(v==='group'&&c.grp)u=b+'#g='+encodeURIComponent(c.grp);
-a.href=u;});}
+var b=a.dataset.base,v=a.dataset.view,p=[];
+if(v==='explore'){if(c.rec)p.push('id='+c.rec);if(c.grp&&!c.g0)p.push('groups='+encodeURIComponent(c.grp));}
+else if(v==='group'&&c.grp)p.push('g='+encodeURIComponent(c.grp));
+a.setAttribute('href',b+(p.length?'#'+p.join('&'):''));WtidCarry.link(a);});}
 ['mouseover','focusin','touchstart',
 'click'].forEach(function(e){n.addEventListener(e,sync,true);});
 var cur=n.querySelector('[aria-current]');
@@ -202,6 +197,9 @@ if(a.dataset.fallback){a.dataset.base=a.dataset.fallback;a.dataset.view='';
 a.href=a.dataset.base;}else a.remove();
 }).catch(function(){});});})();
 """.strip()
+
+# The shared filter state (site_assets/carry.js), on every page nav or the Help bar draws.
+CARRY = (Path(__file__).parent / "site_assets" / "carry.js").read_text().strip()
 
 # The toggletips (site_assets/explain.js) and the glossary go on every page nav draws.
 _EXPLAIN = Path(__file__).parent / "site_assets"
@@ -265,7 +263,7 @@ def nav(
         f'<div class="site-shell"><a class="site-brand" href="{escape(base)}index.html">'
         'What to ID<span class="site-bc">\u00a0· BC</span></a>'
         f'<nav class="site-nav" aria-label="Views"{flags}>{"".join(links)}</nav>{extra}</div>\n'
-        f"<script>{JS}</script>\n" + explain()
+        f"<script>{CARRY}\n{JS}</script>\n" + explain()
     )
 
 
@@ -335,5 +333,5 @@ def help_bar(base: str = "") -> str:
         f'<div class="hm"><button type="button" id="hmbtn" aria-expanded="false" '
         f'aria-controls="hmenu">{icon}Help</button>'
         f'<ul id="hmenu" aria-label="Help" hidden>{items}</ul></div></div>\n'
-        f"<script>{HELP_JS}</script>\n" + explain()
+        f"<script>{CARRY}\n{HELP_JS}</script>\n" + explain()
     )

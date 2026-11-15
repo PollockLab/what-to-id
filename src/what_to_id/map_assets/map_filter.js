@@ -162,8 +162,10 @@ MapFilter.color=function(name,i){var d=MapFilter.dark(),c=MapFilter.BY[name];
   if(c)return d&&MapFilter.BYD[name]||c;
   i%=MapFilter.PAL.length;return d&&MapFilter.PALD[i]||MapFilter.PAL[i];};
 // The hash tokens a selection is made of, as one string.
+MapFilter.KEYS=['by','from','to','months','groups','only','acc','taxa','user','umode','umin'];
+MapFilter.WHERE=['area','park','bcpark','projects'];  // the map's own filters, beyond the shared selection
 MapFilter.tokens=function(hash){return hash.replace(/^#/,'').split('&').filter(function(t){
-  return /^(by|from|to|months|groups|only|acc|taxa|user|umode|umin)=/.test(t);}).join('&');};
+  return t.indexOf('=')>0&&MapFilter.KEYS.indexOf(t.split('=')[0])>=0;}).join('&');};
 // Live selection sync for a page inside the split view. key() is the selection the page holds, apply(str) puts
 // one in place. A change goes to the parent at most once a frame; one that comes from outside (the parent's
 // message, a hash change unless o.hash is false) is applied and not sent back.

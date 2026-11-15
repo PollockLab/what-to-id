@@ -169,16 +169,14 @@ function where(){var t=A&&A.term();return LBL!==null?LBL||'Anywhere':t?t.label:'
 
 // The panels: the open one is raised under its segment, the rest of the bar greyed
 function visible(k){return SEG[k].p.offsetParent!==null;}
-// What's links to the full-screen photo space and taxonomy, and Where's to the map (explore.html), with the selection in the address
+// What's links to the full-screen photo space and taxonomy, and Where's to the map (explore.html); carry.js puts the filters on them
 var XL=$('xlinks'),XM=$('xmap');
-function xl(){['xspace','xtree','xmap'].forEach(function(id){var a=$(id);a.href=a.getAttribute('href').split('#')[0]+location.hash;});}
 if(XL&&!o.embedded)fetch('explore.html',{method:'HEAD'}).then(function(r){XL.hidden=XM.hidden=!r.ok;}).catch(function(){});
-if(XL){XL.addEventListener('click',xl,true);XM.addEventListener('click',xl);}
 function fill(k){
   if(!visible(k))return;
-  if(k===0){counts();if(XL)xl();}
+  if(k===0)counts();
   else if(k===1)MH.draw();
-  else if(k===2){if(W)W.show();SG.where();if(XL)xl();}
+  else if(k===2){if(W)W.show();SG.where();}
   else{SG.who();[].forEach.call(SEG[3].p.querySelectorAll('details details'),function(d){d.open=true;});}  // Who: the threshold sits in a closed Adjust
 }
 function place(k){

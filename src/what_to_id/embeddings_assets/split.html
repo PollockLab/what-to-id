@@ -112,12 +112,12 @@ function hashFor(n){
     if(k==='id')return true;
     if(k==='life'||k==='clade')return n==='space';
     if(k==='at')return n===(v0.indexOf('map')<0?'space':'map');
-    return n==='map';});
+    return OWNF[n]?OWNF[n].indexOf(k)>=0:n==='map';});
   return (last?[last]:[]).concat(own.map(function(t){
     return n==='map'&&t.indexOf('id=')===0?'record='+t.slice(3):t;})).join('&');}
-// The address: the shared selection, then the photo space's map of life view.
+// The address: the shared selection, the filters the panes keep (carry.js), then the photo space's map of life view.
 function life(t){var k=t.split('=')[0];return k==='life'||k==='clade';}
-function addr(){var h=(last?[last]:[]).concat(rest.filter(life));  // with the path, so an empty selection drops the hash
+function addr(){var h=(last?[last]:[]).concat(WtidCarry.take(rest.join('&')),rest.filter(life));  // with the path, so an empty selection drops the hash
   history.replaceState(null,'',location.pathname+location.search+(h.length?'#'+h.join('&'):''));}
 function visible(n){return !!frames[n]&&view.indexOf(n)>=0;}  // a pane shown, not the map's frame as the rail
 function live(n){return visible(n)||n==='map'&&!!frames.map;}  // the rail shows the selection too
@@ -265,6 +265,17 @@ addEventListener('message',function(e){
   last=e.data.sel;Object.keys(frames).forEach(function(o){if(o!==n&&live(o))sendSel(o,last);});
   addr();
 });
+// The filters a pane owns beyond the shared selection (Identify's tab, cut and checks, the map's area), as it
+// posts them (carry.js), kept in the address; a pane applies them, the others hold them (the note says which).
+var OWNF={identify:['lvl','kind','conf','gap','pri','base','rg','look','risk','inv'],map:MapFilter.WHERE};
+addEventListener('message',function(e){
+  var d=e.data,n=Object.keys(frames).filter(function(k){return frames[k].contentWindow===e.source;})[0],o=OWNF[n];
+  if(!o||e.origin!==location.origin||!d||d.type!=='wtid-carry'||!Array.isArray(d.tokens))return;
+  var t=d.tokens.filter(function(x){return typeof x==='string'&&o.indexOf(x.split('=')[0])>=0;});
+  rest=rest.filter(function(x){return o.indexOf(x.split('=')[0])<0;}).concat(t);addr();
+});
+WtidCarry.own(function(){var k=MapFilter.KEYS;
+  Object.keys(OWNF).forEach(function(n){if(n==='map'?frames.map:visible(n))k=k.concat(OWNF[n]);});return k;});  // the map's rail keeps its area
 // The photo space's view tokens (life=look, clade=), kept for a reload, a shared link and a frame made later.
 addEventListener('message',function(e){
   var d=e.data;
