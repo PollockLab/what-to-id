@@ -18,7 +18,7 @@ var T={
   mine:'Not yet by me',mineSub:'Leave out what you identified',mineNeed:'Type your iNaturalist login below first.',
   mineExcl:'Untick “my observations” below first.',nobody:'Nobody has looked',nobodySub:'No one but the observer has identified it',
   second:'Needs a second opinion',secondSub:'One ID, and nobody agrees yet',
-  ids:'Top identifiers here',newTab:' (opens in a new tab)'
+  ids:'Top identifiers here, tap to see their genera',onInat:'{u} on iNaturalist',newTab:' (opens in a new tab)'
 };
 var NS='http://www.w3.org/2000/svg',R=50,PTS=64,KM=111.195,STORE={recent:'wtid-recent',visit:'wtid-lastvisit',opened:'wtid-opened',improving:'wtid-improving'},
   ICON={
@@ -160,6 +160,11 @@ function who(){
     .then(function(r){if(!r.ok)throw 0;return r.json();})
     .then(function(j){IDS[k]=j.results.filter(function(x){return x.user&&x.user.login;}).slice(0,5);draw();}).catch(function(){});
 }
+// Tapping an identifier fills the User box and ticks "Only the user's genera", as if typed and ticked
+function strengths(l){
+  var i=document.getElementById('usrname'),c=document.getElementById('usrtaxa');if(!i||!c)return;
+  i.value=l;c.checked=true;c.dispatchEvent(new Event('change'));
+}
 function look(){var m=/(?:^|&)look=(nobody|second)(?:&|$)/.exec(location.hash.slice(1));return m&&m[1];}
 function setLook(v){
   o.rewrite(function(x){return /^look=/.test(x);},look()===v?[]:['look='+v]);o.changed();
@@ -203,11 +208,13 @@ function section(secs,k){
     id='sgh-'+k+j;head.id=id;u.setAttribute('aria-labelledby',id);u.setAttribute('role','list');
     s.rows.forEach(function(r){u.appendChild(row(r));});
     b.append(head);if(s.line)b.append(el('p','sgn muted',s.line));
-    if(s.ids&&s.ids.length){var q=el('p','sgn muted',T.ids+': ');
-      s.ids.forEach(function(x){var a=el('a','sga',x.user.login+' ('+o.nf.format(x.count)+')');
-        a.href='https://www.inaturalist.org/people/'+encodeURIComponent(x.user.login);a.target='_blank';a.rel='noopener';a.dataset.k='i:'+x.user.login;
-        a.append(el('span','vh',T.newTab));q.append(a);});
-      b.append(q);}
+    if(s.ids&&s.ids.length){var q=el('p','sgh',T.ids),w=el('ul','sgl sgids');q.id=id+'i';w.setAttribute('aria-labelledby',q.id);w.setAttribute('role','list');
+      s.ids.forEach(function(x){var l=x.user.login,li=el('li'),n=el('button','sga',l+' ('+o.nf.format(x.count)+')'),a=el('a','sgp'),t=fmt(T.onInat,{u:l});
+        n.type='button';n.dataset.k='i:'+l;n.onclick=function(){strengths(l);};
+        a.href='https://www.inaturalist.org/people/'+encodeURIComponent(l);a.target='_blank';a.rel='noopener';
+        a.setAttribute('aria-label',t);a.title=t+T.newTab;a.appendChild(svg('<path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6"/>'));
+        li.append(n,a);w.append(li);});
+      b.append(q,w);}
     b.append(u);
   });
   if(msg[k]){var m=el('p','sgm',msg[k]);m.setAttribute('role','status');b.append(m);}

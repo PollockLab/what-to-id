@@ -1,6 +1,8 @@
 """Identify's one-tap suggestions at the top of each search panel in Chromium: each applies the
 address key the full filter writes, and Near me acts only on a tap. iNaturalist is stubbed."""
 
+import os
+
 import numpy as np
 import pytest
 
@@ -12,6 +14,7 @@ from .test_identify_bar_browser import blank_map
 browser = eb.browser
 N = ib.N
 WIDE = (1440, 900)
+SHOT = os.environ.get("WTID_SHOT")
 GEO = """(code) => {
   navigator.geolocation.getCurrentPosition = (ok, err) => {
     if (code) err({code}); else ok({coords: {longitude: -123, latitude: 49}});
@@ -210,28 +213,46 @@ def open_who(browser, base, hash_="", status=200):
     return page, urls
 
 
-def test_who_lists_the_top_identifiers_as_profile_links(browser, site):
+def test_who_lists_the_top_identifiers_as_buttons_with_profile_links(browser, site):
     base, _ = site
     page, urls = open_who(browser, base)
-    page.wait_for_selector("#sgwho a.sga")
-    links = page.locator("#sgwho a.sga")
-    assert links.count() == 5 and links.first.inner_text().startswith("user0 (50)")
-    assert links.first.get_attribute("href") == "https://www.inaturalist.org/people/user0"
-    assert links.first.get_attribute("target") == "_blank"
-    assert "noopener" in links.first.get_attribute("rel")
+    page.wait_for_selector("#sgwho button.sga")
+    names = page.locator("#sgwho button.sga")
+    assert names.count() == 5 and names.first.inner_text().startswith("user0 (50)")
+    link = page.get_by_role("link", name="user0 on iNaturalist")
+    assert link.get_attribute("href") == "https://www.inaturalist.org/people/user0"
+    assert link.get_attribute("target") == "_blank"
+    assert "noopener" in link.get_attribute("rel")
     assert len(urls) == 1 and "per_page=5" in urls[0] and "taxon_id" not in urls[0]
-    links.first.focus()
+    assert page.get_by_text("Top identifiers here, tap to see their genera").count() == 1
+    names.first.focus()
     assert "look=" not in hash_(page) and page.errors == []
+
+
+def test_tapping_an_identifier_fills_the_login_and_ticks_only_their_genera(browser, site):
+    base, _ = site
+    page, _ = open_who(browser, base)
+    page.wait_for_selector("#sgwho button.sga")
+    page.route("https://api.inaturalist.org/v1/users/autocomplete*", lambda r: r.abort())
+    page.locator("#sgwho button.sga").first.click()
+    page.wait_for_function("document.getElementById('usrname').value === 'user0'")
+    page.wait_for_function("document.getElementById('usrtaxa').checked")
+    # Only the genera is the default tick, so the address carries no umode
+    page.wait_for_function("location.hash.includes('user=user0')")
+    assert "user=user0" in hash_(page) and page.locator("#usrtaxa").is_checked()
+    assert page.get_by_role("link", name="user0 on iNaturalist").count() == 1
+    page.screenshot(path=SHOT, clip=page.locator("#pwho").bounding_box()) if SHOT else None
+    assert page.errors == []
 
 
 def test_the_top_identifiers_are_asked_per_what_taxon_once(browser, site):
     base, _ = site
     page, urls = open_who(browser, base, "#taxa=900")
-    page.wait_for_selector("#sgwho a.sga")
+    page.wait_for_selector("#sgwho button.sga")
     assert len(urls) == 1 and "taxon_id=900" in urls[0]
     page.click("#bwho")
     page.click("#bwho")
-    page.wait_for_selector("#sgwho a.sga")
+    page.wait_for_selector("#sgwho button.sga")
     assert len(urls) == 1
 
 
@@ -239,5 +260,5 @@ def test_the_top_identifiers_hide_when_the_fetch_fails(browser, site):
     base, _ = site
     page, urls = open_who(browser, base, status=500)
     page.wait_for_timeout(300)
-    assert len(urls) == 1 and page.locator("#sgwho a.sga").count() == 0
+    assert len(urls) == 1 and page.locator("#sgwho button.sga").count() == 0
     assert page.locator("#sgwho .sgr").count() > 0
