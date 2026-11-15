@@ -151,6 +151,37 @@ def test_a_suggested_park_sets_bcpark(browser, site):
     assert f"bcpark={key}" in hash_(page)
 
 
+def test_where_puts_the_map_first_with_three_suggestions_and_an_explore_link(browser, site):
+    base, _ = site
+    page = ib.open_identify(browser, base, "", size=WIDE)
+    page.route(  # the fixture's site has no Explore page: a blank one stands in
+        "**/explore.html*", lambda r: r.fulfill(body="<!doctype html>", content_type="text/html")
+    )
+    page.reload()
+    page.wait_for_function("window.__identify && __identify.ids().length > 0")
+    blank_map(page)
+    page.click("#bwhere")
+    page.wait_for_selector("#sgwhere .sgr[data-k^='p:']")
+    assert page.evaluate(  # the map, then the suggestions
+        "!!(document.getElementById('wbox').compareDocumentPosition("
+        "document.getElementById('sgwhere')) & Node.DOCUMENT_POSITION_FOLLOWING)"
+    )
+    assert page.locator("#sgwhere .sgr").count() == 3  # Near me and two parks
+    park = page.locator("#sgwhere .sgr[data-k^='p:']").first
+    key = park.get_attribute("data-k")[2:]
+    park.click()
+    page.wait_for_function(f"location.hash.includes('bcpark={key}')")
+    link = page.get_by_role("link", name="Open in Explore")
+    page.wait_for_function(
+        f"document.getElementById('xmap').href.includes('bcpark={key}')"
+    )  # follows the area once the panel redraws
+    href = link.get_attribute("href")
+    assert href.startswith("explore.html?view=map#") and f"bcpark={key}" in href
+    page.click("#wexp")  # the expanded map keeps the link in reach
+    assert link.is_visible() and page.get_attribute("#wexp", "aria-expanded") == "true"
+    assert page.errors == []
+
+
 def test_the_who_chips_keep_the_records_with_that_many_outside_ids(browser, site):
     base, pts = site
     page = opened(browser, base, "who")

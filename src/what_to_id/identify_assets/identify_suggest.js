@@ -10,7 +10,7 @@ var T={
   what:'Suggested',recent:'Recently used',recentSub:'Recently used',backlog:'Biggest backlogs',backlogSub:'{n} of the records to identify',
   blitz:'Blitz targets',blitzSub:'{n} threatened or introduced',lists:'Suggestions',
   when:'Quick picks',visit:'Since your last visit',visitSub:'From {d}',allSub:'Every record',rangeSub:'{a} to {b}',
-  where:'Near you',near:'Near me',nearSub:'Within 50 km of where you are',nearWait:'Finding where you are…',
+  near:'Near me',nearSub:'Within 50 km of where you are',nearWait:'Finding where you are…',
   denied:'Location is blocked for this site. Allow it in the browser, or draw an area below.',
   unavailable:'Your location is not available. Draw an area below instead.',outside:'You seem to be outside this map’s area.',
   places:'Suggested places',placesSub:'Up to {n} of the records to identify',placesLoad:'Loading parks…',placesFail:'The park list did not load.',
@@ -112,7 +112,7 @@ function whenRows(){
   return [{h:T.when,rows:r}];
 }
 
-// Where: Near me on tap, and the parks with the most records waiting. A park's boundary comes from the map, which reloads.
+// Where: Near me on tap, and the two parks with the most records to identify, under the map. A park's boundary comes from the map, which reloads.
 function near(){
   if(bt())return;
   var g=navigator.geolocation;
@@ -137,17 +137,16 @@ function parks(){
       var lo=P.lonlat[2*i],la=P.lonlat[2*i+1],cs=cell[Math.floor(lo*4)+','+Math.floor(la*4)]||[];
       cs.forEach(function(r){var b=r[4];if(lo>=b[0]&&lo<=b[2]&&la>=b[1]&&la<=b[3])c[r[0]]=(c[r[0]]||0)+1;});
     }
-    PN=list.filter(function(r){return c[r[0]]>0;}).sort(function(a,b){return c[b[0]]-c[a[0]]||(a[1]<b[1]?-1:1);}).slice(0,5)
+    PN=list.filter(function(r){return c[r[0]]>0;}).sort(function(a,b){return c[b[0]]-c[a[0]]||(a[1]<b[1]?-1:1);}).slice(0,2)
       .map(function(r){return {key:r[0],name:r[1],n:c[r[0]]};});
     PS=2;draw();
   }).catch(function(){PS=3;draw();});
 }
 function whereRows(){
-  var h=location.hash,k=/(?:^|&)bcpark=([^&]*)/.exec(h),out=[{h:T.where,rows:[{k:'n:near',i:'near',t:T.near,s:T.nearSub,on:false,fn:near}]}];
-  if(PN&&PN.length)out.push({h:T.places,rows:PN.map(function(p){
+  var h=location.hash,k=/(?:^|&)bcpark=([^&]*)/.exec(h);
+  return [{h:T.places,rows:[{k:'n:near',i:'near',t:T.near,s:T.nearSub,on:false,fn:near}].concat((PN||[]).map(function(p){
     return {k:'p:'+p.key,i:'park',t:p.name,s:fmt(T.placesSub,{n:o.nf.format(p.n)}),on:!!k&&decodeURIComponent(k[1])===p.key,
-      fn:function(){o.area('','bcpark='+encodeURIComponent(p.key),p.name);}};})});
-  return out;
+      fn:function(){o.area('','bcpark='+encodeURIComponent(p.key),p.name);}};}))}];
 }
 
 // Who: the progress so far, the top identifiers for the What taxon (read-only, one fetch per taxon a session), then the three chips
