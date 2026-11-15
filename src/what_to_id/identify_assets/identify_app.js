@@ -120,7 +120,7 @@ function pick(picks){
 // i<0: a batch record the pool does not hold, its name filled in with its photo; old: the card drawn for it before, kept with its photo
 function card(i,lv,id,old){
   id=i<0?id:P.id[i];
-  var li=old||el('li','card'),det=el('div','det'),w=el('a','when','Date and place…'),a=el('a','btn','Identify'),o=CACHE.get(id);
+  var li=old||el('li','card'),det=el('div','det'),w=el('a','when','Date and place…'),a=el('a','btn','Identify'),o=CACHE.get(id)||!BT&&CARD.kept()[id];
   li.dataset.id=id;li.tabIndex=0;
   w.href=OBS+id;IdentifyFlow.link(w);
   a.href=one(id);a.setAttribute('aria-label','Identify this record on iNaturalist');
@@ -146,7 +146,7 @@ function card(i,lv,id,old){
 function photos(lis){
   var sig=AB&&AB.signal;lis=lis.filter(function(li){return !(li.w&&!li.w.aborted);});lis.forEach(function(li){li.w=sig;});
   Meta.fetchObservations(lis.map(function(li){return +li.dataset.id;}),function(u){return fetch(I18N.api(u),{signal:sig});},CACHE).then(function(){lis.forEach(function(li){
-    if(!li.isConnected)return;var o=CACHE.get(+li.dataset.id),g=CARD.gone(li,o);if(!g)fill(li,o);else{li.remove();if(g>1)drop(+li.dataset.i);}});
+    if(!li.isConnected)return;var o=CACHE.get(+li.dataset.id),g=CARD.gone(li,o);if(!g)fill(li,o);else{li.remove();if(g>1)drop(+li.dataset.i);}});if(!BT)CARD.keep($('grid'),CACHE);
   }).catch(function(e){if(!(sig&&sig.aborted))status('Could not load the photos: '+e.message,1);}).then(function(){lis.forEach(function(li){li.w=null;});});
 }
 // A card's photo, date and place (and a batch record's name) from its observation; a photo already shown stays.
@@ -155,9 +155,9 @@ function fill(li,o){
   if(!li.dataset.i){var nm=el('div','name');nm.appendChild(el('i',null,t?t.name:'Unidentified'));
     li.querySelector('.title').replaceChildren(nm);if(t&&t.preferred_common_name&&I18N.names!=='latin')nm.after(el('div','com',t.preferred_common_name));}
   if(!img||img.getAttribute('src')!==u){ph.textContent='';img=u&&el('img');
-    if(img){img.loading='lazy';img.onerror=function(){img.removeAttribute('src');};img.src=u;ph.appendChild(img);}else ph.textContent='No photo on iNaturalist now';}if(img)img.alt='Photo of '+li.querySelector('i').textContent;
+    if(img){CARD.hi(img,li.e);img.onerror=function(){img.removeAttribute('src');};img.src=u;ph.appendChild(img);}else ph.textContent='No photo on iNaturalist now';}if(img)img.alt='Photo of '+li.querySelector('i').textContent;
   w.textContent=(o.observed_on||'Date unknown')+' · '+(o.place_guess||'Place unknown');w.title=w.textContent;CARD.face(li,o.place_guess||'');
-  if(IN.user()&&t&&t.id&&!li.querySelector('.acts'))acts(li,t);
+  if(IN.user()&&t&&t.id&&!o.s&&!li.querySelector('.acts'))acts(li,t);
   if(CMP)CMP.landed(li);
 }
 // a removed card leaves the list, so the caption, Show more and the batches count only cards that can show
@@ -200,10 +200,10 @@ function sep(n,top){var c=nf.format(n)+(n===1?' card':' cards');
   return el('li',top?'sep top':'sep',top?'Your genera first · '+c:n?'End of your genera · '+c:'None of your genera here. The rest follow.');}
 // The next LIMIT cards of the chosen level; the button is the scroll sentinel and stays as the fallback.
 function more(){
-  var rows=view[LV]||[],ol=$('grid'),to=Math.min(rows.length,shown),lis=[],b=$('more');
+  var rows=view[LV]||[],ol=$('grid'),to=Math.min(rows.length,shown),lis=[],b=$('more'),nc=drawn?0:getComputedStyle(ol).gridTemplateColumns.split(' ').length;
   if(!drawn&&MINE[LV]>0)ol.appendChild(sep(MINE[LV],1));
   for(var j=drawn;j<to;j++){if(j===MINE[LV])ol.appendChild(sep(j));
-    if(rows.size&&CMP&&looksOf(rows[j])!==(j?looksOf(rows[j-1]):null))ol.appendChild(IdentifyNarrow.head(looksOf(rows[j]),rows.size.get(looksOf(rows[j])),CMP.ref));var li=card(rows[j],LV,0,KEPT[j]);if(!KEPT[j])ol.appendChild(li);lis.push(li);}
+    if(rows.size&&CMP&&looksOf(rows[j])!==(j?looksOf(rows[j-1]):null))ol.appendChild(IdentifyNarrow.head(looksOf(rows[j]),rows.size.get(looksOf(rows[j])),CMP.ref));var li=card(rows[j],LV,0,KEPT[j]);if(j<nc)CARD.eager(li);if(!KEPT[j])ol.appendChild(li);lis.push(li);}
   drawn=to;KEPT=[];
   b.hidden=rows.length<=to;b.textContent='Show more ('+nf.format(rows.length-to)+' left)';
   if(lis.length){photos(lis);if(CMP&&LOOKS){CMP.fill(lis);lis.forEach(CARD.paint);}}

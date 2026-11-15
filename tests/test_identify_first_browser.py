@@ -175,3 +175,32 @@ def test_the_bulk_files_wait_for_the_first_card(browser, site):
     got = [rank[i] for i in page.evaluate("__identify.view()")[3]]
     assert got == sorted(got) and got[0] == 0  # strict rank order once it lands
     assert page.errors == []
+
+
+def test_a_second_visit_paints_the_kept_photos_before_inaturalist_answers(browser, site):
+    base, _ = site
+    ctx = browser.new_context(viewport={"width": 380, "height": 800})
+    page = ctx.new_page()
+    eb.stub_inat(page, None)
+    page.goto(f"{base}/identify.html#lvl=1")
+    page.wait_for_function("localStorage.getItem('wtid-identify-obs')")
+    first = int(page.locator("#grid .card").first.get_attribute("data-id"))
+    page.close()
+    page = ctx.new_page()
+    page.errors = []
+    page.on("pageerror", lambda e: page.errors.append(str(e)))
+    eb.stub_inat(page, first)  # it left Needs ID since the last visit
+    held = []
+    page.route("https://api.inaturalist.org/v1/observations*", lambda r: held.append(r))
+    page.goto(f"{base}/identify.html#lvl=1")
+    page.wait_for_selector("#grid .card .ph img")
+    assert held and int(page.locator("#grid .card").first.get_attribute("data-id")) == first
+    # the first row (two columns at this width) loads at once and first
+    imgs = "[...document.querySelectorAll('#grid .card .ph img')].slice(0, 3)"
+    got = page.evaluate(f"{imgs}.map(i => [i.loading, i.fetchPriority])")
+    assert got == [["eager", "high"], ["eager", "high"], ["lazy", "auto"]]
+    for r in held:
+        r.fallback()
+    page.wait_for_function(f"!document.querySelector('#grid .card[data-id=\"{first}\"]')")
+    assert page.errors == []
+    ctx.close()
