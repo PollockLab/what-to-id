@@ -15,8 +15,9 @@ function labels(){
 function count(){
   var cap=I18N.raw($('cap')),m=/^[\d,.\s ]+/.exec(cap),n=$('none').hidden?(m?m[0].trim():''):'0';
   var st=I18N.raw($('status'));  // loading and load errors stay in sight while the totals sit in the help sheet
-  // the heading relates its cards to the tab's records: "22,902 cards · 3 per species of 324,594 records"
-  var tb=document.querySelector('[role=tab][aria-selected=true] b'),pr=/up to (\d+) per/.exec(cap),rel=tb&&tb.textContent?(pr?' · '+pr[1]+' per species':'')+' of '+tb.textContent+' records':'';
+  // the heading relates its cards to the tab's records: "22,902 cards · 3 per species of 324,594 records", and level 3's to its records before the Best x%
+  var tb=document.querySelector('[role=tab][aria-selected=true] b'),pr=/up to (\d+) per/.exec(cap),ct=/, (the most confident \d+% of [\d,.\s ]*\d)/.exec(cap),
+    rel=tb&&tb.textContent?(pr?' · '+pr[1]+' per species':'')+' of '+tb.textContent+' records'+(ct?', '+ct[1]:''):'';
   $('count').textContent=n?n+' cards':/^(Loading|Could not)/.test(st)?st:'';$('count').title=cap;  // raw English, translated when it lands
   if(n&&rel){var r=document.createElement('span');r.className='rel';r.textContent=rel;$('count').appendChild(r);}  // a phone keeps the short heading
   $('pshow').textContent=n?'Show '+n+' cards':'Close';

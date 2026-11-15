@@ -38,7 +38,7 @@ function kept(st){
 }
 function select(){UF.sync(P);SEL=kept(S);}
 // kept(st) at the chosen level, as the bar's counts and histograms show it
-function atLevel(st){var m=kept(st);for(var i=0;i<P.n;i++)if(m[i]&&(LV?LEVEL[i]!==LV:!LEVEL[i]))m[i]=0;return m;}
+function atLevel(st){var m=kept(st);for(var i=0;i<P.n;i++)if(m[i]&&LV!==6&&(LV?LEVEL[i]!==LV:!LEVEL[i]))m[i]=0;return m;}
 // Per level the kept records best first: each kind of the tab in CFG.merge's
 // order, then the quantized score (a bucket each), newest (highest id) first within a bucket; then at most PER_SPECIES of any one
 // taxon, none cut when the level holds one taxon only. The kind control (KF) keeps one kind of its tab; KC counts the kinds. MORE: for the first card of a cut taxon, how many records it left out.
@@ -54,11 +54,11 @@ function byId(P){
 // What the per-species cap counts: the record's label, but on level 3 the suggested species (the label is a coarse rank there).
 function ck(i,lv){var v=lv===3&&LOOKS?LOOKS.lo[i]|LOOKS.hi[i]<<8:NO_LOOK;return v===NO_LOOK?P.tax[i]:v;}
 function RUN(){return /(^|&)run=1(&|$)/.test(location.hash.slice(1));}
-function on(i){return SEL[i]&&LEVEL[i]&&(!R||R.pass(i,LEVEL[i]))&&(!X||X.pass(i))&&(!GP||GP.pass(i,KIND[i]))&&(!WW||KIND[i]!==3||WW.pass(i));}
+function on(i,all){return SEL[i]&&LEVEL[i]&&(!R||R.pass(i,LEVEL[i]))&&(!X||X.pass(i))&&(!GP||GP.pass(i,KIND[i],all))&&(!WW||KIND[i]!==3||WW.pass(i));}
 // Under My taxa first the user's genera lead each level, each kind in turn, then the rest; MINE: how many cards they are, -1 without the mode.
 function build(){
-  var n=P.n,W=2*NK*STEPS,c=new Uint32Array(6*W+1),key=new Uint16Array(n),rk=UF.ranked(),i,k,lv;
-  for(i=0;i<n;i++)if(on(i)){key[i]=LEVEL[i]*W+(rk&&UF.mine(i)?NK*STEPS:0)+(NK-1-SUB[i])*STEPS;c[key[i]+1]++;}
+  var n=P.n,W=2*NK*STEPS,c=new Uint32Array(6*W+1),key=new Uint16Array(n),rk=UF.ranked(),i,k,lv,u=0;
+  for(i=0;i<n;i++)if(on(i)){key[i]=LEVEL[i]*W+(rk&&UF.mine(i)?NK*STEPS:0)+(NK-1-SUB[i])*STEPS;c[key[i]+1]++;}else if(KIND[i]===3&&on(i,1))u++;  // u: level 3 past its Best x%
   for(k=1;k<c.length;k++)c[k]+=c[k-1];
   var at=c.slice(),order=new Int32Array(c[c.length-1]);
   for(k=0;k<n;k++){i=BYID[k];if(on(i))order[at[key[i]]++]=i;}
@@ -77,13 +77,11 @@ function build(){
     out[lv]=rows;total[lv]=b-a;
     for(k=0;rk&&k<rows.length&&UF.mine(rows[k]);k++);MINE[lv]=rk?k:-1;
   }
-  view=out;S.total=total;
+  // All needing ID (6): every kept record, level or not, in the base order (newest first); its list only while it shows
+  for(out[6]=[],total[6]=0,k=n-1;k>=0;k--)if(SEL[i=BYID[k]]&&++total[6]&&LV===6)out[6].push(i);
+  view=out;S.total=total;S.all3=total[3]+u;
 }
-function looksOf(i){
-  if(!LOOKS)return null;
-  var v=LOOKS.lo[i]|LOOKS.hi[i]<<8;
-  return v===NO_LOOK?null:LOOKS.names[v];
-}
+function looksOf(i){var v=LOOKS?LOOKS.lo[i]|LOOKS.hi[i]<<8:NO_LOOK;return v===NO_LOOK?null:LOOKS.names[v];}
 // level 3's runner-up: [name, margin in thousandths, 255 none], or null; its place is in its suggestion's list
 function whyOf(i){
   var v=WHY&&LOOKS?LOOKS.lo[i]|LOOKS.hi[i]<<8:NO_LOOK,c=WHY?WHY.lo[i]:255,r=v===NO_LOOK||c===255?null:WHY.runners[v];
@@ -203,7 +201,7 @@ function more(){
   var rows=view[LV]||[],ol=$('grid'),to=Math.min(rows.length,shown),lis=[],b=$('more'),nc=drawn?0:getComputedStyle(ol).gridTemplateColumns.split(' ').length;
   if(!drawn&&MINE[LV]>0)ol.appendChild(sep(MINE[LV],1));
   for(var j=drawn;j<to;j++){if(j===MINE[LV])ol.appendChild(sep(j));
-    if(rows.size&&CMP&&looksOf(rows[j])!==(j?looksOf(rows[j-1]):null))ol.appendChild(IdentifyNarrow.head(looksOf(rows[j]),rows.size.get(looksOf(rows[j])),CMP.ref));var li=card(rows[j],LV,0,KEPT[j]);if(j<nc)CARD.eager(li);if(!KEPT[j])ol.appendChild(li);lis.push(li);}
+    if(rows.size&&CMP&&looksOf(rows[j])!==(j?looksOf(rows[j-1]):null))ol.appendChild(IdentifyNarrow.head(looksOf(rows[j]),rows.size.get(looksOf(rows[j])),CMP.ref));var li=card(rows[j],LV===6?LEVEL[rows[j]]:LV,0,KEPT[j]);if(j<nc)CARD.eager(li);if(!KEPT[j])ol.appendChild(li);lis.push(li);}
   drawn=to;KEPT=[];
   b.hidden=rows.length<=to;b.textContent='Show more ('+nf.format(rows.length-to)+' left)';
   if(lis.length){photos(lis);if(CMP&&LOOKS){CMP.fill(lis);lis.forEach(CARD.paint);}}
@@ -216,10 +214,10 @@ function batch(){
   LINKS=rows.length?IdentifyLinks.batches(rows.map(function(i){return P.id[i];}),true):[];BI=0;
   $('batch').hidden=!rows.length;
   ONE=capped?'Identify the first '+nf.format(rows.length)+' on iNaturalist':null;
-  $('cap').textContent=LV===3?IdentifyNarrow.line(t,S.total[3],[GP&&GP.label(),GP&&GP.gaplabel(),R&&R.label(3)],RUN()?'all':'up to '+PER_SPECIES):
-    nf.format(t)+' cards (up to '+PER_SPECIES+' per species) · '+(capped?'first '+nf.format(rows.length):'all')+
+  $('cap').textContent=LV===3?IdentifyNarrow.line(t,S.total[3],[GP&&RK&&GP.cut(S.all3),GP&&GP.gaplabel(),R&&R.label(3)],RUN()?'all':'up to '+PER_SPECIES):
+    nf.format(t)+' cards'+(LV===6?'':' (up to '+PER_SPECIES+' per species)')+' · '+(capped?'first '+nf.format(rows.length):'all')+
     ' in '+LINKS.length+' batches of '+IdentifyLinks.BATCH+', in the order shown';
-  $('go').title=(LV===3&&RUN()?'All':'Up to '+PER_SPECIES)+(LV===3?' per suggested species':' per species');
+  $('go').title=LV===6?'':(LV===3&&RUN()?'All':'Up to '+PER_SPECIES)+(LV===3?' per suggested species':' per species');
   step(0);
 }
 function step(d){
@@ -247,14 +245,15 @@ function paint(){
   if(!k){if(AB)AB.abort();AB=new AbortController();}GO=false;  // the photos still loading for cards that go
   var old=cs.slice(k),last=old.pop();old.forEach(function(c){c.remove();});KEPT=cs.slice(0,k);drawn=0;
   var kf=KF&&TAB[KF]===LV;  // the controls count the chosen kind, as the cards show it
-  if(R)R.draw(kf?KF:LV,SEL,kf?KIND:LEVEL);
-  if(X)X.draw(kf?KF:LV,SEL,kf?KIND:LEVEL);
+  if(R&&LV<6)R.draw(kf?KF:LV,SEL,kf?KIND:LEVEL);
+  if(X&&LV<6)X.draw(kf?KF:LV,SEL,kf?KIND:LEVEL);
   if(GP)GP.draw(LV);
+  if(LV===6)$('sortb').hidden=$('rg').hidden=true;  // its order is the base order, its filters the bar's
   IdentifyFlow.draw(LV);
   empty();
   more();if(last)last.remove();batch();scrollTo(0,STAY?y:0);STAY=false;
   if(LV===3&&WHYF)setTimeout(WHYF,0);
-  if(LV===2||LV===3||LV===5)LKF();  // only these show a look-alike; level 3's order is by rank
+  if(LV!==1)LKF();  // only levels 2, 3, 5 (and All needing ID) show a look-alike; level 3's order is by rank
   if(LV===3)RKF();
 }
 function redraw(late){if(late===true)STAY=true;build();counts();paint();}  // late: records that arrived, not a choice, keep the scroll
@@ -275,7 +274,7 @@ function kinds(){
   box.append(g);
 }
 function counts(){
-  [].forEach.call($('tabs').querySelectorAll('[data-lv]'),function(t){var n=S.total[+t.dataset.lv]||0,w=+t.dataset.lv===3&&GP&&RKW&&!RK&&GP.label();t.lastChild.textContent=w?'':nf.format(n);t.classList.toggle('zero',!n&&!w);});
+  [].forEach.call($('tabs').querySelectorAll('[data-lv]'),function(t){var lv=+t.dataset.lv,n=S.total[lv]||0,L=lv===3&&(GP||IdentifyGaps).label(),w=L&&(!GP||RKW&&!RK);t.children[1].textContent=w?'':nf.format(n);t.lastChild.textContent=L&&(RK||!GP)?' · '+L.toLowerCase():'';t.classList.toggle('zero',!n&&!w);});
 }
 // An empty level here points at the levels that do have records, rather than a dead end.
 function empty(){
@@ -297,22 +296,18 @@ function keep(k,v){
 function choose(lv){
   LV=lv;mode(false);track('tab-'+lv);
   try{localStorage.setItem(LS,lv);}catch(e){}
-  keep('lvl',lv);
-  if(R){R.level(lv);redraw();}else paint();
+  keep('lvl',lv===6?'all':lv);
+  if(R)R.level(lv);if(R||lv===6)redraw();else paint();  // All needing ID builds its list only while it shows
 }
-// the kept tab: a level number, or b for Batches
+// the kept tab: a level number, all for All needing ID, or b for Batches
 function stored(){
-  var m=/(?:^|&)lvl=(\w)/.exec(location.hash.slice(1)),v=m?m[1]:'';
+  var m=/(?:^|&)lvl=(all|\w)/.exec(location.hash.slice(1)),v=m?m[1]:'';
   try{v=v||localStorage.getItem(LS)||'';}catch(e){}
   return v;
 }
-function saved(){var v=+stored();return CFG.levels.some(function(l){return l[0]===v;})?v:0;}
+function saved(){var v=stored();v=v==='all'?6:+v;return CFG.levels.some(function(l){return l[0]===v;})?v:0;}
 // With no saved level: Easy confirms, else Might be wrong, else the first level that has records.
-function first(){
-  if(S.total[1])return 1;
-  if(S.total[5])return 5;
-  return (CFG.levels.filter(function(l){return S.total[l[0]];})[0]||CFG.levels[1])[0];
-}
+function first(){return (CFG.levels.filter(function(l){return l[0]<6&&S.total[l[0]];})[0]||CFG.levels[1])[0];}
 // each level tab explains itself from the glossary, by level number
 var XK=[0,'level-clear-matches','level-close-calls','level-narrow-it-down','level-odd-shots','level-might-be-wrong'],
   KX=[0,0,'level-close-calls',0,'level-odd-shots','level-might-be-mislabelled'];  // a kind's own entry
@@ -320,12 +315,12 @@ function tabs(){
   var box=$('tabs');
   CFG.levels.forEach(function(x){
     var t=el('button','tab'),n=el('b',null,'');t.type='button';t.id='tab'+x[0];t.dataset.lv=x[0];
-    t.dataset.explain=XK[x[0]];t.setAttribute('role','tab');t.setAttribute('aria-controls','panel');t.append(el('span',null,x[1]),n);
-    t.onclick=function(){if(P)choose(x[0]);};
+    if(XK[x[0]])t.dataset.explain=XK[x[0]];t.setAttribute('role','tab');t.setAttribute('aria-controls','panel');t.append(el('span',null,x[1]),n,el('span','cut'));
+    t.onclick=function(){if(P&&(MF||x[0]<6))choose(x[0]);};
     box.appendChild(t);
   });
   box.onkeydown=function(e){
-    var k=['ArrowLeft','ArrowRight','Home','End'].indexOf(e.key),all=[].slice.call(box.children);
+    var k=['ArrowLeft','ArrowRight','Home','End'].indexOf(e.key),all=[].filter.call(box.children,function(t){return t.getClientRects().length;});
     if(k<0)return;e.preventDefault();
     var at=all.indexOf(document.activeElement),to=k===2?0:k===3?all.length-1:(at+(k?1:-1)+all.length)%all.length;
     all[to].focus();all[to].click();
@@ -338,7 +333,7 @@ function tabs(){
   $('prev').onclick=function(){step(-1);};$('next').onclick=function(){step(1);};
 }
 function refresh(){
-  select();build();
+  select();LV=LV||saved();build();
   var kept=0,lev=0;
   for(var i=0;i<P.n;i++)if(SEL[i]){kept++;if(LEVEL[i])lev++;}
   S.kept=kept;
@@ -347,7 +342,7 @@ function refresh(){
   var why=el('a',null,'in a level');why.href='#about';why.onclick=function(e){e.preventDefault();$('about').open=true;$('about').scrollIntoView({block:'nearest'});};
   $('status').append(why,MORE.size?' · '+PER_SPECIES+' per species':'');
   counts();if(WW)WW.sync();$('unpick').hidden=parent!==window||!S.picks.length;
-  if(!LV)LV=saved()||first();
+  if(!LV)LV=first();
   paint();
 }
 // The map's viewport moves often: one refresh once it rests for a moment, on a frame.
@@ -369,15 +364,16 @@ function firstOf(F){
 // beside a phone it is hidden and posts ''. Any other selection waits for the records.
 function early(){
   var h=location.hash.slice(1),b=FIRST.bbox,I=VIEW&&SpaceMask.areaIndex(VIEW),
-    s=!AREA&&!KEEPIDS&&!SUBIDS&&!/(^|&)(area|out|rg)=/.test(h)&&(!VIEW||I&&[[0,1],[2,1],[2,3],[0,3]].every(function(c){
+    s=saved()!==6&&!AREA&&!KEEPIDS&&!SUBIDS&&!/(^|&)(area|out|rg)=/.test(h)&&(!VIEW||I&&[[0,1],[2,1],[2,3],[0,3]].every(function(c){
       return MapArea.inside(I,b[c[0]],b[c[1]]);}))&&FIRST.s[sel()]||null;
   if(s===SHOWN)return;SHOWN=s;P=s&&FIRST.P;
   if(!s){view=[];$('grid').textContent='';$('none').hidden=$('more').hidden=$('batch').hidden=true;
-    [].forEach.call($('tabs').querySelectorAll('[data-lv]'),function(t){t.lastChild.textContent='';});status('Loading all the records for this selection…');return;}
+    [].forEach.call($('tabs').querySelectorAll('[data-lv] b'),function(t){t.textContent='';});status('Loading all the records for this selection…');return;}
   // a tab of several kinds starts as its first kind's list (or the chosen kind's), its count their sum
   view=s.rows.slice();S.total=s.total.slice();KC=s.total.slice();MINE=[];
   Object.keys(CFG.merge).forEach(function(tb){var ks=CFG.merge[tb];
     S.total[tb]=ks.reduce(function(x,k){return x+(s.total[k]||0);},0);view[tb]=s.rows[KF&&TAB[KF]===+tb?KF:ks[0]];});
+  var g=/^groups=(.*)/.exec(sel());S.total[6]=g?(FIRST.groups||[])[META.groups.indexOf(decodeURIComponent(g[1]))]:META.shards.reduce(function(x,h){return x+h.n;},0);  // All needing ID: the pool, or its one group
   counts();
   if(!LV)LV=saved()||first();
   status('Showing the top records, loading all of them…');paint();
@@ -417,7 +413,7 @@ function inbox(){
     else if(d.type==='wtid-subset'&&(d.ids===null||Array.isArray(d.ids))){SUBIDS=d.ids&&Uint32Array.from(d.ids).sort();again();}  // the photo search's hits
   });
   SYNC=MapFilter.sync({key:key,apply:function(str){if(MF){clearTimeout(TK);TK=setTimeout(function(){take(str,false);},60);}else{PEND=str;again();}},hash:false});
-  addEventListener('hashchange',function(){if(MF)take(location.hash.slice(1),true);else again();});
+  addEventListener('hashchange',function(){if(GP)GP.reread();if(WW)WW.sync();if(MF)take(location.hash.slice(1),true);else again();});  // a new address (Clear filters, back) sets every filter
 }
 // the look-alike file (planes of one entry per level 2, 3, 5 record, expanded to all n by KIND), or (why) the runner-up file (planes of n)
 function looks(buf,why){
@@ -460,7 +456,7 @@ async function load(){
   CMP=IdentifyCompare({taxa:TAXA,tax:P.tax,look:looksOf,why:whyOf,obs:function(id){return CACHE.get(id);},range:function(){return R;},more:function(){shown+=LIMIT;more();},lend:CARD.lend});
   MF=MapFilter(META);Object.assign(S,MF.read(new URLSearchParams()));  // the defaults, until the address is read
   OX=IdentifyOnly({META:META,mf:MF,P:function(){return P;},taxa:function(){return TAXA;},range:function(){return R;},rewrite:rewrite,changed:refresh,embedded:parent!==window,get:function(f){return get(new URL(f,MAP));}});
-  BAR=IdentifyBar({rewrite:rewrite,S:S,META:META,mf:MF,nf:nf,taxa:function(){return TAXA;},P:function(){return P;},tf:function(){return TF;},mask:atLevel,all:kept,tab:function(){var l=CFG.levels.filter(function(x){return x[0]===LV;})[0];return {name:l?l[1]:'',has:function(i){return LV?LEVEL[i]===LV:LEVEL[i]>0;}};},changed:put,blocked:function(){return !!(AREA||VIEW||KEEPIDS||SUBIDS||PIDS||UF.active());},
+  BAR=IdentifyBar({rewrite:rewrite,S:S,META:META,mf:MF,nf:nf,taxa:function(){return TAXA;},P:function(){return P;},tf:function(){return TF;},mask:atLevel,all:kept,tab:function(){var l=CFG.levels.filter(function(x){return x[0]===LV;})[0];return {name:l?l[1]:'',has:function(i){return LV===6||(LV?LEVEL[i]===LV:LEVEL[i]>0);}};},changed:put,blocked:function(){return !!(AREA||VIEW||KEEPIDS||SUBIDS||PIDS||UF.active());},
     where:where,get:function(u){return get(new URL(u,MAP));},map:MAP,key:key,embedded:parent!==window});
   RKF=function(){if(RK||rkp)return;LKF();Promise.all([rk(),lk()]).then(function(d){if(rank(d[0]))LV===3?redraw(true):(build(),counts());});};
   LKF=function(){if(lkp)return;lk().then(function(b){if(!b)return;LOOKS=looks(b);retitle();
@@ -469,7 +465,7 @@ async function load(){
   var co=CMP.open;CMP.open=function(){LKF();return co.apply(this,arguments);};if(WW.active())LKF();
   STAY=!!SHOWN;take(location.hash.slice(1),AREA==='');
   if(PEND!==null){take(PEND,false);PEND=null;}
-  function retitle(){[].forEach.call($('grid').children,function(li){var t=li.querySelector('.title');if(t&&li.dataset.i){t.replaceWith(title(+li.dataset.i,LV));CARD.face(li);}});}
+  function retitle(){[].forEach.call($('grid').children,function(li){var t=li.querySelector('.title');if(t&&li.dataset.i){t.replaceWith(title(+li.dataset.i,+li.dataset.lv));CARD.face(li);}});}
   WHYF=function(){WHYF=null;  // the runner-up file is large and only level 3 shows it: fetched once its first cards are drawn
     Promise.all([lk(),file('why').catch(function(){return null;})]).then(function(b){if(b[0]&&b[1]){WHY=looks(b[1],1);if(LV===3)retitle();}});};
   if(LV===3&&!BT)setTimeout(WHYF,0);rg.then(RKF,RKF);  // the rank and look-alikes follow the records in the background: level 3's count reads both

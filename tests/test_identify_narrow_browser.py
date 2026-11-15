@@ -52,6 +52,7 @@ def test_the_copy_button_copies_the_suggestion_and_says_so(browser, site):
     )
     eb.stub_inat(page, None)
     page.goto(f"{base}/identify.html#lvl=3")
+    page.wait_for_function("window.__identify")  # the full records may reorder the first cards
     page.locator("#grid .card .copy").first.wait_for(state="attached")
     name = page.locator("#grid .card .look i").first.inner_text()
     ib.panel(page, page.locator("#grid .card").first)
@@ -151,14 +152,16 @@ def test_level_3_caps_by_the_suggested_species_and_other_levels_by_label(browser
 
 
 def test_level_3_has_one_count_line_that_agrees_with_the_tab(browser, site):
-    base, _ = site
+    base, pts = site
     page = ib.open_identify(browser, base, "#lvl=3")
     page.wait_for_selector("#grid .card .look", state="attached")
     cards = len(page.evaluate("__identify.view()")[3])
     records = page.evaluate("__identify.total()")[3]
     assert page.inner_text("#tab3 b") == f"{records:,}"
+    every = sum(1 for x in pts["level"] if x == 3)  # no filter: every level 3 record before the cut
+    cut = f"the most confident 5% of {every:,}"
     assert page.inner_text("#cap") == (
-        f"{cards:,} cards to ID ({records:,} records, Best 5%; up to 3 per suggested species)"
+        f"{cards:,} cards to ID ({records:,} records, {cut}; up to 3 per suggested species)"
     )
     assert page.inner_text("#count") == f"{cards:,} cards"  # a phone keeps the short heading
     reveal(page, "#ptop")
@@ -168,11 +171,39 @@ def test_level_3_has_one_count_line_that_agrees_with_the_tab(browser, site):
     )
     page.wait_for_function(
         "location.hash.includes('conf=all')"
-        " && !document.getElementById('cap').textContent.includes('Best')"
+        " && !document.getElementById('cap').textContent.includes('most confident')"
     )
     records = page.evaluate("__identify.total()")[3]
     assert page.inner_text("#tab3 b") == f"{records:,}"
     assert f"({records:,} records; up to 3 per suggested species)" in page.inner_text("#cap")
+    assert page.errors == []
+
+
+def test_the_tab_names_the_cut_and_show_all_lifts_it_and_back(browser, site):
+    base, pts = site
+    page = ib.open_identify(browser, base, "#lvl=3")
+    page.wait_for_selector("#grid .card .look", state="attached")
+    records, every = page.evaluate("__identify.total()")[3], int((pts["level"] == 3).sum())
+    assert records < every
+    assert " ".join(page.inner_text("#tab3").split()) == f"Narrow it down {records:,} · best 5%"
+    assert page.text_content("#count .rel").endswith(
+        f" of {records:,} records, the most confident 5% of {every:,}"
+    )
+    b = page.locator("#showall")
+    assert b.inner_text() == "Show all" and b.is_visible()
+    b.focus()
+    page.keyboard.press("Enter")
+    page.wait_for_function(f"__identify.total()[3] === {every}")
+    assert "conf=all" in page.evaluate("location.hash")
+    assert page.inner_text("#tab3").split() == ["Narrow", "it", "down", f"{every:,}"]
+    assert b.inner_text() == "Best 5% only"
+    b.click()
+    page.wait_for_function(f"__identify.total()[3] === {records}")
+    assert "conf=" not in page.evaluate("location.hash") and b.inner_text() == "Show all"
+    page.goto(f"{base}/identify.html#lvl=3&conf=all")  # the hash round-trips
+    page.reload()
+    page.wait_for_function(f"window.__identify && __identify.total()[3] === {every}")
+    assert page.locator("#showall").inner_text() == "Best 5% only"
     assert page.errors == []
 
 

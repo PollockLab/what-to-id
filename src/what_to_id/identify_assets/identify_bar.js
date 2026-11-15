@@ -54,6 +54,8 @@ var S=o.S,META=o.META,MF=o.mf,G=META.groups,LAST=MF.LAST,iso=MF.iso,bar=$('bar')
   SEG=NAMES.map(function(n){var b=$('b'+n.toLowerCase());return {b:b,p:$('p'+n.toLowerCase()),l:b.querySelector('b')};}),
   cur=-1,CUM=null,SUB=null,TC,TOT=null,GM=null,A=null,ACC=[];
 SEG[2].b.hidden=o.embedded;  // the split view's map beside it holds the area
+// Clear filters: the address without them, read back by the hashchange; the focus goes to What. Explore has its own.
+var FC=$('fclear');if(o.embedded)FC.remove();else WtidCarry.clear(FC,function(t){location.hash=t.join('&');LBL=null;A.clear();if(W.live())W.reset();SEG[0].b.focus();});
 
 // What: the taxon picker and its shortcuts, then the groups list with the groups filter left out of its counts, then the Show only
 // chips and the location accuracy (the projects box is the app's, identify_only.js)
@@ -76,7 +78,7 @@ function counts(){var c=tally();GL.set(c);scope(c);}
 // and the tab's count when that differs (blank while level 3 waits for its rank)
 function scope(c){
   var t=o.tab(),n=0,j,b=[].filter.call(document.querySelectorAll('#tabs [data-lv]'),function(x){return I18N.raw(x.firstChild)===t.name;})[0],
-    k=b?b.lastChild.textContent.replace(/\D/g,''):'';
+    k=b?b.children[1].textContent.replace(/\D/g,''):'';
   for(j=0;j<c.length;j++)n+=c[j];
   $('gscope').textContent=t.name?'In '+t.name+(k&&+k!==n?', before its own filters; the tab shows '+o.nf.format(+k):''):'';
 }
@@ -169,16 +171,14 @@ function where(){var t=A&&A.term();return LBL!==null?LBL||'Anywhere':t?t.label:'
 
 // The panels: the open one is raised under its segment, the rest of the bar greyed
 function visible(k){return SEG[k].p.offsetParent!==null;}
-// What's links to the full-screen photo space and taxonomy, and Where's to the map (explore.html), with the selection in the address
+// What's links to the full-screen photo space and taxonomy, and Where's to the map (explore.html); carry.js puts the filters on them
 var XL=$('xlinks'),XM=$('xmap');
-function xl(){['xspace','xtree','xmap'].forEach(function(id){var a=$(id);a.href=a.getAttribute('href').split('#')[0]+location.hash;});}
 if(XL&&!o.embedded)fetch('explore.html',{method:'HEAD'}).then(function(r){XL.hidden=XM.hidden=!r.ok;}).catch(function(){});
-if(XL){XL.addEventListener('click',xl,true);XM.addEventListener('click',xl);}
 function fill(k){
   if(!visible(k))return;
-  if(k===0){counts();if(XL)xl();}
+  if(k===0)counts();
   else if(k===1)MH.draw();
-  else if(k===2){if(W)W.show();SG.where();if(XL)xl();}
+  else if(k===2){if(W)W.show();SG.where();}
   else{SG.who();[].forEach.call(SEG[3].p.querySelectorAll('details details'),function(d){d.open=true;});}  // Who: the threshold sits in a closed Adjust
 }
 function place(k){

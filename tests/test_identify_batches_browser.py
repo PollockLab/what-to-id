@@ -118,6 +118,16 @@ def test_the_default_is_easy_confirms_and_the_mode_control_has_no_batches(browse
     assert page.errors == []
 
 
+def test_the_batches_hide_all_needing_id(browser, site):
+    base, _ = site
+    page = open_batches(browser, base)
+    page.wait_for_function("window.__identify && __identify.total()[6] > 0")
+    assert page.evaluate("document.body.classList.contains('bt')")
+    assert page.is_hidden("#tab6")
+    assert "All needing ID" not in page.inner_text("body")
+    assert page.errors == []
+
+
 def test_a_record_link_opens_the_levels_not_the_batches(browser, site):
     base, lists = site
     page = open_batches(browser, base, f"#record={lists['A']['Aves'][0][0]}")
@@ -154,3 +164,10 @@ def test_the_search_suggestions_are_hidden_in_the_batches(browser, site):
     page.wait_for_selector("body.bt")
     page.wait_for_timeout(300)
     assert page.locator(".sg:visible").count() == 0 and urls == []  # no top identifiers either
+
+
+def test_batches_show_no_clear_filters(browser, site):
+    base, _ = site
+    page = open_batches(browser, base, "#lvl=b&months=6")
+    page.wait_for_function("window.__identify")
+    assert page.locator("#fclear").count() == 1 and page.locator("#fclear").is_hidden()

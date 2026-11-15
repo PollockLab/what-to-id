@@ -312,10 +312,11 @@ function settle(){var f=M.lead(D,S.focus),c=M.crumbs(D,f);
   if(!D.kids[f].length&&c.length){if(S.sel<0)S.sel=f;S.focus=f=c[c.length-1];M.reveal(D,S,S.sel);}
   if(!S.open.has(f))M.toggle(D,S,f);}
 // With no address the page opens on the root selected, so the card names the biggest taxa below.
+WtidCarry.own([]);  // the tree draws every record: the filters are held for the other views
 function readHash(){S=M.read(D,location.hash,GS);if(!location.hash.slice(1))S.sel=M.lead(D,D.root);settle();}
 function reread(){readHash();share();draw(true);}
 function go(animate,push){
-  settle();var base=location.pathname+location.search,h=M.write(D,S),u=base+(h?'#'+h:'');
+  settle();var base=location.pathname+location.search,h=[M.write(D,S)].concat(WtidCarry.held([])).filter(Boolean).join('&'),u=base+(h?'#'+h:'');  // the filters ride along, held
   if(u!==base+location.hash)history[push?'pushState':'replaceState'](null,'',u);
   share();draw(animate);
 }

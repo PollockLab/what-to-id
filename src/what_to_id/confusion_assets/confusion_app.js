@@ -53,8 +53,9 @@ function pairOf(t,l){for(var k=0;k<D.pairs.length;k++)
   if(D.pairs[k][0]===t&&D.pairs[k][1]===l)return D.pairs[k];return null;}
 function groupName(g){return g!=null&&g>=0?D.head.groups[g][0]:'';}
 
+WtidCarry.own([]);  // the pairs are not filtered: the filters are held for the other views
 function readHash(){
-  var s=decodeURIComponent(location.hash.slice(1)),m=/^t(\d+)$/.exec(s),p;
+  var s=decodeURIComponent(location.hash.slice(1)),m=/^t(\d+)(?:&|$)/.exec(s),p;
   S=fresh();
   if(m){var t=D.byKey.get(m[1]);if(t==null)return;S.t=t;
     p=D.pairs.find(function(x){return x[0]===t;});S.l=p?p[1]:-1;return;}
@@ -81,6 +82,7 @@ function writeHash(){
   if(S.hi<100)h.push('max='+S.hi);
   if(S.t>=0)h.push('t='+e(key(D.taxa[S.t])));
   if(S.l>=0)h.push('l='+e(key(D.taxa[S.l])));
+  h=h.concat(WtidCarry.held([]));  // the filters ride along, held for the other views
   history.replaceState(null,'',h.length?'#'+h.join('&'):location.pathname+location.search);
 }
 

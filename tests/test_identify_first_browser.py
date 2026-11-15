@@ -163,7 +163,7 @@ def test_the_bulk_files_wait_for_the_first_card(browser, site):
     bulk = shards + [files["levels"], files["rank"], files["looks"]]
     assert shards and all(up for n, up in seen if n in bulk)
     # the rank and look-alikes follow the records in the background: level 3's count reads both
-    tab3 = "document.querySelector('#tab3').lastChild.textContent"
+    tab3 = "document.querySelector('#tab3 b').textContent"
     page.wait_for_function(f"/\\d/.test({tab3})")
     other = open_identify(browser, base, "#lvl=3&sort=conf&conf=all")
     other.wait_for_load_state("networkidle")

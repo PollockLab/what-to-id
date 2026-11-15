@@ -47,6 +47,9 @@ LEVELS = (
         "Labelled above species, and the photo points to one species of it. Take it to species.",
     ),
 )
+# The tab of every record that needs an ID, level or not (hash lvl=all): not a level, so not in
+# LEVELS
+ALL_TAB = (6, "All needing ID", "Every record that needs an ID, with a level or not, newest first.")
 # The kinds a tab shows, in order: Might be wrong (5) lists likely mislabels by margin, then odd
 # shots, then close calls. This order beat interleaving the three by rank on crowd corrections
 # (AUC +0.028 [0.013, 0.044], 10-15 to 11-03 BC).
@@ -162,7 +165,7 @@ def render(
         "__CONFIG__": json.dumps(
             {
                 "mapUrl": map_url,
-                "levels": LEVELS,
+                "levels": (*LEVELS, ALL_TAB),
                 "merge": MERGE,
                 "kinds": KINDS,
                 "first": first,

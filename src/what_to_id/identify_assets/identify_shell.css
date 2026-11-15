@@ -50,9 +50,10 @@ dialog.sheet::backdrop{background:rgba(0,0,0,.45)}
 .sfoot .btn{min-height:44px;padding:0 20px;border:0;border-radius:999px;font:inherit;font-weight:650;cursor:pointer}
 .sfoot .lnk{font:inherit;color:var(--ink);background:none;border:0;text-decoration:underline;cursor:pointer;padding:8px 0}
 @media (max-width:600px){
-  .rline{gap:2px;flex-wrap:wrap}.rline .rel{display:none}.rline .qchip{padding:0 6px}.today{order:9;flex-basis:100%}
+  .rline{gap:2px;flex-wrap:wrap}.rline #showall{margin:0 4px}.rline .rel{display:none}.rline .qchip{padding:0 6px}.today{order:9;flex-basis:100%}
   #sortpop,#setpop{inset:auto 0 0 0;box-sizing:border-box;width:100vw;max-width:100vw;border-radius:20px 20px 0 0;padding:16px 20px 24px}
-  dialog.sheet{width:100vw;max-width:100vw;max-height:90vh;margin:auto 0 0;border-radius:20px 20px 0 0}}
+  dialog.sheet{width:100vw;max-width:100vw;max-height:90vh;margin:auto 0 0;border-radius:20px 20px 0 0}
+  .tabs{flex:1 1 100%;display:grid;grid-template-columns:1fr 1fr}.tab{flex-wrap:wrap;align-items:center;column-gap:6px;border-radius:12px}.tab>span:first-child{flex-basis:100%;text-align:left}.tab b{min-height:1.2em}}  /* two by two, the count under the name: a count landing never moves a tab */
 .missions{flex:1 1 100%;min-width:0;margin:2px 0 6px}.missions[hidden]{display:none}
 .mlbl{font-size:13px;font-weight:650;margin:0 0 4px}
 .mrow{display:flex;gap:8px;margin:0;padding:2px 2px 6px;list-style:none;overflow-x:auto;scroll-snap-type:x proximity;overscroll-behavior-x:contain}

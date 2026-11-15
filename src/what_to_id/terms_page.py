@@ -215,7 +215,8 @@ def render(
     return (
         '<!doctype html><html lang="en"><head><meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width,initial-scale=1">\n'
-        f"<title>How it works</title>\n<style>\n{page_nav.CSS}\n{CSS}\n</style></head><body>\n"
+        f"<title>How it works</title>\n<style>\n{page_nav.CSS}\n{CSS}\n</style></head>"
+        "<body data-anchors>\n"
         f'{page_nav.nav(PAGE_NAME)}<div class="doc">\n'
         f'<details id="toc"><summary>On this page</summary><nav aria-label="On this page">{toc}'
         f'</nav></details>\n<main id="main-content">\n{body}</main></div>\n'

@@ -201,6 +201,7 @@ def test_the_compare_panel_fits_a_phone_with_the_species_and_three_similar(brows
     eb.stub_inat(page, None)
     stub_taxa(page)
     page.goto(f"{base}/identify.html#lvl=1")
+    page.wait_for_function("window.__identify")  # the panel needs the full records
     page.locator("#grid .card .title").first.click()
     page.wait_for_function("document.querySelectorAll('#cprefs .cpref').length === 4")
     h = page.locator("#cprefs .cpref h3").all_inner_texts()
