@@ -72,8 +72,8 @@ def test_the_first_cards_show_before_the_records_and_stay_when_they_land(browser
     eb.stub_inat(page, None)
     held = []
     page.route(re.compile(r"/pool-\d+\.\w+\.bin"), lambda r: held.append(r))
-    page.goto(f"{base}/identify.html#lvl=1")
-    page.wait_for_selector("#grid .card .ph img")
+    with page.expect_request(re.compile(r"/pool-\d+\.\w+\.bin")):  # after the first row's photos
+        page.goto(f"{base}/identify.html#lvl=1")
     early = cards(page)
     assert [c[0] for c in early] == [r[0] for r in first[""]["rows"][1][:12]]
     assert any(c[2] for c in early)  # a cut species offers the rest of its records
@@ -115,7 +115,8 @@ def test_a_species_picked_from_a_first_card_shows_once_the_records_land(browser,
     eb.stub_inat(page, None)
     held = []
     page.route(re.compile(r"/pool-\d+\.\w+\.bin"), lambda r: held.append(r))
-    page.goto(f"{base}/identify.html#lvl=1")
+    with page.expect_request(re.compile(r"/pool-\d+\.\w+\.bin")):  # after the first row's photos
+        page.goto(f"{base}/identify.html#lvl=1")
     link = page.locator("#grid .card .sp").first
     rid = int(link.locator("xpath=ancestor::li[1]").get_attribute("data-id"))
     link.click()
@@ -204,3 +205,22 @@ def test_a_second_visit_paints_the_kept_photos_before_inaturalist_answers(browse
     page.wait_for_function(f"!document.querySelector('#grid .card[data-id=\"{first}\"]')")
     assert page.errors == []
     ctx.close()
+
+
+def test_the_bulk_files_wait_for_the_first_rows_photos(browser, site):
+    base, _ = site
+    page = browser.new_page(viewport={"width": 380, "height": 800})
+    page.errors = []
+    page.on("pageerror", lambda e: page.errors.append(str(e)))
+    eb.stub_inat(page, None)
+    held = []
+    page.route("https://static.inaturalist.org/**", lambda r: held.append(r))
+    seen = watch(page)
+    page.goto(f"{base}/identify.html#lvl=1")
+    page.wait_for_selector("#grid .card .ph img")
+    page.wait_for_timeout(500)
+    assert held and not [n for n, _ in seen if re.fullmatch(r"pool-\d+\.\w+\.bin", n)]
+    for r in held:
+        r.fallback()
+    page.wait_for_function("window.__identify")
+    assert page.errors == []

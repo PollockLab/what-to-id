@@ -28,6 +28,7 @@ def level_3(browser, base, hash_="#lvl=3"):
     page.route("https://pollocklab.github.io/**", lambda r: r.abort())  # no gap data needed here
     page.goto(f"{base}/identify.html{hash_}")
     page.wait_for_selector("#grid .card .copy", state="attached")
+    page.wait_for_function("window.__identify")  # the panel needs the records, not the first cards
     return page
 
 
@@ -245,6 +246,8 @@ def test_the_panel_asks_for_its_observation_when_the_cards_have_not_got_it(brows
     page.goto(f"{base}/identify.html#lvl=3")
     page.wait_for_selector("#grid .card .copy", state="attached")
     assert page.locator("#grid .card .ph img").count() == 0 and held
+    page.wait_for_function("window.__identify")  # the records stop waiting for a silent iNaturalist
+    assert page.locator("#grid .card .ph img").count() == 0
     clicked.append(1)
     page.locator("#grid .card .title").first.click()
     page.wait_for_selector("#cpobs .cpbig")

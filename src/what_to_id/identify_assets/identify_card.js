@@ -99,6 +99,12 @@ return function(ctx){
   // the first row's photos load at once and first, the rest as they near the screen
   function hi(img,e){img.fetchPriority=e?'high':'auto';img.loading=e?'eager':'lazy';}
   function eager(li){li.e=1;var i=li.querySelector('.ph img');if(i)hi(i,1);}
-  return {car:car,face:face,lend:lend,keys:keys,gone:gone,med:med,ahead:ahead,kept:kept,keep:keep,hi:hi,eager:eager,paint:function(li){var c=li.querySelector('.car');if(c)show(c,+c.dataset.at);}};
+  // resolves once the first row's photos are in or failed, or their fetch did (at once with no first row drawn), ms at most, 4 s while
+  // iNaturalist has not answered: the bulk downloads wait for it
+  function row(ms){var g=document.getElementById('grid'),t0=Date.now(),t,iv;return new Promise(function(ok){
+    function done(){clearTimeout(t);clearInterval(iv);g.removeEventListener('load',f,true);g.removeEventListener('error',f,true);ok();}
+    function f(){if([].every.call(g.querySelectorAll('.card'),function(li){var i=li.querySelector('.ph img');return !li.e||(i?i.complete:!li.w||Date.now()-t0>4e3);}))done();}
+    t=setTimeout(done,ms);iv=setInterval(f,100);g.addEventListener('load',f,true);g.addEventListener('error',f,true);f();});}  // a fetch's end has no event: polled
+  return {car:car,face:face,lend:lend,keys:keys,gone:gone,med:med,ahead:ahead,kept:kept,keep:keep,hi:hi,eager:eager,row:row,paint:function(li){var c=li.querySelector('.car');if(c)show(c,+c.dataset.at);}};
 };
 })();
