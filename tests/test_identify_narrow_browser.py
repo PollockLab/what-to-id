@@ -52,6 +52,7 @@ def test_the_copy_button_copies_the_suggestion_and_says_so(browser, site):
     )
     eb.stub_inat(page, None)
     page.goto(f"{base}/identify.html#lvl=3")
+    page.wait_for_function("window.__identify")  # the full records may reorder the first cards
     page.locator("#grid .card .copy").first.wait_for(state="attached")
     name = page.locator("#grid .card .look i").first.inner_text()
     ib.panel(page, page.locator("#grid .card").first)
