@@ -160,8 +160,8 @@ def render(data_url: str, built_at: str = "", has_records: bool = True) -> str:
     built = escape(built_at[:10]) if built_at else "unknown"
     note = "" if has_records else f'<p class="note" id="norecords">{escape(NO_RECORDS)}</p>'
     for key, value in {
-        "__SITE_CSS__": page_nav.CSS,
-        "__SITE_NAV__": page_nav.nav(PAGE_NAME),
+        "__SITE_CSS__": f"{page_nav.CSS}\n{page_nav.HELP_CSS}",
+        "__SITE_NAV__": page_nav.nav(PAGE_NAME, menu=True),
         "__CONFIG__": json.dumps({"data": data_url}).replace("<", "\\u003c"),
         "__BUILT__": built,
         "__RECORDS_NOTE__": note,

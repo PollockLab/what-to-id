@@ -29,6 +29,12 @@ def test_explore_header_carries_the_help_menu_in_place_of_the_switcher():
     assert 'href="terms.html"' in html and 'href="explore.html"' not in html
 
 
+def test_a_help_menu_header_leaves_out_its_own_page():
+    html = nav("terms.html", menu=True)
+    assert 'href="terms.html"' not in html
+    assert 'href="confusion.html"' in html and 'href="explore.html"' in html
+
+
 @pytest.mark.parametrize(
     "current", ["explore.html", "map.html", "embeddings.html", "tree.html", "search.html"]
 )
