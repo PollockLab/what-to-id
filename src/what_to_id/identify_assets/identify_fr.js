@@ -154,7 +154,7 @@ R('first # in # batches of #, in the order shown',function(m,a,n,k){return 'les 
 R('# cards to ID \\(# records((?:, [^;]+)?); (up to|all) # per suggested species\\)',function(m,c,r,t,u,k){
   return c+' '+pl(c,'carte','cartes')+' à identifier ('+r+' '+pl(r,'observation','observations')+t.replace('Best ','meilleurs ').replace('in range',"dans l'aire")+'; '+(u==='all'?'toutes':"jusqu'à "+k)+' par espèce suggérée)';}),
 R('# of the records to identify','$1 des observations à identifier'),
-R('Up to # of the records to identify',"Jusqu'à $1 des observations à identifier"),
+R('Up to # to identify',"Jusqu'à $1 à identifier"),
 R('# threatened or introduced',function(m,n){return n+' '+pl(n,'menacée ou introduite','menacées ou introduites');}),
 R('From (\\d{4}-\\d\\d-\\d\\d)','Depuis le $1'),
 R('# of 10 improving IDs in 30 days',function(m,n){return n+' sur 10 identifications améliorantes en 30 jours';}),

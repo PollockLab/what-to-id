@@ -145,7 +145,7 @@ def test_a_suggested_park_sets_bcpark(browser, site):
     page = opened(browser, base, "where")
     page.wait_for_selector("#sgwhere .sgr[data-k^='p:']")
     park = page.locator("#sgwhere .sgr[data-k^='p:']").first
-    assert re.search(r"Up to [\d,]+ of the records to identify", park.inner_text())
+    assert re.search(r"Up to [\d,]+ to identify", park.inner_text())
     key = park.get_attribute("data-k")[2:]
     park.click()
     assert f"bcpark={key}" in hash_(page)
