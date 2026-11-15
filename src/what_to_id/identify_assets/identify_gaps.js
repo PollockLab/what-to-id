@@ -241,8 +241,8 @@ var F=function(ctx){
   return {
     ready:ready,  // settles once the checklist has loaded or failed and the redraw is done
     // a record the filters keep: level 3's Best x% and every level's survey days range
-    pass:function(i,kind){
-      if(kind===3&&st.top<100){var p=ctx.pct(i);if(p!=null&&p>st.top/100)return false;}
+    pass:function(i,kind,all){
+      if(kind===3&&st.top<100&&!all){var p=ctx.pct(i);if(p!=null&&p>st.top/100)return false;}
       if(!st.gap||state!=='ready')return true;
       var d=days[i];
       return d!==NODAYS&&d>=st.gap[0]&&(st.gap[1]>=LIT||d<=st.gap[1]);
@@ -276,12 +276,14 @@ var F=function(ctx){
     },
     // the filters' names for the count line
     label:function(){return st.top<100?'Best '+st.top+'%':'';},
+    cut:function(n){return st.top<100?'the most confident '+st.top+'% of '+I18N.nf.format(n):'';},
     gaplabel:function(){return st.gap&&state==='ready'?'survey days '+st.gap[0]+'-'+st.gap[1]:'';},
     // the controls and the summary line, for level lv
     draw:function(lv){
       if(!UI)return;
       var pr=preset(),btn=$('sortb');
       UI.top.row.hidden=!(lv===3&&ctx.hasRank());UI.top.input.value=st.top;UI.top.out.textContent=st.top+'%';
+      var sa=$('showall');if(sa){sa.hidden=UI.top.row.hidden;sa.textContent=st.top<100?'Show all':'Best 5% only';sa.onclick=function(){st.top=st.top<100?100:5;change();};}  // one tap past the Best x% cut, and back
       var g=st.gap||[0,LIT0];
       UI.lo.value=g[0];UI.hi.value=g[1];UI.lo.style.zIndex=g[0]>LIT0/2?2:1;UI.gv.textContent=g[0]+'-'+g[1];
       UI.lo.setAttribute('aria-valuetext',g[0]+' survey days');UI.hi.setAttribute('aria-valuetext',g[1]+' survey days');

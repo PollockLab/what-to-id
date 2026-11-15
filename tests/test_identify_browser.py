@@ -343,7 +343,8 @@ def test_the_tabs_switch_the_cards_and_their_counts_are_the_totals(browser, site
         "tab3",
     ]
     for lv, label, _ in page_identify.LEVELS:
-        assert " ".join(tab(page, lv).inner_text().split()) == f"{label} {total[lv]:,}"
+        cut = " · best 5%" if lv == 3 else ""  # level 3 names its Best x% cut
+        assert " ".join(tab(page, lv).inner_text().split()) == f"{label} {total[lv]:,}{cut}"
     assert total[5] == int(pts["level"].isin([2, 4, 5]).sum())
     tab(page, 1).focus()
     page.keyboard.press("ArrowRight")

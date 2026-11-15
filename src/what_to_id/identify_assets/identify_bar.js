@@ -76,7 +76,7 @@ function counts(){var c=tally();GL.set(c);scope(c);}
 // and the tab's count when that differs (blank while level 3 waits for its rank)
 function scope(c){
   var t=o.tab(),n=0,j,b=[].filter.call(document.querySelectorAll('#tabs [data-lv]'),function(x){return I18N.raw(x.firstChild)===t.name;})[0],
-    k=b?b.lastChild.textContent.replace(/\D/g,''):'';
+    k=b?b.children[1].textContent.replace(/\D/g,''):'';
   for(j=0;j<c.length;j++)n+=c[j];
   $('gscope').textContent=t.name?'In '+t.name+(k&&+k!==n?', before its own filters; the tab shows '+o.nf.format(+k):''):'';
 }

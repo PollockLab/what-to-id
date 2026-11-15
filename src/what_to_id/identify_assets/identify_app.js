@@ -54,11 +54,11 @@ function byId(P){
 // What the per-species cap counts: the record's label, but on level 3 the suggested species (the label is a coarse rank there).
 function ck(i,lv){var v=lv===3&&LOOKS?LOOKS.lo[i]|LOOKS.hi[i]<<8:NO_LOOK;return v===NO_LOOK?P.tax[i]:v;}
 function RUN(){return /(^|&)run=1(&|$)/.test(location.hash.slice(1));}
-function on(i){return SEL[i]&&LEVEL[i]&&(!R||R.pass(i,LEVEL[i]))&&(!X||X.pass(i))&&(!GP||GP.pass(i,KIND[i]))&&(!WW||KIND[i]!==3||WW.pass(i));}
+function on(i,all){return SEL[i]&&LEVEL[i]&&(!R||R.pass(i,LEVEL[i]))&&(!X||X.pass(i))&&(!GP||GP.pass(i,KIND[i],all))&&(!WW||KIND[i]!==3||WW.pass(i));}
 // Under My taxa first the user's genera lead each level, each kind in turn, then the rest; MINE: how many cards they are, -1 without the mode.
 function build(){
-  var n=P.n,W=2*NK*STEPS,c=new Uint32Array(6*W+1),key=new Uint16Array(n),rk=UF.ranked(),i,k,lv;
-  for(i=0;i<n;i++)if(on(i)){key[i]=LEVEL[i]*W+(rk&&UF.mine(i)?NK*STEPS:0)+(NK-1-SUB[i])*STEPS;c[key[i]+1]++;}
+  var n=P.n,W=2*NK*STEPS,c=new Uint32Array(6*W+1),key=new Uint16Array(n),rk=UF.ranked(),i,k,lv,u=0;
+  for(i=0;i<n;i++)if(on(i)){key[i]=LEVEL[i]*W+(rk&&UF.mine(i)?NK*STEPS:0)+(NK-1-SUB[i])*STEPS;c[key[i]+1]++;}else if(KIND[i]===3&&on(i,1))u++;  // u: level 3 past its Best x%
   for(k=1;k<c.length;k++)c[k]+=c[k-1];
   var at=c.slice(),order=new Int32Array(c[c.length-1]);
   for(k=0;k<n;k++){i=BYID[k];if(on(i))order[at[key[i]]++]=i;}
@@ -77,7 +77,7 @@ function build(){
     out[lv]=rows;total[lv]=b-a;
     for(k=0;rk&&k<rows.length&&UF.mine(rows[k]);k++);MINE[lv]=rk?k:-1;
   }
-  view=out;S.total=total;
+  view=out;S.total=total;S.all3=total[3]+u;
 }
 function looksOf(i){
   if(!LOOKS)return null;
@@ -216,7 +216,7 @@ function batch(){
   LINKS=rows.length?IdentifyLinks.batches(rows.map(function(i){return P.id[i];}),true):[];BI=0;
   $('batch').hidden=!rows.length;
   ONE=capped?'Identify the first '+nf.format(rows.length)+' on iNaturalist':null;
-  $('cap').textContent=LV===3?IdentifyNarrow.line(t,S.total[3],[GP&&GP.label(),GP&&GP.gaplabel(),R&&R.label(3)],RUN()?'all':'up to '+PER_SPECIES):
+  $('cap').textContent=LV===3?IdentifyNarrow.line(t,S.total[3],[GP&&RK&&GP.cut(S.all3),GP&&GP.gaplabel(),R&&R.label(3)],RUN()?'all':'up to '+PER_SPECIES):
     nf.format(t)+' cards (up to '+PER_SPECIES+' per species) · '+(capped?'first '+nf.format(rows.length):'all')+
     ' in '+LINKS.length+' batches of '+IdentifyLinks.BATCH+', in the order shown';
   $('go').title=(LV===3&&RUN()?'All':'Up to '+PER_SPECIES)+(LV===3?' per suggested species':' per species');
@@ -275,7 +275,7 @@ function kinds(){
   box.append(g);
 }
 function counts(){
-  [].forEach.call($('tabs').querySelectorAll('[data-lv]'),function(t){var n=S.total[+t.dataset.lv]||0,w=+t.dataset.lv===3&&GP&&RKW&&!RK&&GP.label();t.lastChild.textContent=w?'':nf.format(n);t.classList.toggle('zero',!n&&!w);});
+  [].forEach.call($('tabs').querySelectorAll('[data-lv]'),function(t){var n=S.total[+t.dataset.lv]||0,w=+t.dataset.lv===3&&GP&&RKW&&!RK&&GP.label();t.children[1].textContent=w?'':nf.format(n);t.lastChild.textContent=+t.dataset.lv===3&&RK&&GP.label()?' · '+GP.label().toLowerCase():'';t.classList.toggle('zero',!n&&!w);});
 }
 // An empty level here points at the levels that do have records, rather than a dead end.
 function empty(){
@@ -320,7 +320,7 @@ function tabs(){
   var box=$('tabs');
   CFG.levels.forEach(function(x){
     var t=el('button','tab'),n=el('b',null,'');t.type='button';t.id='tab'+x[0];t.dataset.lv=x[0];
-    t.dataset.explain=XK[x[0]];t.setAttribute('role','tab');t.setAttribute('aria-controls','panel');t.append(el('span',null,x[1]),n);
+    t.dataset.explain=XK[x[0]];t.setAttribute('role','tab');t.setAttribute('aria-controls','panel');t.append(el('span',null,x[1]),n,el('span','cut'));
     t.onclick=function(){if(P)choose(x[0]);};
     box.appendChild(t);
   });
@@ -373,7 +373,7 @@ function early(){
       return MapArea.inside(I,b[c[0]],b[c[1]]);}))&&FIRST.s[sel()]||null;
   if(s===SHOWN)return;SHOWN=s;P=s&&FIRST.P;
   if(!s){view=[];$('grid').textContent='';$('none').hidden=$('more').hidden=$('batch').hidden=true;
-    [].forEach.call($('tabs').querySelectorAll('[data-lv]'),function(t){t.lastChild.textContent='';});status('Loading all the records for this selection…');return;}
+    [].forEach.call($('tabs').querySelectorAll('[data-lv] b'),function(t){t.textContent='';});status('Loading all the records for this selection…');return;}
   // a tab of several kinds starts as its first kind's list (or the chosen kind's), its count their sum
   view=s.rows.slice();S.total=s.total.slice();KC=s.total.slice();MINE=[];
   Object.keys(CFG.merge).forEach(function(tb){var ks=CFG.merge[tb];
