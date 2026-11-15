@@ -229,13 +229,24 @@ def nav(
     *,
     base: str = "",
     extra: str = "",
+    menu: bool = False,
 ) -> str:
     """Skip link, brand and switcher with `current` marked. `available` lists the built pages.
 
     With `available=None` the page cannot know which optional pages exist, so the script drops
     the ones that answer 404. `base` prefixes the links of a page served from another folder.
     `extra` is html placed at the end of the header row (the split page's view switch and counts).
+    `menu` swaps the switcher for Identify's Help menu, so Explore's header reads as Identify's.
     """
+    if menu:
+        skip = {"explore.html"} | (OPTIONAL - (available or OPTIONAL))
+        return (
+            f'<a class="site-skip" href="#main-content" {_SKIP}>Skip to content</a>\n'
+            f'<div class="site-shell"><a class="site-brand" href="{escape(base)}index.html">'
+            f'What to ID<span class="site-bc">\u00a0· BC</span></a>{extra}'
+            f"{_help_menu(base, skip)}</div>\n"
+            f"<script>{CARRY}\n{HELP_JS}</script>\n" + explain()
+        )
     links = []
     here = EXPLORE if current in _EXPLORE_OF else current
     for page, label in PAGES:
@@ -312,17 +323,27 @@ if(r.ok)a.parentNode.hidden=false;else if(a.hasAttribute('data-drop'))a.parentNo
 """.strip()
 
 
-def help_bar(base: str = "") -> str:
-    """Skip link, wordmark and the Help menu, for the page that is the whole app (Identify)."""
+def _help_menu(base: str = "", skip: frozenset[str] | set[str] = frozenset()) -> str:
+    """The Help button and its list of the other pages, without the pages in `skip`."""
     items = "".join(
         f"<li{' hidden' if 'hidden' in flags else ''}>"
         f'<a href="{escape(base + page)}"{flags.replace(" hidden", "")}>{label}</a></li>'
         for page, label, flags in HELP_LINKS
+        if page not in skip
     )
     icon = (
         '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/>'
         '<path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7M12 17h.01"/></svg>'
     )
+    return (
+        f'<div class="hm"><button type="button" id="hmbtn" aria-expanded="false" '
+        f'aria-controls="hmenu">{icon}Help</button>'
+        f'<ul id="hmenu" aria-label="Help" hidden>{items}</ul></div>'
+    )
+
+
+def help_bar(base: str = "") -> str:
+    """Skip link, wordmark and the Help menu, for the page that is the whole app (Identify)."""
     return (
         f'<a class="site-skip" href="#main-content" {_SKIP}>Skip to content</a>\n'
         f'<div class="appbar"><div class="bl">'
@@ -330,8 +351,6 @@ def help_bar(base: str = "") -> str:
         'What to ID<span class="site-bc">\u00a0· BC</span></a>'
         '<span class="lng"><a lang="fr" href="#fr">Français</a><span aria-hidden="true"> | </span>'
         '<a lang="en" href="#en">English</a></span></div>'
-        f'<div class="hm"><button type="button" id="hmbtn" aria-expanded="false" '
-        f'aria-controls="hmenu">{icon}Help</button>'
-        f'<ul id="hmenu" aria-label="Help" hidden>{items}</ul></div></div>\n'
+        f"{_help_menu(base)}</div>\n"
         f"<script>{CARRY}\n{HELP_JS}</script>\n" + explain()
     )

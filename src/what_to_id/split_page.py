@@ -68,8 +68,7 @@ BAR = (
     f"{TREE_BUTTON}</span>"
     '<button type="button" class="infob" id="i" aria-expanded="false" aria-controls="note" '
     'aria-label="About this view"><svg viewBox="0 0 24 24" aria-hidden="true">'
-    '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.7'
-    'M12 17h.01"/></svg></button>'
+    '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/></svg></button>'
     '<p class="note" id="note" hidden>Show Identify, the map, the photo space and the taxonomy '
     "in any mix. "
     "The panes share one selection: change a filter in any and the others follow. Dates, months, "
@@ -99,8 +98,8 @@ def build(
     bar = BAR if has_tree else BAR.replace(TREE_BUTTON, "")
     bar = bar if has_identify else bar.replace(IDENTIFY_BUTTON, "").replace(BACK, "")
     for key, value in {
-        "__SITE_CSS__": page_nav.CSS,
-        "__SITE_NAV__": page_nav.nav(PAGE_NAME, pages, extra=bar),
+        "__SITE_CSS__": f"{page_nav.CSS}\n{page_nav.HELP_CSS}",
+        "__SITE_NAV__": page_nav.nav(PAGE_NAME, pages, extra=bar, menu=True),
         "__IDENTIFY_FILE__": json.dumps(identify_url if has_identify else None),
         "__MAP_FILE__": json.dumps(map_url),
         "__SPACE_FILE__": json.dumps(space_url),

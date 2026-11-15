@@ -22,6 +22,13 @@ def test_exactly_one_current_page(current):
     assert re.search(rf'href="{current}" aria-current="page"', html)
 
 
+def test_explore_header_carries_the_help_menu_in_place_of_the_switcher():
+    html = nav("explore.html", extra="<i id=bar></i>", menu=True)
+    assert 'class="site-nav"' not in html and 'id="hmbtn"' in html
+    assert html.index("id=bar") < html.index('id="hmbtn"')  # the bar, then Help at the row's end
+    assert 'href="terms.html"' in html and 'href="explore.html"' not in html
+
+
 @pytest.mark.parametrize(
     "current", ["explore.html", "map.html", "embeddings.html", "tree.html", "search.html"]
 )

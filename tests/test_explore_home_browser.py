@@ -160,7 +160,7 @@ def test_the_header_keeps_one_line_at_1280(browser, site):
     page = open_page(browser, f"{site[0]}/explore.html")
     map_frame(page)
     tops = page.evaluate(
-        "[...document.querySelectorAll('.site-nav, #xbar > *:not([hidden]):not(.note)')]"
+        "[...document.querySelectorAll('.site-brand, .hm, #xbar > *:not([hidden]):not(.note)')]"
         ".filter(e => e.offsetWidth).map(e => { const r = e.getBoundingClientRect();"
         " return Math.round(r.top + r.height / 2); })"
     )
