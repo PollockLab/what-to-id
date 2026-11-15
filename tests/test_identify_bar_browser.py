@@ -67,6 +67,25 @@ def test_a_group_row_filters_the_cards_and_the_segment_names_it(browser, site):
     assert page.inner_text("#bwhat b") == "Birds" and page.errors == []
 
 
+def test_the_groups_list_names_its_tab_and_the_tabs_count_when_they_differ(browser, site):
+    base, _ = site
+    # level 3's Best x% and per-species cap cut the fixture's cards; level 1 keeps them all
+    for lvl, name, cut in ((1, "Easy confirms", False), (3, "Narrow it down", True)):
+        page = ib.open_identify(browser, base, f"#lvl={lvl}", size=(1100, 800))
+        page.wait_for_function("__identify.ids().length > 0")
+        page.wait_for_load_state("networkidle")  # the rank and look files re-cut level 3
+        page.click("#bwhat")
+        page.wait_for_function(
+            f"document.getElementById('gscope').textContent.startsWith('In {name}')"
+        )
+        listed = sum(int(t.replace(",", "")) for t in page.locator("#groups .gc").all_inner_texts())
+        tab = int(page.inner_text(f"#tab{lvl} b").replace(",", ""))
+        assert (tab != listed) == cut
+        want = f"In {name}" + (f", before its own filters; the tab shows {tab:,}" if cut else "")
+        assert page.inner_text("#gscope") == want and page.errors == []
+        page.close()
+
+
 def test_a_preset_writes_the_dates_into_the_hash(browser, site):
     base, _ = site
     page = ib.open_identify(browser, base, "#lvl=1", size=(1100, 800))

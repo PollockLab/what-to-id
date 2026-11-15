@@ -50,6 +50,7 @@
 .bpanel .sugg{z-index:8;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);max-height:240px;overflow:auto}
 .bpanel p{margin:6px 0}
 .bpanel .gbar{margin:8px 0}
+.bpanel .gscope{margin:8px 0 0;font-size:12px}.gscope:empty{display:none}
 .bpanel .gl{max-height:46vh;overflow:auto}
 .bpanel .chips{display:flex;flex-wrap:wrap;gap:4px}
 .bpanel .chips button,.tseg button{border:1px solid var(--line);background:var(--chip);color:var(--ink);font:inherit;font-size:12px;padding:3px 9px;

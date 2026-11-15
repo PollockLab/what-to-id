@@ -71,7 +71,15 @@ function tally(){
   if(!ALLC){ALLC=new Uint32Array(G.length);for(i=0;i<P.n;i++)ALLC[P.grp[i]]++;}
   cats(c);return c;
 }
-function counts(){GL.set(tally());}
+function counts(){var c=tally();GL.set(c);scope(c);}
+// The groups list counts the chosen tab's records before the tab's own cuts (Best x%, range, per species): its line names the tab,
+// and the tab's count when that differs (blank while level 3 waits for its rank)
+function scope(c){
+  var t=o.tab(),n=0,j,b=[].filter.call(document.querySelectorAll('#tabs [data-lv]'),function(x){return I18N.raw(x.firstChild)===t.name;})[0],
+    k=b?b.lastChild.textContent.replace(/\D/g,''):'';
+  for(j=0;j<c.length;j++)n+=c[j];
+  $('gscope').textContent=t.name?'In '+t.name+(k&&+k!==n?', before its own filters; the tab shows '+o.nf.format(+k):''):'';
+}
 // the life-form row (above): drawn early or here, then live
 var CATS=null,MORE=null,ALLC=null;
 function cats(c){
