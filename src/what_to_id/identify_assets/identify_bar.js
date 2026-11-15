@@ -15,7 +15,41 @@ var IdentifyBar=(function(){
 var NAMES=['What','When','Where','Who'];
 function $(id){return document.getElementById(id);}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
-return function(o){
+function nm(META,g){return (META.names[g]||g).replace(/ \([^)]*\)$/,'');}
+// The life-form row above the bar: All, then one tab per group, largest first and the catch-alls last, then Combine. A tab is the group's icon
+// (iNaturalist's, group_icons.js) in its map colour, toned down; the strip under the row is every record on the page split
+// by group in the same order and colours, whatever is filtered, and a group picked or pointed at takes its full colour in
+// both. A tab or its segment shows its group alone and a second click clears it. Several groups, or leaving one out, are
+// the What panel's: Combine opens it and names how many it picked, and the row lights every group picked, strikes those left out.
+// IdentifyBar.row(META, allc (the records per group), nf, g0 (the one group picked, '' none)) draws it before the records land, from
+// the first lists' totals (pool_levels.py), its tabs disabled until the bar takes them; the bar draws it itself without.
+var REST=/^(Animalia|Unknown)$/,NS='http://www.w3.org/2000/svg',ROW=null;
+function cat(META,allc,g,j){
+  var b=el('button','cat'),v=document.createElementNS(NS,'svg'),p=document.createElementNS(NS,'path');
+  b.type='button';b.disabled=true;v.setAttribute('viewBox','0 0 512 512');v.setAttribute('aria-hidden','true');
+  p.setAttribute('d',GROUP_ICONS[g||'All']||GROUP_ICONS.Unknown);p.setAttribute('transform','translate(0 480) scale(1 -1)');v.appendChild(p);
+  if(g)b.style.setProperty('--c','rgb('+MapFilter.color(g,j).join(',')+')');
+  b.append(v,el('span',null,g?nm(META,g):'All'));
+  if(g){
+    var s=el('i');s.style.flexGrow=allc[j];s.dataset.k=nm(META,g);s.style.setProperty('--c',b.style.getPropertyValue('--c'));
+    $('mix').appendChild(s);
+    s.onmouseenter=function(){b.classList.add('hot');};s.onmouseleave=function(){b.classList.remove('hot');};
+    b.onmouseenter=b.onfocus=function(){s.classList.add('hot');};
+    b.onmouseleave=b.onblur=function(){s.classList.remove('hot');};
+  }
+  $('cats').appendChild(b);return {g:g,j:j,b:b,s:s};
+}
+function row(META,allc,nf,g0){
+  var G=META.groups,m=el('button','cat more'),cs=[cat(META,allc,null,-1)].concat(G.map(function(g,k){return k;}).sort(function(a,b){return REST.test(G[a])-REST.test(G[b])||allc[b]-allc[a]||a-b;}).map(function(k){return cat(META,allc,G[k],k);}));
+  cs.forEach(function(t){t.b.setAttribute('aria-pressed',String(t.g?t.g===g0:!g0));});
+  m.type='button';m.disabled=true;m.setAttribute('aria-controls','pwhat');m.setAttribute('aria-pressed','false');
+  m.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2.4"/><circle cx="15" cy="17" r="2.4"/></svg><span>Combine</span>';
+  $('cats').after(m);  // outside the scroller, always in reach
+  $('mixn').textContent=nf.format(META.n)+' records to identify';
+  var over=function(){var c=$('cats');c.classList.toggle('over',c.scrollWidth>c.clientWidth+1);};over();addEventListener('resize',over);
+  return (ROW={cats:cs,more:m});
+}
+function make(o){
 var S=o.S,META=o.META,MF=o.mf,G=META.groups,LAST=MF.LAST,iso=MF.iso,bar=$('bar'),SH=$('bsheet'),phone=matchMedia('(max-width:760px)'),
   SEG=NAMES.map(function(n){var b=$('b'+n.toLowerCase());return {b:b,p:$('p'+n.toLowerCase()),l:b.querySelector('b')};}),
   cur=-1,CUM=null,SUB=null,TC,TOT=null,GM=null,A=null,ACC=[];
@@ -38,38 +72,15 @@ function tally(){
   cats(c);return c;
 }
 function counts(){GL.set(tally());}
-// The life-form row above the bar: All, then one tab per group, largest first and the catch-alls last, then Combine. A tab is the group's icon
-// (iNaturalist's, group_icons.js) in its map colour, toned down; the strip under the row is every record on the page split
-// by group in the same order and colours, whatever is filtered, and a group picked or pointed at takes its full colour in
-// both. A tab or its segment shows its group alone and a second click clears it. Several groups, or leaving one out, are
-// the What panel's: Combine opens it and names how many it picked, and the row lights every group picked, strikes those left out.
-var CATS=null,MORE=null,REST=/^(Animalia|Unknown)$/,ALLC=null,NS='http://www.w3.org/2000/svg';
-function cat(g,j){
-  var b=el('button','cat'),v=document.createElementNS(NS,'svg'),p=document.createElementNS(NS,'path');
-  b.type='button';v.setAttribute('viewBox','0 0 512 512');v.setAttribute('aria-hidden','true');
-  p.setAttribute('d',GROUP_ICONS[g||'All']||GROUP_ICONS.Unknown);p.setAttribute('transform','translate(0 480) scale(1 -1)');v.appendChild(p);
-  if(g)b.style.setProperty('--c','rgb('+MapFilter.color(g,j).join(',')+')');
-  b.append(v,el('span',null,g?short(g):'All'));
-  if(g){
-    var s=el('i');s.style.flexGrow=ALLC[j];s.dataset.k=short(g);s.style.setProperty('--c',b.style.getPropertyValue('--c'));
-    $('mix').appendChild(s);
-    s.onmouseenter=function(){b.classList.add('hot');};s.onmouseleave=function(){b.classList.remove('hot');};
-    b.onmouseenter=b.onfocus=function(){s.classList.add('hot');};
-    b.onmouseleave=b.onblur=function(){s.classList.remove('hot');};
-  }
-  b.onclick=function(){var only=g&&S.groups[g]==='inc'&&Object.keys(S.groups).length===1;S.groups={};if(g&&!only)S.groups[g]='inc';o.changed();};
-  if(s)s.onclick=b.onclick;
-  $('cats').appendChild(b);return {g:g,j:j,b:b,s:s};
-}
+// the life-form row (above): drawn early or here, then live
+var CATS=null,MORE=null,ALLC=null;
 function cats(c){
   var all=o.P().n||1;
   if(!CATS){
-    CATS=[cat(null,-1)].concat(G.map(function(g,k){return k;}).sort(function(a,b){return REST.test(G[a])-REST.test(G[b])||ALLC[b]-ALLC[a]||a-b;}).map(function(k){return cat(G[k],k);}));
-    MORE=el('button','cat more');MORE.type='button';MORE.setAttribute('aria-controls','pwhat');
-    MORE.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2.4"/><circle cx="15" cy="17" r="2.4"/></svg><span></span>';
-    MORE.onclick=function(){$('bwhat').click();};$('cats').after(MORE);  // outside the scroller, always in reach
-    $('mixn').textContent=o.nf.format(all)+' records to identify';
-    var over=function(){var c=$('cats');c.classList.toggle('over',c.scrollWidth>c.clientWidth+1);};over();addEventListener('resize',over);
+    var r=ROW||row(META,ALLC,o.nf,'');CATS=r.cats;MORE=r.more;MORE.disabled=false;MORE.onclick=function(){$('bwhat').click();};
+    CATS.forEach(function(t){var g=t.g;t.b.disabled=false;
+      t.b.onclick=function(){var only=g&&S.groups[g]==='inc'&&Object.keys(S.groups).length===1;S.groups={};if(g&&!only)S.groups[g]='inc';o.changed();};
+      if(t.s)t.s.onclick=t.b.onclick;});
   }
   var picked=Object.keys(S.groups),multi=picked.length>1||picked.some(function(g){return S.groups[g]==='not';});
   MORE.lastChild.textContent=multi?picked.length+' groups':'Combine';MORE.setAttribute('aria-pressed',String(multi));
@@ -119,7 +130,7 @@ if(!o.embedded){
 }
 
 // The segments' words
-function short(g){return (META.names[g]||g).replace(/ \([^)]*\)$/,'');}
+function short(g){return nm(META,g);}
 function many(a,n){return a.length===1?short(a[0]):a.length+' '+n;}
 function taxon(p){var r=o.taxa().filter(function(t){return t[2]===p.id;})[0];return (p.not?'not ':'')+(r?r[1]||r[0]:'1 taxon');}
 function what(){
@@ -224,5 +235,7 @@ function update(){
   SEG.forEach(function(s,k){if(!s.b.hidden)fill(k);});
 }
 return {update:update};
-};
+}
+make.row=row;
+return make;
 })();

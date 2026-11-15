@@ -360,7 +360,7 @@ function firstOf(F){
     var out=r.map(function(x){var i=id.length;id.push(x[0]);tax.push(x[1]);lk.push(x[2]);if(x[3])MORE.set(i,x[3]);return i;});
     out.n=s.n[lv];return out;});});
   F.P={id:id,tax:tax,n:id.length};TAXA=I18N.taxa(F.taxa,F.fr);LOOKS={names:F.looks,lo:lk,hi:new Uint8Array(id.length)};  // lo holds the whole index
-  FIRST=F;early();
+  FIRST=F;if(F.groups)IdentifyBar.row(META,F.groups,nf,/^groups=[^&]*$/.test(sel())&&F.s[sel()]?decodeURIComponent(sel().slice(7)):'');early();  // the life-form row with the first cards
 }
 // The first list of the selection while the records load, when it is one built (no filter or one group) with no area, lasso,
 // photo search or range toggle, and a map view that takes in every record: the split view's map posts its view on load,
@@ -426,9 +426,9 @@ function looks(buf,why){
 }
 async function load(){
   status('Reading the map data…');
-  var drawn_=new Promise(function(ok){if(!CFG.first)return ok();setTimeout(ok,2000);  // the bulk files wait for the first cards' paint, or 2 s
-    get(new URL(CFG.first,MAP)).then(function(b){if(!MF)firstOf(JSON.parse(new TextDecoder().decode(b)));}).catch(function(){}).then(ok);});  // optional
-  META=await L.fetchMapMeta(MAP,fetch);
+  var mp=L.fetchMapMeta(MAP,fetch),drawn_=new Promise(function(ok){if(!CFG.first)return ok();setTimeout(ok,2000);  // the bulk files wait for the first cards' paint, or 2 s
+    Promise.all([get(new URL(CFG.first,MAP)),mp]).then(function(b){if(!MF)firstOf(JSON.parse(new TextDecoder().decode(b[0])));}).catch(function(){}).then(ok);});  // optional
+  META=await mp;
   WW=IdentifyWWW({value:META.value,taxa:function(){return TAXA;},look:looksOf,redraw:function(){if(P)redraw();}});
   function file(k){var f=META.files[k];return f?get(new URL(f,MAP)):Promise.reject(new Error('the map lists no '+k+' file'));}
   await drawn_;

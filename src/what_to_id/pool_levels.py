@@ -45,9 +45,10 @@ the file is not written; the levels are.
 `identify_app.js` builds for no filter (``""``) and for each one group (``"groups=Aves"``, as
 MapFilter writes it), with no area, view or taxa and the range file's default (Clear matches leave
 out records far outside). Gzipped JSON ``{"bbox": META.bbox, "taxa": [[latin, common, taxon id],
-...], "looks": [...], "s": {state: {"total": [...], "n": [...], "rows": [...]}}}``, per level 0..5:
-the records in it, the cards after the per-species cut, and the first FIRST_ROWS cards as ``[id,
-taxa index (65535 none), looks index (65535 none), how many more of its taxon the cut left out]``.
+...], "looks": [...], "groups": [records per META.groups entry], "s": {state: {"total": [...],
+"n": [...], "rows": [...]}}}``, per level 0..5: the records in it, the cards after the per-species
+cut, and the first FIRST_ROWS cards as ``[id, taxa index (65535 none), looks index (65535 none), how
+many more of its taxon the cut left out]``. Identify draws the life-form row from ``groups``.
 
 ``pool-taxa-fr.bin`` (``--fr``, the cache `taxonomy --fr` fills): gzipped JSON ``{taxon id: French
 common name}`` for taxa whose French name differs from the English one (META.files.taxa_fr), and
@@ -446,6 +447,8 @@ def pack_first(site, ids, tax, taxa, level, q, looks, far, names=None) -> bytes:
                 ]
             )
     head = {"bbox": meta["bbox"], "taxa": [taxa[t][:3] for t in tx], "looks": list(nm), "s": out}
+    ng = len(meta["groups"])
+    head["groups"] = np.bincount(grp[grp < ng], minlength=ng).tolist()  # Identify's life-form row
     if names:
         head["fr"] = {k: names[k] for k in names.keys() & {str(taxa[t][2]) for t in tx}}
     return gzip.compress(json.dumps(head, separators=(",", ":")).encode(), mtime=0)

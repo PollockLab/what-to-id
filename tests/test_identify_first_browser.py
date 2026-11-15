@@ -19,11 +19,15 @@ site = ib.site
 open_identify = ib.open_identify
 
 
-def first_lists(base):
+def first_file(base):
     with urllib.request.urlopen(f"{base}/{site_files.MAP_NAME}") as r:
         name = site_files.read_meta(r.read().decode())["files"]["first"]
     with urllib.request.urlopen(f"{base}/{name}") as r:
-        return json.loads(gzip.decompress(r.read()))["s"]
+        return json.loads(gzip.decompress(r.read()))
+
+
+def first_lists(base):
+    return first_file(base)["s"]
 
 
 @pytest.mark.parametrize("hash_", ["", "#groups=Aves"])
@@ -60,7 +64,8 @@ def cards(page):
 
 def test_the_first_cards_show_before_the_records_and_stay_when_they_land(browser, site):
     base, _ = site
-    first = first_lists(base)
+    head = first_file(base)
+    first = head["s"]
     page = browser.new_page(viewport={"width": 380, "height": 800})
     page.errors = []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
@@ -74,6 +79,11 @@ def test_the_first_cards_show_before_the_records_and_stay_when_they_land(browser
     assert any(c[2] for c in early)  # a cut species offers the rest of its records
     assert "loading all" in page.locator("#status").inner_text()
     assert page.evaluate("window.__identify") is None and held
+    # the life-form row comes with the first cards (the first file's group totals)
+    row = "[...document.querySelectorAll('#cats .cat')].map(b => [b.textContent, b.ariaPressed])"
+    tabs = page.evaluate(row)
+    assert len(tabs) == len(head["groups"]) + 1 and tabs[0] == ["All", "true"]
+    assert page.locator("#cats .cat:disabled").count() == len(tabs)
     page.evaluate("location.hash = 'groups=Aves&lvl=1'")  # another first list
     aves = first["groups=Aves"]["rows"][1][0][0]
     page.wait_for_function(f"+document.querySelector('#grid .card').dataset.id === {aves}")
@@ -91,6 +101,7 @@ def test_the_first_cards_show_before_the_records_and_stay_when_they_land(browser
         r.continue_()
     page.wait_for_function("window.__identify")
     page.wait_for_selector("#grid .card .ph img")
+    assert page.evaluate(row) == tabs and page.locator("#cats .cat:disabled").count() == 0
     assert cards(page) == drawn and page.evaluate("scrollY") == y  # the same cards, where they were
     assert page.locator("#status").inner_text().startswith("2,100 ")
     assert page.errors == []
