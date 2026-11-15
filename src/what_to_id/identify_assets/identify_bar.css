@@ -103,8 +103,8 @@
 @media (max-width:760px){
   .catrow{margin-top:6px}
   .mixrow{flex-wrap:wrap;row-gap:3px;min-height:24px}.mix{flex-basis:100%}.mixn{margin-left:auto}
-  .bseg{flex-wrap:wrap;border-radius:26px}  /* two rows: a pill's round ends would crowd the labels */
-  .seg1{flex:1 1 45%;padding:8px 12px;border-radius:20px}
+  .bseg{flex-wrap:wrap;border-radius:20px}  /* two rows: a pill's round ends would crowd the labels */
+  .seg1{flex:1 1 45%;padding:8px 12px;border-radius:12px}
   .seg1 b{font-size:13px}
   dialog.sheet#bsheet{width:100vw;height:100dvh;max-width:100vw;max-height:100dvh;margin:0;border-radius:0}
 }
