@@ -2,7 +2,7 @@
 // of cards under one tab per level. The selection is the map's: MapFilter's keep and rest over the pool shards, the group chips' verdict,
 // the area and the lasso's ids (SpaceMask). Up to PER_SPECIES cards per species, best first, are drawn at view time;
 // their photos come from iNaturalist 200 ids to a request as the cards are drawn, a batch at a time as the list scrolls.
-// With the study (CFG.study) a Batches tab comes first and is the default: it draws the study's batches (identify_study.js)
+// With the study (CFG.study, the URL of the one file every viewer fetches) a Batches tab comes first and is the default: it draws the study's batches (identify_study.js)
 // as the same cards, pool or not, and a viewer signed in with iNaturalist (identify_inat.js) can post an ID from a card.
 (function(){
 'use strict';
@@ -13,7 +13,7 @@ function one(id){return OBS+id+'#comment-id-tabs';}
 var CARD=IdentifyCard({ref:function(n){return CMP?CMP.ref(n):Promise.resolve(null);}}),TAB=[],SUBK=[],NK=1,KIND=null,SUB=null,KF=0,KC=[],UF=null,UON=false,MINE=[],CMP=null,BT=false,ST=null,SK='',IN=IdentifyInat(CFG.oauth);
 // CFG.merge: the kinds (levels) a tab shows, in order; SUBK a kind's place in its tab
 Object.keys(CFG.merge).forEach(function(t){CFG.merge[t].forEach(function(k,j){TAB[k]=+t;SUBK[k]=j;});NK=Math.max(NK,CFG.merge[t].length);});
-var META=null,SYNC=null,MORE=new Map(),TAXA=null,P=null,BYID=null,LEVEL=null,Q=null,LOOKS=null,WHY=null,WHYF=null,RK=null,N3=0,GP=null,R=null,MF=null,TF=null,PEND=null,OX=null,PIDS=null,REC=-1,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,ONE='',CACHE=new Map(),KEPT=[],PT=0,GO=false,FIRST=null,SHOWN,STAY=false,X=null,WW=null,BAR=null;
+var SP=null,META=null,SYNC=null,MORE=new Map(),TAXA=null,P=null,BYID=null,LEVEL=null,Q=null,LOOKS=null,WHY=null,WHYF=null,RK=null,N3=0,GP=null,R=null,MF=null,TF=null,PEND=null,OX=null,PIDS=null,REC=-1,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,ONE='',CACHE=new Map(),KEPT=[],PT=0,GO=false,FIRST=null,SHOWN,STAY=false,X=null,WW=null,BAR=null;
 var RKF=function(){},LKF=RKF,RKW=true;  // fetch rank (level 3) / look-alikes (levels 2, 3, 5, Batches, Compare) once; level 3's count waits for the rank under Best x%
 function $(id){return document.getElementById(id);}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
@@ -230,11 +230,13 @@ function step(d){
   $('prev').hidden=$('next').hidden=LINKS.length<2;
   $('prev').disabled=BI===0;$('next').disabled=BI>=LINKS.length-1;
 }
+function study(){return SP=SP||fetch(CFG.study).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();}).then(function(d){
+  return ST=IdentifyStudy.tab({data:d,draw:drawIds,count:function(){},active:function(){return BT;},track:function(n){track('study-'+n);}});});}
 // Draws the chosen level from its first card; STAY (the records replacing the first list) keeps the cards drawn and the scroll.
 function paint(){
   if(BAR)BAR.update();
   [].forEach.call($('tabs').children,function(t){var on=BT?!t.dataset.lv:+t.dataset.lv===LV;t.setAttribute('aria-selected',on);t.tabIndex=on?0:-1;});
-  if(BT){LKF();ST.show();return;}
+  if(BT){LKF();study().then(function(t){if(BT)t.show();},function(e){status('Could not load the batches: '+e.message,1);});return;}
   var x=CFG.levels.filter(function(l){return l[0]===LV;})[0];
   $('desc').textContent=x[2];kinds();$('panel').setAttribute('aria-labelledby','tab'+LV);
   var y=scrollY,cs=[].slice.call($('grid').children),rows=view[LV]||[],k=0,m=0,t=++PT;shown=STAY?Math.max(LIMIT,drawn):LIMIT;
@@ -488,8 +490,6 @@ var KD=/(?:^|&)kind=(\d)/.exec(location.hash.slice(1));KF=KD&&TAB[+KD[1]]?+KD[1]
 function start(){
   tabs();inbox();IdentifyProgress($('prog'),$('today'));IdentifyFlow.keys({level:function(){return BT?0:LV;},more:function(){shown+=LIMIT;more();}});
   if(CFG.study){
-    ST=IdentifyStudy.tab({data:CFG.study,draw:drawIds,count:function(){},
-      active:function(){return BT;},track:function(n){track('study-'+n);}});
     signin();
     // Batches only when the link names them (#lvl=b), never as the default
     if(!/(?:^|&)record=/.test(location.hash.slice(1))&&/(?:^|&)lvl=b(?:&|$)/.test(location.hash.slice(1))){mode(true);paint();}

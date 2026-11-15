@@ -131,11 +131,11 @@ def render(
     dates: dict | None = None,
     first: str | None = None,
     goatcounter: str | None = None,
-    study: dict | None = None,
+    study: str | None = None,
 ) -> str:
     """The page; `dates` is `pool_levels.scoring_dates` output, for the About; `first` the URL of
     the first cards beside the map, None without them; `goatcounter` a GoatCounter site code,
-    None for no counting; `study` page_rotation's study.json, None for no Batches tab."""
+    None for no counting; `study` the URL of the study file, None for no Batches tab."""
     photos, scored = _day((dates or {}).get("photos")), _day((dates or {}).get("scored"))
     when = f"Photos downloaded on {photos}" if photos else ""
     if scored:
@@ -166,7 +166,7 @@ def render(
                 "merge": MERGE,
                 "kinds": KINDS,
                 "first": first,
-                "study": study and {k: study[k] for k in ("build", "day", "names", "lists")},
+                "study": study and urljoin(map_url, study),
                 "oauth": {"client": INAT_CLIENT_ID, "redirect": INAT_REDIRECT},
             }
         ).replace("<", "\\u003c"),
@@ -181,6 +181,20 @@ def render(
     return html
 
 
+def _publish_study(out: Path, study: dict) -> str:
+    """The study less its methods as one hashed file, the same bytes for every viewer; its name."""
+    blob = json.dumps(
+        {k: study[k] for k in ("build", "day", "names", "lists")}, separators=(",", ":")
+    ).encode()
+    if (
+        out / site_files.MAP_NAME
+    ).exists():  # listed in META.files, so `keep` carries it across deploys
+        return site_files.publish(out, "study", "study.json", blob).name
+    name = site_files.hashed("study.json", blob)
+    (out / name).write_bytes(blob)
+    return name
+
+
 def build(
     out_dir: str | Path,
     map_url: str = "map.html",
@@ -193,12 +207,13 @@ def build(
     target = out / PAGE_NAME
     dates = out / DATES_NAME
     first = (out / site_files.MAP_NAME).exists() and site_files.path(out, "first")
+    name = study and _publish_study(out, read_study(study))
     html = render(
         map_url,
         json.loads(dates.read_text()) if dates.exists() else None,
         first.name if first else None,
         goatcounter,
-        read_study(study) if study else None,
+        name,
     )
     target.write_text(html)
     return target

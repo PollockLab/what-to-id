@@ -355,13 +355,22 @@ def _config(html):
     return json.loads(re.search(r"var IDENTIFY_CONFIG=(\{.*?\});</script>", html).group(1))
 
 
-def test_identify_embeds_the_lists_but_not_the_fold_and_refuses_a_leak(tmp_path):
+def test_identify_names_one_hashed_study_file_without_the_fold_and_refuses_a_leak(tmp_path):
     from what_to_id import page_identify
 
     path = write_study(tmp_path, _manifest())
     html = page_identify.build(tmp_path, study=path).read_text()
     cfg = _config(html)
-    assert set(cfg["study"]) == {"build", "day", "names", "lists"}
+    assert re.fullmatch(r"study\.[0-9a-f]{12}\.json", cfg["study"])
+    assert set(json.loads((tmp_path / cfg["study"]).read_text())) == {
+        "build",
+        "day",
+        "names",
+        "lists",
+    }
+    assert (
+        page_identify.build(tmp_path, study=path).read_text() == html
+    )  # same file for every build
     assert 'href="terms.html#study"' in html and 'id="sgrid"' in html
     _assert_blind(html)
     assert _config(page_identify.render())["study"] is None
