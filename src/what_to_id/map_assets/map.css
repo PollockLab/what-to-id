@@ -10,6 +10,9 @@ header{grid-area:head;padding:10px 16px;border-bottom:1px solid var(--line);disp
 .embed header{padding:6px 12px}
 .embed .share{display:inline;margin-left:8px}
 @media (max-width:560px){.embed .share{display:none}}  /* a narrow pane: the map keeps the room, Explore's bar has the counts */
+.embed header{container-type:inline-size}
+/* room for the count and both switches on one line, not for the sentence too: it takes the next line */
+@container (min-width:600px) and (max-width:1180px){.embed .stat{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}.embed .share{order:1;flex:1 1 100%;margin-left:0}}
 .embed .time{padding:4px 12px 6px}
 .embed .unit,.embed .hint{display:none}
 .embed #over{height:26px}
