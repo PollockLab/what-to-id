@@ -58,9 +58,9 @@ def build(out_dir: str | Path, map_url: str = "map.html") -> Path:
     html = (ASSETS / PAGE_NAME).read_text()
     for key, value in {
         "__TREE_CONFIG__": config,
-        "__SITE_CSS__": page_nav.CSS,
+        "__SITE_CSS__": f"{page_nav.CSS}\n{page_nav.HELP_CSS}",
         "__SELECT_CSS__": (HERE / "map_assets" / "map_select.css").read_text(),
-        "__SITE_NAV__": page_nav.nav(PAGE_NAME),
+        "__SITE_NAV__": page_nav.nav(PAGE_NAME, menu=True),
     }.items():
         html = html.replace(key, value)
     for key, path in SCRIPTS.items():

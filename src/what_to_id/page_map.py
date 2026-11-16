@@ -238,8 +238,10 @@ def render_map(meta: dict, *, freeze: str | None, data_url: str | None = None) -
         "MAPLIBRE_CSS": MAPLIBRE_CSS,
         "MAPLIBRE_JS": MAPLIBRE_JS,
         "DECK_JS": DECK_JS,
-        "CSS": "\n".join((page_nav.CSS, _assets(MAP_CSS), _assets(SHARED_CSS, _PKG))),
-        "NAV": page_nav.nav("map.html"),
+        "CSS": "\n".join(
+            (page_nav.CSS, page_nav.HELP_CSS, _assets(MAP_CSS), _assets(SHARED_CSS, _PKG))
+        ),
+        "NAV": page_nav.nav("map.html", menu=True),
         "META": dump(page_meta),
         "BASEMAPS": json.dumps(BASEMAPS, sort_keys=True),
         "JS": _assets(SHARED_JS, _PKG) + "\n" + _assets(MAP_JS),
