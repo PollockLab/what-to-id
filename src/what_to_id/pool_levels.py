@@ -455,14 +455,16 @@ def pack_first(site, ids, tax, taxa, level, q, looks, far, names=None) -> bytes:
 
 
 def scoring_dates(manifest: dict) -> dict:
-    """{"photos", "scored"} as YYYY-MM-DD (or None) from the atlas manifest, for the About."""
+    """{"photos", "scored", "updated"} as YYYY-MM-DD (or None) from the atlas manifest."""
     entry = manifest.get("identify", {})
     source = entry.get("emb") or manifest.get("model", {}).get("source", "")
     photos = re.search(r"\d{4}-\d{2}-\d{2}", str(source))
-    scored = str(entry.get("built_at", ""))[:10]
+    # built_at is the full scoring run, delta_at the last daily run that scored the new photos
+    scored, updated = (str(entry.get(k, ""))[:10] for k in ("built_at", "delta_at"))
     return {
         "photos": photos.group() if photos else None,
         "scored": scored if re.fullmatch(r"\d{4}-\d{2}-\d{2}", scored) else None,
+        "updated": updated if re.fullmatch(r"\d{4}-\d{2}-\d{2}", updated) else None,
     }
 
 

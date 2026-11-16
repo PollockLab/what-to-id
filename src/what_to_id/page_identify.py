@@ -143,6 +143,11 @@ def render(
     when = f"Photos downloaded on {photos}" if photos else ""
     if scored:
         when = f"{when}, scored on {scored}" if when else f"Scored on {scored}"
+    updated = _day((dates or {}).get("updated"))
+    if (
+        when and updated
+    ):  # the daily run: without it the page reads as last touched on the dates above
+        when = f"{when}. Updated daily with new records, last on {updated}"
     html = (ASSETS / PAGE_NAME).read_text()
     # the page fetches these same origin with default credentials: as=fetch crossorigin matches
     preload = "".join(

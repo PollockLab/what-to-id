@@ -14,6 +14,8 @@ function C(n){return n.replace('.',',');}
 function G(n){return T(n);}  // a group or level name inside a longer line
 var DL=" Photos downloaded on ",SC="Scored on ";
 function when(s){
+  var u=/^(.*\.) Updated daily with new records, last on (.+)\.$/.exec(s);
+  if(u)return when(u[1])+' Mise à jour quotidienne avec les nouvelles observations, la dernière le '+D(u[2])+'.';
   var m=/^ Photos downloaded on (.+), scored on (.+)\.$/.exec(s);if(m)return ' Photos téléchargées le '+D(m[1])+', évaluées le '+D(m[2])+'.';
   m=/^ Photos downloaded on (.+)\.$/.exec(s);if(m)return ' Photos téléchargées le '+D(m[1])+'.';
   m=/^ Scored on (.+)\.$/.exec(s);return m?' Évaluées le '+D(m[1])+'.':s;
