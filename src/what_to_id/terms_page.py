@@ -38,6 +38,11 @@ LABELS = {
         "level-" + re.sub("[^a-z]+", "-", name.lower()).strip("-"): name
         for _, name, _ in page_identify.LEVELS
     },
+    # keys from the earlier five levels: the first is a tab, the rest Might be wrong's kinds
+    "level-clear-matches": page_identify.LEVELS[0][1],
+    "level-might-be-mislabelled": "Likely mislabelled",
+    "level-odd-shots": "Odd shots",
+    "level-close-calls": "Close calls",
 }
 GROUPS = {
     "Records": [
@@ -46,7 +51,11 @@ GROUPS = {
         *("location-hidden", "location-uncertain", "location-accuracy"),
         *("observed", "uploaded", "introduced", "threatened", "agreeing-ids"),
     ],
-    "Levels": ["levels", *(k for k in GLOSSARY if k.startswith("level-"))],
+    "Levels": [  # the tabs in Identify's order, each kind under its tab
+        *("levels", "level-clear-matches", "level-might-be-wrong"),
+        *("level-might-be-mislabelled", "level-odd-shots", "level-close-calls"),
+        "level-narrow-it-down",
+    ],
     "Map filters": [
         *(
             "your-selection",

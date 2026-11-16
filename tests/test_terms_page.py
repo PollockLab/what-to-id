@@ -23,6 +23,8 @@ def test_every_glossary_key_is_one_anchor_in_one_group():
         assert f'<dt id="{key}">' in html
     assert html.count("<dt id=") == len(GLOSSARY)
     assert "Needs ID</dt>" in html and "Narrow it down</dt>" in html
+    # the level terms carry the names Identify shows, not their keys
+    assert "Easy confirms</dt>" in html and ">Level " not in html
 
 
 def test_labels_read_id_as_ID_and_match_the_page():
