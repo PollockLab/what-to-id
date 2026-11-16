@@ -15,7 +15,7 @@ function box(a){
       b[0]=Math.min(b[0],r[k+1]);b[1]=Math.min(b[1],r[k]);b[2]=Math.max(b[2],r[k+1]);b[3]=Math.max(b[3],r[k]);}});
     return b[0]<=b[2]?b:null;}catch(e){return null;}
 }
-return function(ctx){
+function make(ctx){
   var T=ctx.taxa,tax=ctx.P.tax,species=new Set(),memo=new Map(),on=/(?:^|&)rg=none(?:&|$)/.test(location.hash.slice(1)),
     have=null,key='',bad='',err='',run=0,capped=false,SEG,note,
     api=inatGate({say:function(t){note.textContent=t;}});
@@ -88,5 +88,6 @@ return function(ctx){
         ' Only the first '+nf.format(CAP*PER)+' species with one were read, so some listed here may have one.':''));
     }
   };
-};
+}
+make.box=box;return make;
 })();
