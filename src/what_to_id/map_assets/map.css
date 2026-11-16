@@ -15,6 +15,7 @@ header{grid-area:head;padding:10px 16px;border-bottom:1px solid var(--line);disp
 @container (min-width:600px) and (max-width:1180px){.embed .stat{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}.embed .share{order:1;flex:1 1 100%;margin-left:0}}
 .embed .time{padding:4px 12px 6px}
 .embed .unit,.embed .hint{display:none}
+.embed .reset{display:none}  /* the host page has Clear filters */
 .embed #over{height:26px}
 .embed .months button{min-width:32px;min-height:24px;padding:1px 0;font-size:11px}
 /* embedded in Explore, the filters are a rail left of the map, full height; folded, a strip with a Filters
