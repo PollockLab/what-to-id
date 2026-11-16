@@ -274,7 +274,7 @@ function kinds(){
   box.append(g);
 }
 function counts(){
-  [].forEach.call($('tabs').querySelectorAll('[data-lv]'),function(t){var lv=+t.dataset.lv,n=S.total[lv]||0,L=lv===3&&(GP||IdentifyGaps).label(),w=L&&(!GP||RKW&&!RK);t.children[1].textContent=w?'':I18N.cf.format(n);t.children[1].title=w?'':nf.format(n);t.lastChild.textContent=L&&(RK||!GP)?' · '+L.toLowerCase():'';t.classList.toggle('zero',!n&&!w);});
+  [].forEach.call($('tabs').querySelectorAll('[data-lv]'),function(t){var lv=+t.dataset.lv,n=S.total[lv]||0,L=lv===3&&(GP||IdentifyGaps).label(),w=L&&(!GP||RKW&&!RK);t.children[1].textContent=w?'…':I18N.cf.format(n);t.children[1].title=w?'':nf.format(n);t.lastChild.textContent=L&&(RK||!GP)?' · '+L.toLowerCase():'';t.classList.toggle('zero',!n&&!w);});
 }
 // An empty level here points at the levels that do have records, rather than a dead end.
 function empty(){
@@ -433,7 +433,7 @@ async function load(){
   var taxa=Promise.all([get(new URL(META.taxa,MAP)),I18N.lang==='fr'&&META.files.taxa_fr?file('taxa_fr').catch(function(){return null;}):null]).then(function(r){return I18N.taxa(JSON.parse(new TextDecoder().decode(r[0])),r[1]&&JSON.parse(new TextDecoder().decode(r[1])));});
   var shards=Promise.all(META.shards.map(function(s){return get(new URL(s.file,MAP)).then(function(b){return L.decodeShard(b,s.n);});}));
   var lev=file('levels'),lkp=null,rkp=null,rg=file('range').catch(function(){return null;});  // optional: no range maps without it
-  function lk(){return lkp||(lkp=file('looks').catch(function(){return null;}));}function rk(){return rkp||(rkp=file('rank').catch(function(){return null;}).then(function(b){RKW=false;return b;}));}  // optional: level 3 by score bucket without it
+  function lk(){return lkp||(lkp=file('looks').catch(function(){return null;}));}function rk(){return rkp||(rkp=file('rank').catch(function(){return null;}));}  // optional: level 3 by score bucket without it
   function rank(b){var m=0,j,k=0,r;for(j=0;j<P.n;j++)if(KIND[j]===3)m++;if(!b||b.byteLength!==4*m)return false;b=new Uint8Array(b);r=new Uint32Array(P.n);for(j=0;j<P.n;j++)if(KIND[j]===3){r[j]=(b[k]|b[m+k]<<8|b[2*m+k]<<16|b[3*m+k]<<24)>>>0;k++;}RK=r;N3=m;return true;}  // byte planes of the level-3 records only
   if(!FIRST)status('Downloading the records…');
   var d=await Promise.all([shards,taxa,lev,saved()===3?rk():null]);  // level 3 opens on its rank
@@ -458,7 +458,7 @@ async function load(){
   OX=IdentifyOnly({META:META,mf:MF,P:function(){return P;},taxa:function(){return TAXA;},range:function(){return R;},rewrite:rewrite,changed:refresh,embedded:parent!==window,get:function(f){return get(new URL(f,MAP));}});
   BAR=IdentifyBar({rewrite:rewrite,S:S,META:META,mf:MF,nf:nf,taxa:function(){return TAXA;},P:function(){return P;},tf:function(){return TF;},mask:atLevel,all:kept,tab:function(){var l=CFG.levels.filter(function(x){return x[0]===LV;})[0];return {name:l?l[1]:'',has:function(i){return LV===6||(LV?LEVEL[i]===LV:LEVEL[i]>0);}};},changed:put,blocked:function(){return !!(AREA||VIEW||KEEPIDS||SUBIDS||PIDS||UF.active());},
     where:where,get:function(u){return get(new URL(u,MAP));},map:MAP,key:key,embedded:parent!==window});
-  RKF=function(){if(RK||rkp)return;LKF();Promise.all([rk(),lk()]).then(function(d){if(rank(d[0]))LV===3?redraw(true):(build(),counts());});};
+  RKF=function(){if(RK||rkp)return;LKF();Promise.all([rk(),lk()]).then(function(d){var ok=rank(d[0]);RKW=false;ok&&LV===3?redraw(true):(build(),counts());});};  // the count waits until the rank is read, not just fetched
   LKF=function(){if(lkp)return;lk().then(function(b){if(!b)return;LOOKS=looks(b);retitle();
     var cs=[].slice.call($('grid').querySelectorAll('.card'));CMP.fill(cs);cs.forEach(CARD.paint);if(BT)paint();
     if(LV===3){STAY=true;redraw();}else build();});};  // level 3's cap reads the suggestions

@@ -40,6 +40,27 @@ def test_level_3_lists_strictly_by_rank_and_labels_the_top(browser, site):
     assert page.errors == []
 
 
+def test_the_tab_count_waits_with_a_placeholder_until_the_rank_is_read(browser, site):
+    base, _ = site
+    with urllib.request.urlopen(f"{base}/{site_files.MAP_NAME}") as r:
+        looks = site_files.read_meta(r.read().decode())["files"]["looks"]
+    page = browser.new_page()
+    eb.stub_inat(page, None)
+    held = []
+    # the rank arrives, the look-alikes it waits with do not
+    page.route(f"**/{looks}*", lambda r: held.append(r))
+    page.goto(f"{base}/identify.html")
+    page.wait_for_function("window.__identify")
+    page.wait_for_timeout(500)
+    count = page.locator('#tabs [data-lv="3"]').locator("xpath=*[2]")
+    assert held and count.inner_text() == "…"
+    for r in held:
+        r.continue_()
+    page.wait_for_function(
+        "/^[0-9]/.test(document.querySelector('#tabs [data-lv=\"3\"]').children[1].textContent)"
+    )
+
+
 def test_the_copy_button_copies_the_suggestion_and_says_so(browser, site):
     base, _ = site
     page = browser.new_page(viewport={"width": 600, "height": 900})
