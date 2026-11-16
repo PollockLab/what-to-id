@@ -93,6 +93,8 @@ def site(tmp_path_factory):
     ref = write_fixture(root / "atlas")
     write_taxa(root / "atlas", ref)
     build(root, data_url="atlas/")
+    for page in ("explore.html", "confusion.html"):  # the header menu probes these
+        (root / page).write_text("")
     handler = functools.partial(RangeHandler, directory=str(root))
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -169,7 +171,11 @@ def open_page(browser, site):
         page.errors = []
         page.on("pageerror", lambda e: page.errors.append(str(e)))
         page.on("console", lambda m: page.errors.append(m.text) if m.type == "error" else None)
-        page.on("requestfailed", lambda r: page.errors.append(f"failed {r.url}"))
+        # Chrome reports the header menu's HEAD probes as aborted even when they answer
+        page.on(
+            "requestfailed",
+            lambda r: page.errors.append(f"failed {r.url}") if r.method != "HEAD" else None,
+        )
         if fake_encoder:
             page.add_init_script(
                 f"window.encoded = []; window.AtlasEncoderOverride = {{encode: async t => "
