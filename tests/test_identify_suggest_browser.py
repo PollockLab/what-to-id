@@ -230,7 +230,8 @@ def stub_identifiers(page, status=200):
 
     def route(r):
         urls.append(r.request.url)
-        body = {"results": [{"user": {"login": f"user{i}"}, "count": 50 - i} for i in range(5)]}
+        n = int(r.request.url.split("per_page=")[1])
+        body = {"results": [{"user": {"login": f"user{i}"}, "count": 50 - i} for i in range(n)]}
         r.fulfill(status=status, json=body, headers={"access-control-allow-origin": "*"})
 
     page.route(IDENT, route)
@@ -244,21 +245,29 @@ def open_who(browser, base, hash_="", status=200):
     page.wait_for_function("__identify.ids().length > 0")
     page.click("#bwho")
     page.wait_for_selector("#sgwho .sgr")
+    assert (
+        urls == [] and not page.locator("#topids button.sga").count()
+    )  # folded: nothing asked yet
+    # the fold sits under the login box
+    assert page.evaluate(
+        "usrbox.compareDocumentPosition(topids) & Node.DOCUMENT_POSITION_FOLLOWING"
+    )
+    page.click("#topids summary")
     return page, urls
 
 
 def test_who_lists_the_top_identifiers_as_buttons_with_profile_links(browser, site):
     base, _ = site
     page, urls = open_who(browser, base)
-    page.wait_for_selector("#sgwho button.sga")
-    names = page.locator("#sgwho button.sga")
+    page.wait_for_selector("#topids button.sga")
+    names = page.locator("#topids button.sga")
     assert names.count() == 5 and names.first.inner_text().startswith("user0 (50)")
     link = page.get_by_role("link", name="user0 on iNaturalist")
     assert link.get_attribute("href") == "https://www.inaturalist.org/people/user0"
     assert link.get_attribute("target") == "_blank"
     assert "noopener" in link.get_attribute("rel")
     assert len(urls) == 1 and "per_page=5" in urls[0] and "taxon_id" not in urls[0]
-    assert page.get_by_text("Top identifiers here, tap to see their genera").count() == 1
+    assert page.get_by_text("Top identifiers for these filters").count() == 1
     names.first.focus()
     assert "look=" not in hash_(page) and page.errors == []
 
@@ -266,9 +275,9 @@ def test_who_lists_the_top_identifiers_as_buttons_with_profile_links(browser, si
 def test_tapping_an_identifier_fills_the_login_and_ticks_only_their_genera(browser, site):
     base, _ = site
     page, _ = open_who(browser, base)
-    page.wait_for_selector("#sgwho button.sga")
+    page.wait_for_selector("#topids button.sga")
     page.route("https://api.inaturalist.org/v1/users/autocomplete*", lambda r: r.abort())
-    page.locator("#sgwho button.sga").first.click()
+    page.locator("#topids button.sga").first.click()
     page.wait_for_function("document.getElementById('usrname').value === 'user0'")
     page.wait_for_function("document.getElementById('usrtaxa').checked")
     # Only the genera is the default tick, so the address carries no umode
@@ -282,17 +291,34 @@ def test_tapping_an_identifier_fills_the_login_and_ticks_only_their_genera(brows
 def test_the_top_identifiers_are_asked_per_what_taxon_once(browser, site):
     base, _ = site
     page, urls = open_who(browser, base, "#taxa=900")
-    page.wait_for_selector("#sgwho button.sga")
+    page.wait_for_selector("#topids button.sga")
     assert len(urls) == 1 and "taxon_id=900" in urls[0]
     page.click("#bwho")
     page.click("#bwho")
-    page.wait_for_selector("#sgwho button.sga")
+    page.wait_for_selector("#topids button.sga")
     assert len(urls) == 1
+
+
+def test_the_top_identifiers_follow_the_filters_and_the_chosen_number(browser, site):
+    base, _ = site
+    page, urls = open_who(browser, base, "#groups=Aves&taxa=900")
+    page.wait_for_selector("#topids button.sga")
+    assert "iconic_taxa=Aves" in urls[0] and "taxon_id=900" in urls[0] and "d1=" not in urls[0]
+    page.select_option("#topn", "10")
+    page.wait_for_function("document.querySelectorAll('#topids button.sga').length === 10")
+    assert "per_page=10" in urls[-1]
+    page.evaluate(
+        "location.hash = '#taxa=900'"
+    )  # a filter change asks again while the fold is open
+    page.wait_for_function("document.querySelectorAll('#topids button.sga').length === 10")
+    page.wait_for_timeout(300)
+    assert "iconic_taxa" not in urls[-1] and "per_page=10" in urls[-1] and len(urls) == 3
 
 
 def test_the_top_identifiers_hide_when_the_fetch_fails(browser, site):
     base, _ = site
     page, urls = open_who(browser, base, status=500)
     page.wait_for_timeout(300)
-    assert len(urls) == 1 and page.locator("#sgwho button.sga").count() == 0
+    assert len(urls) == 1 and page.locator("#topids button.sga").count() == 0
+    assert page.inner_text("#topids [role=status]") == "None found for these filters."
     assert page.locator("#sgwho .sgr").count() > 0
