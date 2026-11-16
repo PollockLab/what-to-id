@@ -1,4 +1,4 @@
-// The language links in the header (the current one is plain text) and the Settings popover (#setpop, native radios): how species names show.
+// The language links in the header (the current one is plain text) and the Names popover (#setpop, native radios): how species names show.
 // A change saves and reloads; the Popover API closes it on Escape and returns focus to the gear, which after a reload takes it back (a language change leaves focus on the other language link).
 (function(){
 'use strict';

@@ -34,7 +34,7 @@ def site(tmp_path_factory):
 
 
 def set_to(page, name, value):
-    """Click a header language link, or pick a names radio in the Settings popover (reloads)."""
+    """Click a header language link, or pick a names radio in the Names popover (reloads)."""
     with page.expect_event("load"):
         if name == "lang":
             page.click(f'.lng a[lang="{value}"]')
@@ -62,7 +62,10 @@ def test_french_changes_the_text_and_lang_and_survives_a_reload(browser, site):
     assert page.evaluate("document.documentElement.lang") == "fr"
     fr = page.get_attribute(HELP, "aria-label")
     assert fr and fr != en
-    assert page.locator("#setb").get_attribute("aria-label") != "Settings"
+    assert (
+        page.text_content("#setb").strip() == "Noms"
+        and page.text_content("#seth") == "Noms des espèces"
+    )
     assert set(common(page)) <= set(FR.values()) and common(page)  # the build's French names
     page.reload()
     page.wait_for_function("window.__identify && __identify.ids().length > 0")

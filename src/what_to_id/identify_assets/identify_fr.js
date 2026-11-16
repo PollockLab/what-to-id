@@ -24,7 +24,7 @@ var CLICK="Cliquez pour choisir, de nouveau pour ",CLEAR="effacer.";
 var words={
 // the page
 "Identify: What to ID next":"Identifier : quoi identifier ensuite","What to ID":"What to ID","Skip to content":"Passer au contenu",
-"Close":"Fermer","Close (Esc)":"Fermer (Échap)","Loading…":"Chargement…","Settings":"Paramètres","Language":"Langue","Species names":"Noms des espèces",
+"Close":"Fermer","Close (Esc)":"Fermer (Échap)","Loading…":"Chargement…","Names":"Noms","Language":"Langue","Species names":"Noms des espèces",
 "English":"English","Français":"Français","Latin":"Latin","Common":"Commun","Both":"Les deux","Methods":"Méthodes","Identify":"Identifier",
 "Identify (Enter)":"Identifier (Entrée)","Identify on iNaturalist (Enter)":"Identifier sur iNaturalist (Entrée)","openbiodiversity.ca":"openbiodiversity.ca",
 "(opens in a new tab)":"(s'ouvre dans un nouvel onglet)","· BC":"· C.-B.","About":"À propos","About this page":"À propos de cette page",
