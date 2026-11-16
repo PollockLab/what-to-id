@@ -60,7 +60,7 @@ function slots(){var n=T.length,s=new Int8Array(n).fill(-2),path=[],i,j,v;s[top]
 // Works out the breakdown; a change of it recolours the dots.
 function sync(){
   if(!prep())return;
-  var t=focus(o.st());t=deep(t)?t:-1;
+  var t=focus(o.st());t=deep(t)&&CC.col[t]?t:-1;  // a row outside every group's taxon has no palette to break down
   if(t!==top||t>=0&&held(t).slice(0,TOP).join()!==show.join()){top=t;
     // below a group (a picked sub-clade) the palette focuses on the breakdown, as the tree's focus does
     show=t<0?[]:held(t).slice(0,TOP);var F=CC.at(t);sc=show.map(function(c){return F[c].concat(110);});

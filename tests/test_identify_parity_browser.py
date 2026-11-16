@@ -86,6 +86,9 @@ def test_a_map_filter_in_the_hash_keeps_the_same_records_in_identify(browser, si
     m = open_map(browser, base, hash_)
     carried = m.evaluate("location.hash")
     assert all(t in carried for t in hash_.split("&")) and m.errors == []
+    # the map shows records too: a legend error once left it at "0 of" with no page error
+    m.wait_for_function("/^[1-9]/.test(document.getElementById('count').textContent)")
+    assert m.errors == []
     page = ib.open_identify(browser, base, carried)
     want = sorted(pts["id"][verdict(pts)].tolist())
     assert want and len(want) < len(pts)
