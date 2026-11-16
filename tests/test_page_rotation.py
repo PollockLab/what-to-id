@@ -189,8 +189,9 @@ def test_study_data_refuses_a_batch_out_of_sequence():
 
 
 def test_write_study_writes_json_and_refuses_a_leaked_arm_name(tmp_path):
-    path = write_study(tmp_path, _manifest())
-    assert path.name == "study.json" and read_study(path) == study_data(_manifest())
+    m = _manifest()  # one manifest: a second one can be stamped a second later
+    path = write_study(tmp_path, m)
+    assert path.name == "study.json" and read_study(path) == study_data(m)
     m = _manifest()
     m.arm_labels = {"recency": "recency", "gap_first": "A"}
     with pytest.raises(ValueError, match="leaked"):
