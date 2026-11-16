@@ -237,8 +237,9 @@ def test_the_study_section_and_its_fold_come_with_the_study_only():
 
     plain = terms_page.render()
     assert '<h2 id="study">' in plain and 'id="study-methods"' not in plain
-    for words in ("only thing randomized", "public on iNaturalist", "nothing to sign up for"):
+    for words in ("starts at a random batch", "GoatCounter", "nothing to sign up for"):
         assert words in plain
+    assert ("sign in lasts" in plain) == bool(page_identify.INAT_CLIENT_ID)
     study = read_study(SRC.parents[1] / "site" / "study.json")
     html = terms_page.render(study=study)
     assert 'id="study-methods"' in html and 'href="#study-methods-refs"' in html

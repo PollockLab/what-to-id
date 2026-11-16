@@ -11,9 +11,9 @@ SURVEY_DAYS_TARGET = 30
 
 GLOSSARY: dict[str, tuple[str, str | None]] = {
     "identify-keys": (
-        "Click or tap a card to compare. On a keyboard, Enter opens iNat with the name copied"
-        " (press i there to suggest an ID), j and k go to the next and previous card, s skips"
-        " and u undoes.",
+        "Click or tap a card to compare. In the compare panel, j and k go to the next and"
+        " previous card, Enter opens iNat with the name copied (press i there to suggest an ID),"
+        " s skips and u undoes.",
         None,
     ),
     "needs-id": (
@@ -132,7 +132,9 @@ GLOSSARY: dict[str, tuple[str, str | None]] = {
         "Use it when you have time for a careful look.",
     ),
     "level-narrow-it-down": (
-        "Labelled above species, and the photo points to one species of it.",
+        "Labelled above species, and the photo points to one species of it. The tab opens on"
+        " the best 5%, the records whose photo points most clearly to one species: Show all,"
+        " beside the count, lifts that, and the Best slider under Prioritize sets another share.",
         "Use it when you can take a record to species.",
     ),
     "level-odd-shots": (
@@ -198,7 +200,9 @@ GLOSSARY: dict[str, tuple[str, str | None]] = {
         None,
     ),
     "best-match": (
-        "How closely the photo points to one species, ranked among all records of this level.",
+        "How closely the photo points to one species, ranked among all records of this level."
+        " Best 5% keeps the top 5%. Show all lifts the cut, and the Best slider under Prioritize"
+        " sets another share.",
         None,
     ),
 }
