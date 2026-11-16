@@ -23,6 +23,9 @@ if('IntersectionObserver' in window){
 var box=document.getElementById('find'),q=document.getElementById('find-q'),n=document.getElementById('find-n');
 var dts=[].slice.call(document.querySelectorAll('#glossary-list dt'));
 box.hidden=false;
+var gl=document.getElementById('glossary');
+function place(){if(wide.matches)toc.querySelector('nav').before(box);else gl.after(box);}  // wide: the search stays in view beside the page
+place();wide.addEventListener('change',place);
 q.addEventListener('input',function(){
   var v=q.value.trim().toLowerCase(),shown=0;
   dts.forEach(function(dt){var dd=dt.nextElementSibling,
@@ -31,5 +34,6 @@ q.addEventListener('input',function(){
   [].forEach.call(document.querySelectorAll('#glossary-list dl'),function(dl){
     var h=dl.previousElementSibling;dl.hidden=h.hidden=!dl.querySelector('dt:not([hidden])');});
   n.textContent=v?shown+' of '+dts.length+' terms':'';
+  if(v&&wide.matches)gl.scrollIntoView();
 });
 })();

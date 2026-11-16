@@ -41,7 +41,9 @@ def test_filter_hides_non_matching_terms_and_empty_groups(browser, tmp_path):
     page = _page(browser, tmp_path)
     total = page.locator("#glossary-list dt").count()
     assert total == len(GLOSSARY)
+    assert page.locator("#toc #find-q").is_visible()  # wide: beside the page, always in view
     page.fill("#find-q", "cosine")
+    assert page.evaluate("scrollY") > 0  # typing brings the glossary up
     assert page.locator("#glossary-list dt:visible").count() >= 1
     assert page.is_hidden("#glossary-list dt#needs-id")
     assert page.locator("#glossary-list h3:visible").count() == 1
