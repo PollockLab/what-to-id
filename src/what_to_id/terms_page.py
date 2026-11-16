@@ -100,13 +100,20 @@ STUDY = """<h2 id="study">The study behind Batches</h2>
 <p>The Batches tab on Identify comes from a research study of which records to show identifiers
 first. The records are split by chance into lists, and each list puts its records in its own
 order. Your browser takes the lists in a random order, drawn once, and each press of Next batch
-shows a batch from the next list in turn. That order of lists is the only thing randomized.</p>
+shows a batch from the next list in turn. Within a list your browser starts at a random batch,
+also drawn once. Nothing else is randomized.</p>
 <p>What is recorded: the identifications people make, which are public on iNaturalist, and the
 batches your browser was served, which stay in your browser unless you press Download my
-batches. If you sign in with iNaturalist, the sign in lasts for that tab only, and the IDs you
-post from a card go straight to iNaturalist.</p>
+batches. The site also keeps anonymous counts of use with GoatCounter, such as how many batches
+and cards were served and which tabs were opened. A count never holds a login or a record.
+__SIGN_IN__</p>
 <p>Taking part is just identifying as usual. There is nothing to sign up for, and you can stop
 or switch to another tab at any time.</p>"""
+# Shown only while Identify offers Sign in (page_identify.INAT_CLIENT_ID).
+SIGN_IN = (
+    "If you sign in with iNaturalist, the sign in lasts for that tab only, and the IDs you post"
+    " from a card go straight to iNaturalist."
+)
 
 
 def label(key: str) -> str:
@@ -214,7 +221,7 @@ def render(
         '<input id="find-q" type="search" autocomplete="off">'
         '<p id="find-n" role="status"></p></div>\n'
         f'<div id="glossary-list">{chr(10).join(terms)}</div>\n'
-        f"{STUDY}\n{fold}\n"
+        f"{STUDY.replace('__SIGN_IN__', SIGN_IN if page_identify.INAT_CLIENT_ID else '')}\n{fold}\n"
         f'<h2 id="methods">Methods</h2>\n{terms_methods.render(manifest, data_url)}\n'
         f'<p>Planning a bioblitz? See <a href="{page_nav.BLITZ}" target="_blank" rel="noopener">'
         'Where to Blitz\u00a0<span aria-hidden="true">\u2197</span>'
