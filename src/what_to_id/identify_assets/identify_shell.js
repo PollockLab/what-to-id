@@ -36,7 +36,7 @@ function sheets(){
       b.onclick=function(){d.showModal();};});
   });
 }
-// the Sort and Settings popovers open under their buttons, the Settings one right-aligned; on a phone the CSS makes them bottom sheets
+// the Sort and Names popovers open under their buttons, the Names one right-aligned; on a phone the CSS makes them bottom sheets
 function popovers(){
   $('pshow').onclick=function(){$('sortpop').hidePopover();};
   [['sortpop','sortb',420],['setpop','setb',280]].forEach(function(x){
