@@ -122,18 +122,18 @@ def test_the_kind_control_filters_might_be_wrong_and_keeps_the_kind_in_the_hash(
     assert page.errors == []
 
 
-def test_the_help_menu_replaces_the_nav_and_works_from_the_keyboard(browser, site):
+def test_the_menu_replaces_the_nav_and_works_from_the_keyboard(browser, site):
     base, _ = site
     page = open_identify(browser, base, "#lvl=1")
     assert page.locator(".site-nav").count() == 0
     btn = page.locator("#hmbtn")
-    assert btn.inner_text() == "Help" and btn.get_attribute("aria-expanded") == "false"
+    assert btn.inner_text() == "Menu" and btn.get_attribute("aria-expanded") == "false"
     assert page.locator("#hmenu").is_hidden()
     btn.focus()
     page.keyboard.press("Enter")
     assert page.locator("#hmenu").is_visible() and btn.get_attribute("aria-expanded") == "true"
     shown = page.locator("#hmenu a:visible").all_inner_texts()
-    assert shown[0] == "How it works" and "Methods" not in shown
+    assert shown[-1] == "How it works" and "Methods" not in shown
     page.keyboard.press("Tab")
     page.keyboard.press("Escape")
     assert page.locator("#hmenu").is_hidden()

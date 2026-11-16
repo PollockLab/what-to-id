@@ -22,11 +22,14 @@ def test_exactly_one_current_page(current):
     assert re.search(rf'href="{current}" aria-current="page"', html)
 
 
-def test_explore_header_carries_the_help_menu_in_place_of_the_switcher():
+def test_explore_header_carries_the_page_links_in_place_of_the_switcher():
     html = nav("explore.html", extra="<i id=bar></i>", menu=True)
     assert 'class="site-nav"' not in html and 'id="hmbtn"' in html
-    assert html.index("id=bar") < html.index('id="hmbtn"')  # the bar, then Help at the row's end
+    assert html.index("id=bar") < html.index('id="hmbtn"')  # the bar, then the links at the end
     assert 'href="terms.html"' in html and 'href="explore.html"' not in html
+    # the views come before the help, and the list shows without the button from 900 px
+    assert html.index('href="confusion.html"') < html.index('href="terms.html"')
+    assert "@media (min-width:900px){.hm>button{display:none}" in page_nav.HELP_CSS
 
 
 def test_a_help_menu_header_leaves_out_its_own_page():
