@@ -345,7 +345,12 @@ def test_the_tabs_switch_the_cards_and_their_counts_are_the_totals(browser, site
     ]
     for lv, label, _ in page_identify.LEVELS:
         cut = " · best 5%" if lv == 3 else ""  # level 3 names its Best x% cut
-        assert " ".join(tab(page, lv).inner_text().split()) == f"{label} {total[lv]:,}{cut}"
+        text = " ".join(tab(page, lv).inner_text().split())
+        assert text.startswith(label + " ") and text.endswith(cut or text)
+        # the tab shows a short count ("2.1K"), the full one on hover
+        short = tab(page, lv).locator("b")
+        assert short.get_attribute("title") == f"{total[lv]:,}"
+        assert short.inner_text() == page.evaluate("n => I18N.cf.format(n)", total[lv])
     assert total[5] == int(pts["level"].isin([2, 4, 5]).sum())
     tab(page, 1).focus()
     page.keyboard.press("ArrowRight")

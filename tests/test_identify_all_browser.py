@@ -14,7 +14,7 @@ def test_all_needing_id_lists_the_whole_pool_newest_first_under_the_filters(brow
     page.wait_for_function("__identify.total()[6] > 0")
     assert page.evaluate("__identify.level()") == 1  # not the default
     assert page.evaluate("__identify.total()[6]") == len(pts)
-    assert ib.tab(page, 6).locator("b").inner_text() == f"{len(pts):,}"
+    assert ib.tab(page, 6).locator("b").get_attribute("title") == f"{len(pts):,}"
     ib.tab(page, 6).click()
     page.wait_for_selector("#grid .card")
     assert "lvl=all" in page.evaluate("location.hash")
