@@ -274,7 +274,7 @@ function kinds(){
   box.append(g);
 }
 function counts(){
-  [].forEach.call($('tabs').querySelectorAll('[data-lv]'),function(t){var lv=+t.dataset.lv,n=S.total[lv]||0,L=lv===3&&(GP||IdentifyGaps).label(),w=L&&(!GP||RKW&&!RK);t.children[1].textContent=w?'…':I18N.cf.format(n);t.children[1].title=w?'':nf.format(n);t.lastChild.textContent=L&&(RK||!GP)?' · '+L.toLowerCase():'';t.classList.toggle('zero',!n&&!w);});
+  [].forEach.call($('tabs').querySelectorAll('[data-lv]'),function(t){var lv=+t.dataset.lv,n=S.total[lv]||0,L=lv===3&&(GP||IdentifyGaps).label(),w=L&&(!GP||RKW&&!RK);if(w&&GP)RKF();t.children[1].textContent=w?'…':I18N.cf.format(n);t.children[1].title=w?'':nf.format(n);t.lastChild.textContent=L&&(RK||!GP)?' · '+L.toLowerCase():'';t.classList.toggle('zero',!n&&!w);});
 }
 // An empty level here points at the levels that do have records, rather than a dead end.
 function empty(){
