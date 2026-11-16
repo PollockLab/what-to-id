@@ -55,7 +55,7 @@ def test_french_changes_the_text_and_lang_and_survives_a_reload(browser, site):
     page = ib.open_identify(browser, site)
     assert page.evaluate("document.documentElement.lang") == "en"
     en = page.get_attribute(HELP, "aria-label")
-    assert page.inner_text("#hmbtn") == "Help"
+    assert page.text_content("#hmenu li:last-child a") == "How it works"
     assert page.get_attribute(".lng [aria-current]", "lang") == "en"
     assert set(common(page)) <= {f"Common {k}" for k in range(7)} and common(page)
     set_to(page, "lang", "fr")
@@ -72,7 +72,7 @@ def test_french_changes_the_text_and_lang_and_survives_a_reload(browser, site):
     assert (
         page.locator(".lng a[href]").get_attribute("lang") == "en"
     )  # only the other one is a link
-    assert page.inner_text("#hmbtn") == "Aide"
+    assert page.text_content("#hmenu li:last-child a") == "Comment ça marche"
     assert not page.errors
     set_to(page, "lang", "en")  # and back
     assert (

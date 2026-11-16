@@ -260,7 +260,7 @@ def test_the_page_names_the_narrowing_group_from_one_constant_and_has_the_header
     assert html.count(page_identify.NARROW_LABEL) == 2  # the config and the About, both from it
     template = (page_identify.ASSETS / page_identify.PAGE_NAME).read_text()
     assert page_identify.NARROW_LABEL not in template
-    assert 'id="hmenu"' in html and "<nav" not in html  # Help replaces the view switcher
+    assert 'id="hmenu"' in html and 'class="site-nav"' not in html  # no view switcher
     assert not [w for w in FORBIDDEN if w in html.lower()]
 
 

@@ -237,7 +237,7 @@ def nav(
     With `available=None` the page cannot know which optional pages exist, so the script drops
     the ones that answer 404. `base` prefixes the links of a page served from another folder.
     `extra` is html placed at the end of the header row (the split page's view switch and counts).
-    `menu` swaps the switcher for Identify's Help menu (without `current`), so every header reads
+    `menu` swaps the switcher for Identify's page links (without `current`), so every header reads
     as Identify's.
     """
     if menu:
@@ -280,13 +280,14 @@ def nav(
     )
 
 
-# Identify is the whole app, so it swaps the view switcher for a wordmark and a Help menu that
-# reaches the other pages. Confused pairs drops out when it answers 404, Explore shows only when
-# it answers (the same HEAD check the switcher uses).
+# Identify is the whole app, so it swaps the view switcher for a wordmark and links to the other
+# pages: the views, then the help. They sit in the header from 900 px and fold into a Menu button
+# below. Confused pairs drops out when it answers 404, Explore shows only when it answers (the
+# same HEAD check the switcher uses).
 HELP_LINKS = (
-    ("terms.html", "How it works", ""),
-    ("confusion.html", "Confused pairs", " data-drop"),
     ("explore.html", "Explore", " data-show hidden"),
+    ("confusion.html", "Confused pairs", " data-drop"),
+    ("terms.html", "How it works", ""),
 )
 HELP_CSS = """
 .appbar{max-width:1100px;margin:0 auto;padding:0 12px;display:flex;align-items:center;
@@ -298,7 +299,7 @@ HELP_CSS = """
 .lng a{color:var(--muted);text-decoration:underline;display:inline-block;padding:11px 2px}
 .lng a:not([href]){text-decoration:none;color:var(--ink)}
 .hm{position:relative}
-.site-shell>.hm{margin-left:auto}  /* a header with no bar between: Help keeps to the right */
+.site-shell>.hm{margin-left:auto}  /* a header with no bar between: the links keep to the right */
 .hm>button{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 10px;
   font:inherit;color:var(--ink);background:none;border:0;border-radius:6px;cursor:pointer}
 .hm>button:hover,.hm>button[aria-expanded=true]{background:var(--chip)}
@@ -310,6 +311,10 @@ HELP_CSS = """
   color:var(--ink);text-decoration:none;white-space:nowrap}
 .hm li a:hover{background:var(--chip)}
 .hm [hidden]{display:none!important}
+@media (min-width:900px){.hm>button{display:none}
+  .hm ul,.hm ul[hidden]{display:flex!important;position:static;gap:2px;min-width:0;padding:0;
+    background:none;border:0;box-shadow:none}
+  .hm li a{padding:0 10px}}
 .embed .appbar{display:none}
 """.strip()
 HELP_JS = """
@@ -327,26 +332,23 @@ if(r.ok)a.parentNode.hidden=false;else if(a.hasAttribute('data-drop'))a.parentNo
 
 
 def _help_menu(base: str = "", skip: frozenset[str] | set[str] = frozenset()) -> str:
-    """The Help button and its list of the other pages, without the pages in `skip`."""
+    """The Menu button and its list of the other pages, without the pages in `skip`."""
     items = "".join(
         f"<li{' hidden' if 'hidden' in flags else ''}>"
         f'<a href="{escape(base + page)}"{flags.replace(" hidden", "")}>{label}</a></li>'
         for page, label, flags in HELP_LINKS
         if page not in skip
     )
-    icon = (
-        '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/>'
-        '<path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7M12 17h.01"/></svg>'
-    )
+    icon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>'
     return (
-        f'<div class="hm"><button type="button" id="hmbtn" aria-expanded="false" '
-        f'aria-controls="hmenu">{icon}Help</button>'
-        f'<ul id="hmenu" aria-label="Help" hidden>{items}</ul></div>'
+        f'<nav class="hm" aria-label="Pages"><button type="button" id="hmbtn" '
+        f'aria-expanded="false" aria-controls="hmenu">{icon}Menu</button>'
+        f'<ul id="hmenu" hidden>{items}</ul></nav>'
     )
 
 
 def help_bar(base: str = "") -> str:
-    """Skip link, wordmark and the Help menu, for the page that is the whole app (Identify)."""
+    """Skip link, wordmark and the page links, for the page that is the whole app (Identify)."""
     return (
         f'<a class="site-skip" href="#main-content" {_SKIP}>Skip to content</a>\n'
         f'<div class="appbar"><div class="bl">'
