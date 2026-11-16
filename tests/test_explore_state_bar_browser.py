@@ -80,10 +80,8 @@ def test_the_bar_shows_the_same_chips_in_every_view(browser, site):
         assert page.text_content("#sbn")[0].isdigit()  # the map's count
         assert page.get_attribute("#sbl", "aria-expanded") == "false"
         assert page.is_hidden("#fb")  # the old Filters button is gone
-        # one name a control: the rail is What and the bar's button the rest, or every filter when
-        # a map pane under 760 px puts What in the sheet too (map_sheet.js)
-        label = "Filters" if view == "map-identify-tree" else "When & where"
-        assert page.text_content("#sbf") == label
+        # one Filters button with the count of filters on, the same chips as the bar shows
+        assert page.text_content("#sbf") == "Filters \u00b7 2"
         assert frame.text_content("#side .railhd b") == "What"
         assert page.errors == []
         page.close()
@@ -148,7 +146,7 @@ def test_filters_opens_the_dates_and_the_area_and_closes_the_legend(browser, sit
     frame.wait_for_selector("#xsheet #from", state="visible")  # the frame hears it a message later
     for sel in ("#from", "#to", "#byObs", "#byUp"):
         assert frame.is_visible(f"#xsheet {sel}")
-    assert frame.get_by_role("button", name="Draw area", exact=True).is_visible()
+    assert frame.locator("#xsheet .area").count() == 0  # Where stays on the map
     assert frame.is_hidden("#xsheet .lvleg")
     frame.fill("#from", "2026-09-01")
     frame.dispatch_event("#from", "change")
@@ -191,7 +189,7 @@ def test_at_400_px_the_bar_fits_and_the_sheet_stays_within_60vh(browser, site, v
     assert page.evaluate(width) <= 400
     bar = page.locator("#sbar").bounding_box()
     assert bar["x"] >= 0 and bar["x"] + bar["width"] <= 400
-    assert page.text_content("#sbf") == "Filters"  # no room for the rail: every filter in the sheet
+    assert page.text_content("#sbf").startswith("Filters")  # the rail is in the sheet
     page.click("#sbf")
     page.wait_for_function(f"/^\\d/.test({COUNT} || '')")
     frame = next(f for f in page.frames if "map.html" in f.url)
@@ -199,6 +197,8 @@ def test_at_400_px_the_bar_fits_and_the_sheet_stays_within_60vh(browser, site, v
     if view == "map":
         assert frame.locator("#xsheet").bounding_box()["height"] <= 0.6 * 800 + 1
         assert frame.is_visible("#xsheet #grpsec")  # no room for the rail: it heads Filters
+        heads = "[...document.querySelectorAll('#xsheet .railhd b, .xh')].map(e => e.textContent)"
+        assert frame.evaluate(heads) == ["What", "When"]  # What, then When with the timeline
         page.click("#sbf")
         frame.wait_for_selector("#xsheet", state="hidden")
         assert frame.evaluate("document.documentElement.classList.contains('rail-off')")

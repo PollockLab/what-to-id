@@ -100,11 +100,11 @@ def test_beside_identify_the_dots_take_the_level_colours_and_go_back_without_it(
     assert got["c5"] not in (GREY, GREEN) and got["c5"][3] > GREY[3]  # level 5 has its own colour
     assert got["names"] == [name for _, name, _ in LEVELS] + ["No level"]
     assert got["c2"] == got["c5"]  # a close call takes its tab's colour, Might be wrong's
-    page.click("[data-p=identify]")  # the map alone: the group colours again
+    page.click("[data-p=identify]", modifiers=["Shift"])  # the map alone: the group colours again
     frame.wait_for_function(f"!({COLOURS})().legend")
     got = frame.evaluate(COLOURS)
     assert got["c1"][3] == 110 and got["c1"] != GREEN
-    page.click("[data-p=identify]")
+    page.click("[data-p=identify]", modifiers=["Shift"])
     frame.wait_for_function(f"({COLOURS})().legend")
     assert page.errors == []
     page.close()

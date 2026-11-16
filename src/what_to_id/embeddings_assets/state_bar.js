@@ -30,11 +30,10 @@ function tick(){
   if(x&&(!ro||ro.x!==x)){ro=new d.defaultView.ResizeObserver(fit);ro.x=x;ro.observe(x);ro.observe(d.getElementById('side'));}
   var c=d&&d.getElementById('count'),t=c&&/\d/.test(c.textContent)?c.textContent.replace(/ records?$/,''):'';
   if(num.textContent!==t)num.textContent=t;
-  // a frame too narrow for its rail (map_sheet.js) puts What in the sheet too, so the button holds every filter
-  var w=d&&d.defaultView.matchMedia('(max-width:760px)').matches&&!d.documentElement.classList.contains('rail-only'),
-    lb=!d||w?'Filters':'When & where';if(bs.filters.textContent!==lb)bs.filters.textContent=lb;
+  // one Filters button, with how many filters are on: the chips of the map's selection bar
   var li=d?[].slice.call(d.querySelectorAll('#selbar li')):[],
-    s=li.map(function(x){return x.firstChild.textContent+(x.querySelector('.x')?'×':'');}).join('\n');
+    lb='Filters'+(li.length?' \u00b7 '+li.length:'');if(bs.filters.textContent!==lb)bs.filters.textContent=lb;
+  var s=li.map(function(x){return x.firstChild.textContent+(x.querySelector('.x')?'×':'');}).join('\n');
   if(s===sig)return;sig=s;ul.textContent='';
   li.forEach(function(x,j){var c=ul.appendChild(document.createElement('li')),fx=x.querySelector('.x');
     c.appendChild(document.createElement('span')).textContent=x.firstChild.textContent;if(!fx)return;

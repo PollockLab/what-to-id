@@ -1,5 +1,5 @@
-// Explore's sheet, in the embedded map only: the dates (#time), the area control (map_area.js) and the dots'
-// legend (level_colour.js) leave their places for one panel, which the shell's state bar (state_bar.js) opens
+// Explore's sheet, in the embedded map only: the dates (#time) and the dots' legend (level_colour.js)
+// leave their places for one panel (the area control stays on the map), which the shell's state bar (state_bar.js) opens
 // with {type:'wtid-sheet',open:'filters'|'legend'|null}. It sits over the foot of the map, or, with the map
 // pane hidden, fills the frame the shell shows as a sheet. A frame too narrow for the rail (760 px) has the
 // rail at the head of Filters, opened for it. Esc shuts it, and the shell is told.
@@ -11,7 +11,8 @@ var p=document.createElement('section'),f=p.appendChild(document.createElement('
   area=document.querySelector('.maplibregl-ctrl.area'),none=document.createElement('p'),open=null,
   side=document.getElementById('side'),NARROW=matchMedia('(max-width:760px)'),ours=false;
 p.id='xsheet';p.className='xsheet';p.hidden=true;p.setAttribute('role','region');
-f.append(document.getElementById('time'));if(area)f.append(area);
+var wh=f.appendChild(document.createElement('h2'));wh.className='xh';wh.textContent='When';  // What is the rail, above
+f.append(document.getElementById('time'));
 if(leg)l.append(leg);
 none.className='muted xnone';none.textContent='Each dot takes its group’s colour. Pick one group or taxon to colour its dots by clade.';
 l.append(none);document.body.appendChild(p);

@@ -37,6 +37,8 @@ body{display:flex;flex-direction:column}
 .seg button{touch-action:none}
 .seg button.dr{position:relative;z-index:2;box-shadow:var(--shadow);cursor:grabbing}
 .seg button[aria-pressed="true"]{background:var(--on);color:var(--onink);font-weight:650}
+.xbar #sbs{font:inherit;font-size:12px;min-height:28px;padding:0 11px;border:1px solid var(--line);border-radius:999px;background:var(--chip);color:var(--ink);cursor:pointer}
+.xbar #sbs[aria-pressed="true"]{background:var(--on);color:var(--onink);border-color:var(--on);font-weight:650}
 .note{position:absolute;z-index:30;top:100%;right:16px;width:min(380px,calc(100vw - 24px));margin:6px 0 0;padding:10px 12px;
   background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);font-size:12px;color:var(--muted);white-space:normal}
 .note[hidden]{display:none}
@@ -72,14 +74,14 @@ body{display:flex;flex-direction:column}
 @media (max-width:800px){.xbar{flex:1 1 100%;margin:0 0 6px;flex-wrap:wrap;white-space:normal}
   .xbar{justify-content:flex-start}#counts{flex:1 1 12em;height:auto;justify-content:flex-start}#counts::before{content:none}
   .seg{flex:1 1 0;order:-1;max-width:420px}.seg button{flex:1 1 auto;min-height:36px;padding:0 6px}
-  .xbar .infob{order:-1;width:36px;height:36px}
+  .xbar .infob{order:-1;width:36px;height:36px}#sbs{display:none}
   #sf{flex:1 1 100%}#sq{flex:1 1 0;width:auto;min-height:36px}#sf button{min-height:36px}}
 </style>
 </head>
 <body>
 __SITE_NAV__
 <main id="main-content" tabindex="-1"><h1 class="site-vh">Explore</h1></main>
-<div class="sbar" id="sbar" role="region" aria-label="Your selection"><span class="sbn" id="sbn" aria-live="polite"></span><ul class="sbc" id="sbc" aria-label="Active filters"></ul><button type="button" id="sbx" aria-label="Clear filters: What, When, Where, Who, At risk, Invasive and Best x%" hidden>Clear filters</button><button type="button" id="sbl" aria-expanded="false" aria-controls="map">Legend</button><button type="button" id="sbf" aria-expanded="false" aria-controls="map">When &amp; where</button></div>
+<div class="sbar" id="sbar" role="region" aria-label="Your selection"><span class="sbn" id="sbn" aria-live="polite"></span><ul class="sbc" id="sbc" aria-label="Active filters"></ul><button type="button" id="sbx" aria-label="Clear filters: What, When, Where, Who, At risk, Invasive and Best x%" hidden>Clear filters</button><button type="button" id="sbl" aria-expanded="false" aria-controls="map">Legend</button><button type="button" id="sbf" aria-expanded="false" aria-controls="map">Filters</button></div>
 <script>
 __MAP_FILTER__
 __STATE_BAR__
@@ -137,7 +139,9 @@ function mk(n){
     if(n==='tree')tally(true);if(n==='map'){colour();rail();}});
   // in ORDER in the page too, so the keys move through the panes as they are seen
   box.insertBefore(f,ORDER.slice(ORDER.indexOf(n)+1).map(function(k){return frames[k];}).filter(Boolean)[0]||null);frames[n]=f;}
+var multi=[];try{multi=parse(localStorage.getItem('wtid-multi'));}catch(e){}
 function setView(v){
+  if(v.length>1&&innerWidth>=800){multi=v;try{localStorage.setItem('wtid-multi',v.join('-'));}catch(e){}}
   if(innerWidth<800&&v.length>1)v=[v.indexOf('identify')>=0?'identify':v.indexOf('tree')>=0?'tree':v[0]];  // a phone holds one pane, Identify first
   var old=view||[],tree0=visible('tree');view=v;
   Object.keys(FILES).forEach(function(n){
@@ -157,6 +161,7 @@ function setView(v){
   tally(!tree0&&visible('tree'));
   colour();
   [].forEach.call(document.querySelectorAll('[data-p]'),function(b){b.setAttribute('aria-pressed',v.indexOf(b.dataset.p)>=0);});
+  document.getElementById('sbs').setAttribute('aria-pressed',v.length>1);
   count();}
 // Beside Identify the map's dots take the Identify levels' colours, so both panes read as one task.
 function colour(){post('map',{type:'wtid-colour',by:visible('identify')&&visible('map')?'level':'group',names:LEVELS});}
@@ -171,12 +176,21 @@ function count(){
   // against the last write, not innerHTML: explain.js adds attributes to the term, and a rewrite closes its popover
   var c=document.getElementById('counts'),h=p.map(function(s,i){return '<span>'+(i?' · ':'')+s+'</span>';}).join('');if(c.dataset.h!==h){c.dataset.h=h;c.innerHTML=h;}}
 setInterval(count,400);
+// A click shows that pane alone; Shift or Cmd/Ctrl adds or removes it beside the others (a phone always shows one).
 document.getElementById('xbar').addEventListener('click',function(e){
   var b=e.target.closest('[data-p]');if(!b)return;
   var p=b.dataset.p,on=view.indexOf(p)>=0;
-  if(on&&view.length===1)return;  // the last pane stays
-  setView(innerWidth<800?[p]:order.filter(function(n){return n===p?!on:view.indexOf(n)>=0;}));
+  if(innerWidth>=800&&(e.shiftKey||e.metaKey||e.ctrlKey)){
+    if(on&&view.length===1)return;  // the last pane stays
+    setView(order.filter(function(n){return n===p?!on:view.indexOf(n)>=0;}));
+  }else if(view.length===1&&on)return;
+  else setView([p]);
   url();});
+// Side by side: the last layout of more than one pane (kept as 'wtid-multi'); lit while several panes show.
+var sbs=document.getElementById('sbs');
+sbs.addEventListener('click',function(){
+  var m=view.length>1?[view[0]]:multi.length>1?multi:order.filter(function(n){return n==='map'||n===(FILES.identify?'identify':FILES.tree?'tree':'space');});
+  setView(order.filter(function(n){return m.indexOf(n)>=0;}));url();});
 function url(){history.replaceState(null,'','?view='+serialize(order.filter(function(n){return view.indexOf(n)>=0;}))+
   (qs?'&q='+encodeURIComponent(qs):'')+location.hash);}
 // back to the cards: where the viewer came from with its filters intact, else Identify with the shared selection
@@ -196,7 +210,7 @@ addEventListener('keydown',function(e){if(e.key==='Escape'&&!note.hidden)i.click
 var MIN={identify:280,map:600,space:320,tree:260},NAME={identify:'Identify',map:'Map',space:'Photo space',tree:'Taxonomy'},sizes={};
 try{sizes=JSON.parse(localStorage.getItem('wtid-panes'))||{};}catch(e){}
 function vis(){return order.filter(visible);}
-function room(){return box.clientWidth-7*Math.max(0,vis().length-1)-(frames.map&&!visible('map')?(railOpen?280:36):0);}
+function room(){return box.clientWidth-7*Math.max(0,vis().length-1)-(frames.map&&!visible('map')?(railOpen?280:0):0);}  // a folded rail takes no width: the Filters button opens the sheet
 function wide(n){return frames[n].getBoundingClientRect().width;}
 function dflt(v,W){  // Identify a narrow column, the tree a third, the map and photos share the rest
   var d={},free=W,open=0;
@@ -206,7 +220,7 @@ function dflt(v,W){  // Identify a narrow column, the tree a third, the map and 
   return d;}
 function layout(){
   var v=vis(),W=room(),d=dflt(v,W),f={},t=0;MIN.map=(railOpen?280:36)+320;  // the map beside its rail
-  if(frames.map&&!visible('map'))frames.map.style.flex='0 0 '+(railOpen?280:36)+'px';
+  if(frames.map&&!visible('map')){frames.map.style.flex='0 0 '+(railOpen?280:0)+'px';frames.map.style.borderRightWidth=railOpen?'':'0';}
   v.forEach(function(n){f[n]=sizes[n]>0&&sizes[n]<1?sizes[n]:d[n]/W;t+=f[n];});
   v.forEach(function(n){frames[n].style.flex=f[n]/t*1000+' 1 0';});
   // CSS order, not moving the iframes (a moved iframe reloads); Tab still follows the old order
@@ -240,7 +254,7 @@ addEventListener('resize',function(){[].forEach.call(box.querySelectorAll('.sep'
 // The pane switch sets the order: drag a button sideways (past 6 px, so a click still toggles) or Alt+Left/Right.
 var seg=document.querySelector('.seg'),say=document.createElement('span'),grab,gx,gl,drag,quiet;
 say.className='site-vh';say.setAttribute('role','status');seg.parentNode.appendChild(say);
-[].forEach.call(seg.querySelectorAll('[data-p]'),function(b){b.title='Drag or Alt+arrows to reorder';});
+[].forEach.call(seg.querySelectorAll('[data-p]'),function(b){b.title='Click to show alone, Shift-click to add. Drag or Alt+arrows to reorder';});
 order.forEach(function(n){seg.appendChild(seg.querySelector('[data-p='+n+']'));});
 function reorder(){order=[].map.call(seg.querySelectorAll('[data-p]'),function(b){return b.dataset.p;});layout();url();}
 function keep(){try{localStorage.setItem('wtid-order',order.join('-'));}catch(e){}}
@@ -256,7 +270,7 @@ seg.addEventListener('pointermove',function(e){
 function drop(){if(grab&&drag){grab.classList.remove('dr');grab.style.transform='';keep();quiet=true;setTimeout(function(){quiet=false;});}
   grab=null;drag=false;}
 seg.addEventListener('pointerup',drop);seg.addEventListener('pointercancel',drop);
-seg.addEventListener('click',function(e){if(quiet)e.stopPropagation();},true);  // the click that ends a drag is not a toggle
+seg.addEventListener('click',function(e){if(quiet)e.stopPropagation();},true);  // the click that ends a drag picks nothing
 seg.addEventListener('keydown',function(e){
   var b=e.target.closest('[data-p]'),d={ArrowLeft:-1,ArrowRight:1}[e.key],o=b&&(d<0?b.previousElementSibling:b.nextElementSibling);
   if(!e.altKey||!d||!b)return;e.preventDefault();if(!o)return;

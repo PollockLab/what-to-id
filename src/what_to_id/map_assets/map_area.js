@@ -83,9 +83,9 @@ function MapArea(ctx){
     mode=false,ended=0,pts=[],cursor=null,ready=false,color=getComputedStyle(document.documentElement)
       .getPropertyValue('--share').trim()||'#c2410c',nf=new Intl.NumberFormat((typeof I18N!=='undefined'?I18N.loc:'en-CA'));
   var box=document.createElement('div');box.className='maplibregl-ctrl area';
-  box.innerHTML='<button type="button" class="atoggle" aria-expanded="false">Draw area or park</button>'+
-    '<div class="abtns"><button type="button" data-a="draw">Draw area</button>'+
-    '<label class="afile">Load GeoJSON<input type="file" accept=".geojson,.json,application/geo+json,'+
+  box.innerHTML='<button type="button" class="atoggle" aria-expanded="false">Where</button>'+
+    '<div class="abtns"><button type="button" data-a="draw">Draw</button>'+
+    '<label class="afile">Upload area<input type="file" accept=".geojson,.json,application/geo+json,'+
     'application/json"></label><button type="button" data-a="finish" hidden>Finish</button>'+
     '<button type="button" data-a="cancel" hidden>Cancel</button><button type="button" data-a="clear" '+
     'hidden>Clear area</button></div><div class="apark"><div class="acombo"><input type="text" '+
@@ -97,9 +97,9 @@ function MapArea(ctx){
     'aria-label="BC parks"></div><p class="amore" hidden></p></div></div><div class="achips" hidden></div>'+
     '<p class="anote" aria-live="polite" hidden></p><a class="abox" target="_blank" rel="noopener" hidden></a>'+
     '<p class="alive" aria-live="polite"></p>';
-  // a phone starts with the panel folded behind its toggle (map_area.css shows the toggle only there, never in Explore's sheet)
-  if(!document.documentElement.classList.contains('embed')){box.classList.add('acol');
-    box.querySelector('.atoggle').onclick=function(){this.setAttribute('aria-expanded',String(box.classList.toggle('acol')===false));};}
+  // a phone starts with the panel folded behind its toggle (map_area.css shows the toggle only there)
+  box.classList.add('acol');
+  box.querySelector('.atoggle').onclick=function(){this.setAttribute('aria-expanded',String(box.classList.toggle('acol')===false));};
   function el(a){return box.querySelector('[data-a="'+a+'"]');}
   var note=box.querySelector('.anote'),file=box.querySelector('.afile input'),q=box.querySelector('.acombo input'),
     tog=box.querySelector('.atog'),panel=box.querySelector('.apanel'),hdr=box.querySelector('.ahdr'),
@@ -162,8 +162,8 @@ function MapArea(ctx){
     if(parent!==window)parent.postMessage({type:'wtid-area',area:ringlist(),hash:hash(),label:(term()||{}).label||''},location.origin);}
   function ringlist(){return encode(loaded().reduce(function(r,a){return r.concat(a.rings);},[]));}
   // Sets a drawn or loaded shape in place of any area, or clears the area with null.
-  function set(rings,msg,quiet){NOTE=msg||'';INVALID='';
-    AREAS=rings&&rings.length?[{key:'',place:0,label:'',drawn:true,rings:rings,idx:index(rings)}]:[];
+  function set(rings,msg,quiet,name){NOTE=msg||'';INVALID='';
+    AREAS=rings&&rings.length?[{key:'',place:0,label:name||'',drawn:true,rings:rings,idx:index(rings)}]:[];
     refresh(quiet);
   }
   function prepare(rings){
@@ -198,11 +198,15 @@ function MapArea(ctx){
   addEventListener('keydown',function(e){if(e.key==='Escape'&&mode)stop();});
   el('draw').onclick=start;el('cancel').onclick=stop;el('finish').onclick=finish;
   el('clear').onclick=function(){set(null);};
-  file.onchange=function(){var f=file.files[0];file.value='';if(!f)return;
-    if(f.size>MAXMB*1048576){NOTE='This file is over '+MAXMB+' MB.';ui();return;}
-    f.text().then(function(t){var p=prepare(fromGeoJSON(JSON.parse(t)));set(p.rings,p.msg);fit(bbox());})
-      .catch(function(e){NOTE='Could not use '+f.name+': '+(e instanceof SyntaxError?'it is not JSON.':e.message);
-        ui();});};
+  // A file from Upload area or dropped on the map: its name is the area's chip. A refusal opens the panel to say why.
+  function take(f){if(!f)return;function fault(m){NOTE=m;box.classList.remove('acol');ui();}
+    if(f.size>MAXMB*1048576){fault('This file is over '+MAXMB+' MB.');return;}
+    f.text().then(function(t){var p=prepare(fromGeoJSON(JSON.parse(t)));set(p.rings,p.msg,false,f.name);fit(bbox());})
+      .catch(function(e){fault('Could not use '+f.name+': '+(e instanceof SyntaxError?'it is not JSON.':e.message));});}
+  file.onchange=function(){var f=file.files[0];file.value='';take(f);};
+  var dz=map.getContainer&&map.getContainer();  // Identify's stand-in map has no container to drop on
+  if(dz)['dragover','dragleave','drop'].forEach(function(t){dz.addEventListener(t,function(e){
+    e.preventDefault();dz.classList.toggle('adrop',t==='dragover');if(t==='drop')take(e.dataTransfer.files[0]);});});
   // iNaturalist answers a busy moment with an error that carries no CORS header, so try twice more
   function get(u,n){return fetch(u).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();})
     .catch(function(e){if(!n)throw e;return new Promise(function(ok){setTimeout(ok,1500);})
@@ -333,7 +337,7 @@ function MapArea(ctx){
   // The area as a filter term: what it keeps, and what iNaturalist can say of it. iNaturalist takes
   // several place ids as OR, so parks that all match a place use its native filter directly.
   function term(){var a=AREAS;if(!a.length)return null;var exact=!unresolved()&&!drawn()&&a.every(function(x){return x.place;});
-    return {dim:'area',kind:drawn()?'polygon':'parks',id:hash(),label:drawn()?'Drawn area':names(a),n:a.length,
+    return {dim:'area',kind:drawn()?'polygon':'parks',id:hash(),label:drawn()?AREAS[0].label||'Drawn area':names(a),n:a.length,
       exclude:false,mask:function(){return api.mask(ctx.P().n);},
       inat:function(){return exact?{params:{place_id:a.map(function(x){return x.place;}).join(',')},exact:true}:
         {params:{},exact:false};}};}

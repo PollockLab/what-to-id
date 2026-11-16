@@ -111,6 +111,7 @@ var CHANGES=0,map={addControl:function(c){document.body.appendChild(c.onAdd());}
   getBounds:function(){return {getWest:function(){return -124;},getEast:function(){return -122.9;},
     getSouth:function(){return 49;},getNorth:function(){return 49.5;}};},
   fitBounds:function(){},getCanvas:function(){return {style:{}};},
+  getContainer:function(){return {addEventListener:function(){}};},
   doubleClickZoom:{enable:function(){},disable:function(){}},dragPan:{enable:function(){},disable:function(){}}};
 var h=new URLSearchParams(location.hash.slice(1)),PARKS=%s,
   AREA=MapArea({map:map,S:{},LAST:0,P:function(){return {n:0};},keep:function(){},
@@ -316,7 +317,7 @@ def test_unreadable_shared_area_requires_explicit_recovery_before_identify(brows
     assert len(page.context.pages) == pages_before
     page.evaluate("refilter()")
     assert page.locator("#identify").get_attribute("href") is None
-    page.get_by_role("button", name="Draw area", exact=True).click()
+    page.get_by_role("button", name="Draw", exact=True).click()
     page.get_by_role("button", name="Cancel", exact=True).click()
     assert page.evaluate("AREA.invalid()") is True
     page.get_by_role("button", name="Clear invalid area", exact=True).click()
