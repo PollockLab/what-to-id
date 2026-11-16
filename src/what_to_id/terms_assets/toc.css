@@ -25,4 +25,5 @@ main :is(h2,h3){scroll-margin-top:16px}
   .doc>#toc{position:sticky;top:16px;max-width:none;max-height:calc(100vh - 32px);overflow:auto;
     padding:16px 0 0}
   #toc summary{display:none}
+  #toc #find{margin:0 0 12px}
 }
