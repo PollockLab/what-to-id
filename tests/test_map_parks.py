@@ -93,6 +93,18 @@ def test_names_match_across_forms_and_designations():
     assert m.kind_ok("ECOLOGICAL RESERVE", "Ten Mile Point")
 
 
+def test_national_parks_match_by_name_and_designation():
+    m = _script()
+    assert m.core("Yoho National Park") == m.core("YOHO NATIONAL PARK") == "yoho"
+    assert m.name_score("PACIFIC RIM NATIONAL PARK RESERVE", "Pacific Rim National Park") == 1.0
+    assert m.kind("Gwaii Haanas National Park Reserve") == "national park"
+    # a reserve matches a place named either way; a provincial park or a plain park is another area
+    assert m.kind_ok("NATIONAL PARK RESERVE", "Pacific Rim National Park")
+    assert m.kind_ok("NATIONAL PARK", "Yoho")
+    assert not m.kind_ok("NATIONAL PARK", "Yoho Provincial Park")
+    assert not m.kind_ok("PROVINCIAL PARK", "Yoho National Park")
+
+
 def test_a_place_matches_by_geometry_only_when_it_covers_the_area_both_ways():
     m = _script()
     assert m.two_way(0.95, 0.95, 1.0, 1.0)
