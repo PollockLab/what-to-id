@@ -62,6 +62,13 @@ def cards(page):
     )
 
 
+def hold_checklist(page):
+    """Hold the range checklist: its tiers re-rank the cards when they land, after the records."""
+    held = []
+    page.route(re.compile(r"/checklist_\d+m_\w+\.png"), lambda r: held.append(r))
+    return held
+
+
 def test_the_first_cards_show_before_the_records_and_stay_when_they_land(browser, site):
     base, _ = site
     head = first_file(base)
@@ -72,6 +79,7 @@ def test_the_first_cards_show_before_the_records_and_stay_when_they_land(browser
     eb.stub_inat(page, None)
     held = []
     page.route(re.compile(r"/pool-\d+\.\w+\.bin"), lambda r: held.append(r))
+    tiers = hold_checklist(page)
     with page.expect_request(re.compile(r"/pool-\d+\.\w+\.bin")):  # after the first row's photos
         page.goto(f"{base}/identify.html#lvl=1")
     early = cards(page)
@@ -104,6 +112,8 @@ def test_the_first_cards_show_before_the_records_and_stay_when_they_land(browser
     assert page.evaluate(row) == tabs and page.locator("#cats .cat:disabled").count() == 0
     assert cards(page) == drawn and page.evaluate("scrollY") == y  # the same cards, where they were
     assert page.locator("#status").inner_text().startswith("2,100 ")
+    for r in tiers:  # the tiers land last and may re-rank
+        r.continue_()
     assert page.errors == []
 
 
@@ -183,6 +193,7 @@ def test_a_second_visit_paints_the_kept_photos_before_inaturalist_answers(browse
     ctx = browser.new_context(viewport={"width": 380, "height": 800})
     page = ctx.new_page()
     eb.stub_inat(page, None)
+    hold_checklist(page)  # no re-rank under the first card read here
     page.goto(f"{base}/identify.html#lvl=1")
     page.wait_for_function("localStorage.getItem('wtid-identify-obs')")
     first = int(page.locator("#grid .card").first.get_attribute("data-id"))
@@ -193,6 +204,7 @@ def test_a_second_visit_paints_the_kept_photos_before_inaturalist_answers(browse
     eb.stub_inat(page, first)  # it left Needs ID since the last visit
     held = []
     page.route("https://api.inaturalist.org/v1/observations*", lambda r: held.append(r))
+    hold_checklist(page)
     page.goto(f"{base}/identify.html#lvl=1")
     page.wait_for_selector("#grid .card .ph img")
     assert held and int(page.locator("#grid .card").first.get_attribute("data-id")) == first
