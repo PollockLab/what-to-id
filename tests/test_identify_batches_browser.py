@@ -34,6 +34,27 @@ def site(tmp_path_factory):
     server.shutdown()
 
 
+@pytest.fixture(scope="module")
+def keyed_site(tmp_path_factory):
+    """The same site built with an OAuth client id, so the sign in line draws."""
+    pytest.importorskip("pyarrow")
+    root = tmp_path_factory.mktemp("keyed-site")
+    ids = np.random.default_rng(3).choice(2**32 - 2, N, replace=False) + 1
+    server, pts = serve(root, pool_frame(ids), np.zeros(N, "float32"))
+    study = {
+        "build": "b1",
+        "day": "2026-09-01",
+        "names": {"Aves": "Birds"},
+        "lists": {"A": {"Aves": [[int(pts["id"][0])]]}},
+    }
+    (root / "study.json").write_text(json.dumps(study))
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(page_identify, "INAT_CLIENT_ID", "test-client")
+        page_identify.build(root, study=root / "study.json")
+    yield f"http://127.0.0.1:{server.server_port}"
+    server.shutdown()
+
+
 def open_batches(browser, base, hash_="#lvl=b", signed_in=False, size=(600, 900)):
     page = browser.new_page(viewport={"width": size[0], "height": size[1]})
     page.errors, page.posts = [], []
@@ -171,3 +192,13 @@ def test_batches_show_no_clear_filters(browser, site):
     page = open_batches(browser, base, "#lvl=b&months=6")
     page.wait_for_function("window.__identify")
     assert page.locator("#fclear").count() == 1 and page.locator("#fclear").is_hidden()
+
+
+def test_the_sign_in_line_points_to_your_ids_signed_in_or_out(browser, keyed_site):
+    base = keyed_site
+    for signed_in in (False, True):
+        page = open_batches(browser, base, signed_in=signed_in)
+        line = page.inner_text("#sin")
+        assert "IDs you add here are posted under your iNaturalist account." in line
+        assert "Check Your IDs to see if someone disagreed or commented." in line
+        assert line.startswith("Signed in as me.") == signed_in

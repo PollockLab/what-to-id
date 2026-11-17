@@ -3,7 +3,7 @@
 // the area and the lasso's ids (SpaceMask). Up to PER_SPECIES cards per species, best first, are drawn at view time;
 // their photos come from iNaturalist 200 ids to a request as the cards are drawn, a batch at a time as the list scrolls.
 // With the study (CFG.study, the URL of the one file every viewer fetches) a Batches tab comes first and is the default: it draws the study's batches (identify_study.js)
-// as the same cards, pool or not, and a viewer signed in with iNaturalist (identify_inat.js) can post an ID from a card.
+// as the same cards, pool or not, and a viewer signed in with iNaturalist (identify_inat.js) can post an ID from a card; the sign in line points to Your IDs (identify_suggest.js), the records others replied to.
 (function(){
 'use strict';
 var CFG=IDENTIFY_CONFIG,L=EmbeddingsLayout,Meta=AtlasSearchMeta,PER_SPECIES=3,LIMIT=12,STEPS=16,NO_LOOK=65535,NOTAX=65535,LS='wtid-identify-tab',IO=null,T=0,TK=0,AB=null;
@@ -179,7 +179,7 @@ function signin(){
   var box=$('sin');box.textContent='';if(!IN.on)return;
   var u=IN.user(),b=el('button','lnk',u?'Sign out':'Sign in with iNaturalist');b.type='button';
   b.onclick=function(){if(u){IN.out();signin();SK='';paint();}else IN.start();};
-  box.append(u?'Signed in as '+u.login+'. ':'',b,u?'':' to post IDs from here');
+  box.append(u?'Signed in as '+u.login+'. ':'',b,u?'':' to post IDs from here',el('span','muted',' IDs you add here are posted under your iNaturalist account. Check Your IDs to see if someone disagreed or commented.'));
 }
 // The Batches tab's cards: the batch newest first, each a pool card when the pool holds it; drawn again only when
 // the batch or what a card can show (the pool, the look-alikes, the ranges, the sign in) changed.
@@ -457,7 +457,7 @@ async function load(){
   MF=MapFilter(META);Object.assign(S,MF.read(new URLSearchParams()));  // the defaults, until the address is read
   OX=IdentifyOnly({META:META,mf:MF,P:function(){return P;},taxa:function(){return TAXA;},range:function(){return R;},rewrite:rewrite,changed:refresh,embedded:parent!==window,get:function(f){return get(new URL(f,MAP));}});
   BAR=IdentifyBar({rewrite:rewrite,S:S,META:META,mf:MF,nf:nf,taxa:function(){return TAXA;},P:function(){return P;},tf:function(){return TF;},mask:atLevel,all:kept,tab:function(){var l=CFG.levels.filter(function(x){return x[0]===LV;})[0];return {name:l?l[1]:'',has:function(i){return LV===6||(LV?LEVEL[i]===LV:LEVEL[i]>0);}};},changed:put,blocked:function(){return !!(AREA||VIEW||KEEPIDS||SUBIDS||PIDS||UF.active());},
-    where:where,get:function(u){return get(new URL(u,MAP));},map:MAP,key:key,embedded:parent!==window});
+    where:where,get:function(u){return get(new URL(u,MAP));},map:MAP,key:key,user:function(){return IN.user();},embedded:parent!==window});
   RKF=function(){if(RK||rkp)return;LKF();Promise.all([rk(),lk()]).then(function(d){var ok=rank(d[0]);RKW=false;ok&&LV===3?redraw(true):(build(),counts());});};  // the count waits until the rank is read, not just fetched
   LKF=function(){if(lkp)return;lk().then(function(b){if(!b)return;LOOKS=looks(b);retitle();
     var cs=[].slice.call($('grid').querySelectorAll('.card'));CMP.fill(cs);cs.forEach(CARD.paint);if(BT)paint();

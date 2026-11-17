@@ -137,7 +137,10 @@ var words={
 "Your progress":"Votre progression","Nothing opened yet today.":"Rien d'ouvert pour l'instant aujourd'hui.","Not yet by me":"Pas encore par moi",
 "Leave out what you identified":"Exclure ce que vous avez identifié","Type your iNaturalist login below first.":"Saisissez d'abord votre identifiant iNaturalist ci-dessous.",
 "Untick “my observations” below first.":"Décochez d'abord « mes observations » ci-dessous.","Nobody has looked":"Personne n'a regardé",
-"No one but the observer has identified it":"Seul l'observateur l'a identifiée","Needs a second opinion":"Demande un deuxième avis","One ID, and nobody agrees yet":"Une identification, et personne n'est encore d'accord"
+"No one but the observer has identified it":"Seul l'observateur l'a identifiée","Needs a second opinion":"Demande un deuxième avis","One ID, and nobody agrees yet":"Une identification, et personne n'est encore d'accord",
+"Your IDs":"Vos identifications","Someone disagreed":"Quelqu'un n'est pas d'accord","New comment":"Nouveau commentaire","No replies to your IDs yet.":"Aucune réponse à vos identifications pour l'instant.",
+"Type your iNaturalist login above, or sign in.":"Saisissez votre identifiant iNaturalist ci-dessus, ou connectez-vous.","Your IDs did not load.":"Vos identifications n'ont pas pu être chargées.",
+"IDs you add here are posted under your iNaturalist account. Check Your IDs to see if someone disagreed or commented.":"Les identifications ajoutées ici sont publiées sous votre compte iNaturalist. Consultez Vos identifications pour voir si quelqu'un n'est pas d'accord ou a commenté."
 };
 var rules=[
 // the About text with its scoring dates, and the "no level" rule with the photo download
@@ -161,6 +164,7 @@ R('# threatened or introduced',function(m,n){return n+' '+pl(n,'menacée ou intr
 R('From (\\d{4}-\\d\\d-\\d\\d)','Depuis le $1'),
 R('# of 10 improving IDs in 30 days',function(m,n){return n+' sur 10 identifications améliorantes en 30 jours';}),
 [/^(\S+) on iNaturalist$/,'$1 sur iNaturalist'],
+R('Observation # on iNaturalist','Observation $1 sur iNaturalist'),
 R('# opened today',function(m,n){return n+' '+pl(n,'ouverte','ouvertes')+" aujourd'hui";}),
 R('# records to identify','$1 observations à identifier'),
 R('# of # BC records with photos need an ID',"$1 des $2 observations avec photos de la C.-B. attendent une identification"),
