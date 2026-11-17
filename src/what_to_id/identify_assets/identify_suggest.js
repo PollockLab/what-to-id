@@ -20,7 +20,7 @@ var T={
   second:'Needs a second opinion',secondSub:'One ID, and nobody agrees yet',
   ids:'Tap a name to see their genera',idsNone:'None found for these filters.',onInat:'{u} on iNaturalist',newTab:' (opens in a new tab)',
   yoursNone:'No replies to your IDs yet.',yoursNeed:'Add your iNat login in About this page, or sign in.',yoursFail:'Your IDs did not load.',
-  unknown:'Unknown',obsOn:'Observation {n} on iNaturalist',suggests:'suggests',commented:'commented:',fresh:'New',rep1:'1 reply to your IDs',repN:'{n} replies to your IDs'
+  unknown:'Unknown',obsOn:'Observation {n} on iNaturalist',suggests:'suggests',commented:'commented:',fresh:'New',rep1:'1 new reply to your IDs',repN:'{n} new replies to your IDs',useMe:'Use my login:'
 };
 var NS='http://www.w3.org/2000/svg',R=50,PTS=64,KM=111.195,STORE={topn:'wtid-topn',recent:'wtid-recent',visit:'wtid-lastvisit',opened:'wtid-opened',improving:'wtid-improving',replies:'wtid-replies',seen:'wtid-yours-seen'},
   ICON={
@@ -232,7 +232,7 @@ function load(me){
   var c=get(STORE.replies,true);
   if(c&&c.u===me&&Date.now()-c.at<6e5){MINE[me]=c.rows;return;}
   MINE[me]=null;
-  fetch(I18N.api('https://api.inaturalist.org/v2/observations?ident_user_id='+encodeURIComponent(me)+'&order_by=updated_at&order=desc&per_page=200&fields='+encodeURIComponent(FIELDS)))
+  fetch(I18N.api('https://api.inaturalist.org/v2/observations?ident_user_id='+encodeURIComponent(me)+'&not_user_id='+encodeURIComponent(me)+'&order_by=updated_at&order=desc&per_page=200&fields='+encodeURIComponent(FIELDS)))
     .then(function(r){if(!r.ok)throw 0;return r.json();})
     .then(function(j){
       MINE[me]=j.results.map(function(ob){var r=replies(ob,me);return r&&Object.assign(r,{oid:ob.id,taxon:ob.taxon});}).filter(Boolean)
@@ -246,7 +246,14 @@ function yours(){
   var me=person();
   if(me&&!(me in MINE))load(me);
   if(MY.open&&MY.offsetParent)drawYours(me);  // seen only when the fold shows
-  drawCount(me);
+  drawCount(me);offer(me);
+}
+// One tap puts the viewer's own login in an empty User box; nothing is filled or ticked unasked
+function offer(me){
+  var h=document.getElementById('usrhint'),b=document.getElementById('usrme');if(!h)return;
+  if(!b){b=el('button','lnk');b.type='button';b.id='usrme';h.after(' ',b);
+    b.onclick=function(){var i=document.getElementById('usrname');i.value=b.dataset.me;i.dispatchEvent(new Event('change'));};}
+  b.dataset.me=me;b.textContent=T.useMe+' '+me;b.hidden=!me||!!S.user;
 }
 // Tapping an identifier fills the User box and ticks "Only the user's genera", as if typed and ticked
 function strengths(l){

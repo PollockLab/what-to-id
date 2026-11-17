@@ -228,7 +228,7 @@ def test_the_sign_in_line_counts_unseen_replies_and_drops_them_at_sign_out(brows
     )
     page.reload()
     page.wait_for_selector("#sin b")
-    assert page.inner_text("#sin b") == "1 reply to your IDs"
+    assert page.inner_text("#sin b") == "1 new reply to your IDs"
     assert page.locator("#rep").is_visible()
     page.click("#sin button")
     page.wait_for_function("!document.querySelector('#sin b')")

@@ -138,7 +138,7 @@ var words={
 "Leave out what you identified":"Exclure ce que vous avez identifié","Type your iNaturalist login below first.":"Saisissez d'abord votre identifiant iNaturalist ci-dessous.",
 "Untick “my observations” below first.":"Décochez d'abord « mes observations » ci-dessous.","Nobody has looked":"Personne n'a regardé",
 "No one but the observer has identified it":"Seul l'observateur l'a identifiée","Needs a second opinion":"Demande un deuxième avis","One ID, and nobody agrees yet":"Une identification, et personne n'est encore d'accord",
-"Your IDs":"Vos identifications","suggests":"suggère","commented:":"a commenté :","New":"Nouveau","1 reply to your IDs":"1 réponse à vos identifications","No replies to your IDs yet.":"Aucune réponse à vos identifications pour l'instant.",
+"Your IDs":"Vos identifications","suggests":"suggère","commented:":"a commenté :","New":"Nouveau","Use my login:":"Utiliser mon identifiant :","1 new reply to your IDs":"1 nouvelle réponse à vos identifications","No replies to your IDs yet.":"Aucune réponse à vos identifications pour l'instant.",
 "Add your iNat login in About this page, or sign in.":"Ajoutez votre identifiant iNat dans À propos de cette page, ou connectez-vous.","Your IDs did not load.":"Vos identifications n'ont pas pu être chargées.",
 "IDs you add here are posted under your iNaturalist account. Check Your IDs to see if someone disagreed or commented.":"Les identifications ajoutées ici sont publiées sous votre compte iNaturalist. Consultez Vos identifications pour voir si quelqu'un n'est pas d'accord ou a commenté."
 };
@@ -164,7 +164,7 @@ R('# threatened or introduced',function(m,n){return n+' '+pl(n,'menacée ou intr
 R('From (\\d{4}-\\d\\d-\\d\\d)','Depuis le $1'),
 R('# of 10 improving IDs in 30 days',function(m,n){return n+' sur 10 identifications améliorantes en 30 jours';}),
 [/^(\S+) on iNaturalist$/,'$1 sur iNaturalist'],
-R('# replies to your IDs','$1 réponses à vos identifications'),
+R('# new replies to your IDs','$1 nouvelles réponses à vos identifications'),
 R('Observation # on iNaturalist','Observation $1 sur iNaturalist'),
 R('# opened today',function(m,n){return n+' '+pl(n,'ouverte','ouvertes')+" aujourd'hui";}),
 R('# records to identify','$1 observations à identifier'),

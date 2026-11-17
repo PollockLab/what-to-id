@@ -164,7 +164,10 @@ def test_your_ids_is_asked_once_per_person_in_v2_with_a_field_list(browser, site
     page.wait_for_timeout(300)
     assert len(urls) == 1
     url = urls[0]
-    assert url.startswith("https://api.inaturalist.org/v2/observations?ident_user_id=me&")
+    # the person's own observations would fill the 200 and are skipped anyway
+    assert url.startswith(
+        "https://api.inaturalist.org/v2/observations?ident_user_id=me&not_user_id=me&"
+    )
     assert "per_page=200" in url and "order_by=updated_at" in url and "ancestor_ids" in url
     assert "fields=(id%3A!t" in url
 
@@ -177,7 +180,7 @@ def test_the_count_shows_unopened_opens_the_fold_and_clears_until_a_newer_reply(
     ]
     page, urls = open_yours(browser, base, results, fold=False)
     page.wait_for_selector("#rep button")
-    assert page.inner_text("#rep button") == "2 replies to your IDs"
+    assert page.inner_text("#rep button") == "2 new replies to your IDs"
     assert page.locator("#pwho").is_hidden()
     page.click("#rep button")
     page.wait_for_selector("#myids li")
@@ -194,7 +197,7 @@ def test_the_count_shows_unopened_opens_the_fold_and_clears_until_a_newer_reply(
     page.evaluate("sessionStorage.removeItem('wtid-replies')")
     page.reload()
     page.wait_for_selector("#rep button")
-    assert page.inner_text("#rep button") == "1 reply to your IDs"
+    assert page.inner_text("#rep button") == "1 new reply to your IDs"
     page.click("#rep button")
     page.wait_for_selector("#myids li")
     assert page.locator("#myids li").count() == 3
@@ -262,7 +265,7 @@ def test_replies_are_not_marked_seen_while_the_fold_is_out_of_sight(browser, sit
     page.evaluate("localStorage.setItem('wtid-yours-seen', JSON.stringify({me: 0}))")
     page.evaluate("location.hash = '#groups=Aves'")  # a filter change redraws the suggestions
     page.wait_for_selector("#rep button")
-    assert page.inner_text("#rep button") == "1 reply to your IDs"
+    assert page.inner_text("#rep button") == "1 new reply to your IDs"
 
 
 def test_your_ids_and_the_count_read_in_french(browser, site):
@@ -270,7 +273,7 @@ def test_your_ids_and_the_count_read_in_french(browser, site):
     one = [record(102, MINE, comments=[(BOB, AFTER, "hi")])]
     page, _ = open_yours(browser, base, one, lang="fr", fold=False)
     page.wait_for_selector("#rep button")
-    assert page.inner_text("#rep button") == "1 réponse à vos identifications"
+    assert page.inner_text("#rep button") == "1 nouvelle réponse à vos identifications"
     page.click("#rep button")
     page.wait_for_selector("#myids li")
     assert page.inner_text("#myids summary") == "Vos identifications"
@@ -280,8 +283,25 @@ def test_your_ids_and_the_count_read_in_french(browser, site):
     two = [*one, record(103, MINE, [ident(ALICE, GULL, day(1), True, True, "Larus")])]
     page, urls = open_yours(browser, base, two, lang="fr", fold=False)
     page.wait_for_selector("#rep button")
-    assert page.inner_text("#rep button") == "2 réponses à vos identifications"
+    assert page.inner_text("#rep button") == "2 nouvelles réponses à vos identifications"
     page.click("#rep button")
     page.wait_for_selector("#myids li")
     assert "alice suggère Larus" in page.inner_text("#myids")
     assert "locale=fr" in urls[0]
+
+
+def test_one_tap_puts_the_known_login_in_an_empty_user_box(browser, site):
+    base, _ = site
+    page, _ = open_yours(browser, base, [], "#me=them", signed_in=False)
+    assert page.input_value("#usrname") == "" and "user=" not in page.evaluate("location.hash")
+    assert page.inner_text("#usrme") == "Use my login: them"
+    page.click("#usrme")
+    page.wait_for_function("document.querySelector('#usrme').hidden")
+    assert page.input_value("#usrname") == "them"
+    assert not page.is_checked("#usrtaxa")
+
+
+def test_no_login_is_offered_when_none_is_known(browser, site):
+    base, _ = site
+    page, _ = open_yours(browser, base, [], signed_in=False)
+    assert page.locator("#usrme").is_hidden()
