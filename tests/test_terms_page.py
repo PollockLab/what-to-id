@@ -146,7 +146,7 @@ def test_methods_numbers_come_from_the_code_and_the_manifest():
         "<code>hf-hub:x/y</code>",
         "<code>abc123</code>",
         "vector of 1024 numbers",
-        'prompt "a photo of {}"; the index holds 34,717',
+        'prompt "a photo of {}": 34,717 names, one text vector each',
         "sample of 100,000 photos, the 12 nearest",
         "on average 15% of the 12 true closest matches (median\n8%, and 27% of sampled",
         "early exaggeration 12 for 250 iterations; phases 250@12, 500@4, 500@1",
