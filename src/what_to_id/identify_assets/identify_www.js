@@ -11,7 +11,7 @@ function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=c
 function invasive(t){var m=t.establishment_means||{};
   return /introduced|invasive/.test(m.establishment_means||'')&&(!m.place||m.place.id===7085)?INV:0;}
 return function(ctx){
-  var api=inatGate({gap:1000}),ids=new Map(),cache={},want=new Set(),busy=new Set(),T=0,need=0,risk=new Set((ctx.value||[]).map(function(r){return r[0];}));
+  var api=inatGate({gap:1000}),ids=new Map(),cache={},want=new Set(),busy=new Set(),T=0,out=0,need=0,risk=new Set((ctx.value||[]).map(function(r){return r[0];}));
   try{var c=JSON.parse(localStorage.getItem(LS))||{};if(Date.now()-c.at<WEEK)cache=c.f||{};}catch(e){}
   function on(k){return new RegExp('(^|&)'+k+'=1(&|$)').test(location.hash.slice(1));}
   function keep(k,v){var t=location.hash.slice(1).split('&').filter(function(x){return x&&x.indexOf(k+'=')!==0;});if(v)t.push(k+'=1');
@@ -19,15 +19,17 @@ return function(ctx){
   function save(){try{localStorage.setItem(LS,JSON.stringify({at:Date.now(),f:cache}));}catch(e){}}
   function ask(){
     var todo=[...want].filter(function(id){return !busy.has(id)&&!(id in cache);});want.clear();
-    for(var k=0;k<todo.length;k+=30)(function(b){b.forEach(function(id){busy.add(id);});
+    for(var k=0;k<todo.length;k+=30)(function(b){b.forEach(function(id){busy.add(id);});out++;
       api('taxa/'+b.join(',')+'?preferred_place_id=7085').then(function(j){
         b.forEach(function(id){cache[id]=0;});(j.results||[]).forEach(function(t){cache[t.id]=invasive(t);});save();
       }).catch(function(){b.forEach(function(id){cache[id]=0;});}).then(function(){
-        b.forEach(function(id){busy.delete(id);});clearTimeout(T);T=setTimeout(ctx.redraw,300);});})(todo.slice(k,k+30));
+        b.forEach(function(id){busy.delete(id);});out--;settled();});})(todo.slice(k,k+30));
   }
   // a suggestion the taxa table lacks: its id by an exact name search, 0 for none
-  function named(nm){ids.set(nm,0);api('taxa?rank=species&per_page=1&q='+encodeURIComponent(nm)).then(function(j){
-    var x=(j.results||[])[0];if(x&&x.name===nm){ids.set(nm,x.id);clearTimeout(T);T=setTimeout(ctx.redraw,300);}}).catch(function(){});}
+  // one redraw once every lookup in flight has answered: a redraw per answer (one a second) made the grid flicker
+  function settled(){clearTimeout(T);if(!out)T=setTimeout(ctx.redraw,300);}
+  function named(nm){ids.set(nm,0);out++;api('taxa?rank=species&per_page=1&q='+encodeURIComponent(nm)).then(function(j){
+    var x=(j.results||[])[0];if(x&&x.name===nm)ids.set(nm,x.id);}).catch(function(){}).then(function(){out--;settled();});}
   // records pass unless a toggle is on and their suggestion fails it
   function pass(i){
     if(!need)return true;
