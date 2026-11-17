@@ -79,7 +79,7 @@ def values(manifest: dict | None) -> dict[str, str]:
         "__WEIRD_SHARE__": _pct(levels.WEIRD_SHARE),
         "__EASY_TOP_SHARE__": _pct(levels.EASY_TOP_SHARE),
         "__MIN_PER_CLASS__": str(confusion.MIN_PER_CLASS),
-        "__TAXONOMIST_MARGIN__": f"{levels.TAXONOMIST_MARGIN:g}",
+        "__TAXONOMIST_QUANTILE__": f"{levels.TAXONOMIST_QUANTILE * 100:g}th",
         "__MIN_LOOKALIKE_RECORDS__": str(levels.MIN_LOOKALIKE_RECORDS),
         "__STEPS__": str(pool_levels.STEPS),
         "__PAIRS_PER_SPECIES__": str(confusion.FIR_PAIRS_PER_SPECIES),
@@ -147,9 +147,7 @@ def evaluation(data_url: str | None = None) -> dict[str, str]:
         "__BASELINE_ROWS__": baseline_rows,
         "__CLOSE_AUC__": _ci(base["close_calls_lowest_margin_first"], "auc", 3),
         "__COHORT_LINK__": f'<a href="{cohort_url}">{cohort}</a>' if cohort_url else MISSING,
-        "__FIG_MARGIN__": terms_figures.margin_hist(
-            ev["figures"]["margin_hist"], LEVEL_NAMES, [0, -levels.TAXONOMIST_MARGIN]
-        ),
+        "__FIG_MARGIN__": terms_figures.margin_hist(ev["figures"]["margin_hist"], LEVEL_NAMES, [0]),
         "__FIG_CALIBRATION__": terms_figures.corrected_by_margin(
             ev["figures"]["corrected_by_margin"]
         ),

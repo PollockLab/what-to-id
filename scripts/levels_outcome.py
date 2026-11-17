@@ -26,7 +26,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from what_to_id.levels import TAXONOMIST_MARGIN, WEIRD_SHARE, lookalike_known, species_masks
+from what_to_id.levels import WEIRD_SHARE, lookalike_known, species_masks, taxonomist_cut
 from what_to_id.pool_levels import STEPS, quantize
 
 LEVELS = {0: "none", 1: "easy", 2: "taxonomist", 4: "weird", 5: "mislabel"}
@@ -51,7 +51,7 @@ def cohort(scores: Path, before: Path, after: Path) -> pd.DataFrame:
     g = s["iconic_taxon"].fillna("")
     weird = s["top"] <= s.groupby(g)["top"].transform(lambda x: x.quantile(WEIRD_SHARE))
     easy, tax = species_masks(s, weird)
-    mis = (s["margin"] < -TAXONOMIST_MARGIN) & lookalike_known(s) & ~weird
+    mis = (s["margin"] < -taxonomist_cut(s)) & lookalike_known(s) & ~weird
     s["level"] = np.select([weird, easy, tax, mis], [4, 1, 2, 5], 0)
     b = pd.read_parquet(after, columns=["id", "taxon_id", "taxon_name"]).rename(
         columns={"taxon_id": "taxon_b", "taxon_name": "name_b"}

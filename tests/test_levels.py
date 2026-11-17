@@ -66,7 +66,8 @@ def test_each_level_is_filled_and_its_rule_holds(monkeypatch):
     assert (easy["margin"] > 0).all() and (easy["score"] == easy["own"].astype(np.float32)).all()
     # the top quarter by own of 11 photos is 2 photos per species
     assert easy.groupby("taxon_id").size().eq(2).all()
-    assert tax["margin"].between(-levels.TAXONOMIST_MARGIN, 0, inclusive="left").all()
+    cut = levels.taxonomist_cut(s.set_index("id")).loc[tax["id"]].to_numpy()
+    assert ((tax["margin"] < 0) & (tax["margin"] >= -cut)).all()
     # the photos just past their look-alike, one per species
     assert (tax["id"] - 100).mod(11).eq(8).all() and len(tax) == 3
     assert set(tax["looks_like_name"]) == {"G a", "G b"}
@@ -277,7 +278,8 @@ def test_weird_wins_at_any_rank():
 
 
 def mislabel_levels(margin, bc, top=0.9):
-    """Levels of a species row at `margin` whose look-alike has `bc` BC records, among 49 others."""
+    """Levels of a species row at `margin` whose look-alike has `bc` BC records, among 49 others;
+    the group's Close calls cut is 0.02."""
     n = 50
     s = pd.DataFrame(
         {
@@ -298,6 +300,7 @@ def mislabel_levels(margin, bc, top=0.9):
     )
     s.loc[0, "top"] = top
     s.loc[1:, ["own", "other"]] = [0.9, 0.1]  # the rest sit squarely in their label
+    s.loc[1:30, ["own", "other"]] = [0.5, 0.52]  # but 30 at -0.02 set the group's cut there
     out = identify.identify_levels(s, bc_counts=pd.Series({"G b": bc}))
     return out.iloc[0]
 
@@ -360,3 +363,19 @@ def test_cli_identify_registers_the_new_key_and_leaves_levels(tmp_path, capsys):
     with pytest.raises(ValueError, match="--tree"):
         (tmp_path / "taxonomy.json").write_text('{"taxa":{}}')
         levels.main(args)
+
+
+def test_close_calls_cut_is_per_group():
+    # group A's margins sit near zero, B's ten times further out: each gets its own 75th percentile
+    margin = [-0.01, -0.02, -0.03, -0.04, -0.1, -0.2, -0.3, -0.4, 0.5]
+    group = ["A"] * 4 + ["B"] * 4 + ["C"]
+    s = pd.DataFrame(
+        {"margin": margin, "iconic_taxon": group, "taxon_id": range(9), "taxon_name": "y"}
+    )
+    s = s.assign(own=0.5, other_name="y")
+    cut = levels.taxonomist_cut(s)
+    assert cut.iloc[:4].round(6).eq(0.0175).all() and cut.iloc[4:8].round(6).eq(0.175).all()
+    assert np.isnan(cut.iloc[8])  # group C has no negative margin, so no cut
+    _, tax = levels.species_masks(s, pd.Series(False, index=s.index), pd.Series({"y": 100}))
+    got = s[tax].set_index("margin")["iconic_taxon"].to_dict()
+    assert got == {-0.01: "A", -0.1: "B"}

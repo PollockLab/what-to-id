@@ -9,19 +9,19 @@ outside the clade. Every row gets `top`, its best cosine to any prototype.
 `identify_levels` turns that into one row per record (`IDENTIFY_COLUMNS`): weird first at any
 rank, then easy / taxonomist at species rank with no per-species or per-group cap, then narrow
 for a higher rank whose clade has a prototype, then mislabel: a species-ranked margin below
-`-TAXONOMIST_MARGIN` with a look-alike of `MIN_LOOKALIKE_RECORDS` records. Everything else is
-level 0.
+its group's Close calls cut (`levels.taxonomist_cut`) with a look-alike of
+`MIN_LOOKALIKE_RECORDS` records. Everything else is level 0.
 
 `identify_delta` brings a base table up to the pool (the daily atlas run) against cut-offs frozen
-from that table (`freeze_cutoffs`): the per-group weird cut and, per species, the lowest `own` of
-its Clear matches. A species with fewer than `MIN_PER_CLASS` base records never gets a Clear
-match, as in the full run. It drops records that left the pool (or lost their taxon), rescores
-records whose pool taxon_id differs from the stored one, and scores pool records the base lacks
-(new, or in the index but never scored). Other base rows are untouched. A record with no vector
-keeps its old row (or gets none). Vectors come from the raw deltas where present, else
-`atlas_index_io.reconstruct` rebuilds them from the index's refine codes. Levels of rescored
-Fir-era records come from 3-bit refine reconstructions, 97.7% level agreement with true vectors.
-A Fir rerun replaces the file.
+from that table (`freeze_cutoffs`): the per-group weird and Close calls cuts and, per species,
+the lowest `own` of its Clear matches. A species with fewer than `MIN_PER_CLASS` base records
+never gets a Clear match, as in the full run. It drops records that left the pool (or lost their
+taxon), rescores records whose pool taxon_id differs from the stored one, and scores pool
+records the base lacks (new, or in the index but never scored). Other base rows are untouched.
+A record with no vector keeps its old row (or gets none). Vectors come from the raw deltas where
+present, else `atlas_index_io.reconstruct` rebuilds them from the index's refine codes. Levels of
+rescored Fir-era records come from 3-bit refine reconstructions, 97.7% level agreement with true
+vectors. A Fir rerun replaces the file.
 
     python -m what_to_id.identify --live DIR --index DIR --pool pool.parquet --tree taxonomy.json \\
         --taxa DIR --vectors raw-delta-*.npz [--bc-counts bc-verifiable-counts.parquet]
@@ -45,7 +45,7 @@ import pandas as pd
 
 from what_to_id.atlas_index_io import read_manifest, reconstruct, write_manifest
 from what_to_id.confusion import CHUNK, FIR_SLICE, MIN_PER_CLASS, read_taxa_vectors
-from what_to_id.levels import TAXONOMIST_MARGIN, WEIRD_SHARE, lookalike_known, species_masks
+from what_to_id.levels import WEIRD_SHARE, lookalike_known, species_masks, taxonomist_cut
 
 IDENTIFY_COLUMNS = ("id", "taxon_id", "level", "score", "score2", "looks_like")
 NONE, EASY, TAXONOMIST, NARROW, WEIRD, MISLABEL = 0, 1, 2, 3, 4, 5
@@ -57,6 +57,7 @@ class Frozen(NamedTuple):
     weird: pd.Series  # iconic group ("" for none) -> highest `top` that is weird
     easy: pd.Series  # taxon id -> lowest `own` among its Clear matches
     n: pd.Series  # taxon id -> species-ranked records in the base
+    tax: pd.Series  # iconic group ("" for none) -> how far below zero its deepest Close call is
 
 
 def freeze_cutoffs(base: pd.DataFrame, pool: pd.DataFrame) -> Frozen:
@@ -64,10 +65,12 @@ def freeze_cutoffs(base: pd.DataFrame, pool: pd.DataFrame) -> Frozen:
     m = base.merge(pool[["id", "rank", "iconic_taxon"]].drop_duplicates("id"), on="id")
     weird = m[m["level"] == WEIRD]
     easy = m[m["level"] == EASY]
+    tax = m[m["level"] == TAXONOMIST]
     return Frozen(
         weird["score"].groupby(weird["iconic_taxon"].fillna("")).max(),
         easy["score"].groupby(easy["taxon_id"]).min(),
         m[m["rank"] == "species"].groupby("taxon_id").size(),
+        -tax["score"].groupby(tax["iconic_taxon"].fillna("")).min(),
     )
 
 
@@ -195,8 +198,9 @@ def identify_levels(
     species (taxonomist, mislabel) or the probable species (narrow); a trailing `runner_up` column
     holds narrow's second-best species in the clade, the one `score2` is the margin over.
 
-    With `frozen`, the weird cut and the easy share come from it, not from `scores`; a group or
-    species it lacks gets neither level. `bc_counts` should then cover the whole pool.
+    With `frozen`, the weird and Close calls cuts and the easy share come from it, not from
+    `scores`; a group or species it lacks gets neither level (a group with no Close calls cut gets
+    neither Close calls nor Might be mislabelled). `bc_counts` should then cover the whole pool.
     """
     s = scores.copy()
     s["group"] = s["iconic_taxon"].fillna("")
@@ -207,7 +211,11 @@ def identify_levels(
     sp = s[(s["rank"] == "species") & s["own"].notna() & s["other"].notna()].assign(
         margin=lambda d: d["own"] - d["other"]
     )
-    easy, tax = species_masks(sp, weird.loc[sp.index], bc_counts)
+    if frozen is None:
+        cut = taxonomist_cut(sp)
+    else:
+        cut = sp["iconic_taxon"].fillna("").map(frozen.tax).astype(float)
+    easy, tax = species_masks(sp, weird.loc[sp.index], bc_counts, cut)
     if frozen is not None:
         easy = (
             (sp["margin"] > 0)
@@ -219,7 +227,7 @@ def identify_levels(
     narrow = (s["rank"] != "species") & s["in_best"].notna() & ~weird
     # species rank only, so disjoint from narrow; the margin test is disjoint from easy and tax
     mislabel = (
-        (sp["margin"] < -TAXONOMIST_MARGIN) & lookalike_known(sp, bc_counts) & ~weird.loc[sp.index]
+        (sp["margin"] < -cut) & lookalike_known(sp, bc_counts) & ~weird.loc[sp.index]
     ).reindex(s.index, fill_value=False)
     conds = [weird, easy, tax, narrow, mislabel]
     level = np.select(conds, [WEIRD, EASY, TAXONOMIST, NARROW, MISLABEL], NONE)

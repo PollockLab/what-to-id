@@ -23,9 +23,9 @@ other. A margin above 0 means the label is the model's first choice among the po
 For a record labelled above species (a genus, say), the best score inside the label's clade is
 compared with the best score outside it.</p>
 <figure tabindex="0" role="region" aria-labelledby="figcap-margin">__FIG_MARGIN__<figcaption id="figcap-margin">Margin of every species-labelled record in the scored pool,
-coloured by the level it took, on a log count axis. Dashed lines: the cut at 0 between Clear
-matches and Close calls, and at &minus;__TAXONOMIST_MARGIN__ between Close calls and Might be
-mislabelled. The end bins hold every record beyond &minus;0.15 and 0.15. From the committed
+coloured by the level it took, on a log count axis. Dashed line: the cut at 0 between Clear
+matches and Close calls. The cut between Close calls and Might be mislabelled is set per iconic
+group (see Identify levels), so no single line marks it. The end bins hold every record beyond &minus;0.15 and 0.15. From the committed
 output of the evaluation script below.</figcaption></figure>
 
 <h3 id="methods-levels">Identify levels</h3>
@@ -35,21 +35,25 @@ output of the evaluation script below.</figcaption></figure>
 iconic group (birds, plants, fungi and so on). Any rank.</li>
 <li>Clear matches: species rank, margin above 0, own in the top __EASY_TOP_SHARE__ of the
 species' scored records, and the species has __MIN_PER_CLASS__ or more scored records.</li>
-<li>Close calls: species rank, margin below 0 but not below &minus;__TAXONOMIST_MARGIN__, and the
+<li>Close calls: species rank, margin below 0 but not below the cut of the record's iconic group, and the
 best other species has __MIN_LOOKALIKE_RECORDS__ or more verifiable records in BC.</li>
 <li>Narrow it down: a rank above species whose clade holds at least one species with a text
 vector. The score is the smaller of two margins: the in-clade best minus the best outside the
 clade, and the in-clade best minus the second-best in the clade.</li>
-<li>Might be mislabelled: species rank, margin below &minus;__TAXONOMIST_MARGIN__, and the
+<li>Might be mislabelled: species rank, margin below the cut of the record's iconic group, and the
 best other species has __MIN_LOOKALIKE_RECORDS__ or more verifiable records in BC.</li>
 </ol>
+<p>The Close calls cut is set per iconic group, as the Odd shots cut is, because margins spread
+differently from one group to the next. It is the __TAXONOMIST_QUANTILE__ percentile of the
+negative margins among the group's species-labelled scored records: the quarter of them nearest
+0 are within it. The cut is a distance below 0 and differs by group.</p>
 <p>The page shows Odd shots, Close calls and Might be mislabelled as one list. Within a level,
 records are ranked by their score and the rank is stored in __STEPS__ equal buckets; the bucket,
 not the raw score, orders the cards. Odd shots show the farthest first; Close calls and Might be
 mislabelled show the most negative margin first (see Evaluation for why). Levels order records for
 review; they do not say that a label is right or wrong.</p>
 <p>Daily updates score only the records the last full run lacks, against cut-offs frozen from
-that run: the per-group Odd shots cut and, per species, the lowest own among its Clear matches.
+that run: the per-group Odd shots and Close calls cuts and, per species, the lowest own among its Clear matches.
 A species with fewer than __MIN_PER_CLASS__ records in the full run gets no Clear match until the
 next full run.</p>
 
