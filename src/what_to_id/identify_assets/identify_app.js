@@ -54,7 +54,7 @@ function byId(P){
 // What the per-species cap counts: the record's label, but on level 3 the suggested species (the label is a coarse rank there).
 function ck(i,lv){var v=lv===3&&LOOKS?LOOKS.lo[i]|LOOKS.hi[i]<<8:NO_LOOK;return v===NO_LOOK?P.tax[i]:v;}
 function RUN(){return /(^|&)run=1(&|$)/.test(location.hash.slice(1));}
-function on(i,all){return SEL[i]&&LEVEL[i]&&(!R||R.pass(i,LEVEL[i]))&&(!X||X.pass(i))&&(!GP||GP.pass(i,KIND[i],all))&&(!WW||KIND[i]!==3||WW.pass(i));}
+function on(i,all){return SEL[i]&&LEVEL[i]&&(!R||R.pass(i,LEVEL[i]))&&(!X||X.pass(i))&&(!GP||GP.pass(i,KIND[i],all))&&(!WW||WW.pass(i));}
 // Under My taxa first the user's genera lead each level, each kind in turn, then the rest; MINE: how many cards they are, -1 without the mode.
 function build(){
   var n=P.n,W=2*NK*STEPS,c=new Uint32Array(6*W+1),key=new Uint16Array(n),rk=UF.ranked(),i,k,lv,u=0;
@@ -429,7 +429,7 @@ async function load(){
   var mp=L.fetchMapMeta(MAP,fetch),drawn_=new Promise(function(ok){if(!CFG.first)return ok();setTimeout(ok,2000);  // the bulk files wait for the first cards' paint (2 s at most), then their first row's photos
     Promise.all([get(new URL(CFG.first,MAP)),mp]).then(function(b){if(!MF)firstOf(JSON.parse(new TextDecoder().decode(b[0])));}).catch(function(){}).then(ok);});  // optional
   META=await mp;
-  WW=IdentifyWWW({value:META.value,taxa:function(){return TAXA;},look:looksOf,redraw:function(){if(P)redraw();}});
+  WW=IdentifyWWW({value:META.value,taxa:function(){return TAXA;},look:function(i){return looksOf(i)||(P.tax[i]!==NOTAX&&TAXA[P.tax[i]]?TAXA[P.tax[i]][0]:null);},redraw:function(){if(P)redraw();}});  // the suggestion, else the record's own taxon
   function file(k){var f=META.files[k];return f?get(new URL(f,MAP)):Promise.reject(new Error('the map lists no '+k+' file'));}
   await drawn_;await CARD.row(2e4);
   var taxa=Promise.all([get(new URL(META.taxa,MAP)),I18N.lang==='fr'&&META.files.taxa_fr?file('taxa_fr').catch(function(){return null;}):null]).then(function(r){return I18N.taxa(JSON.parse(new TextDecoder().decode(r[0])),r[1]&&JSON.parse(new TextDecoder().decode(r[1])));});
