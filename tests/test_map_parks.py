@@ -39,14 +39,15 @@ def test_encode_rings_codes_as_the_page_does():
 def test_park_list_holds_every_bc_area_once():
     doc = read_parks()
     assert doc["kinds"] == ["Park", "Ecological reserve", "Protected area", "Recreation area",
-                            "Conservancy"]  # fmt: skip
+                            "Conservancy", "National park"]  # fmt: skip
     rows = doc["parks"]
     kind = {r[1]: doc["kinds"][r[2]] for r in rows}
     assert kind["Strathcona Park"] == "Park"
     assert kind["Tacheeda Lakes Ecological Reserve"] == "Ecological reserve"
+    assert kind["Yoho National Park"] == "National park"
     keys = [r[0] for r in rows]
     assert len(keys) == len(set(keys))
-    assert all(re.fullmatch(r"\d{4}(-\d+)?", k) for k in keys)
+    assert all(re.fullmatch(r"\d{4}(-\d+)?|NP[A-Z]+", k) for k in keys)
     # a park in several sites has a row for each site and one for the whole park
     sites = {k.split("-")[0] for k in keys if "-" in k}
     assert sites and sites <= set(keys)
