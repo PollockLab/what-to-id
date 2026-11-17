@@ -133,7 +133,7 @@ def test_methods_numbers_come_from_the_code_and_the_manifest():
     for text in (
         f"lowest {levels.WEIRD_SHARE:.0%} of",
         f"top {levels.EASY_TOP_SHARE:.0%} of",
-        f"not below &minus;{levels.TAXONOMIST_MARGIN:g},",
+        f"{levels.TAXONOMIST_QUANTILE * 100:g}th percentile of the\nnegative margins",
         f"{levels.MIN_LOOKALIKE_RECORDS} or more verifiable records",
         f"has {confusion.MIN_PER_CLASS} or more scored",
         f"at most {confusion.FIR_PAIRS_PER_SPECIES} pairs with up to "

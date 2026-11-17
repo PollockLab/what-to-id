@@ -5,7 +5,8 @@ Each species-ranked Needs ID record has `own` (cosine to its labelled species' t
 
 - easy: margin above zero and `own` in the top `EASY_TOP_SHARE` of its species, the records that
   sit squarely in their labelled species, for ticking off many quickly;
-- taxonomist: margin just below zero, down to `-TAXONOMIST_MARGIN`, where one look-alike species
+- taxonomist: margin just below zero, down to its iconic group's cut (`taxonomist_cut`, the
+  `TAXONOMIST_QUANTILE` of the group's negative margins), where one look-alike species
   is barely ahead of the label: believable, ambiguous between the two, and the look-alike
   has at least `MIN_LOOKALIKE_RECORDS` records (rarer ones are noise for identifiers), counted
   over all BC verifiable observations when `--bc-counts` is given, else over the pool;
@@ -68,9 +69,12 @@ LEVEL_COLUMNS = (
 # A species' top quarter by `own`: 91.5% of it already has margin > 0, and a quarter still lets
 # a species of 4 photos contribute its best one.
 EASY_TOP_SHARE = 0.25
-# The quarter of negative margins nearest zero (their 75th percentile is -0.020); at the median
-# negative margin, -0.047, the look-alike clearly leads and the label stops being believable.
-TAXONOMIST_MARGIN = 0.02
+# The quarter of a group's negative margins nearest zero, as for `WEIRD_SHARE` cut per iconic
+# group, since margins spread differently by group: the 75th percentile is -0.014 (Mollusca) to
+# -0.036 (Protozoa), -0.035 for Aves, against -0.020 pooled (identify table of 3.1M records, the
+# ones with a known look-alike); at the median, -0.047 pooled, the look-alike clearly leads and
+# the label stops being believable.
+TAXONOMIST_QUANTILE = 0.75
 # The bottom 2% per group by max(own, other) (0.42 for Aves to 0.56 for Fungi, against a median
 # of 0.64): only the small groups reach this cut, the big ones fill `CAP` farthest first.
 WEIRD_SHARE = 0.02
@@ -90,21 +94,35 @@ def lookalike_known(s: pd.DataFrame, bc_counts: pd.Series | None = None) -> pd.S
     return s["other_name"].map(counts).fillna(0) >= MIN_LOOKALIKE_RECORDS
 
 
-def species_masks(s: pd.DataFrame, weird: pd.Series, bc_counts: pd.Series | None = None):
+def taxonomist_cut(s: pd.DataFrame) -> pd.Series:
+    """Per row of `s`, how far below zero its iconic group's Close calls reach (a positive number).
+
+    The `TAXONOMIST_QUANTILE` of the group's negative margins, negated; NaN for a group with none.
+    """
+    neg = s["margin"].where(s["margin"] < 0)
+    q = neg.groupby(s["iconic_taxon"].fillna("")).transform(
+        lambda x: x.quantile(TAXONOMIST_QUANTILE)
+    )
+    return -q
+
+
+def species_masks(
+    s: pd.DataFrame,
+    weird: pd.Series,
+    bc_counts: pd.Series | None = None,
+    cut: pd.Series | None = None,
+):
     """(easy, taxonomist) masks over scored species rows `s`, outside the `weird` rows.
 
-    `s` has `taxon_id`, `taxon_name`, `own`, `margin`, `other_name`; `bc_counts` as in `assign`.
+    `s` has `taxon_id`, `taxon_name`, `iconic_taxon`, `own`, `margin`, `other_name`; `bc_counts`
+    as in `assign`; `cut` is a per-row `taxonomist_cut`, by default read from `s` itself.
     """
+    cut = taxonomist_cut(s) if cut is None else cut
     by_species = s.groupby("taxon_id")["own"]
     n_species = by_species.transform("size")
     own_share = by_species.rank(ascending=False, pct=True, method="first")
     easy = (s["margin"] > 0) & (n_species >= MIN_PER_CLASS) & (own_share <= EASY_TOP_SHARE) & ~weird
-    taxonomist = (
-        (s["margin"] < 0)
-        & (s["margin"] >= -TAXONOMIST_MARGIN)
-        & lookalike_known(s, bc_counts)
-        & ~weird
-    )
+    taxonomist = (s["margin"] < 0) & (s["margin"] >= -cut) & lookalike_known(s, bc_counts) & ~weird
     return easy, taxonomist
 
 
@@ -184,11 +202,15 @@ def describe(scores: pd.DataFrame, levels: pd.DataFrame) -> str:
         "margin quantiles " + _quantiles(s["margin"], q),
         "own quantiles " + _quantiles(s["own"], q),
         "max(own, other) quantiles " + _quantiles(top, q),
-        f"share with margin in [-{TAXONOMIST_MARGIN}, 0): "
-        f"{((s['margin'] < 0) & (s['margin'] >= -TAXONOMIST_MARGIN)).mean():.3f}",
+        f"share with margin in [-cut, 0), the cut per group below: "
+        f"{((s['margin'] < 0) & (s['margin'] >= -taxonomist_cut(s))).mean():.3f}",
         f"max(own, other) at the {WEIRD_SHARE:.0%} cut per group:",
     ]
-    cut = top.groupby(s["iconic_taxon"].fillna("")).quantile(WEIRD_SHARE)
+    group = s["iconic_taxon"].fillna("")
+    cut = top.groupby(group).quantile(WEIRD_SHARE)
+    lines += [f"  {g or '(none)'}: {v:.4f}" for g, v in cut.items()]
+    cut = taxonomist_cut(s).groupby(group).first()
+    lines += [f"Close calls cut (-margin) per group at the {TAXONOMIST_QUANTILE:.0%} point:"]
     lines += [f"  {g or '(none)'}: {v:.4f}" for g, v in cut.items()]
     counts = (
         levels.groupby([levels["iconic_taxon"].fillna(""), "level"]).size().unstack(fill_value=0)

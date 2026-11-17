@@ -37,9 +37,12 @@ def rows(tops, own=0.9, other=0.1, taxon_id=4, group="Plantae", start=1000):
     )
 
 
-def frozen(weird=0.5, easy=0.8, n=10):
+def frozen(weird=0.5, easy=0.8, n=10, tax=0.02):
     return identify.Frozen(
-        pd.Series({"Plantae": weird}), pd.Series({4: easy}), pd.Series({4: n}, dtype="int64")
+        pd.Series({"Plantae": weird}),
+        pd.Series({4: easy}),
+        pd.Series({4: n}, dtype="int64"),
+        pd.Series({"Plantae": tax}),
     )
 
 
@@ -75,6 +78,14 @@ def test_mislabel_boundary_needs_margin_below_the_cut_and_a_known_lookalike():
     assert levels_of(rows([0.9], **far), frozen()) == [MISLABEL]
     assert levels_of(rows([0.9], **far), frozen(), bc=19) == [NONE]
     assert levels_of(rows([0.9], **far), frozen(), bc=20) == [MISLABEL]
+
+
+def test_close_calls_cut_is_frozen_per_group():
+    close = dict(own=0.5, other=0.52)  # margin -0.02, up to float noise
+    assert levels_of(rows([0.9], **close), frozen(tax=0.03)) == [TAX]
+    assert levels_of(rows([0.9], **close), frozen(tax=0.01)) == [MISLABEL]
+    # no cut for the group: neither Close calls nor Might be mislabelled
+    assert levels_of(rows([0.9], group="Aves", **close), frozen()) == [NONE]
 
 
 def test_delta_appends_new_ids_and_leaves_base_rows_alone():
