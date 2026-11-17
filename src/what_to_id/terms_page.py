@@ -213,8 +213,8 @@ def render(
         '<h2 id="about">What to ID</h2>\n'
         "<p>What to ID helps iNaturalist identifiers choose which records that need an ID to work "
         "on next. The identifying happens in iNaturalist: this site only orders the records and "
-        "links to them. Batches is part of a study on whether the order records are served in "
-        "changes how much gets identified, and what.</p>\n"
+        "links to them. Batches is also an experiment: it tests whether the order records "
+        "are shown in changes how many get identified, and which ones.</p>\n"
         f"<h2>How each view works</h2>\n{how}\n"
         '<h2 id="glossary">Glossary</h2>\n'
         '<div id="find" hidden><label for="find-q">Find a term</label>'

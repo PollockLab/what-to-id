@@ -148,6 +148,13 @@ def render(
         when and updated
     ):  # the daily run: without it the page reads as last touched on the dates above
         when = f"{when}. Updated daily with new records, last on {updated}"
+    no_score = (  # the daily run scores new records, so "not in the download" no longer explains it
+        "the record has no score yet (new records are scored in the daily update, which can take "
+        "a day or two to reach them)"
+        if updated
+        else f"the record was not in the {photos or 'last'} photo download "
+        "(most were added after it)"
+    )
     html = (ASSETS / PAGE_NAME).read_text()
     # the page fetches these same origin with default credentials: as=fetch crossorigin matches
     preload = "".join(
@@ -180,7 +187,7 @@ def render(
         ).replace("<", "\\u003c"),
         **{f"__LEVEL_{n}__": name for n, name, _ in LEVELS},
         "__SCORING_DATES__": f"{when}." if when else "",
-        "__PHOTO_DOWNLOAD__": f"{photos} photo download" if photos else "last photo download",
+        "__NO_SCORE__": no_score,
         "__ANALYTICS__": analytics(goatcounter),
     }.items():
         html = html.replace(key, value)

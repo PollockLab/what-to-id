@@ -287,7 +287,7 @@ def test_the_manifest_names_the_range_tables_or_the_levels_go_out_alone(tmp_path
     page_identify.build(site)
     about = (site / page_identify.PAGE_NAME).read_text()
     assert "Photos downloaded on 15 October 2026, scored on 27 October 2026." in about
-    assert "not in the\n15 October 2026 photo download" in about
+    assert "not in the 15 October 2026 photo download" in about
     pool_levels.build(site, parquet=src / "identify.parquet")  # a local table has no dates
     assert not (site / pool_levels.DATES_NAME).exists()
 
@@ -303,6 +303,9 @@ def test_the_scoring_dates_fall_back_to_the_model_source_and_skip_what_is_not_a_
     assert pool_levels.scoring_dates(bad) == {"photos": None, "scored": None, "updated": None}
     daily = {"identify": {"built_at": "2026-11-12T22:31:58Z", "delta_at": "2026-11-15T23:51:28Z"}}
     assert pool_levels.scoring_dates(daily)["updated"] == "2026-11-15"
+    daily_dates = pool_levels.scoring_dates(daily)
+    daily_about = page_identify.render(dates={**daily_dates, "updated": "2026-11-15"})
+    assert "has no score yet" in daily_about and "photo download (most" not in daily_about
     html = page_identify.render(dates=None).replace(
         (page_identify.ASSETS / "identify_fr.js").read_text(), ""
     )
