@@ -37,8 +37,8 @@ function boxed(v,bb,P,ok){
 }
 // The park picker's search. Names fold to lower case without accents or punctuation, and the query
 // drops the designation words, so "Garibaldi Park" and "garibaldi" find the same parks.
-var DESIG=/\b(provincial|park|ecological reserve|protected area|conservancy|recreation area)\b/g,
-  TAG={Park:'PP','Ecological reserve':'ER','Protected area':'PA','Recreation area':'RA',Conservancy:'Conservancy'};
+var DESIG=/\b(provincial|national|park|ecological reserve|reserve|protected area|conservancy|recreation area)\b/g,
+  TAG={Park:'PP','Ecological reserve':'ER','Protected area':'PA','Recreation area':'RA',Conservancy:'Conservancy','National park':'NP'};
 function fold(s){return String(s||'').normalize('NFD').replace(/\p{M}/gu,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();}
 // s folded, and for each of its characters the index in s it came from, to bold a match in place
 function folded(s){var f='',at=[],i,j,c;

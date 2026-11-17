@@ -44,7 +44,9 @@ def test_search_ignores_case_accents_and_designation_words():
         _row("3", "Garibaldi Park"),
         _row("4", "Garibaldi Lake Ecological Reserve", 1),
         _row("5", "Tweedsmuir Park", alt="Kluskoil"),
+        _row("NPGWAA", "Gwaii Haanas National Park Reserve"),
     ]
+    assert node("return MapArea.match(P[5],'gwaii haanas national park reserve').rank;", rows) == 0
     got = node(
         "function m(i,t){var r=MapArea.match(P[i],t);"
         "return r&&[r.rank,r.b?P[i].name.slice(r.a,r.b):null];}"
