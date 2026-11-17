@@ -37,8 +37,6 @@ body{display:flex;flex-direction:column}
 .seg button{touch-action:none}
 .seg button.dr{position:relative;z-index:2;box-shadow:var(--shadow);cursor:grabbing}
 .seg button[aria-pressed="true"]{background:var(--on);color:var(--onink);font-weight:650}
-.xbar #sbs{font:inherit;font-size:12px;min-height:28px;padding:0 11px;border:1px solid var(--line);border-radius:999px;background:var(--chip);color:var(--ink);cursor:pointer}
-.xbar #sbs[aria-pressed="true"]{background:var(--on);color:var(--onink);border-color:var(--on);font-weight:650}
 .note{position:absolute;z-index:30;top:100%;right:16px;width:min(380px,calc(100vw - 24px));margin:6px 0 0;padding:10px 12px;
   background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);font-size:12px;color:var(--muted);white-space:normal}
 .note[hidden]{display:none}
@@ -74,7 +72,7 @@ body{display:flex;flex-direction:column}
 @media (max-width:800px){.xbar{flex:1 1 100%;margin:0 0 6px;flex-wrap:wrap;white-space:normal}
   .xbar{justify-content:flex-start}#counts{flex:1 1 12em;height:auto;justify-content:flex-start}#counts::before{content:none}
   .seg{flex:1 1 0;order:-1;max-width:420px}.seg button{flex:1 1 auto;min-height:36px;padding:0 6px}
-  .xbar .infob{order:-1;width:36px;height:36px}#sbs{display:none}
+  .xbar .infob{order:-1;width:36px;height:36px}
   #sf{flex:1 1 100%}#sq{flex:1 1 0;width:auto;min-height:36px}#sf button{min-height:36px}}
 </style>
 </head>
@@ -139,9 +137,7 @@ function mk(n){
     if(n==='tree')tally(true);if(n==='map'){colour();rail();}});
   // in ORDER in the page too, so the keys move through the panes as they are seen
   box.insertBefore(f,ORDER.slice(ORDER.indexOf(n)+1).map(function(k){return frames[k];}).filter(Boolean)[0]||null);frames[n]=f;}
-var multi=[];try{multi=parse(localStorage.getItem('wtid-multi'));}catch(e){}
 function setView(v){
-  if(v.length>1&&innerWidth>=800){multi=v;try{localStorage.setItem('wtid-multi',v.join('-'));}catch(e){}}
   if(innerWidth<800&&v.length>1)v=[v.indexOf('identify')>=0?'identify':v.indexOf('tree')>=0?'tree':v[0]];  // a phone holds one pane, Identify first
   var old=view||[],tree0=visible('tree');view=v;
   Object.keys(FILES).forEach(function(n){
@@ -161,7 +157,6 @@ function setView(v){
   tally(!tree0&&visible('tree'));
   colour();
   [].forEach.call(document.querySelectorAll('[data-p]'),function(b){b.setAttribute('aria-pressed',v.indexOf(b.dataset.p)>=0);});
-  document.getElementById('sbs').setAttribute('aria-pressed',v.length>1);
   count();}
 // Beside Identify the map's dots take the Identify levels' colours, so both panes read as one task.
 function colour(){post('map',{type:'wtid-colour',by:visible('identify')&&visible('map')?'level':'group',names:LEVELS});}
@@ -176,21 +171,16 @@ function count(){
   // against the last write, not innerHTML: explain.js adds attributes to the term, and a rewrite closes its popover
   var c=document.getElementById('counts'),h=p.map(function(s,i){return '<span>'+(i?' · ':'')+s+'</span>';}).join('');if(c.dataset.h!==h){c.dataset.h=h;c.innerHTML=h;}}
 setInterval(count,400);
-// A click shows that pane alone; Shift or Cmd/Ctrl adds or removes it beside the others (a phone always shows one).
+// Wide: a click turns that pane on or off beside the others (the last one stays). A phone shows one, so a click shows it alone.
 document.getElementById('xbar').addEventListener('click',function(e){
   var b=e.target.closest('[data-p]');if(!b)return;
   var p=b.dataset.p,on=view.indexOf(p)>=0;
-  if(innerWidth>=800&&(e.shiftKey||e.metaKey||e.ctrlKey)){
+  if(innerWidth>=800){
     if(on&&view.length===1)return;  // the last pane stays
     setView(order.filter(function(n){return n===p?!on:view.indexOf(n)>=0;}));
   }else if(view.length===1&&on)return;
   else setView([p]);
   url();});
-// Side by side: the last layout of more than one pane (kept as 'wtid-multi'); lit while several panes show.
-var sbs=document.getElementById('sbs');
-sbs.addEventListener('click',function(){
-  var m=view.length>1?[view[0]]:multi.length>1?multi:order.filter(function(n){return n==='map'||n===(FILES.identify?'identify':FILES.tree?'tree':'space');});
-  setView(order.filter(function(n){return m.indexOf(n)>=0;}));url();});
 function url(){history.replaceState(null,'','?view='+serialize(order.filter(function(n){return view.indexOf(n)>=0;}))+
   (qs?'&q='+encodeURIComponent(qs):'')+location.hash);}
 // back to the cards: where the viewer came from with its filters intact, else Identify with the shared selection
@@ -254,7 +244,7 @@ addEventListener('resize',function(){[].forEach.call(box.querySelectorAll('.sep'
 // The pane switch sets the order: drag a button sideways (past 6 px, so a click still toggles) or Alt+Left/Right.
 var seg=document.querySelector('.seg'),say=document.createElement('span'),grab,gx,gl,drag,quiet;
 say.className='site-vh';say.setAttribute('role','status');seg.parentNode.appendChild(say);
-[].forEach.call(seg.querySelectorAll('[data-p]'),function(b){b.title='Click to show alone, Shift-click to add. Drag or Alt+arrows to reorder';});
+[].forEach.call(seg.querySelectorAll('[data-p]'),function(b){b.title='Click to show or hide beside the others. Drag or Alt+arrows to reorder';});
 order.forEach(function(n){seg.appendChild(seg.querySelector('[data-p='+n+']'));});
 function reorder(){order=[].map.call(seg.querySelectorAll('[data-p]'),function(b){return b.dataset.p;});layout();url();}
 function keep(){try{localStorage.setItem('wtid-order',order.join('-'));}catch(e){}}
