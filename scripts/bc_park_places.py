@@ -2,10 +2,14 @@
 
 Usage: uv run --with geopandas --with shapely python scripts/bc_park_places.py \
     --gpkg bc_parks.gpkg --cache <dir> --out park_inat_places.csv \
-    --index src/what_to_id/map_assets/bc_parks.json.gz
+    --index src/what_to_id/map_assets/bc_parks.json.gz [--national national_parks_bc_raw.geojson]
 
 The BC layers (bc_parks, bc_conservancies) come from the BC Data Catalogue; see PROVENANCE.md
-next to the GeoPackage. iNaturalist keeps no BC Parks (ORCS) id on its places, so a place matches
+next to the GeoPackage. With --national, the national parks and park reserves in BC (NRCan CLSS
+boundaries) join them, keyed "NP" and the CLSS admin area id, which no ORCS number can equal;
+without it nothing about the BC rows changes.
+
+iNaturalist keeps no BC Parks (ORCS) id on its places, so a place matches
 an area by name and by geometry, among places under British Columbia:
 
 - First, place searches by designation ("provincial park", "ecological reserve", ...) gather most
@@ -46,6 +50,7 @@ SEARCH = "https://api.inaturalist.org/v1/search"
 USER_AGENT = "what-to-id (+https://github.com/PollockLab/what-to-id)"
 SLEEP = 1.6
 HARVEST = ("provincial park", "ecological reserve", "protected area", "marine park")
+NATIONAL_HARVEST = ("national park",)  # only with --national, so BC-only output stays as it was
 MIN_NAME = 0.86
 MIN_IOU_NAMED = 0.2
 MIN_TWO_WAY = 0.9
@@ -56,17 +61,20 @@ KINDS = {
     "ECOLOGICAL RESERVE": "ecological reserve",
     "PROTECTED AREA": "protected area",
     "CONSERVANCY": "conservancy",
+    "NATIONAL PARK": "national park",
+    "NATIONAL PARK RESERVE": "national park",  # iNaturalist names a reserve either way
 }
 # words that say what kind of area a name is, not which one
 _DESIG = re.compile(
     r"\b(provincial|marine|parks?|ecological|eco|reserves?|protected|areas?|conservancy|"
-    r"recreation|heritage|site|class [abc]|pp|er|pa)\b"
+    r"national|of canada|recreation|heritage|site|class [abc]|pp|er|pa)\b"
 )
 _KIND_WORDS = (
     ("ecological reserve", r"\becological reserve|\beco ?reserve"),
     ("protected area", r"\bprotected area"),
     ("conservancy", r"\bconservancy"),
     ("recreation area", r"\brecreation area"),
+    ("national park", r"\bnational park"),
     ("park", r"\bpark\b"),
 )
 FIELDS = (
@@ -83,7 +91,7 @@ def fold(s: str) -> str:
 
 
 def forms(name: str) -> list[str]:
-    """The name and its other forms: a.k.a. and bracketed names, and each side of a '/'."""
+    """The name and its other forms: a.k.a. and bracketed names, and each side of a '/' or ','."""
     out = [name]
     inner = re.findall(r"[\[(]([^\])]*)[\])]?", name)
     bare = re.sub(r"[\[(][^\])]*([\])]|$)", " ", name)
@@ -91,8 +99,8 @@ def forms(name: str) -> list[str]:
     for x in inner:
         out.append(re.sub(r"^\s*a\.?\s*k\.?\s*a\.?\s*", "", x, flags=re.I))
     for x in list(out):
-        if "/" in x:
-            out.extend(x.split("/"))
+        if "/" in x or "," in x:
+            out.extend(re.split(r"[/,]", x))
     seen, keep = set(), []
     for x in out:
         k = core(x)
@@ -190,9 +198,9 @@ def bc_places(results: list[dict]) -> dict[int, dict]:
     return out
 
 
-def harvest(client: Client) -> dict[int, dict]:
+def harvest(client: Client, terms: tuple[str, ...] = HARVEST) -> dict[int, dict]:
     out: dict[int, dict] = {}
-    for q in HARVEST:
+    for q in terms:
         page = 1
         while True:
             j = client.search(q, page)
@@ -203,7 +211,20 @@ def harvest(client: Client) -> dict[int, dict]:
     return out
 
 
-def load_areas(gpkg: Path):
+def load_national(path: Path):
+    """The national parks as area rows: id "NP<CLSS admin area id>", names without "OF CANADA"."""
+    import geopandas as gpd
+
+    n = gpd.read_file(path)
+    n["orcs"] = "NP" + n["adminAreaId"]
+    n["name"] = n["adminAreaNameEng"].str.replace(r" OF CANADA$", "", regex=True)
+    n["desig"] = n["distributionTypeEng"].str.upper().str.replace(r" OF CANADA$", "", regex=True)
+    return n.assign(orcs_secondary="", layer="national_parks")[
+        ["orcs", "orcs_secondary", "layer", "name", "desig", "geometry"]
+    ]
+
+
+def load_areas(gpkg: Path, national: Path | None = None):
     """One row per BC feature, plus one per multi-site park for the sites together."""
     import geopandas as gpd
     import pandas as pd
@@ -228,6 +249,8 @@ def load_areas(gpkg: Path):
              "desig": g["desig"].iloc[0], "geometry": unary_union(list(g.geometry))}
         )  # fmt: skip
     a = pd.concat([a, gpd.GeoDataFrame(whole, crs=a.crs)], ignore_index=True)
+    if national:
+        a = pd.concat([a, load_national(national).to_crs(a.crs)], ignore_index=True)
     a["geometry"] = [make_valid(g) for g in a.geometry]
     return gpd.GeoDataFrame(a, crs=p.crs)
 
@@ -289,7 +312,8 @@ def assign(pairs: list[tuple]) -> dict[int, tuple]:
 
 
 def match(areas, client: Client) -> tuple[dict[int, tuple], dict[int, dict]]:
-    places = harvest(client)
+    nat = bool(areas["layer"].eq("national_parks").any())
+    places = harvest(client, HARVEST + NATIONAL_HARVEST * nat)
     got = assign(score_pairs(areas, places))
     # each unmatched area's own names, until one turns up a candidate that matches
     for ai, row in enumerate(areas.itertuples()):
@@ -398,10 +422,13 @@ def write_index(areas, got, places, out: Path, max_corners: int, min_tol: float)
 
     from what_to_id.map_parks import encode_rings
 
+    nat = bool(areas["layer"].eq("national_parks").any())
     kinds = ["Park", "Ecological reserve", "Protected area", "Recreation area", "Conservancy"]
+    kinds += ["National park"] * nat
     kind_of = {"PROVINCIAL PARK": "Park", "ECOLOGICAL RESERVE": "Ecological reserve",
                "PROTECTED AREA": "Protected area", "RECREATION AREA": "Recreation area",
-               "CONSERVANCY": "Conservancy"}  # fmt: skip
+               "CONSERVANCY": "Conservancy", "NATIONAL PARK": "National park",
+               "NATIONAL PARK RESERVE": "National park"}  # fmt: skip
     multi = set(areas.loc[areas["orcs_secondary"] == "", "orcs"])
     rows = []
     for ai, row in enumerate(areas.itertuples()):
@@ -420,7 +447,8 @@ def write_index(areas, got, places, out: Path, max_corners: int, min_tol: float)
     rows.sort(key=lambda r: (fold(r[1]), r[0]))
     doc = {
         "source": "BC Data Catalogue, WHSE_TANTALIS.TA_PARK_ECORES_PA_SVW and "
-        "TA_CONSERVANCY_AREAS_SVW, Open Government Licence - British Columbia",
+        "TA_CONSERVANCY_AREAS_SVW, Open Government Licence - British Columbia"
+        + ("; NRCan CLSS national parks, Open Government Licence - Canada" if nat else ""),
         "kinds": kinds,
         "parks": rows,
     }
@@ -432,6 +460,7 @@ def write_index(areas, got, places, out: Path, max_corners: int, min_tol: float)
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--gpkg", required=True, type=Path)
+    ap.add_argument("--national", type=Path, help="GeoJSON of the national parks in BC to add")
     ap.add_argument("--cache", required=True, type=Path, help="folder for cached API responses")
     ap.add_argument("--out", required=True, type=Path, help="CSV to write")
     ap.add_argument("--places", type=Path, help="also write the candidate places as JSON here")
@@ -439,7 +468,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--max-corners", type=int, default=1500, help="per park, in the park list")
     ap.add_argument("--min-tol", type=float, default=0.0, help="least simplification, degrees")
     a = ap.parse_args(argv)
-    areas = load_areas(a.gpkg)
+    areas = load_areas(a.gpkg, a.national)
     client = Client(a.cache)
     got, places = match(areas, client)
     write_csv(areas, got, a.out)
