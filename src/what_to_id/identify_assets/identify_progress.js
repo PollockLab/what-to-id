@@ -1,22 +1,22 @@
 // Progress: the cards opened today on this device, and for an iNaturalist login (hash me=, else the one typed, kept in
 // localStorage) the improving IDs it made for others in the last 30 days, toward the 10 an OAuth app needs. Counts
-// come from /v1/identifications total_results, kept for 10 minutes. No sign in. The line beside the cards (line) says
+// come from /v1/identifications total_results, kept for 10 minutes. No sign in. IdentifyProgress.login() gives the login in the box. The line beside the cards (line) says
 // how many of 10 improving IDs the login made today, green at 10; the rest sits in the help sheet.
 var IdentifyProgress=(function(){
 'use strict';
-var OPENED='wtid-opened',LOGIN='wtid-login',CACHE='wtid-improving',GOAL=10,TTL=6e5;
+var OPENED='wtid-opened',LOGIN='wtid-login',CACHE='wtid-improving',GOAL=10,TTL=6e5,ME='';
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 function get(k){try{return JSON.parse(localStorage.getItem(k));}catch(e){return null;}}
 function put(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 function day(){return new Date().toLocaleDateString('en-CA');}
-return function(box,line){
+function build(box,line){
   var o=get(OPENED),ids=new Set(o&&o.d===day()?o.ids:[]),n=el('span'),me=el('input','padd'),bar=el('progress'),t=el('span','muted');
   var h=/(?:^|&)me=([\w-]{1,40})(?:&|$)/.exec(location.hash.slice(1));
   me.placeholder='iNat login';me.size=10;me.setAttribute('aria-label','Your iNaturalist login');me.value=h?h[1]:get(LOGIN)||'';
   bar.max=GOAL;bar.hidden=true;
   function count(){n.textContent=ids.size+' opened today';}
   function improving(){
-    var u=me.value.trim();bar.hidden=true;t.textContent='';box.classList.remove('ok');line.hidden=true;
+    var u=me.value.trim();ME=/^[\w-]{1,40}$/.test(u)?u:'';bar.hidden=true;t.textContent='';box.classList.remove('ok');line.hidden=true;
     if(!/^[\w-]{1,40}$/.test(u))return;
     put(LOGIN,u);
     var c=get(CACHE),today=function(k){line.hidden=false;line.textContent=k+' of '+GOAL+' improving IDs today';line.classList.toggle('ok',k>=GOAL);};
@@ -33,7 +33,9 @@ return function(box,line){
     if(ids.delete(e.detail)){put(OPENED,{d:day(),ids:[...ids]});count();}});
   document.addEventListener('wtid-opened',function(e){
     if(ids.has(e.detail))return;ids.add(e.detail);put(OPENED,{d:day(),ids:[...ids]});count();});
-  me.onchange=improving;
+  me.onchange=function(){improving();document.dispatchEvent(new Event('wtid-person'));};
   box.append(n,' · ',me,' ',bar,' ',t);count();improving();
-};
+}
+build.login=function(){return ME;};  // the login in the box (valid or empty), for Your IDs (identify_suggest.js); a change fires wtid-person
+return build;
 })();
