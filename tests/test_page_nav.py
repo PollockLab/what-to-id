@@ -169,8 +169,8 @@ def test_identify_tab_falls_back_to_the_map_when_the_split_page_is_missing(brows
     pg.route("http://site.test/identify.html", lambda r: r.fulfill(status=404, body=""))
     pg.route("http://site.test/search.html", lambda r: r.fulfill(status=404, body=""))
     pg.goto("http://site.test/map.html#groups=-Aves")
-    pg.wait_for_selector('.site-nav a[href="map.html"]')
-    assert pg.get_attribute(".site-nav [aria-current=page]", "href") == "map.html"
+    # the fallback sets a bare href, then the debounced carry.js sweep appends the filters
+    pg.wait_for_selector('.site-nav [aria-current=page][href="map.html#groups=-Aves"]')
 
 
 def test_shell_is_one_short_row_on_a_phone(browser):
