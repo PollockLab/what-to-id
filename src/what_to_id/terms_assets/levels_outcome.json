@@ -51,25 +51,25 @@
    ]
   },
   "taxonomist": {
-   "n": 73368,
-   "left_per_1000": 4.77,
-   "corrected_per_1000": 1.14,
-   "to_suggested_share": 0.083,
-   "to_suggested_genus_share": 0.476,
-   "corrected_rr": 1.95,
+   "n": 73820,
+   "left_per_1000": 4.92,
+   "corrected_per_1000": 1.15,
+   "to_suggested_share": 0.082,
+   "to_suggested_genus_share": 0.471,
+   "corrected_rr": 1.96,
    "corrected_rr_ci": [
-    1.53,
-    2.39
+    1.54,
+    2.42
    ],
-   "to_suggested_rr": 3.22,
+   "to_suggested_rr": 3.18,
    "to_suggested_rr_ci": [
-    1.16,
-    8.28
+    1.15,
+    7.88
    ],
-   "to_suggested_genus_rr": 1.21,
+   "to_suggested_genus_rr": 1.2,
    "to_suggested_genus_rr_ci": [
-    0.91,
-    1.53
+    0.9,
+    1.49
    ]
   },
   "weird": {
@@ -80,7 +80,7 @@
    "to_suggested_genus_share": 0.065,
    "corrected_rr": 2.72,
    "corrected_rr_ci": [
-    1.97,
+    1.98,
     3.61
    ],
    "to_suggested_rr": 0.0,
@@ -95,25 +95,25 @@
    ]
   },
   "mislabel": {
-   "n": 226344,
-   "left_per_1000": 4.18,
+   "n": 225892,
+   "left_per_1000": 4.13,
    "corrected_per_1000": 2.56,
    "to_suggested_share": 0.069,
-   "to_suggested_genus_share": 0.461,
+   "to_suggested_genus_share": 0.462,
    "corrected_rr": 4.36,
    "corrected_rr_ci": [
-    3.89,
-    4.87
+    3.86,
+    4.95
    ],
    "to_suggested_rr": 2.67,
    "to_suggested_rr_ci": [
-    1.5,
-    5.83
+    1.55,
+    5.61
    ],
-   "to_suggested_genus_rr": 1.17,
+   "to_suggested_genus_rr": 1.18,
    "to_suggested_genus_rr_ci": [
-    1.03,
-    1.35
+    1.01,
+    1.37
    ]
   }
  },
@@ -122,14 +122,14 @@
    "auc": 0.696,
    "auc_ci": [
     0.681,
-    0.712
+    0.711
    ]
   },
   "page_shown": {
    "auc": 0.631,
    "auc_ci": [
-    0.611,
-    0.652
+    0.61,
+    0.651
    ]
   },
   "margin_lowest_first": {
@@ -142,14 +142,14 @@
   "margin_lowest_first_shown": {
    "auc": 0.63,
    "auc_ci": [
-    0.611,
-    0.65
+    0.61,
+    0.649
    ]
   },
   "own_lowest_first": {
    "auc": 0.711,
    "auc_ci": [
-    0.697,
+    0.696,
     0.726
    ]
   },
@@ -163,22 +163,22 @@
   "top_lowest_first": {
    "auc": 0.571,
    "auc_ci": [
-    0.556,
-    0.587
+    0.555,
+    0.588
    ]
   },
   "top_lowest_first_shown": {
    "auc": 0.481,
    "auc_ci": [
-    0.462,
-    0.5
+    0.461,
+    0.501
    ]
   },
   "close_calls_lowest_margin_first": {
-   "auc": 0.58,
+   "auc": 0.578,
    "auc_ci": [
     0.523,
-    0.639
+    0.633
    ]
   }
  },
@@ -394,13 +394,13 @@
      0,
      0,
      0,
-     0,
-     0,
-     0,
-     0,
-     0,
-     17006,
-     17885,
+     3,
+     2,
+     281,
+     368,
+     1522,
+     15283,
+     17884,
      18683,
      19794,
      0,
@@ -518,13 +518,13 @@
      9560,
      10100,
      10847,
-     11764,
-     12619,
-     13714,
-     14432,
-     15673,
-     0,
-     0,
+     11761,
+     12617,
+     13433,
+     14064,
+     14151,
+     1723,
+     1,
      0,
      0,
      0,

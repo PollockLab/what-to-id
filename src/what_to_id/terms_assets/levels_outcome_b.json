@@ -19,7 +19,7 @@
  "seed": 20261105,
  "bootstrap_reps": 1000,
  "cohort": 1439324,
- "cohort_file": null,
+ "cohort_file": "levels-outcome-cohort-2026-10-15.parquet",
  "levels": {
   "none": {
    "n": 788572,
@@ -51,25 +51,25 @@
    ]
   },
   "taxonomist": {
-   "n": 73368,
-   "left_per_1000": 5.25,
-   "corrected_per_1000": 1.29,
-   "to_suggested_share": 0.074,
-   "to_suggested_genus_share": 0.505,
-   "corrected_rr": 1.88,
+   "n": 73820,
+   "left_per_1000": 5.43,
+   "corrected_per_1000": 1.3,
+   "to_suggested_share": 0.073,
+   "to_suggested_genus_share": 0.5,
+   "corrected_rr": 1.89,
    "corrected_rr_ci": [
-    1.51,
-    2.35
+    1.5,
+    2.33
    ],
-   "to_suggested_rr": 3.33,
+   "to_suggested_rr": 3.3,
    "to_suggested_rr_ci": [
-    1.07,
-    8.17
+    1.13,
+    8.48
    ],
-   "to_suggested_genus_rr": 1.25,
+   "to_suggested_genus_rr": 1.24,
    "to_suggested_genus_rr_ci": [
-    0.99,
-    1.55
+    0.97,
+    1.52
    ]
   },
   "weird": {
@@ -80,8 +80,8 @@
    "to_suggested_genus_share": 0.088,
    "corrected_rr": 2.87,
    "corrected_rr_ci": [
-    2.17,
-    3.64
+    2.15,
+    3.72
    ],
    "to_suggested_rr": 0.0,
    "to_suggested_rr_ci": [
@@ -95,25 +95,25 @@
    ]
   },
   "mislabel": {
-   "n": 226344,
-   "left_per_1000": 4.53,
+   "n": 225892,
+   "left_per_1000": 4.47,
    "corrected_per_1000": 2.92,
    "to_suggested_share": 0.068,
-   "to_suggested_genus_share": 0.449,
+   "to_suggested_genus_share": 0.45,
    "corrected_rr": 4.24,
    "corrected_rr_ci": [
-    3.79,
-    4.73
+    3.8,
+    4.74
    ],
-   "to_suggested_rr": 3.08,
+   "to_suggested_rr": 3.09,
    "to_suggested_rr_ci": [
     1.73,
-    6.58
+    6.17
    ],
-   "to_suggested_genus_rr": 1.11,
+   "to_suggested_genus_rr": 1.12,
    "to_suggested_genus_rr_ci": [
     0.98,
-    1.27
+    1.28
    ]
   }
  },
@@ -121,7 +121,7 @@
   "page": {
    "auc": 0.693,
    "auc_ci": [
-    0.679,
+    0.678,
     0.706
    ]
   },
@@ -129,21 +129,21 @@
    "auc": 0.63,
    "auc_ci": [
     0.611,
-    0.649
+    0.648
    ]
   },
   "margin_lowest_first": {
    "auc": 0.75,
    "auc_ci": [
-    0.736,
+    0.737,
     0.763
    ]
   },
   "margin_lowest_first_shown": {
    "auc": 0.631,
    "auc_ci": [
-    0.612,
-    0.651
+    0.611,
+    0.65
    ]
   },
   "own_lowest_first": {
@@ -156,8 +156,8 @@
   "own_lowest_first_shown": {
    "auc": 0.587,
    "auc_ci": [
-    0.569,
-    0.605
+    0.568,
+    0.606
    ]
   },
   "top_lowest_first": {
@@ -175,10 +175,10 @@
    ]
   },
   "close_calls_lowest_margin_first": {
-   "auc": 0.583,
+   "auc": 0.581,
    "auc_ci": [
-    0.528,
-    0.637
+    0.527,
+    0.635
    ]
   }
  },
@@ -394,13 +394,13 @@
      0,
      0,
      0,
-     0,
-     0,
-     0,
-     0,
-     0,
-     17006,
-     17885,
+     3,
+     2,
+     281,
+     368,
+     1522,
+     15283,
+     17884,
      18683,
      19794,
      0,
@@ -518,13 +518,13 @@
      9560,
      10100,
      10847,
-     11764,
-     12619,
-     13714,
-     14432,
-     15673,
-     0,
-     0,
+     11761,
+     12617,
+     13433,
+     14064,
+     14151,
+     1723,
+     1,
      0,
      0,
      0,
