@@ -202,3 +202,34 @@ def test_the_sign_in_line_points_to_your_ids_signed_in_or_out(browser, keyed_sit
         assert "IDs you add here are posted under your iNaturalist account." in line
         assert "Check Your IDs to see if someone disagreed or commented." in line
         assert line.startswith("Signed in as me.") == signed_in
+
+
+def test_the_sign_in_line_counts_unseen_replies_and_drops_them_at_sign_out(browser, keyed_site):
+    page = open_batches(browser, keyed_site, signed_in=True)
+    reply = {
+        "id": 5,
+        "user": {"id": 8, "login": "them"},
+        "identifications": [
+            {
+                "user": {"id": 7, "login": "me"},
+                "created_at": "2026-05-01T00:00:00Z",
+                "current": True,
+            }
+        ],
+        "comments": [
+            {"user": {"id": 9, "login": "bob"}, "created_at": "2026-05-02T00:00:00Z", "body": "hi"}
+        ],
+    }
+    page.route(
+        "https://api.inaturalist.org/v2/observations?*",
+        lambda r: r.fulfill(
+            json={"results": [reply]}, headers={"access-control-allow-origin": "*"}
+        ),
+    )
+    page.reload()
+    page.wait_for_selector("#sin b")
+    assert page.inner_text("#sin b") == "1 reply to your IDs"
+    assert page.locator("#rep").is_visible()
+    page.click("#sin button")
+    page.wait_for_function("!document.querySelector('#sin b')")
+    assert "IDs you add here" in page.inner_text("#sin") and page.locator("#rep").is_hidden()

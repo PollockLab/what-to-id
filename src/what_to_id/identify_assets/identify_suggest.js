@@ -1,8 +1,8 @@
 // One-tap suggestions at the top of each What, When, Where and Who panel on Identify, above the full filters. Each applies
 // filters that already exist (the same address keys), so a suggestion can be undone with the filter it set. Hidden in Batches.
 // IdentifySuggest(o), o {S, META, mf, nf, P(), taxa(), allc() (records per group), short(g), tm (MapTime), changed(), rewrite(drop, add),
-// area(rings, hash, label) (the area changed, the map reloads), get(url), user() ({id, login} when signed in with iNaturalist, else null), embedded}. Returns update(), after every change.
-// where() starts the park list's fetch, called when Where opens; who() fetches the top identifiers and the viewer's IDs that others replied to (Your IDs, under the top identifiers) when their folds under the login are open. Needs group_icons.js, identify_unconfirmed.js (the area's box), map_area.js (the park list's address and MapArea.encode) and the panels' #sgwhat, #sgwhen, #sgwhere, #sgwho.
+// area(rings, hash, label) (the area changed, the map reloads), get(url), user() (the viewer's login: the iNaturalist sign in, else the progress box's, else ''), show() (opens the Who panel), embedded}. Returns update(), after every change.
+// where() starts the park list's fetch, called when Where opens; who() fetches the top identifiers and shows Your IDs (the viewer's IDs that others replied to) when their folds under the login are open. Your IDs is also fetched once in the background when a person is known, kept 10 minutes in sessionStorage, and the replies not yet seen are counted in #rep (and in a wtid-replies event for the sign in line); it listens for wtid-person (a sign out, or a new login in the progress box). Needs group_icons.js, identify_unconfirmed.js (the area's box), map_area.js (the park list's address and MapArea.encode) and the panels' #sgwhat, #sgwhen, #sgwhere, #sgwho.
 var IdentifySuggest=(function(){
 'use strict';
 // Every English string, in one place for the translation file to take over; {n} and {d} are filled in.
@@ -19,10 +19,10 @@ var T={
   mineExcl:'Untick “my observations” below first.',nobody:'Nobody has looked',nobodySub:'No one but the observer has identified it',
   second:'Needs a second opinion',secondSub:'One ID, and nobody agrees yet',
   ids:'Tap a name to see their genera',idsNone:'None found for these filters.',onInat:'{u} on iNaturalist',newTab:' (opens in a new tab)',
-  yours:'Someone disagreed',yoursCom:'New comment',yoursNone:'No replies to your IDs yet.',yoursNeed:'Type your iNaturalist login above, or sign in.',
-  yoursFail:'Your IDs did not load.',unknown:'Unknown',obsOn:'Observation {n} on iNaturalist'
+  yoursNone:'No replies to your IDs yet.',yoursNeed:'Add your iNat login in About this page, or sign in.',yoursFail:'Your IDs did not load.',
+  unknown:'Unknown',obsOn:'Observation {n} on iNaturalist',suggests:'suggests',commented:'commented:',fresh:'New',rep1:'1 reply to your IDs',repN:'{n} replies to your IDs'
 };
-var NS='http://www.w3.org/2000/svg',R=50,PTS=64,KM=111.195,STORE={topn:'wtid-topn',recent:'wtid-recent',visit:'wtid-lastvisit',opened:'wtid-opened',improving:'wtid-improving'},
+var NS='http://www.w3.org/2000/svg',R=50,PTS=64,KM=111.195,STORE={topn:'wtid-topn',recent:'wtid-recent',visit:'wtid-lastvisit',opened:'wtid-opened',improving:'wtid-improving',replies:'wtid-replies',seen:'wtid-yours-seen'},
   ICON={
     near:'<circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>',
     park:'<path d="M12 21v-6M12 3l5 7h-3l4 6H6l4-6H7z"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
@@ -32,18 +32,22 @@ var NS='http://www.w3.org/2000/svg',R=50,PTS=64,KM=111.195,STORE={topn:'wtid-top
     user:'<circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-4 3-6 7-6s7 2 7 6"/>',leaf:'<path d="M5 19c0-9 5-14 14-14 0 9-5 14-14 14zM5 19l7-7"/>',
     warn:'<path d="M12 3l10 18H2zM12 10v5M12 18v.5"/>'
   };
-// Whether someone else has replied to the viewer's current ID on a record: {dis, com} (a later current ID that disagrees, a later comment), else null.
-// Times are compared as dates, as the offsets differ; me is a lower-case login or a user number.
+// The newest reply someone else made to the viewer's current ID on a record, else null: {at, who, to (the taxon a disagreeing ID suggests) or body
+// (a comment's first 80 characters)}. A reply counts after the later of that ID and the viewer's own latest comment there. Times are compared as dates,
+// as the offsets differ; me is a lower-case login or a user number. A different branch (neither lineage holds the other's taxon) disagrees without the flag.
 function same(u,me){return !!u&&(String(u.id)===me||String(u.login).toLowerCase()===me);}
 function replies(ob,me){
   var ids=ob.identifications||[],mi=ids.filter(function(i){return i.current&&same(i.user,me);})[0];
   if(same(ob.user,me)||!mi)return null;
-  var t=Date.parse(mi.created_at),a=mi.taxon,after=function(x){return !same(x.user,me)&&Date.parse(x.created_at)>t;},
-    dis=ids.some(function(i){var b=i.taxon;return i.current&&after(i)&&(i.disagreement===true||
-      !!(a&&b&&a.id!==b.id&&(a.ancestor_ids||[]).indexOf(b.id)<0&&(b.ancestor_ids||[]).indexOf(a.id)<0));}),
-    com=(ob.comments||[]).some(after);
-  return dis||com?{dis:dis,com:com}:null;
+  var cs=ob.comments||[],a=mi.taxon,t=Math.max.apply(null,[Date.parse(mi.created_at)].concat(cs.filter(function(c){return same(c.user,me);}).map(function(c){return Date.parse(c.created_at);}))),
+    r=[];
+  ids.forEach(function(i){var b=i.taxon;
+    if(i.current&&!same(i.user,me)&&Date.parse(i.created_at)>t&&(i.disagreement===true||
+      !!(a&&b&&a.id!==b.id&&(a.ancestor_ids||[]).indexOf(b.id)<0&&(b.ancestor_ids||[]).indexOf(a.id)<0)))r.push({at:Date.parse(i.created_at),who:i.user.login,to:b});});
+  cs.forEach(function(c){if(!same(c.user,me)&&Date.parse(c.created_at)>t)r.push({at:Date.parse(c.created_at),who:c.user.login,body:String(c.body||'').replace(/\s+/g,' ').trim().slice(0,80)});});
+  return r.sort(function(x,y){return y.at-x.at;})[0]||null;
 }
+var FIELDS='(id:!t,user:(id:!t,login:!t),taxon:(id:!t,name:!t,preferred_common_name:!t),identifications:(created_at:!t,current:!t,disagreement:!t,user:(id:!t,login:!t),taxon:(id:!t,name:!t,preferred_common_name:!t,ancestor_ids:!t)),comments:(created_at:!t,body:!t,user:(id:!t,login:!t)))';
 function fmt(s,v){return s.replace(/\{(\w+)\}/g,function(m,k){return v[k]!=null?v[k]:m;});}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 function get(k,s){try{return JSON.parse((s?sessionStorage:localStorage).getItem(k));}catch(e){return null;}}
@@ -60,9 +64,10 @@ return function(o){
 var S=o.S,META=o.META,MF=o.mf,G=META.groups,box={},bt=function(){return document.body.classList.contains('bt');},
   rows={what:[],when:[],where:[],who:[]},msg={where:'',who:''},PN=null,PS=0,IDS={},BLZ=null,seen=null,prev=null,LV=null;
 ['what','when','where','who'].forEach(function(k){box[k]=document.getElementById('sg'+k);});
-var TOP=document.getElementById('topids'),TN=document.getElementById('topn'),MY=document.getElementById('myids'),MINE={};
+var TOP=document.getElementById('topids'),TN=document.getElementById('topn'),MY=document.getElementById('myids'),REP=document.getElementById('rep'),MINE={},LOOK={};
 if(TOP){TN.value=get(STORE.topn)||'5';if(!TN.value)TN.value='5';TOP.addEventListener('toggle',who);TN.onchange=function(){put(STORE.topn,TN.value);who();};}
-if(MY)MY.addEventListener('toggle',yours);
+if(MY){MY.addEventListener('toggle',yours);document.addEventListener('wtid-person',yours);
+  REP.querySelector('button').onclick=function(){MY.open=true;o.show();MY.scrollIntoView({block:'nearest'});};}
 var hasFlags=META.flags.indexOf('threatened')>=0||META.flags.indexOf('introduced')>=0;
 
 // Recently used: the last groups and taxa picked, newest first, kept on this device
@@ -198,28 +203,50 @@ function who(){
     .then(function(j){IDS[q]=j.results.filter(function(x){return x.user&&x.user.login;});}).catch(function(){IDS[q]=[];})
     .then(function(){if(q===idsQuery())drawIds(q);});
 }
-// Your IDs: the records the viewer identified that others have replied to, newest activity first; the person is the iNaturalist sign in, else the User box.
-// shortcut: only the 50 most recently updated records are checked, so an older reply can be missed; page further if people report misses.
-function person(){var u=o.user();return String(u?u.login:S.user||'').toLowerCase();}
+// Your IDs: the records the viewer identified that others replied to, newest reply first, up to 20; the person is the iNaturalist sign in, else the progress box's login, never the User box (it can hold anyone).
+// A person's replies are fetched once (background, from update(), which first runs after the first cards and the pool are loaded) and kept 10 minutes in
+// sessionStorage. The time the fold last drew them is kept per person in localStorage: later replies are New in the list and counted in #rep.
+// shortcut: only the 200 most recently updated records are checked, so an older reply can be missed; page further if people report misses.
+function person(){return String(o.user()||'').toLowerCase();}
+function unseen(me){var r=MINE[me],t=(get(STORE.seen)||{})[me]||0;return r?r.filter(function(x){return x.at>t;}).length:0;}
+function drawCount(me){
+  var n=unseen(me);
+  REP.hidden=!n;REP.querySelector('button').textContent=n===1?T.rep1:fmt(T.repN,{n:n});
+  document.dispatchEvent(new CustomEvent('wtid-replies',{detail:n?REP.querySelector('button').textContent:''}));
+}
 function drawYours(me){
-  var w=MY.querySelector('ul'),st=MY.querySelector('[role=status]'),r=MINE[me];
+  var w=MY.querySelector('ul'),st=MY.querySelector('[role=status]'),r=MINE[me],seen=get(STORE.seen)||{};
   w.textContent='';st.textContent=!me?T.yoursNeed:r===false?T.yoursFail:r&&!r.length?T.yoursNone:'';
-  (r||[]).forEach(function(x){var li=el('li'),n=el('span','sgx'),s=el('span','sgs',x.dis?T.yours:T.yoursCom),a=el('a','sgp'),t=fmt(T.obsOn,{n:x.id}),
-    t2=el('span','sgt2');t2.append(x.taxon?I18N.nm(x.taxon.name,x.taxon.preferred_common_name):T.unknown);
-    if(x.dis&&x.com)s.append(' · ',T.yoursCom);
-    n.append(t2,s);a.href='https://www.inaturalist.org/observations/'+x.id;a.target='_blank';a.rel='noopener';
+  if(!(me in LOOK))LOOK[me]=seen[me]||0;
+  (r||[]).forEach(function(x){var li=el('li'),n=el('span','sgx'),s=el('span','sgs'),a=el('a','sgp'),t=fmt(T.obsOn,{n:x.oid}),t2=el('span','sgt2');
+    if(x.at>LOOK[me])t2.append(el('b',null,T.fresh),' ');
+    t2.append(x.taxon?I18N.nm(x.taxon.name,x.taxon.preferred_common_name):T.unknown);
+    s.append(x.who,' ');
+    if(x.body!=null)s.append(T.commented,' ',x.body);else s.append(T.suggests,' ',x.to?I18N.nm(x.to.name,x.to.preferred_common_name):T.unknown);
+    n.append(t2,s);a.href='https://www.inaturalist.org/observations/'+x.oid;a.target='_blank';a.rel='noopener';
     a.setAttribute('aria-label',t);a.title=t+T.newTab;a.appendChild(svg('<path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6"/>'));
     li.append(n,a);w.append(li);});
+  if(r){seen[me]=Date.now();put(STORE.seen,seen);}
 }
-function yours(){
-  if(!MY||!MY.open||bt())return;
-  var me=person();drawYours(me);
-  if(!me||me in MINE)return;
+function load(me){
+  var c=get(STORE.replies,true);
+  if(c&&c.u===me&&Date.now()-c.at<6e5){MINE[me]=c.rows;return;}
   MINE[me]=null;
-  fetch(I18N.api('https://api.inaturalist.org/v1/observations?ident_user_id='+encodeURIComponent(me)+'&order_by=updated_at&order=desc&per_page=50'))
+  fetch(I18N.api('https://api.inaturalist.org/v2/observations?ident_user_id='+encodeURIComponent(me)+'&order_by=updated_at&order=desc&per_page=200&fields='+encodeURIComponent(FIELDS)))
     .then(function(r){if(!r.ok)throw 0;return r.json();})
-    .then(function(j){MINE[me]=j.results.map(function(ob){var r=replies(ob,me);return r&&{id:ob.id,taxon:ob.taxon,dis:r.dis,com:r.com};}).filter(Boolean);})
-    .catch(function(){MINE[me]=false;}).then(function(){if(me===person())drawYours(me);});
+    .then(function(j){
+      MINE[me]=j.results.map(function(ob){var r=replies(ob,me);return r&&Object.assign(r,{oid:ob.id,taxon:ob.taxon});}).filter(Boolean)
+        .sort(function(x,y){return y.at-x.at;}).slice(0,20);
+      put(STORE.replies,{u:me,at:Date.now(),rows:MINE[me]},true);})
+    .catch(function(){MINE[me]=false;}).then(yours);
+}
+// the person's known: fetch their replies if not yet; the count and (when open) the list follow
+function yours(){
+  if(!MY)return;
+  var me=person();
+  if(me&&!(me in MINE))load(me);
+  if(MY.open&&MY.offsetParent)drawYours(me);  // seen only when the fold shows
+  drawCount(me);
 }
 // Tapping an identifier fills the User box and ticks "Only the user's genera", as if typed and ticked
 function strengths(l){
