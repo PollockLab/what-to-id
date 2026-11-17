@@ -96,12 +96,12 @@ dt:target{background:var(--chip);outline:2px solid var(--bar)}
     + TOC_CSS.strip()
 )
 # Linked from the Batches tab on Identify: what the study changes, records and asks.
-STUDY = """<h2 id="study">The study behind Batches</h2>
-<p>The Batches tab on Identify comes from a research study of which records to show identifiers
-first. The records are split by chance into lists, and each list puts its records in its own
-order. Your browser takes the lists in a random order, drawn once, and each press of Next batch
-shows a batch from the next list in turn. Within a list your browser starts at a random batch,
-also drawn once. Nothing else is randomized.</p>
+STUDY = """<h2 id="study">How Batches rotates</h2>
+<p>The Batches tab on Identify serves records in a rotation. The records are split by chance
+into lists, and each list puts its records in its own order. Your browser takes the lists in a
+random order, drawn once, and each press of Next batch shows a batch from the next list in turn.
+Within a list your browser starts at a random batch, also drawn once. Nothing else is
+randomized.</p>
 <p>What is recorded: the identifications people make, which are public on iNaturalist, and the
 batches your browser was served, which stay in your browser unless you press Download my
 batches. The site also keeps anonymous counts of use with GoatCounter, such as how many batches
@@ -213,8 +213,8 @@ def render(
         '<h2 id="about">What to ID</h2>\n'
         "<p>What to ID helps iNaturalist identifiers choose which records that need an ID to work "
         "on next. The identifying happens in iNaturalist: this site only orders the records and "
-        "links to them. Batches is also an experiment: it tests whether the order records "
-        "are shown in changes how many get identified, and which ones.</p>\n"
+        "links to them. Batches serves records in a rotation of lists, each with its own order, "
+        "taken in turn.</p>\n"
         f"<h2>How each view works</h2>\n{how}\n"
         '<h2 id="glossary">Glossary</h2>\n'
         '<div id="find" hidden><label for="find-q">Find a term</label>'
