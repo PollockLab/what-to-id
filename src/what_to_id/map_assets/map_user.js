@@ -5,7 +5,7 @@
 // genera (taxa), Hide records I identified (unid: the dots the user identified in the view) and Only records I
 // observed (observer: pool-observer.bin, one uint32 per record in shard order). Observed opens Identify on the
 // user's records (user_id); otherwise the link adds without_ident_user_id, which would hide nearly all of an
-// observer's own records, so Hide and Observed exclude each other. A typed login ticks only Hide, and only if it was
+// observer's own records, so Hide and Observed exclude each other: ticking one unticks the other. A typed login ticks only Hide, and only if it was
 // last left ticked; the login is kept a day (localStorage) for the next page opened without one.
 // Everything but the observer file comes from api.inaturalist.org in the browser, one request at a
 // time and at least a second apart, and is kept for the session. Without a user nothing is filtered.
@@ -62,9 +62,9 @@ function usrFit(T,ranks,ids,tax,budget){
 function usrMask(T,ids){return ids.length?TX.filter(T,ids.map(function(id){return {id:id,not:false};})).inc:
   new Uint8Array(T.length);}
 // Pages 1..cap of a listing one after the other; get(page) gives {results, total_results}. capped is
-// true when the listing goes on past the last page read.
-function usrPages(get,cap,per){var out=[];
-  function next(p){return get(p).then(function(j){var r=j.results||[];out=out.concat(r);
+// true when the listing goes on past the last page read. step(page, total) runs before each page after the first.
+function usrPages(get,cap,per,step){var out=[];
+  function next(p){if(p>1&&step)step(p,0);return get(p).then(function(j){var r=j.results||[];out=out.concat(r);
     if(r.length<per||(j.total_results&&out.length>=j.total_results))return {items:out,capped:false};
     return p>=cap?{items:out,capped:true}:next(p+1);});}
   return next(1);}
@@ -84,7 +84,7 @@ function inatGate(o){var cache={},q=Promise.resolve(),last=0,gap=o.gap==null?100
 function userFilter(o){
   var S=o.S,META=o.meta,nf=new Intl.NumberFormat((typeof I18N!=='undefined'?I18N.loc:'en-CA')),box=document.getElementById('usrbox'),
     api=inatGate({gap:o.gap,fetch:o.fetch,say:function(t){say(t);}}),cur='',bad=0,run=0,id=0,mask=null,ob=null,hide=null,capT=false,capU=false,key=0,Pn=null,
-    gen=[],used=0,top=null,fit=null,restored=0,cb={},input,minsel,adj,msg,again,out,sum,note;
+    gen=[],used=0,top=null,fit=null,restored=0,busy=0,cb={},input,minsel,adj,msg,again,out,sum,note;
   function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;
     if(text!=null)e.textContent=text;return e;}
   // with no umode an old link's single mode: Observed, or Only my genera without an observer file
@@ -103,43 +103,50 @@ function userFilter(o){
       top?'Your top '+(n===1?'genus':nf.format(n)+' genera')+', '+Math.round(100*top.n/top.total)+'% of your '+nf.format(top.total)+' IDs in BC.':
       'Genera where '+S.user+' has at least '+used+' IDs in BC ('+nf.format(n)+(n===1?' genus':' genera')+')'+(used<min()?'; none reach '+min()+' yet.':'.');}
   function dim(){return ranked()?' Other records are listed last on Identify and dimmed on the map.':'';}
-  function say(t){if(msg)msg.textContent=t;}
+  function say(t){if(msg)msg.textContent=t;label();}
+  // the closed box's line: who, the ticks, and Loading… while iNaturalist is read
+  function label(){if(sum)sum.textContent=S.user?'User: '+S.user+' · '+(busy?'Loading…':(USR_FLAGS.filter(function(m){return has(m[0]);})
+    .map(function(m){return m[1](usrWho(S));}).join(', ')||'Your genera first')):'User';}
   // the user's genera always, then the observer file and the ids identified in the view when ticked
   function load(live){
-    var place='&place_id='+META.place_id;
+    var place='&place_id='+META.place_id,u=S.user,
+      obf=has('observer')&&META.observer?o.get(META.observer):null;  // the file is not iNaturalist's, so it loads alongside
+    if(obf)obf.catch(function(){});
+    say('Reading '+u+"'s IDs in BC…");
     return usrPages(function(n){return api('identifications/species_counts?user_id='+id+place+'&per_page=500&page='+n);},
-      USR_CAP.taxa,USR_PER.taxa).then(function(r){capT=r.capped;
+      USR_CAP.taxa,USR_PER.taxa,function(p){say('Reading '+u+"'s IDs in BC, page "+p+' of up to '+USR_CAP.taxa+'…');}).then(function(r){capT=r.capped;
       var T=o.taxa(),k=min()?usrKeep(T,META.ranks,r.items,min()):usrTop(T,META.ranks,r.items);
       gen=k.genera;used=k.used||0;top=min()?null:k;fit=null;mask=usrMask(T,gen.map(function(e){return e[0];}));}).then(live)
     .then(function(){if(!has('observer'))return;if(!META.observer)throw new Error('This map has no observer file');
-      return o.get(META.observer).then(function(buf){if(buf.byteLength!==4*META.n)throw new Error('observer file does not match the map');
+      return obf.then(function(buf){if(buf.byteLength!==4*META.n)throw new Error('observer file does not match the map');
         ob=new Uint32Array(buf);});}).then(live)
-    .then(function(){if(!has('unid'))return;
+    .then(function(){if(!has('unid'))return;say('Finding records '+u+' identified in this view…');
       var b=o.bounds(),view='&swlat='+b.s.toFixed(4)+'&swlng='+b.w.toFixed(4)+'&nelat='+b.n.toFixed(4)+'&nelng='+b.e.toFixed(4);
       return usrPages(function(n){return api('observations?ident_user_id='+id+place+'&quality_grade=needs_id&per_page=200&only_id=true'+view+'&page='+n);},
-        USR_CAP.unid,USR_PER.unid).then(function(r){hide=new Set(r.items.map(function(x){return x.id;}));capU=r.capped;});});}
+        USR_CAP.unid,USR_PER.unid,function(p){say('Finding records '+u+' identified in this view, page '+p+'…');}).then(function(r){hide=new Set(r.items.map(function(x){return x.id;}));capU=r.capped;});});}
   // Starts what S.user, S.umode and S.umin ask for once, whenever the records are drawn again.
   function start(){
     var u=S.user,p=usrParse(u),k=u?u+'|'+em()+'|'+min():'';
     if(k===cur||(p&&!o.taxa()))return;  // the genera wait for the taxa table; the next refilter retries
-    bad=0;var tag=++run;cur=k;id=0;mask=ob=hide=top=null;gen=[];used=0;fit=null;capT=capU=false;key++;
+    bad=0;var tag=++run;cur=k;busy=0;id=0;mask=ob=hide=top=null;gen=[];used=0;fit=null;capT=capU=false;key++;
     if(!u){say('');return;}
     if(!p){say('Enter an iNaturalist login or user number.');return;}
-    say('Looking up '+u+'…');
+    busy=1;say('Looking up '+u+' on iNaturalist…');
     var live=function(v){if(run!==tag)throw 0;return v;};
     (p.id?Promise.resolve(p.id):api('users/autocomplete?q='+encodeURIComponent(p.login)).then(function(j){
       var r=(j.results||[]).filter(function(x){return String(x.login).toLowerCase()===p.login.toLowerCase();})[0];
       if(!r)throw new Error('No iNaturalist user "'+p.login+'"');return r.id;})).then(live)
-    .then(function(v){id=v;key++;o.changed();say('Loading '+u+'…');return load(live);}).then(live)
-    .then(function(){say([head()+dim(),ob?'Showing records observed by '+u+'.':'',hide?'Hiding records '+u+' identified.':''].filter(Boolean).join(' '));
+    .then(function(v){id=v;key++;o.changed();return load(live);}).then(live)
+    .then(function(){busy=0;say([head()+dim(),ob?'Showing records observed by '+u+'.':'',hide?'Hiding records '+u+' identified.':''].filter(Boolean).join(' '));
       key++;o.changed();})
-    .catch(function(e){if(e===0)return;bad=1;mask=ob=hide=null;key++;
+    .catch(function(e){if(e===0)return;busy=0;bad=1;mask=ob=hide=null;key++;
       say(e instanceof TypeError?'Could not reach iNaturalist.':e.message);o.changed();});}
-  // Hide and Observed together would leave almost nothing, as an observer's own ID counts as an identification
-  function excl(){var why="Off while the other is ticked: a user's own records carry their own ID.",no=!S.user,hint='Enter a user name first';
+  // Hide and Observed together would leave almost nothing, as an observer's own ID counts as an identification,
+  // so ticking one unticks the other (onchange) rather than locking it
+  function excl(){var why="Ticking this unticks the other: a user's own records carry their own ID.",no=!S.user,hint='Enter a user name first';
     cb.taxa.disabled=no;cb.taxa.title=no?hint:'';
-    cb.observer.disabled=no||!META.observer||cb.unid.checked;cb.unid.disabled=no||cb.observer.checked;
-    cb.observer.title=no?hint:!META.observer?'This map has no observer file.':cb.unid.checked?why:'';cb.unid.title=no?hint:cb.observer.checked?why:'';
+    cb.observer.disabled=no||!META.observer;cb.unid.disabled=no;
+    cb.observer.title=no?hint:!META.observer?'This map has no observer file.':why;cb.unid.title=no?hint:META.observer?why:'';
     if(note)note.hidden=!no;
     USR_FLAGS.forEach(function(m){cb[m[0]].parentNode.lastChild.textContent=' '+m[1](usrWho(S));});}
   // what a typed login starts on: nothing ticked but Hide, if it was last left ticked
@@ -158,7 +165,8 @@ function userFilter(o){
     input.placeholder='Login or number';input.autocomplete='off';input.spellcheck=false;
     USR_FLAGS.forEach(function(m){var l=f.appendChild(el('label')),c=l.appendChild(el('input'));
       c.type='checkbox';c.id='usr'+m[0];c.dataset.explain=m[2];l.append(' '+m[1](usrWho(S)));cb[m[0]]=c;
-      c.onchange=function(){if(m[0]==='unid')usrStore(USR_HIDE,c.checked?'1':'0');excl();apply();};});
+      c.onchange=function(){var x={unid:'observer',observer:'unid'}[m[0]];if(x&&c.checked)cb[x].checked=false;
+        usrStore(USR_HIDE,cb.unid.checked?'1':'0');excl();apply();};});
     note=f.appendChild(el('span','muted','Enter a user name first'));note.id='usrhint';
     defaults();
     adj=f.appendChild(el('details'));adj.appendChild(el('summary',null,'Adjust'));
@@ -183,8 +191,8 @@ function userFilter(o){
         if(S.user)USR_FLAGS.forEach(function(m){cb[m[0]].checked=has(m[0]);});
         excl();
         minsel.value=min();adj.hidden=!S.user;again.hidden=!o.again||!has('unid')||!S.user;out.hidden=!S.user;
-        sum.textContent=S.user?'User: '+S.user+' · '+(USR_FLAGS.filter(function(m){return has(m[0]);}).map(function(m){return m[1](usrWho(S));}).join(', ')||'Your genera first'):'User';}
-      start();},
+        }
+      start();label();},
     drop:function(i){if(!id)return false;var t=Pn.tax[i];
       return !!(mask&&has('taxa')&&!(t<mask.length&&mask[t]===1)||ob&&i<ob.length&&ob[i]!==id||hide&&hide.has(Pn.id[i]));},
     key:function(){return key;},

@@ -34,11 +34,12 @@ def test_hide_and_observed_exclude_each_other(browser, site):
     page.wait_for_function("/^Your top/.test(document.querySelector('#usrbox p').textContent)")
     assert not page.is_disabled("#usrunid") and not page.is_disabled("#usrobserver")
     page.check("#usrunid")
-    assert page.is_disabled("#usrobserver") and "ID" in page.get_attribute("#usrobserver", "title")
-    page.uncheck("#usrunid")
-    page.check("#usrobserver")
+    assert not page.is_disabled("#usrobserver")
+    assert "ID" in page.get_attribute("#usrobserver", "title")
+    page.check("#usrobserver")  # ticking one unticks the other, nothing is locked
     shown(page, N // 2)
-    assert page.is_disabled("#usrunid") and not page.is_checked("#usrunid")
+    assert not page.is_checked("#usrunid") and not page.is_disabled("#usrunid")
+    assert page.evaluate("localStorage.getItem('wtid.uhide')") == "0"
     page.wait_for_function("!location.hash.includes('umode')")  # Observed alone, an old link
     page.close()
 

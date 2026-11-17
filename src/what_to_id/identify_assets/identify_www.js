@@ -1,5 +1,5 @@
 // The At risk, Invasive and Group by suggested species toggles. At risk and Invasive (hash risk=1, inv=1) keep
-// level 3 cards by their suggested species: At risk from the map's META.value list (at_risk_bc_taxa.json, listed in Canada
+// cards by their suggested species (else the record's own taxon): At risk from the map's META.value list (at_risk_bc_taxa.json, listed in Canada
 // or BC S1-S3), at once; Invasive when iNaturalist marks it introduced in BC, from /v1/taxa/<ids>?preferred_place_id=7085
 // (30 ids a request), cached by taxon id for a week. A suggestion not yet looked up is hidden until its answer lands.
 // IdentifyWWW(ctx), ctx {look(i), taxa(), value (META.value), redraw()}.
@@ -28,7 +28,7 @@ return function(ctx){
   // a suggestion the taxa table lacks: its id by an exact name search, 0 for none
   function named(nm){ids.set(nm,0);api('taxa?rank=species&per_page=1&q='+encodeURIComponent(nm)).then(function(j){
     var x=(j.results||[])[0];if(x&&x.name===nm){ids.set(nm,x.id);clearTimeout(T);T=setTimeout(ctx.redraw,300);}}).catch(function(){});}
-  // level 3 records pass unless a toggle is on and their suggestion fails it
+  // records pass unless a toggle is on and their suggestion fails it
   function pass(i){
     if(!need)return true;
     if(!ids.size)ctx.taxa().forEach(function(t){if(t[2])ids.set(t[0],t[2]);});
