@@ -230,7 +230,7 @@ def test_identify_about_links_to_methods():
     assert 'href="terms.html#methods"' in page_identify.render()
 
 
-def test_the_study_section_and_its_fold_come_with_the_study_only():
+def test_the_study_section_and_its_fold_come_with_the_study_only(monkeypatch):
     from collections import Counter
 
     from what_to_id.page_rotation import read_study
@@ -241,6 +241,8 @@ def test_the_study_section_and_its_fold_come_with_the_study_only():
         assert words in plain
     assert ("sign in lasts" in plain) == bool(page_identify.INAT_CLIENT_ID)
     study = read_study(SRC.parents[1] / "site" / "study.json")
+    assert 'id="study-methods"' not in terms_page.render(study=study)  # held with the prereg
+    monkeypatch.setattr(terms_page, "SHOW_TEST_FOLD", True)
     html = terms_page.render(study=study)
     assert 'id="study-methods"' in html and 'href="#study-methods-refs"' in html
     ids = Counter(re.findall(r'\bid="([^"]+)"', html))

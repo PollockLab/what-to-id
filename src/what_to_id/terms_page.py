@@ -109,6 +109,8 @@ and cards were served and which tabs were opened. A count never holds a login or
 __SIGN_IN__</p>
 <p>Taking part is just identifying as usual. There is nothing to sign up for, and you can stop
 or switch to another tab at any time.</p>"""
+# The "How the test works" fold stays hidden while the pre-registration is on hold.
+SHOW_TEST_FOLD = False
 # Shown only while Identify offers Sign in (page_identify.INAT_CLIENT_ID).
 SIGN_IN = (
     "If you sign in with iNaturalist, the sign in lasts for that tab only, and the IDs you post"
@@ -202,7 +204,7 @@ def render(
         .replace('"methods-refs"', '"study-methods-refs"')
         .replace('"#methods-refs"', '"#study-methods-refs"')
         + f"<style>{METHOD_CSS}</style><script>{METHOD_JS}</script>"
-        if study and study.get("methods")
+        if SHOW_TEST_FOLD and study and study.get("methods")
         else ""
     )
     how = "\n".join(
