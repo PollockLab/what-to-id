@@ -211,8 +211,8 @@ def test_an_old_link_with_a_login_alone_still_opens_on_observer(browser, site):
     assert checked(page) == ["observer"]
     assert "umode" not in page.evaluate("location.hash")
     assert page.inner_text("#usrbox > summary") == "User: 10 · Only records @10 observed"
-    # an observer's own ID counts as one, so Hide is off while Observed is ticked
-    assert page.is_disabled("#usrunid") and page.get_attribute("#usrunid", "title")
+    # an observer's own ID counts as one, so Hide stays unticked, but can be ticked to swap
+    assert not page.is_checked("#usrunid") and page.get_attribute("#usrunid", "title")
     page.close()
 
 
@@ -240,7 +240,7 @@ def test_my_taxa_first_ranks_the_users_genera_and_dims_the_rest(browser, site):
 def test_not_yet_identified_hides_the_records_the_user_identified_in_the_view(browser, site):
     page = open_map(browser, site, "#user=42&umode=unid")
     shown(page, N - 3)
-    assert checked(page) == ["unid"] and page.is_disabled("#usrobserver")
+    assert checked(page) == ["unid"] and not page.is_disabled("#usrobserver")
     q = page.calls[-1][1]
     assert page.calls[-1][0].endswith("/observations")
     assert q["ident_user_id"] == ["42"] and q["quality_grade"] == ["needs_id"]
