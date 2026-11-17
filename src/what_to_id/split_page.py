@@ -2,10 +2,10 @@
 
 Each page runs in an iframe (``?embed=1`` hides its header) and reports selection changes to this
 page by postMessage; this page relays them to the other frames, which apply them in place. A click
-on a pane's button shows it alone, Shift-click adds it beside the others. With no ``?view=`` it
-opens Identify and the map, or without ``identify.html`` in ``out_dir`` the map and the tree, or
-without ``tree.html`` too the map and the photo space, so build those pages first. It writes
-``explore.html``, plus ``split.html`` and ``levels.html``, which forward old links to it.
+on a pane's button shows or hides it beside the others (a phone shows one at a time). With no
+``?view=`` it opens Identify and the map, or without ``identify.html`` in ``out_dir`` the map and
+the tree, or without ``tree.html`` too the map and the photo space, so build those pages first.
+It writes ``explore.html``, plus ``split.html`` and ``levels.html``, which forward old links to it.
 """
 
 from __future__ import annotations
@@ -65,13 +65,12 @@ BAR = (
     f'<span class="seg" role="group" aria-label="View">{IDENTIFY_BUTTON}'
     '<button type="button" data-p="map">Map</button>'
     '<button type="button" data-p="space" data-explain="photo-space">Photo space</button>'
-    f'{TREE_BUTTON}</span><button type="button" id="sbs" aria-pressed="false" '
-    'title="Show the last layout of more than one pane">Side by side</button>'
+    f"{TREE_BUTTON}</span>"
     '<button type="button" class="infob" id="i" aria-expanded="false" aria-controls="note" '
     'aria-label="About this view"><svg viewBox="0 0 24 24" aria-hidden="true">'
     '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/></svg></button>'
-    '<p class="note" id="note" hidden>Click a pane to show it alone; Shift-click adds or removes '
-    "one beside the others, and Side by side brings back your last mix. "
+    '<p class="note" id="note" hidden>Click a pane to show or hide it beside the others; the last '
+    "one stays. On a phone a click shows that pane alone. "
     "The panes share one selection: change a filter in any and the others follow. Dates, months, "
     "show only, groups, taxa, the photo search and the map's area and the photo space's lasso "
     "travel across; projects stay with the map. The taxonomy counts what the map shows, or the "

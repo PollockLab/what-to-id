@@ -291,7 +291,7 @@ def test_what_opens_the_photo_space_full_screen_and_show_cards_returns_with_the_
     page.close()
 
 
-def test_a_click_shows_one_pane_shift_click_adds_one_and_side_by_side_restores(browser, site, pts):
+def test_a_click_toggles_a_pane_beside_the_others_and_the_last_one_stays(browser, site, pts):
     page = explore(browser, site[0])
     frame_of(page, "identify")
     frame_of(page, "map")
@@ -302,29 +302,20 @@ def test_a_click_shows_one_pane_shift_click_adds_one_and_side_by_side_restores(b
             ".filter(f => !f.hidden).map(f => f.id)"
         )
 
-    def width(n):
-        return page.evaluate(f"document.getElementById('{n}').getBoundingClientRect().width")
+    def pressed(n):
+        return page.locator(f"[data-p={n}]").get_attribute("aria-pressed")
 
-    page.click("[data-p=identify]")  # a plain click: Identify alone, full width
+    assert page.locator("#sbs").count() == 0  # no Side by side button any more
+    assert sorted(shown()) == ["identify", "map"]
+    assert pressed("identify") == "true" and pressed("map") == "true"
+    page.click("[data-p=map]")  # a plain click turns the map off, Identify stays
     page.wait_for_function("document.getElementById('map').classList.contains('rail')")
-    assert shown() == ["identify"] and width("identify") > 1280 - 290
-    assert page.locator("[data-p=map]").get_attribute("aria-pressed") == "false"
-    assert page.locator("#sbs").get_attribute("aria-pressed") == "false"
-    page.click("[data-p=map]", modifiers=["Shift"])  # shift adds the map beside it
+    assert shown() == ["identify"] and pressed("map") == "false"
+    page.click("[data-p=identify]")  # the last pane cannot be turned off
+    assert shown() == ["identify"] and pressed("identify") == "true"
+    page.click("[data-p=map]")  # a plain click turns it back on beside Identify
     page.wait_for_function("!document.getElementById('map').classList.contains('rail')")
-    assert sorted(shown()) == ["identify", "map"]
-    page.click("[data-p=map]")  # a plain click on another pane leaves only that one
-    page.wait_for_function("document.getElementById('identify').hidden")
-    assert (
-        shown() == ["map"]
-        and page.locator("[data-p=identify]").get_attribute("aria-pressed") == "false"
-    )
-    page.click("[data-p=map]")  # the one pane stays
-    assert shown() == ["map"]
-    page.click("#sbs")  # Side by side brings the last mix back
-    page.wait_for_function("!document.getElementById('identify').hidden")
-    assert sorted(shown()) == ["identify", "map"]
-    assert page.locator("#sbs").get_attribute("aria-pressed") == "true"
-    assert page.evaluate("localStorage.getItem('wtid-multi')") in ("identify-map", "map-identify")
+    assert sorted(shown()) == ["identify", "map"] and pressed("map") == "true"
+    assert page.evaluate("localStorage.getItem('wtid-multi')") is None
     assert page.errors == []
     page.close()
