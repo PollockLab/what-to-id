@@ -16,6 +16,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: write # to start CI on the refresh branch
 
 env:
   WHAT_TO_ID_USER_AGENT: what-to-id reference refresh (https://github.com/PollockLab/what-to-id)
@@ -47,6 +48,7 @@ jobs:
           git add src/what_to_id/invasive_bc_taxa.json src/what_to_id/at_risk_bc_taxa.json
           git commit -m "chore(data): refresh reference lists"
           git push --force origin "$BRANCH"
+          gh workflow run ci.yml --ref "$BRANCH"
           if gh pr view "$BRANCH" --json state --jq '.state' 2>/dev/null | grep -qx OPEN; then
             gh pr edit "$BRANCH" --body-file "$RUNNER_TEMP/summary.md"
           else
