@@ -50,8 +50,10 @@ function popovers(){
       p.style.setProperty('--pt',r.bottom+6+'px');p.style.setProperty('--pl',Math.max(8,Math.min(r.right-x[2],innerWidth-x[2]-8))+'px');});
   });
 }
+// the first-step line under the bar: gone for good once dismissed (the page's own script drops it before first paint)
+function first(){var t=$('first');if(t)$('firstx').onclick=function(){t.remove();try{localStorage.setItem('wtid-tip','1');}catch(e){}};}
 function start(){
-  popovers();
+  popovers();first();
   sheets();labels();count();
   var mo=new MutationObserver(function(){labels();count();});
   ['cap','status'].forEach(function(id){mo.observe($(id),{childList:true,characterData:true,subtree:true});});

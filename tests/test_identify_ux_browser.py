@@ -9,6 +9,10 @@ from . import test_identify_www_browser as wb
 browser = eb.browser
 site = ib.site
 CORS = {"access-control-allow-origin": "*"}
+TIP_HEIGHT = (
+    "document.addEventListener('DOMContentLoaded',"
+    "()=>{window.__h=document.getElementById('first').offsetHeight;});"
+)
 
 
 def opened(browser, base, hash_="#lvl=3", fail=None, init=None):
@@ -77,3 +81,23 @@ def test_a_failed_invasive_lookup_stays_unknown_and_asks_again(browser, site):
     page.wait_for_function(wb.KINDS + "===1")  # the retry landed: Bombus b is the invasive one
     assert wb.looks(page) == {"Bombus b"} and len(asked) >= 2
     assert page.errors == []
+
+
+def test_the_first_step_line_is_reserved_dismissible_and_french(browser, site):
+    base, _ = site
+    page = opened(browser, base, "", init=TIP_HEIGHT)
+    tip = page.locator("#first")
+    assert tip.inner_text().startswith("Pick a tab, then open a card")
+    assert (
+        page.evaluate("__h") == tip.evaluate("e => e.offsetHeight") > 0
+    )  # no shift as the page fills in
+    tip.get_by_role("button", name="Got it").click()
+    assert page.locator("#first").count() == 0
+    assert page.evaluate("localStorage.getItem('wtid-tip')") == "1"
+    page.reload()
+    page.wait_for_function("window.__identify")
+    assert page.locator("#first").count() == 0  # dropped before first paint
+    fr = opened(browser, base, "", init="localStorage.setItem('wtid-lang','fr');" + TIP_HEIGHT)
+    assert fr.inner_text("#first").startswith("Choisissez un onglet")
+    assert "Compris" in fr.inner_text("#first")
+    assert fr.evaluate("__h") == fr.locator("#first").evaluate("e => e.offsetHeight")
