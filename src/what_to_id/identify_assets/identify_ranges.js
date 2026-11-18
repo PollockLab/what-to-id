@@ -142,6 +142,8 @@ return function(buf,ctx){
     g.beginPath();g.arc(px,py,5*u*dpr,0,7);g.fillStyle='#fff';g.fill();
     g.beginPath();g.arc(px,py,3.2*u*dpr,0,7);g.fillStyle='#111';g.fill();
   }
+  // level 3's range words: whether the suggestion's range holds the record
+  function says(i){return !bits(ctx.look(i))?'No range map for the suggestion':fits(i)?"Range: fits the suggestion":"Range: outside the suggestion's";}
   // The chip on a card: the verdict in a few words.
   function verdict(i,lv){
     if((lv===2||lv===5)&&NOTE[i]!==NONE){var t=D.notes[NOTE[i]].replace('Range: ','');
@@ -276,6 +278,8 @@ return function(buf,ctx){
     // the chip alone, or null when the label's range is unknown; close drops its popover
     chip:function(i,lv){return bits(ctx.name(i))?chip(i,lv):null;},
     close:function(){closePop(false);},
+    // the range line of a record's explanation: level 3 the suggestion's, else the label's chip verdict, null when unknown
+    says:function(i,lv){return lv===3?says(i):bits(ctx.name(i))?verdict(i,lv):null;},
     // one name's range alone on cv, with the record's point: {inside} whether the record's cell is in it, null when its range is unknown
     mini:function(cv,i,name){var a=bits(name);if(!a)return null;cv.style.aspectRatio=box().w+'/'+box().h;drawMap(cv,i,0,name);return {inside:!!has(a,cellOf(i))};},
     // a name's range cells as a GeoJSON MultiPolygon in degrees (the grid holds lon/lat times 1000), null when unknown
@@ -294,8 +298,7 @@ return function(buf,ctx){
     // beside Identify, the range chip, or why there is none
     links:function(a,i,lv){
       var row=el('div','links');row.appendChild(a);
-      if(lv===3)row.appendChild(el('span','range',!bits(ctx.look(i))?'No range map for the suggestion':
-        fits(i)?"Range: fits the suggestion":"Range: outside the suggestion's"));
+      if(lv===3)row.appendChild(el('span','range',says(i)));
       else if(bits(ctx.name(i)))row.appendChild(chip(i,lv));
       else if((lv===2||lv===5)&&NOTE[i]!==NONE)row.appendChild(el('span','range',D.notes[NOTE[i]]));
       else row.appendChild(el('span','range','No range map: range unknown'));

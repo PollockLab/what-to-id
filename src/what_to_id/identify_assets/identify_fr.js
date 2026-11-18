@@ -24,7 +24,12 @@ var CLICK="Cliquez pour choisir, de nouveau pour ",CLEAR="effacer.";
 var words={
 // the page
 "Identify: What to ID next":"Identifier : quoi identifier ensuite","What to ID":"What to ID","Skip to content":"Passer au contenu",
-"Close":"Fermer","Close (Esc)":"Fermer (Échap)","Loading…":"Chargement…","Names":"Noms","Language":"Langue","Species names":"Noms des espèces",
+"Close":"Fermer",
+// the compare panel's "Why this card?" (identify_why.js); its rule and term sentences are the glossary's
+"Why this card?":"Pourquoi cette carte ?","Raised by":"Remontée par","Kept by":"Gardée par","Label’s range":"Aire de l'étiquette",
+"Range: fits the suggestion":"Aire : dans celle de la suggestion","Range: outside the suggestion's":"Aire : hors de celle de la suggestion",
+"A species at risk, listed in Canada or BC S1-S3.":"Une espèce à risque, inscrite au Canada ou classée S1-S3 en C.-B.","A species introduced to BC, per iNaturalist.":"Une espèce introduite en C.-B., selon iNaturalist.",
+"How strongly the record fits its level's rule (on Narrow it down: how closely the photo points to one species).":"Dans quelle mesure l'observation répond à la règle de son niveau (pour À préciser : à quel point la photo désigne une seule espèce).","Close (Esc)":"Fermer (Échap)","Loading…":"Chargement…","Names":"Noms","Language":"Langue","Species names":"Noms des espèces",
 "English":"English","Français":"Français","Latin":"Latin","Common":"Commun","Both":"Les deux","Methods":"Méthodes","Identify":"Identifier",
 "Identify (Enter)":"Identifier (Entrée)","Identify on iNaturalist (Enter)":"Identifier sur iNaturalist (Entrée)","openbiodiversity.ca":"openbiodiversity.ca",
 "(opens in a new tab)":"(s'ouvre dans un nouvel onglet)","· BC":"· C.-B.","About":"À propos","About this page":"À propos de cette page",
@@ -188,7 +193,10 @@ R('Runner-up (.+), reference photo','Deuxième choix $1, photo de référence'),
 R('Taxon page of (.+) on iNaturalist','Page du taxon $1 sur iNaturalist'),R('Identify as (.+) on iNaturalist','Identifier comme $1 sur iNaturalist'),
 R('ID as (.+)','Identifier comme $1'),R('Copied (.+), paste in iNat','$1 copié, collez dans iNat'),
 R('Second best: (.+?)(?:\\. Margin ([\\d.]+) cosine; under 0\\.010 a close call, under 0\\.040 fair, else clear)?',function(m,n,g){return 'Deuxième meilleure : '+n+(g?'. Marge de '+C(g)+' de cosinus; sous 0,010 un cas limite, sous 0,040 correcte, sinon nette':'');}),R(', close call',', cas limite'),R(', fair margin',', marge correcte'),R(', clear margin',', marge nette'),
-R('Best #%','Meilleurs $1 %'),R('Click to keep the Best #%','Cliquez pour garder les meilleurs $1 %'),
+R('Best #%','Meilleurs $1 %'),
+R('Ranks in the best #% of this level by how closely the photo points to one species. A rank, not a measured accuracy.','Se classe parmi les meilleurs $1 % de ce niveau selon la netteté avec laquelle la photo mène à une espèce. Un rang, pas une exactitude mesurée.'),
+R('# of # observer-days in its 25 km cell','$1 jours-observateur sur $2 dans sa cellule de 25 km'),R('Survey days #-#',"Jours d'inventaire $1-$2"),
+R('How it works: (.+)',function(m,n){return 'Comment ça marche : '+G(n);}),R('Click to keep the Best #%','Cliquez pour garder les meilleurs $1 %'),
 // group names with their counts
 R('(.+?)(?: \\((\\w+)\\))?\\. Click to pick, again to clear\\.',function(m,n,l){return G(n)+(l?' ('+l+')':'')+'. '+CLICK+CLEAR;}),
 R('(.+?)\\. Click to pick, again to leave out, again to clear\\.',function(m,n){return G(n)+'. '+CLICK+'exclure, de nouveau pour '+CLEAR;}),

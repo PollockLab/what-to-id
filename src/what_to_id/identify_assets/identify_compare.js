@@ -7,7 +7,7 @@
 // names and its look-alikes (the model's runner-up, iNaturalist's similar species) each with a row of reference photos and a
 // small range map (identify_refs.js), as in iNaturalist's Compare. Up and down pick the species, left and right step its photos
 // (with Shift the record's), z zooms; j, k, Enter, c, s, u (undo) and Esc work through the cards without a tab.
-// ctx.range() is the IdentifyRanges once loaded, else null. Strings: identify_compare_text.js. Needs identify_zoom.js, identify_refs.js.
+// ctx.range() is the IdentifyRanges once loaded, else null; ctx.explain(i,lv) the data of "Why this card?" (identify_why.js). Strings: identify_compare_text.js. Needs identify_zoom.js, identify_refs.js.
 var IdentifyCompare=(function(){
 'use strict';
 var AHEAD=3,MAX=30,ROWS=4,NOTAX=65535,PLACE=7085,TAXON='https://www.inaturalist.org/taxa/',TXT=IdentifyText;  // AHEAD: cards whose references load while the user is in iNat
@@ -73,7 +73,7 @@ return function(ctx){
       '<button type="button" id="cpx" class="arrow" aria-label="Close (Esc)">×</button></div>'+
       '<p id="cplive" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)"></p>'+
       '<div class="cpbody"><div class="cpl"><div id="cpobs"></div><div id="cpdet"></div></div>'+
-      '<div class="cpr"><p id="cpkeys" class="muted"></p><div id="cpwhy"></div><div id="cprefs"></div></div></div>'+
+      '<div class="cpr"><p id="cpkeys" class="muted"></p><div id="cpwhy"></div><details id="cpexp"><summary>Why this card?</summary><ul></ul></details><div id="cprefs"></div></div></div>'+
       '<div class="cpbar"><button type="button" id="cpk" class="arrow" aria-label="Previous card (k)" aria-keyshortcuts="k">‹</button>'+
       '<button type="button" id="cpj" class="arrow" aria-label="Next card (j)" aria-keyshortcuts="j">›</button>'+
       '<button type="button" id="cps" class="more" aria-keyshortcuts="s" title="Skip (s)">Skip</button>'+
@@ -96,7 +96,7 @@ return function(ctx){
     box.addEventListener('keydown',function(e){
       var t=e.target,k=e.key;
       if(k==='Tab'){  // focus stays in the open panel: Tab and Shift+Tab cycle its controls
-        var f=[].filter.call(box.querySelectorAll('a[href],button'),function(x){return x.offsetParent;}),a=f.indexOf(t);
+        var f=[].filter.call(box.querySelectorAll('a[href],button,summary'),function(x){return x.offsetParent;}),a=f.indexOf(t);
         e.preventDefault();if(f.length)f[e.shiftKey?(a<=0?f.length-1:a-1):(a+1)%f.length].focus();return;}
       if(e.metaKey||e.ctrlKey||e.altKey||/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))return;
       if(k==='Escape'&&document.querySelector('#rpop:not([hidden])'))return;  // the range map over the panel closes first
@@ -106,7 +106,7 @@ return function(ctx){
       d={ArrowLeft:-1,ArrowRight:1}[k];
       if(d){e.preventDefault();if(e.shiftKey)ZM.step(d);else RF.step(rows[act],d);return;}
       if(k==='z'){e.preventDefault();ZM.toggle();return;}
-      var b={Escape:'#cpx',j:'#cpj',k:'#cpk',s:'#cps',c:'#cpc .copy',Enter:t.closest('button,a')?null:'#cpo'}[k];
+      var b={Escape:'#cpx',j:'#cpj',k:'#cpk',s:'#cps',c:'#cpc .copy',Enter:t.closest('button,a,summary')?null:'#cpo'}[k];
       b=b&&box.querySelector(b);if(!b)return;
       e.preventDefault();e.stopPropagation();b.click();
     });
@@ -177,6 +177,11 @@ return function(ctx){
     w.href=li.querySelector('.when').href;w.textContent=(o.observed_on||TXT.dateUnknown)+' · '+(o.place_guess||TXT.placeUnknown);IdentifyFlow.link(w);
     v.append(ZM.view(ps),w);
   }
+  // "Why this card?": one <details> for every card, so it stays open (or shut) from card to card
+  function explain(li){
+    var ex=box.querySelector('#cpexp'),d=ctx.explain&&li.dataset.i&&ctx.explain(+li.dataset.i,+li.dataset.lv);
+    ex.hidden=!(d&&IdentifyWhy.fill(ex.lastChild,d));
+  }
   // quiet: the pick came from another pane, so it is not told back
   function open(li,quiet){
     if(!box)build();
@@ -187,6 +192,7 @@ return function(ctx){
     box.querySelector('#cplive').textContent=(all.indexOf(li)+1)+' of '+all.length+', '+(nm?nm.textContent:'Record')+(t&&li.dataset.lv!=='1'?' to '+t[0]:'');
     c.replaceChildren();if(t)c.append(IdentifyNarrow.copy(t[0]));
     var y=why(li),wy=box.querySelector('#cpwhy');wy.replaceChildren();if(y)wy.append(IdentifyNarrow.why(y[0],y[1]));
+    explain(li);
     obs(li);refs(li);if(ctx.lend)ctx.lend(li,box.querySelector('#cpdet'));
     box.hidden=false;document.body.classList.add('cpon');li.scrollIntoView({block:'nearest'});
     [].forEach.call(document.querySelectorAll('.card.cur'),function(x){x.classList.remove('cur');});li.classList.add('cur');
@@ -200,9 +206,11 @@ return function(ctx){
     if(shown())open(li,true);
     else{[].forEach.call(document.querySelectorAll('.card.cur'),function(x){x.classList.remove('cur');});li.classList.add('cur');li.scrollIntoView({block:'nearest'});}
   }
+  // the look-alikes have just loaded: the open panel's explanation names them
+  function again(){if(shown())explain(cur);}
   function shown(){return box&&!box.hidden?cur:null;}
   // the cards' request brought the observation: the panel showing it fills in
   function landed(li){if(box&&!box.hidden&&cur===li)obs(li);}
-  return {ref:rival,fill:fill,pair:pair,open:open,close:close,landed:landed,pick:pick,shown:shown};
+  return {ref:rival,fill:fill,pair:pair,open:open,again:again,close:close,landed:landed,pick:pick,shown:shown};
 };
 })();
