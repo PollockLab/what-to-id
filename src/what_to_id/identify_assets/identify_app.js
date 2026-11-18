@@ -29,11 +29,11 @@ function get(url){return fetchOnce(url).then(L.gunzip,function(e){
 function kept(st){
   var n=P.n,i,out=MF.keep(TF,MF.groupSet(st,TF),P.tax,P.grp,n,new Uint8Array(n));
   var ok=CH.groupPass(st.groups,META.groups,!!TF.inc);
-  for(i=0;i<n;i++)if(!ok[P.grp[i]])out[i]=0;
+  if(ok.indexOf(false)>=0)for(i=0;i<n;i++)if(!ok[P.grp[i]])out[i]=0;
   MF.rest(st,P.obs,P.up,P.flags,n,out);OX.rest(st,out,PIDS);
   var I=SpaceMask.areaIndex(AREA),V=SpaceMask.areaIndex(VIEW),m=[I&&SpaceMask.area(I,P),V&&SpaceMask.area(V,P),KEEPIDS&&SpaceMask.ids(KEEPIDS,P),SUBIDS&&SpaceMask.ids(SUBIDS,P)];
   m.forEach(function(v){if(v)for(var j=0;j<n;j++)out[j]&=v[j];});
-  for(i=0;i<n;i++)if(out[i]&&UF.drop(i))out[i]=0;
+  if(UF.active())for(i=0;i<n;i++)if(out[i]&&UF.drop(i))out[i]=0;
   return out;
 }
 function select(){UF.sync(P);SEL=kept(S);}
@@ -54,15 +54,23 @@ function byId(P){
 // What the per-species cap counts: the record's label, but on level 3 the suggested species (the label is a coarse rank there).
 function ck(i,lv){var v=lv===3&&LOOKS?LOOKS.lo[i]|LOOKS.hi[i]<<8:NO_LOOK;return v===NO_LOOK?P.tax[i]:v;}
 function RUN(){return /(^|&)run=1(&|$)/.test(location.hash.slice(1));}
-function on(i,all){return SEL[i]&&LEVEL[i]&&(!R||R.pass(i,LEVEL[i]))&&(!X||X.pass(i))&&(!GP||GP.pass(i,KIND[i],all))&&(!WW||WW.pass(i));}
 // Under My taxa first the user's genera lead each level, each kind in turn, then the rest; MINE: how many cards they are, -1 without the mode.
 function build(){
-  var n=P.n,W=2*NK*STEPS,c=new Uint32Array(6*W+1),key=new Uint16Array(n),rk=UF.ranked(),i,k,lv,u=0,run=RUN(),kf0=KF,out=[],total=[];
-  KC=[];MINE=[];MORE.clear();
-  for(i=0;i<n;i++)if(on(i)){key[i]=LEVEL[i]*W+(rk&&UF.mine(i)?NK*STEPS:0)+(NK-1-SUB[i])*STEPS;c[key[i]+1]++;KC[KIND[i]]=(KC[KIND[i]]||0)+1;}else if(KIND[i]===3&&on(i,1))u++;  // u: level 3 past its Best x%
+  var n=P.n,W=2*NK*STEPS,c=new Uint32Array(6*W+1),key=new Uint16Array(n),rk=UF.ranked(),i,k,lv,l,v,u=0,ts=0,run=RUN(),kf0=KF,out=[],total=[],kc=new Uint32Array(16),sel=SEL,lev=LEVEL,kd=KIND,lk=LOOKS,
+    wm=WW&&WW.need()?new Int8Array(131072).fill(-1):null;  // wm: At risk / Invasive's verdict per look-alike code (65536 + the taxon without one), asked once a build
+  MINE=[];MORE.clear();if(R)R.prep();
+  // a record is kept when every filter holds; u counts the level 3 records only the Best x% leaves out, and the filters apart from it still ask of them
+  for(i=0;i<n;i++){
+    if(!sel[i])continue;ts++;
+    if(!(l=lev[i])||R&&!R.pass(i,l)||X&&!X.pass(i)||GP&&!GP.pass(i))continue;
+    if(wm){v=lk?lk.lo[i]|lk.hi[i]<<8:NO_LOOK;if(v===NO_LOOK)v=65536+P.tax[i];if(wm[v]<0)wm[v]=WW.pass(i)?1:0;if(!wm[v])continue;}
+    if(kd[i]===3&&GP&&GP.past(i)){u++;continue;}
+    key[i]=l*W+(rk&&UF.mine(i)?NK*STEPS:0)+(NK-1-SUB[i])*STEPS;c[key[i]+1]++;kc[kd[i]]++;
+  }
+  KC=[];kc.forEach(function(x,k){if(x)KC[k]=x;});
   for(k=1;k<c.length;k++)c[k]+=c[k-1];
   var at=c.slice(),order=new Int32Array(c[c.length-1]);
-  for(k=0;k<n;k++){i=BYID[k];if(key[i])order[at[key[i]]++]=i;}  // key[i] is 0 unless on(i) held in the first loop
+  for(k=0;k<n;k++){i=BYID[k];if(key[i])order[at[key[i]]++]=i;}  // key[i] is 0 unless the first loop kept the record
   // A level is sorted and cut when first read (the shown one at the end of build), so a build pays for one level, not five; the counts are known from the filter pass.
   function rows_(lv){
     var tot=new Uint32Array(65536*NK),taken=new Uint32Array(65536*NK),rows=[],a=c[lv*W],b=c[(lv+1)*W],nd=[],cut,t,i,k,kf=kf0&&TAB[kf0]===lv?kf0:0;
@@ -73,7 +81,7 @@ function build(){
     for(k=b-1;k>=a;k--){i=order[k];if(i<0)continue;t=SUB[i]*65536+ck(i,lv);cut=nd[SUB[i]]===1||lv===3&&run?Infinity:PER_SPECIES;
       if(taken[t]<cut){rows.push(i);if(!taken[t]++&&tot[t]>cut&&!(lv===3&&LOOKS))MORE.set(i,tot[t]-cut);}}
     // the #record= card leads its level, even past the per-species cut
-    if(REC>=0&&LEVEL[REC]===lv&&on(REC)&&rows[0]!==REC){k=rows.indexOf(REC);if(k>0)rows.splice(k,1);rows.unshift(REC);}
+    if(REC>=0&&LEVEL[REC]===lv&&key[REC]&&rows[0]!==REC){k=rows.indexOf(REC);if(k>0)rows.splice(k,1);rows.unshift(REC);}
     if(lv===3&&run&&LOOKS)rows=IdentifyNarrow.runs(rows,looksOf);
     for(k=0;rk&&k<rows.length&&UF.mine(rows[k]);k++);MINE[lv]=rk?k:-1;
     return rows;
@@ -81,7 +89,7 @@ function build(){
   for(lv=1;lv<=5;lv++){total[lv]=c[(lv+1)*W]-c[lv*W];(function(lv){Object.defineProperty(out,lv,{configurable:true,enumerable:true,get:function(){
     var r=rows_(lv);Object.defineProperty(out,lv,{value:r,writable:true,configurable:true,enumerable:true});return r;}});})(lv);}
   // All needing ID (6): every kept record, level or not, in the base order (newest first); its list only while it shows
-  for(out[6]=[],total[6]=0,k=n-1;k>=0;k--)if(SEL[i=BYID[k]]&&++total[6]&&LV===6)out[6].push(i);
+  out[6]=[];total[6]=ts;if(LV===6)for(k=n-1;k>=0;k--)if(SEL[i=BYID[k]])out[6].push(i);
   view=out;S.total=total;S.all3=total[3]+u;if(LV>0&&LV<6)out[LV];  // the shown level now
 }
 // the look-alike's index in LOOKS.names, -1 for none: a cheaper key than its name
@@ -489,7 +497,7 @@ async function load(){
     Promise.all([lk(),file('why').catch(function(){return null;})]).then(function(b){if(b[0]&&b[1]){WHY=looks(b[1],1);if(LV===3)retitle();}});};
   if(LV===3&&!BT)setTimeout(WHYF,0);rg.then(PCF,PCF);  // the percentiles and look-alikes follow the records in the background: level 3's count reads both
   rg.then(function(b){if(!b)return;
-    R=IdentifyRanges(b,{P:P,sdm:META.sdm,name:function(i){return P.tax[i]!==NOTAX&&TAXA[P.tax[i]]?TAXA[P.tax[i]][0]:null;},look:looksOf,code:lookCode,redraw:redraw});
+    R=IdentifyRanges(b,{P:P,sdm:META.sdm,name:function(i){return P.tax[i]!==NOTAX&&TAXA[P.tax[i]]?TAXA[P.tax[i]][0]:null;},look:looksOf,code:lookCode,ver:function(){return LOOKS;},redraw:redraw});
     // #record=<id> (the map's token): its level, its card first, its range popover open
     var rec=/(?:^|&)record=(\d+)(?:&|$)/.exec(location.hash.slice(1));
     for(var i=0;rec&&i<P.n;i++)if(P.id[i]===+rec[1]){REC=i;break;}

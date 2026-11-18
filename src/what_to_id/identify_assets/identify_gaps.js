@@ -262,9 +262,10 @@ var F=function(ctx){
   return {
     ready:ready,  // settles once the checklist has loaded or failed and the redraw is done
     reread:function(){st=read();if(UI)show();},  // the address changed under it (Clear filters, back)
-    // a record the filters keep: level 3's Best x% and every level's survey days range
-    pass:function(i,kind,all){
-      if(kind===3&&st.top<100&&!all){var p=ctx.pct(i);if(p!=null&&p>st.top/100)return false;}
+    // a level 3 record past the Best x% (build asks for level 3 records only)
+    past:function(i){var p=st.top<100?ctx.pct(i):null;return p!=null&&p>st.top/100;},
+    // a record the survey days range keeps
+    pass:function(i){
       if(!st.gap||state!=='ready')return true;
       var d=days[i];
       return d!==NODAYS&&d>=st.gap[0]&&(st.gap[1]>=LIT||d<=st.gap[1]);

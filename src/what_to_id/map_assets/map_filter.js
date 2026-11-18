@@ -107,6 +107,7 @@ function groupSet(S,TF){return TF.inc&&CH.picked(S.groups,META.groups,'inc').len
 // result and gs the groupSet; tax and grp are the records' columns.
 function keep(TF,gs,tax,grp,n,out){
   var ti=TF.inc,te=TF.exc;
+  if(!ti&&!te)return out.fill(1);  // no taxon picked: every record stays
   for(var i=0;i<n;i++){var t=tax[i],k=!ti||(t!==NOTAX&&ti[t]===1)||(gs!==null&&gs[grp[i]]);
     if(te&&t!==NOTAX&&te[t]===1)k=false;out[i]=k?1:0;}
   return out;
@@ -115,11 +116,13 @@ function keep(TF,gs,tax,grp,n,out){
 // the dates and months read the observed day, or the uploaded one with by=uploaded, and a record with no
 // date fails any date or month limit. o, u and f are the records' observed day, uploaded day and flags.
 function rest(S,o,u,f,n,out){
-  var day=S.up?u:o,full=S.lo===0&&S.hi===LAST,m=S.months,s=status(S),req=s.req,hide=s.hide,
-    fi=FLAG.introduced,ft=FLAG.threatened;
+  var day=S.up?u:o,full=S.lo===0&&S.hi===LAST,m=S.months,s=status(S),req=s.req,hide=s.hide,bt=new Uint8Array(256),any=false,j;
+  // the status bits per flags byte, so a record reads one and the pass is skipped when no byte and no date or month leaves a record out
+  for(j=0;j<256;j++){bt[j]=(j&FLAG.introduced?ST_INTRO:0)|(j&FLAG.threatened?ST_THREAT:0)|accOut(S.acc,j);if((bt[j]&req)!==req||bt[j]&hide)any=true;}
+  if(full&&!m&&!any)return out;
   for(var i=0;i<n;i++){
     if(!out[i])continue;
-    var d=day[i],b=(f[i]&fi?ST_INTRO:0)|(f[i]&ft?ST_THREAT:0)|accOut(S.acc,f[i]);
+    var d=day[i],b=bt[f[i]];
     if((!full&&(d===NO||d<S.lo||d>S.hi))||(m&&(d===NO||!(m>>MOY[d]&1)))||(b&req)!==req||b&hide)out[i]=0;
   }
   return out;

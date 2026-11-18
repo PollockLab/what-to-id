@@ -66,6 +66,6 @@ return function(ctx){
   var risk_=toggle('risk','At risk'),inv_=toggle('inv','Invasive');risk_.className=inv_.className='tog qchip';
   $('qchips').append(risk_,inv_);$('frun').append(toggle('run','Group by suggested species'));$('frun').firstChild.className='swt';
   sync();
-  return {pass:pass,flag:flag,sync:sync,active:function(){return on('risk')||on('inv');}};
+  return {pass:pass,flag:flag,sync:sync,need:function(){return need;},active:function(){return on('risk')||on('inv');}};
 };
 })();
