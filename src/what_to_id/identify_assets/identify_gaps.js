@@ -273,6 +273,18 @@ var F=function(ctx){
     // 0 lit or no data, 1 a gap, 2 a big gap
     tier:function(i){return tier?tier[i]:0;},
     risk:function(){return st.w.risk>0;},
+    // what shapes record i of level lv in the order and the cut, for its card's explanation: [prioritizers with a weight that count for it, filters that kept it], each [glossary key, name, detail]
+    why:function(i,lv){
+      var w=st.w,f=lv===3&&(w.risk||w.inv)?ctx.flag(i,!!w.inv):0,by=[],kept=[];
+      if(w.conf)by.push(['level-order',NAMES.conf[0],'']);
+      if(w.gap&&days&&days[i]!==NODAYS&&days[i]<LIT)by.push(['survey-days',NAMES.gap[0],days[i]+' of '+names[i][1]+' observer-days in its 25 km cell']);
+      if(w.risk&&f&1)by.push(['threatened',NAMES.risk[0],'']);
+      if(w.inv&&f&2)by.push(['introduced',NAMES.inv[0],'']);
+      if(w.out&&ctx.hasOut()&&ctx.out(i))by.push(['',NAMES.out[0],'']);
+      if(lv===3&&st.top<100&&ctx.hasRank())kept.push(['best-match','Best '+st.top+'%','']);
+      if(st.gap&&state==='ready')kept.push(['survey-days','Survey days '+st.gap[0]+'-'+st.gap[1],'']);
+      return [by,kept];
+    },
     // orders a level's records (a typed-array slice), the best last, under key (the groups of the level's order) and the prioritizers
     sort:function(ord,lv,key){
       if(!BUF||BUF[0].length!==P.n)BUF=[new Float64Array(P.n),new Float64Array(P.n)];  // reused: rsort reads only the entries of ord written here

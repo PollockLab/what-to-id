@@ -95,6 +95,7 @@ SCRIPTS = {
     "__IDENTIFY_COMPARE_TEXT__": ASSETS / "identify_compare_text.js",
     "__IDENTIFY_ZOOM__": ASSETS / "identify_zoom.js",
     "__IDENTIFY_REFS__": ASSETS / "identify_refs.js",
+    "__IDENTIFY_WHY__": ASSETS / "identify_why.js",
     "__IDENTIFY_COMPARE__": ASSETS / "identify_compare.js",
     "__IDENTIFY_STUDY__": ASSETS / "identify_study.js",
     "__IDENTIFY_INAT__": ASSETS / "identify_inat.js",

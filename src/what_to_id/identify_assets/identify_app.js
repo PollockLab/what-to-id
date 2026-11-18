@@ -366,6 +366,13 @@ function first(){return (CFG.levels.filter(function(l){return l[0]<6&&S.total[l[
 // each level tab explains itself from the glossary, by level number
 var XK=[0,'level-clear-matches','level-close-calls','level-narrow-it-down','level-odd-shots','level-might-be-wrong'],
   KX=[0,0,'level-close-calls',0,'level-odd-shots','level-might-be-mislabelled'];  // a kind's own entry
+// The data of a card's "Why this card?" (identify_why.js): its level and rule, its place (level 3), the look-alike, the range words and what the weights and filters did.
+function explain(i,lv){
+  var l=lv===5?KIND[i]:lv,lk=looksOf(i),k=lv===5?KX[l]||XK[5]:XK[lv],lvl=CFG.levels.filter(function(x){return x[0]===lv;})[0],w=GP?GP.why(i,lv):[[],[]],
+    r=R&&(lv===3?lk&&R.says(i,3):R.says(i,lv)),pc=lv===3?(RK?(RK[i]+1)/N3:PC&&PC[i]?PC[i]/100:null):null;
+  return {rule:k&&lvl?[lv===5?kindName(l):lvl[1],k]:null,pct:pc,look:lk&&(lv===2||lv===3||lv===5)?[lv===3?'Looks most like':'Looks more like',lk]:null,
+    range:r&&r!=='Range map'?[lv===3?'':'Label’s range',r]:null,by:w[0],kept:w[1]};
+}
 function tabs(){
   var box=$('tabs');
   CFG.levels.forEach(function(x){
@@ -511,7 +518,7 @@ async function load(){
   // Not yet identified by me asks iNaturalist within the pool's extent: Identify has no map viewport of its own
   var b=META.bbox;UF=userFilter({S:S,meta:META,get:function(f){return get(new URL(f,MAP));},taxa:function(){return TAXA;},changed:user,
     bounds:function(){return {w:b[0],s:b[1],e:b[2],n:b[3]};}});
-  CMP=IdentifyCompare({taxa:TAXA,tax:P.tax,look:looksOf,why:whyOf,obs:function(id){return CACHE.get(id);},range:function(){return R;},more:function(){shown+=LIMIT;more();},lend:CARD.lend});
+  CMP=IdentifyCompare({taxa:TAXA,tax:P.tax,look:looksOf,why:whyOf,obs:function(id){return CACHE.get(id);},range:function(){return R;},more:function(){shown+=LIMIT;more();},lend:CARD.lend,explain:explain});
   MF=MapFilter(META);Object.assign(S,MF.read(new URLSearchParams()));  // the defaults, until the address is read
   OX=IdentifyOnly({META:META,mf:MF,P:function(){return P;},taxa:function(){return TAXA;},range:function(){return R;},rewrite:rewrite,changed:refresh,embedded:parent!==window,get:function(f){return get(new URL(f,MAP));}});
   BAR=IdentifyBar({rewrite:rewrite,S:S,META:META,mf:MF,nf:nf,taxa:function(){return TAXA;},P:function(){return P;},tf:function(){return TF;},mask:atLevel,all:kept,tab:function(){var l=CFG.levels.filter(function(x){return x[0]===LV;})[0];return {name:l?l[1]:'',has:function(i){return LV===6||(LV?LEVEL[i]===LV:LEVEL[i]>0);}};},changed:put,blocked:function(){return !!(AREA||VIEW||KEEPIDS||SUBIDS||PIDS||UF.active());},
@@ -519,7 +526,7 @@ async function load(){
   RKF=function(){if(RK||rkp)return;LKF();Promise.all([rk(),lk()]).then(function(d){var ok=rank(d[0]);RKW=false;ok&&LV===3?redraw(true):(build(),counts());});};  // the count waits until the rank is read, not just fetched
   PCF=function(){if(RK||rkp||PC||pcp)return;if(!META.files.pct)return RKF();if(!ftp)LKF();pcp=file('pct').catch(function(){return null;});Promise.all([pcp,ftd]).then(function(d){if(!pct(d[0]))return RKF();return FT?0:(LKF(),lk());}).then(function(){if(PC){RKW=false;build();counts();}});};  // the count needs the percentiles, not the rank, so the rank waits for level 3
   var lkd=false;LKF=function(){if(lkd)return;lkd=true;lk().then(function(b){LKS=true;if(!b){if(LV===3&&WW){STAY=true;redraw();}return;}LOOKS=looks(b);retitle();
-    var cs=[].slice.call($('grid').querySelectorAll('.card'));CMP.fill(cs);cs.forEach(CARD.paint);if(BT)paint();
+    var cs=[].slice.call($('grid').querySelectorAll('.card'));CMP.fill(cs);cs.forEach(CARD.paint);CMP.again();if(BT)paint();
     if(LV===3){STAY=true;redraw();}else build();});};  // level 3's cap reads the suggestions; LKS: at-risk ranks only once they settle, so the order does not jump when they land, and falls back to each record's own taxon when there are none
   var co=CMP.open;CMP.open=function(){LKF();return co.apply(this,arguments);};if(WW.active())LKF();
   STAY=!!SHOWN;take(location.hash.slice(1),AREA==='');
@@ -534,7 +541,7 @@ async function load(){
     var rec=/(?:^|&)record=(\d+)(?:&|$)/.exec(location.hash.slice(1));
     for(var i=0;rec&&i<P.n;i++)if(P.id[i]===+rec[1]){REC=i;break;}
     if(REC>=0&&LEVEL[REC])LV=LEVEL[REC];
-    R.level(LV,true);redraw(true);if(S.only.range)refresh();
+    R.level(LV,true);redraw(true);CMP.again();if(S.only.range)refresh();
     // once the checklist has settled: its redraw closes the popover
     GP.ready.then(function(){var li=REC>=0&&document.querySelector('.card[data-id="'+P.id[REC]+'"]'),c=li&&li.querySelector('.rchip');
       if(c){if(CMP)CMP.open(li);c.click();}});});
