@@ -459,3 +459,30 @@ def test_the_root_is_life_and_the_group_cards_link_to_their_records(browser, lif
     assert "No taxon" not in page.inner_text("#card dl")
     assert page.errors == []
     page.close()
+
+
+# the sum of the page's layout shifts, as Chromium scores them
+SHIFTS = """window.__cls=0;new PerformanceObserver(l=>{for(const e of l.getEntries())
+  if(!e.hadRecentInput)window.__cls+=e.value}).observe({type:'layout-shift',buffered:true})"""
+
+
+def test_the_phone_page_holds_its_layout_while_the_taxa_load(browser, site):
+    page = browser.new_page(viewport={"width": 390, "height": 844})
+    page.add_init_script(SHIFTS)
+    page.calls = stub_taxa(page)
+    held = []
+    page.route("**/pool-taxa*", lambda r: held.append(r))  # the taxa arrive late, as on a slow link
+    page.goto(f"{site}/tree.html")
+    page.wait_for_selector("#crumbs:text('Loading')")
+    page.wait_for_timeout(500)
+    live = page.eval_on_selector_all("[role=status]", "e => e.map(x => x.textContent)")
+    assert any("Loading the taxa" in t for t in live)  # announced, drawn once in the crumbs
+    head = page.locator("header").bounding_box()["height"]
+    for route in held:
+        route.continue_()
+    page.wait_for_selector("#outline [role=treeitem]")
+    page.wait_for_selector("#card:not([hidden])")
+    assert page.locator("header").bounding_box()["height"] == head  # the crumbs row was reserved
+    page.wait_for_timeout(300)
+    assert page.evaluate("__cls") < 0.01  # the card opens above an outline that was not yet drawn
+    page.close()
