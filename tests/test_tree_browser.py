@@ -264,12 +264,28 @@ def test_a_phone_shows_the_outline_and_switches_to_the_radial_tree(browser, site
     page = open_tree(browser, site, 390, 800)
     assert page.locator("#side").is_visible() and page.locator("#radial").is_hidden()
     # the main landmark stays when the circle is hidden, and the skip link has its target
-    assert page.evaluate("getComputedStyle(document.querySelector('main#main-content')).display") != "none"
+    assert (
+        page.evaluate("getComputedStyle(document.querySelector('main#main-content')).display")
+        != "none"
+    )
     assert page.get_attribute(".site-skip", "href") == "#main-content"
     page.click("#mode")
     page.wait_for_selector("#svg .nd")
     assert page.locator("#radial").is_visible() and page.locator("#side").is_hidden()
     assert page.errors == []
+    page.close()
+
+
+def test_the_card_terms_are_24px_targets_that_do_not_overlap_on_a_phone(browser, site):
+    page = open_tree(browser, site, 390, 800)
+    page.wait_for_selector("#card:not([hidden])")
+    assert page.evaluate("getComputedStyle(document.getElementById('card')).position") == "relative"
+    boxes = page.evaluate(
+        "[...document.querySelectorAll('#card dt [data-explain]')]"
+        ".map(e => e.getBoundingClientRect()).map(r => [r.top, r.bottom])"
+    )
+    assert len(boxes) >= 2 and all(b - t >= 24 for t, b in boxes)
+    assert all(boxes[k][1] <= boxes[k + 1][0] + 0.5 for k in range(len(boxes) - 1))
     page.close()
 
 
