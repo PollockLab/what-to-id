@@ -14,10 +14,21 @@
   "pool_after": {
    "name": "pool-2026-11-03.parquet",
    "sha256": "b4f131ea2c2836cee7a85ddf622ad6007c15744a07d1b1d108bac4b906bd4a6e"
+  },
+  "leaver_taxa": {
+   "name": "leavers-taxa-now.parquet",
+   "sha256": "740ae994b45fd703f32b9c8c5e9b11ea242f217a09f63d87955f292d128eb2cb"
   }
  },
  "seed": 20261105,
  "bootstrap_reps": 1000,
+ "leaver_taxa_fetched_on": "2026-11-18",
+ "cluster": {
+  "unit": "observer (user_id)",
+  "observers": 42261,
+  "records_without_observer": 0,
+  "interval": "95% percentile of resampled observers, all their records kept"
+ },
  "cohort": 1439324,
  "cohort_file": "levels-outcome-cohort-2026-10-15.parquet",
  "levels": {
@@ -25,13 +36,54 @@
    "n": 788572,
    "left_per_1000": 9.52,
    "corrected_per_1000": 0.59,
+   "record_level": {
+    "corrected_per_1000_ci": [
+     0.54,
+     0.64
+    ],
+    "left_per_1000_ci": [
+     9.31,
+     9.74
+    ]
+   },
    "to_suggested_share": 0.026,
-   "to_suggested_genus_share": 0.393
+   "to_suggested_genus_share": 0.393,
+   "cluster": {
+    "corrected_per_1000_ci": [
+     0.52,
+     0.66
+    ],
+    "left_per_1000_ci": [
+     8.7,
+     10.42
+    ]
+   },
+   "any_change": {
+    "per_1000": 0.79,
+    "record_level_ci": [
+     0.73,
+     0.86
+    ],
+    "per_1000_ci": [
+     0.7,
+     0.9
+    ]
+   }
   },
   "easy": {
    "n": 322244,
    "left_per_1000": 12.99,
    "corrected_per_1000": 0.35,
+   "record_level": {
+    "corrected_per_1000_ci": [
+     0.29,
+     0.42
+    ],
+    "left_per_1000_ci": [
+     12.6,
+     13.39
+    ]
+   },
    "to_suggested_share": 0.054,
    "to_suggested_genus_share": 0.634,
    "corrected_rr": 0.59,
@@ -48,12 +100,75 @@
    "to_suggested_genus_rr_ci": [
     1.34,
     1.92
-   ]
+   ],
+   "cluster": {
+    "corrected_per_1000_ci": [
+     0.26,
+     0.44
+    ],
+    "left_per_1000_ci": [
+     11.99,
+     14.11
+    ],
+    "corrected_diff_per_1000": -0.24,
+    "corrected_diff_per_1000_ci": [
+     -0.32,
+     -0.15
+    ],
+    "left_diff_per_1000": 3.47,
+    "left_diff_per_1000_ci": [
+     2.86,
+     4.09
+    ],
+    "corrected_rr_ci": [
+     0.46,
+     0.73
+    ],
+    "to_suggested_rr_ci": [
+     0.7,
+     5.27
+    ],
+    "to_suggested_genus_rr_ci": [
+     1.33,
+     1.96
+    ]
+   },
+   "any_change": {
+    "per_1000": 0.54,
+    "record_level_ci": [
+     0.46,
+     0.62
+    ],
+    "per_1000_ci": [
+     0.42,
+     0.68
+    ],
+    "diff_per_1000": -0.26,
+    "diff_per_1000_ci": [
+     -0.36,
+     -0.15
+    ],
+    "rr_ci": [
+     0.56,
+     0.82
+    ],
+    "rr": 0.68
+   }
   },
   "taxonomist": {
    "n": 73820,
    "left_per_1000": 4.92,
    "corrected_per_1000": 1.15,
+   "record_level": {
+    "corrected_per_1000_ci": [
+     0.93,
+     1.42
+    ],
+    "left_per_1000_ci": [
+     4.44,
+     5.45
+    ]
+   },
    "to_suggested_share": 0.082,
    "to_suggested_genus_share": 0.471,
    "corrected_rr": 1.96,
@@ -70,12 +185,75 @@
    "to_suggested_genus_rr_ci": [
     0.9,
     1.49
-   ]
+   ],
+   "cluster": {
+    "corrected_per_1000_ci": [
+     0.89,
+     1.45
+    ],
+    "left_per_1000_ci": [
+     4.09,
+     5.81
+    ],
+    "corrected_diff_per_1000": 0.56,
+    "corrected_diff_per_1000_ci": [
+     0.29,
+     0.85
+    ],
+    "left_diff_per_1000": -4.6,
+    "left_diff_per_1000_ci": [
+     -5.36,
+     -3.83
+    ],
+    "corrected_rr_ci": [
+     1.49,
+     2.49
+    ],
+    "to_suggested_rr_ci": [
+     1.14,
+     6.21
+    ],
+    "to_suggested_genus_rr_ci": [
+     0.86,
+     1.51
+    ]
+   },
+   "any_change": {
+    "per_1000": 1.46,
+    "record_level_ci": [
+     1.21,
+     1.77
+    ],
+    "per_1000_ci": [
+     1.17,
+     1.8
+    ],
+    "diff_per_1000": 0.67,
+    "diff_per_1000_ci": [
+     0.38,
+     1.0
+    ],
+    "rr_ci": [
+     1.46,
+     2.29
+    ],
+    "rr": 1.85
+   }
   },
   "weird": {
    "n": 28796,
    "left_per_1000": 9.58,
    "corrected_per_1000": 1.6,
+   "record_level": {
+    "corrected_per_1000_ci": [
+     1.2,
+     2.13
+    ],
+    "left_per_1000_ci": [
+     8.52,
+     10.78
+    ]
+   },
    "to_suggested_share": 0.0,
    "to_suggested_genus_share": 0.065,
    "corrected_rr": 2.72,
@@ -92,12 +270,75 @@
    "to_suggested_genus_rr_ci": [
     0.0,
     0.37
-   ]
+   ],
+   "cluster": {
+    "corrected_per_1000_ci": [
+     1.17,
+     2.15
+    ],
+    "left_per_1000_ci": [
+     7.99,
+     11.38
+    ],
+    "corrected_diff_per_1000": 1.01,
+    "corrected_diff_per_1000_ci": [
+     0.59,
+     1.56
+    ],
+    "left_diff_per_1000": 0.07,
+    "left_diff_per_1000_ci": [
+     -1.54,
+     1.8
+    ],
+    "corrected_rr_ci": [
+     1.97,
+     3.64
+    ],
+    "to_suggested_rr_ci": [
+     0.0,
+     0.0
+    ],
+    "to_suggested_genus_rr_ci": [
+     0.0,
+     0.37
+    ]
+   },
+   "any_change": {
+    "per_1000": 1.98,
+    "record_level_ci": [
+     1.53,
+     2.56
+    ],
+    "per_1000_ci": [
+     1.51,
+     2.56
+    ],
+    "diff_per_1000": 1.19,
+    "diff_per_1000_ci": [
+     0.71,
+     1.76
+    ],
+    "rr_ci": [
+     1.86,
+     3.29
+    ],
+    "rr": 2.5
+   }
   },
   "mislabel": {
    "n": 225892,
    "left_per_1000": 4.13,
    "corrected_per_1000": 2.56,
+   "record_level": {
+    "corrected_per_1000_ci": [
+     2.36,
+     2.78
+    ],
+    "left_per_1000_ci": [
+     3.87,
+     4.4
+    ]
+   },
    "to_suggested_share": 0.069,
    "to_suggested_genus_share": 0.462,
    "corrected_rr": 4.36,
@@ -114,7 +355,60 @@
    "to_suggested_genus_rr_ci": [
     1.01,
     1.37
-   ]
+   ],
+   "cluster": {
+    "corrected_per_1000_ci": [
+     2.31,
+     2.86
+    ],
+    "left_per_1000_ci": [
+     3.66,
+     4.67
+    ],
+    "corrected_diff_per_1000": 1.97,
+    "corrected_diff_per_1000_ci": [
+     1.73,
+     2.27
+    ],
+    "left_diff_per_1000": -5.39,
+    "left_diff_per_1000_ci": [
+     -6.08,
+     -4.74
+    ],
+    "corrected_rr_ci": [
+     3.82,
+     5.04
+    ],
+    "to_suggested_rr_ci": [
+     1.56,
+     5.39
+    ],
+    "to_suggested_genus_rr_ci": [
+     1.01,
+     1.37
+    ]
+   },
+   "any_change": {
+    "per_1000": 3.07,
+    "record_level_ci": [
+     2.85,
+     3.31
+    ],
+    "per_1000_ci": [
+     2.77,
+     3.43
+    ],
+    "diff_per_1000": 2.28,
+    "diff_per_1000_ci": [
+     2.0,
+     2.61
+    ],
+    "rr_ci": [
+     3.43,
+     4.42
+    ],
+    "rr": 3.88
+   }
   }
  },
  "baselines": {

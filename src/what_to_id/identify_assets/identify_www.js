@@ -8,7 +8,7 @@
 // IdentifyWWW(ctx), ctx {look(i), why(i) [name, margin in thousandths, 255 none] or null, taxa(), value (META.value), invasive (META.invasive, optional), redraw()}.
 var IdentifyWWW=(function(){
 'use strict';
-var LS='wtid-status',WEEK=7*864e5,RISK=1,INV=2,TEMP=0.02;  // TEMP: the cosine margin of a softmax over the two matches (a margin of 0.04, a clear one, leaves the runner-up 12%)
+var LS='wtid-status',WEEK=7*864e5,RISK=1,INV=2,TEMP=0.024;  // TEMP: the cosine margin of a softmax over the two matches, fitted by scripts/narrow_temp.py (a margin of 0.04, a clear one, leaves the runner-up 16%)
 function $(id){return document.getElementById(id);}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 function invasive(t){var m=t.establishment_means||{};

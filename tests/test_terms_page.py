@@ -181,14 +181,24 @@ def test_evaluation_table_comes_from_the_committed_script_output():
 
     ev = json.loads(terms_methods.OUTCOME.read_text())
     assert ev["script"] == "scripts/levels_outcome.py"
-    assert {"scores", "pool_before", "pool_after"} == ev["inputs"].keys()
+    assert {"scores", "pool_before", "pool_after", "leaver_taxa"} == ev["inputs"].keys()
     assert all(len(v["sha256"]) == 64 for v in ev["inputs"].values())
     html = terms_page.render()
     mis = ev["levels"]["mislabel"]
     assert f"<td>Might be mislabelled</td><td>{mis['n']:,}</td>" in html
     # the left rate sits beside the corrected one, and the count is n x rate to the rate's rounding
     events = round(mis["n"] * mis["corrected_per_1000"] / 1000)
-    assert f"<td>{mis['corrected_per_1000']:.2f}</td><td>{mis['left_per_1000']:.2f}</td>" in html
+    c = mis["cluster"]
+    lo, hi = c["corrected_per_1000_ci"]
+    cell = f"<td>{mis['corrected_per_1000']:.2f} [{lo:.2f}, {hi:.2f}]</td>"
+    assert cell + f"<td>{mis['left_per_1000']:.2f} [" in html
+    # the observer-clustered ratio and difference sit beside the record-level ratio
+    lo, hi = c["corrected_rr_ci"]
+    assert f"<td>{mis['corrected_rr']:.2f} [{lo:.2f}, {hi:.2f}]</td>" in html
+    lo, hi = c["corrected_diff_per_1000_ci"]
+    assert f"<td>{c['corrected_diff_per_1000']:.2f} [{lo:.2f}, {hi:.2f}]</td></tr>" in html
+    assert ev["cluster"]["unit"] == "observer (user_id)" and ev["bootstrap_reps"] >= 1000
+    assert f"takes the cohort's\n{ev['cluster']['observers']:,} observers with replacement" in html
     assert f"<td>{events:,}</td>" in html
     assert "meaning relabelled while still Needs ID" in html
     assert "reached Research Grade after a re-ID" in html and "rollback to a genus" in html
@@ -227,7 +237,7 @@ def test_figures_baselines_replication_and_cohort_link_come_from_the_outputs():
     assert "the same cohort, not an independent sample" in " ".join(methods.split()).lower()
     mis, n = ev_b["levels"]["mislabel"], ev_b["levels"]["mislabel"]["n"]
     assert (
-        f"<td>Might be mislabelled</td><td>{n:,}</td><td>{mis['corrected_per_1000']:.2f}</td>"
+        f"<td>Might be mislabelled</td><td>{n:,}</td><td>{mis['corrected_per_1000']:.2f} ["
         in methods
     )
     assert terms_methods.MISSING + " on the index" in methods

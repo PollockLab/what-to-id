@@ -16,6 +16,7 @@ from what_to_id.page_lookalike import _fetch
 
 TEMPLATE = Path(__file__).parent / "terms_assets/methods.html"
 OUTCOME = TEMPLATE.with_name("levels_outcome.json")  # scripts/levels_outcome.py
+TEMP_FIT = TEMPLATE.with_name("narrow_temp.json")  # scripts/narrow_temp.py
 OUTCOME_B = TEMPLATE.with_name("levels_outcome_b.json")  # the same, on a later pool
 CLOSE_CALLS_CHANGED = "2026-11-06"  # pool_levels.quantize: Close calls lowest margin first
 ORDERINGS = {
@@ -109,18 +110,74 @@ def _ci(r: dict, col: str, digits: int = 2) -> str:
     return f"{r[col]:.{digits}f} [{lo:.{digits}f}, {hi:.{digits}f}]"
 
 
+def _with(est: float, ci: list[float], digits: int = 2) -> str:
+    return f"{est:.{digits}f} [{ci[0]:.{digits}f}, {ci[1]:.{digits}f}]"
+
+
 def _level_rows(ev: dict) -> str:
     rows = []
     for key, name in LEVEL_NAMES.items():
         r = ev["levels"][key]
-        rr = _ci(r, "corrected_rr") if "corrected_rr" in r else "1 (reference)"
+        c = r["cluster"]  # observers resampled; the record-level interval is `corrected_rr_ci`
+        ref = "corrected_rr" not in r
+        rr = "1 (reference)" if ref else _ci(r, "corrected_rr")
+        rr_c = "1 (reference)" if ref else _with(r["corrected_rr"], c["corrected_rr_ci"])
+        diff = (
+            "0 (reference)"
+            if ref
+            else _with(c["corrected_diff_per_1000"], c["corrected_diff_per_1000_ci"])
+        )
         # the JSON has rates, not counts: n x rate, to the rate's two decimals
+        relabelled = _with(r["corrected_per_1000"], c["corrected_per_1000_ci"])
+        left = _with(r["left_per_1000"], c["left_per_1000_ci"])
         events = round(r["n"] * r["corrected_per_1000"] / 1000)
         rows.append(
-            f"<tr><td>{name}</td><td>{r['n']:,}</td><td>{r['corrected_per_1000']:.2f}</td>"
-            f"<td>{r['left_per_1000']:.2f}</td><td>{events:,}</td><td>{rr}</td></tr>"
+            f"<tr><td>{name}</td><td>{r['n']:,}</td><td>{relabelled}</td><td>{left}</td>"
+            f"<td>{events:,}</td>"
+            f"<td>{rr}</td><td>{rr_c}</td><td>{diff}</td></tr>"
         )
     return "\n".join(rows)
+
+
+def _any_rows(ev: dict) -> str:
+    rows = []
+    for key, name in LEVEL_NAMES.items():
+        a = ev["levels"][key]["any_change"]
+        ref = "rr" not in a
+        rr = "1 (reference)" if ref else _with(a["rr"], a["rr_ci"])
+        diff = "0 (reference)" if ref else _with(a["diff_per_1000"], a["diff_per_1000_ci"])
+        rows.append(
+            f"<tr><td>{name}</td><td>{_with(a['per_1000'], a['per_1000_ci'])}</td>"
+            f"<td>{rr}</td><td>{diff}</td></tr>"
+        )
+    return "\n".join(rows)
+
+
+def _any_order(ev: dict) -> str:
+    """Whether the levels rank the same by the secondary outcome as by the primary."""
+
+    def rank(f) -> list[str]:
+        return sorted(LEVEL_NAMES, key=lambda k: f(ev["levels"][k]))
+
+    same = rank(lambda r: r["corrected_per_1000"]) == rank(lambda r: r["any_change"]["per_1000"])
+    return "holds" if same else "changes"
+
+
+def temperature(fit: dict) -> str:
+    """The Methods clause on the At risk temperature, from scripts/narrow_temp.py."""
+    lo, hi = fit["temp_ci"]
+    n, later = f"{fit['resolved']:,}", fit["runner_up_later"]
+    if fit["temp"] >= 1:  # the search's upper bound: the margin did not separate the two
+        return (
+            f"the temperature is not fitted: among {n} records later resolved to the suggestion "
+            f"or the runner-up ({later} to the runner-up), the margin did not tell them apart, "
+            "so the likelihood has no interior maximum and 0.02 stays a hand-set value"
+        )
+    return (
+        f"temperature fitted on {n} resolved records, {fit['temp']:.3f} [{lo:.3f}, {hi:.3f}] "
+        "with observers resampled, by maximum likelihood on whether the runner-up became the "
+        "species"
+    )
 
 
 def reference_lists() -> dict[str, str]:
@@ -137,6 +194,7 @@ def evaluation(data_url: str | None = None) -> dict[str, str]:
     """Placeholders filled from the committed output of scripts/levels_outcome.py."""
     ev = json.loads(OUTCOME.read_text())
     ev_b = json.loads(OUTCOME_B.read_text())
+    fit = json.loads(TEMP_FIT.read_text())
     mis, none = ev["levels"]["mislabel"], ev["levels"]["none"]
     base = ev["baselines"]
     baseline_rows = "\n".join(
@@ -147,11 +205,16 @@ def evaluation(data_url: str | None = None) -> dict[str, str]:
     cohort = ev["cohort_file"]
     cohort_url = f"{data_url.rstrip('/')}/{cohort}" if data_url and cohort else None
 
-    def rr(r: dict, col: str) -> str:
-        return _ci(r, f"{col}_rr")
+    def rr(r: dict, col: str) -> str:  # observers resampled
+        return _with(r[f"{col}_rr"], r["cluster"][f"{col}_rr_ci"])
 
     return {
         "__EVAL_ROWS__": _level_rows(ev),
+        "__ANY_ROWS__": _any_rows(ev),
+        "__ANY_ORDER__": _any_order(ev),
+        "__ANY_FETCHED__": ev["leaver_taxa_fetched_on"],
+        "__TEMP_FIT__": temperature(fit),
+        "__TEMP_VALUE__": f"{fit['temp']:.3f}" if fit["temp"] < 1 else f"{fit['page_temp']}",
         "__CAL_BINS__": str(len(ev["figures"]["corrected_by_margin"]["n"])),
         "__REPL_OUTCOME_FIRST__": ev["outcome_on"],
         "__CLOSE_CHANGED__": CLOSE_CALLS_CHANGED,
@@ -176,6 +239,7 @@ def evaluation(data_url: str | None = None) -> dict[str, str]:
         "__EVAL_SCORED__": ev["scored_on"],
         "__EVAL_OUTCOME__": ev["outcome_on"],
         "__EVAL_REPS__": f"{ev['bootstrap_reps']:,}",
+        "__EVAL_OBSERVERS__": f"{ev['cluster']['observers']:,}",
         "__EVAL_COHORT__": f"{ev['cohort']:,}",
     }
 
