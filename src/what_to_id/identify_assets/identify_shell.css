@@ -18,7 +18,7 @@
 .rline{display:flex;align-items:center;gap:8px;margin:4px 0 2px}.rline>*{flex:none}.rline .sp1{flex:1}
 .rline b{min-width:0;flex-shrink:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rline .bad{margin-left:8px;font-size:13px;font-weight:400;color:var(--muted)}.rline b{font-size:15px}.today{font-size:13px;color:var(--muted)}.today.ok{color:var(--good);font-weight:650}
-.qicon{padding:0;width:34px;justify-content:center}.qicon svg{width:20px;height:20px}
+.qicon{padding:0;width:34px;justify-content:center}.qicon svg{width:20px;height:20px}.qabout{gap:4px}.qabout svg{width:18px;height:18px}
 #help .sbody>p:first-child{margin-top:0}.rline .qchip{min-height:30px;padding:0 10px;border:0}
 .pop{margin:0;inset:auto;position:fixed;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);
   box-shadow:var(--shadow);max-width:min(420px,calc(100vw - 32px))}

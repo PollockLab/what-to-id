@@ -12,7 +12,7 @@ from . import test_identify_browser as ib
 from .embeddings_fixture import pool_frame
 
 browser = eb.browser
-HELP = "#helpb"  # its aria-label is "About, notes and keys"
+HELP = "#helpb"  # its aria-label is "About this page"
 PAGE_TIP = (
     "Observer-days in the 25 km cell, one person recording on one day, where about 30 make a"
     " complete checklist."
