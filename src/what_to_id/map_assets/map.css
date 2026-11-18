@@ -52,7 +52,9 @@ h1{font-size:18px;margin:0}
 #acclbl{display:flex;gap:6px;align-items:baseline}
 .accu{margin-left:auto}
 .accu[aria-pressed="true"]{color:var(--ink);font-weight:600}
-.accr{display:block;width:100%;margin:2px 0 0;accent-color:var(--on)}
+.accr{display:block;width:100%;min-height:24px;margin:2px 0 0;accent-color:var(--on)}
+.ontouch{display:none}@media (hover:none){.onhover{display:none}.ontouch{display:inline}}
+.maplibregl-ctrl-attrib a{display:inline-block;min-height:24px;line-height:24px}  /* the OSM and CARTO credits are 24 px targets */
 /* each label centred under its stop, the thumb's half width in from the ends */
 .accticks{display:flex;justify-content:space-between;padding:0 8px;font-size:11px;color:var(--muted)}
 .accticks span{width:0;display:flex;justify-content:center;white-space:nowrap}

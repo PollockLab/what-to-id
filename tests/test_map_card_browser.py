@@ -24,6 +24,19 @@ from .test_atlas_search_browser import PNG, RangeHandler
 pytestmark = pytest.mark.network
 browser = eb.browser
 BLANK = '{"version":8,"sources":{},"layers":[]}'
+# a basemap that credits OpenStreetMap and CARTO as the live one does
+CREDITED = {
+    "version": 8,
+    "sources": {
+        "s": {
+            "type": "geojson",
+            "data": {"type": "FeatureCollection", "features": []},
+            "attribution": '<a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            ' <a href="https://carto.com/attributions">CARTO</a>',
+        }
+    },
+    "layers": [{"id": "c", "type": "circle", "source": "s"}],
+}
 # the layers the map last gave deck.gl, to read the numbered dots (deck loads after the page starts)
 HOOK = """(() => { const t = setInterval(() => { const O = window.deck && deck.MapboxOverlay;
   if (!O) return; clearInterval(t); const f = O.prototype.setProps;
@@ -372,8 +385,12 @@ def test_a_blocked_pool_keeps_its_error_in_the_count(browser, range_site):
     stub(page)
     page.route("**/pool*.bin", lambda r: r.abort())
     page.goto(f"{range_site}/map.html?standalone=1")
-    page.wait_for_function("/Could not load the records/.test(document.getElementById('count').textContent)")
-    page.locator("#months button").first.click()  # a filter change renders again, which must not say "Loading"
+    page.wait_for_function(
+        "/Could not load the records/.test(document.getElementById('count').textContent)"
+    )
+    page.locator(
+        "#months button"
+    ).first.click()  # a filter change renders again, which must not say "Loading"
     page.wait_for_timeout(500)
     assert "Could not load the records" in page.locator("#count").inner_text()
     page.close()
@@ -387,3 +404,27 @@ def test_the_map_sits_in_the_main_landmark_the_skip_link_targets(browser, range_
     box = page.locator("#map").bounding_box()
     assert box["width"] > 600 and box["height"] > 300  # the inner map still fills the page
     page.close()
+
+
+def test_touch_gets_tap_wording_and_the_slider_and_credits_are_24px_targets(browser, range_site):
+    page = open_map(browser, f"{range_site}/map.html?standalone=1")
+    page.unroute("https://basemaps.cartocdn.com/**")
+    page.route("https://basemaps.cartocdn.com/**", lambda r: r.fulfill(json=CREDITED))
+    page.reload()
+    page.wait_for_selector(".maplibregl-ctrl-attrib a")
+    assert page.locator(".onhover").is_visible() and page.locator(".ontouch").is_hidden()
+    assert page.evaluate("getComputedStyle(document.getElementById('accr')).minHeight") == "24px"
+    sizes = page.evaluate(
+        "[...document.querySelectorAll('.maplibregl-ctrl-attrib a')]"
+        ".map(e => e.getBoundingClientRect().height)"
+    )
+    assert len(sizes) >= 2 and min(sizes) >= 24  # the OSM and CARTO credits
+    page.close()
+    ctx = browser.new_context(
+        viewport={"width": 390, "height": 800}, has_touch=True, is_mobile=True
+    )
+    page = ctx.new_page()
+    stub(page)
+    page.goto(f"{range_site}/map.html?standalone=1")
+    assert page.locator(".ontouch").is_visible() and page.locator(".onhover").is_hidden()
+    ctx.close()
