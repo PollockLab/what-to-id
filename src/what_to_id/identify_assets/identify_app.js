@@ -461,7 +461,7 @@ async function load(){
   BAR=IdentifyBar({rewrite:rewrite,S:S,META:META,mf:MF,nf:nf,taxa:function(){return TAXA;},P:function(){return P;},tf:function(){return TF;},mask:atLevel,all:kept,tab:function(){var l=CFG.levels.filter(function(x){return x[0]===LV;})[0];return {name:l?l[1]:'',has:function(i){return LV===6||(LV?LEVEL[i]===LV:LEVEL[i]>0);}};},changed:put,blocked:function(){return !!(AREA||VIEW||KEEPIDS||SUBIDS||PIDS||UF.active());},
     where:where,get:function(u){return get(new URL(u,MAP));},map:MAP,key:key,user:function(){var u=IN.user();return u?u.login:IdentifyProgress.login();},leave:function(){if(BT)choose(LV);},embedded:parent!==window});
   RKF=function(){if(RK||rkp)return;LKF();Promise.all([rk(),lk()]).then(function(d){var ok=rank(d[0]);RKW=false;ok&&LV===3?redraw(true):(build(),counts());});};  // the count waits until the rank is read, not just fetched
-  LKF=function(){if(lkp)return;lk().then(function(b){if(!b)return;LOOKS=looks(b);retitle();
+  var lkd=false;LKF=function(){if(lkd)return;lkd=true;lk().then(function(b){if(!b)return;LOOKS=looks(b);retitle();
     var cs=[].slice.call($('grid').querySelectorAll('.card'));CMP.fill(cs);cs.forEach(CARD.paint);if(BT)paint();
     if(LV===3){STAY=true;redraw();}else build();});};  // level 3's cap reads the suggestions
   var co=CMP.open;CMP.open=function(){LKF();return co.apply(this,arguments);};if(WW.active())LKF();
