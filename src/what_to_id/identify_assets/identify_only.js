@@ -16,9 +16,10 @@ return function(o){
   function rest(st,out,pids){
     var P=o.P(),n=P.n,R=o.range(),lk=o.embedded?null:/(?:^|&)look=(nobody|second)(?:&|$)/.exec(location.hash.slice(1)),ids=P.ids,nv=st.only.oneid==='not'?1:0,rv=st.only.range==='not'?1:0,i,
       oo=st.only.oneid&&(ONE=ONE||o.mf.oneIds(P.ids,P.tax,o.taxa(),n)),ro=st.only.range&&R?R.outside():null,
-      pm=pids&&SpaceMask.ids(pids,P);
+      pm=pids&&SpaceMask.ids(pids,P),pj,lo;
     if(PJ)PJ.sync(P);
-    for(i=0;i<n;i++)if(out[i]&&((oo&&oo[i]===nv)||(ro&&ro[i]===rv)||(pm&&!pm[i])||(PJ&&PJ.drop(i))||(lk&&ids&&look(ids[i],lk[1]))))out[i]=0;
+    pj=PJ&&PJ.active();lo=lk&&ids;
+    if(oo||ro||pm||pj||lo)for(i=0;i<n;i++)if(out[i]&&((oo&&oo[i]===nv)||(ro&&ro[i]===rv)||(pm&&!pm[i])||(pj&&PJ.drop(i))||(lo&&look(ids[i],lk[1]))))out[i]=0;
     return out;
   }
   return {rest:rest};

@@ -3,7 +3,7 @@
 // Over the level, the far-outside control (All / Hide / Only) in #rout; Clear matches start with records far outside left out.
 // Level 3 (narrowing) has no species label, so its control asks instead whether the record sits in the suggested species' range,
 // and starts with the records that do.
-// IdentifyRanges(buf,ctx), ctx {P, name(i) the label, look(i) the look-alike or null, code(i) its index (-1 for none), redraw(), sdm the ECCC habitat
+// IdentifyRanges(buf,ctx), ctx {P, name(i) the label, look(i) the look-alike or null, code(i) its index (-1 for none), ver() what the look-alikes are read from (null until they load), redraw(), sdm the ECCC habitat
 // models (META.sdm, sdm_manifest.py; P.tax then indexes sdm.taxa) or none}. The map's record card takes only the chip and
 // its popover (chip(i,lv)); it has no #rout, so no segmented control.
 var IdentifyRanges=(function(){
@@ -33,7 +33,7 @@ return function(buf,ctx){
   if(buf.byteLength!==4+size+2*n)throw new Error('the range file holds '+buf.byteLength+' bytes, expected '+(4+size+2*n));
   var D=JSON.parse(new TextDecoder().decode(new Uint8Array(buf,4,size))),OKM=new Uint8Array(buf,4+size,n),NOTE=new Uint8Array(buf,4+size+n,n),
     RI=new Map(D.names.map(function(x,k){return [x,k];})),memo=[],CB=[],BOX=null,OUTL=null,FAR=null,BIN=null,CELL=null,
-    S={lv:0,o:0},Q={i:-1,lv:0,chip:null,pin:false,t:0},pop=null,HAB=new Map(),AB=null;  // S.o: 0 all, 1 only far outside, -1 hide far outside
+    S={lv:0,o:0},Q={i:-1,lv:0,chip:null,pin:false,t:0},pop=null,HAB=new Map(),AB=null,M=null,MK='',MV=null;  // S.o: 0 all, 1 only far outside, -1 hide far outside
   // a name's bitset over the grid cells, null when its range is unknown
   function bits(name){
     var k=name==null?undefined:RI.get(name);
@@ -54,7 +54,14 @@ return function(buf,ctx){
   function out(i,lv){return lv===3?!fits(i):far(i);}
   // Clear matches are for confirming in bulk and level 3 for adding a species, so both start with the doubtful left out
   function def(lv){return lv===1||lv===3?-1:0;}
-  function pass(i,lv){var o=lv===S.lv?S.o:def(lv);return !o||(o>0)===out(i,lv);}
+  // the toggle of each level 1..5 as one string; verdicts per record (M: 0 not asked, 1 left out, 2 kept) stand while it and the look-alikes are the same
+  function modes(){return [0,1,2,3,4,5].map(function(lv){return lv===S.lv?S.o:def(lv);}).join();}
+  function pass(i,lv){
+    var m=M[i],o,r;
+    if(m)return m>1;
+    o=lv===S.lv?S.o:def(lv);r=!o||(o>0)===out(i,lv);M[i]=r?2:1;
+    return r;
+  }
   function two(i,lv){var l=(lv===2||lv===5)&&ctx.look(i);return l&&bits(l)?l:null;}
   function box(){
     if(BOX)return BOX;
@@ -262,6 +269,8 @@ return function(buf,ctx){
   SEG=seg();
   return {
     pass:pass,
+    // build asks once before its pass over the records: a toggle or the look-alikes changed since the last one forgets the verdicts
+    prep:function(){var k=modes(),v=ctx.ver();if(!M)M=new Uint8Array(ctx.P.n);else if(k!==MK||v!==MV)M.fill(0);MK=k;MV=v;},
     // 1 per record far outside its label's range, for the map's Outside usual range chip
     outside:function(){if(!FAR){FAR=new Uint8Array(n);for(var i=0;i<n;i++)FAR[i]=far(i)?1:0;}return FAR;},
     // the chip alone, or null when the label's range is unknown; close drops its popover

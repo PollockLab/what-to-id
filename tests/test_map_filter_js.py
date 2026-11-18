@@ -108,6 +108,25 @@ def test_accuracy_choice_filters_each_class_on_both_filter_paths(acc, passes):
     assert got == [passes, passes]
 
 
+def test_rest_leaves_every_record_when_no_chip_limits_and_filters_the_set_ones():
+    got = run(
+        "var F=[0,1,2,3],f=new Uint8Array(F),o=new Uint16Array([5,6,7,8]),run=function(h){"
+        "var S=MF.read(new URLSearchParams(h));"
+        "return Array.from(MF.rest(S,o,o,f,4,new Uint8Array(4).fill(1)));};"
+        "return [run(''),run('only=threatened'),run('only=introduced'),run('from=2024-01-30')];"
+    )
+    assert got == [[1, 1, 1, 1], [0, 0, 1, 1], [0, 1, 0, 1], [1, 1, 1, 1]]
+
+
+def test_keep_without_a_taxon_picks_every_record_and_with_one_only_its_taxa():
+    got = run(
+        "var tax=new Uint16Array([0,1,65535]),grp=new Uint8Array(3),on=function(T){"
+        "return Array.from(MF.keep(T,null,tax,grp,3,new Uint8Array(3)));},a=new Uint8Array([1,0]);"
+        "return [on({inc:null,exc:null}),on({inc:a,exc:null}),on({inc:null,exc:a})];"
+    )
+    assert got == [[1, 1, 1], [1, 0, 0], [0, 1, 1]]
+
+
 def test_obscured_records_pass_only_any_and_unknown():
     got = run(
         f"return ['','unknown','known','1000','10'].map(function(a){{"
