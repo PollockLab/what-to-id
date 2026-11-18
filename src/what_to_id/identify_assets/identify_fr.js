@@ -97,7 +97,7 @@ var words={
 "These batches are served in a rotation.":"Ces lots sont servis en rotation.","You have seen every batch in this group.":"Vous avez vu tous les lots de ce groupe.",
 "No records at this level here.":"Aucune observation à ce niveau ici.","None at this level here. Try":"Aucune à ce niveau ici. Essayez",
 "Loading all the records for this selection…":"Chargement de toutes les observations de cette sélection…","Showing the top records, loading all of them…":"Affichage des meilleures observations, chargement de toutes en cours…",
-"Reading the map data…":"Lecture des données cartographiques…","Loading photo":"Chargement de la photo","Loading photos…":"Chargement des photos…",
+"Reading the map data…":"Lecture des données cartographiques…","Loading photo":"Chargement de la photo","Pick a tab, then open a card or identify the batch on iNaturalist.":"Choisissez un onglet, puis ouvrez une carte ou identifiez le lot sur iNaturalist.","Got it":"Compris","Photo unavailable":"Photo non disponible","Retry":"Réessayer","Loading photos…":"Chargement des photos…",
 "Loading reference photos…":"Chargement des photos de référence…","No reference photo":"Aucune photo de référence","No photo on iNaturalist now":"Aucune photo sur iNaturalist pour l'instant",
 "Date unknown":"Date inconnue","Place unknown":"Lieu inconnu","Your genus":"Votre genre","Unconfirmed":"Non confirmée","Record":"Observation",
 "Identify this record on iNaturalist":"Identifier cette observation sur iNaturalist","All":"Toutes","All dates":"Toutes les dates","At risk":"À risque","Date and place…":"Date et lieu…","Most survey days":"Plus de jours d'inventaire","Next photo":"Photo suivante","Previous photo":"Photo précédente","Survey days":"Jours d'inventaire","Taxon page":"Page du taxon","Views":"Vues","Map":"Carte","or":"ou","cards":"cartes","Suggestion in range":"Suggestion dans l'aire","Suggestion not in range":"Suggestion hors de l'aire","Only far outside":"Seulement les très éloignées",
@@ -201,7 +201,8 @@ R('Move (.+), position # of #',function(m,n,a,b){return 'Déplacer '+G(n)+', pos
 R('One bar per (day|week|month|year), ([^.]+?) to ([^.]+?)\\.( Faint all-record bars show only with bars per month or year\\.)?( Drag to pick a period\\.)?',function(m,u,a,b,f,d){
   return 'Une barre par '+{day:'jour',week:'semaine',month:'mois',year:'année'}[u]+', du '+D(a)+' au '+D(b)+'.'+(f?" Les barres pâles de toutes les observations n'apparaissent qu'avec des barres par mois ou par année.":'')+(d?' Faites glisser pour choisir une période.':'');}),
 R('Week of (.+)',function(m,d){return 'Semaine du '+D(d);}),
-R('Could not load the photos: (.+)','Impossible de charger les photos : $1')
+R('Could not load the photos: (.+)','Impossible de charger les photos : $1'),
+R('Checking # species…',function(m,n){return 'Vérification de '+n+' '+pl(n,'espèce','espèces')+'…';})
 ];
 return {words:words,rules:rules};
 })();

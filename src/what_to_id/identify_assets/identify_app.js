@@ -143,18 +143,27 @@ function card(i,lv,id,old){
   return li;
 }
 // Fills the photos of the cards just drawn (a record gone drops out); a card whose photo is already on its way (a kept card) waits for that one.
+// When iNaturalist does not answer, the cards that never got their observation say so and offer a retry.
 function photos(lis){
   var sig=AB&&AB.signal;lis=lis.filter(function(li){return !(li.w&&!li.w.aborted);});lis.forEach(function(li){li.w=sig;});
-  Meta.fetchObservations(lis.map(function(li){return +li.dataset.id;}),function(u){return fetch(I18N.api(u),{signal:sig});},CACHE).then(function(){lis.forEach(function(li){
-    if(!li.isConnected)return;var o=CACHE.get(+li.dataset.id),g=CARD.gone(li,o);if(!g)fill(li,o);else{li.remove();if(g>1)drop(+li.dataset.i);}});if(!BT)CARD.keep($('grid'),CACHE);
-  }).catch(function(e){if(!(sig&&sig.aborted))status('Could not load the photos: '+e.message,1);}).then(function(){lis.forEach(function(li){li.w=null;});});
+  function land(){lis.forEach(function(li){
+    if(!li.isConnected)return;var id=+li.dataset.id,o=CACHE.get(id);if(!CACHE.has(id))return lost(li);
+    var g=CARD.gone(li,o);if(!g)fill(li,o);else{li.remove();if(g>1)drop(+li.dataset.i);}});if(!BT)CARD.keep($('grid'),CACHE);}
+  Meta.fetchObservations(lis.map(function(li){return +li.dataset.id;}),function(u){return fetch(I18N.api(u),{signal:sig});},CACHE).then(land,
+    function(e){if(!(sig&&sig.aborted)){land();status('Could not load the photos: '+e.message,1);}}).then(function(){lis.forEach(function(li){li.w=null;});});
+}
+// a card whose observation did not load: "Photo unavailable" and Retry, which asks again for this card alone
+function lost(li){
+  var ph=li.querySelector('.ph'),b=el('button','lnk','Retry');if(ph.querySelector('img'))return;b.type='button';
+  b.onclick=function(e){e.stopPropagation();ph.classList.remove('bad');ph.textContent='Loading photo';photos([li]);};
+  ph.classList.add('bad');ph.replaceChildren(el('span',null,'Photo unavailable'),b);
 }
 // A card's photo, date and place (and a batch record's name) from its observation; a photo already shown stays.
 function fill(li,o){
   var ph=li.querySelector('.ph'),w=li.querySelector('.when'),t=o.taxon,u=CARD.med(o),img=ph.querySelector('img');
   if(!li.dataset.i){var nm=el('div','name');nm.appendChild(el('i',null,t?t.name:'Unidentified'));
     li.querySelector('.title').replaceChildren(nm);if(t&&t.preferred_common_name&&I18N.names!=='latin')nm.after(el('div','com',t.preferred_common_name));}
-  if(!img||img.getAttribute('src')!==u){ph.textContent='';img=u&&el('img');
+  if(!img||img.getAttribute('src')!==u){ph.classList.remove('bad');ph.textContent='';img=u&&el('img');
     if(img){CARD.hi(img,li.e);img.onerror=function(){img.removeAttribute('src');};img.src=u;ph.appendChild(img);}else ph.textContent='No photo on iNaturalist now';}if(img)img.alt='Photo of '+li.querySelector('i').textContent;
   w.textContent=(o.observed_on||'Date unknown')+' · '+(o.place_guess||'Place unknown');w.title=w.textContent;CARD.face(li,o.place_guess||'');
   if(IN.user()&&t&&t.id&&!o.s&&!li.querySelector('.acts'))acts(li,t);
