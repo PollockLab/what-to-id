@@ -48,7 +48,10 @@ def serve(root, frame, score, projects=None, totals=None):
     blobs[PARKS_NAME] = parks_blob()  # the Where suggestions read the park list
     for name, blob in blobs.items():
         (root / name).write_bytes(blob)
-    meta["value"] = [[953, 2, 5]]  # the at-risk list: Apis c, the www tests' third suggestion
+    # Apis c (the www tests' third suggestion), and 1003, a record taxon that reorders level 3
+    # before the look-alikes load: the race where WHYF's fetch left LOOKS unset
+    meta["value"] = [[953, 2, 5], [1003, 3, 7]]
+    meta["invasive"] = [952]  # Bombus b, the www tests' second suggestion
     (root / "map.html").write_text(render_map(meta, freeze=None))
     pts = decode_points(blobs, meta)
     i = np.arange(len(frame))

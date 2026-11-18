@@ -1,6 +1,7 @@
 """Identify's What, When and Where row in Chromium: When writes the map filter's from=, Where
-links to the map, At risk (from the map's list, no request) and Invasive (iNat's BC status) keep
-level 3 cards by their suggestion. iNaturalist is stubbed."""
+links to the map, At risk and Invasive (both from the map's lists, no request; an older map
+without the Invasive list asks iNat's BC status) keep cards by their suggestion, else their own
+taxon. iNaturalist is stubbed."""
 
 from urllib.parse import parse_qs, urlparse
 
@@ -14,15 +15,17 @@ KINDS = "new Set([...document.querySelectorAll('#grid .card .look i')].map(e=>e.
 IDS = {"Bombus a": 951, "Bombus b": 952, "Apis c": 953}
 
 
-def open_row(browser, base, hash_):
+def open_row(browser, base, hash_, meta=None):
     page = browser.new_page(viewport={"width": 600, "height": 900})
     page.errors = []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     eb.stub_inat(page, None)
     page.asked = []
+    page.taxa_urls = []
 
     def taxa(route):
         url = route.request.url
+        page.taxa_urls.append(url)
         if "/v1/taxa?" in url:
             name = parse_qs(urlparse(url).query)["q"][0]
             photo = {"url": "https://static.inaturalist.org/photos/1/square.jpg"}
@@ -55,8 +58,15 @@ def open_row(browser, base, hash_):
         route.fulfill(json=body, headers={"access-control-allow-origin": "*"})
 
     page.route("**/v1/taxa**", taxa)
+    if meta:  # edit the META the page reads
+
+        def edit(route):
+            res = route.fetch()
+            route.fulfill(response=res, json=meta(res.json()))
+
+        page.route("**/map-meta.json", edit)
     page.goto(f"{base}/identify.html{hash_}")
-    page.wait_for_selector("#grid .card .look", state="attached")
+    page.wait_for_selector("#grid .card" + (" .look" if "lvl=3" in hash_ else ""), state="attached")
     return page
 
 
@@ -64,9 +74,9 @@ def looks(page):
     return set(page.locator("#grid .card .look i").all_inner_texts())
 
 
-def test_at_risk_and_invasive_keep_cards_by_their_suggestions_bc_status(browser, site):
+def test_invasive_without_the_maps_list_asks_inat_for_each_suggestions_bc_status(browser, site):
     base, _ = site
-    page = open_row(browser, base, "#lvl=3&conf=all")
+    page = open_row(browser, base, "#lvl=3&conf=all", meta=lambda m: {**m, "invasive": None})
     page.wait_for_function(KINDS + "===2")  # Bombus a never reaches level 3 here
     page.get_by_role("checkbox", name="At risk").check()
     page.wait_for_function("document.querySelectorAll('#grid .card').length>0")
@@ -86,6 +96,28 @@ def test_at_risk_and_invasive_keep_cards_by_their_suggestions_bc_status(browser,
     page.get_by_role("checkbox", name="Invasive").uncheck()
     page.wait_for_function(KINDS + "===2")
     assert "risk=" not in page.evaluate("location.hash") and page.errors == []
+
+
+def test_invasive_and_at_risk_read_the_maps_lists_without_a_request(browser, site):
+    base, _ = site
+    page = open_row(browser, base, "#lvl=3&conf=all")
+    page.wait_for_function(KINDS + "===2")
+    page.get_by_role("checkbox", name="Invasive").check()
+    page.wait_for_function(KINDS + "===1")
+    assert looks(page) == {"Bombus b"} and "inv=1" in page.evaluate("location.hash")
+    page.get_by_role("checkbox", name="At risk").check()
+    page.wait_for_function(KINDS + "===2")
+    assert looks(page) == {"Apis c", "Bombus b"}
+    assert page.asked == [] and page.errors == []
+
+
+def test_at_risk_keeps_a_card_that_is_not_level_3_by_its_own_taxon(browser, site):
+    base, _ = site
+    # Easy confirm has no suggestion: its own taxon decides; only 1003 ("Taxon 3") is listed
+    page = open_row(browser, base, "#lvl=1&risk=1", meta=lambda m: {**m, "value": [[1003, 3, 7]]})
+    names = "[...document.querySelectorAll('#grid .card .name')].map(e=>e.textContent)"
+    page.wait_for_function(f"{names}.length>0 && {names}.every(n=>n.includes('Taxon 3'))")
+    assert page.asked == [] and page.errors == []
 
 
 def test_a_category_tab_shows_one_group_and_keeps_the_order(browser, site):

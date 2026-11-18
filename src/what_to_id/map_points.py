@@ -15,6 +15,7 @@ from what_to_id.site_files import hashed
 from what_to_id.taxonomy import (
     AT_RISK,
     GROUP_TAXA,
+    INVASIVE,
     NO_RANK,
     NO_TAXON,
     PRESETS,
@@ -130,7 +131,7 @@ def encode_points(pool: pd.DataFrame, tree: dict | None = None) -> tuple[dict[st
         "taxa_n": int(np.unique(tidx[tidx != NO_TAXON]).size),
     }
     if complete:
-        meta["presets"], meta["value"] = PRESETS, AT_RISK
+        meta["presets"], meta["value"], meta["invasive"] = PRESETS, AT_RISK, INVASIVE
     if users is not None:
         meta["observer"] = observer
     return out, meta

@@ -64,6 +64,10 @@ PRESETS = [
 # say how.
 # shortcut: species first seen in BC needs-ID after that day are missing, refetch when stale.
 AT_RISK = json.loads((Path(__file__).with_name("at_risk_bc_taxa.json")).read_text())["taxa"]
+# invasive_bc_taxa.json holds the taxa iNaturalist counts as introduced in BC (place 7085), for
+# Identify's Invasive toggle; scripts/invasive_bc_taxa.py writes it.
+# shortcut: a snapshot, rerun the script when stale.
+INVASIVE = json.loads((Path(__file__).with_name("invasive_bc_taxa.json")).read_text())["taxa"]
 # The iNaturalist taxon behind each iconic group the map shows as a chip, so Identify can add the
 # chosen groups to the picked taxa in one taxon_id. Animalia (animals in no other group) and
 # Unknown have no single taxon.
