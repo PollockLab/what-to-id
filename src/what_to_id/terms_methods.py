@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import tempfile
+from datetime import date
 from pathlib import Path
 
 from what_to_id import atlas_update, confusion, host_pairs, levels, pool_levels, terms_figures
@@ -145,6 +146,9 @@ def evaluation(data_url: str | None = None) -> dict[str, str]:
         "__REPL_OUTCOME_FIRST__": ev["outcome_on"],
         "__CLOSE_CHANGED__": CLOSE_CALLS_CHANGED,
         "__REPL_OUTCOME__": ev_b["outcome_on"],
+        "__REPL_DAYS__": str(
+            (date.fromisoformat(ev_b["outcome_on"]) - date.fromisoformat(ev["outcome_on"])).days
+        ),
         "__REPL_ROWS__": _level_rows(ev_b),
         "__BASELINE_ROWS__": baseline_rows,
         "__CLOSE_AUC__": _ci(base["close_calls_lowest_margin_first"], "auc", 3),

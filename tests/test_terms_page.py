@@ -222,7 +222,8 @@ def test_figures_baselines_replication_and_cohort_link_come_from_the_outputs():
         f"gives an AUC of {ev['baselines']['close_calls_lowest_margin_first']['auc']:.3f} ["
         in methods
     )
-    assert f"the pool of {ev_b['outcome_on']}:</p>" in methods
+    assert f"the pool of {ev_b['outcome_on']}, 3 days after the first reading:</p>" in methods
+    assert "the same cohort, not an independent sample" in " ".join(methods.split()).lower()
     mis, n = ev_b["levels"]["mislabel"], ev_b["levels"]["mislabel"]["n"]
     assert (
         f"<td>Might be mislabelled</td><td>{n:,}</td><td>{mis['corrected_per_1000']:.2f}</td>"
