@@ -88,7 +88,7 @@ def test_the_keys_move_open_and_copy_and_the_hint_shows_on_level_3_only(browser,
     assert len(page.evaluate("COPIED")) == 1 and page.evaluate("OPENED") == []
     page.keyboard.press("i")
     assert len(page.evaluate("OPENED")) == 1 and page.evaluate(focused) == ids[1]
-    page.keyboard.press("Enter")
+    page.keyboard.press("i")
     assert len(page.evaluate("OPENED")) == 2 and page.evaluate(focused) == ids[2]
     page.click("#bwhat")
     page.focus("#q")  # a form field keeps its keys
@@ -99,6 +99,25 @@ def test_the_keys_move_open_and_copy_and_the_hint_shows_on_level_3_only(browser,
     page.click("#tab1")
     assert page.locator("#keys").is_hidden()
     assert page.errors == []
+
+
+def test_enter_on_a_card_opens_the_panel_and_i_still_identifies(browser, site):
+    base, _ = site
+    page = level_3(browser, base)
+    posts = []
+    page.route(
+        "**/*", lambda r: r.abort() if r.request.method == "POST" else r.fallback()
+    )  # never submit
+    page.on("request", lambda r: r.method == "POST" and posts.append(r.url))
+    page.keyboard.press("j")
+    page.keyboard.press("Enter")
+    page.wait_for_selector("#cpanel:visible")
+    assert page.evaluate("OPENED") == []
+    close(page)
+    page.locator("#grid .card").nth(0).focus()
+    page.keyboard.press("i")
+    assert len(page.evaluate("OPENED")) == 1 and page.locator("#cpanel:visible").count() == 0
+    assert posts == [] and page.errors == []
 
 
 def stub_taxa(page):

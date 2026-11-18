@@ -1,5 +1,5 @@
 // Fewer tab switches on level 3: iNaturalist links share one tab (named wtid-inat, reused), Identify on a level 3 card first copies the suggested name, marks the card Opened and moves focus to the next card,
-// and j, k, i (or Enter) and c work the cards from the keyboard. A blocked open or a modified click falls back to the link itself.
+// and j, k, i and c work the cards from the keyboard. A blocked open or a modified click falls back to the link itself.
 var IdentifyFlow=(function(){
 'use strict';
 var NAME='wtid-inat',DONE=new Map(),LAST=null;
@@ -52,7 +52,7 @@ return {
         if(k==='j'&&at===cards.length-1){ctx.more();cards=[].slice.call(document.querySelectorAll('#grid .card'));}
         c=cards[Math.max(0,Math.min(cards.length-1,at+(k==='j'?1:-1)))];
         if(c){c.focus({preventScroll:true});c.scrollIntoView({block:'nearest'});}
-      }else if(cur&&(k==='i'||k==='enter'&&t===cur)){e.preventDefault();var a=cur.querySelector('a.btn');if(a)a.click();}
+      }else if(cur&&k==='i'){e.preventDefault();var a=cur.querySelector('a.btn');if(a)a.click();}
       else if(cur&&k==='c'){c=cur.querySelector('.copy');if(c){e.preventDefault();c.click();}}
     });
   },

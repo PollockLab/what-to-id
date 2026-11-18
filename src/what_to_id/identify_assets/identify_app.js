@@ -146,9 +146,9 @@ function card(i,lv,id,old){
   if(i>=0&&lv===3&&!BT)IdentifyFlow.identify(a,li);else IdentifyFlow.link(a);
   var row=R&&i>=0&&R.links(a,i,lv);li.append(a,det);if(row)det.prepend(row);  // the range words go with the detail
   li.onmouseenter=li.onfocus=function(){tell('wtid-focus',id);};
-  // a click or Space opens the compare panel beside the list
+  // a click, Enter or Space opens the compare panel beside the list
   li.onclick=function(e){if(!e.target.closest('a,button')){if(CMP)CMP.open(li);else tell('wtid-record',id);}};
-  li.onkeydown=function(e){if(e.target===li&&(e.key==='Enter'||e.key===' ')){e.preventDefault();if(e.key===' '&&CMP)CMP.open(li);else tell('wtid-record',id);}};
+  li.onkeydown=function(e){if(e.target===li&&(e.key==='Enter'||e.key===' ')){e.preventDefault();if(CMP)CMP.open(li);else tell('wtid-record',id);}};
   IdentifyFlow.seen(li);CARD.face(li);if(!old)CARD.keys(li);
   if(!CARD.gone(li,o))fill(li,o);  // fetched already: no wait, no flash
   return li;
