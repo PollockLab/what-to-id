@@ -13,7 +13,7 @@ function one(id){return OBS+id+'#comment-id-tabs';}
 var CARD=IdentifyCard({ref:function(n){return CMP?CMP.ref(n):Promise.resolve(null);}}),TAB=[],SUBK=[],NK=1,KIND=null,SUB=null,KF=0,KC=[],UF=null,UON=false,MINE=[],CMP=null,BT=false,ST=null,SK='',IN=IdentifyInat(CFG.oauth);
 // CFG.merge: the kinds (levels) a tab shows, in order; SUBK a kind's place in its tab
 Object.keys(CFG.merge).forEach(function(t){CFG.merge[t].forEach(function(k,j){TAB[k]=+t;SUBK[k]=j;});NK=Math.max(NK,CFG.merge[t].length);});
-var SP=null,META=null,SYNC=null,MORE=new Map(),TAXA=null,P=null,BYID=null,LEVEL=null,Q=null,LOOKS=null,WHY=null,WHYF=null,RK=null,N3=0,GP=null,R=null,MF=null,TF=null,PEND=null,OX=null,PIDS=null,REC=-1,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,ONE='',CACHE=new Map(),KEPT=[],PT=0,GO=false,FIRST=null,SHOWN,STAY=false,X=null,WW=null,BAR=null;
+var SP=null,META=null,SYNC=null,MORE=new Map(),TAXA=null,P=null,BYID=null,LEVEL=null,Q=null,LOOKS=null,LKS=false,WHY=null,WHYF=null,RK=null,N3=0,GP=null,R=null,MF=null,TF=null,PEND=null,OX=null,PIDS=null,REC=-1,S={},KEEPIDS=null,SUBIDS=null,AREA='',VIEW='',SEL=null,view=[],shown=0,drawn=0,LV=0,LINKS=[],BI=0,ONE='',CACHE=new Map(),KEPT=[],PT=0,GO=false,FIRST=null,SHOWN,STAY=false,X=null,WW=null,BAR=null;
 var RKF=function(){},LKF=RKF,RKW=true;  // fetch rank (level 3) / look-alikes (levels 2, 3, 5, Batches, Compare) once; level 3's count waits for the rank under Best x%
 function $(id){return document.getElementById(id);}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
@@ -439,7 +439,7 @@ async function load(){
   function rank(b){var m=0,j,k=0,r;for(j=0;j<P.n;j++)if(KIND[j]===3)m++;if(!b||b.byteLength!==4*m)return false;b=new Uint8Array(b);r=new Uint32Array(P.n);for(j=0;j<P.n;j++)if(KIND[j]===3){r[j]=(b[k]|b[m+k]<<8|b[2*m+k]<<16|b[3*m+k]<<24)>>>0;k++;}RK=r;N3=m;return true;}  // byte planes of the level-3 records only
   if(!FIRST)status('Downloading the records…');
   var d=await Promise.all([shards,taxa,lev,saved()===3?rk():null]);  // level 3 opens on its rank
-  P=L.pool(d[0],META.bbox);BYID=byId(P);TAXA=d[1];LOOKS=null;
+  P=L.pool(d[0],META.bbox);BYID=byId(P);TAXA=d[1];LOOKS=null;LKS=false;
   var raw=new Uint8Array(d[2]);
   if(raw.length!==P.n)throw new Error('the levels file holds '+raw.length+' records, the map '+P.n);
   LEVEL=raw.map(function(v){return TAB[v&15]||v&15;});KIND=raw.map(function(v){return v&15;});SUB=raw.map(function(v){return SUBK[v&15]||0;});Q=raw.map(function(v){return v>>4;});
@@ -449,7 +449,7 @@ async function load(){
     conf:function(i,lv){return RK&&lv===3?3-IdentifyNarrow.band(RK[i],N3):Q[i]*3/(STEPS-1);},
     cont:function(i,lv){return RK&&lv===3?1-RK[i]/N3:Q[i]/(STEPS-1);},
     fine:function(i,lv){return RK&&lv===3?-RK[i]:Q[i];},
-    flag:function(i,inv){return LOOKS&&WW?WW.flag(i,inv):0;},hasOut:function(){return !!R;},out:function(i){return R?R.outside()[i]:0;},
+    flag:function(i,inv){return LKS&&WW?WW.flag(i,inv):0;},hasOut:function(){return !!R;},out:function(i){return R?R.outside()[i]:0;},
     redraw:redraw});  // a failed or missing checklist leaves every gap at 0
   X=IdentifyUnconfirmed({P:P,taxa:TAXA,ranks:META.ranks,area:function(){return AREA;},redraw:redraw});
   // Not yet identified by me asks iNaturalist within the pool's extent: Identify has no map viewport of its own
@@ -461,9 +461,9 @@ async function load(){
   BAR=IdentifyBar({rewrite:rewrite,S:S,META:META,mf:MF,nf:nf,taxa:function(){return TAXA;},P:function(){return P;},tf:function(){return TF;},mask:atLevel,all:kept,tab:function(){var l=CFG.levels.filter(function(x){return x[0]===LV;})[0];return {name:l?l[1]:'',has:function(i){return LV===6||(LV?LEVEL[i]===LV:LEVEL[i]>0);}};},changed:put,blocked:function(){return !!(AREA||VIEW||KEEPIDS||SUBIDS||PIDS||UF.active());},
     where:where,get:function(u){return get(new URL(u,MAP));},map:MAP,key:key,user:function(){var u=IN.user();return u?u.login:IdentifyProgress.login();},leave:function(){if(BT)choose(LV);},embedded:parent!==window});
   RKF=function(){if(RK||rkp)return;LKF();Promise.all([rk(),lk()]).then(function(d){var ok=rank(d[0]);RKW=false;ok&&LV===3?redraw(true):(build(),counts());});};  // the count waits until the rank is read, not just fetched
-  var lkd=false;LKF=function(){if(lkd)return;lkd=true;lk().then(function(b){if(!b)return;LOOKS=looks(b);retitle();
+  var lkd=false;LKF=function(){if(lkd)return;lkd=true;lk().then(function(b){LKS=true;if(!b){if(LV===3&&WW){STAY=true;redraw();}return;}LOOKS=looks(b);retitle();
     var cs=[].slice.call($('grid').querySelectorAll('.card'));CMP.fill(cs);cs.forEach(CARD.paint);if(BT)paint();
-    if(LV===3){STAY=true;redraw();}else build();});};  // level 3's cap reads the suggestions
+    if(LV===3){STAY=true;redraw();}else build();});};  // level 3's cap reads the suggestions; LKS: at-risk ranks only once they settle, so the order does not jump when they land, and falls back to each record's own taxon when there are none
   var co=CMP.open;CMP.open=function(){LKF();return co.apply(this,arguments);};if(WW.active())LKF();
   STAY=!!SHOWN;take(location.hash.slice(1),AREA==='');
   if(PEND!==null){take(PEND,false);PEND=null;}

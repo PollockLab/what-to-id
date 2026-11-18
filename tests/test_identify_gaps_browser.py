@@ -500,3 +500,22 @@ def test_the_default_order_is_the_blitz_the_gap_preset(browser, site):
     page = open_with(browser, base, "&pri=gap:100,risk:60,conf:40")
     assert len(default) > 3 and view(page) == default
     assert page.inner_text("#sortb").strip().startswith("Blitz the gap")
+
+
+def test_without_the_suggestions_at_risk_ranks_by_the_records_own_taxon(browser, site):
+    base, pts = site
+    page = browser.new_page(viewport={"width": 600, "height": 900})
+    page.route("**/pool-levels-looks.*", lambda r: r.abort())
+    page.errors = []
+    page.on("pageerror", lambda e: page.errors.append(str(e)))
+    eb.stub_inat(page, None)
+    stub_checklist(page, True)
+    page.goto(f"{base}/identify.html#lvl=3&conf=all")
+    page.wait_for_function("window.__identify && __identify.ids().length > 0")
+    rank = dict(zip(pts["id"].tolist(), rank_plane(base).tolist(), strict=True))
+    # the failed file still settles: fixture taxon 1003's records rise above confidence order
+    page.wait_for_function("(() => { const v = __identify.view()[3]; return v.length > 1; })()")
+    page.wait_for_timeout(300)
+    got = [rank[i] for i in view(page)]
+    assert got != sorted(got)
+    assert page.errors == []
