@@ -181,7 +181,7 @@ def test_evaluation_table_comes_from_the_committed_script_output():
 
     ev = json.loads(terms_methods.OUTCOME.read_text())
     assert ev["script"] == "scripts/levels_outcome.py"
-    assert {"scores", "pool_before", "pool_after"} == ev["inputs"].keys()
+    assert {"scores", "pool_before", "pool_after", "leaver_taxa"} == ev["inputs"].keys()
     assert all(len(v["sha256"]) == 64 for v in ev["inputs"].values())
     html = terms_page.render()
     mis = ev["levels"]["mislabel"]

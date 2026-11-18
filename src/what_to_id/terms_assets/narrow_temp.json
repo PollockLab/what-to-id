@@ -1,0 +1,33 @@
+{
+ "script": "scripts/narrow_temp.py",
+ "scored_on": "2026-10-15",
+ "outcome_on": "2026-11-17",
+ "inputs": {
+  "why": {
+   "name": "identify-why.parquet",
+   "sha256": "2b123675d0e117986a29aa91056d9ae81afba79b439ddd04176bf4b81853ae5e"
+  },
+  "pool_after": {
+   "name": "pool-2026-11-17.parquet",
+   "sha256": "b853ada65cfd2572ae90e92097ee1ef09e27695645d368e44b5c4d87733eefbc"
+  },
+  "leaver_taxa": {
+   "name": "level3-leavers-taxa-now.parquet",
+   "sha256": "134e159e0b756730cf1409f5d8a36cb9caa7b05bbf991541997379834816459d"
+  }
+ },
+ "seed": 20261118,
+ "bootstrap_reps": 1000,
+ "resolved": 793,
+ "runner_up_later": 91,
+ "observers": 438,
+ "temp": 0.0242,
+ "temp_ci": [
+  0.0203,
+  0.029
+ ],
+ "page_temp": 0.02,
+ "log_loss": 0.2762,
+ "log_loss_page_temp": 0.2805,
+ "log_loss_even": 0.6931
+}

@@ -45,9 +45,16 @@ COHORT_COLUMNS = [
 ]
 
 
-def cohort(scores: Path, before: Path, after: Path, exclude: Path | None = None) -> pd.DataFrame:
+def cohort(
+    scores: Path,
+    before: Path,
+    after: Path,
+    exclude: Path | None = None,
+    leaver_taxa: Path | None = None,
+) -> pd.DataFrame:
     """The scored cohort with levels and outcomes. `exclude` is a pool whose records are left
-    out once levelled, to keep only records that were not Needs ID then (the held-out cohort)."""
+    out once levelled, to keep only records that were not Needs ID then (the held-out cohort).
+    `leaver_taxa` (scripts/fetch_taxa_now.py) adds `changed_any`, the secondary outcome."""
     s = pd.read_parquet(scores, columns=["id", "taxon_name", "own", "other", "other_name"])
     p = pd.read_parquet(before, columns=["id", "taxon_id", "rank", "iconic_taxon", "user_id"])
     s = s.merge(p, on="id", how="inner", validate="one_to_one")
@@ -68,6 +75,12 @@ def cohort(scores: Path, before: Path, after: Path, exclude: Path | None = None)
     s["left"] = s["taxon_b"].isna()
     changed = ~s["left"] & (s["taxon_b"] != s["taxon_id"])
     s["corrected"] = changed & s["taxon_id"].isin(set(b["taxon_b"].unique()))
+    if leaver_taxa:  # any new community taxon, also on a record that left (e.g. Research Grade)
+        now = pd.read_parquet(leaver_taxa, columns=["id", "taxon_id"])
+        now = now.rename(columns={"taxon_id": "taxon_now"}).drop_duplicates("id")
+        s = s.merge(now, on="id", how="left", validate="one_to_one")
+        gone = s["left"] & s["taxon_now"].notna() & (s["taxon_now"] != s["taxon_id"])
+        s["changed_any"] = (changed | gone) & s["taxon_id"].isin(set(b["taxon_b"].unique()))
     # where a corrected record went: the suggested species itself, or its genus
 
     def genus(n: pd.Series) -> pd.Series:
@@ -164,9 +177,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--seed", type=int, default=20261105)
     ap.add_argument("--reps", type=int, default=1000)
     ap.add_argument("--exclude-pool", type=Path, help="drop records in this pool (held-out)")
+    ap.add_argument("--leaver-taxa", type=Path, help="taxon now of the records that left")
     ap.add_argument("--cohort-out", type=Path, help="write the scored cohort as parquet")
     a = ap.parse_args(argv)
-    s = cohort(a.scores, a.pool_before, a.pool_after, a.exclude_pool)
+    s = cohort(a.scores, a.pool_before, a.pool_after, a.exclude_pool, a.leaver_taxa)
     if a.cohort_out:
         s[COHORT_COLUMNS].to_parquet(a.cohort_out, index=False)
     rng = np.random.default_rng(a.seed)
@@ -197,6 +211,28 @@ def main(argv: list[str] | None = None) -> int:
     shares = ("to_suggested", "to_suggested_genus")
     for name, stats in level_stats(s, LEVELS, a.reps, a.seed, shares).items():
         levels[name]["cluster"] = stats
+    if a.leaver_taxa:
+        sec = level_stats(s.assign(corrected=s["changed_any"]), LEVELS, a.reps, a.seed)
+        for k, name in LEVELS.items():
+            d = s[s["level"] == k]
+            n_any = int(d["changed_any"].sum())
+            keep = (
+                "corrected_per_1000_ci",
+                "corrected_diff_per_1000",
+                "corrected_diff_per_1000_ci",
+            )
+            levels[name]["any_change"] = {
+                "per_1000": round(1000 * n_any / len(d), 2),
+                "record_level_ci": wilson(n_any, len(d)),
+                **{
+                    key.replace("corrected_", ""): v
+                    for key, v in sec[name].items()
+                    if key.startswith(keep) or key == "corrected_rr_ci"
+                },
+            }
+            if k:
+                p0 = s.loc[s["level"] == 0, "changed_any"].mean()
+                levels[name]["any_change"]["rr"] = round(float(d["changed_any"].mean() / p0), 2)
     base = {}
     shown = s["level"].isin([2, 4, 5]).to_numpy()  # the records the Might be wrong list holds
     for name, score in orderings(s).items():
@@ -220,10 +256,16 @@ def main(argv: list[str] | None = None) -> int:
                 ("pool_before", a.pool_before),
                 ("pool_after", a.pool_after),
                 *((("pool_excluded", a.exclude_pool),) if a.exclude_pool else ()),
+                *((("leaver_taxa", a.leaver_taxa),) if a.leaver_taxa else ()),
             )
         },
         "seed": a.seed,
         "bootstrap_reps": a.reps,
+        **(
+            {"leaver_taxa_fetched_on": str(pd.read_parquet(a.leaver_taxa)["fetched_on"].max())}
+            if a.leaver_taxa
+            else {}
+        ),
         "cluster": {
             "unit": "observer (user_id)",
             "observers": int(s["user_id"].nunique()),

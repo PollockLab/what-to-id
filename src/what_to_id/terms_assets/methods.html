@@ -114,7 +114,7 @@ species in suitable habitat the card says the range map may lag its spread.</p>
 threatened (__AT_RISK_N__ taxa, fetched __AT_RISK_FETCHED__, <code>scripts/at_risk_bc_taxa.py</code>).
 A taxon is in tier 1 when it is listed in Canada (SARA or COSEWIC: Endangered, Threatened, Special
 Concern, Extirpated), tier 2 when NatureServe ranks it S1 or S2 in BC, tier 3 when S3; the first
-match counts. On Narrow it down the At risk order is an expected value, not a confirmed ID: the model's two best species for the record weighted by their cosine margin (a softmax at temperature 0.02, a fixed weighting, not a calibrated probability), each worth 1, 2/3 or 1/3 for tier 1, 2 or 3, so a genus-level record can rank on a close match that is at risk. The At risk filter still reads only the suggestion. Introduced is every taxon with wild BC observations that iNaturalist counts as
+match counts. On Narrow it down the At risk order is an expected value, not a confirmed ID: the model's two best species for the record weighted by their cosine margin (a softmax at temperature __TEMP_VALUE__, a fixed weighting, not a calibrated probability: __TEMP_FIT__), each worth 1, 2/3 or 1/3 for tier 1, 2 or 3, so a genus-level record can rank on a close match that is at risk. The At risk filter still reads only the suggestion. Introduced is every taxon with wild BC observations that iNaturalist counts as
 introduced (__INTRODUCED_N__ taxa, fetched __INTRODUCED_FETCHED__,
 <code>scripts/invasive_bc_taxa.py</code>). Survey gap is 1 minus the observer-days in the record's
 25 km cell divided by 30, from where-to-blitz's checklist layer, and 0 without data; about 30
@@ -158,9 +158,21 @@ __EVAL_ROWS__
 </tbody></table>
 <p>Records in Might be mislabelled were corrected at several times the rate of records in no
 level, and Clear matches at a lower rate. The level order on the page follows these rates.
-Narrow it down is not tested: it has no species label to be corrected from. The outcome misses
+Narrow it down is not tested: it has no species label to be corrected from. The primary outcome misses
 records that reached Research Grade after a re-ID, since they leave the pool and count as left,
-and a rollback to a genus counts as corrected. The AUC intervals below resample records, not
+and a rollback to a genus counts as corrected. It stays primary because it is read from two
+pools alone and counts only a record that was re-identified while it still needed an ID. The
+secondary outcome counts any change of the community taxon, including records that reached
+Research Grade; for records that left the pool their taxon was read on __ANY_FETCHED__ and not
+at the window's end, and a record that could not be fetched counts as unchanged. The level order
+__ANY_ORDER__ under the secondary outcome.</p>
+<table class="eval"><thead><tr><th>Level</th>
+<th>Any taxon change, per 1,000 [observers resampled]</th>
+<th>Rate ratio vs no level [observers resampled]</th>
+<th>Minus no level, per 1,000 [observers resampled]</th></tr></thead><tbody>
+__ANY_ROWS__
+</tbody></table>
+<p>The AUC intervals below resample records, not
 observers. The window overlaps
 the page's launch, so some corrections may have been prompted by the page itself. The order within
 Might be mislabelled, the Close calls order and the per-group cut were chosen using this cohort, so

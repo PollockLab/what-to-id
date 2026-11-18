@@ -14,10 +14,15 @@
   "pool_after": {
    "name": "pool-2026-11-03.parquet",
    "sha256": "b4f131ea2c2836cee7a85ddf622ad6007c15744a07d1b1d108bac4b906bd4a6e"
+  },
+  "leaver_taxa": {
+   "name": "leavers-taxa-now.parquet",
+   "sha256": "740ae994b45fd703f32b9c8c5e9b11ea242f217a09f63d87955f292d128eb2cb"
   }
  },
  "seed": 20261105,
  "bootstrap_reps": 1000,
+ "leaver_taxa_fetched_on": "2026-11-18",
  "cluster": {
   "unit": "observer (user_id)",
   "observers": 42261,
@@ -51,6 +56,17 @@
     "left_per_1000_ci": [
      8.7,
      10.42
+    ]
+   },
+   "any_change": {
+    "per_1000": 0.79,
+    "record_level_ci": [
+     0.73,
+     0.86
+    ],
+    "per_1000_ci": [
+     0.7,
+     0.9
     ]
    }
   },
@@ -116,6 +132,27 @@
      1.33,
      1.96
     ]
+   },
+   "any_change": {
+    "per_1000": 0.54,
+    "record_level_ci": [
+     0.46,
+     0.62
+    ],
+    "per_1000_ci": [
+     0.42,
+     0.68
+    ],
+    "diff_per_1000": -0.26,
+    "diff_per_1000_ci": [
+     -0.36,
+     -0.15
+    ],
+    "rr_ci": [
+     0.56,
+     0.82
+    ],
+    "rr": 0.68
    }
   },
   "taxonomist": {
@@ -180,6 +217,27 @@
      0.86,
      1.51
     ]
+   },
+   "any_change": {
+    "per_1000": 1.46,
+    "record_level_ci": [
+     1.21,
+     1.77
+    ],
+    "per_1000_ci": [
+     1.17,
+     1.8
+    ],
+    "diff_per_1000": 0.67,
+    "diff_per_1000_ci": [
+     0.38,
+     1.0
+    ],
+    "rr_ci": [
+     1.46,
+     2.29
+    ],
+    "rr": 1.85
    }
   },
   "weird": {
@@ -244,6 +302,27 @@
      0.0,
      0.37
     ]
+   },
+   "any_change": {
+    "per_1000": 1.98,
+    "record_level_ci": [
+     1.53,
+     2.56
+    ],
+    "per_1000_ci": [
+     1.51,
+     2.56
+    ],
+    "diff_per_1000": 1.19,
+    "diff_per_1000_ci": [
+     0.71,
+     1.76
+    ],
+    "rr_ci": [
+     1.86,
+     3.29
+    ],
+    "rr": 2.5
    }
   },
   "mislabel": {
@@ -308,6 +387,27 @@
      1.01,
      1.37
     ]
+   },
+   "any_change": {
+    "per_1000": 3.07,
+    "record_level_ci": [
+     2.85,
+     3.31
+    ],
+    "per_1000_ci": [
+     2.77,
+     3.43
+    ],
+    "diff_per_1000": 2.28,
+    "diff_per_1000_ci": [
+     2.0,
+     2.61
+    ],
+    "rr_ci": [
+     3.43,
+     4.42
+    ],
+    "rr": 3.88
    }
   }
  },
