@@ -303,6 +303,7 @@ function paint(){
   if(R&&LV<6)R.draw(kf?KF:LV,SEL,kf?KIND:LEVEL);
   if(X&&LV<6)X.draw(kf?KF:LV,SEL,kf?KIND:LEVEL);
   if(GP)GP.draw(LV);
+  document.body.classList.toggle('l3',LV===3);  // shell.css holds level 3's late second lines
   if(LV===6)$('sortb').hidden=$('rg').hidden=true;  // its order is the base order, its filters the bar's
   IdentifyFlow.draw(LV);
   empty();
