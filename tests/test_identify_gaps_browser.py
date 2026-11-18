@@ -580,7 +580,7 @@ def test_at_risk_on_level_3_ranks_a_group_by_the_expected_value_of_its_matches(b
     )  # a stable sort: the Apis c cards lead
     assert all(m == (k == "Apis c") for k, m in cards)
     assert page.get_attribute("#grid .maybe", "title") == (
-        "A likely species in this group is listed at risk"
+        "A close match for this record is listed at risk"
     )
     assert page.inner_text("#grid .maybe") == "possibly at risk"
     # the confidence order alone does not put them first

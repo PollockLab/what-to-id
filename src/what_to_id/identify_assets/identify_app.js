@@ -107,7 +107,7 @@ function title(i,lv){
   box.appendChild(nm);
   if(t&&t[1])box.appendChild(el('div','com',t[1]));
   if(lv===3&&lk)l.append('Looks most like ',el('i',null,lk));
-  if(lv===3&&lk&&!BT){var g=el('div','sugg'),cf=RK&&IdentifyNarrow.conf(RK[i],N3);g.appendChild(IdentifyNarrow.copy(lk));if(cf)g.appendChild(GP?GP.confBadge(i,cf):el('span','conf',cf));var gp=GP&&GP.badge(i);if(gp)g.appendChild(gp);if(LKS&&WW.maybe(i,t&&t[2]))g.appendChild(el('span','maybe','possibly at risk')).title='A likely species in this group is listed at risk';}
+  if(lv===3&&lk&&!BT){var g=el('div','sugg'),cf=RK&&IdentifyNarrow.conf(RK[i],N3);g.appendChild(IdentifyNarrow.copy(lk));if(cf)g.appendChild(GP?GP.confBadge(i,cf):el('span','conf',cf));var gp=GP&&GP.badge(i);if(gp)g.appendChild(gp);if(LKS&&WW.maybe(i,t&&t[2]))g.appendChild(el('span','maybe','possibly at risk')).title='A close match for this record is listed at risk';}
   else if((lv===2||lv===5)&&lk)l.append('Looks more like ',el('i',null,lk));
   if(l.firstChild)box.appendChild(l);
   if(g){var y=whyOf(i);if(y)box.appendChild(IdentifyNarrow.why(y[0],y[1]));box.appendChild(g);}
