@@ -102,6 +102,22 @@ def test_the_rank_file_orders_level_3_by_score_highest_first_and_leaves_the_rest
     assert len(gzip.decompress(pool_levels.pack_rank(level[:0], score[:0]))) == 0
 
 
+def test_the_pct_file_holds_the_percentile_ceiling_of_the_rank_for_level_3_only():
+    def pct(level, score):
+        return np.frombuffer(gzip.decompress(pool_levels.pack_pct(level, score)), np.uint8).tolist()
+
+    level = np.full(100, 3, np.int8)
+    got = pct(level, np.arange(100, 0, -1, dtype=np.float32))  # record i has rank i
+    assert got[4] == 5 and got[5] == 6 and got[0] == 1 and got[99] == 100
+    assert pct(np.array([3, 1], np.int8), np.array([0.5, 0.9], np.float32)) == [100]  # m = 1
+    assert pct(np.array([1, 4], np.int8), np.array([0.5, 0.9], np.float32)) == []  # no level 3
+    level = np.array([3, 3, 3, 1, 0, 3], np.int8)
+    score = np.array([0.2, 0.9, 0.5, 0.7, np.nan, np.nan], np.float32)
+    r = pool_levels.unpack_rank(pool_levels.pack_rank(level, score), level)[level == 3]
+    want = [-(-100 * (x + 1) // 4) for x in r]  # ceil(100 (r + 1) / m)
+    assert pct(level, score) == want
+
+
 def test_the_rank_and_looks_files_hold_only_their_records_at_the_edges():
     for level in (
         np.array([1, 4, 0], np.int8),
