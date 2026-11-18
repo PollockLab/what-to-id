@@ -5,6 +5,7 @@ name: ci
 on:
   push:
   pull_request:
+  workflow_dispatch: # reference.yml's pushes use GITHUB_TOKEN, which fires no push event
 
 permissions:
   contents: read
