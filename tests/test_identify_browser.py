@@ -223,10 +223,13 @@ def test_cards_follow_the_chosen_level_with_a_few_per_species_and_photos_in_batc
         assert counts.max() <= 3 and len(counts) == 7
     assert page.locator("#grid .card").count() == 12
     assert all(len(c) <= 200 for c in page.calls) and page.calls
-    before = len(page.calls)
     page.evaluate("scrollTo(0, document.body.scrollHeight)")
     page.wait_for_function("document.querySelectorAll('#grid .card').length === 21")
-    assert len(page.calls) == before + 1 and len(page.calls[-1]) == 9
+    # the next page's ids went with the first page's request, so none is asked for twice
+    asked = [i for c in page.calls for i in c]
+    assert len(asked) == len(set(asked)) and set(
+        page.evaluate("[...document.querySelectorAll('#grid .card')].map(c=>+c.dataset.id)")
+    ) <= set(asked)
     tab(page, 3).click()
     page.wait_for_selector("#grid .card .look", state="attached")
     text = page.locator("#grid .card .look").first.inner_text()
