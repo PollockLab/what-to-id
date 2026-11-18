@@ -88,8 +88,8 @@ GLOSSARY: dict[str, tuple[str, str | None]] = {
         " also hides records whose location is hidden.",
         None,
     ),
-    "introduced": ("A species that is not native to BC.", None),
-    "threatened": ("A species with a threatened status.", None),
+    "introduced": ("A species introduced to BC, per iNaturalist.", None),
+    "threatened": ("A species at risk, listed in Canada or BC S1-S3.", None),
     "observer-filter": (
         "Keeps only the records this user observed. "
         "Off while Hide records the user identified is ticked.",

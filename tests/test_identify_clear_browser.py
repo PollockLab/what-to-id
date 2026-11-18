@@ -40,7 +40,9 @@ def test_clear_filters_restores_the_defaults_on_the_same_tab(browser, site):
     assert page.evaluate("document.activeElement.id") == "bwhat"
     seg = "[...document.querySelectorAll('.seg1 b, #qchips input')]"
     seg += ".map(e => e.checked ?? e.textContent)"
-    assert page.evaluate(seg) == clean.evaluate(seg)  # the bar and the At risk, Invasive chips too
+    assert page.evaluate(seg) == clean.evaluate(
+        seg
+    )  # the bar and the At risk, Introduced chips too
     assert page.errors == [] and clean.errors == []
 
 

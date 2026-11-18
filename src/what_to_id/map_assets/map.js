@@ -214,7 +214,7 @@ function link(){
   if(gl.out.length)why.push('Identify cannot leave out the '+gn(gl.out)+' group beside picked taxa, so it keeps it');
   if(lost.indexOf('taxa')>=0)why.push('too many taxa for one link, so it opens every taxon');
   if(lost.indexOf('not')>=0)why.push('too many taxa left out for one link, so it keeps them');
-  if(PJ.inexact())why.push(PJ.inexact());if(S.only.oneid)why.push('Identify cannot filter records one ID from Research Grade');if(S.only.range)why.push('Identify cannot filter records outside their range');if(ORDER&&!u)why.push('sorted by conservation status: listed by SARA or COSEWIC, then BC S1-S2, then BC S3, at most 5 records of a species a round');
+  if(PJ.inexact())why.push(PJ.inexact());if(S.only.oneid)why.push('Identify cannot filter records one ID from Research Grade');if(S.only.range)why.push('Identify cannot filter records outside their range');if(ORDER&&!u)why.push('sorted by At risk first: listed by SARA or COSEWIC, then BC S1-S2, then BC S3, at most 5 records of a species a round');
   // listed by id (u stays null), the records are the map's, so only the way they open is said
   // these records' next agree settles them, so the note asks for an independent ID first
   // past the limit the first 10,000 open by default; the button switches to all of them and back
@@ -284,7 +284,7 @@ function names(i){var t=TAXA&&P.tax[i]!==NOTAX?TAXA[P.tax[i]]:null,g=META.groups
   return {common:t&&t[1]||'',latin:t&&t[0]||META.names[g]||g,group:META.names[g]||g,
     rank:t&&t[3]!==255?META.ranks[t[3]]:''};}
 function badges(i,ex){var f=P.fl[i],out=[];
-  if(f&FLAG.introduced)out.push(['Introduced','','introduced']);if(f&FLAG.threatened)out.push(['Threatened','','threatened']);
+  if(f&FLAG.introduced)out.push(['Introduced','','introduced']);if(f&FLAG.threatened)out.push(['At risk','','threatened']);
   if(f&FLAG.obscured)out.push(['Location hidden','warn','location-hidden']);
   else if(MF.accClass(f)===1)out.push(['Location over 1 km uncertain','warn','location-uncertain']);
   return out.map(function(b){return '<span class="badge '+b[1]+'"'+(ex?' data-explain="'+b[2]+'"':'')+'>'+b[0]+'</span>';}).join('');}

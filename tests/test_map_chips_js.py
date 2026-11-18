@@ -186,7 +186,7 @@ var T=[['Bryophyta','Mosses',3,2,-1],['Plantae','Plants',4,2,-1]];
 function items(){return CH.items({S:S,meta:META,
   terms:TX.terms({T:T,picks:S.picks,groups:[],meta:META,n:0,split:S.split}),
   picker:{changed:function(){log.push('taxa');}},pj:pj,months:['January','February','March'],
-  only:[['introduced','Introduced to BC'],['exact','Exact location']],two:['exact'],area:area,
+  only:[['introduced','Introduced'],['exact','Exact location']],two:['exact'],area:area,
   mf:{LAST:99,iso:function(d){return 'day'+d;}},redraw:function(){log.push('redraw');}});}
 var box=new El('div');box.appendChild(new El('p')).appendChild(new El('button'));
 box.appendChild(new El('ul'));
@@ -225,7 +225,7 @@ def test_selection_bar_lists_every_chip_and_removes_each():
         ["not Insects", True, "Remove not Insects"],
         ["January", False, "Remove January"],
         ["March", False, "Remove March"],
-        ["not Introduced to BC", True, "Remove not Introduced to BC"],
+        ["not Introduced", True, "Remove not Introduced"],
         ["Exact location", False, "Remove Exact location"],
         ["Garibaldi Park", False, "Remove Garibaldi Park"],
     ]
@@ -263,7 +263,7 @@ def test_selection_bar_flips_a_chip_between_picked_and_left_out():
         ["not in project 90486", "true"],
         ["Birds", "false"],
         ["not Insects", "true"],
-        ["not Introduced to BC", "true"],
+        ["not Introduced", "true"],
     ]
     assert got["first"] == ["not Bryophyta", "true"]
     assert got["picks"] == [{"id": 3, "not": True}, {"id": 4, "not": True}]

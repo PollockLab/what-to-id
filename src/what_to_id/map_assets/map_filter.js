@@ -143,8 +143,8 @@ function oneIds(ids,tax,taxa,n){
 var MONTH=['January','February','March','April','May','June','July','August','September','October','November',
   'December'];
 // The show only chips as [key, label, flag, hint], those the data has the flag for.
-var ONLYDEF=[['introduced','Introduced to BC','introduced','Species not native to BC'],
-  ['threatened','Threatened','threatened','Species with a threatened status'],
+var ONLYDEF=[['introduced','Introduced','introduced','Introduced to BC, per iNaturalist'],
+  ['threatened','At risk','threatened','Species at risk, listed in Canada or BC S1-S3'],
   ['oneid','One ID from Research Grade','oneid','Species where one more agreeing ID makes the record Research Grade, so agree only with an ID you would make yourself from the photos'],
   ['range','Outside usual range','range','Records more than 50 km outside the iNaturalist range map of their label, so the ID or the location deserves a second look']]
   .filter(function(o){return META.flags.indexOf(o[2])>=0;});

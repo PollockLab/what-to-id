@@ -8,7 +8,7 @@ var IdentifySuggest=(function(){
 // Every English string, in one place for the translation file to take over; {n} and {d} are filled in.
 var T={
   what:'Suggested',recent:'Recently used',recentSub:'Recently used',backlog:'Biggest backlogs',backlogSub:'{n} of the records to identify',
-  blitz:'Blitz targets',blitzSub:'{n} threatened or introduced',lists:'Suggestions',
+  blitz:'Blitz targets',blitzSub:'{n} at risk or introduced',lists:'Suggestions',
   when:'Quick picks',visit:'Since your last visit',visitSub:'From {d}',allSub:'Every record',rangeSub:'{a} to {b}',
   near:'Near me',nearSub:'Within 50 km of where you are',nearWait:'Finding where you are…',
   denied:'Location is blocked for this site. Allow it in the browser, or draw an area below.',

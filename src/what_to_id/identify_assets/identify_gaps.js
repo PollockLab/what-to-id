@@ -12,7 +12,7 @@ var IdentifyGaps=(function(){
 'use strict';
 var BASE='https://pollocklab.github.io/where-to-blitz/',DIR=BASE+'cluster_results/checklist/',RES='25000',ALL='All biodiversity',
   KEYS=['conf','gap','risk','inv','out'],LEG=[0,33,67,100],DEFAULT={conf:40,gap:100,risk:60,inv:0,out:0},LEGACY={conf:1,gap:1,risk:0,inv:0,out:0},LIT0=30,
-  NAMES={conf:['Match','best matches'],gap:['Survey gap','biggest survey gaps'],risk:['At risk','at-risk species'],inv:['Invasive','invasive species'],
+  NAMES={conf:['Match','best matches'],gap:['Survey gap','biggest survey gaps'],risk:['At risk','at-risk species'],inv:['Introduced','introduced species'],
     out:['Out of range','records out of range']},
   EXPLAIN={conf:'best-match',gap:'survey-days'},
   PRESETS=[['blitz','Blitz the gap',{gap:100,risk:60,conf:40}],['quick','Quick wins',{conf:100}],['unusual','Unusual',{out:100,conf:40}],['newest','Newest',{}]],
