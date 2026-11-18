@@ -327,6 +327,7 @@ def test_an_identify_click_opens_the_full_card_over_a_minimized_one(browser, ran
     left.locator("#card").wait_for(state="visible")
     left.locator("#card .mn").click()
     assert left.locator("#card.min").count() == 1
+    ident.locator("#cpx").click()  # the compare panel the first click opened covers the grid
     ident.locator("#grid .card .title").nth(1).click()
     left.wait_for_function("!document.getElementById('card').classList.contains('min')")
     assert left.locator("#card a.btn").is_visible()
