@@ -68,5 +68,6 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["scripts"]  # the reference fetchers import each other as modules
 addopts = "-ra --strict-markers -m 'not network and not labelfirst'"
 markers = ["atlas: requires the optional pinned atlas build dependencies", "network: hits the live iNaturalist API", "labelfirst: requires the pinned optional LabelFirst integration"]
