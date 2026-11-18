@@ -33,15 +33,14 @@ jobs:
         with:
           python-version: "3.11"
       - name: Refetch the lists
+        id: refresh
         env:
           FORCE: ${{ inputs.force && '1' || '' }}
         run: python scripts/refresh_reference.py "$RUNNER_TEMP/summary.md" ${FORCE:+"--force"}
+      # Only a changed taxon set or tier counts; Research Grade counts and dates alone do not.
       - name: Open or update the pull request
+        if: steps.refresh.outputs.changed == 'true'
         run: |
-          if git diff --quiet; then
-            echo "No reference list changed."
-            exit 0
-          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -B "$BRANCH"
