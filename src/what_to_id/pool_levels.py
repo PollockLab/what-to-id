@@ -18,6 +18,10 @@ whose label changed since it was scored, is level 0.
 record in record order (m the count of level 3), its place in its level by score, 0 the highest
 (shown first), so level 3 lists in strict score order.
 
+``pool-levels-pct.bin``: gzip of one uint8 per level-3 record in record order, its percentile
+ceil(100 (r + 1) / m) for the rank r above (1 to 100), enough for level 3's Best x% count without
+the rank file.
+
 ``pool-levels-looks.bin``: the look-alike species of the taxonomist, narrow and mislabel records,
 apart so the levels load first. A uint32 LE length and that many bytes of JSON
 ``{"names": [...]}``, then two planes of n bytes (low byte, high byte) of indexes into
@@ -91,6 +95,7 @@ STEPS = 16
 NO_LOOK = 0xFFFF
 RANGE_NAME = "pool-levels-range.bin"
 RANK_NAME = "pool-levels-rank.bin"
+PCT_NAME = "pool-levels-pct.bin"
 TAXA_FR_NAME = "pool-taxa-fr.bin"
 NO_BYTE = 0xFF
 NOTAX = 0xFFFF
@@ -127,6 +132,13 @@ def pack_rank(level: np.ndarray, score: np.ndarray) -> bytes:
     """The gzipped rank file: each level-3 record's place in its level, as four byte planes."""
     plane = ranks(level, score)[level == NARROW].astype("<u4")
     return gzip.compress(plane.view(np.uint8).reshape(-1, 4).T.tobytes(), mtime=0)
+
+
+def pack_pct(level: np.ndarray, score: np.ndarray) -> bytes:
+    """The gzipped percentile file: per level-3 record ceil(100 (r + 1) / m), r its rank among m."""
+    r = ranks(level, score)[level == NARROW]
+    pct = (100 * (r + 1) + len(r) - 1) // max(len(r), 1)
+    return gzip.compress(pct.astype(np.uint8).tobytes(), mtime=0)
 
 
 def unpack_rank(blob: bytes, level: np.ndarray) -> np.ndarray:
@@ -361,6 +373,7 @@ def build(
     site_files.publish(site, "levels", OUT_NAME, pack(level, score))
     site_files.publish(site, "looks", LOOKS_NAME, pack_looks(level, looks))
     site_files.publish(site, "rank", RANK_NAME, pack_rank(level, score))
+    site_files.publish(site, "pct", PCT_NAME, pack_pct(level, score))
     why_blob = None
     if "runner_up" in scored:
         runner = np.full(len(ids), None, dtype=object)
@@ -493,9 +506,8 @@ def main(argv: list[str] | None = None) -> int:
     except (ValueError, FileNotFoundError, OSError) as exc:
         print(f"pool_levels: {exc}", file=sys.stderr)
         return 1
-    paths = [
-        site_files.path(a.out, k) for k in ("levels", "rank", "looks", "why", "range", "first")
-    ]
+    keys = ("levels", "rank", "pct", "looks", "why", "range", "first")
+    paths = [site_files.path(a.out, k) for k in keys]
     sizes = ", ".join(f"{p.name} {p.stat().st_size / 1e6:.2f} MB" for p in paths if p)
     print(f"pool_levels: records per level {counts}; {sizes} gzipped")
     return 0

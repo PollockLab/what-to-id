@@ -170,9 +170,11 @@ def test_the_bulk_files_wait_for_the_first_card(browser, site):
     names = [n for n, _ in seen]
     assert files["first"] in names
     shards = [n for n, up in seen if re.fullmatch(r"pool-\d+\.\w+\.bin", n)]
-    bulk = shards + [files["levels"], files["rank"], files["looks"]]
+    bulk = shards + [files["levels"], files["pct"], files["looks"]]
     assert shards and all(up for n, up in seen if n in bulk)
-    # the rank and look-alikes follow the records in the background: level 3's count reads both
+    # the percentiles and look-alikes follow the records in the background: the count reads both
+    # (the rank waits for level 3)
+    assert files["rank"] not in names
     tab3 = "document.querySelector('#tab3 b').textContent"
     page.wait_for_function(f"/\\d/.test({tab3})")
     other = open_identify(browser, base, "#lvl=3&sort=conf&conf=all")
@@ -182,6 +184,7 @@ def test_the_bulk_files_wait_for_the_first_card(browser, site):
     assert names.count(files["first"]) == 1 and names.count("map-meta.json") == 1
     page.click("#tab3")  # strict rank order on level 3
     page.wait_for_selector("#grid .card .conf", state="attached")
+    assert files["rank"] in [n for n, _ in seen]
     rank = dict(zip(pts["id"].tolist(), nb.rank_plane(base).tolist(), strict=True))
     got = [rank[i] for i in page.evaluate("__identify.view()")[3]]
     assert got == sorted(got) and got[0] == 0  # strict rank order once it lands
