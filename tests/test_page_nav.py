@@ -193,3 +193,28 @@ def test_the_site_link_is_secondary_hidden_on_phones_and_where_to_blitz_stays_on
     assert "@media (max-width:480px){.site-nav .ext{display:none}}" in CSS
     body = terms_page.render().split('<main id="main-content">', 1)[1]
     assert f'href="{BLITZ}"' in body and "Where to Blitz" in body
+
+
+def test_footer_shows_the_build_sha_and_date(monkeypatch):
+    monkeypatch.setenv("GITHUB_SHA", "0123456789abcdef")
+    sha, day = page_nav.build_info()
+    assert sha == "0123456" and re.fullmatch(r"\d{4}-\d{2}-\d{2}", day)
+    assert f"<code>0123456</code>, {day}</footer>" in page_nav.footer()
+
+
+def test_footer_without_git_or_ci_shows_the_date_alone(monkeypatch):
+    monkeypatch.delenv("GITHUB_SHA", raising=False)
+
+    def no_git(*args, **kwargs):
+        raise FileNotFoundError("git")
+
+    monkeypatch.setattr(page_nav.subprocess, "run", no_git)
+    assert page_nav.build_info()[0] == ""
+    assert "<code>" not in page_nav.footer() and "build, 20" in page_nav.footer()
+
+
+def test_the_how_it_works_page_ends_with_the_footer(monkeypatch):
+    from what_to_id import terms_page
+
+    monkeypatch.setenv("GITHUB_SHA", "abcdef0123")
+    assert "<code>abcdef0</code>" in terms_page.render().split("</main>")[1]

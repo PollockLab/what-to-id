@@ -240,7 +240,7 @@ def render(
         f'{page_nav.nav(PAGE_NAME, menu=True)}<div class="doc">\n'
         f'<details id="toc"><summary>On this page</summary><nav aria-label="On this page">{toc}'
         f'</nav></details>\n<main id="main-content">\n{body}</main></div>\n'
-        f"<script>{TOC_JS}</script></body></html>\n"
+        f"{page_nav.footer()}<script>{TOC_JS}</script></body></html>\n"
     )
 
 
