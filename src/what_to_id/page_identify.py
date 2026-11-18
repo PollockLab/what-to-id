@@ -52,7 +52,7 @@ LEVELS = (
 ALL_TAB = (6, "All needing ID", "Every record that needs an ID, with a level or not, newest first.")
 # The kinds a tab shows, in order: Might be wrong (5) lists might-be-mislabelled records by margin,
 # then odd shots, then close calls. This order beat interleaving the three by rank on crowd
-# corrections (AUC +0.028 [0.013, 0.044], 10-15 to 11-03 BC).
+# corrections (AUC +0.028 [0.013, 0.044], 10-15 to 11-03 BC; in-sample, chosen on that cohort).
 MERGE = {5: (5, 4, 2)}
 # (level, the kind control's name) for Might be wrong's kinds
 KINDS = ((5, "Might be mislabelled"), (4, "Odd shots"), (2, "Close calls"))

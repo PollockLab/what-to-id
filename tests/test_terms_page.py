@@ -265,3 +265,12 @@ def test_about_says_odd_shots_are_checked_first_at_any_rank():
     assert "Odd shots are checked first, at any rank; then Easy confirms, close calls," in text
     assert "goes here, unless it is an odd shot." in text and "whatever its match" not in text
     assert "unless it is an odd shot" in GLOSSARY["level-narrow-it-down"][0]
+
+
+def test_no_claim_the_code_does_not_back_remains_in_the_built_pages():
+    for page in (terms_page.render(), page_identify.render()):
+        flat = " ".join(page.split())
+        for gone in ("Probably ", "Likely mislabel", "written down before", "set in advance"):
+            assert gone not in flat, gone
+    methods = " ".join(terms_page.render().split())
+    assert "were chosen using this cohort, so these figures are in-sample." in methods
