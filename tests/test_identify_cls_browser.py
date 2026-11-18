@@ -34,6 +34,24 @@ def test_the_empty_tabs_and_chips_are_as_tall_as_the_filled_ones(browser, site, 
     page.close()
 
 
+LATE = """(()=>{sortb.hidden=false;showall.hidden=false;showall.textContent='Show all';
+count.textContent='5,417 cards · 3 per species of 73,367 records, the best 5%';
+go.textContent='Identify these 200 on iNaturalist';prev.hidden=next.hidden=false;
+bn.textContent='Batch 1 of 28'})()"""
+
+
+def test_level_3_bar_holds_the_lines_that_arrive_late_on_a_phone(browser, site):
+    """The Prioritize chip and Show all (the survey layer) and Batch n of m (the whole pool) wrap
+    a second line in the count row and the batch row: the cards below must not move for them."""
+    page = ib.open_identify(browser, site[0], "#lvl=3&sort=conf", size=(390, 844), touch=True)
+    page.wait_for_selector("#grid .card")
+    top = "grid.getBoundingClientRect().top"
+    before = page.evaluate(top)
+    page.evaluate(LATE)
+    assert page.evaluate(top) == pytest.approx(before, abs=1)
+    page.close()
+
+
 def png(w, h):
     """A grey PNG of this size."""
     raw = b"".join(b"\0" + b"\x80" * w for _ in range(h))

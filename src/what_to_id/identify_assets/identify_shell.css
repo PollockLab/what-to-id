@@ -51,6 +51,7 @@ dialog.sheet::backdrop{background:rgba(0,0,0,.45)}
 .sfoot .btn{min-height:44px;padding:0 20px;border:0;border-radius:999px;font:inherit;font-weight:650;cursor:pointer}
 .sfoot .lnk{font:inherit;color:var(--ink);background:none;border:0;text-decoration:underline;cursor:pointer;padding:8px 0}
 @media (max-width:600px){
+  .l3 .rline{min-height:62px;align-content:flex-start}.l3 .batch{min-height:68px;align-content:flex-start}  /* level 3's Prioritize chip and Batch n of m arrive late (the survey layer, the pool) and wrap a second line: the rows hold it */
   .rline{gap:2px;flex-wrap:wrap}.rline #showall{margin:0 4px}.rline .rel{display:none}.rline .qchip{padding:0 6px}.today{order:9;flex-basis:100%}
   #sortpop,#setpop{inset:auto 0 0 0;box-sizing:border-box;width:100vw;max-width:100vw;border-radius:20px 20px 0 0;padding:16px 20px 24px}
   dialog.sheet{width:100vw;max-width:100vw;max-height:90vh;margin:auto 0 0;border-radius:20px 20px 0 0}
