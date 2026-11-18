@@ -34,7 +34,11 @@ FIRST_NAME = "pool-levels-first.bin"  # likewise: the first cards, drawn while t
 NARROW_LABEL = "Narrow it down"
 # (level as in identify.LEVEL_NAMES, name, one line for the page)
 LEVELS = (
-    (1, "Easy confirms", "These look just like their label. Confirm many in one go."),
+    (
+        1,
+        "Easy confirms",
+        "These match their label best among their species. Confirm many in one go.",
+    ),
     (
         5,
         "Might be wrong",

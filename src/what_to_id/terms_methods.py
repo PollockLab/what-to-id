@@ -123,6 +123,16 @@ def _level_rows(ev: dict) -> str:
     return "\n".join(rows)
 
 
+def reference_lists() -> dict[str, str]:
+    """Placeholders for the at-risk and introduced lists, from the fetch scripts' output."""
+    out = {}
+    for key, name in (("AT_RISK", "at_risk_bc_taxa.json"), ("INTRODUCED", "invasive_bc_taxa.json")):
+        doc = json.loads((TEMPLATE.parent.parent / name).read_text())
+        out[f"__{key}_N__"] = f"{len(doc['taxa']):,}"
+        out[f"__{key}_FETCHED__"] = doc["fetched"]
+    return out
+
+
 def evaluation(data_url: str | None = None) -> dict[str, str]:
     """Placeholders filled from the committed output of scripts/levels_outcome.py."""
     ev = json.loads(OUTCOME.read_text())
@@ -170,9 +180,13 @@ def evaluation(data_url: str | None = None) -> dict[str, str]:
     }
 
 
-def render(manifest: dict | None = None, data_url: str | None = None) -> str:
+def render(
+    manifest: dict | None = None, data_url: str | None = None, dates: dict | None = None
+) -> str:
     html = TEMPLATE.read_text()
-    for key, text in (values(manifest) | evaluation(data_url)).items():
+    base = (dates or {}).get("scored")  # pool_levels.scoring_dates: built_at of the full run
+    extra = {"__BASE_RUN__": f"on {base}" if base else f"on a date {MISSING}"}
+    for key, text in (values(manifest) | evaluation(data_url) | reference_lists() | extra).items():
         html = html.replace(key, text)
     if "__" in html:
         raise ValueError("terms_methods: a placeholder in methods.html has no value")

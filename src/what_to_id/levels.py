@@ -47,7 +47,11 @@ from what_to_id.confusion import MIN_PER_CLASS, fir_scores, read_taxa_vectors
 
 # (key, name, one line for the page)
 LEVELS = (
-    ("easy", "Clear matches", "These look just like their label. Confirm many in one go."),
+    (
+        "easy",
+        "Clear matches",
+        "These match their label best among their species. Confirm many in one go.",
+    ),
     (
         "taxonomist",
         "Close calls",

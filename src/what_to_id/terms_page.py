@@ -224,7 +224,7 @@ def render(
         '<p id="find-n" role="status"></p></div>\n'
         f'<div id="glossary-list">{chr(10).join(terms)}</div>\n'
         f"{STUDY.replace('__SIGN_IN__', SIGN_IN if page_identify.INAT_CLIENT_ID else '')}\n{fold}\n"
-        f'<h2 id="methods">Methods</h2>\n{terms_methods.render(manifest, data_url)}\n'
+        f'<h2 id="methods">Methods</h2>\n{terms_methods.render(manifest, data_url, dates)}\n'
         f'<p>Planning a bioblitz? See <a href="{page_nav.BLITZ}" target="_blank" rel="noopener">'
         'Where to Blitz\u00a0<span aria-hidden="true">\u2197</span>'
         '<span class="site-vh"> (opens in a new tab)</span></a>.</p>\n'

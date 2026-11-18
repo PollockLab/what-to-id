@@ -55,7 +55,9 @@ review; they do not say that a label is right or wrong.</p>
 <p>Daily updates score only the records the last full run lacks, against cut-offs frozen from
 that run: the per-group Odd shots and Close calls cuts and, per species, the lowest own among its Clear matches.
 A species with fewer than __MIN_PER_CLASS__ records in the full run gets no Clear match until the
-next full run.</p>
+next full run. The last full run was __BASE_RUN__. A record scored again whose raw vector is no
+longer kept is rebuilt from the index's 3-bit refine codes; its level agrees with the one from the
+true vector for 97.7% of such records.</p>
 
 <h3 id="methods-pairs">Confused pairs</h3>
 <p>Only records labelled at species count. A record is confused when its margin is below 0; it
@@ -91,12 +93,42 @@ Biotic Interactions database [8], release __GLOBI_RELEASE__, keeping family pair
 __GLOBI_MIN_ROWS__ or more recorded interactions. The confused-pairs table does not apply this
 filter.</p>
 
+<h3 id="methods-ranges">Ranges and habitat</h3>
+<p>Close calls and Might be mislabelled cards check the record's point against range maps. The
+ranges are the repaired Open Range Map, as H3 resolution-4 cells about 22 km across. The label's
+range holds the record when the record's cell is one of its cells; a name with no map is unknown
+and gets no note. A record is far outside when its point is 50 km or more from the nearest centre
+of the label's cells, since a smaller distance is cell-edge noise; a record with no range map
+counts as in range. For a far-outside record the card also reads the ECCC 1 km habitat model at
+its point: 50% suitable or more is read as habitat that suits the species, under 20% as habitat
+that does not. These two cut-offs sit in the trough of the distribution of far-outside records on
+2026-11-06 and have not yet been validated against expert-checked records. For an introduced
+species in suitable habitat the card says the range map may lag its spread.</p>
+
+<h3 id="methods-status">At risk, Introduced and Survey gap</h3>
+<p>At risk comes from iNaturalist's conservation statuses for the BC Needs ID taxa it flags as
+threatened (__AT_RISK_N__ taxa, fetched __AT_RISK_FETCHED__, <code>scripts/at_risk_bc_taxa.py</code>).
+A taxon is in tier 1 when it is listed in Canada (SARA or COSEWIC: Endangered, Threatened, Special
+Concern, Extirpated), tier 2 when NatureServe ranks it S1 or S2 in BC, tier 3 when S3; the first
+match counts. Introduced is every taxon with wild BC observations that iNaturalist counts as
+introduced (__INTRODUCED_N__ taxa, fetched __INTRODUCED_FETCHED__,
+<code>scripts/invasive_bc_taxa.py</code>). Survey gap is 1 minus the observer-days in the record's
+25 km cell divided by 30, from where-to-blitz's checklist layer, and 0 without data; about 30
+observer-days make a complete checklist by that project's rule of thumb. The Prioritize presets are
+weights set by hand. They were not fitted to any outcome.</p>
+
 <h3 id="methods-limits">Limits</h3>
 <p>The model sees one photo per record, so a record whose first photo is not the organism gets
 a poor score. Only names in the pool are candidates, so a species not yet observed in BC cannot
 be proposed. Text vectors carry what the model learned about a name during training, which is
 thin for rare or recently split taxa. Cut-offs were read from the distribution of scores in the
-BC pool and are not calibrated probabilities.</p>
+BC pool and are not calibrated probabilities. How much identifier effort a record gets varies by
+taxon and region, and a record that needs an ID because few people identify its group is not the
+same as one that is hard. Species differ greatly in how many records they have, so the cut-offs
+for rare species rest on few records. BioCLIP 2.5 is weaker on fungi and fish: on a 10,000-record
+BC sample the nearest photo shared its species in 43% and 53% of cases, against 84% for
+amphibians (<code>docs/protocol.md</code>). The evaluation is BC only, and covers one 19-day
+window.</p>
 
 <h3 id="methods-eval">Evaluation</h3>
 <p>Do the levels predict what identifiers do? The species-labelled records scored on

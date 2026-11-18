@@ -124,7 +124,7 @@ GLOSSARY: dict[str, tuple[str, str | None]] = {
         None,
     ),
     "level-clear-matches": (
-        "Labelled at species, and the photo looks just like its label.",
+        "Labelled at species, and the photo matches its label best among the pool's species.",
         "Use it when you want to confirm many in one go.",
     ),
     "level-close-calls": (
@@ -140,7 +140,7 @@ GLOSSARY: dict[str, tuple[str, str | None]] = {
         "Use it when you can take a record to species.",
     ),
     "level-odd-shots": (
-        "Hard photos, like hands, eggs and close-ups, that match no species well.",
+        "Photos that match no species well (often hands, eggs, close-ups).",
         "Use it when you feel lucky.",
     ),
     "level-might-be-mislabelled": (
@@ -207,8 +207,9 @@ GLOSSARY: dict[str, tuple[str, str | None]] = {
     ),
     "best-match": (
         "How closely the photo points to one species, ranked among all records of this level."
-        " Best 5% keeps the top 5%. Show all lifts the cut, and the Best slider under Prioritize"
-        " sets another share.",
+        " It is a rank, not a measured accuracy: Narrow it down is not yet evaluated. Best 5%"
+        " keeps the top 5%. Show all lifts the cut, and the Best slider under Prioritize sets"
+        " another share.",
         None,
     ),
 }

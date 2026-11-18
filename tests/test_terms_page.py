@@ -128,7 +128,8 @@ MANIFEST = {
 def test_methods_numbers_come_from_the_code_and_the_manifest():
     from what_to_id import atlas_update, confusion, host_pairs, levels, pool_levels, terms_methods
 
-    html = terms_page.render(manifest=MANIFEST, data_url="https://x.test/atlas")
+    dates = {"photos": "2026-10-01", "scored": "2026-10-15", "updated": None}
+    html = terms_page.render(dates, manifest=MANIFEST, data_url="https://x.test/atlas")
     methods = html.split('id="methods"')[1]
     assert "__" not in methods and terms_methods.MISSING not in methods
     for text in (
@@ -275,3 +276,27 @@ def test_no_claim_the_code_does_not_back_remains_in_the_built_pages():
             assert gone not in flat, gone
     methods = " ".join(terms_page.render().split())
     assert "were chosen using this cohort, so these figures are in-sample." in methods
+
+
+def test_methods_state_ranges_status_lists_and_limits_from_their_sources():
+    from what_to_id import identify
+
+    dates = {"photos": "2026-10-01", "scored": "2026-10-15", "updated": "2026-11-10"}
+    methods = " ".join(terms_page.render(dates).split())
+    assert {"methods-ranges", "methods-status"} <= _ids(terms_page.render())
+    ranges_js = (page_identify.ASSETS / "identify_ranges.js").read_text()
+    assert "var OUT_KM=50," in ranges_js
+    assert "is 50 km or more from the nearest centre" in methods
+    assert "have not yet been validated" in methods and "may lag its spread" in methods
+    assert "97.7% level agreement" in identify.__doc__ and "for 97.7% of such records" in methods
+    assert "The last full run was on 2026-10-15." in methods
+    for name in ("at_risk_bc_taxa", "invasive_bc_taxa"):
+        doc = json.loads((SRC / f"{name}.json").read_text())
+        assert f"{len(doc['taxa']):,} taxa, fetched {doc['fetched']}" in methods
+    assert "weights set by hand. They were not fitted" in methods
+    for words in ("fungi and fish", "43% and 53%", "84% for amphibians", "BC only", "19-day"):
+        assert words in methods
+    assert "a rank, not a measured accuracy" in GLOSSARY["best-match"][0]
+    assert "Narrow it down is not yet evaluated" in GLOSSARY["best-match"][0]
+    assert GLOSSARY["level-odd-shots"][0].startswith("Photos that match no species well (often")
+    assert "These match their label best among their species." in page_identify.render()
