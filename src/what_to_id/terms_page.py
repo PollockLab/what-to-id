@@ -72,7 +72,7 @@ GROUPS = {
         *("photo-space", "taxonomy", "confused-pairs", "closest-matches", "match-n", "cosine"),
         *("clade", "globi", "backlog-per-identifier", "share-needing-id", "identified-to-rank"),
     ],
-    "Prioritize": ["best-match", "survey-days"],
+    "Prioritize": ["level-order", "best-match", "survey-days"],
 }
 CSS = (
     """

@@ -200,6 +200,10 @@ GLOSSARY: dict[str, tuple[str, str | None]] = {
         f" {SURVEY_DAYS_TARGET} make a complete checklist.",
         None,
     ),
+    "level-order": (
+        "How strongly the record fits its level's rule (on Narrow it down: the best matches).",
+        None,
+    ),
     "best-match": (
         "How closely the photo points to one species, ranked among all records of this level."
         " Best 5% keeps the top 5%. Show all lifts the cut, and the Best slider under Prioritize"
