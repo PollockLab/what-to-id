@@ -17,7 +17,7 @@ fetch('explore.html',{method:'HEAD'}).then(function(r){if(r.ok)location.replace(
 {{NAV}}<header>
 <div class="head">
 <h1>{{TITLE}}</h1>
-<p class="sub">Where the records are. Draw an area or pick a park to filter every view. Each dot is one record that needed an ID and had a photo{{WHEN}}. Hover a dot for its name, click it for the photo.</p>
+<p class="sub">Where the records are. Draw an area or pick a park to filter every view. Each dot is one record that needed an ID and had a photo{{WHEN}}. <span class="onhover">Hover a dot for its name, click it for the photo.</span><span class="ontouch">Tap a dot for its photo.</span></p>
 </div>
 <p class="stat" aria-live="polite"><b id="count">Loading</b> <span id="scope" class="seg" role="group" aria-label="Count"><button type="button" aria-pressed="true" data-explain="in-view">In view</button><button type="button" aria-pressed="false" data-explain="all-of-bc">All of BC</button></span> <span id="more"></span><span id="share" class="share"></span> <span id="leftbox" hidden></span></p>
 <p id="mine" class="mine" role="status" hidden><span data-explain="your-groups">Your groups</span> <button type="button" class="link">Show all</button></p>
@@ -49,7 +49,7 @@ fetch('explore.html',{method:'HEAD'}).then(function(r){if(r.ok)location.replace(
 <details class="sec" id="projbox" hidden></details>
 <details class="sec" id="usrbox" hidden></details>
 </section>
-<main id="map" role="application" aria-label="Map of records"></main>
+<main id="main-content"><div id="map" role="application" aria-label="Map of records"></div></main>
 <section id="time" class="time" aria-label="Dates">
 <div class="row">
 <span class="seg" role="group" aria-label="Date to filter on">

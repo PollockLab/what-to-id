@@ -31,6 +31,7 @@ button[aria-pressed="true"],.btn.primary{background:var(--on);color:var(--onink)
 #crumbs{flex:1 1 100%;font-size:12px;color:var(--muted);overflow-wrap:anywhere}
 #about{flex:1 1 100%;margin:0;padding:8px 10px;border-radius:12px;background:var(--warnbg);color:var(--warn);font-size:12px}
 #about[hidden],.card[hidden]{display:none}
+#main-content{display:contents}  /* the landmark stays when the phone hides the circle; the grid sees its children */
 #side{grid-area:side;overflow:auto;border-right:1px solid var(--line);padding:0 0 6px;container-type:inline-size}
 #outline,#outline ul{list-style:none;margin:0;padding:0}
 #outline ul{margin-left:12px;border-left:1px solid var(--line)}
@@ -83,6 +84,8 @@ button[aria-pressed="true"],.btn.primary{background:var(--on);color:var(--onink)
 .body dl{display:grid;grid-template-columns:1fr auto;gap:2px 10px;margin:0;font-size:12px}
 .body dt{color:var(--muted)}
 .body dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
+/* rows of 24px, so the toggletip terms in them have their own target and do not overlap the next row's */
+.body dt,.body dd{min-height:24px;display:flex;align-items:center}.body dd{justify-content:flex-end}.body dt [data-explain]{margin:0;padding:0}
 .actions{display:flex;flex-wrap:wrap;gap:6px}
 .kids{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
 .kids button{width:100%;display:flex;align-items:center;gap:8px;text-align:left;border-radius:6px;padding:3px 6px}
@@ -123,8 +126,10 @@ __SITE_NAV__<header>
 <nav id="crumbs" aria-label="Focus"></nav>
 <p id="about" hidden>Every observation in BC that still needs an ID, counted at the taxon iNaturalist shows for it (the community ID when there is one, else the observer's ID) and rolled up iNaturalist's taxonomy. The rings are taxonomic ranks, not time: this is not a dated phylogeny. A filled dot means every record stops at that taxon; a part-filled one, the share that does. Branches share the circle by the square root of their records, so small clades stay in sight: an angle is not a share. The outline's percentages, and the bars under them, are each taxon's plain share of all records that need an ID. Bars outside the tips show the records below each tip, on a log scale. Click to select a taxon (the tree stays put and its branch stands out), double-click or the card's Open to open or close it, shift+click or Open more below to open further down, Focus here to make it the centre, Esc to clear.</p>
 </header>
+<main id="main-content" tabindex="-1">
 <section id="side" aria-label="Outline"><ul id="outline" role="tree" aria-label="Taxonomy"></ul></section>
-<main id="radial" tabindex="-1"><svg id="svg" role="img" aria-label="Radial tree of the taxa that need an ID; the outline holds the same tree"></svg></main>
+<div id="radial"><svg id="svg" role="img" aria-label="Radial tree of the taxa that need an ID; the outline holds the same tree"></svg></div>
+</main>
 <aside id="card" class="card" hidden aria-label="Selected taxon"></aside>
 <script>var CFG=__TREE_CONFIG__;</script>
 <script>__MAP_FILTER__</script>

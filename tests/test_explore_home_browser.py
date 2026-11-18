@@ -222,3 +222,16 @@ def test_with_storage_blocked_the_map_and_explore_still_work(browser, site):
     map_frame(page)
     assert page.errors == []
     page.close()
+
+
+def test_a_french_viewer_is_told_only_the_identify_pane_follows(browser, site):
+    page = open_page(browser, f"{site[0]}/explore.html")
+    assert page.evaluate("document.documentElement.lang") == "en"
+    assert page.locator("#frnote").is_hidden()
+    page.close()
+    ctx = browser.new_context(locale="fr-CA")
+    page = ctx.new_page()
+    page.goto(f"{site[0]}/explore.html")
+    assert page.locator("#frnote").is_visible()
+    assert page.evaluate("document.documentElement.lang") == "en"  # the page itself is English
+    ctx.close()

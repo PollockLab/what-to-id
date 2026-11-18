@@ -13,6 +13,10 @@ from .embeddings_fixture import pool_frame
 
 browser = eb.browser
 HELP = "#helpb"  # its aria-label is "About, notes and keys"
+PAGE_TIP = (
+    "Observer-days in the 25 km cell, one person recording on one day, where about 30 make a"
+    " complete checklist."
+)
 FR = {1000 + k: f"Commun {k}" for k in range(7)}
 
 
@@ -82,6 +86,17 @@ def test_french_changes_the_text_and_lang_and_survives_a_reload(browser, site):
         page.get_attribute(HELP, "aria-label") == en
         and page.evaluate("document.documentElement.lang") == "en"
     )
+
+
+def test_french_counts_translate_the_tab_names_and_leave_bare_numbers_alone(browser, site):
+    page = ib.open_identify(browser, site)
+    set_to(page, "lang", "fr")
+    tr = "s => I18N.tr(s)"
+    assert page.evaluate(tr, "Likely mislabelled (12)") == "Probablement mal étiquetées (12)"
+    assert page.evaluate(tr, "All needing ID 7") == "Toutes à identifier 7"
+    assert page.evaluate(tr, "(12)") == "(12)" and page.evaluate(tr, "12") == "12"
+    assert page.evaluate(tr, "Kind of possible error") == "Genre d'erreur possible"
+    assert page.evaluate(tr, PAGE_TIP).startswith("Jours-observateur dans la cellule")
 
 
 def test_a_french_browser_opens_in_french_and_a_missing_name_falls_back(browser, site):

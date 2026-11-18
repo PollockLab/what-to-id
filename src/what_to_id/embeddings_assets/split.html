@@ -7,6 +7,7 @@
 <style>
 __SITE_CSS__
 *{box-sizing:border-box}
+.frnote{margin:0;padding:2px 12px;font-size:12px;color:var(--muted)}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
 body{display:flex;flex-direction:column}
 /* the bar takes the row's spare width, or its own row when under 700 px is spare: nothing clips or overlaps */
@@ -78,6 +79,7 @@ body{display:flex;flex-direction:column}
 </head>
 <body>
 __SITE_NAV__
+<p id="frnote" class="frnote" lang="en" hidden>Français is on, but only the Identify pane is translated. The rest of Explore stays in English.</p>
 <main id="main-content" tabindex="-1"><h1 class="site-vh">Explore</h1></main>
 <div class="sbar" id="sbar" role="region" aria-label="Your selection"><span class="sbn" id="sbn" aria-live="polite"></span><ul class="sbc" id="sbc" aria-label="Active filters"></ul><button type="button" id="sbx" aria-label="Clear filters: What, When, Where, Who, At risk, Invasive and Best x%" hidden>Clear filters</button><button type="button" id="sbl" aria-expanded="false" aria-controls="map">Legend</button><button type="button" id="sbf" aria-expanded="false" aria-controls="map">Filters</button></div>
 <script>
@@ -98,6 +100,9 @@ var box=document.getElementById("main-content"),frames={},last=MapFilter.tokens(
 try{var mine=localStorage.getItem('wtid-my-groups');if(mine&&!/(^|&)groups=/.test(last))last=(last?last+'&':'')+'groups='+mine;}catch(e){}
 if(!FILES.tree)delete FILES.tree;  // a site built without the taxon tree
 if(!FILES.identify)delete FILES.identify;  // or without the Identify page
+// Identify keeps the language (wtid-lang, else the browser's, as identify_i18n.js reads it) and the other panes do not follow it
+try{var lg=localStorage.getItem('wtid-lang');if(lg!=='en'&&lg!=='fr')lg=/^fr/i.test(navigator.language||'')?'fr':'en';
+  if(lg==='fr'&&FILES.identify)document.getElementById('frnote').hidden=false;}catch(e){}
 // The pane order is the viewer's (the pane switch's buttons, kept in 'wtid-order'); ORDER is the first one.
 var ALL=ORDER.filter(function(n){return FILES[n];}),order=ALL.slice();
 try{var so=(localStorage.getItem('wtid-order')||'').split('-');
@@ -356,7 +361,7 @@ async function hitsFor(st){
         'Downloading search model, about '+AtlasEncoder.megabytes(spec)+' MB, once. It is stored in this browser afterwards. '+
         'Searching by observation link needs no download.'))return null;
       sm.textContent='Downloading search model…';
-      enc=await AtlasEncoder.load(mf,DATA,{});
+      enc=await AtlasEncoder.load(mf,DATA,{onProgress:function(f){sm.textContent='Downloading search model… '+Math.round(100*f)+'%';}});  // f is 0..1 once a byte count is known
     }
     q=await enc.encode(/^(an? )?(photo|picture|image)\b/i.test(st.text)?st.text:'a photo of '+st.text);
   }
@@ -369,7 +374,7 @@ async function photos(){
   try{
     var hits=await hitsFor(st);
     if(r!==run)return;
-    if(!hits){sm.textContent='';return;}
+    if(!hits){sm.textContent='Search model not downloaded';return;}  // hitsFor gives null only when the viewer declined
     sm.textContent=hits.length?'':'No matching photos.';
     if(hits.length)setSub(hits.map(function(h){return h.id;}),st.kind==='id'?'like '+st.id:st.text);
   }catch(err){if(r===run)sm.textContent='Search failed: '+err.message;}

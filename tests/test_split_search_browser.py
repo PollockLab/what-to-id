@@ -135,3 +135,24 @@ def test_a_map_that_does_not_answer_leaves_only_the_photo_option(explore):
     page.fill("#sq", "")
     assert not page.is_visible("#sg")
     assert page.errors == []
+
+
+def test_declining_the_model_download_says_so(explore):
+    page = explore([{**PLANTS, "exact": False}])
+    page.evaluate("delete window.AtlasEncoderOverride")
+
+    def with_model(route):  # an index that names a text model, which nobody has downloaded
+        body = route.fetch().json()
+        body["text_encoder"] = {"onnx": "m.onnx", "vocab": "v.txt", "bytes": 4_000_000}
+        route.fulfill(json=body)
+
+    page.route("**/manifest.json", with_model)
+    asked = []
+    page.on("dialog", lambda d: (asked.append(d.message), d.dismiss()))
+    page.fill("#sq", "a hummingbird at a flower")
+    page.wait_for_selector("#sg li")
+    page.press("#sq", "Enter")
+    page.wait_for_function("document.getElementById('sm').textContent.includes('not downloaded')")
+    assert asked and "4 MB" in asked[0]
+    assert page.inner_text("#sm") == "Search model not downloaded"
+    assert page.errors == []
