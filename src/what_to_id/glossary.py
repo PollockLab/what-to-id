@@ -202,7 +202,8 @@ GLOSSARY: dict[str, tuple[str, str | None]] = {
         None,
     ),
     "level-order": (
-        "How strongly the record fits its level's rule (on Narrow it down: how closely the photo points to one species).",
+        "How strongly the record fits its level's rule"
+        " (on Narrow it down: how closely the photo points to one species).",
         None,
     ),
     "best-match": (
