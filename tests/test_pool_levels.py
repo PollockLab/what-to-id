@@ -256,8 +256,10 @@ def test_the_build_lines_the_ranges_up_with_the_site_and_skips_them_when_absent(
         assert np.isnan(km[i]) if i % 7 == 0 else km[i] == km_text(i * 10)
         assert notes[i] == pool_levels_note(i)
     assert head["notes"] == ["Range: outside both ranges"]
+    m = int((pool_levels.unpack(site_files.path(site, "levels").read_bytes())[0] == 3).sum())
+    assert len(gzip.decompress(site_files.path(site, "fit").read_bytes())) == (m + 7) // 8
     assert pool_levels.main(args) == 0  # a later build without ranges drops the stale file
-    assert site_files.path(site, "range") is None
+    assert site_files.path(site, "range") is None and site_files.path(site, "fit") is None
     assert "range" not in flags(site)
 
 
@@ -267,6 +269,45 @@ def flags(site):
 
 def flags_meta(site):
     return site_files.read_meta((site / site_files.MAP_NAME).read_text())
+
+
+def test_the_fit_file_holds_one_bit_per_level_3_record_for_its_suggestions_range():
+    ranges, grid = range_tables()  # cells 0 (lon -124..-123) and 1 (-123..-122), lat 48..49.5
+    ranges = pd.concat([ranges, pd.DataFrame({"name": ["Bombus a"], "cells": [[1]]})])  # last wins
+    level = np.array([3, 3, 3, 3, 3, 3, 3, 3, 3, 1], np.int8)
+    names = [
+        "Apis c",
+        "Apis c",
+        "Bombus a",
+        "Cus",
+        "Zed",
+        None,
+        "Apis c",
+        "Apis c",
+        "Apis c",
+        "Apis c",
+    ]
+    looks = np.array(names, dtype=object)
+    lon = np.float32([-123.5, -122.5, -122.5, -123.5, -123.5, -123.5, -121, -123.5, -123.0, -123.5])
+    lat = np.float32([49, 49, 49, 49, 49, 49, 49, 47, 48.5, 49])
+    got = pool_levels.pack_fit(level, looks, lon, lat, ranges, grid)
+    bits = np.unpackbits(np.frombuffer(gzip.decompress(got), np.uint8), bitorder="little")
+    # in cell 0 or 1 (Apis c holds both), Bombus a only 1, no cells (Cus), no range (Zed), no
+    # suggestion, off the grid east and south, on the shared edge (the first cell takes it)
+    assert len(gzip.decompress(got)) == 2 and bits.tolist() == [1, 1, 1, 0, 0, 0, 0, 0, 1] + [0] * 7
+    assert (
+        gzip.decompress(pool_levels.pack_fit(level[:0], looks[:0], lon[:0], lat[:0], ranges, grid))
+        == b""
+    )
+
+
+def test_the_grid_cell_is_the_first_whose_ring_holds_the_point():
+    tri = [0, 0, 4000, 0, 0, 4000]
+    sq = [0, 0, 4000, 0, 4000, 4000, 0, 4000]
+    cells = pool_levels.grid_cells(
+        np.array([1000, 3000, -1, 1000.0]), np.array([1000, 3000, 1, 1000.0]), [tri, sq]
+    )
+    assert cells.tolist() == [0, 1, -1, 0]
 
 
 def test_the_manifest_names_the_range_tables_or_the_levels_go_out_alone(tmp_path, monkeypatch):

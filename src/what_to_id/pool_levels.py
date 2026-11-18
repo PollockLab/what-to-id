@@ -28,6 +28,11 @@ apart so the levels load first. A uint32 LE length and that many bytes of JSON
 ``names``, 65535 for none, one entry per record of level 2, 3 or 5 in record order (not n); all
 gzipped.
 
+``pool-levels-fit.bin``: gzip of one bit per level-3 record in record order (bit k in byte k>>3
+at 1<<(k&7), ceil(m / 8) bytes, m the count of level 3), 1 when the suggested species' range holds
+the record's cell: what `fits()` in identify_ranges.js answers once the looks file has loaded, so
+level 3's default range filter counts without it. Written with the range file, from its tables.
+
 ``pool-levels-why.bin``: for narrow records, the runner-up species (identify.parquet's
 ``runner_up``, the second best in the clade) and ``score2``, the margin over it. A uint32 LE length
 and that many bytes of JSON ``{"names": [...], "runners": [[index into names, ...] per name of the
@@ -95,6 +100,7 @@ STEPS = 16
 NO_LOOK = 0xFFFF
 RANGE_NAME = "pool-levels-range.bin"
 RANK_NAME = "pool-levels-rank.bin"
+FIT_NAME = "pool-levels-fit.bin"
 PCT_NAME = "pool-levels-pct.bin"
 TAXA_FR_NAME = "pool-taxa-fr.bin"
 NO_BYTE = 0xFF
@@ -266,6 +272,84 @@ def okm_km(code: np.ndarray) -> np.ndarray:
     return np.where(c == NO_BYTE, np.nan, km)
 
 
+def rings(grid: pd.DataFrame) -> list[list[int]]:
+    """Per grid cell its ring as lon, lat, ... in integer thousandths of a degree."""
+    return [
+        np.rint(np.column_stack([lo, la]).astype(np.float64) * 1000).astype(int).ravel().tolist()
+        for la, lo in zip(grid["lat"], grid["lon"], strict=True)
+    ]
+
+
+def grid_cells(x: np.ndarray, y: np.ndarray, grid: list[list[int]]) -> np.ndarray:
+    """The cell of each point (thousandths of a degree), -1 for none, as `cellOf` in
+    identify_ranges.js finds it: the first cell, in grid order, whose 0.1 degree bins take in the
+    point's and whose ring holds it by the page's even-odd test, in the same float64 operations."""
+    out = np.full(len(x), -1, np.int64)
+    bx, by = np.floor(x / 100), np.floor(y / 100)
+    for c, g in enumerate(grid):
+        ring = np.asarray(g, np.float64).reshape(-1, 2)
+        gx, gy = ring[:, 0], ring[:, 1]
+        near = (
+            (out < 0)
+            & (bx >= np.floor(gx.min() / 100))
+            & (bx <= np.floor(gx.max() / 100))
+            & (by >= np.floor(gy.min() / 100))
+            & (by <= np.floor(gy.max() / 100))
+        )
+        at = np.flatnonzero(near)
+        px, py = x[at], y[at]
+        odd = np.zeros(len(at), bool)
+        for k in range(len(ring)):
+            xk, yk = ring[k]
+            xj, yj = ring[k - 1]
+            cross = (yk > py) != (yj > py)
+            odd[cross] ^= px[cross] < (xj - xk) * (py[cross] - yk) / (yj - yk) + xk
+        out[at[odd]] = c
+    return out
+
+
+def pack_fit(
+    level: np.ndarray,
+    looks: np.ndarray,
+    lon: np.ndarray,
+    lat: np.ndarray,
+    ranges: pd.DataFrame,
+    grid: pd.DataFrame,
+) -> bytes:
+    """The gzipped fit file: per level-3 record whether its suggestion's range holds its cell.
+    `lon`, `lat`: the records as the page holds them (float32, `site_lonlat`)."""
+    rows = np.flatnonzero(level == NARROW)
+    cell = grid_cells(
+        lon[rows].astype(np.float64) * 1000, lat[rows].astype(np.float64) * 1000, rings(grid)
+    )
+    held = {}  # the page's name index keeps the last of a repeated name
+    for name, cells in zip(ranges["name"], ranges["cells"], strict=True):
+        b = np.zeros(len(grid), bool)
+        b[np.asarray(cells, np.int64)] = True
+        held[str(name)] = b
+    fit = np.zeros(len(rows), bool)
+    look = np.asarray(looks, dtype=object)[rows]
+    for name in {str(v) for v in look[pd.notna(look)]} & held.keys():
+        hit = (look == name) & (cell >= 0)
+        fit[hit] = held[name][cell[hit]]
+    return gzip.compress(np.packbits(fit, bitorder="little").tobytes(), mtime=0)
+
+
+def site_lonlat(site: Path) -> tuple[np.ndarray, np.ndarray]:
+    """(lon, lat) float32 per record in shard order, as Identify's `pool()` places them."""
+    meta = map_meta(site, keys=("shards", "bbox"))
+    x0, y0, x1, y1 = meta["bbox"]
+    q = 65535  # embeddings_layout.js Q
+    tx, ty = ((x1 - x0) or 1) / q, ((y1 - y0) or 1) / q
+    cols = [
+        _decode_shard(gzip.decompress((site / s["file"].split("?")[0]).read_bytes()), s["n"])
+        for s in meta["shards"]
+    ]
+    lon = x0 + np.concatenate([c["lon"] for c in cols]).astype(np.float64) * tx
+    lat = y0 + np.concatenate([c["lat"] for c in cols]).astype(np.float64) * ty
+    return lon.astype(np.float32), lat.astype(np.float32)
+
+
 def pack_range(km: np.ndarray, note: np.ndarray, ranges: pd.DataFrame, grid: pd.DataFrame) -> bytes:
     """The gzipped range file: km (NaN unknown) and note (str or None) per record, the range
     tables (`level_ranges`: ranges name, cells; grid lat, lon boundary arrays)."""
@@ -285,13 +369,7 @@ def pack_range(km: np.ndarray, note: np.ndarray, ranges: pd.DataFrame, grid: pd.
         bits = np.packbits(b, bitorder="little").tobytes() if len(cells) else b""
         rng.append(base64.b64encode(bits).decode())
     head = {
-        "grid": [
-            np.rint(np.column_stack([lo, la]).astype(np.float64) * 1000)
-            .astype(int)
-            .ravel()
-            .tolist()
-            for la, lo in zip(grid["lat"], grid["lon"], strict=True)
-        ],
+        "grid": rings(grid),
         "names": [str(n) for n in ranges["name"]],
         "rng": rng,
         "notes": notes.tolist(),
@@ -383,6 +461,7 @@ def build(
         why_blob = pack_why(level, looks, runner, margin)
     site_files.publish(site, "why", WHY_NAME, why_blob)
     site_files.publish(site, "range", RANGE_NAME, None)  # a stale one would no longer line up
+    site_files.publish(site, "fit", FIT_NAME, None)
     far = None
     (site / DATES_NAME).unlink(missing_ok=True)
     if parquet_from_manifest:
@@ -391,12 +470,15 @@ def build(
         if tables is not None:
             km, note = range_planes(ids, hit, tables[0])
             site_files.publish(site, "range", RANGE_NAME, pack_range(km, note, *tables[1:]))
+            lon, lat = site_lonlat(site)
+            site_files.publish(site, "fit", FIT_NAME, pack_fit(level, looks, lon, lat, *tables[1:]))
             code = okm_code(km)
             far = (code >= FAR_CODE) & (code != NO_BYTE)
     except (KeyError, ValueError) as exc:
         why = f"the range tables do not fit: {exc}"
         far = None
         site_files.publish(site, "range", RANGE_NAME, None)
+        site_files.publish(site, "fit", FIT_NAME, None)
     # level 3 in strict score order, as identify_app.js orders it with the rank file
     key = np.where(level == NARROW, -ranks(level, score), quantize(level, score))
     first = pack_first(site, ids, tax, rows, level, key, looks, far, names)
@@ -506,7 +588,7 @@ def main(argv: list[str] | None = None) -> int:
     except (ValueError, FileNotFoundError, OSError) as exc:
         print(f"pool_levels: {exc}", file=sys.stderr)
         return 1
-    keys = ("levels", "rank", "pct", "looks", "why", "range", "first")
+    keys = ("levels", "rank", "pct", "looks", "why", "range", "fit", "first")
     paths = [site_files.path(a.out, k) for k in keys]
     sizes = ", ".join(f"{p.name} {p.stat().st_size / 1e6:.2f} MB" for p in paths if p)
     print(f"pool_levels: records per level {counts}; {sizes} gzipped")
