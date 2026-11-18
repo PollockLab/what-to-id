@@ -77,12 +77,27 @@ def test_level_3_names_the_rank_the_look_alike_the_range_verdict_and_the_weights
     b = guarded(browser)
     page = wb.open_row(b, base, "#lvl=3&conf=all&run=1&pri=conf:40,risk:60")
     page.ctx = b.ctx
-    card = level_3(page, "Apis c")
+    level_3(page, "Apis c")
+    # look-alikes and ranges land after the first cards: wait for the card redrawn with its verdict
+    page.wait_for_function(
+        "[...document.querySelectorAll('#grid .card .range')]"
+        ".some(e => /^Range: /.test(e.textContent))"
+    )
+    card = (
+        page.locator("#grid .card", has=page.locator(".look i", has_text="Apis c"))
+        .filter(has=page.locator(".range", has_text="Range: "))
+        .first
+    )
     verdict = card.locator(".range").inner_text()  # the card's own words for the range
     d = why(page, card)
-    page.wait_for_function("document.querySelector('#cpexp ul').innerText.includes('Ranks in')")
+    page.wait_for_function(
+        "(() => { const t = document.querySelector('#cpexp ul').innerText;"
+        " return ['Ranks in', 'Looks most like', 'Range: '].every(s => t.includes(s)); })()"
+    )
     text = d.inner_text()
-    assert RULE_3 in text and "Looks most like Apis c" in text and verdict in text
+    assert RULE_3 in text, text
+    assert "Looks most like Apis c" in text, text
+    assert verdict in text, (verdict, text)
     assert re.search(
         r"Ranks in the best \d+% of this level .* A rank, not a measured accuracy\.", text
     )

@@ -541,7 +541,7 @@ async function load(){
     var rec=/(?:^|&)record=(\d+)(?:&|$)/.exec(location.hash.slice(1));
     for(var i=0;rec&&i<P.n;i++)if(P.id[i]===+rec[1]){REC=i;break;}
     if(REC>=0&&LEVEL[REC])LV=LEVEL[REC];
-    R.level(LV,true);redraw(true);if(S.only.range)refresh();
+    R.level(LV,true);redraw(true);CMP.again();if(S.only.range)refresh();
     // once the checklist has settled: its redraw closes the popover
     GP.ready.then(function(){var li=REC>=0&&document.querySelector('.card[data-id="'+P.id[REC]+'"]'),c=li&&li.querySelector('.rchip');
       if(c){if(CMP)CMP.open(li);c.click();}});});
