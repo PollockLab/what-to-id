@@ -4,6 +4,7 @@ under the bar. iNaturalist is stubbed."""
 
 from . import test_embeddings_browser as eb
 from . import test_identify_browser as ib
+from . import test_identify_www_browser as wb
 
 browser = eb.browser
 site = ib.site
@@ -49,4 +50,30 @@ def test_photos_say_unavailable_when_inat_fails_and_retry_recovers(browser, site
     page.wait_for_selector("#grid .card .ph img")
     assert page.locator("#grid .card").first.locator(".ph img").count() == 1
     assert page.locator("#grid .card .ph.bad").count() > 0  # only the retried card asked again
+    assert page.errors == []
+
+
+def test_a_failed_invasive_lookup_stays_unknown_and_asks_again(browser, site):
+    base, _ = site
+    page = wb.open_row(browser, base, "#lvl=3&conf=all", meta=lambda m: {**m, "invasive": None})
+    page.wait_for_function(wb.KINDS + "===2")
+    asked = []
+
+    def taxa(
+        route,
+    ):  # 403 fails at once; a 429 would first wait out the gate's own 5 s and 15 s retries
+        asked.append(route.request.url)
+        if len(asked) == 1:
+            route.fulfill(status=403, headers=CORS)
+        else:
+            route.fallback()
+
+    page.route("**/v1/taxa/**", taxa)
+    page.get_by_role("checkbox", name="Invasive").check()
+    page.wait_for_function(
+        "/^Checking \\d+ species…$/.test(document.getElementById('count').textContent)"
+    )
+    page.wait_for_function("!document.getElementById('count').textContent.startsWith('Checking')")
+    page.wait_for_function(wb.KINDS + "===1")  # the retry landed: Bombus b is the invasive one
+    assert wb.looks(page) == {"Bombus b"} and len(asked) >= 2
     assert page.errors == []

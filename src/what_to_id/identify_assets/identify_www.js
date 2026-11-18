@@ -2,7 +2,8 @@
 // cards by their suggested species (else the record's own taxon): At risk from the map's META.value list (at_risk_bc_taxa.json, listed in Canada
 // or BC S1-S3), Invasive from META.invasive (invasive_bc_taxa.json, introduced in BC per iNaturalist), both at once. Only a map
 // without META.invasive asks /v1/taxa/<ids>?preferred_place_id=7085 (30 ids a request, cached by taxon id for a week) and hides a
-// suggestion not yet looked up until its answer lands.
+// suggestion not yet looked up until its answer lands. A lookup that fails (429) stays unknown and is asked again after a growing wait;
+// while any is pending body[data-checking] holds how many (the result line says "Checking N species…").
 // IdentifyWWW(ctx), ctx {look(i), taxa(), value (META.value), invasive (META.invasive, optional), redraw()}.
 var IdentifyWWW=(function(){
 'use strict';
@@ -12,25 +13,29 @@ function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=c
 function invasive(t){var m=t.establishment_means||{};
   return /introduced|invasive/.test(m.establishment_means||'')&&(!m.place||m.place.id===7085)?INV:0;}
 return function(ctx){
-  var api=inatGate({gap:1000}),ids=new Map(),cache={},want=new Set(),busy=new Set(),T=0,out=0,need=0,risk=new Set((ctx.value||[]).map(function(r){return r[0];})),bc=ctx.invasive?new Set(ctx.invasive):null;
+  var api=inatGate({gap:1000}),ids=new Map(),cache={},want=new Set(),busy=new Set(),T=0,out=0,nn=0,fails=0,RT=0,need=0,risk=new Set((ctx.value||[]).map(function(r){return r[0];})),bc=ctx.invasive?new Set(ctx.invasive):null;
   try{var c=JSON.parse(localStorage.getItem(LS))||{};if(Date.now()-c.at<WEEK)cache=c.f||{};}catch(e){}
   function on(k){return new RegExp('(^|&)'+k+'=1(&|$)').test(location.hash.slice(1));}
   function keep(k,v){var t=location.hash.slice(1).split('&').filter(function(x){return x&&x.indexOf(k+'=')!==0;});if(v)t.push(k+'=1');
     history.replaceState(null,'','#'+t.join('&'));}
   function save(){try{localStorage.setItem(LS,JSON.stringify({at:Date.now(),f:cache}));}catch(e){}}
+  function show(){var n=need?(need&INV?want.size+busy.size:0)+nn:0;if(n)document.body.dataset.checking=n;else delete document.body.dataset.checking;}
   function ask(){
     var todo=[...want].filter(function(id){return !busy.has(id)&&!(id in cache);});want.clear();
-    for(var k=0;k<todo.length;k+=30)(function(b){b.forEach(function(id){busy.add(id);});out++;
+    for(var k=0;k<todo.length;k+=30)(function(b){var bad=0;b.forEach(function(id){busy.add(id);});out++;show();
       api('taxa/'+b.join(',')+'?preferred_place_id=7085').then(function(j){
-        b.forEach(function(id){cache[id]=0;});(j.results||[]).forEach(function(t){cache[t.id]=invasive(t);});save();
-      }).catch(function(){b.forEach(function(id){cache[id]=0;});}).then(function(){
-        b.forEach(function(id){busy.delete(id);});out--;settled();});})(todo.slice(k,k+30));
+        b.forEach(function(id){cache[id]=0;});(j.results||[]).forEach(function(t){cache[t.id]=invasive(t);});save();fails=0;
+      }).catch(function(){bad=1;}).then(function(){
+        b.forEach(function(id){busy.delete(id);if(bad)want.add(id);});out--;
+        if(bad){clearTimeout(RT);RT=setTimeout(ask,Math.min(2e3*Math.pow(2,fails++),6e4));}  // asked again, 2 s, 4 s, 8 s… up to a minute
+        show();settled();});})(todo.slice(k,k+30));
+    show();
   }
   // a suggestion the taxa table lacks: its id by an exact name search, 0 for none
   // one redraw once every lookup in flight has answered: a redraw per answer (one a second) made the grid flicker
   function settled(){clearTimeout(T);if(!out)T=setTimeout(ctx.redraw,300);}
-  function named(nm){ids.set(nm,0);out++;api('taxa?rank=species&per_page=1&q='+encodeURIComponent(nm)).then(function(j){
-    var x=(j.results||[])[0];if(x&&x.name===nm)ids.set(nm,x.id);}).catch(function(){}).then(function(){out--;settled();});}
+  function named(nm){ids.set(nm,0);out++;nn++;show();api('taxa?rank=species&per_page=1&q='+encodeURIComponent(nm)).then(function(j){
+    var x=(j.results||[])[0];if(x&&x.name===nm)ids.set(nm,x.id);}).catch(function(){}).then(function(){out--;nn--;show();settled();});}
   // records pass unless a toggle is on and their suggestion fails it
   function pass(i){
     if(!need)return true;
@@ -40,7 +45,7 @@ return function(ctx){
     if(need&RISK&&risk.has(id))return true;
     if(!(need&INV))return false;
     if(bc)return bc.has(id);
-    if(!(id in cache)){if(!want.size)setTimeout(ask,0);want.add(id);return false;}
+    if(!(id in cache)){if(!want.size)setTimeout(ask,0);want.add(id);show();return false;}
     return (cache[id]&INV)!==0;
   }
   // 1 at risk | 2 invasive for the record's suggestion, whatever the filters say; inv asks iNaturalist for the ones not yet read
@@ -50,13 +55,13 @@ return function(ctx){
     if(!id||!inv)return f;
     if(bc)return bc.has(id)?f|INV:f;
     if(id in cache)return f|cache[id]&INV;
-    if(!want.size)setTimeout(ask,0);want.add(id);return f;
+    if(!want.size)setTimeout(ask,0);want.add(id);show();return f;
   }
   function toggle(k,label){
     var l=el('label','tog'),b=el('input');b.type='checkbox';if(k==='run')b.setAttribute('role','switch');b.checked=on(k);
     b.onchange=function(){keep(k,b.checked);sync();ctx.redraw();};l.append(b,' '+label);return l;
   }
-  function sync(){need=(on('risk')?RISK:0)|(on('inv')?INV:0);if(risk_){risk_.firstChild.checked=!!(need&RISK);inv_.firstChild.checked=!!(need&INV);}}
+  function sync(){need=(on('risk')?RISK:0)|(on('inv')?INV:0);if(risk_){risk_.firstChild.checked=!!(need&RISK);inv_.firstChild.checked=!!(need&INV);}show();}
   // At risk and Invasive are one-tap chips under the search bar; the grouping toggle sits with Sort
   var risk_=toggle('risk','At risk'),inv_=toggle('inv','Invasive');risk_.className=inv_.className='tog qchip';
   $('qchips').append(risk_,inv_);$('frun').append(toggle('run','Group by suggested species'));$('frun').firstChild.className='swt';

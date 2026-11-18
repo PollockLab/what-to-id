@@ -201,7 +201,8 @@ R('Move (.+), position # of #',function(m,n,a,b){return 'Déplacer '+G(n)+', pos
 R('One bar per (day|week|month|year), ([^.]+?) to ([^.]+?)\\.( Faint all-record bars show only with bars per month or year\\.)?( Drag to pick a period\\.)?',function(m,u,a,b,f,d){
   return 'Une barre par '+{day:'jour',week:'semaine',month:'mois',year:'année'}[u]+', du '+D(a)+' au '+D(b)+'.'+(f?" Les barres pâles de toutes les observations n'apparaissent qu'avec des barres par mois ou par année.":'')+(d?' Faites glisser pour choisir une période.':'');}),
 R('Week of (.+)',function(m,d){return 'Semaine du '+D(d);}),
-R('Could not load the photos: (.+)','Impossible de charger les photos : $1')
+R('Could not load the photos: (.+)','Impossible de charger les photos : $1'),
+R('Checking # species…',function(m,n){return 'Vérification de '+n+' '+pl(n,'espèce','espèces')+'…';})
 ];
 return {words:words,rules:rules};
 })();
