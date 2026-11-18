@@ -125,6 +125,9 @@ def open_slow(browser, base, photos_url, hash_, size):
         ),
     )
     page.add_init_script(
+        "window.IntersectionObserver = undefined"
+    )  # only the first page, not scroll's
+    page.add_init_script(
         """window.__cls=0;new PerformanceObserver(l=>{for(const e of l.getEntries())
         if(!e.hadRecentInput&&(e.sources||[]).some(s=>s.node&&s.node.closest&&s.node.closest('#grid')))window.__cls+=e.value;
         }).observe({type:'layout-shift',buffered:true});"""
