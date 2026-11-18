@@ -51,7 +51,8 @@ LEVELS = (
     (
         "taxonomist",
         "Close calls",
-        "Another species looks almost as likely, or it may be something else. Take a careful look.",
+        "Another species matches the photo slightly better than the label does (by the model's"
+        " match score). Take a careful look.",
     ),
     ("weird", "Odd shots", "Hard photos: hands, eggs, close-ups. Feeling lucky?"),
 )

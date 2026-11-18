@@ -128,7 +128,8 @@ GLOSSARY: dict[str, tuple[str, str | None]] = {
         "Use it when you want to confirm many in one go.",
     ),
     "level-close-calls": (
-        "Another species looks almost as likely as the label, or it may be something else.",
+        "Another species matches the photo slightly better than the label does (by the model's"
+        " match score).",
         "Use it when you have time for a careful look.",
     ),
     "level-narrow-it-down": (
