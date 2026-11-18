@@ -18,8 +18,10 @@ function count(){
   // the heading relates its cards to the tab's records: "22,902 cards · 3 per species of 324,594 records", and level 3's to its records before the Best x%
   var tb=document.querySelector('[role=tab][aria-selected=true] b'),pr=/up to (\d+) per/.exec(cap),ct=/, (the most confident \d+% of [\d,.\s ]*\d)/.exec(cap),
     rel=tb&&tb.textContent?(pr?' · '+pr[1]+' per species':'')+' of '+(tb.title||tb.textContent)+' records'+(ct?', '+ct[1]:''):'';
+  var bad=/^Could not/.test(st);
   $('count').textContent=n?n+' cards':/^(Loading|Could not)/.test(st)?st:'';$('count').title=cap;  // raw English, translated when it lands
   if(n&&rel){var r=document.createElement('span');r.className='rel';r.textContent=rel;$('count').appendChild(r);}  // a phone keeps the short heading
+  if(bad&&n){var e=document.createElement('span');e.className='bad';e.textContent=st;$('count').appendChild(e);}  // a load error stays beside the count
   $('pshow').textContent=n?'Show '+n+' cards':'Close';
   [].forEach.call(document.querySelectorAll('.sdone .n'),function(s){s.textContent=n||'0';});
 }
