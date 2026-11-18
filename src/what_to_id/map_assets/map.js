@@ -64,7 +64,7 @@ function rowOf(id){return MapShard.rowOf(P,id);}
 // included taxa are one set, so the kept bit then carries the groups too).
 var SUB=null,SUBL='',SUBV=0;  // the split view's photo search: a Set of ids, its label, a version for PD_KEY
 var ST_KEEP=MF.ST_KEEP,ST_INEXACT=MF.ST_INEXACT,PD=null,PD_KEY=null,PD_GONE=-1,PD_CAT=0,PD_UK=0,
-  OUT=new Uint8Array(0),RC=null,PJW=null,FK=null,FKV=0,FKM=null,PJP='',KV=0,CNP='',CNT=0;
+  OUT=new Uint8Array(0),RC=null,PJW=null,FK=null,FKV=0,FKM=null,PJP='',KV=0,CNP='',CNT=0,LERR='';  // LERR: a failed records load, which render() leaves in the count
 // The photo space's lasso: the ids it keeps, or null; the mask is built once per list and shard count.
 function fmask(n){
   if(!FKM||FKM.v!==FKV||FKM.m.length!==n){var m=new Uint8Array(n);projMask(P.id,[FK],m,0,n);FKM={v:FKV,m:m};}
@@ -167,7 +167,7 @@ function render(){
   var shown=nShown();LC.sync();  // the legend's clades follow the dates too
   var iv=P.n&&!AREA.invalid()?inView():null;
   $('count').textContent=AREA.invalid()?'Area unresolved · '+nf.format(shown)+' records available to browse':
-    P.n?iv!==null&&iv<shown?nf.format(iv)+' in view of '+nf.format(shown)+' records':
+    LERR?LERR:P.n?iv!==null&&iv<shown?nf.format(iv)+' in view of '+nf.format(shown)+' records':
       nf.format(shown)+' of '+nf.format(META.n)+' records':'Loading';
   var all=P.n&&!$('more').textContent?FB.total(S.lo,S.hi):null;
   $('share').textContent=all&&!AREA.invalid()?nf.format(Math.min(shown,all))+' of '+nf.format(all)+
@@ -488,7 +488,7 @@ META.shards.forEach(function(s,k){
     if(k===META.shards.length-1&&META.files.range)get(META.files.range).then(function(b){MC.range(b);SDM.sync();if(S.only.range)refilter();}).catch(function(){});
   });
 });
-chain.catch(function(e){$('count').textContent='Could not load the records ('+e.message+')';});
+chain.catch(function(e){LERR='Could not load the records ('+e.message+')';$('count').textContent=LERR;});
 // the all-record counts are optional and the bulk of the page, so they load beside the shards
 if(META.files.totals)get(META.files.totals).then(function(b){TOT=JSON.parse(new TextDecoder().decode(b));if(P.n)refilter();}).catch(function(){});
 })();

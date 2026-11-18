@@ -365,3 +365,15 @@ def test_on_a_short_phone_help_identify_stays_in_reach_under_the_photo(browser, 
     assert page.evaluate(reach) == [True, True, True]
     assert page.errors == []
     page.close()
+
+
+def test_a_blocked_pool_keeps_its_error_in_the_count(browser, range_site):
+    page = browser.new_page(viewport={"width": 1280, "height": 900})
+    stub(page)
+    page.route("**/pool*.bin", lambda r: r.abort())
+    page.goto(f"{range_site}/map.html?standalone=1")
+    page.wait_for_function("/Could not load the records/.test(document.getElementById('count').textContent)")
+    page.locator("#months button").first.click()  # a filter change renders again, which must not say "Loading"
+    page.wait_for_timeout(500)
+    assert "Could not load the records" in page.locator("#count").inner_text()
+    page.close()
