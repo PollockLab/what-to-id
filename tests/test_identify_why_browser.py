@@ -52,7 +52,9 @@ def why(page, card):
 
 def level_3(page, name="Apis c"):
     page.wait_for_function("document.querySelectorAll('#grid .card .look i').length > 0")
-    page.wait_for_function("__identify.ranges()")
+    page.wait_for_function(
+        "window.__identify && __identify.ranges()"
+    )  # open_row waits for a card only
     card = page.locator("#grid .card", has=page.locator(".look i", has_text=name)).first
     card.wait_for()
     return card
