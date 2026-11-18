@@ -35,10 +35,11 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
         pass
 
 
-def serve(root, frame, score, projects=None, totals=None):
+def serve(root, frame, score, projects=None, totals=None, ranges=None):
     """Writes the map, levels and Identify pages for these pool rows and scores, and serves them;
     `projects` is a pool-projects.bin path for the map's Projects, `totals` the all-record counts
-    as page_map.fetch_totals returns them, written as the map's totals file."""
+    as page_map.fetch_totals returns them, written as the map's totals file; `ranges` makes the
+    `level_ranges` tables dir from (root, pts)."""
     blobs, meta = encode_points(frame, TREE)
     if totals is not None:
         gz = gzip.compress(json.dumps(align_totals(totals, meta)).encode())
@@ -68,7 +69,7 @@ def serve(root, frame, score, projects=None, totals=None):
     )[[*IDENTIFY_COLUMNS, "runner_up"]]
     scored.loc[scored.index[scored["level"] == 4][0], "level"] = 5  # the one likely mislabel
     scored.to_parquet(root / "identify.parquet")
-    pool_levels.build(root, parquet=root / "identify.parquet")
+    pool_levels.build(root, parquet=root / "identify.parquet", ranges=ranges and ranges(root, pts))
     page_identify.build(root)
     server = http.server.ThreadingHTTPServer(
         ("127.0.0.1", 0), functools.partial(Quiet, directory=str(root))
