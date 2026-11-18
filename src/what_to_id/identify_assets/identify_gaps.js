@@ -1,6 +1,6 @@
 // Prioritize: how the cards of every level are ordered and cut. Two filters: Best x% (level 3 by its rank, hash conf=1..100, all or 100 for everything) and the
 // survey days range (observer-days of a cell, hash gap=lo-hi, the old gap=n reads 0-n, absent or 0-30 off). Five prioritizers each carry a weight 0 (off) to 100 and
-// add up to one score of weight x metric 0..1 (hash pri=conf:70,gap:100, pri=none for all off): Match (level 3 by its rank percentile, else the score bucket), Survey gap
+// add up to one score of weight x metric 0..1 (hash pri=conf:70,gap:100, pri=none for all off): Level order (level 3 by its rank percentile, else the score bucket), Survey gap
 // (1 - observer-days/30, 0 without data), At risk, Invasive and Out of range (0 or 1). The old pri values 0..3 read as 0, 33, 67, 100.
 // A link without pri= starts from the Blitz the gap preset; an old sort=conf or sort=gaps link keeps the tiered order it always had (the confidence band and the gap tier).
 // Presets are sets of weights. Ties go to the confidence order when base= is absent and a prioritizer is on, else to the base order (hash base=new|old|rand:<seed>).
@@ -12,9 +12,9 @@ var IdentifyGaps=(function(){
 'use strict';
 var BASE='https://pollocklab.github.io/where-to-blitz/',DIR=BASE+'cluster_results/checklist/',RES='25000',ALL='All biodiversity',
   KEYS=['conf','gap','risk','inv','out'],LEG=[0,33,67,100],DEFAULT={conf:40,gap:100,risk:60,inv:0,out:0},LEGACY={conf:1,gap:1,risk:0,inv:0,out:0},LIT0=30,
-  NAMES={conf:['Match','best matches'],gap:['Survey gap','biggest survey gaps'],risk:['At risk','at-risk species'],inv:['Introduced','introduced species'],
+  NAMES={conf:['Level order','level order'],gap:['Survey gap','biggest survey gaps'],risk:['At risk','at-risk species'],inv:['Introduced','introduced species'],
     out:['Out of range','records out of range']},
-  EXPLAIN={conf:'best-match',gap:'survey-days'},
+  EXPLAIN={conf:'level-order',gap:'survey-days'},
   PRESETS=[['blitz','Blitz the gap',{gap:100,risk:60,conf:40}],['quick','Quick wins',{conf:100}],['unusual','Unusual',{out:100,conf:40}],['newest','Newest',{}]],
   GRIP='<svg viewBox="0 0 10 16" width="10" height="16" aria-hidden="true" focusable="false" fill="currentColor">'+[3,8,13].map(function(y){return '<circle cx="3" cy="'+y+'" r="1.5"/><circle cx="7" cy="'+y+'" r="1.5"/>';}).join('')+'</svg>',
   BASES={new:'newest first',old:'oldest first',rand:'random order'},NODAYS=65535;

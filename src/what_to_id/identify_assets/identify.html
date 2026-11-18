@@ -206,24 +206,25 @@ __SITE_NAV__<main id="main-content">
 (ViT-H/14), an image and text model trained on the tree of life. A match score is the cosine between
 the photo's embedding and the embedding of the text "a photo of &lt;species&gt;". The margin is the
 match score of the label minus the best match score of any other species. __SCORING_DATES__</p>
-<p>A record takes the first level whose rule it meets, in this order:</p>
+<p>A record takes the first level whose rule it meets. Odd shots are checked first, at any rank; then
+__LEVEL_1__, close calls, __LEVEL_3__ and might be mislabelled, in that order:</p>
 <dl>
 <dt>__LEVEL_1__</dt><dd>Labelled at species. The margin is above 0, and the record is in the top 25%
 of its species by match score to the label. Only species with 4 or more scored records.</dd>
 <dt>__LEVEL_3__</dt><dd>Labelled above species (a genus or a family, say), and the pool names one or
-more species inside the label. Every such record goes here, whatever its match scores.</dd>
-<dt>__LEVEL_5__</dt><dd>Three kinds of record, in this order: might be mislabelled (lowest margin
+more species inside the label. Every such record goes here, unless it is an odd shot.</dd>
+<dt>__LEVEL_5__</dt><dd>Three kinds of record, listed in this order: might be mislabelled (lowest margin
 first), odd shots, close calls. This order put the records iNaturalist identifiers later corrected nearer the top than
-mixing the three did. Odd shots: any rank,
+mixing the three did, on the cohort the order was chosen on. Odd shots: any rank,
 the photo's best match score to any species is in the lowest 2% of its group (birds, plants, fungi
 and so on). Close calls: labelled at species, one other species scores higher than the label by no more than a cut set per group (birds, plants, fungi
-and so on), the quarter of that group's negative margins nearest zero, and has 20 or more verifiable iNaturalist records in BC. Might be mislabelled: labelled at
-species, the margin is below that group's cut and the best other species has 20 or more verifiable iNaturalist
-records in BC. Close calls and might-be-mislabelled cards name that species and show a reference photo of it
+and so on), the quarter of that group's negative margins nearest zero, and has 20 or more records needing ID in BC. Might be mislabelled: labelled at
+species, the margin is below that group's cut and the best other species has 20 or more records needing ID
+in BC. Close calls and might-be-mislabelled cards name that species and show a reference photo of it
 beside one of the label, from iNaturalist.</dd>
 <dt>No level</dt><dd>All other records: the margin is above 0 but the record is outside the top 25%
 of its species, or its species has fewer than 4 records; the look-alike
-has fewer than 20 BC records; the pool names no species inside the label, or the label is a species that was not in the pool at scoring; __NO_SCORE__; or its label changed after scoring.</dd>
+has fewer than 20 records needing ID in BC; the pool names no species inside the label, or the label is a species that was not in the pool at scoring; __NO_SCORE__; or its label changed after scoring.</dd>
 </dl>
 <p>A level sorts records for review. It does not say that a label is right or wrong.
 <a href="terms.html#methods" target="_blank">How it works: Methods</a> gives the model, every

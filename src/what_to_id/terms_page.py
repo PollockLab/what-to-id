@@ -40,7 +40,7 @@ LABELS = {
     },
     # keys from the earlier five levels: the first is a tab, the rest Might be wrong's kinds
     "level-clear-matches": page_identify.LEVELS[0][1],
-    "level-might-be-mislabelled": "Likely mislabelled",
+    "level-might-be-mislabelled": "Might be mislabelled",
     "level-odd-shots": "Odd shots",
     "level-close-calls": "Close calls",
 }
@@ -72,7 +72,7 @@ GROUPS = {
         *("photo-space", "taxonomy", "confused-pairs", "closest-matches", "match-n", "cosine"),
         *("clade", "globi", "backlog-per-identifier", "share-needing-id", "identified-to-rank"),
     ],
-    "Prioritize": ["best-match", "survey-days"],
+    "Prioritize": ["level-order", "best-match", "survey-days"],
 }
 CSS = (
     """
@@ -84,6 +84,7 @@ h1{font-size:28px;line-height:1.2;margin:8px 0}h2{font-size:22px;line-height:1.2
 h3{font-size:18px;margin:24px 0 6px}
 a{color:var(--bar)}dt{font-weight:650;margin-top:10px}dd{margin:2px 0 0}
 code{font-size:14px;word-break:break-all}ol.refs{padding-left:20px}ol.refs li{margin:4px 0}
+.use{border:1px solid var(--line);border-left:4px solid var(--bar);padding:2px 12px;margin:12px 0}
 table.eval{border-collapse:collapse;font-size:15px}
 figure{margin:12px 0;overflow-x:auto}
 figure svg{width:100%;min-width:560px;height:auto;font-size:14px;fill:var(--ink)}
@@ -224,7 +225,7 @@ def render(
         '<p id="find-n" role="status"></p></div>\n'
         f'<div id="glossary-list">{chr(10).join(terms)}</div>\n'
         f"{STUDY.replace('__SIGN_IN__', SIGN_IN if page_identify.INAT_CLIENT_ID else '')}\n{fold}\n"
-        f'<h2 id="methods">Methods</h2>\n{terms_methods.render(manifest, data_url)}\n'
+        f'<h2 id="methods">Methods</h2>\n{terms_methods.render(manifest, data_url, dates)}\n'
         f'<p>Planning a bioblitz? See <a href="{page_nav.BLITZ}" target="_blank" rel="noopener">'
         'Where to Blitz\u00a0<span aria-hidden="true">\u2197</span>'
         '<span class="site-vh"> (opens in a new tab)</span></a>.</p>\n'
@@ -239,7 +240,7 @@ def render(
         f'{page_nav.nav(PAGE_NAME, menu=True)}<div class="doc">\n'
         f'<details id="toc"><summary>On this page</summary><nav aria-label="On this page">{toc}'
         f'</nav></details>\n<main id="main-content">\n{body}</main></div>\n'
-        f"<script>{TOC_JS}</script></body></html>\n"
+        f"{page_nav.footer()}<script>{TOC_JS}</script></body></html>\n"
     )
 
 

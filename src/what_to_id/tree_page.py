@@ -11,6 +11,8 @@ from __future__ import annotations
 import argparse
 import gzip
 import json
+import re
+from html import escape
 from pathlib import Path
 
 from what_to_id import page_nav
@@ -46,6 +48,14 @@ def map_meta(out: Path, keys: tuple[str, ...] = KEYS) -> dict:
     return {k: meta[k] for k in keys}
 
 
+def pool_date(out: Path) -> str:
+    """The day the map's pool stands for (map.html's updated time), or "" when it has none."""
+    found = re.search(
+        r'<time id="updated" datetime="(\d{4}-\d{2}-\d{2})"', (out / "map.html").read_text()
+    )
+    return found.group(1) if found else ""
+
+
 def build(out_dir: str | Path, map_url: str = "map.html") -> Path:
     """Write ``tree.html`` into ``out_dir`` (which holds the built map) and return its path."""
     out = Path(out_dir)
@@ -56,7 +66,9 @@ def build(out_dir: str | Path, map_url: str = "map.html") -> Path:
         raise ValueError(f"{taxa} has no record counts: build the map with --tree")
     config = json.dumps({"meta": meta, "mapUrl": map_url}).replace("<", "\\u003c")
     html = (ASSETS / PAGE_NAME).read_text()
+    day = pool_date(out)
     for key, value in {
+        "__POOL_DATE__": f"The pool is as of {escape(day)}. " if day else "",
         "__TREE_CONFIG__": config,
         "__SITE_CSS__": f"{page_nav.CSS}\n{page_nav.HELP_CSS}",
         "__SELECT_CSS__": (HERE / "map_assets" / "map_select.css").read_text(),

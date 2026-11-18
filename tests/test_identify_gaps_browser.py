@@ -373,18 +373,18 @@ def test_a_handle_moves_its_row_with_the_arrow_keys_and_keeps_focus(browser, sit
     page = open_with(browser, base, "&pri=conf:40,gap:100")
     page.click("#sortb")
     handle = "#sorto .pw:has(#pw-conf) .pgrip"
-    assert page.get_attribute(handle, "aria-label") == "Move Match, position 2 of 4"
+    assert page.get_attribute(handle, "aria-label") == "Move Level order, position 2 of 4"
     page.focus(handle)
     page.keyboard.press("ArrowUp")
     page.wait_for_function("document.getElementById('pw-conf').value === '100'")
     assert page.input_value("#pw-conf") == "100" and page.input_value("#pw-gap") == "40"
     assert page.evaluate(ORDER)[0] == "pw-conf"
     assert page.evaluate("document.activeElement.getAttribute('aria-label')") == (
-        "Move Match, position 1 of 4"
+        "Move Level order, position 1 of 4"
     )
-    assert "Match moved to position 1 of 4" in page.inner_text("#sorto .vh")
+    assert "Level order moved to position 1 of 4" in page.inner_text("#sorto .vh")
     assert "pri=conf:100,gap:40" in page.evaluate("location.hash")
-    assert page.eval_on_selector("#psum", "e => e.textContent").startswith("Best matches first")
+    assert page.eval_on_selector("#psum", "e => e.textContent").startswith("Level order first")
     assert page.query_selector("#sorto .pw button[aria-label$=' up']") is None
     assert page.errors == []
 
@@ -442,7 +442,10 @@ def test_the_labelled_terms_open_a_toggletip_on_click_and_on_keyboard(browser, s
     base, _ = site
     page = open_with(browser, base, "")
     page.click("#sortb")
-    for term, text in (("Match", "ranked among"), ("Survey gap", "Observer-days")):
+    for term, text in (
+        ("Level order", "How strongly the record fits"),
+        ("Survey gap", "Observer-days"),
+    ):
         trigger = page.locator("#sorto [data-explain]", has_text=term).first
         trigger.click()
         assert page.is_visible("#explain-pop") and text in page.inner_text("#explain-pop")

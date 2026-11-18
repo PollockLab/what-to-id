@@ -24,7 +24,8 @@ def test_every_glossary_key_is_one_anchor_in_one_group():
     assert html.count("<dt id=") == len(GLOSSARY)
     assert "Needs ID</dt>" in html and "Narrow it down</dt>" in html
     # the level terms carry the names Identify shows, not their keys
-    assert "Easy confirms</dt>" in html and ">Level " not in html
+    assert "Easy confirms</dt>" in html
+    assert ">Level " not in html.replace(">Level order</dt>", "")  # the prioritizer, not a level
 
 
 def test_labels_read_id_as_ID_and_match_the_page():
@@ -127,14 +128,15 @@ MANIFEST = {
 def test_methods_numbers_come_from_the_code_and_the_manifest():
     from what_to_id import atlas_update, confusion, host_pairs, levels, pool_levels, terms_methods
 
-    html = terms_page.render(manifest=MANIFEST, data_url="https://x.test/atlas")
+    dates = {"photos": "2026-10-01", "scored": "2026-10-15", "updated": None}
+    html = terms_page.render(dates, manifest=MANIFEST, data_url="https://x.test/atlas")
     methods = html.split('id="methods"')[1]
     assert "__" not in methods and terms_methods.MISSING not in methods
     for text in (
         f"lowest {levels.WEIRD_SHARE:.0%} of",
         f"top {levels.EASY_TOP_SHARE:.0%} of",
         f"{levels.TAXONOMIST_QUANTILE * 100:g}th percentile of the\nnegative margins",
-        f"{levels.MIN_LOOKALIKE_RECORDS} or more verifiable records",
+        f"{levels.MIN_LOOKALIKE_RECORDS} or more records needing ID in BC",
         f"has {confusion.MIN_PER_CLASS} or more scored",
         f"at most {confusion.FIR_PAIRS_PER_SPECIES} pairs with up to "
         f"{confusion.FIR_RECORDS_PER_PAIR} records",
@@ -184,6 +186,12 @@ def test_evaluation_table_comes_from_the_committed_script_output():
     html = terms_page.render()
     mis = ev["levels"]["mislabel"]
     assert f"<td>Might be mislabelled</td><td>{mis['n']:,}</td>" in html
+    # the left rate sits beside the corrected one, and the count is n x rate to the rate's rounding
+    events = round(mis["n"] * mis["corrected_per_1000"] / 1000)
+    assert f"<td>{mis['corrected_per_1000']:.2f}</td><td>{mis['left_per_1000']:.2f}</td>" in html
+    assert f"<td>{events:,}</td>" in html
+    assert "meaning relabelled while still Needs ID" in html
+    assert "reached Research Grade after a re-ID" in html and "rollback to a genus" in html
     assert f"{mis['corrected_rr']:.2f} [{mis['corrected_rr_ci'][0]:.2f}, " in html
     assert f"scored on\n{ev['scored_on']} were looked up again" in html
     assert f"in the pool of {ev['outcome_on']}" in html
@@ -215,7 +223,8 @@ def test_figures_baselines_replication_and_cohort_link_come_from_the_outputs():
         f"gives an AUC of {ev['baselines']['close_calls_lowest_margin_first']['auc']:.3f} ["
         in methods
     )
-    assert f"the pool of {ev_b['outcome_on']}:</p>" in methods
+    assert f"the pool of {ev_b['outcome_on']}, 3 days after the first reading:</p>" in methods
+    assert "the same cohort, not an independent sample" in " ".join(methods.split()).lower()
     mis, n = ev_b["levels"]["mislabel"], ev_b["levels"]["mislabel"]["n"]
     assert (
         f"<td>Might be mislabelled</td><td>{n:,}</td><td>{mis['corrected_per_1000']:.2f}</td>"
@@ -249,3 +258,53 @@ def test_the_study_section_and_its_fold_come_with_the_study_only(monkeypatch):
     assert [i for i, n in ids.items() if n > 1] == []
     assert html.index('id="study"') < html.index('id="study-methods"') < html.index('id="methods"')
     assert not re.search("recency|gap_first|gap first|similarity|novelty|surprise", html, re.I)
+
+
+def test_about_says_odd_shots_are_checked_first_at_any_rank():
+    # identify_levels np.select([weird, easy, tax, narrow, mislabel]): a weird genus goes to level 4
+    # (tests/test_levels.py::test_weird_wins_at_any_rank)
+    text = " ".join(page_identify.render().split())
+    assert "Odd shots are checked first, at any rank; then Easy confirms, close calls," in text
+    assert "goes here, unless it is an odd shot." in text and "whatever its match" not in text
+    assert "unless it is an odd shot" in GLOSSARY["level-narrow-it-down"][0]
+
+
+def test_no_claim_the_code_does_not_back_remains_in_the_built_pages():
+    for page in (terms_page.render(), page_identify.render()):
+        flat = " ".join(page.split())
+        for gone in ("Probably ", "Likely mislabel", "written down before", "set in advance"):
+            assert gone not in flat, gone
+    methods = " ".join(terms_page.render().split())
+    assert "were chosen using this cohort, so these figures are in-sample." in methods
+
+
+def test_methods_state_ranges_status_lists_and_limits_from_their_sources():
+    from what_to_id import identify
+
+    dates = {"photos": "2026-10-01", "scored": "2026-10-15", "updated": "2026-11-10"}
+    methods = " ".join(terms_page.render(dates).split())
+    assert {"methods-ranges", "methods-status"} <= _ids(terms_page.render())
+    ranges_js = (page_identify.ASSETS / "identify_ranges.js").read_text()
+    assert "var OUT_KM=50," in ranges_js
+    assert "is 50 km or more from the nearest centre" in methods
+    assert "have not yet been validated" in methods and "may lag its spread" in methods
+    assert "97.7% level agreement" in identify.__doc__ and "for 97.7% of such records" in methods
+    assert "The last full run was on 2026-10-15." in methods
+    for name in ("at_risk_bc_taxa", "invasive_bc_taxa"):
+        doc = json.loads((SRC / f"{name}.json").read_text())
+        assert f"{len(doc['taxa']):,} taxa, fetched {doc['fetched']}" in methods
+    assert "weights set by hand. They were not fitted" in methods
+    for words in ("fungi and fish", "43% and 53%", "84% for amphibians", "BC only", "19-day"):
+        assert words in methods
+    assert "a rank, not a measured accuracy" in GLOSSARY["best-match"][0]
+    assert "Narrow it down is not yet evaluated" in GLOSSARY["best-match"][0]
+    assert GLOSSARY["level-odd-shots"][0].startswith("Photos that match no species well (often")
+    assert "These match their label best among their species." in page_identify.render()
+
+
+def test_methods_open_with_the_intended_use_box():
+    methods = " ".join(terms_page.render().split('id="methods"')[1].split())
+    box = methods.index('class="use"')
+    assert box < methods.index('id="methods-data"')
+    assert "for prioritising which records to look at" in methods
+    assert "not an ID tool" in methods and "never agree to an ID because of a level" in methods

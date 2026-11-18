@@ -92,7 +92,7 @@ def test_french_counts_translate_the_tab_names_and_leave_bare_numbers_alone(brow
     page = ib.open_identify(browser, site)
     set_to(page, "lang", "fr")
     tr = "s => I18N.tr(s)"
-    assert page.evaluate(tr, "Likely mislabelled (12)") == "Probablement mal étiquetées (12)"
+    assert page.evaluate(tr, "Might be mislabelled (12)") == "Peut-être mal étiquetées (12)"
     assert page.evaluate(tr, "All needing ID 7") == "Toutes à identifier 7"
     assert page.evaluate(tr, "(12)") == "(12)" and page.evaluate(tr, "12") == "12"
     assert page.evaluate(tr, "Kind of possible error") == "Genre d'erreur possible"

@@ -100,13 +100,13 @@ function whyOf(i){
   var v=WHY&&LOOKS?LOOKS.lo[i]|LOOKS.hi[i]<<8:NO_LOOK,c=WHY?WHY.lo[i]:255,r=v===NO_LOOK||c===255?null:WHY.runners[v];
   return r&&r[c]!=null?[WHY.names[r[c]],WHY.hi[i]===255?255:WHY.hi[i]*5]:null;
 }
-// Under a card's photo: its label, and for a close call, a likely mislabel or a record above species what it looks like.
+// Under a card's photo: its label, and for a close call, a might-be-mislabelled record or a record above species what it looks like.
 function title(i,lv){
   var t=P.tax[i]!==NOTAX&&TAXA[P.tax[i]],box=el('div','title'),nm=el('div','name'),lk=looksOf(i),l=el('div','look');
   nm.appendChild(el('i',null,t?t[0]:'Unidentified'));
   box.appendChild(nm);
   if(t&&t[1])box.appendChild(el('div','com',t[1]));
-  if(lv===3&&lk)l.append('Probably ',el('i',null,lk));
+  if(lv===3&&lk)l.append('Looks most like ',el('i',null,lk));
   if(lv===3&&lk&&!BT){var g=el('div','sugg'),cf=RK&&IdentifyNarrow.conf(RK[i],N3);g.appendChild(IdentifyNarrow.copy(lk));if(cf)g.appendChild(GP?GP.confBadge(i,cf):el('span','conf',cf));var gp=GP&&GP.badge(i);if(gp)g.appendChild(gp);}
   else if((lv===2||lv===5)&&lk)l.append('Looks more like ',el('i',null,lk));
   if(l.firstChild)box.appendChild(l);

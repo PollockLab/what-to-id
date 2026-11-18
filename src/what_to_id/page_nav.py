@@ -8,6 +8,9 @@ script that points the switcher at what the viewer has open, then the toggletips
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+from datetime import UTC, datetime
 from html import escape
 from pathlib import Path
 
@@ -169,6 +172,8 @@ white-space:nowrap}
 .site-nav{--fade:linear-gradient(90deg,transparent,#000 16px,#000 calc(100% - 16px),transparent);
 -webkit-mask-image:var(--fade);mask-image:var(--fade)}}
 @media (max-width:480px){.site-bc{display:none}}
+.site-prov{max-width:1100px;margin:24px auto 0;padding:8px 12px 16px;font-size:12px;
+color:var(--muted)}
 """.strip()
 
 # Points the switcher at what is open: the map keeps record=, the photo pages keep id=. One group
@@ -204,6 +209,33 @@ CARRY = (Path(__file__).parent / "site_assets" / "carry.js").read_text().strip()
 
 # The toggletips (site_assets/explain.js) and the glossary go on every page nav draws.
 _EXPLAIN = Path(__file__).parent / "site_assets"
+
+
+def build_info() -> tuple[str, str]:
+    """(git short sha or "", build date as YYYY-MM-DD in UTC) at build time.
+
+    The sha comes from GITHUB_SHA in CI, else from git in the source folder; without either (an
+    sdist, no git on PATH) it is empty and the footer shows the date alone."""
+    sha = os.environ.get("GITHUB_SHA", "")[:7]
+    if not sha:
+        try:
+            sha = subprocess.run(
+                ["git", "-C", str(Path(__file__).parent), "rev-parse", "--short=7", "HEAD"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=True,
+            ).stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            sha = ""
+    return sha, datetime.now(UTC).strftime("%Y-%m-%d")
+
+
+def footer() -> str:
+    """The provenance line shared by the built pages that scroll: build commit and date."""
+    sha, day = build_info()
+    code = f" <code>{escape(sha)}</code>," if sha else ","
+    return f'<footer class="site-prov">What to ID, build{code} {day}</footer>\n'
 
 
 def explain() -> str:

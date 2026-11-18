@@ -73,3 +73,17 @@ def test_the_old_split_page_forwards_to_explore_with_its_hash(tmp_path):
     split_page.build(tmp_path)
     old = (tmp_path / "split.html").read_text()
     assert "location.replace('explore.html'+location.search+location.hash)" in old
+
+
+def test_the_about_text_names_the_pool_date_when_the_map_has_one(tmp_path):
+    meta = write_site(tmp_path)
+    (tmp_path / "map.html").write_text(render_map(meta, freeze="2026-11-17"))
+    assert (
+        "The pool is as of 2026-11-17. Every observation" in tree_page.build(tmp_path).read_text()
+    )
+
+
+def test_the_about_text_has_no_pool_date_without_one(tmp_path):
+    write_site(tmp_path)
+    html = tree_page.build(tmp_path).read_text()
+    assert "The pool is as of" not in html and '<p id="about" hidden>Every observation' in html

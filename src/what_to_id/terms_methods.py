@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import tempfile
+from datetime import date
 from pathlib import Path
 
 from what_to_id import atlas_update, confusion, host_pairs, levels, pool_levels, terms_figures
@@ -113,11 +114,23 @@ def _level_rows(ev: dict) -> str:
     for key, name in LEVEL_NAMES.items():
         r = ev["levels"][key]
         rr = _ci(r, "corrected_rr") if "corrected_rr" in r else "1 (reference)"
+        # the JSON has rates, not counts: n x rate, to the rate's two decimals
+        events = round(r["n"] * r["corrected_per_1000"] / 1000)
         rows.append(
             f"<tr><td>{name}</td><td>{r['n']:,}</td><td>{r['corrected_per_1000']:.2f}</td>"
-            f"<td>{rr}</td></tr>"
+            f"<td>{r['left_per_1000']:.2f}</td><td>{events:,}</td><td>{rr}</td></tr>"
         )
     return "\n".join(rows)
+
+
+def reference_lists() -> dict[str, str]:
+    """Placeholders for the at-risk and introduced lists, from the fetch scripts' output."""
+    out = {}
+    for key, name in (("AT_RISK", "at_risk_bc_taxa.json"), ("INTRODUCED", "invasive_bc_taxa.json")):
+        doc = json.loads((TEMPLATE.parent.parent / name).read_text())
+        out[f"__{key}_N__"] = f"{len(doc['taxa']):,}"
+        out[f"__{key}_FETCHED__"] = doc["fetched"]
+    return out
 
 
 def evaluation(data_url: str | None = None) -> dict[str, str]:
@@ -143,6 +156,9 @@ def evaluation(data_url: str | None = None) -> dict[str, str]:
         "__REPL_OUTCOME_FIRST__": ev["outcome_on"],
         "__CLOSE_CHANGED__": CLOSE_CALLS_CHANGED,
         "__REPL_OUTCOME__": ev_b["outcome_on"],
+        "__REPL_DAYS__": str(
+            (date.fromisoformat(ev_b["outcome_on"]) - date.fromisoformat(ev["outcome_on"])).days
+        ),
         "__REPL_ROWS__": _level_rows(ev_b),
         "__BASELINE_ROWS__": baseline_rows,
         "__CLOSE_AUC__": _ci(base["close_calls_lowest_margin_first"], "auc", 3),
@@ -164,9 +180,13 @@ def evaluation(data_url: str | None = None) -> dict[str, str]:
     }
 
 
-def render(manifest: dict | None = None, data_url: str | None = None) -> str:
+def render(
+    manifest: dict | None = None, data_url: str | None = None, dates: dict | None = None
+) -> str:
     html = TEMPLATE.read_text()
-    for key, text in (values(manifest) | evaluation(data_url)).items():
+    base = (dates or {}).get("scored")  # pool_levels.scoring_dates: built_at of the full run
+    extra = {"__BASE_RUN__": f"on {base}" if base else f"on a date {MISSING}"}
+    for key, text in (values(manifest) | evaluation(data_url) | reference_lists() | extra).items():
         html = html.replace(key, text)
     if "__" in html:
         raise ValueError("terms_methods: a placeholder in methods.html has no value")

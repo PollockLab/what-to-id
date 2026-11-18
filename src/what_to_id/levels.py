@@ -47,11 +47,16 @@ from what_to_id.confusion import MIN_PER_CLASS, fir_scores, read_taxa_vectors
 
 # (key, name, one line for the page)
 LEVELS = (
-    ("easy", "Clear matches", "These look just like their label. Confirm many in one go."),
+    (
+        "easy",
+        "Clear matches",
+        "These match their label best among their species. Confirm many in one go.",
+    ),
     (
         "taxonomist",
         "Close calls",
-        "Another species looks almost as likely, or it may be something else. Take a careful look.",
+        "Another species matches the photo slightly better than the label does (by the model's"
+        " match score). Take a careful look.",
     ),
     ("weird", "Odd shots", "Hard photos: hands, eggs, close-ups. Feeling lucky?"),
 )

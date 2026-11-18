@@ -1,3 +1,7 @@
+<div class="use" role="note"><p><strong>Intended use.</strong> The levels are for prioritising which
+records to look at. They are not an ID tool: a level is not an identification, and you should never
+agree to an ID because of a level. Check the photo yourself.</p></div>
+
 <p>How the site computes what it shows. Every number here is read from the code or from the
 index manifest at build time, so this text and the site cannot drift apart.</p>
 
@@ -36,12 +40,12 @@ iconic group (birds, plants, fungi and so on). Any rank.</li>
 <li>Clear matches: species rank, margin above 0, own in the top __EASY_TOP_SHARE__ of the
 species' scored records, and the species has __MIN_PER_CLASS__ or more scored records.</li>
 <li>Close calls: species rank, margin below 0 but not below the cut of the record's iconic group, and the
-best other species has __MIN_LOOKALIKE_RECORDS__ or more verifiable records in BC.</li>
+best other species has __MIN_LOOKALIKE_RECORDS__ or more records needing ID in BC.</li>
 <li>Narrow it down: a rank above species whose clade holds at least one species with a text
 vector. The score is the smaller of two margins: the in-clade best minus the best outside the
 clade, and the in-clade best minus the second-best in the clade.</li>
 <li>Might be mislabelled: species rank, margin below the cut of the record's iconic group, and the
-best other species has __MIN_LOOKALIKE_RECORDS__ or more verifiable records in BC.</li>
+best other species has __MIN_LOOKALIKE_RECORDS__ or more records needing ID in BC.</li>
 </ol>
 <p>The Close calls cut is set per iconic group, as the Odd shots cut is, because margins spread
 differently from one group to the next. It is the __TAXONOMIST_QUANTILE__ percentile of the
@@ -55,7 +59,9 @@ review; they do not say that a label is right or wrong.</p>
 <p>Daily updates score only the records the last full run lacks, against cut-offs frozen from
 that run: the per-group Odd shots and Close calls cuts and, per species, the lowest own among its Clear matches.
 A species with fewer than __MIN_PER_CLASS__ records in the full run gets no Clear match until the
-next full run.</p>
+next full run. The last full run was __BASE_RUN__. A record scored again whose raw vector is no
+longer kept is rebuilt from the index's 3-bit refine codes; its level agrees with the one from the
+true vector for 97.7% of such records.</p>
 
 <h3 id="methods-pairs">Confused pairs</h3>
 <p>Only records labelled at species count. A record is confused when its margin is below 0; it
@@ -91,37 +97,72 @@ Biotic Interactions database [8], release __GLOBI_RELEASE__, keeping family pair
 __GLOBI_MIN_ROWS__ or more recorded interactions. The confused-pairs table does not apply this
 filter.</p>
 
+<h3 id="methods-ranges">Ranges and habitat</h3>
+<p>Close calls and Might be mislabelled cards check the record's point against range maps. The
+ranges are the repaired Open Range Map, as H3 resolution-4 cells about 22 km across. The label's
+range holds the record when the record's cell is one of its cells; a name with no map is unknown
+and gets no note. A record is far outside when its point is 50 km or more from the nearest centre
+of the label's cells, since a smaller distance is cell-edge noise; a record with no range map
+counts as in range. For a far-outside record the card also reads the ECCC 1 km habitat model at
+its point: 50% suitable or more is read as habitat that suits the species, under 20% as habitat
+that does not. These two cut-offs sit in the trough of the distribution of far-outside records on
+2026-11-06 and have not yet been validated against expert-checked records. For an introduced
+species in suitable habitat the card says the range map may lag its spread.</p>
+
+<h3 id="methods-status">At risk, Introduced and Survey gap</h3>
+<p>At risk comes from iNaturalist's conservation statuses for the BC Needs ID taxa it flags as
+threatened (__AT_RISK_N__ taxa, fetched __AT_RISK_FETCHED__, <code>scripts/at_risk_bc_taxa.py</code>).
+A taxon is in tier 1 when it is listed in Canada (SARA or COSEWIC: Endangered, Threatened, Special
+Concern, Extirpated), tier 2 when NatureServe ranks it S1 or S2 in BC, tier 3 when S3; the first
+match counts. Introduced is every taxon with wild BC observations that iNaturalist counts as
+introduced (__INTRODUCED_N__ taxa, fetched __INTRODUCED_FETCHED__,
+<code>scripts/invasive_bc_taxa.py</code>). Survey gap is 1 minus the observer-days in the record's
+25 km cell divided by 30, from where-to-blitz's checklist layer, and 0 without data; about 30
+observer-days make a complete checklist by that project's rule of thumb. The Prioritize presets are
+weights set by hand. They were not fitted to any outcome.</p>
+
 <h3 id="methods-limits">Limits</h3>
 <p>The model sees one photo per record, so a record whose first photo is not the organism gets
 a poor score. Only names in the pool are candidates, so a species not yet observed in BC cannot
 be proposed. Text vectors carry what the model learned about a name during training, which is
 thin for rare or recently split taxa. Cut-offs were read from the distribution of scores in the
-BC pool and are not calibrated probabilities.</p>
+BC pool and are not calibrated probabilities. How much identifier effort a record gets varies by
+taxon and region, and a record that needs an ID because few people identify its group is not the
+same as one that is hard. Species differ greatly in how many records they have, so the cut-offs
+for rare species rest on few records. BioCLIP 2.5 is weaker on fungi and fish: on a 10,000-record
+BC sample the nearest photo shared its species in 43% and 53% of cases, against 84% for
+amphibians (<code>docs/protocol.md</code>). The evaluation is BC only, and covers one 19-day
+window.</p>
 
 <h3 id="methods-eval">Evaluation</h3>
 <p>Do the levels predict what identifiers do? The species-labelled records scored on
 __EVAL_SCORED__ were looked up again in the pool of __EVAL_OUTCOME__. A record counts as
-corrected when it is still Needs ID under another taxon that still exists; a record whose old
-taxon vanished (a swap, merge or split) counts as neither. The rate ratio compares a level's
+corrected, meaning relabelled while still Needs ID, when it is still Needs ID under another taxon
+that still exists; a record whose old taxon vanished (a swap, merge or split) counts as neither.
+Records that left Needs ID are shown on their own. The rate ratio compares a level's
 corrected share with that of records in no level; the interval is a percentile bootstrap of
 __EVAL_REPS__ draws. Cohort: __EVAL_COHORT__ records. The script is
 <code>scripts/levels_outcome.py</code> and its output, with the input files' checksums, is
 committed beside this page's template.</p>
-<table class="eval"><thead><tr><th>Level</th><th>Records</th><th>Corrected per 1,000</th>
-<th>Rate ratio vs no level</th></tr></thead><tbody>
+<table class="eval"><thead><tr><th>Level</th><th>Records</th>
+<th>Relabelled while still Needs ID, per 1,000</th><th>Left Needs ID, per 1,000</th>
+<th>Relabelled, about n</th><th>Rate ratio vs no level</th></tr></thead><tbody>
 __EVAL_ROWS__
 </tbody></table>
 <p>Records in Might be mislabelled were corrected at several times the rate of records in no
 level, and Clear matches at a lower rate. The level order on the page follows these rates.
-Narrow it down is not tested: it has no species label to be corrected from. The window overlaps
-the page's launch, so some corrections may have been prompted by the page itself. The bars for
-this test were written down before the outcome was read.</p>
+Narrow it down is not tested: it has no species label to be corrected from. The outcome misses
+records that reached Research Grade after a re-ID, since they leave the pool and count as left,
+and a rollback to a genus counts as corrected. The window overlaps
+the page's launch, so some corrections may have been prompted by the page itself. The order within
+Might be mislabelled, the Close calls order and the per-group cut were chosen using this cohort, so
+these figures are in-sample.</p>
 <p>Where did the corrected records go? Of the corrected records in Might be mislabelled, __SUG_MIS__
 moved to the species the model suggested and __SUG_MIS_GENUS__ to that species' genus; for corrected
 records in no level the shares are __SUG_NONE__ and __SUG_NONE_GENUS__ (rate ratios __SUG_MIS_RR__ and
 __SUG_MIS_GENUS_RR__). The suggestion points in the right direction more often than chance, but it is
-rarely the exact answer, so the page shows it as a look-alike to check, not as a proposed ID. The bar
-set in advance for the exact species was a share of 0.25; it was not met. Records that left Needs ID
+rarely the exact answer, so the page shows it as a look-alike to check, not as a proposed ID. The share
+that moved to the exact species is below 0.25. Records that left Needs ID
 are not counted here, since their new taxon is not in the pool.</p>
 <p>Does the margin itself predict a correction? The next figure bins the same cohort into
 __CAL_BINS__ groups of equal size by margin, lowest first, and shows the corrected share in each.
@@ -142,9 +183,11 @@ __CLOSE_CHANGED__. Across all records a plain sort by margin beats the page orde
 levels leave most records in no level and keep only __STEPS__ steps of order within a level; on the
 records the page shows, the two tie. The levels earn their place by what they say about a record,
 not by ranking it better than its margin would.</p>
-<p>Does it hold on a later pool? The same cohort looked up in the pool of __REPL_OUTCOME__:</p>
-<table class="eval"><thead><tr><th>Level</th><th>Records</th><th>Corrected per 1,000</th>
-<th>Rate ratio vs no level</th></tr></thead><tbody>
+<p>Does the reading change a few days later? This is the same cohort, not an independent sample,
+looked up again in the pool of __REPL_OUTCOME__, __REPL_DAYS__ days after the first reading:</p>
+<table class="eval"><thead><tr><th>Level</th><th>Records</th>
+<th>Relabelled while still Needs ID, per 1,000</th><th>Left Needs ID, per 1,000</th>
+<th>Relabelled, about n</th><th>Rate ratio vs no level</th></tr></thead><tbody>
 __REPL_ROWS__
 </tbody></table>
 <p>Run it yourself. The scored cohort, one row per record with its level, scores, suggested

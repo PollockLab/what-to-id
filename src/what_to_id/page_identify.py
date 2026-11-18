@@ -34,7 +34,11 @@ FIRST_NAME = "pool-levels-first.bin"  # likewise: the first cards, drawn while t
 NARROW_LABEL = "Narrow it down"
 # (level as in identify.LEVEL_NAMES, name, one line for the page)
 LEVELS = (
-    (1, "Easy confirms", "These look just like their label. Confirm many in one go."),
+    (
+        1,
+        "Easy confirms",
+        "These match their label best among their species. Confirm many in one go.",
+    ),
     (
         5,
         "Might be wrong",
@@ -50,12 +54,12 @@ LEVELS = (
 # The tab of every record that needs an ID, level or not (hash lvl=all): not a level, so not in
 # LEVELS
 ALL_TAB = (6, "All needing ID", "Every record that needs an ID, with a level or not, newest first.")
-# The kinds a tab shows, in order: Might be wrong (5) lists likely mislabels by margin, then odd
-# shots, then close calls. This order beat interleaving the three by rank on crowd corrections
-# (AUC +0.028 [0.013, 0.044], 10-15 to 11-03 BC).
+# The kinds a tab shows, in order: Might be wrong (5) lists might-be-mislabelled records by margin,
+# then odd shots, then close calls. This order beat interleaving the three by rank on crowd
+# corrections (AUC +0.028 [0.013, 0.044], 10-15 to 11-03 BC; in-sample, chosen on that cohort).
 MERGE = {5: (5, 4, 2)}
 # (level, the kind control's name) for Might be wrong's kinds
-KINDS = ((5, "Likely mislabelled"), (4, "Odd shots"), (2, "Close calls"))
+KINDS = ((5, "Might be mislabelled"), (4, "Odd shots"), (2, "Close calls"))
 # GoatCounter's script, pinned (sha384 of https://gc.zgo.at/count.v4.js on 2026-11-05)
 GOATCOUNTER_JS = "https://gc.zgo.at/count.v4.js"
 GOATCOUNTER_SRI = "sha384-nRw6qfbWyJha9LhsOtSb2YJDyZdKvvCFh0fJYlkquSFjUxp9FVNugbfy8q1jdxI+"

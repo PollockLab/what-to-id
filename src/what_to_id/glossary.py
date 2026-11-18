@@ -124,21 +124,23 @@ GLOSSARY: dict[str, tuple[str, str | None]] = {
         None,
     ),
     "level-clear-matches": (
-        "Labelled at species, and the photo looks just like its label.",
+        "Labelled at species, and the photo matches its label best among the pool's species.",
         "Use it when you want to confirm many in one go.",
     ),
     "level-close-calls": (
-        "Another species looks almost as likely as the label, or it may be something else.",
+        "Another species matches the photo slightly better than the label does (by the model's"
+        " match score).",
         "Use it when you have time for a careful look.",
     ),
     "level-narrow-it-down": (
-        "Labelled above species, and the photo points to one species of it. The tab opens on"
-        " the best 5%, the records whose photo points most clearly to one species: Show all,"
-        " beside the count, lifts that, and the Best slider under Prioritize sets another share.",
+        "Labelled above species, and the photo points to one species of it, unless it is an odd"
+        " shot. The tab opens on the best 5%, the records whose photo points most clearly to one"
+        " species: Show all, beside the count, lifts that, and the Best slider under Prioritize"
+        " sets another share.",
         "Use it when you can take a record to species.",
     ),
     "level-odd-shots": (
-        "Hard photos, like hands, eggs and close-ups, that match no species well.",
+        "Photos that match no species well (often hands, eggs, close-ups).",
         "Use it when you feel lucky.",
     ),
     "level-might-be-mislabelled": (
@@ -146,8 +148,8 @@ GLOSSARY: dict[str, tuple[str, str | None]] = {
         "Use it when you want to check whether a label is wrong.",
     ),
     "level-might-be-wrong": (
-        "Records whose photo may not support the label: likely mislabels first, then odd shots,"
-        " then close calls.",
+        "Records whose photo may not support the label: might-be-mislabelled records first, then"
+        " odd shots, then close calls.",
         "Use it when you want to check whether a label is right.",
     ),
     "photo-space": (
@@ -199,10 +201,15 @@ GLOSSARY: dict[str, tuple[str, str | None]] = {
         f" {SURVEY_DAYS_TARGET} make a complete checklist.",
         None,
     ),
+    "level-order": (
+        "How strongly the record fits its level's rule (on Narrow it down: the best matches).",
+        None,
+    ),
     "best-match": (
         "How closely the photo points to one species, ranked among all records of this level."
-        " Best 5% keeps the top 5%. Show all lifts the cut, and the Best slider under Prioritize"
-        " sets another share.",
+        " It is a rank, not a measured accuracy: Narrow it down is not yet evaluated. Best 5%"
+        " keeps the top 5%. Show all lifts the cut, and the Best slider under Prioritize sets"
+        " another share.",
         None,
     ),
 }

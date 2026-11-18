@@ -84,7 +84,7 @@ def test_identify_reads_the_model_at_the_point_beside_the_range_map(browser, sit
     assert habitat(page, "Just outside range") == SDM + "no value here"  # 255 is nodata
     assert habitat(page, "1,200 km outside") == (
         SDM + "70 % suitable here. Habitat suits it and the species is introduced: "
-        "the range map is likely behind its spread"
+        "the range map may lag its spread"
     )
     assert (
         habitat(page, "In range") == SDM + "43 % suitable here" and len(page.asked) == 3
@@ -111,7 +111,7 @@ def test_the_map_card_reads_the_introduced_flag(browser, site):
     page = open_map(browser, f"{site}/map.html?standalone=1", "#record=3000&at=9/49/-123")
     tiler(page)
     page.locator("#card .rchip").wait_for()
-    assert habitat(page, "1,200 km outside").endswith("the range map is likely behind its spread")
+    assert habitat(page, "1,200 km outside").endswith("the range map may lag its spread")
     assert page.errors == []
     page.close()
 
