@@ -22,7 +22,10 @@ def test_the_modes_sit_on_the_bar_row_with_their_counts(browser, site):
     assert " ".join(tabs.first.inner_text().split()) == f"Easy confirms {total[1]:,}"
     top = page.locator(".top")
     assert top.locator("#bar").is_visible() and top.locator("#tabs").is_visible()
-    assert top.locator("#qchips label").count() == 2  # At risk and Invasive
+    assert top.locator("#qchips label").count() == 2  # At risk and Introduced
+    assert top.get_by_role("checkbox", name="Introduced").locator("..").get_attribute("title") == (
+        "Introduced to BC, per iNaturalist"
+    )
     assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
     assert page.errors == []
 

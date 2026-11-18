@@ -73,7 +73,7 @@ def test_a_failed_invasive_lookup_stays_unknown_and_asks_again(browser, site):
             route.fallback()
 
     page.route("**/v1/taxa/**", taxa)
-    page.get_by_role("checkbox", name="Invasive").check()
+    page.get_by_role("checkbox", name="Introduced").check()
     page.wait_for_function(
         "/^Checking \\d+ species…$/.test(document.getElementById('count').textContent)"
     )

@@ -1,4 +1,4 @@
-// One filter state for every view. The keys below are the filters (What, When, Where, Who, At risk, Invasive)
+// One filter state for every view. The keys below are the filters (What, When, Where, Who, At risk, Introduced)
 // and Identify's tab and Best x% cut, in the hash every page reads. Every link to another page of the site
 // carries them, its own tokens (an id, a pick) first; a view that cannot apply one keeps it in its hash
 // (held) and names it in a note, so it survives the round trip. A page whose hash is an anchor (How it
@@ -9,7 +9,7 @@ var KEYS=['by','from','to','months','groups','only','acc','taxa','user','umode',
   'projects','risk','inv','lvl','kind','conf','gap','pri','base','rg','look'],
   NAME={groups:'What',taxa:'What',only:'What',acc:'What',by:'When',from:'When',to:'When',months:'When',
     user:'Who',umode:'Who',umin:'Who',area:'Where',park:'Where',bcpark:'Where',projects:'Where',risk:'At risk',
-    inv:'Invasive',lvl:'Identify tab',kind:'Identify tab',conf:'Best x%',gap:'Survey gaps',pri:'Order',
+    inv:'Introduced',lvl:'Identify tab',kind:'Identify tab',conf:'Best x%',gap:'Survey gaps',pri:'Order',
     base:'Order',rg:'Unconfirmed',look:'Look-alikes'},
   // Clear filters drops these; Identify's tab and its order stay
   CLEAR=KEYS.filter(function(k){return ['lvl','kind','pri','base','gap','look'].indexOf(k)<0;}),BTN=[],

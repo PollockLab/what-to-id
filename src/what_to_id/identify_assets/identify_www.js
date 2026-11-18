@@ -62,8 +62,8 @@ return function(ctx){
     b.onchange=function(){keep(k,b.checked);sync();ctx.redraw();};l.append(b,' '+label);return l;
   }
   function sync(){need=(on('risk')?RISK:0)|(on('inv')?INV:0);if(risk_){risk_.firstChild.checked=!!(need&RISK);inv_.firstChild.checked=!!(need&INV);}show();}
-  // At risk and Invasive are one-tap chips under the search bar; the grouping toggle sits with Sort
-  var risk_=toggle('risk','At risk'),inv_=toggle('inv','Invasive');risk_.className=inv_.className='tog qchip';
+  // At risk and Introduced are one-tap chips under the search bar; the grouping toggle sits with Sort
+  var risk_=toggle('risk','At risk'),inv_=toggle('inv','Introduced');risk_.className=inv_.className='tog qchip';inv_.title='Introduced to BC, per iNaturalist';
   $('qchips').append(risk_,inv_);$('frun').append(toggle('run','Group by suggested species'));$('frun').firstChild.className='swt';
   sync();
   return {pass:pass,flag:flag,sync:sync,need:function(){return need;},active:function(){return on('risk')||on('inv');}};

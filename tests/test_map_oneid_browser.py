@@ -168,7 +168,7 @@ def test_conservation_status_sort_lists_at_risk_records_first_and_back(browser, 
     assert "batch 1 of 2" in page.inner_text("#identify")
     assert order.get_attribute("aria-pressed") == "true"
     note = page.inner_text("#idnote")
-    assert note.startswith("Sorted by conservation status: listed by SARA or COSEWIC, then BC S1")
+    assert note.startswith("Sorted by At risk first: listed by SARA or COSEWIC, then BC S1")
     assert ", so it opens these records" in note
     order.click()
     page.wait_for_function("!(document.getElementById('identify').href || '').includes('&id=')")

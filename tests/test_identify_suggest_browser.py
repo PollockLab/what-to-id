@@ -79,7 +79,7 @@ def test_blitz_targets_count_threatened_records_and_a_group_pick_is_remembered(b
     base, pts = site
     page = opened(browser, base, "what")
     blitz = page.locator("#sgwhat .sgr[data-k^='z:']")
-    assert blitz.count() == 3 and "threatened or introduced" in blitz.first.inner_text()
+    assert blitz.count() == 3 and "at risk or introduced" in blitz.first.inner_text()
     g = blitz.first.get_attribute("data-k")[2:]
     blitz.first.click()
     page.reload()

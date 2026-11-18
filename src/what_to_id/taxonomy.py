@@ -60,7 +60,7 @@ PRESETS = [
 ]
 # at_risk_bc_taxa.json holds the taxa of BC needs-ID records flagged threatened that are listed in
 # Canada (tier 1) or ranked S1-S2 (2) or S3 (3) in BC, with their BC Research Grade count, for the
-# map's "Sort by conservation status" order (map_value.js); its "source" and "rule" say how.
+# map's "Sort by At risk first" order (map_value.js); its "source" and "rule" say how.
 # scripts/at_risk_bc_taxa.py writes it; the weekly reference workflow refreshes it.
 AT_RISK = json.loads((Path(__file__).with_name("at_risk_bc_taxa.json")).read_text())["taxa"]
 # invasive_bc_taxa.json holds the taxa iNaturalist counts as introduced in BC (place 7085), for

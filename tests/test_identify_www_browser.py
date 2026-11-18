@@ -84,7 +84,7 @@ def test_invasive_without_the_maps_list_asks_inat_for_each_suggestions_bc_status
         "[...document.querySelectorAll('#grid .card .look i')].every(e=>e.textContent==='Apis c')"
     )
     assert "risk=1" in page.evaluate("location.hash") and page.asked == []
-    page.get_by_role("checkbox", name="Invasive").check()
+    page.get_by_role("checkbox", name="Introduced").check()
     page.wait_for_function(KINDS + "===2")
     assert looks(page) == {"Apis c", "Bombus b"}
     assert page.asked and all(
@@ -93,7 +93,7 @@ def test_invasive_without_the_maps_list_asks_inat_for_each_suggestions_bc_status
     page.get_by_role("checkbox", name="At risk").uncheck()
     page.wait_for_function(KINDS + "===1")
     assert looks(page) == {"Bombus b"}
-    page.get_by_role("checkbox", name="Invasive").uncheck()
+    page.get_by_role("checkbox", name="Introduced").uncheck()
     page.wait_for_function(KINDS + "===2")
     assert "risk=" not in page.evaluate("location.hash") and page.errors == []
 
@@ -102,7 +102,7 @@ def test_invasive_and_at_risk_read_the_maps_lists_without_a_request(browser, sit
     base, _ = site
     page = open_row(browser, base, "#lvl=3&conf=all")
     page.wait_for_function(KINDS + "===2")
-    page.get_by_role("checkbox", name="Invasive").check()
+    page.get_by_role("checkbox", name="Introduced").check()
     page.wait_for_function(KINDS + "===1")
     assert looks(page) == {"Bombus b"} and "inv=1" in page.evaluate("location.hash")
     page.get_by_role("checkbox", name="At risk").check()
