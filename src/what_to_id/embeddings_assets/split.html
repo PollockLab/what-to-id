@@ -361,7 +361,7 @@ async function hitsFor(st){
         'Downloading search model, about '+AtlasEncoder.megabytes(spec)+' MB, once. It is stored in this browser afterwards. '+
         'Searching by observation link needs no download.'))return null;
       sm.textContent='Downloading search model…';
-      enc=await AtlasEncoder.load(mf,DATA,{});
+      enc=await AtlasEncoder.load(mf,DATA,{onProgress:function(f){sm.textContent='Downloading search model… '+Math.round(100*f)+'%';}});  // f is 0..1 once a byte count is known
     }
     q=await enc.encode(/^(an? )?(photo|picture|image)\b/i.test(st.text)?st.text:'a photo of '+st.text);
   }
@@ -374,7 +374,7 @@ async function photos(){
   try{
     var hits=await hitsFor(st);
     if(r!==run)return;
-    if(!hits){sm.textContent='';return;}
+    if(!hits){sm.textContent='Search model not downloaded';return;}  // hitsFor gives null only when the viewer declined
     sm.textContent=hits.length?'':'No matching photos.';
     if(hits.length)setSub(hits.map(function(h){return h.id;}),st.kind==='id'?'like '+st.id:st.text);
   }catch(err){if(r===run)sm.textContent='Search failed: '+err.message;}
