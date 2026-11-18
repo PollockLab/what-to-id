@@ -18,6 +18,12 @@
  },
  "seed": 20261105,
  "bootstrap_reps": 1000,
+ "cluster": {
+  "unit": "observer (user_id)",
+  "observers": 42261,
+  "records_without_observer": 0,
+  "interval": "95% percentile of resampled observers, all their records kept"
+ },
  "cohort": 1439324,
  "cohort_file": "levels-outcome-cohort-2026-10-15.parquet",
  "levels": {
@@ -25,13 +31,43 @@
    "n": 788572,
    "left_per_1000": 10.88,
    "corrected_per_1000": 0.69,
+   "record_level": {
+    "corrected_per_1000_ci": [
+     0.63,
+     0.75
+    ],
+    "left_per_1000_ci": [
+     10.65,
+     11.11
+    ]
+   },
    "to_suggested_share": 0.022,
-   "to_suggested_genus_share": 0.403
+   "to_suggested_genus_share": 0.403,
+   "cluster": {
+    "corrected_per_1000_ci": [
+     0.62,
+     0.77
+    ],
+    "left_per_1000_ci": [
+     9.83,
+     12.06
+    ]
+   }
   },
   "easy": {
    "n": 322244,
    "left_per_1000": 14.54,
    "corrected_per_1000": 0.4,
+   "record_level": {
+    "corrected_per_1000_ci": [
+     0.34,
+     0.48
+    ],
+    "left_per_1000_ci": [
+     14.13,
+     14.96
+    ]
+   },
    "to_suggested_share": 0.062,
    "to_suggested_genus_share": 0.646,
    "corrected_rr": 0.59,
@@ -48,12 +84,54 @@
    "to_suggested_genus_rr_ci": [
     1.36,
     1.89
-   ]
+   ],
+   "cluster": {
+    "corrected_per_1000_ci": [
+     0.32,
+     0.5
+    ],
+    "left_per_1000_ci": [
+     13.36,
+     15.83
+    ],
+    "corrected_diff_per_1000": -0.29,
+    "corrected_diff_per_1000_ci": [
+     -0.37,
+     -0.19
+    ],
+    "left_diff_per_1000": 3.66,
+    "left_diff_per_1000_ci": [
+     2.98,
+     4.35
+    ],
+    "corrected_rr_ci": [
+     0.47,
+     0.71
+    ],
+    "to_suggested_rr_ci": [
+     1.11,
+     6.76
+    ],
+    "to_suggested_genus_rr_ci": [
+     1.35,
+     1.91
+    ]
+   }
   },
   "taxonomist": {
    "n": 73820,
    "left_per_1000": 5.43,
    "corrected_per_1000": 1.3,
+   "record_level": {
+    "corrected_per_1000_ci": [
+     1.07,
+     1.59
+    ],
+    "left_per_1000_ci": [
+     4.93,
+     5.99
+    ]
+   },
    "to_suggested_share": 0.073,
    "to_suggested_genus_share": 0.5,
    "corrected_rr": 1.89,
@@ -70,12 +148,54 @@
    "to_suggested_genus_rr_ci": [
     0.97,
     1.52
-   ]
+   ],
+   "cluster": {
+    "corrected_per_1000_ci": [
+     1.03,
+     1.6
+    ],
+    "left_per_1000_ci": [
+     4.55,
+     6.44
+    ],
+    "corrected_diff_per_1000": 0.61,
+    "corrected_diff_per_1000_ci": [
+     0.33,
+     0.91
+    ],
+    "left_diff_per_1000": -5.45,
+    "left_diff_per_1000_ci": [
+     -6.45,
+     -4.45
+    ],
+    "corrected_rr_ci": [
+     1.46,
+     2.37
+    ],
+    "to_suggested_rr_ci": [
+     1.18,
+     6.58
+    ],
+    "to_suggested_genus_rr_ci": [
+     0.94,
+     1.52
+    ]
+   }
   },
   "weird": {
    "n": 28796,
    "left_per_1000": 10.04,
    "corrected_per_1000": 1.98,
+   "record_level": {
+    "corrected_per_1000_ci": [
+     1.53,
+     2.56
+    ],
+    "left_per_1000_ci": [
+     8.95,
+     11.25
+    ]
+   },
    "to_suggested_share": 0.0,
    "to_suggested_genus_share": 0.088,
    "corrected_rr": 2.87,
@@ -92,12 +212,54 @@
    "to_suggested_genus_rr_ci": [
     0.04,
     0.4
-   ]
+   ],
+   "cluster": {
+    "corrected_per_1000_ci": [
+     1.48,
+     2.56
+    ],
+    "left_per_1000_ci": [
+     8.41,
+     11.86
+    ],
+    "corrected_diff_per_1000": 1.29,
+    "corrected_diff_per_1000_ci": [
+     0.78,
+     1.84
+    ],
+    "left_diff_per_1000": -0.84,
+    "left_diff_per_1000_ci": [
+     -2.59,
+     1.0
+    ],
+    "corrected_rr_ci": [
+     2.11,
+     3.71
+    ],
+    "to_suggested_rr_ci": [
+     0.0,
+     0.0
+    ],
+    "to_suggested_genus_rr_ci": [
+     0.05,
+     0.42
+    ]
+   }
   },
   "mislabel": {
    "n": 225892,
    "left_per_1000": 4.47,
    "corrected_per_1000": 2.92,
+   "record_level": {
+    "corrected_per_1000_ci": [
+     2.71,
+     3.15
+    ],
+    "left_per_1000_ci": [
+     4.2,
+     4.75
+    ]
+   },
    "to_suggested_share": 0.068,
    "to_suggested_genus_share": 0.45,
    "corrected_rr": 4.24,
@@ -114,7 +276,39 @@
    "to_suggested_genus_rr_ci": [
     0.98,
     1.28
-   ]
+   ],
+   "cluster": {
+    "corrected_per_1000_ci": [
+     2.64,
+     3.26
+    ],
+    "left_per_1000_ci": [
+     3.97,
+     5.02
+    ],
+    "corrected_diff_per_1000": 2.23,
+    "corrected_diff_per_1000_ci": [
+     1.98,
+     2.56
+    ],
+    "left_diff_per_1000": -6.41,
+    "left_diff_per_1000_ci": [
+     -7.32,
+     -5.58
+    ],
+    "corrected_rr_ci": [
+     3.75,
+     4.85
+    ],
+    "to_suggested_rr_ci": [
+     1.85,
+     6.24
+    ],
+    "to_suggested_genus_rr_ci": [
+     0.98,
+     1.28
+    ]
+   }
   }
  },
  "baselines": {

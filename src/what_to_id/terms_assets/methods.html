@@ -140,27 +140,35 @@ __EVAL_SCORED__ were looked up again in the pool of __EVAL_OUTCOME__. A record c
 corrected, meaning relabelled while still Needs ID, when it is still Needs ID under another taxon
 that still exists; a record whose old taxon vanished (a swap, merge or split) counts as neither.
 Records that left Needs ID are shown on their own. The rate ratio compares a level's
-corrected share with that of records in no level; the interval is a percentile bootstrap of
-__EVAL_REPS__ draws. Cohort: __EVAL_COHORT__ records. The script is
+corrected share with that of records in no level. Records by one observer are not independent, so
+the intervals in brackets resample observers: each of __EVAL_REPS__ draws takes the cohort's
+__EVAL_OBSERVERS__ observers with replacement and keeps all their records (fixed seed, 2.5th and
+97.5th percentiles). The rate ratio also has a record-level interval, a percentile bootstrap over
+records, shown for comparison; it is narrower because it counts every record as a separate
+observation. Cohort: __EVAL_COHORT__ records. The script is
 <code>scripts/levels_outcome.py</code> and its output, with the input files' checksums, is
 committed beside this page's template.</p>
 <table class="eval"><thead><tr><th>Level</th><th>Records</th>
-<th>Relabelled while still Needs ID, per 1,000</th><th>Left Needs ID, per 1,000</th>
-<th>Relabelled, about n</th><th>Rate ratio vs no level</th></tr></thead><tbody>
+<th>Relabelled while still Needs ID, per 1,000 [observers resampled]</th>
+<th>Left Needs ID, per 1,000 [observers resampled]</th>
+<th>Relabelled, about n</th><th>Rate ratio vs no level [records resampled]</th>
+<th>Rate ratio vs no level [observers resampled]</th>
+<th>Relabelled per 1,000 minus no level [observers resampled]</th></tr></thead><tbody>
 __EVAL_ROWS__
 </tbody></table>
 <p>Records in Might be mislabelled were corrected at several times the rate of records in no
 level, and Clear matches at a lower rate. The level order on the page follows these rates.
 Narrow it down is not tested: it has no species label to be corrected from. The outcome misses
 records that reached Research Grade after a re-ID, since they leave the pool and count as left,
-and a rollback to a genus counts as corrected. The window overlaps
+and a rollback to a genus counts as corrected. The AUC intervals below resample records, not
+observers. The window overlaps
 the page's launch, so some corrections may have been prompted by the page itself. The order within
 Might be mislabelled, the Close calls order and the per-group cut were chosen using this cohort, so
-these figures are in-sample.</p>
+these figures are in-sample. No held-out cohort has been scored yet.</p>
 <p>Where did the corrected records go? Of the corrected records in Might be mislabelled, __SUG_MIS__
 moved to the species the model suggested and __SUG_MIS_GENUS__ to that species' genus; for corrected
 records in no level the shares are __SUG_NONE__ and __SUG_NONE_GENUS__ (rate ratios __SUG_MIS_RR__ and
-__SUG_MIS_GENUS_RR__). The suggestion points in the right direction more often than chance, but it is
+__SUG_MIS_GENUS_RR__, observers resampled). The suggestion points in the right direction more often than chance, but it is
 rarely the exact answer, so the page shows it as a look-alike to check, not as a proposed ID. The share
 that moved to the exact species is below 0.25. Records that left Needs ID
 are not counted here, since their new taxon is not in the pool.</p>
@@ -186,8 +194,11 @@ not by ranking it better than its margin would.</p>
 <p>Does the reading change a few days later? This is the same cohort, not an independent sample,
 looked up again in the pool of __REPL_OUTCOME__, __REPL_DAYS__ days after the first reading:</p>
 <table class="eval"><thead><tr><th>Level</th><th>Records</th>
-<th>Relabelled while still Needs ID, per 1,000</th><th>Left Needs ID, per 1,000</th>
-<th>Relabelled, about n</th><th>Rate ratio vs no level</th></tr></thead><tbody>
+<th>Relabelled while still Needs ID, per 1,000 [observers resampled]</th>
+<th>Left Needs ID, per 1,000 [observers resampled]</th>
+<th>Relabelled, about n</th><th>Rate ratio vs no level [records resampled]</th>
+<th>Rate ratio vs no level [observers resampled]</th>
+<th>Relabelled per 1,000 minus no level [observers resampled]</th></tr></thead><tbody>
 __REPL_ROWS__
 </tbody></table>
 <p>Run it yourself. The scored cohort, one row per record with its level, scores, suggested

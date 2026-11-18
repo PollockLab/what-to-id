@@ -10,10 +10,13 @@ by the rules of `what_to_id.levels` (the look-alike count taken over the pool, a
 without BC counts). Outcome at pool B: "left" when the record is no longer Needs ID; "corrected"
 when it is still there under another taxon that still exists in B (a taxon that vanished from B
 is a swap, merge or split and is counted as neither). The rate ratio of corrected records in a
-level against records in no level gets a percentile bootstrap interval. The inputs' sha256 go
-into the JSON so a quoted number can be traced to the files that produced it. The JSON also
-holds the figure data (margin histogram per level, corrected share per margin bin) and the AUC of
-the page order against plain orderings; `--cohort-out` writes the scored cohort for others to run.
+level against records in no level gets a percentile bootstrap interval. Every level also gets
+observer-clustered intervals (`what_to_id.cluster_bootstrap`: observers, not records, are
+resampled), beside the record-level ones. `--exclude-pool` drops records that were in that pool
+after levelling, for a held-out cohort. The inputs' sha256 go into the JSON so a quoted number can
+be traced to the files that produced it. The JSON also holds the figure data (margin histogram per
+level, corrected share per margin bin) and the AUC of the page order against plain orderings;
+`--cohort-out` writes the scored cohort for others to run.
 """
 
 from __future__ import annotations
@@ -26,6 +29,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from what_to_id.cluster_bootstrap import level_stats
 from what_to_id.levels import WEIRD_SHARE, lookalike_known, species_masks, taxonomist_cut
 from what_to_id.pool_levels import STEPS, quantize
 
@@ -37,13 +41,15 @@ MARGIN_EDGES = np.round(np.arange(-0.15, 0.1501, 0.005), 3)
 CALIBRATION_BINS = 20
 COHORT_COLUMNS = [
     *("id", "taxon_id", "taxon_name", "iconic_taxon", "own", "other", "other_name", "margin"),
-    *("level", "left", "corrected", "name_b", "to_suggested", "to_suggested_genus"),
+    *("user_id", "level", "left", "corrected", "name_b", "to_suggested", "to_suggested_genus"),
 ]
 
 
-def cohort(scores: Path, before: Path, after: Path) -> pd.DataFrame:
+def cohort(scores: Path, before: Path, after: Path, exclude: Path | None = None) -> pd.DataFrame:
+    """The scored cohort with levels and outcomes. `exclude` is a pool whose records are left
+    out once levelled, to keep only records that were not Needs ID then (the held-out cohort)."""
     s = pd.read_parquet(scores, columns=["id", "taxon_name", "own", "other", "other_name"])
-    p = pd.read_parquet(before, columns=["id", "taxon_id", "rank", "iconic_taxon"])
+    p = pd.read_parquet(before, columns=["id", "taxon_id", "rank", "iconic_taxon", "user_id"])
     s = s.merge(p, on="id", how="inner", validate="one_to_one")
     s = s[(s["rank"] == "species") & s["own"].notna() & s["other"].notna()].reset_index(drop=True)
     s["margin"] = s["own"] - s["other"]
@@ -53,6 +59,8 @@ def cohort(scores: Path, before: Path, after: Path) -> pd.DataFrame:
     easy, tax = species_masks(s, weird)
     mis = (s["margin"] < -taxonomist_cut(s)) & lookalike_known(s) & ~weird
     s["level"] = np.select([weird, easy, tax, mis], [4, 1, 2, 5], 0)
+    if exclude:  # after the levels, which production assigns over the whole pool
+        s = s[~s["id"].isin(pd.read_parquet(exclude, columns=["id"])["id"])].reset_index(drop=True)
     b = pd.read_parquet(after, columns=["id", "taxon_id", "taxon_name"]).rename(
         columns={"taxon_id": "taxon_b", "taxon_name": "name_b"}
     )
@@ -74,6 +82,14 @@ def rate_ratio(x: np.ndarray, y: np.ndarray, rng, reps: int) -> tuple[float, lis
     est = x.mean() / y.mean()
     bs = [rng.choice(x, x.size).mean() / rng.choice(y, y.size).mean() for _ in range(reps)]
     return float(est), [float(v) for v in np.percentile(bs, [2.5, 97.5])]
+
+
+def wilson(k: float, n: float) -> list[float]:
+    """95% Wilson interval of a record-level proportion, per 1,000."""
+    z, p = 1.959964, k / n
+    mid = (p + z * z / (2 * n)) / (1 + z * z / n)
+    half = z * np.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / (1 + z * z / n)
+    return [round(1000 * float(mid - half), 2), round(1000 * float(mid + half), 2)]
 
 
 def auc(score: np.ndarray, y: np.ndarray, rng, reps: int) -> tuple[float, list[float]]:
@@ -147,9 +163,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--seed", type=int, default=20261105)
     ap.add_argument("--reps", type=int, default=1000)
+    ap.add_argument("--exclude-pool", type=Path, help="drop records in this pool (held-out)")
     ap.add_argument("--cohort-out", type=Path, help="write the scored cohort as parquet")
     a = ap.parse_args(argv)
-    s = cohort(a.scores, a.pool_before, a.pool_after)
+    s = cohort(a.scores, a.pool_before, a.pool_after, a.exclude_pool)
     if a.cohort_out:
         s[COHORT_COLUMNS].to_parquet(a.cohort_out, index=False)
     rng = np.random.default_rng(a.seed)
@@ -162,6 +179,10 @@ def main(argv: list[str] | None = None) -> int:
             "n": int(len(d)),
             "left_per_1000": round(1000 * float(d["left"].mean()), 2),
             "corrected_per_1000": round(1000 * float(d["corrected"].mean()), 2),
+            "record_level": {  # as if records were independent, for comparison with `cluster`
+                "corrected_per_1000_ci": wilson(d["corrected"].sum(), len(d)),
+                "left_per_1000_ci": wilson(d["left"].sum(), len(d)),
+            },
         }
         c = d[d["corrected"]]
         for col in ("to_suggested", "to_suggested_genus"):
@@ -173,6 +194,9 @@ def main(argv: list[str] | None = None) -> int:
                 rr, ci = rate_ratio(c[col].to_numpy(), none_c[col].to_numpy(), rng, a.reps)
                 row[f"{col}_rr"], row[f"{col}_rr_ci"] = round(rr, 2), [round(v, 2) for v in ci]
         levels[name] = row
+    shares = ("to_suggested", "to_suggested_genus")
+    for name, stats in level_stats(s, LEVELS, a.reps, a.seed, shares).items():
+        levels[name]["cluster"] = stats
     base = {}
     shown = s["level"].isin([2, 4, 5]).to_numpy()  # the records the Might be wrong list holds
     for name, score in orderings(s).items():
@@ -195,10 +219,17 @@ def main(argv: list[str] | None = None) -> int:
                 ("scores", a.scores),
                 ("pool_before", a.pool_before),
                 ("pool_after", a.pool_after),
+                *((("pool_excluded", a.exclude_pool),) if a.exclude_pool else ()),
             )
         },
         "seed": a.seed,
         "bootstrap_reps": a.reps,
+        "cluster": {
+            "unit": "observer (user_id)",
+            "observers": int(s["user_id"].nunique()),
+            "records_without_observer": int(s["user_id"].isna().sum()),
+            "interval": "95% percentile of resampled observers, all their records kept",
+        },
         "cohort": int(len(s)),
         "cohort_file": a.cohort_out.name if a.cohort_out else None,
         "levels": levels,

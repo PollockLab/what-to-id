@@ -109,16 +109,31 @@ def _ci(r: dict, col: str, digits: int = 2) -> str:
     return f"{r[col]:.{digits}f} [{lo:.{digits}f}, {hi:.{digits}f}]"
 
 
+def _with(est: float, ci: list[float], digits: int = 2) -> str:
+    return f"{est:.{digits}f} [{ci[0]:.{digits}f}, {ci[1]:.{digits}f}]"
+
+
 def _level_rows(ev: dict) -> str:
     rows = []
     for key, name in LEVEL_NAMES.items():
         r = ev["levels"][key]
-        rr = _ci(r, "corrected_rr") if "corrected_rr" in r else "1 (reference)"
+        c = r["cluster"]  # observers resampled; the record-level interval is `corrected_rr_ci`
+        ref = "corrected_rr" not in r
+        rr = "1 (reference)" if ref else _ci(r, "corrected_rr")
+        rr_c = "1 (reference)" if ref else _with(r["corrected_rr"], c["corrected_rr_ci"])
+        diff = (
+            "0 (reference)"
+            if ref
+            else _with(c["corrected_diff_per_1000"], c["corrected_diff_per_1000_ci"])
+        )
         # the JSON has rates, not counts: n x rate, to the rate's two decimals
+        relabelled = _with(r["corrected_per_1000"], c["corrected_per_1000_ci"])
+        left = _with(r["left_per_1000"], c["left_per_1000_ci"])
         events = round(r["n"] * r["corrected_per_1000"] / 1000)
         rows.append(
-            f"<tr><td>{name}</td><td>{r['n']:,}</td><td>{r['corrected_per_1000']:.2f}</td>"
-            f"<td>{r['left_per_1000']:.2f}</td><td>{events:,}</td><td>{rr}</td></tr>"
+            f"<tr><td>{name}</td><td>{r['n']:,}</td><td>{relabelled}</td><td>{left}</td>"
+            f"<td>{events:,}</td>"
+            f"<td>{rr}</td><td>{rr_c}</td><td>{diff}</td></tr>"
         )
     return "\n".join(rows)
 
@@ -147,8 +162,8 @@ def evaluation(data_url: str | None = None) -> dict[str, str]:
     cohort = ev["cohort_file"]
     cohort_url = f"{data_url.rstrip('/')}/{cohort}" if data_url and cohort else None
 
-    def rr(r: dict, col: str) -> str:
-        return _ci(r, f"{col}_rr")
+    def rr(r: dict, col: str) -> str:  # observers resampled
+        return _with(r[f"{col}_rr"], r["cluster"][f"{col}_rr_ci"])
 
     return {
         "__EVAL_ROWS__": _level_rows(ev),
@@ -176,6 +191,7 @@ def evaluation(data_url: str | None = None) -> dict[str, str]:
         "__EVAL_SCORED__": ev["scored_on"],
         "__EVAL_OUTCOME__": ev["outcome_on"],
         "__EVAL_REPS__": f"{ev['bootstrap_reps']:,}",
+        "__EVAL_OBSERVERS__": f"{ev['cluster']['observers']:,}",
         "__EVAL_COHORT__": f"{ev['cohort']:,}",
     }
 
