@@ -262,8 +262,10 @@ def test_a_drop_after_show_more_keeps_the_batch_and_the_counts(browser, site):
     eb.stub_inat(page, None)
     later = []
 
-    def observations(route):  # after Show more, even ids already hold a species ID
+    def observations(route):  # on Show more's own request, even ids already hold a species ID
         ids = [int(i) for i in parse_qs(urlparse(route.request.url).query)["id"][0].split(",")]
+        gone = len(later) == 1
+        later.extend([1] if gone else [])  # later answers, for the refills, keep theirs
         ident = [{"current": True, "taxon": {"rank_level": 10, "name": "Bombus a"}}]
         route.fulfill(
             json={
@@ -273,7 +275,7 @@ def test_a_drop_after_show_more_keeps_the_batch_and_the_counts(browser, site):
                         "quality_grade": "needs_id",
                         "photos": [],
                         "taxon": {"name": "Bombus", "rank_level": 20},
-                        "identifications": ident if later and i % 2 == 0 else [],
+                        "identifications": ident if gone and i % 2 == 0 else [],
                     }
                     for i in ids
                 ]
@@ -282,10 +284,11 @@ def test_a_drop_after_show_more_keeps_the_batch_and_the_counts(browser, site):
         )
 
     page.route("https://api.inaturalist.org/v1/observations*", observations)
-    page.route(  # two cards a page, so the six at level 3 need Show more
+    page.route(  # two cards a page, so the six at level 3 need Show more; no ids asked ahead
         "**/identify.html*",
         lambda r: r.fulfill(
-            response=(f := r.fetch()), body=f.text().replace("LIMIT=12", "LIMIT=2")
+            response=(f := r.fetch()),
+            body=f.text().replace("LIMIT=12", "LIMIT=2").replace("Math.min(24,lis.length)", "0"),
         ),
     )
     page.goto(f"{base}/identify.html#lvl=3&conf=all")

@@ -153,15 +153,43 @@ function card(i,lv,id,old){
   if(!CARD.gone(li,o))fill(li,o);  // fetched already: no wait, no flash
   return li;
 }
-// Fills the photos of the cards just drawn (a record gone drops out); a card whose photo is already on its way (a kept card) waits for that one.
-// When iNaturalist does not answer, the cards that never got their observation say so and offer a retry.
-function photos(lis){
+// Fills the photos of the cards just drawn (a record gone is refilled by the next one); a card whose photo is already on its way (a kept card) waits for that one.
+// When iNaturalist does not answer, the cards that never got their observation say so and offer a retry. `next`: ids fetched in the same request, the next
+// records, so a card's refill is usually answered already.
+function photos(lis,next){
   var sig=AB&&AB.signal;lis=lis.filter(function(li){return !(li.w&&!li.w.aborted);});lis.forEach(function(li){li.w=sig;});
-  function land(){lis.forEach(function(li){
+  function land(){var fresh=[],dirty=0;lis.forEach(function(li){
     if(!li.isConnected)return;var id=+li.dataset.id,o=CACHE.get(id);if(!CACHE.has(id))return lost(li);
-    var g=CARD.gone(li,o);if(!g)fill(li,o);else{li.remove();if(g>1)drop(+li.dataset.i);}});if(!BT)CARD.keep($('grid'),CACHE);}
-  Meta.fetchObservations(lis.map(function(li){return +li.dataset.id;}),function(u){return fetch(I18N.api(u),{signal:sig});},CACHE).then(land,
+    var g=CARD.gone(li,o);if(!g)return fill(li,o);
+    var nl=swap(li);if(nl===undefined){li.remove();if(g>1)drop(+li.dataset.i);return;}
+    dirty=1;if(nl)fresh.push(nl);else li.remove();});
+    if(dirty)recount();
+    if(fresh.length){var nc=fresh.filter(function(li){return !CACHE.has(+li.dataset.id);});
+      if(nc.length)photos(nc);
+      if(CMP&&LOOKS){CMP.fill(fresh);fresh.forEach(CARD.paint);}}
+    if(!BT)CARD.keep($('grid'),CACHE);}
+  Meta.fetchObservations(lis.map(function(li){return +li.dataset.id;}).concat(next||[]),function(u){return fetch(I18N.api(u),{signal:sig});},CACHE).then(land,
     function(e){if(!(sig&&sig.aborted)){land();status('Could not load the photos: '+e.message,1);}}).then(function(){lis.forEach(function(li){li.w=null;});});
+}
+// Whether iNaturalist has answered for record i (drawn as level lv) and it is gone.
+function left(i,lv){var id=P.id[i];return CACHE.has(id)&&CARD.gone({dataset:{lv:String(lv)}},CACHE.get(id));}
+// A card of the grid whose record is gone is refilled in place with the next record not drawn yet (one of the same look-alike where the list is grouped),
+// so the cards after it keep their places. With none left, the last card takes its place and the last slot goes. Returns the new card, null when the card
+// went without one, undefined when this is not a grid card of a plain list (a batch's, or under "Your genera"). The record leaves the list as drop() does;
+// the caller counts again.
+function swap(li){
+  var rows=view[LV],k=Array.isArray(rows)&&!BT&&li.parentNode===$('grid')&&!(MINE[LV]>=0)&&li.dataset.i?rows.indexOf(+li.dataset.i):-1;
+  if(k<0||k>=drawn||drawn>rows.length)return;  // not a card of this list
+  var lk=rows.size&&looksOf(rows[k]),on=li.contains(document.activeElement);rows.splice(k,1);if(rows.n)rows.n--;drawn--;
+  while(drawn<rows.length&&(!rows.size||looksOf(rows[drawn])===lk)){
+    var i=rows[drawn],lv=LV===6?LEVEL[i]:LV;
+    if(left(i,lv)){rows.splice(drawn,1);if(rows.n)rows.n--;continue;}
+    var nl=card(i,lv);nl.e=li.e;drawn++;li.replaceWith(nl);if(on)nl.focus({preventScroll:true});return nl;
+  }
+  var end=[].filter.call($('grid').children,function(c){return c.classList.contains('card');}).pop();
+  if(end&&end!==li&&k<drawn&&(!rows.size||looksOf(rows[drawn-1])===lk)){
+    rows.splice(k,0,rows.splice(drawn-1,1)[0]);li.replaceWith(end);if(on)end.focus({preventScroll:true});}
+  return null;
 }
 // a card whose observation did not load: "Photo unavailable" and Retry, which asks again for this card alone
 function lost(li){
@@ -181,8 +209,8 @@ function fill(li,o){
   if(CMP)CMP.landed(li);
 }
 // a removed card leaves the list, so the caption, Show more and the batches count only cards that can show
-function drop(i){var r=view[LV],k=r&&Array.isArray(r)?r.indexOf(i):-1;if(k<0)return;r.splice(k,1);if(r.n)r.n--;if(k<drawn)drawn--;
-  var b=$('more');b.hidden=r.length<=drawn;b.textContent='Show more ('+nf.format(r.length-drawn)+' left)';var bi=BI;batch();BI=bi;step(0);}
+function drop(i){var r=view[LV],k=r&&Array.isArray(r)?r.indexOf(i):-1;if(k<0)return;r.splice(k,1);if(r.n)r.n--;if(k<drawn)drawn--;recount();}
+function recount(){var r=view[LV],b=$('more');b.hidden=r.length<=drawn;b.textContent='Show more ('+nf.format(r.length-drawn)+' left)';var bi=BI;batch();BI=bi;step(0);}
 // Signed in: Agree with the record's taxon, and on a card that names a look-alike, ID it as that. The Identify link stays.
 function acts(li,t){
   var id=+li.dataset.id,pr=li.dataset.i&&CMP&&CMP.pair(+li.dataset.i),row=el('div','acts');
@@ -224,11 +252,14 @@ function sep(n,top){var c=nf.format(n)+(n===1?' card':' cards');
 function more(){
   var rows=view[LV]||[],ol=$('grid'),to=Math.min(rows.length,shown),lis=[],b=$('more'),nc=drawn?0:getComputedStyle(ol).gridTemplateColumns.split(' ').length;
   if(!drawn&&MINE[LV]>0)ol.appendChild(sep(MINE[LV],1));
-  for(var j=drawn;j<to;j++){if(j===MINE[LV])ol.appendChild(sep(j));
+  var skipped=0;
+  for(var j=drawn;j<to;j++){
+    if(!KEPT[j]&&!(MINE[LV]>=0)&&left(rows[j],LV===6?LEVEL[rows[j]]:LV)){rows.splice(j,1);if(rows.n)rows.n--;to=Math.min(rows.length,shown);j--;skipped=1;continue;}  // answered gone: never drawn
+    if(j===MINE[LV])ol.appendChild(sep(j));
     if(rows.size&&CMP&&looksOf(rows[j])!==(j?looksOf(rows[j-1]):null))ol.appendChild(IdentifyNarrow.head(looksOf(rows[j]),rows.size.get(looksOf(rows[j])),CMP.ref));var li=card(rows[j],LV===6?LEVEL[rows[j]]:LV,0,KEPT[j]);if(j<nc)CARD.eager(li);if(!KEPT[j])ol.appendChild(li);lis.push(li);}
   drawn=to;KEPT=[];
-  b.hidden=rows.length<=to;b.textContent='Show more ('+nf.format(rows.length-to)+' left)';
-  if(lis.length){photos(lis);if(CMP&&LOOKS){CMP.fill(lis);lis.forEach(CARD.paint);}}
+  b.hidden=rows.length<=to;b.textContent='Show more ('+nf.format(rows.length-to)+' left)';if(skipped)recount();
+  if(lis.length){photos(lis,rows.slice(to,to+Math.min(24,lis.length)).map(function(r){return P.id[r];}));if(CMP&&LOOKS){CMP.fill(lis);lis.forEach(CARD.paint);}}
   if(IO&&!b.hidden){IO.unobserve(b);IO.observe(b);}  // observe again: a tall pane may still show it
 }
 // "Identify these N on iNaturalist" opens the current batch; with more than one, "Batch 2 of 50" and the arrows
