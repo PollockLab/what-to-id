@@ -72,6 +72,7 @@ var words={
 // levels, tabs, sorting
 "Level":"Niveau","Easy confirms":"Confirmations faciles","Might be wrong":"Peut-être erroné","Narrow it down":"À préciser","All needing ID":"Toutes à identifier","Every record that needs an ID, with a level or not, newest first.":"Toutes les observations qui attendent une identification, avec ou sans niveau, les plus récentes d'abord.","Batches":"Lots",
 "vs":"contre","Likely mislabelled":"Probablement mal étiquetées","Odd shots":"Photos inhabituelles","Close calls":"Cas limites","Kind":"Genre","Kind:":"Genre :",
+"Kind of possible error":"Genre d'erreur possible","Observer-days in the 25 km cell, one person recording on one day, where about 30 make a complete checklist.":"Jours-observateur dans la cellule de 25 km, une personne qui enregistre un jour donné; environ 30 donnent une liste complète.",
 "These look just like their label. Confirm many in one go.":"Celles-ci ressemblent tout à fait à leur étiquette. Confirmez-en plusieurs d'un coup.",
 "The photo is a hard shot, or another species matches it about as well or better. Check whether the label is right.":"La photo est difficile, ou une autre espèce lui correspond à peu près aussi bien, voire mieux. Vérifiez si l'étiquette est juste.",
 "Labelled above species, and the photo points to one species of it. Take it to species.":"Étiquetée au-dessus de l'espèce, et la photo mène à une espèce de ce groupe. Poussez l'identification jusqu'à l'espèce.",
@@ -177,7 +178,7 @@ R('Show # cards',function(m,n){return 'Afficher '+n+' '+pl(n,'carte','cartes');}
 R('Show more \\(# left\\)','Afficher plus ($1 restantes)'),
 R('Identify the first # on iNaturalist','Identifier les $1 premières sur iNaturalist'),
 R('Identify these # on iNaturalist','Identifier ces $1 sur iNaturalist'),
-R('(Easy confirms|Might be wrong|Narrow it down||All needing IDLikely mislabelled|Odd shots|Close calls|All|Suggestion not in range|Suggestion in range|Hide far outside|Only far outside) ?(\\(?#\\)?)',function(m,a,n){return G(a)+' '+n;}),
+R('(Easy confirms|Might be wrong|Narrow it down|All needing ID|Likely mislabelled|Odd shots|Close calls|All|Suggestion not in range|Suggestion in range|Hide far outside|Only far outside) ?(\\(?#\\)?)',function(m,a,n){return G(a)+' '+n;}),
 R('In (Easy confirms|Might be wrong|Narrow it down|All needing ID)(?:, before its own filters; the tab shows #)?',function(m,a,n){return 'Dans '+G(a)+(n?", avant ses propres filtres; l'onglet en montre "+n:'');}),
 R('\\+# more (.+)','+$1 autres $2'),
 R('Show # more records of (.+)',function(m,n,x){return 'Afficher '+n+' '+pl(n,'autre observation','autres observations')+' de '+x;}),
