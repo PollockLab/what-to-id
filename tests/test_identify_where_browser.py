@@ -41,6 +41,7 @@ def open_where(browser, base, hash_="#lvl=1", size=(1100, 800), touch=False):
     page.tap("#bwhere") if touch else page.click("#bwhere")  # a phone's opens the sheet on Where
     frame = page.frame_locator("#pwhere iframe")
     frame.locator("#map canvas").first.wait_for()
+    frame.get_by_role("button", name="Where", exact=True).click()  # folded: the pane is under 760px
     return page, frame
 
 
@@ -73,7 +74,9 @@ def test_the_map_is_not_loaded_until_where_opens_and_then_it_is_bare(browser, si
     frame.locator("#map canvas").first.wait_for()
     for gone in ("header", "#side", "#time", ".site-shell"):
         assert frame.locator(gone).first.is_hidden(), gone
-    assert frame.get_by_role("button", name="Draw area", exact=True).is_visible()
+    assert frame.get_by_role("button", name="Draw", exact=True).is_hidden()  # folded behind Where
+    frame.get_by_role("button", name="Where", exact=True).click()
+    assert frame.get_by_role("button", name="Draw", exact=True).is_visible()
     assert frame.get_by_label("BC parks and protected areas").is_visible()
     assert frame.locator(".area input[type=file]").count() == 1
     page.click("#bwhat")
@@ -115,7 +118,7 @@ def test_an_area_set_in_the_map_writes_area_and_narrows_the_cards(browser, site)
     assert (
         set(pts["id"][pts["lon"] > west + 1e-3]) <= got <= set(pts["id"][pts["lon"] > west - 1e-3])
     )
-    assert page.inner_text("#bwhere b") == "Drawn area"
+    assert page.inner_text("#bwhere b") == "area.geojson"  # a file names its area
     frame.get_by_role("button", name="Clear area").click()
     page.wait_for_function("__identify.ids().length === 2100")
     assert (
@@ -127,7 +130,7 @@ def test_an_area_set_in_the_map_writes_area_and_narrows_the_cards(browser, site)
 def test_a_drawn_area_is_written_to_the_address(browser, site):
     base, _ = site
     page, frame = open_where(browser, base)
-    frame.get_by_role("button", name="Draw area", exact=True).click()
+    frame.get_by_role("button", name="Draw", exact=True).click()
     box = frame.locator("#map canvas").first.bounding_box()
     for fx, fy in ((0.3, 0.4), (0.7, 0.4), (0.7, 0.8)):
         page.mouse.click(box["x"] + fx * box["width"], box["y"] + fy * box["height"])
