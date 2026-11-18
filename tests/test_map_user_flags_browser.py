@@ -1,5 +1,5 @@
 """The map's User ticks in Chromium: they add up, Hide and Observed exclude each other, Hide and
-the login are remembered in localStorage, and Sign out forgets them. The site is
+the login are remembered in localStorage, and Clear forgets them. The site is
 test_map_user_browser.py's."""
 
 import time
@@ -73,7 +73,7 @@ def test_hide_is_off_for_a_typed_login_until_ticked_then_remembered(browser, sit
 
 def sign_out(page):
     page.keyboard.press("Escape")  # a tick's explanation may still be open over the button
-    page.click("#usrbox button:has-text('Sign out')")
+    page.click("#usrbox button:has-text('Clear')")
 
 
 def stored(page, age):
@@ -124,9 +124,7 @@ def test_sign_out_clears_the_hash_and_the_stored_login(browser, site):
     sign_out(page)
     page.wait_for_function("!/(^|[#&])(user|umode|umin)=/.test(location.hash)")
     assert page.evaluate("localStorage.getItem('wtid.user')") is None
-    assert page.input_value("#usrname") == "" and page.is_hidden(
-        "#usrbox button:has-text('Sign out')"
-    )
+    assert page.input_value("#usrname") == "" and page.is_hidden("#usrbox button:has-text('Clear')")
     page.reload()
     shown(page, N)
     assert page.input_value("#usrname") == ""

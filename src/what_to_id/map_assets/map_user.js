@@ -175,7 +175,7 @@ function userFilter(o){
       var op=minsel.appendChild(el('option',null,v[1]));op.value=v[0];});
     again=f.appendChild(el('button','padd','Reload for this view'));again.type='button';again.hidden=true;
     again.onclick=function(){cur='';o.changed();};
-    out=f.appendChild(el('button','padd','Sign out'));out.type='button';out.hidden=true;
+    out=f.appendChild(el('button','padd','Clear'));out.type='button';out.hidden=true;
     out.onclick=function(){input.value='';S.umin=0;apply();};
     f.onsubmit=function(e){e.preventDefault();apply();};input.onchange=apply;minsel.onchange=function(){S.umin=+minsel.value;o.changed();};
     msg=box.appendChild(el('p','muted'));msg.setAttribute('aria-live','polite');box.hidden=false;

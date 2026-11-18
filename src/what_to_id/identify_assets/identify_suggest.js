@@ -19,7 +19,7 @@ var T={
   mineExcl:'Untick “my observations” below first.',nobody:'Nobody has looked',nobodySub:'No one but the observer has identified it',
   second:'Needs a second opinion',secondSub:'One ID, and nobody agrees yet',
   ids:'Tap a name to see their genera',idsNone:'None found for these filters.',onInat:'{u} on iNaturalist',newTab:' (opens in a new tab)',
-  yoursNone:'No replies to your IDs yet.',yoursNeed:'Add your iNat login in About this page, or sign in.',yoursFail:'Your IDs did not load.',
+  yoursNone:'No replies to your IDs yet.',yoursNeed:'Type your iNaturalist login above to see replies to your IDs.',yoursFail:'Your IDs did not load.',signIn:'Sign in with iNaturalist',
   unknown:'Unknown',obsOn:'Observation {n} on iNaturalist',suggests:'suggests',commented:'commented:',fresh:'New',rep1:'1 new reply to your IDs',repN:'{n} new replies to your IDs',useMe:'Use my login:'
 };
 var NS='http://www.w3.org/2000/svg',R=50,PTS=64,KM=111.195,STORE={topn:'wtid-topn',recent:'wtid-recent',visit:'wtid-lastvisit',opened:'wtid-opened',improving:'wtid-improving',replies:'wtid-replies',seen:'wtid-yours-seen'},
@@ -203,11 +203,11 @@ function who(){
     .then(function(j){IDS[q]=j.results.filter(function(x){return x.user&&x.user.login;});}).catch(function(){IDS[q]=[];})
     .then(function(){if(q===idsQuery())drawIds(q);});
 }
-// Your IDs: the records the viewer identified that others replied to, newest reply first, up to 20; the person is the iNaturalist sign in, else the progress box's login, never the User box (it can hold anyone).
+// Your IDs: the records the viewer identified that others replied to, newest reply first, up to 20; the person is the iNaturalist sign in, else the progress box's login, else the User box's (replies to anyone's IDs are public); only the first two get the new-reply count.
 // A person's replies are fetched once (background, from update(), which first runs after the first cards and the pool are loaded) and kept 10 minutes in
 // sessionStorage. The time the fold last drew them is kept per person in localStorage: later replies are New in the list and counted in #rep.
 // shortcut: only the 200 most recently updated records are checked, so an older reply can be missed; page further if people report misses.
-function person(){return String(o.user()||'').toLowerCase();}
+function person(){return String(o.user()||S.user||'').toLowerCase();}
 function unseen(me){var r=MINE[me],t=(get(STORE.seen)||{})[me]||0;return r?r.filter(function(x){return x.at>t;}).length:0;}
 function drawCount(me){
   var n=unseen(me);
@@ -216,7 +216,12 @@ function drawCount(me){
 }
 function drawYours(me){
   var w=MY.querySelector('ul'),st=MY.querySelector('[role=status]'),r=MINE[me],seen=get(STORE.seen)||{};
-  w.textContent='';st.textContent=!me?T.yoursNeed:r===false?T.yoursFail:r&&!r.length?T.yoursNone:'';
+  w.textContent='';st.textContent=!me?'':r===false?T.yoursFail:r&&!r.length?T.yoursNone:'';
+  if(!me){
+    var f=el('button','lnk',T.yoursNeed);f.type='button';st.append(f);
+    f.onclick=function(){var b=document.getElementById('usrbox'),i=document.getElementById('usrname');if(b)b.open=true;if(i)i.focus();};
+    if(o.signin){var s=el('button','lnk',T.signIn);s.type='button';s.onclick=o.signin;st.append(' ',s);}
+  }
   if(!(me in LOOK))LOOK[me]=seen[me]||0;
   (r||[]).forEach(function(x){var li=el('li'),n=el('span','sgx'),s=el('span','sgs'),a=el('a','sgp'),t=fmt(T.obsOn,{n:x.oid}),t2=el('span','sgt2');
     if(x.at>LOOK[me])t2.append(el('b',null,T.fresh),' ');
@@ -246,7 +251,7 @@ function yours(){
   var me=person();
   if(me&&!(me in MINE))load(me);
   if(MY.open&&MY.offsetParent)drawYours(me);  // seen only when the fold shows
-  drawCount(me);offer(me);
+  var v=String(o.user()||'').toLowerCase();drawCount(v);offer(v);
 }
 // One tap puts the viewer's own login in an empty User box; nothing is filled or ticked unasked
 function offer(me){
