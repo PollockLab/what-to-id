@@ -3,6 +3,7 @@ prioritizers, the base order, the badges as shortcuts, the hash and the fall bac
 where-to-blitz checklist does not load. The old sort= and conf= links order as before. iNaturalist
 and where-to-blitz are stubbed."""
 
+import gzip
 import json
 import re
 import struct
@@ -522,3 +523,91 @@ def test_without_the_suggestions_at_risk_ranks_by_the_records_own_taxon(browser,
     got = [rank[i] for i in view(page)]
     assert got != sorted(got)
     assert page.errors == []
+
+
+IDS = {"Bombus a": 951, "Bombus b": 952, "Apis c": 953}
+
+
+def open_genus(browser, base, hash_, listed):
+    """Level 3 with the suggestions in the taxa table (the page reads a species' listing there) and
+    only `listed` (taxon ids) at risk; every POST is blocked, nothing reaches iNaturalist."""
+    page = browser.new_page(viewport={"width": 600, "height": 900})
+    page.errors, page.posts = [], []
+    page.on("pageerror", lambda e: page.errors.append(str(e)))
+    eb.stub_inat(page, None)
+    stub_checklist(page)
+
+    def taxa(route):
+        res = route.fetch()
+        rows = json.loads(gzip.decompress(res.body()))
+        for name, i in IDS.items():
+            rows.append([name, "", i, *rows[0][3:]])
+        route.fulfill(response=res, body=gzip.compress(json.dumps(rows).encode()))
+
+    def meta(route):
+        res = route.fetch()
+        route.fulfill(response=res, json={**res.json(), "value": [[i, 1, 5] for i in listed]})
+
+    def post(route):
+        page.posts.append(route.request.url)
+        route.abort()
+
+    page.route("**/pool-taxa*.bin", taxa)
+    page.route("**/map-meta.json", meta)
+    page.route(lambda u: True, lambda r: post(r) if r.request.method == "POST" else r.fallback())
+    page.goto(f"{base}/identify.html{hash_}")
+    page.wait_for_function("window.__identify && __identify.ids().length > 0")
+    settle(page)
+    page.wait_for_selector("#grid .card .why", state="attached")
+    return page
+
+
+CARDS = """[...document.querySelectorAll('#grid .card')].map(
+    c => [c.querySelector('.look i').textContent, !!c.querySelector('.maybe')])"""
+
+
+def test_at_risk_on_level_3_ranks_a_group_by_the_expected_value_of_its_matches(browser, site):
+    base, pts = site
+    # Bombus a (listed) is the runner-up of Apis c records: only they have a likely species at risk,
+    # which the suggestion alone would miss
+    page = open_genus(browser, base, "#lvl=3&conf=all&pri=risk:100", [951])
+    page.wait_for_selector("#grid .card .maybe", state="attached")
+    cards = page.evaluate(CARDS)
+    kinds = [k for k, _ in cards]
+    assert set(kinds) == {"Apis c", "Bombus b"}
+    assert kinds == sorted(
+        kinds, key=lambda k: k != "Apis c"
+    )  # a stable sort: the Apis c cards lead
+    assert all(m == (k == "Apis c") for k, m in cards)
+    assert page.get_attribute("#grid .maybe", "title") == (
+        "A likely species in this group is listed at risk"
+    )
+    assert page.inner_text("#grid .maybe") == "possibly at risk"
+    # the confidence order alone does not put them first
+    off = open_genus(browser, base, "#lvl=3&conf=all&pri=conf:100", [951])
+    assert [k for k, _ in off.evaluate(CARDS)] != kinds
+    assert page.posts == off.posts == [] and page.errors == []
+
+
+def test_a_listed_suggestion_outranks_a_listed_runner_up(browser, site):
+    base, _ = site
+    page = open_genus(browser, base, "#lvl=3&conf=all&pri=risk:100", [953])
+    cards = page.evaluate(CARDS)
+    kinds = [k for k, _ in cards]
+    # (1 - w) x v for the suggestion, w x v for the runner-up, w under 0.5: Apis c leads Bombus b
+    assert kinds == sorted(kinds, key=lambda k: k != "Apis c") and set(kinds) == set(IDS) - {
+        "Bombus a"
+    }
+    assert all(m for _, m in cards) and page.errors == []
+
+
+def test_a_level_1_records_at_risk_view_ignores_the_risk_weight(browser, site):
+    base, _ = site
+    views = []
+    for pri in ("risk:100", "risk:5"):
+        page = open_genus(browser, base, f"#lvl=3&conf=all&pri={pri}", [951, 1003])
+        page.goto(f"{base}/identify.html#lvl=1&risk=1&pri={pri}")
+        page.reload()
+        page.wait_for_function("window.__identify && __identify.view()[1].length > 0")
+        views.append(page.evaluate("__identify.view()[1]"))
+    assert views[0] == views[1]

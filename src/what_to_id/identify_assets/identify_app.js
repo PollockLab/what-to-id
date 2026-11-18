@@ -107,7 +107,7 @@ function title(i,lv){
   box.appendChild(nm);
   if(t&&t[1])box.appendChild(el('div','com',t[1]));
   if(lv===3&&lk)l.append('Looks most like ',el('i',null,lk));
-  if(lv===3&&lk&&!BT){var g=el('div','sugg'),cf=RK&&IdentifyNarrow.conf(RK[i],N3);g.appendChild(IdentifyNarrow.copy(lk));if(cf)g.appendChild(GP?GP.confBadge(i,cf):el('span','conf',cf));var gp=GP&&GP.badge(i);if(gp)g.appendChild(gp);}
+  if(lv===3&&lk&&!BT){var g=el('div','sugg'),cf=RK&&IdentifyNarrow.conf(RK[i],N3);g.appendChild(IdentifyNarrow.copy(lk));if(cf)g.appendChild(GP?GP.confBadge(i,cf):el('span','conf',cf));var gp=GP&&GP.badge(i);if(gp)g.appendChild(gp);if(LKS&&WW.maybe(i,t&&t[2]))g.appendChild(el('span','maybe','possibly at risk')).title='A likely species in this group is listed at risk';}
   else if((lv===2||lv===5)&&lk)l.append('Looks more like ',el('i',null,lk));
   if(l.firstChild)box.appendChild(l);
   if(g){var y=whyOf(i);if(y)box.appendChild(IdentifyNarrow.why(y[0],y[1]));box.appendChild(g);}
@@ -482,7 +482,7 @@ async function load(){
   var mp=L.fetchMapMeta(MAP,fetch),drawn_=new Promise(function(ok){if(!CFG.first)return ok();setTimeout(ok,2000);  // the bulk files wait for the first cards' paint (2 s at most), then their first row's photos
     Promise.all([get(new URL(CFG.first,MAP)),mp]).then(function(b){if(!MF)firstOf(JSON.parse(new TextDecoder().decode(b[0])));}).catch(function(){}).then(ok);});  // optional
   META=await mp;
-  WW=IdentifyWWW({value:META.value,invasive:META.invasive,taxa:function(){return TAXA;},look:function(i){return looksOf(i)||(P.tax[i]!==NOTAX&&TAXA[P.tax[i]]?TAXA[P.tax[i]][0]:null);},redraw:function(){if(P)redraw();}});  // the suggestion, else the record's own taxon
+  WW=IdentifyWWW({value:META.value,invasive:META.invasive,taxa:function(){return TAXA;},look:function(i){return looksOf(i)||(P.tax[i]!==NOTAX&&TAXA[P.tax[i]]?TAXA[P.tax[i]][0]:null);},why:whyOf,redraw:function(){if(P)redraw();}});  // the suggestion, else the record's own taxon
   function file(k){var f=META.files[k];return f?get(new URL(f,MAP)):Promise.reject(new Error('the map lists no '+k+' file'));}
   await drawn_;await CARD.row(2e4);
   var taxa=Promise.all([get(new URL(META.taxa,MAP)),I18N.lang==='fr'&&META.files.taxa_fr?file('taxa_fr').catch(function(){return null;}):null]).then(function(r){return I18N.taxa(JSON.parse(new TextDecoder().decode(r[0])),r[1]&&JSON.parse(new TextDecoder().decode(r[1])));});
@@ -505,7 +505,7 @@ async function load(){
     conf:function(i,lv){return RK&&lv===3?3-IdentifyNarrow.band(RK[i],N3):Q[i]*3/(STEPS-1);},
     cont:function(i,lv){return RK&&lv===3?1-RK[i]/N3:Q[i]/(STEPS-1);},
     fine:function(i,lv){return RK&&lv===3?-RK[i]:Q[i];},
-    flag:function(i,inv){return LKS&&WW?WW.flag(i,inv):0;},hasOut:function(){return !!R;},out:function(i){return R?R.outside()[i]:0;},
+    flag:function(i,inv){return LKS&&WW?WW.flag(i,inv):0;},risk:function(i){return LKS&&WW?WW.score(i):0;},hasOut:function(){return !!R;},out:function(i){return R?R.outside()[i]:0;},
     redraw:redraw});  // a failed or missing checklist leaves every gap at 0
   X=IdentifyUnconfirmed({P:P,taxa:TAXA,ranks:META.ranks,area:function(){return AREA;},redraw:redraw});
   // Not yet identified by me asks iNaturalist within the pool's extent: Identify has no map viewport of its own
@@ -526,7 +526,7 @@ async function load(){
   if(PEND!==null){take(PEND,false);PEND=null;}
   function retitle(){[].forEach.call($('grid').children,function(li){var t=li.querySelector('.title');if(t&&li.dataset.i){t.replaceWith(title(+li.dataset.i,+li.dataset.lv));CARD.face(li);}});}
   WHYF=function(){WHYF=null;  // the runner-up file is large and only level 3 shows it: fetched once its first cards are drawn
-    Promise.all([lk(),file('why').catch(function(){return null;})]).then(function(b){if(b[0]&&b[1]){WHY=looks(b[1],1);if(LV===3)retitle();}});};
+    Promise.all([lk(),file('why').catch(function(){return null;})]).then(function(b){if(b[0]&&b[1]){WHY=looks(b[1],1);if(LV===3){retitle();if(GP.risk()){STAY=true;redraw();}}}});};
   if(LV===3&&!BT)setTimeout(WHYF,0);rg.then(PCF,PCF);  // the percentiles and look-alikes follow the records in the background: level 3's count reads both
   Promise.all([rg,ftd]).then(function(d){var b=d[0];if(!b)return;
     R=IdentifyRanges(b,{P:P,sdm:META.sdm,name:function(i){return P.tax[i]!==NOTAX&&TAXA[P.tax[i]]?TAXA[P.tax[i]][0]:null;},look:looksOf,code:lookCode,fit:function(i){return LOOKS||!FT?null:FT[i];},ver:function(){return LOOKS||FT;},redraw:redraw});
