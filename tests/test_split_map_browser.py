@@ -214,10 +214,10 @@ def test_a_taxon_from_the_search_box_fits_the_map_until_the_viewer_moves_it(brow
     assert in_view(left, SPREAD) and left.evaluate("__map.getZoom()") > 7
     assert zoom.is_hidden()
     box = left.locator("#map").bounding_box()  # the viewer drags the map off the records
-    page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+    page.mouse.move(box["x"] + box["width"] * 0.8, box["y"] + box["height"] * 0.8)
     page.mouse.down()
-    page.mouse.move(box["x"] + 20, box["y"] + 20, steps=8)
-    page.mouse.up()
+    page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2, steps=8)
+    page.mouse.up()  # released over the canvas, not the Where control at the top left
     assert not in_view(left, [ONE])
     page.fill("#sq", "taxon 4")
     page.locator("#sg li").nth(1).wait_for()
