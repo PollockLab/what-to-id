@@ -84,6 +84,7 @@ h1{font-size:28px;line-height:1.2;margin:8px 0}h2{font-size:22px;line-height:1.2
 h3{font-size:18px;margin:24px 0 6px}
 a{color:var(--bar)}dt{font-weight:650;margin-top:10px}dd{margin:2px 0 0}
 code{font-size:14px;word-break:break-all}ol.refs{padding-left:20px}ol.refs li{margin:4px 0}
+.use{border:1px solid var(--line);border-left:4px solid var(--bar);padding:2px 12px;margin:12px 0}
 table.eval{border-collapse:collapse;font-size:15px}
 figure{margin:12px 0;overflow-x:auto}
 figure svg{width:100%;min-width:560px;height:auto;font-size:14px;fill:var(--ink)}

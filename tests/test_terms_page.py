@@ -300,3 +300,11 @@ def test_methods_state_ranges_status_lists_and_limits_from_their_sources():
     assert "Narrow it down is not yet evaluated" in GLOSSARY["best-match"][0]
     assert GLOSSARY["level-odd-shots"][0].startswith("Photos that match no species well (often")
     assert "These match their label best among their species." in page_identify.render()
+
+
+def test_methods_open_with_the_intended_use_box():
+    methods = " ".join(terms_page.render().split('id="methods"')[1].split())
+    box = methods.index('class="use"')
+    assert box < methods.index('id="methods-data"')
+    assert "for prioritising which records to look at" in methods
+    assert "not an ID tool" in methods and "never agree to an ID because of a level" in methods
