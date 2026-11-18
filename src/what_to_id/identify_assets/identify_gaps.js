@@ -40,11 +40,32 @@ function png(url){
       return {w:im.width,h:im.height,d:x.getImageData(0,0,im.width,im.height).data};});
 }
 // A comparator that leaves the best last: o {key (the groups of the level's order), score, fine (or null), base 'new'|'old'|'rand', seed, id}, arrays by record.
+function rnd(o,i){var x=(o.id[i]^o.seed)>>>0;x=Math.imul(x^x>>>16,0x45d9f3b)>>>0;x=Math.imul(x^x>>>16,0x45d9f3b)>>>0;return (x^x>>>16)>>>0;}
 function compare(o){
-  function rnd(i){var x=(o.id[i]^o.seed)>>>0;x=Math.imul(x^x>>>16,0x45d9f3b)>>>0;x=Math.imul(x^x>>>16,0x45d9f3b)>>>0;return (x^x>>>16)>>>0;}
   return function(x,y){
     return o.key[x]-o.key[y]||o.score[x]-o.score[y]||(o.fine?o.fine[x]-o.fine[y]:0)||
-      (o.base==='old'?o.id[y]-o.id[x]:o.base==='rand'?rnd(x)-rnd(y):o.id[x]-o.id[y]);};
+      (o.base==='old'?o.id[y]-o.id[x]:o.base==='rand'?rnd(o,x)-rnd(o,y):o.id[x]-o.id[y]);};
+}
+// ord.sort(compare(o)) without a comparator: a stable LSD radix sort of the positions, 16 bits a pass, least significant field first (ties keep ord's order, as the stable sort does).
+// A pass whose digit is the same everywhere is skipped, and so is a field that the order so far already holds in order (build fills it by key, then by id). Shortcuts: scores are >= 0 (their IEEE bits then sort as integers), fine is integer valued and spans < 2^32, the platform is little-endian.
+function rsort(ord,o){
+  var m=ord.length,p=new Uint32Array(m),q=new Uint32Array(m),c=new Uint32Array(65537),w=new Uint32Array(m),f=new Float64Array(m),u=new Uint32Array(f.buffer),k,t,mn=Infinity;
+  for(k=0;k<m;k++)p[k]=k;
+  function pass(s){  // w holds a 32 bit value per position; order p by its 16 bits from bit s
+    c.fill(0);for(k=0;k<m;k++)c[(w[k]>>>s&65535)+1]++;
+    if(c.indexOf(m)>=0)return;
+    for(k=1;k<65537;k++)c[k]+=c[k-1];
+    for(k=0;k<m;k++){t=p[k];q[c[w[t]>>>s&65535]++]=t;}
+    t=p;p=q;q=t;
+  }
+  function by(g){for(k=0;k<m;k++)w[k]=g(ord[k]);if(!asc()){pass(0);pass(16);}}
+  function asc(){for(var j=1;j<m;j++)if(w[p[j]]<w[p[j-1]])return false;return true;}  // p already orders w: a pass would change nothing
+  by(o.base==='old'?function(i){return ~o.id[i];}:o.base==='rand'?function(i){return rnd(o,i);}:function(i){return o.id[i];});
+  if(o.fine){for(k=0;k<m;k++)mn=Math.min(mn,o.fine[ord[k]]);by(function(i){return o.fine[i]-mn;});}
+  for(k=0;k<m;k++)f[k]=o.score[ord[k]];
+  for(var j=0;j<2;j++){for(k=0;k<m;k++)w[k]=u[2*k+j];pass(0);pass(16);}
+  for(k=0;k<m;k++)w[k]=o.key[ord[k]];if(!asc())pass(0);
+  t=ord.slice();for(k=0;k<m;k++)ord[k]=t[p[k]];
 }
 // the state in the hash: top (conf=), gap (gap=), w (pri=, else the Blitz the gap weights), base and seed (base=). legacy: an old sort= link, so w holds the old 0..3 levels.
 function read(){
@@ -255,7 +276,7 @@ var F=function(ctx){
       var sc=new Float64Array(P.n),fn=null,k,i,fine=st.w.conf>0||!st.explicit&&!alloff();
       for(k=0;k<ord.length;k++)sc[ord[k]]=score(ord[k],lv);
       if(fine){fn=new Float64Array(P.n);for(k=0;k<ord.length;k++){i=ord[k];fn[i]=ctx.fine(i,lv);}}
-      ord.sort(compare({key:key,score:sc,fine:fn,base:st.base,seed:st.seed,id:P.id}));
+      rsort(ord,{key:key,score:sc,fine:fn,base:st.base,seed:st.seed,id:P.id});
     },
     // the gap badge of a record in a gap, else null: the badge keeps the cells with that many days or fewer, the arrow opens where-to-blitz at the cell
     badge:function(i){
@@ -301,7 +322,7 @@ var F=function(ctx){
     }
   };
 };
-F.compare=compare;
+F.compare=compare;F.rsort=rsort;
 F.label=function(){var t=read().top;return t<100?'Best '+t+'%':'';};  // the hash's cut, before the records (and the instance) land
 return F;
 })();

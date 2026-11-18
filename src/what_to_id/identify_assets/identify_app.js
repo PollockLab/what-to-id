@@ -61,19 +61,19 @@ function build(){
   for(i=0;i<n;i++)if(on(i)){key[i]=LEVEL[i]*W+(rk&&UF.mine(i)?NK*STEPS:0)+(NK-1-SUB[i])*STEPS;c[key[i]+1]++;}else if(KIND[i]===3&&on(i,1))u++;  // u: level 3 past its Best x%
   for(k=1;k<c.length;k++)c[k]+=c[k-1];
   var at=c.slice(),order=new Int32Array(c[c.length-1]);
-  for(k=0;k<n;k++){i=BYID[k];if(on(i))order[at[key[i]]++]=i;}
+  for(k=0;k<n;k++){i=BYID[k];if(key[i])order[at[key[i]]++]=i;}  // key[i] is 0 unless on(i) held in the first loop
   if(GP)for(lv=1;lv<=5;lv++)GP.sort(order.subarray(c[lv*W],c[(lv+1)*W]),lv,key);  // the best last, as the cut reads from the end
-  var out=[],total=[];MORE.clear();KC=[];
+  var out=[],total=[],run=RUN();MORE.clear();KC=[];
   for(lv=1;lv<=5;lv++){
     // the cut is per kind, so a merged tab lists each kind's level list in turn, as pool_levels writes them
     var tot=new Uint32Array(65536*NK),taken=new Uint32Array(65536*NK),rows=[],a=c[lv*W],b=c[(lv+1)*W],nd=[],cut,t,kf=KF&&TAB[KF]===lv?KF:0;
     for(k=a;k<b;k++){i=order[k];KC[KIND[i]]=(KC[KIND[i]]||0)+1;if(kf&&KIND[i]!==kf){order[k]=-1;continue;}
       if(!tot[SUB[i]*65536+ck(i,lv)]++)nd[SUB[i]]=(nd[SUB[i]]||0)+1;}
-    for(k=b-1;k>=a;k--){i=order[k];if(i<0)continue;t=SUB[i]*65536+ck(i,lv);cut=nd[SUB[i]]===1||lv===3&&RUN()?Infinity:PER_SPECIES;
+    for(k=b-1;k>=a;k--){i=order[k];if(i<0)continue;t=SUB[i]*65536+ck(i,lv);cut=nd[SUB[i]]===1||lv===3&&run?Infinity:PER_SPECIES;
       if(taken[t]<cut){rows.push(i);if(!taken[t]++&&tot[t]>cut&&!(lv===3&&LOOKS))MORE.set(i,tot[t]-cut);}}
     // the #record= card leads its level, even past the per-species cut
     if(REC>=0&&LEVEL[REC]===lv&&on(REC)&&rows[0]!==REC){k=rows.indexOf(REC);if(k>0)rows.splice(k,1);rows.unshift(REC);}
-    if(lv===3&&RUN()&&LOOKS)rows=IdentifyNarrow.runs(rows,looksOf);
+    if(lv===3&&run&&LOOKS)rows=IdentifyNarrow.runs(rows,looksOf);
     out[lv]=rows;total[lv]=b-a;
     for(k=0;rk&&k<rows.length&&UF.mine(rows[k]);k++);MINE[lv]=rk?k:-1;
   }
@@ -81,6 +81,8 @@ function build(){
   for(out[6]=[],total[6]=0,k=n-1;k>=0;k--)if(SEL[i=BYID[k]]&&++total[6]&&LV===6)out[6].push(i);
   view=out;S.total=total;S.all3=total[3]+u;
 }
+// the look-alike's index in LOOKS.names, -1 for none: a cheaper key than its name
+function lookCode(i){var v=LOOKS?LOOKS.lo[i]|LOOKS.hi[i]<<8:NO_LOOK;return v===NO_LOOK?-1:v;}
 function looksOf(i){var v=LOOKS?LOOKS.lo[i]|LOOKS.hi[i]<<8:NO_LOOK;return v===NO_LOOK?null:LOOKS.names[v];}
 // level 3's runner-up: [name, margin in thousandths, 255 none], or null; its place is in its suggestion's list
 function whyOf(i){
@@ -472,7 +474,7 @@ async function load(){
     Promise.all([lk(),file('why').catch(function(){return null;})]).then(function(b){if(b[0]&&b[1]){WHY=looks(b[1],1);if(LV===3)retitle();}});};
   if(LV===3&&!BT)setTimeout(WHYF,0);rg.then(RKF,RKF);  // the rank and look-alikes follow the records in the background: level 3's count reads both
   rg.then(function(b){if(!b)return;
-    R=IdentifyRanges(b,{P:P,sdm:META.sdm,name:function(i){return P.tax[i]!==NOTAX&&TAXA[P.tax[i]]?TAXA[P.tax[i]][0]:null;},look:looksOf,redraw:redraw});
+    R=IdentifyRanges(b,{P:P,sdm:META.sdm,name:function(i){return P.tax[i]!==NOTAX&&TAXA[P.tax[i]]?TAXA[P.tax[i]][0]:null;},look:looksOf,code:lookCode,redraw:redraw});
     // #record=<id> (the map's token): its level, its card first, its range popover open
     var rec=/(?:^|&)record=(\d+)(?:&|$)/.exec(location.hash.slice(1));
     for(var i=0;rec&&i<P.n;i++)if(P.id[i]===+rec[1]){REC=i;break;}
