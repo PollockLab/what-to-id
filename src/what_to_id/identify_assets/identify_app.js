@@ -57,29 +57,32 @@ function RUN(){return /(^|&)run=1(&|$)/.test(location.hash.slice(1));}
 function on(i,all){return SEL[i]&&LEVEL[i]&&(!R||R.pass(i,LEVEL[i]))&&(!X||X.pass(i))&&(!GP||GP.pass(i,KIND[i],all))&&(!WW||WW.pass(i));}
 // Under My taxa first the user's genera lead each level, each kind in turn, then the rest; MINE: how many cards they are, -1 without the mode.
 function build(){
-  var n=P.n,W=2*NK*STEPS,c=new Uint32Array(6*W+1),key=new Uint16Array(n),rk=UF.ranked(),i,k,lv,u=0;
-  for(i=0;i<n;i++)if(on(i)){key[i]=LEVEL[i]*W+(rk&&UF.mine(i)?NK*STEPS:0)+(NK-1-SUB[i])*STEPS;c[key[i]+1]++;}else if(KIND[i]===3&&on(i,1))u++;  // u: level 3 past its Best x%
+  var n=P.n,W=2*NK*STEPS,c=new Uint32Array(6*W+1),key=new Uint16Array(n),rk=UF.ranked(),i,k,lv,u=0,run=RUN(),kf0=KF,out=[],total=[];
+  KC=[];MINE=[];MORE.clear();
+  for(i=0;i<n;i++)if(on(i)){key[i]=LEVEL[i]*W+(rk&&UF.mine(i)?NK*STEPS:0)+(NK-1-SUB[i])*STEPS;c[key[i]+1]++;KC[KIND[i]]=(KC[KIND[i]]||0)+1;}else if(KIND[i]===3&&on(i,1))u++;  // u: level 3 past its Best x%
   for(k=1;k<c.length;k++)c[k]+=c[k-1];
   var at=c.slice(),order=new Int32Array(c[c.length-1]);
   for(k=0;k<n;k++){i=BYID[k];if(key[i])order[at[key[i]]++]=i;}  // key[i] is 0 unless on(i) held in the first loop
-  if(GP)for(lv=1;lv<=5;lv++)GP.sort(order.subarray(c[lv*W],c[(lv+1)*W]),lv,key);  // the best last, as the cut reads from the end
-  var out=[],total=[],run=RUN();MORE.clear();KC=[];
-  for(lv=1;lv<=5;lv++){
+  // A level is sorted and cut when first read (the shown one at the end of build), so a build pays for one level, not five; the counts are known from the filter pass.
+  function rows_(lv){
+    var tot=new Uint32Array(65536*NK),taken=new Uint32Array(65536*NK),rows=[],a=c[lv*W],b=c[(lv+1)*W],nd=[],cut,t,i,k,kf=kf0&&TAB[kf0]===lv?kf0:0;
+    if(GP)GP.sort(order.subarray(a,b),lv,key);  // the best last, as the cut reads from the end
     // the cut is per kind, so a merged tab lists each kind's level list in turn, as pool_levels writes them
-    var tot=new Uint32Array(65536*NK),taken=new Uint32Array(65536*NK),rows=[],a=c[lv*W],b=c[(lv+1)*W],nd=[],cut,t,kf=KF&&TAB[KF]===lv?KF:0;
-    for(k=a;k<b;k++){i=order[k];KC[KIND[i]]=(KC[KIND[i]]||0)+1;if(kf&&KIND[i]!==kf){order[k]=-1;continue;}
+    for(k=a;k<b;k++){i=order[k];if(kf&&KIND[i]!==kf){order[k]=-1;continue;}
       if(!tot[SUB[i]*65536+ck(i,lv)]++)nd[SUB[i]]=(nd[SUB[i]]||0)+1;}
     for(k=b-1;k>=a;k--){i=order[k];if(i<0)continue;t=SUB[i]*65536+ck(i,lv);cut=nd[SUB[i]]===1||lv===3&&run?Infinity:PER_SPECIES;
       if(taken[t]<cut){rows.push(i);if(!taken[t]++&&tot[t]>cut&&!(lv===3&&LOOKS))MORE.set(i,tot[t]-cut);}}
     // the #record= card leads its level, even past the per-species cut
     if(REC>=0&&LEVEL[REC]===lv&&on(REC)&&rows[0]!==REC){k=rows.indexOf(REC);if(k>0)rows.splice(k,1);rows.unshift(REC);}
     if(lv===3&&run&&LOOKS)rows=IdentifyNarrow.runs(rows,looksOf);
-    out[lv]=rows;total[lv]=b-a;
     for(k=0;rk&&k<rows.length&&UF.mine(rows[k]);k++);MINE[lv]=rk?k:-1;
+    return rows;
   }
+  for(lv=1;lv<=5;lv++){total[lv]=c[(lv+1)*W]-c[lv*W];(function(lv){Object.defineProperty(out,lv,{configurable:true,enumerable:true,get:function(){
+    var r=rows_(lv);Object.defineProperty(out,lv,{value:r,writable:true,configurable:true,enumerable:true});return r;}});})(lv);}
   // All needing ID (6): every kept record, level or not, in the base order (newest first); its list only while it shows
   for(out[6]=[],total[6]=0,k=n-1;k>=0;k--)if(SEL[i=BYID[k]]&&++total[6]&&LV===6)out[6].push(i);
-  view=out;S.total=total;S.all3=total[3]+u;
+  view=out;S.total=total;S.all3=total[3]+u;if(LV>0&&LV<6)out[LV];  // the shown level now
 }
 // the look-alike's index in LOOKS.names, -1 for none: a cheaper key than its name
 function lookCode(i){var v=LOOKS?LOOKS.lo[i]|LOOKS.hi[i]<<8:NO_LOOK;return v===NO_LOOK?-1:v;}
