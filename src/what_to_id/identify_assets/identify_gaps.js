@@ -88,7 +88,7 @@ function read(){
     base:bm?bm[1]||'rand':'new',seed:bm&&bm[2]?+bm[2]:1,explicit:!!bm};
 }
 var F=function(ctx){
-  var P=ctx.P,st=read(),state='load',settle,ready=new Promise(function(r){settle=r;}),tier=null,days=null,names=null,LIT=LIT0,UI=null,T=0;
+  var P=ctx.P,st=read(),state='load',settle,ready=new Promise(function(r){settle=r;}),tier=null,days=null,names=null,LIT=LIT0,UI=null,T=0,BUF=null;
   function alloff(){return !KEYS.some(function(k){return st.w[k]>0;});}
   function disp(k){return st.legacy?LEG[st.w[k]]:st.w[k];}  // the weight as the sliders show it, 0..100
   function toNew(){if(st.legacy){KEYS.forEach(function(k){st.w[k]=disp(k);});st.legacy=false;st.sort=null;}}  // a touched slider leaves the old tiered order
@@ -273,9 +273,10 @@ var F=function(ctx){
     tier:function(i){return tier?tier[i]:0;},
     // orders a level's records (a typed-array slice), the best last, under key (the groups of the level's order) and the prioritizers
     sort:function(ord,lv,key){
-      var sc=new Float64Array(P.n),fn=null,k,i,fine=st.w.conf>0||!st.explicit&&!alloff();
+      if(!BUF||BUF[0].length!==P.n)BUF=[new Float64Array(P.n),new Float64Array(P.n)];  // reused: rsort reads only the entries of ord written here
+      var sc=BUF[0],fn=null,k,i,fine=st.w.conf>0||!st.explicit&&!alloff();
       for(k=0;k<ord.length;k++)sc[ord[k]]=score(ord[k],lv);
-      if(fine){fn=new Float64Array(P.n);for(k=0;k<ord.length;k++){i=ord[k];fn[i]=ctx.fine(i,lv);}}
+      if(fine){fn=BUF[1];for(k=0;k<ord.length;k++){i=ord[k];fn[i]=ctx.fine(i,lv);}}
       rsort(ord,{key:key,score:sc,fine:fn,base:st.base,seed:st.seed,id:P.id});
     },
     // the gap badge of a record in a gap, else null: the badge keeps the cells with that many days or fewer, the arrow opens where-to-blitz at the cell
