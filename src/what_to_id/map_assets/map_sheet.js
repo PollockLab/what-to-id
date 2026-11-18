@@ -18,7 +18,7 @@ none.className='muted xnone';none.textContent='Each dot takes its group’s colo
 l.append(none);document.body.appendChild(p);
 function place(){var only=H.classList.contains('rail-only'),on=open==='filters'&&NARROW.matches&&!only;
   if(on&&side.parentNode!==p){p.insertBefore(side,f);if(H.classList.contains('rail-off')){ours=true;flip();}}
-  else if(!on&&side.parentNode===p){document.body.insertBefore(side,document.getElementById('map'));if(ours){ours=false;if(!only)flip();}}}  // alone, the rail stays open
+  else if(!on&&side.parentNode===p){document.body.insertBefore(side,document.getElementById('main-content'));if(ours){ours=false;if(!only)flip();}}}  // alone, the rail stays open
 function flip(){document.getElementById('railx').click();}
 NARROW.addEventListener('change',place);new MutationObserver(place).observe(H,{attributes:true,attributeFilter:['class']});  // rail-only
 function set(k,tell){open=k;place();p.hidden=!k;f.hidden=k!=='filters';l.hidden=k!=='legend';

@@ -377,3 +377,13 @@ def test_a_blocked_pool_keeps_its_error_in_the_count(browser, range_site):
     page.wait_for_timeout(500)
     assert "Could not load the records" in page.locator("#count").inner_text()
     page.close()
+
+
+def test_the_map_sits_in_the_main_landmark_the_skip_link_targets(browser, range_site):
+    page = open_map(browser, f"{range_site}/map.html?standalone=1")
+    assert page.locator("main#main-content > #map[role=application]").count() == 1
+    assert page.get_attribute(".site-skip", "href") == "#main-content"
+    page.wait_for_selector("#map canvas")
+    box = page.locator("#map").bounding_box()
+    assert box["width"] > 600 and box["height"] > 300  # the inner map still fills the page
+    page.close()

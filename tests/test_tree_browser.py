@@ -263,6 +263,9 @@ def test_focusing_a_tip_shows_it_among_its_siblings(browser, site):
 def test_a_phone_shows_the_outline_and_switches_to_the_radial_tree(browser, site):
     page = open_tree(browser, site, 390, 800)
     assert page.locator("#side").is_visible() and page.locator("#radial").is_hidden()
+    # the main landmark stays when the circle is hidden, and the skip link has its target
+    assert page.evaluate("getComputedStyle(document.querySelector('main#main-content')).display") != "none"
+    assert page.get_attribute(".site-skip", "href") == "#main-content"
     page.click("#mode")
     page.wait_for_selector("#svg .nd")
     assert page.locator("#radial").is_visible() and page.locator("#side").is_hidden()
