@@ -28,7 +28,7 @@ button[aria-pressed="true"],.btn.primary{background:var(--on);color:var(--onink)
 #mode{display:none}
 [data-explain]:not(h1 *){display:inline-block;padding:5px 0;margin:-5px 0;min-height:24px;box-sizing:border-box}
 .muted,#qn,#status{color:var(--muted);font-size:12px;margin:0}
-#crumbs{flex:1 1 100%;font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+#crumbs{flex:1 1 100%;font-size:12px;color:var(--muted);overflow-wrap:anywhere;min-height:17px}  /* the row the crumbs fill is held while the taxa load: the plot and outline below do not drop when it appears */
 #about{flex:1 1 100%;margin:0;padding:8px 10px;border-radius:12px;background:var(--warnbg);color:var(--warn);font-size:12px}
 #about[hidden],.card[hidden]{display:none}
 #main-content{display:contents}  /* the landmark stays when the phone hides the circle; the grid sees its children */
@@ -95,6 +95,7 @@ button[aria-pressed="true"],.btn.primary{background:var(--on);color:var(--onink)
 .vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 @media (max-width:600px){body,.embed body{grid-template-columns:1fr;grid-template-rows:auto auto auto minmax(0,1fr);grid-template-areas:"nav" "head" "card" "side"}
   #mode{display:inline-block}#radial{display:none}
+  #side:has(#outline:empty){visibility:hidden}  /* an empty scroller is not drawn: it would shift down when the card opens above it with the first rows */
   .radial #radial{display:block;grid-area:side}.radial #side{display:none}
   /* the card sits above the outline rather than over it */
   .card,.embed .card{grid-area:card;position:relative;top:auto;right:auto;width:auto;max-height:40vh;border-width:0 0 1px;border-radius:0;box-shadow:none}

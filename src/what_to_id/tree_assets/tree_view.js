@@ -57,10 +57,10 @@ function P(g,a,r){return (g.cx+r*Math.sin(a)).toFixed(1)+','+(g.cy-r*Math.cos(a)
 function arc(g,r,a0,a1,sweep){return r<0.5||a0===a1?'':'A'+r.toFixed(1)+','+r.toFixed(1)+' 0 '+(Math.abs(a1-a0)>Math.PI?1:0)+','+
   sweep+' '+P(g,a1,r);}
 function sector(g,a0,a1,r0,r1){return 'M'+P(g,a0,r1)+arc(g,r1,a0,a1,1)+'L'+P(g,a1,r0)+arc(g,r0,a1,a0,0)+'Z';}
-function draw(animate){
+function draw(animate,again){
   if(!D)return;
   // the card floats beside the circle, or stacks above it where that would leave the circle under MINR px
-  var c=$('card'),bd=document.body;c.hidden=S.sel<0;bd.classList.remove('stack');
+  var c=$('card'),bd=document.body,cs;c.hidden=S.sel<0;bd.classList.remove('stack');cs=c.offsetWidth+'x'+c.offsetHeight;
   bd.classList.toggle('stack',!c.hidden&&$('radial').clientWidth-c.offsetWidth-24<MINR);
   var v=M.view(D,S),span=Math.min(2*Math.PI,Math.max(Math.PI/6,v.root.leaves*Math.PI/12)),g=geo(span);
   // each leaf at least half an even share (5 to 16px), so a small view labels every tip; a fan of a few
@@ -89,6 +89,7 @@ function draw(animate){
   else render(V,null);
   prev={};V.all.forEach(function(n){prev[n.key]={a:n.a,r:n.r};});
   outline();card();crumbs();
+  if(!again&&c.offsetWidth+'x'+c.offsetHeight!==cs)draw(animate,1);  // the circle made room for the card before it was filled: once more with the card as it is
 }
 // Each node moves from where it (or the nearest shown ancestor) was to where it goes.
 function tween(from,e){return function(n){var s=null;for(var x=n;x&&!s;x=x.parent)s=from[x.key];s=s||{a:n.a,r:0};
@@ -384,7 +385,7 @@ if(SY)addEventListener('message',function(e){var d=e.data;
     if(D){var s=S.sel;take();if(s>=0&&S.sel<0&&D.tot[s])S.sel=PS=s;draw(true);}});
   CP=d;});
 async function load(){
-  status('Loading the taxa…');
+  $('crumbs').textContent='Loading the taxa…';  // in the crumbs' reserved row: a status line would add a row that the crumbs then replace
   var has=fetch('explore.html',{method:'HEAD'}).then(function(r){return r.ok;},function(){return false;});
   var raw=await fetchOnce(new URL(META.taxa,location.href)).catch(function(e){throw new Error('the taxa file answered '+e.message);});
   var T=JSON.parse(new TextDecoder().decode(await L.gunzip(raw)));
@@ -394,5 +395,5 @@ async function load(){
   CC=CladeColour.build(T,META);D=D0=M.build(T,META.ranks,G,{names:META.names,total:META.n});groupRows();
   readHash();if(SY){SEL=SEL||MapFilter.tokens(location.hash);take();if(S.sel<0)S.sel=PS=M.lead(D,D.root);}split=await has;status('');draw(false);
 }
-load().catch(function(e){status('The tree could not load: '+e.message);});
+load().catch(function(e){$('crumbs').textContent='';status('The tree could not load: '+e.message);});
 })();
