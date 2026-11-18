@@ -475,6 +475,8 @@ def test_the_phone_page_holds_its_layout_while_the_taxa_load(browser, site):
     page.goto(f"{site}/tree.html")
     page.wait_for_selector("#crumbs:text('Loading')")
     page.wait_for_timeout(500)
+    live = page.eval_on_selector_all("[role=status]", "e => e.map(x => x.textContent)")
+    assert any("Loading the taxa" in t for t in live)  # announced, drawn once in the crumbs
     head = page.locator("header").bounding_box()["height"]
     for route in held:
         route.continue_()

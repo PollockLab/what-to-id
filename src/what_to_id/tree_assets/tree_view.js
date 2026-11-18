@@ -9,7 +9,7 @@ var CT=new Set(),M=TreeModel,L=EmbeddingsLayout,META=CFG.meta,nf=new Intl.Number
   D=null,S=null,V=null,G={},GS=[],COL=new Map(),CC=null,prev=null,anim=0,SEL='',SY=null,PS=-1,PH={},Q=[],qt=0,qlast=0,lt=0,split=false,OL=null;
 function $(i){return document.getElementById(i);}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
-function status(t){$('status').textContent=t||'';}
+function status(t,sr){var s=$('status');s.className=sr?'sr':'';s.textContent=t||'';}
 // The clade colours, focused on the shown root as the map's legend focuses on a sub-clade (clade_colour.js).
 function col(r){
   if(COL.f!==S.focus){COL=new Map();COL.f=S.focus;}
@@ -385,7 +385,7 @@ if(SY)addEventListener('message',function(e){var d=e.data;
     if(D){var s=S.sel;take();if(s>=0&&S.sel<0&&D.tot[s])S.sel=PS=s;draw(true);}});
   CP=d;});
 async function load(){
-  $('crumbs').textContent='Loading the taxa…';  // in the crumbs' reserved row: a status line would add a row that the crumbs then replace
+  $('crumbs').textContent='Loading the taxa…';status('Loading the taxa…',1);  // drawn in the crumbs' reserved row, as a status line would add a row; read out from the status line
   var has=fetch('explore.html',{method:'HEAD'}).then(function(r){return r.ok;},function(){return false;});
   var raw=await fetchOnce(new URL(META.taxa,location.href)).catch(function(e){throw new Error('the taxa file answered '+e.message);});
   var T=JSON.parse(new TextDecoder().decode(await L.gunzip(raw)));
