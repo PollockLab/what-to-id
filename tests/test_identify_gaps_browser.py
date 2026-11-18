@@ -309,11 +309,26 @@ def test_the_choices_are_kept_in_the_hash_and_survive_a_reload(browser, site):
 
 def test_without_the_checklist_level_3_lists_by_confidence_without_errors(browser, site):
     base, pts = site
-    page = open_level_3(browser, base, "#lvl=3&conf=all", fail=True)
+    held = []
+    page = browser.new_page(viewport={"width": 600, "height": 900})
+    page.route("**/pool-levels-looks.*", lambda r: held.append(r))  # the suggestions arrive last
+    page.errors = []
+    page.on("pageerror", lambda e: page.errors.append(str(e)))
+    eb.stub_inat(page, None)
+    stub_checklist(page, True)
+    page.goto(f"{base}/identify.html#lvl=3&conf=all")
+    page.wait_for_function("window.__identify && __identify.ids().length > 0")
     page.wait_for_function("document.getElementById('psum').textContent.includes('did not')")
     rank = dict(zip(pts["id"].tolist(), rank_plane(base).tolist(), strict=True))
     got = [rank[i] for i in view(page)]
+    # before the suggestions load, a record's own at-risk taxon (fixture row 1003) must not lift it
     assert got == sorted(got) and page.locator("#grid .gap").count() == 0
+    while not held:
+        page.wait_for_timeout(50)
+    held[0].continue_()
+    page.wait_for_selector("#grid .card .look", state="attached")
+    got = [rank[i] for i in view(page)]
+    assert got == sorted(got)
     assert page.errors == []
 
 
