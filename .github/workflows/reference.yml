@@ -1,0 +1,56 @@
+name: reference
+
+# Refetches the reference lists in src/what_to_id (invasive and at-risk BC taxa) from iNaturalist
+# every week and, when they changed, opens or updates one pull request for review. Never merges.
+# challenge_taxa.json and the BC parks index are not refreshed here: see scripts/refresh_reference.py.
+on:
+  schedule:
+    - cron: "23 9 * * 1" # Mondays, 09:23 UTC
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Write a list even if it shrank more than 10%"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  WHAT_TO_ID_USER_AGENT: what-to-id reference refresh (https://github.com/PollockLab/what-to-id)
+  BRANCH: chore/reference-refresh
+
+jobs:
+  refresh:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - name: Refetch the lists
+        env:
+          FORCE: ${{ inputs.force && '1' || '' }}
+        run: python scripts/refresh_reference.py "$RUNNER_TEMP/summary.md" ${FORCE:+"--force"}
+      - name: Open or update the pull request
+        run: |
+          if git diff --quiet; then
+            echo "No reference list changed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$BRANCH"
+          git add src/what_to_id/invasive_bc_taxa.json src/what_to_id/at_risk_bc_taxa.json
+          git commit -m "chore(data): refresh reference lists"
+          git push --force origin "$BRANCH"
+          if gh pr view "$BRANCH" --json state --jq '.state' 2>/dev/null | grep -qx OPEN; then
+            gh pr edit "$BRANCH" --body-file "$RUNNER_TEMP/summary.md"
+          else
+            gh pr create --head "$BRANCH" \
+              --title "chore(data): refresh reference lists" --body-file "$RUNNER_TEMP/summary.md"
+          fi
