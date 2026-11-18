@@ -49,6 +49,7 @@ def serve(root, frame, score, projects=None, totals=None):
     for name, blob in blobs.items():
         (root / name).write_bytes(blob)
     meta["value"] = [[953, 2, 5]]  # the at-risk list: Apis c, the www tests' third suggestion
+    meta["invasive"] = [952]  # Bombus b, the www tests' second suggestion
     (root / "map.html").write_text(render_map(meta, freeze=None))
     pts = decode_points(blobs, meta)
     i = np.arange(len(frame))

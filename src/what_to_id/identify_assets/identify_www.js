@@ -1,8 +1,9 @@
 // The At risk, Invasive and Group by suggested species toggles. At risk and Invasive (hash risk=1, inv=1) keep
 // cards by their suggested species (else the record's own taxon): At risk from the map's META.value list (at_risk_bc_taxa.json, listed in Canada
-// or BC S1-S3), at once; Invasive when iNaturalist marks it introduced in BC, from /v1/taxa/<ids>?preferred_place_id=7085
-// (30 ids a request), cached by taxon id for a week. A suggestion not yet looked up is hidden until its answer lands.
-// IdentifyWWW(ctx), ctx {look(i), taxa(), value (META.value), redraw()}.
+// or BC S1-S3), Invasive from META.invasive (invasive_bc_taxa.json, introduced in BC per iNaturalist), both at once. Only a map
+// without META.invasive asks /v1/taxa/<ids>?preferred_place_id=7085 (30 ids a request, cached by taxon id for a week) and hides a
+// suggestion not yet looked up until its answer lands.
+// IdentifyWWW(ctx), ctx {look(i), taxa(), value (META.value), invasive (META.invasive, optional), redraw()}.
 var IdentifyWWW=(function(){
 'use strict';
 var LS='wtid-status',WEEK=7*864e5,RISK=1,INV=2;
@@ -11,7 +12,7 @@ function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=c
 function invasive(t){var m=t.establishment_means||{};
   return /introduced|invasive/.test(m.establishment_means||'')&&(!m.place||m.place.id===7085)?INV:0;}
 return function(ctx){
-  var api=inatGate({gap:1000}),ids=new Map(),cache={},want=new Set(),busy=new Set(),T=0,out=0,need=0,risk=new Set((ctx.value||[]).map(function(r){return r[0];}));
+  var api=inatGate({gap:1000}),ids=new Map(),cache={},want=new Set(),busy=new Set(),T=0,out=0,need=0,risk=new Set((ctx.value||[]).map(function(r){return r[0];})),bc=ctx.invasive?new Set(ctx.invasive):null;
   try{var c=JSON.parse(localStorage.getItem(LS))||{};if(Date.now()-c.at<WEEK)cache=c.f||{};}catch(e){}
   function on(k){return new RegExp('(^|&)'+k+'=1(&|$)').test(location.hash.slice(1));}
   function keep(k,v){var t=location.hash.slice(1).split('&').filter(function(x){return x&&x.indexOf(k+'=')!==0;});if(v)t.push(k+'=1');
@@ -38,6 +39,7 @@ return function(ctx){
     if(!id){if(nm&&id===undefined)named(nm);return false;}
     if(need&RISK&&risk.has(id))return true;
     if(!(need&INV))return false;
+    if(bc)return bc.has(id);
     if(!(id in cache)){if(!want.size)setTimeout(ask,0);want.add(id);return false;}
     return (cache[id]&INV)!==0;
   }
@@ -46,6 +48,7 @@ return function(ctx){
     if(!ids.size)ctx.taxa().forEach(function(t){if(t[2])ids.set(t[0],t[2]);});
     var id=ids.get(ctx.look(i)),f=id&&risk.has(id)?1:0;
     if(!id||!inv)return f;
+    if(bc)return bc.has(id)?f|INV:f;
     if(id in cache)return f|cache[id]&INV;
     if(!want.size)setTimeout(ask,0);want.add(id);return f;
   }

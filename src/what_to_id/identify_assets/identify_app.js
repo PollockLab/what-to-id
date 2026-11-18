@@ -429,7 +429,7 @@ async function load(){
   var mp=L.fetchMapMeta(MAP,fetch),drawn_=new Promise(function(ok){if(!CFG.first)return ok();setTimeout(ok,2000);  // the bulk files wait for the first cards' paint (2 s at most), then their first row's photos
     Promise.all([get(new URL(CFG.first,MAP)),mp]).then(function(b){if(!MF)firstOf(JSON.parse(new TextDecoder().decode(b[0])));}).catch(function(){}).then(ok);});  // optional
   META=await mp;
-  WW=IdentifyWWW({value:META.value,taxa:function(){return TAXA;},look:function(i){return looksOf(i)||(P.tax[i]!==NOTAX&&TAXA[P.tax[i]]?TAXA[P.tax[i]][0]:null);},redraw:function(){if(P)redraw();}});  // the suggestion, else the record's own taxon
+  WW=IdentifyWWW({value:META.value,invasive:META.invasive,taxa:function(){return TAXA;},look:function(i){return looksOf(i)||(P.tax[i]!==NOTAX&&TAXA[P.tax[i]]?TAXA[P.tax[i]][0]:null);},redraw:function(){if(P)redraw();}});  // the suggestion, else the record's own taxon
   function file(k){var f=META.files[k];return f?get(new URL(f,MAP)):Promise.reject(new Error('the map lists no '+k+' file'));}
   await drawn_;await CARD.row(2e4);
   var taxa=Promise.all([get(new URL(META.taxa,MAP)),I18N.lang==='fr'&&META.files.taxa_fr?file('taxa_fr').catch(function(){return null;}):null]).then(function(r){return I18N.taxa(JSON.parse(new TextDecoder().decode(r[0])),r[1]&&JSON.parse(new TextDecoder().decode(r[1])));});
