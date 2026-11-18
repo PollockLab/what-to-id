@@ -68,7 +68,7 @@ def test_the_copied_explanations_equal_their_sources():
     assert about.strip() in html and "__" not in about
     for src, pattern in (
         ("confusion", r"</summary>\n(<dl>.*?)<dt>Built</dt>"),
-        ("tree", r'<p id="about" hidden>(.*?)</p>'),
+        ("tree", r'<p id="about" hidden>(?:__POOL_DATE__)?(.*?)</p>'),
         ("space", r'<p class="note" id="honest">(.*?)</p>'),
     ):
         copied = (
@@ -318,3 +318,8 @@ def test_methods_open_with_the_intended_use_box():
     assert box < methods.index('id="methods-data"')
     assert "for prioritising which records to look at" in methods
     assert "not an ID tool" in methods and "never agree to an ID because of a level" in methods
+
+
+def test_views_leave_no_template_placeholders():
+    for _id, _heading, html in terms_page.views():
+        assert not re.search(r"__[A-Z_]+__", html), _id
