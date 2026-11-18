@@ -58,7 +58,7 @@ var words={
 "Pick several groups, or leave some out, in What":"Choisissez plusieurs groupes, ou excluez-en, sous Quoi",
 "Open with these groups next time, in this browser":"Ouvrir avec ces groupes la prochaine fois, dans ce navigateur",
 "Remember these groups":"Mémoriser ces groupes","Add another project for Identify only":"Ajouter un autre projet pour Identifier seulement",
-"Project number or URL":"Numéro ou URL du projet","Add":"Ajouter","Sign out":"Se déconnecter","Login or number":"Identifiant ou numéro",
+"Project number or URL":"Numéro ou URL du projet","Add":"Ajouter","Sign out":"Se déconnecter","Clear":"Effacer","Sign in with iNaturalist":"Se connecter avec iNaturalist","Login or number":"Identifiant ou numéro",
 "iNat login":"Identifiant iNat","iNaturalist login or user number":"Identifiant iNaturalist ou numéro d'utilisateur","Your iNaturalist login":"Votre identifiant iNaturalist",
 "Projects":"Projets","User":"Utilisateur","Adjust":"Ajuster","Group":"Groupe","Level order":"Ordre des niveaux","Match":"Correspond","Only the user's genera":"Seulement les genres de l'utilisateur",
 "Hide records the user identified":"Masquer les observations identifiées par l'utilisateur","Only records the user observed":"Seulement les observations de l'utilisateur",
@@ -145,7 +145,7 @@ var words={
 "Untick “my observations” below first.":"Décochez d'abord « mes observations » ci-dessous.","Nobody has looked":"Personne n'a regardé",
 "No one but the observer has identified it":"Seul l'observateur l'a identifiée","Needs a second opinion":"Demande un deuxième avis","One ID, and nobody agrees yet":"Une identification, et personne n'est encore d'accord",
 "Your IDs":"Vos identifications","suggests":"suggère","commented:":"a commenté :","New":"Nouveau","Use my login:":"Utiliser mon identifiant :","1 new reply to your IDs":"1 nouvelle réponse à vos identifications","No replies to your IDs yet.":"Aucune réponse à vos identifications pour l'instant.",
-"Add your iNat login in About this page, or sign in.":"Ajoutez votre identifiant iNat dans À propos de cette page, ou connectez-vous.","Your IDs did not load.":"Vos identifications n'ont pas pu être chargées.",
+"Type your iNaturalist login above to see replies to your IDs.":"Saisissez votre identifiant iNaturalist ci-dessus pour voir les réponses à vos identifications.","Your IDs did not load.":"Vos identifications n'ont pas pu être chargées.",
 "IDs you add here are posted under your iNaturalist account. Check Your IDs to see if someone disagreed or commented.":"Les identifications ajoutées ici sont publiées sous votre compte iNaturalist. Consultez Vos identifications pour voir si quelqu'un n'est pas d'accord ou a commenté."
 };
 var rules=[

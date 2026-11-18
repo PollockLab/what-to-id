@@ -348,7 +348,7 @@ def test_a_user_with_no_genus_is_not_ranked_and_nothing_is_dimmed(browser, site)
 def test_the_box_names_the_user_and_ticks_and_the_dimming_when_collapsed(browser, site):
     page = open_map(browser, site, "")
     assert page.inner_text("#usrbox > summary") == "User" and page.is_hidden("#usrbox select")
-    assert page.is_hidden("#usrbox button:has-text('Sign out')")
+    assert page.is_hidden("#usrbox button:has-text('Clear')")
     page.close()
     page = open_map(browser, site, "#user=42&umode=first&umin=50")
     page.wait_for_function("/^Genera/.test(document.querySelector('#usrbox p').textContent)")

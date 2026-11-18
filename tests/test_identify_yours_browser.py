@@ -207,17 +207,44 @@ def test_the_count_shows_unopened_opens_the_fold_and_clears_until_a_newer_reply(
     )
 
 
-def test_without_a_person_nothing_is_asked_and_no_count_shows(browser, site):
+def test_without_a_person_nothing_is_asked_and_the_empty_line_focuses_the_login(browser, site):
     base, _ = site
     hit = [record(102, MINE, comments=[(BOB, AFTER, "hi")])]
-    # a name in the User box alone is not the viewer
-    page, urls = open_yours(browser, base, hit, "#user=them", signed_in=False)
+    page, urls = open_yours(browser, base, hit, signed_in=False)
     page.wait_for_timeout(300)
     assert urls == [] and page.locator("#rep").is_hidden()
-    assert page.inner_text(REPLY) == "Add your iNat login in About this page, or sign in."
+    assert page.inner_text(REPLY) == "Type your iNaturalist login above to see replies to your IDs."
+    page.click("#myids [role=status] button")
+    assert page.evaluate("document.activeElement.id") == "usrname"
 
 
-def test_tapping_a_top_identifier_does_not_make_them_the_person(browser, site):
+def test_a_login_typed_in_the_user_box_alone_is_the_person_without_a_reply_count(browser, site):
+    base, _ = site
+    hit = [record(102, ident(OTHER, BIRD, day(1)), comments=[(BOB, day(2), "hi")], owner=ME)]
+    page, urls = open_yours(browser, base, hit, "#user=them", signed_in=False)
+    page.wait_for_selector("#myids li")
+    assert "ident_user_id=them" in urls[0] and page.locator("#rep").is_hidden()
+    page.fill("#usrname", "nobody")
+    page.press("#usrname", "Enter")
+    page.wait_for_function("document.querySelector('#myids li') === null")
+    assert "ident_user_id=nobody" in urls[-1]
+
+
+def test_the_user_filter_button_reads_clear(browser, site):
+    base, _ = site
+    page, _ = open_yours(browser, base, [], "#user=them", signed_in=False)
+    assert page.locator("#usrbox button:has-text('Clear')").is_visible()
+    assert page.locator("#usrbox button:has-text('Sign out')").count() == 0
+
+
+def test_the_help_button_is_named_about_this_page(browser, site):
+    base, _ = site
+    page, _ = open_yours(browser, base, [], signed_in=False, fold=False)
+    assert page.get_attribute("#helpb", "aria-label") == "About this page"
+    assert page.get_attribute("#helpb", "title") == "About this page"
+
+
+def test_tapping_a_top_identifier_fills_the_user_box_and_lists_their_replies(browser, site):
     base, _ = site
     page, urls = open_yours(browser, base, [], signed_in=False, fold=False)
     stub_identifiers(page)
@@ -227,7 +254,7 @@ def test_tapping_a_top_identifier_does_not_make_them_the_person(browser, site):
     page.locator("#topids button.sga").first.click()
     page.wait_for_function("document.getElementById('usrname').value === 'user0'")
     page.wait_for_timeout(300)
-    assert urls == [] and page.locator("#rep").is_hidden()
+    assert any("ident_user_id=user0" in u for u in urls) and page.locator("#rep").is_hidden()
 
 
 def test_your_ids_says_so_when_nothing_qualifies_or_the_fetch_fails(browser, site):
