@@ -61,7 +61,7 @@ function build(){
   for(i=0;i<n;i++)if(on(i)){key[i]=LEVEL[i]*W+(rk&&UF.mine(i)?NK*STEPS:0)+(NK-1-SUB[i])*STEPS;c[key[i]+1]++;}else if(KIND[i]===3&&on(i,1))u++;  // u: level 3 past its Best x%
   for(k=1;k<c.length;k++)c[k]+=c[k-1];
   var at=c.slice(),order=new Int32Array(c[c.length-1]);
-  for(k=0;k<n;k++){i=BYID[k];if(on(i))order[at[key[i]]++]=i;}
+  for(k=0;k<n;k++){i=BYID[k];if(key[i])order[at[key[i]]++]=i;}  // key[i] is 0 unless on(i) held in the first loop
   if(GP)for(lv=1;lv<=5;lv++)GP.sort(order.subarray(c[lv*W],c[(lv+1)*W]),lv,key);  // the best last, as the cut reads from the end
   var out=[],total=[],run=RUN();MORE.clear();KC=[];
   for(lv=1;lv<=5;lv++){
