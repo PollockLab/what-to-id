@@ -104,7 +104,7 @@ var words={
 "A project added for Identify only goes into the Identify link but does not change the map or its counts.":"Un projet ajouté pour Identifier seulement va dans le lien Identifier, mais ne change ni la carte ni ses comptes.",
 "A record takes the first level whose rule it meets, in this order:":"Une observation prend le premier niveau dont elle remplit la règle, dans cet ordre :",
 "Runner-up":"Deuxième choix","Runner-up: no reference photo":"Deuxième choix : aucune photo de référence","Similar":"Semblable","Suggested":"Suggérée",
-"Look-alike":"Espèce semblable","Looks more like":"Ressemble davantage à","Probably":"Probablement","Loading photo…":"Chargement de la photo…",
+"Look-alike":"Espèce semblable","Looks more like":"Ressemble davantage à","Looks most like":"Ressemble surtout à","Loading photo…":"Chargement de la photo…",
 "Fits the label, not the look-alike":"Correspond à l'étiquette, pas à l'espèce semblable","Fits the look-alike, not the label":"Correspond à l'espèce semblable, pas à l'étiquette",
 "Out of range":"Hors de l'aire","Outside usual range":"Hors de l'aire habituelle","Just outside range":"Juste hors de l'aire","In range":"Dans l'aire","Range map":"Carte de répartition",
 "Outside both ranges: maybe neither":"Hors des deux aires : peut-être ni l'une ni l'autre","Outside both ranges: maybe neither.":"Hors des deux aires : peut-être ni l'une ni l'autre.",

@@ -230,7 +230,7 @@ def test_cards_follow_the_chosen_level_with_a_few_per_species_and_photos_in_batc
     tab(page, 3).click()
     page.wait_for_selector("#grid .card .look", state="attached")
     text = page.locator("#grid .card .look").first.inner_text()
-    assert text.startswith("Probably ") and text.split()[1] in {"Bombus", "Apis"}
+    assert text.startswith("Looks most like ") and text.split()[3] in {"Bombus", "Apis"}
     tab(page, 5).click()
     page.wait_for_selector("#grid .card .kind", state="attached")
     assert page.locator("#grid .card .kind").first.text_content() == "Might be mislabelled"
@@ -514,7 +514,7 @@ def test_cards_show_before_the_look_alike_file_and_fill_it_in_where_they_stand(b
     page.evaluate("scrollTo(0, 40)")
     held[0].continue_()
     page.wait_for_selector("#grid .card .look", state="attached")
-    assert page.locator("#grid .card .look").first.inner_text().startswith("Probably ")
+    assert page.locator("#grid .card .look").first.inner_text().startswith("Looks most like ")
     assert page.evaluate("scrollY") == 40  # filled in place, not redrawn from the top
     assert page.errors == []
 

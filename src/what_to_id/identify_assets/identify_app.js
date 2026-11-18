@@ -106,7 +106,7 @@ function title(i,lv){
   nm.appendChild(el('i',null,t?t[0]:'Unidentified'));
   box.appendChild(nm);
   if(t&&t[1])box.appendChild(el('div','com',t[1]));
-  if(lv===3&&lk)l.append('Probably ',el('i',null,lk));
+  if(lv===3&&lk)l.append('Looks most like ',el('i',null,lk));
   if(lv===3&&lk&&!BT){var g=el('div','sugg'),cf=RK&&IdentifyNarrow.conf(RK[i],N3);g.appendChild(IdentifyNarrow.copy(lk));if(cf)g.appendChild(GP?GP.confBadge(i,cf):el('span','conf',cf));var gp=GP&&GP.badge(i);if(gp)g.appendChild(gp);}
   else if((lv===2||lv===5)&&lk)l.append('Looks more like ',el('i',null,lk));
   if(l.firstChild)box.appendChild(l);
