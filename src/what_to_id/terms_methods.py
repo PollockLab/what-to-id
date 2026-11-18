@@ -113,9 +113,11 @@ def _level_rows(ev: dict) -> str:
     for key, name in LEVEL_NAMES.items():
         r = ev["levels"][key]
         rr = _ci(r, "corrected_rr") if "corrected_rr" in r else "1 (reference)"
+        # the JSON has rates, not counts: n x rate, to the rate's two decimals
+        events = round(r["n"] * r["corrected_per_1000"] / 1000)
         rows.append(
             f"<tr><td>{name}</td><td>{r['n']:,}</td><td>{r['corrected_per_1000']:.2f}</td>"
-            f"<td>{rr}</td></tr>"
+            f"<td>{r['left_per_1000']:.2f}</td><td>{events:,}</td><td>{rr}</td></tr>"
         )
     return "\n".join(rows)
 

@@ -185,6 +185,12 @@ def test_evaluation_table_comes_from_the_committed_script_output():
     html = terms_page.render()
     mis = ev["levels"]["mislabel"]
     assert f"<td>Might be mislabelled</td><td>{mis['n']:,}</td>" in html
+    # the left rate sits beside the corrected one, and the count is n x rate to the rate's rounding
+    events = round(mis["n"] * mis["corrected_per_1000"] / 1000)
+    assert f"<td>{mis['corrected_per_1000']:.2f}</td><td>{mis['left_per_1000']:.2f}</td>" in html
+    assert f"<td>{events:,}</td>" in html
+    assert "meaning relabelled while still Needs ID" in html
+    assert "reached Research Grade after a re-ID" in html and "rollback to a genus" in html
     assert f"{mis['corrected_rr']:.2f} [{mis['corrected_rr_ci'][0]:.2f}, " in html
     assert f"scored on\n{ev['scored_on']} were looked up again" in html
     assert f"in the pool of {ev['outcome_on']}" in html

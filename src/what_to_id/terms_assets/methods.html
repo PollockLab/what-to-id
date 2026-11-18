@@ -101,19 +101,23 @@ BC pool and are not calibrated probabilities.</p>
 <h3 id="methods-eval">Evaluation</h3>
 <p>Do the levels predict what identifiers do? The species-labelled records scored on
 __EVAL_SCORED__ were looked up again in the pool of __EVAL_OUTCOME__. A record counts as
-corrected when it is still Needs ID under another taxon that still exists; a record whose old
-taxon vanished (a swap, merge or split) counts as neither. The rate ratio compares a level's
+corrected, meaning relabelled while still Needs ID, when it is still Needs ID under another taxon
+that still exists; a record whose old taxon vanished (a swap, merge or split) counts as neither.
+Records that left Needs ID are shown on their own. The rate ratio compares a level's
 corrected share with that of records in no level; the interval is a percentile bootstrap of
 __EVAL_REPS__ draws. Cohort: __EVAL_COHORT__ records. The script is
 <code>scripts/levels_outcome.py</code> and its output, with the input files' checksums, is
 committed beside this page's template.</p>
-<table class="eval"><thead><tr><th>Level</th><th>Records</th><th>Corrected per 1,000</th>
-<th>Rate ratio vs no level</th></tr></thead><tbody>
+<table class="eval"><thead><tr><th>Level</th><th>Records</th>
+<th>Relabelled while still Needs ID, per 1,000</th><th>Left Needs ID, per 1,000</th>
+<th>Relabelled, about n</th><th>Rate ratio vs no level</th></tr></thead><tbody>
 __EVAL_ROWS__
 </tbody></table>
 <p>Records in Might be mislabelled were corrected at several times the rate of records in no
 level, and Clear matches at a lower rate. The level order on the page follows these rates.
-Narrow it down is not tested: it has no species label to be corrected from. The window overlaps
+Narrow it down is not tested: it has no species label to be corrected from. The outcome misses
+records that reached Research Grade after a re-ID, since they leave the pool and count as left,
+and a rollback to a genus counts as corrected. The window overlaps
 the page's launch, so some corrections may have been prompted by the page itself. The bars for
 this test were written down before the outcome was read.</p>
 <p>Where did the corrected records go? Of the corrected records in Might be mislabelled, __SUG_MIS__
@@ -143,8 +147,9 @@ levels leave most records in no level and keep only __STEPS__ steps of order wit
 records the page shows, the two tie. The levels earn their place by what they say about a record,
 not by ranking it better than its margin would.</p>
 <p>Does it hold on a later pool? The same cohort looked up in the pool of __REPL_OUTCOME__:</p>
-<table class="eval"><thead><tr><th>Level</th><th>Records</th><th>Corrected per 1,000</th>
-<th>Rate ratio vs no level</th></tr></thead><tbody>
+<table class="eval"><thead><tr><th>Level</th><th>Records</th>
+<th>Relabelled while still Needs ID, per 1,000</th><th>Left Needs ID, per 1,000</th>
+<th>Relabelled, about n</th><th>Rate ratio vs no level</th></tr></thead><tbody>
 __REPL_ROWS__
 </tbody></table>
 <p>Run it yourself. The scored cohort, one row per record with its level, scores, suggested
