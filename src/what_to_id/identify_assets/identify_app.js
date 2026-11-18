@@ -453,7 +453,8 @@ async function load(){
   P=L.pool(d[0],META.bbox);BYID=byId(P);TAXA=d[1];LOOKS=null;LKS=false;
   var raw=new Uint8Array(d[2]);
   if(raw.length!==P.n)throw new Error('the levels file holds '+raw.length+' records, the map '+P.n);
-  LEVEL=raw.map(function(v){return TAB[v&15]||v&15;});KIND=raw.map(function(v){return v&15;});SUB=raw.map(function(v){return SUBK[v&15]||0;});Q=raw.map(function(v){return v>>4;});
+  LEVEL=new Uint8Array(P.n);KIND=new Uint8Array(P.n);SUB=new Uint8Array(P.n);Q=new Uint8Array(P.n);
+  for(var j=0;j<P.n;j++){var v=raw[j],g=v&15;LEVEL[j]=TAB[g]||g;KIND[j]=g;SUB[j]=SUBK[g]||0;Q[j]=v>>4;}
   rank(d[3]);
   GP=IdentifyGaps({P:P,groups:META.groups,keep:function(i){return LEVEL[i]>0;},band:function(i){return IdentifyNarrow.band(RK[i],N3);},
     pct:function(i){return RK?(RK[i]+1)/N3:null;},hasRank:function(){return !!RK;},
