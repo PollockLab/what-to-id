@@ -58,15 +58,13 @@ PRESETS = [
         "The species, subspecies and varieties of the Conservation Challenge list",
     ],
 ]
-# at_risk_bc_taxa.json holds the taxa of BC needs-ID records flagged threatened on 2026-11-03 that
-# are listed in Canada (tier 1) or ranked S1-S2 (2) or S3 (3) in BC, with their BC Research Grade
-# count, for the map's "Sort by conservation status" order (map_value.js); its "source" and "rule"
-# say how.
-# shortcut: species first seen in BC needs-ID after that day are missing, refetch when stale.
+# at_risk_bc_taxa.json holds the taxa of BC needs-ID records flagged threatened that are listed in
+# Canada (tier 1) or ranked S1-S2 (2) or S3 (3) in BC, with their BC Research Grade count, for the
+# map's "Sort by conservation status" order (map_value.js); its "source" and "rule" say how.
+# scripts/at_risk_bc_taxa.py writes it; the weekly reference workflow refreshes it.
 AT_RISK = json.loads((Path(__file__).with_name("at_risk_bc_taxa.json")).read_text())["taxa"]
 # invasive_bc_taxa.json holds the taxa iNaturalist counts as introduced in BC (place 7085), for
-# Identify's Invasive toggle; scripts/invasive_bc_taxa.py writes it.
-# shortcut: a snapshot, rerun the script when stale.
+# Identify's Invasive toggle; scripts/invasive_bc_taxa.py writes it, refreshed weekly too.
 INVASIVE = json.loads((Path(__file__).with_name("invasive_bc_taxa.json")).read_text())["taxa"]
 # The iNaturalist taxon behind each iconic group the map shows as a chip, so Identify can add the
 # chosen groups to the picked taxa in one taxon_id. Animalia (animals in no other group) and
