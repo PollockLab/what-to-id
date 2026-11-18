@@ -180,3 +180,25 @@ def test_a_pane_is_loaded_only_once_shown_and_the_page_has_one_heading(browser, 
     page.click("[data-p=tree]", modifiers=["Shift"])
     assert page.locator("#tree").get_attribute("src")
     page.close()
+
+
+def test_the_phone_header_rows_hold_before_the_panes_are_ordered(browser, pts, site):
+    base, *_ = site
+    page = explore(browser, base, "", 390)
+    page.wait_for_selector("#xbar [aria-pressed=true]")
+    rows = (
+        "['xback', 'sf', 'main-content']"
+        ".map(i => document.getElementById(i).getBoundingClientRect().top)"
+    )
+    done = page.evaluate(rows)
+    # the markup as served, before the script orders the toggles and presses the shown ones
+    page.evaluate(
+        "const s = document.querySelector('.seg'); ['identify', 'map', 'space', 'tree'].forEach("
+        "n => { const b = s.querySelector(`[data-p=${n}]`);"
+        " b.removeAttribute('aria-pressed'); s.append(b); });"
+        "document.getElementById('counts').textContent = ''"
+    )
+    assert page.evaluate(rows) == pytest.approx(
+        done, abs=1
+    )  # the back link stays on the counts' row
+    page.close()
