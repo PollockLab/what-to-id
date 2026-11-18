@@ -4,16 +4,17 @@
 // without META.invasive asks /v1/taxa/<ids>?preferred_place_id=7085 (30 ids a request, cached by taxon id for a week) and hides a
 // suggestion not yet looked up until its answer lands. A lookup that fails (429) stays unknown and is asked again after a growing wait;
 // while any is pending body[data-checking] holds how many (the result line says "Checking N species…").
-// IdentifyWWW(ctx), ctx {look(i), taxa(), value (META.value), invasive (META.invasive, optional), redraw()}.
+// score(i) is At risk's order on level 3, not its filter: the expected at-risk value over the suggestion and its runner-up (why(i), optional).
+// IdentifyWWW(ctx), ctx {look(i), why(i) [name, margin in thousandths, 255 none] or null, taxa(), value (META.value), invasive (META.invasive, optional), redraw()}.
 var IdentifyWWW=(function(){
 'use strict';
-var LS='wtid-status',WEEK=7*864e5,RISK=1,INV=2;
+var LS='wtid-status',WEEK=7*864e5,RISK=1,INV=2,TEMP=0.02;  // TEMP: the cosine margin of a softmax over the two matches (a margin of 0.04, a clear one, leaves the runner-up 12%)
 function $(id){return document.getElementById(id);}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 function invasive(t){var m=t.establishment_means||{};
   return /introduced|invasive/.test(m.establishment_means||'')&&(!m.place||m.place.id===7085)?INV:0;}
 return function(ctx){
-  var api=inatGate({gap:1000}),ids=new Map(),cache={},want=new Set(),busy=new Set(),T=0,out=0,nn=0,fails=0,RT=0,need=0,risk=new Set((ctx.value||[]).map(function(r){return r[0];})),bc=ctx.invasive?new Set(ctx.invasive):null;
+  var api=inatGate({gap:1000}),ids=new Map(),cache={},want=new Set(),busy=new Set(),T=0,out=0,nn=0,fails=0,RT=0,need=0,tier=new Map((ctx.value||[]).map(function(r){return [r[0],r[1]];})),risk=new Set(tier.keys()),bc=ctx.invasive?new Set(ctx.invasive):null;
   try{var c=JSON.parse(localStorage.getItem(LS))||{};if(Date.now()-c.at<WEEK)cache=c.f||{};}catch(e){}
   function on(k){return new RegExp('(^|&)'+k+'=1(&|$)').test(location.hash.slice(1));}
   function keep(k,v){var t=location.hash.slice(1).split('&').filter(function(x){return x&&x.indexOf(k+'=')!==0;});if(v)t.push(k+'=1');
@@ -57,6 +58,16 @@ return function(ctx){
     if(id in cache)return f|cache[id]&INV;
     if(!want.size)setTimeout(ask,0);want.add(id);show();return f;
   }
+  // the at-risk value 0..1 of a species by name (tier 1 listed in Canada 1, tier 2 2/3, tier 3 1/3), 0 for one not listed or not in the taxa table
+  function val(nm){var t=tier.get(ids.get(nm));return t?(4-t)/3:0;}
+  // the expected at-risk value over the suggestion and its runner-up, their weights a softmax of the two cosine scores (only their margin is known): 0..1
+  function score(i){
+    if(!ids.size)ctx.taxa().forEach(function(t){if(t[2])ids.set(t[0],t[2]);});
+    var y=ctx.why&&ctx.why(i),w=y&&y[1]!==255?1/(1+Math.exp(y[1]/1000/TEMP)):0;
+    return (1-w)*val(ctx.look(i))+w*val(y&&y[0]);
+  }
+  // a card whose own taxon (id) is not listed but whose likely species are: at risk is only possible
+  function maybe(i,id){return !risk.has(id)&&score(i)>0;}
   function toggle(k,label){
     var l=el('label','tog'),b=el('input');b.type='checkbox';if(k==='run')b.setAttribute('role','switch');b.checked=on(k);
     b.onchange=function(){keep(k,b.checked);sync();ctx.redraw();};l.append(b,' '+label);return l;
@@ -66,6 +77,6 @@ return function(ctx){
   var risk_=toggle('risk','At risk'),inv_=toggle('inv','Introduced');risk_.className=inv_.className='tog qchip';inv_.title='Introduced to BC, per iNaturalist';
   $('qchips').append(risk_,inv_);$('frun').append(toggle('run','Group by suggested species'));$('frun').firstChild.className='swt';
   sync();
-  return {pass:pass,flag:flag,sync:sync,need:function(){return need;},active:function(){return on('risk')||on('inv');}};
+  return {pass:pass,flag:flag,score:score,maybe:maybe,sync:sync,need:function(){return need;},active:function(){return on('risk')||on('inv');}};
 };
 })();

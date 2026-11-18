@@ -6,7 +6,7 @@
 // Presets are sets of weights. Ties go to the confidence order when base= is absent and a prioritizer is on, else to the base order (hash base=new|old|rand:<seed>).
 // Gaps come from where-to-blitz's checklist layer (one 25 km PNG per group, read at run time) for every record of every level. A failed load leaves every gap at 0.
 // IdentifyGaps(ctx), ctx {P, groups (META.groups), keep(i) the records to read, pct(i) the place of a level 3 record in its level 0..1, band(i) 0..3,
-// hasRank(), conf(i,lv) and fine(i,lv) the tiered confidence score 0..3 and its finer order (higher better), cont(i,lv) the confidence 0..1, flag(i,inv) 1 at risk | 2 invasive,
+// hasRank(), conf(i,lv) and fine(i,lv) the tiered confidence score 0..3 and its finer order (higher better), cont(i,lv) the confidence 0..1, flag(i,inv) 1 at risk | 2 invasive, risk(i) 0..1 the level 3 record's expected at-risk value (the pri order),
 // hasOut(), out(i) 1 outside its range, redraw(late) with late true when records arrived}. IdentifyGaps.compare(o) is the pure comparator.
 var IdentifyGaps=(function(){
 'use strict';
@@ -147,7 +147,7 @@ var F=function(ctx){
     }
     if(w.conf)s+=w.conf*ctx.cont(i,lv);
     if(w.gap&&days&&days[i]!==NODAYS)s+=w.gap*(1-Math.min(days[i],LIT)/LIT);
-    if(lv===3&&(w.risk||w.inv)){var g=ctx.flag(i,!!w.inv);s+=w.risk*(g&1)+w.inv*(g>>1&1);}
+    if(lv===3&&(w.risk||w.inv)){var g=ctx.flag(i,!!w.inv);s+=w.risk*ctx.risk(i)+w.inv*(g>>1&1);}
     if(w.out&&ctx.hasOut())s+=w.out*ctx.out(i);
     return s/100;
   }
@@ -272,6 +272,7 @@ var F=function(ctx){
     },
     // 0 lit or no data, 1 a gap, 2 a big gap
     tier:function(i){return tier?tier[i]:0;},
+    risk:function(){return st.w.risk>0;},
     // orders a level's records (a typed-array slice), the best last, under key (the groups of the level's order) and the prioritizers
     sort:function(ord,lv,key){
       if(!BUF||BUF[0].length!==P.n)BUF=[new Float64Array(P.n),new Float64Array(P.n)];  // reused: rsort reads only the entries of ord written here
