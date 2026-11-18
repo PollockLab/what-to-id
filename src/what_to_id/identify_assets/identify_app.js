@@ -81,6 +81,8 @@ function build(){
   for(out[6]=[],total[6]=0,k=n-1;k>=0;k--)if(SEL[i=BYID[k]]&&++total[6]&&LV===6)out[6].push(i);
   view=out;S.total=total;S.all3=total[3]+u;
 }
+// the look-alike's index in LOOKS.names, -1 for none: a cheaper key than its name
+function lookCode(i){var v=LOOKS?LOOKS.lo[i]|LOOKS.hi[i]<<8:NO_LOOK;return v===NO_LOOK?-1:v;}
 function looksOf(i){var v=LOOKS?LOOKS.lo[i]|LOOKS.hi[i]<<8:NO_LOOK;return v===NO_LOOK?null:LOOKS.names[v];}
 // level 3's runner-up: [name, margin in thousandths, 255 none], or null; its place is in its suggestion's list
 function whyOf(i){
@@ -472,7 +474,7 @@ async function load(){
     Promise.all([lk(),file('why').catch(function(){return null;})]).then(function(b){if(b[0]&&b[1]){WHY=looks(b[1],1);if(LV===3)retitle();}});};
   if(LV===3&&!BT)setTimeout(WHYF,0);rg.then(RKF,RKF);  // the rank and look-alikes follow the records in the background: level 3's count reads both
   rg.then(function(b){if(!b)return;
-    R=IdentifyRanges(b,{P:P,sdm:META.sdm,name:function(i){return P.tax[i]!==NOTAX&&TAXA[P.tax[i]]?TAXA[P.tax[i]][0]:null;},look:looksOf,redraw:redraw});
+    R=IdentifyRanges(b,{P:P,sdm:META.sdm,name:function(i){return P.tax[i]!==NOTAX&&TAXA[P.tax[i]]?TAXA[P.tax[i]][0]:null;},look:looksOf,code:lookCode,redraw:redraw});
     // #record=<id> (the map's token): its level, its card first, its range popover open
     var rec=/(?:^|&)record=(\d+)(?:&|$)/.exec(location.hash.slice(1));
     for(var i=0;rec&&i<P.n;i++)if(P.id[i]===+rec[1]){REC=i;break;}

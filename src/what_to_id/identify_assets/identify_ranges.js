@@ -3,7 +3,7 @@
 // Over the level, the far-outside control (All / Hide / Only) in #rout; Clear matches start with records far outside left out.
 // Level 3 (narrowing) has no species label, so its control asks instead whether the record sits in the suggested species' range,
 // and starts with the records that do.
-// IdentifyRanges(buf,ctx), ctx {P, name(i) the label, look(i) the look-alike or null, redraw(), sdm the ECCC habitat
+// IdentifyRanges(buf,ctx), ctx {P, name(i) the label, look(i) the look-alike or null, code(i) its index (-1 for none), redraw(), sdm the ECCC habitat
 // models (META.sdm, sdm_manifest.py; P.tax then indexes sdm.taxa) or none}. The map's record card takes only the chip and
 // its popover (chip(i,lv)); it has no #rout, so no segmented control.
 var IdentifyRanges=(function(){
@@ -32,7 +32,7 @@ return function(buf,ctx){
   var P=ctx.P,n=P.n,dv=new DataView(buf),size=dv.getUint32(0,true);
   if(buf.byteLength!==4+size+2*n)throw new Error('the range file holds '+buf.byteLength+' bytes, expected '+(4+size+2*n));
   var D=JSON.parse(new TextDecoder().decode(new Uint8Array(buf,4,size))),OKM=new Uint8Array(buf,4+size,n),NOTE=new Uint8Array(buf,4+size+n,n),
-    RI=new Map(D.names.map(function(x,k){return [x,k];})),memo=[],BOX=null,OUTL=null,FAR=null,BIN=null,CELL=null,
+    RI=new Map(D.names.map(function(x,k){return [x,k];})),memo=[],CB=[],BOX=null,OUTL=null,FAR=null,BIN=null,CELL=null,
     S={lv:0,o:0},Q={i:-1,lv:0,chip:null,pin:false,t:0},pop=null,HAB=new Map(),AB=null;  // S.o: 0 all, 1 only far outside, -1 hide far outside
   // a name's bitset over the grid cells, null when its range is unknown
   function bits(name){
@@ -49,7 +49,7 @@ return function(buf,ctx){
   function kmText(i){return km(i).toLocaleString(LOC);}
   function far(i){return OKM[i]!==NONE&&OKM[i]>=OUT_KM;}
   // the suggested species' range holds the record's cell; an unknown range does not, as the suggestion is unchecked
-  function fits(i){var a=bits(ctx.look(i));return !!a&&!!has(a,cellOf(i));}
+  function fits(i){var v=ctx.code(i),a=v<0?null:CB[v]!==undefined?CB[v]:(CB[v]=bits(ctx.look(i)));return !!a&&!!has(a,cellOf(i));}  // CB: the bitset by look-alike code
   // outside: far from the label's range, or for level 3 not in the suggestion's
   function out(i,lv){return lv===3?!fits(i):far(i);}
   // Clear matches are for confirming in bulk and level 3 for adding a species, so both start with the doubtful left out
