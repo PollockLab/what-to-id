@@ -11,7 +11,7 @@ from pathlib import Path
 
 URL = (
     "https://api.inaturalist.org/v1/observations/species_counts"
-    "?place_id=7085&introduced=true&per_page=500&page="
+    "?place_id=7085&introduced=true&captive=false&per_page=500&page="
 )
 OUT = Path(__file__).parents[1] / "src/what_to_id/invasive_bc_taxa.json"
 
@@ -33,9 +33,11 @@ def main():
         time.sleep(1)  # be polite to the API
     assert len(ids) == j["total_results"], (len(ids), j["total_results"])
     doc = {
-        "source": "iNaturalist /v1/observations/species_counts?place_id=7085&introduced=true, "
+        "source": "iNaturalist /v1/observations/species_counts"
+        "?place_id=7085&introduced=true&captive=false, "
         f"fetched {date.today()}",
-        "rule": "taxa iNaturalist counts as introduced in BC (place 7085)",
+        # captive=false: zoo and garden records mark a taxon introduced; needs-ID records are wild
+        "rule": "taxa with wild BC (place 7085) observations iNaturalist counts as introduced",
         "taxa": sorted(ids),
     }
     OUT.write_text(json.dumps(doc) + "\n")
