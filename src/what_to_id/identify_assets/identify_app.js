@@ -100,7 +100,7 @@ function whyOf(i){
   var v=WHY&&LOOKS?LOOKS.lo[i]|LOOKS.hi[i]<<8:NO_LOOK,c=WHY?WHY.lo[i]:255,r=v===NO_LOOK||c===255?null:WHY.runners[v];
   return r&&r[c]!=null?[WHY.names[r[c]],WHY.hi[i]===255?255:WHY.hi[i]*5]:null;
 }
-// Under a card's photo: its label, and for a close call, a likely mislabel or a record above species what it looks like.
+// Under a card's photo: its label, and for a close call, a might-be-mislabelled record or a record above species what it looks like.
 function title(i,lv){
   var t=P.tax[i]!==NOTAX&&TAXA[P.tax[i]],box=el('div','title'),nm=el('div','name'),lk=looksOf(i),l=el('div','look');
   nm.appendChild(el('i',null,t?t[0]:'Unidentified'));

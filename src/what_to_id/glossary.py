@@ -146,8 +146,8 @@ GLOSSARY: dict[str, tuple[str, str | None]] = {
         "Use it when you want to check whether a label is wrong.",
     ),
     "level-might-be-wrong": (
-        "Records whose photo may not support the label: likely mislabels first, then odd shots,"
-        " then close calls.",
+        "Records whose photo may not support the label: might-be-mislabelled records first, then"
+        " odd shots, then close calls.",
         "Use it when you want to check whether a label is right.",
     ),
     "photo-space": (

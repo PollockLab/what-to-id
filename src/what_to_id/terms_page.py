@@ -40,7 +40,7 @@ LABELS = {
     },
     # keys from the earlier five levels: the first is a tab, the rest Might be wrong's kinds
     "level-clear-matches": page_identify.LEVELS[0][1],
-    "level-might-be-mislabelled": "Likely mislabelled",
+    "level-might-be-mislabelled": "Might be mislabelled",
     "level-odd-shots": "Odd shots",
     "level-close-calls": "Close calls",
 }

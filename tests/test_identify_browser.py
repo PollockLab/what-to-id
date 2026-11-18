@@ -67,7 +67,7 @@ def serve(root, frame, score, projects=None, totals=None, ranges=None):
             "runner_up": pd.Series([LOOKS[(k + 1) % 3] for k in i], dtype="category"),
         }
     )[[*IDENTIFY_COLUMNS, "runner_up"]]
-    scored.loc[scored.index[scored["level"] == 4][0], "level"] = 5  # the one likely mislabel
+    scored.loc[scored.index[scored["level"] == 4][0], "level"] = 5  # the one mislabel
     scored.to_parquet(root / "identify.parquet")
     pool_levels.build(root, parquet=root / "identify.parquet", ranges=ranges and ranges(root, pts))
     page_identify.build(root)
@@ -233,13 +233,13 @@ def test_cards_follow_the_chosen_level_with_a_few_per_species_and_photos_in_batc
     assert text.startswith("Probably ") and text.split()[1] in {"Bombus", "Apis"}
     tab(page, 5).click()
     page.wait_for_selector("#grid .card .kind", state="attached")
-    assert page.locator("#grid .card .kind").first.text_content() == "Likely mislabelled"
+    assert page.locator("#grid .card .kind").first.text_content() == "Might be mislabelled"
     assert page.locator("#grid .card .look").first.inner_text().startswith("Looks more like ")
     kind(page, "Close calls").click()
     page.wait_for_selector("#grid .card .look", state="attached")
     assert "Looks more like" in page.locator("#grid .card .look").first.inner_text()
     assert page.locator("#grid .card .kind").count() == 0  # one kind shown, no tags
-    kind(page, "Likely mislabelled").click()
+    kind(page, "Might be mislabelled").click()
     assert page.locator("#grid .card").count() == 1
     assert "Might be wrong" in page.locator(".about").text_content()
     body = page.inner_text("body").lower()
