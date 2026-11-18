@@ -133,9 +133,10 @@ GLOSSARY: dict[str, tuple[str, str | None]] = {
         "Use it when you have time for a careful look.",
     ),
     "level-narrow-it-down": (
-        "Labelled above species, and the photo points to one species of it. The tab opens on"
-        " the best 5%, the records whose photo points most clearly to one species: Show all,"
-        " beside the count, lifts that, and the Best slider under Prioritize sets another share.",
+        "Labelled above species, and the photo points to one species of it, unless it is an odd"
+        " shot. The tab opens on the best 5%, the records whose photo points most clearly to one"
+        " species: Show all, beside the count, lifts that, and the Best slider under Prioritize"
+        " sets another share.",
         "Use it when you can take a record to species.",
     ),
     "level-odd-shots": (

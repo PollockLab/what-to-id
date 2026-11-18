@@ -206,13 +206,14 @@ __SITE_NAV__<main id="main-content">
 (ViT-H/14), an image and text model trained on the tree of life. A match score is the cosine between
 the photo's embedding and the embedding of the text "a photo of &lt;species&gt;". The margin is the
 match score of the label minus the best match score of any other species. __SCORING_DATES__</p>
-<p>A record takes the first level whose rule it meets, in this order:</p>
+<p>A record takes the first level whose rule it meets. Odd shots are checked first, at any rank; then
+__LEVEL_1__, close calls, __LEVEL_3__ and might be mislabelled, in that order:</p>
 <dl>
 <dt>__LEVEL_1__</dt><dd>Labelled at species. The margin is above 0, and the record is in the top 25%
 of its species by match score to the label. Only species with 4 or more scored records.</dd>
 <dt>__LEVEL_3__</dt><dd>Labelled above species (a genus or a family, say), and the pool names one or
-more species inside the label. Every such record goes here, whatever its match scores.</dd>
-<dt>__LEVEL_5__</dt><dd>Three kinds of record, in this order: might be mislabelled (lowest margin
+more species inside the label. Every such record goes here, unless it is an odd shot.</dd>
+<dt>__LEVEL_5__</dt><dd>Three kinds of record, listed in this order: might be mislabelled (lowest margin
 first), odd shots, close calls. This order put the records iNaturalist identifiers later corrected nearer the top than
 mixing the three did. Odd shots: any rank,
 the photo's best match score to any species is in the lowest 2% of its group (birds, plants, fungi

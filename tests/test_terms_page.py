@@ -250,3 +250,12 @@ def test_the_study_section_and_its_fold_come_with_the_study_only(monkeypatch):
     assert [i for i, n in ids.items() if n > 1] == []
     assert html.index('id="study"') < html.index('id="study-methods"') < html.index('id="methods"')
     assert not re.search("recency|gap_first|gap first|similarity|novelty|surprise", html, re.I)
+
+
+def test_about_says_odd_shots_are_checked_first_at_any_rank():
+    # identify_levels np.select([weird, easy, tax, narrow, mislabel]): a weird genus goes to level 4
+    # (tests/test_levels.py::test_weird_wins_at_any_rank)
+    text = " ".join(page_identify.render().split())
+    assert "Odd shots are checked first, at any rank; then Easy confirms, close calls," in text
+    assert "goes here, unless it is an odd shot." in text and "whatever its match" not in text
+    assert "unless it is an odd shot" in GLOSSARY["level-narrow-it-down"][0]
