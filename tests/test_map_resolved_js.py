@@ -72,7 +72,8 @@ def run(body: str):
         "return Array.from(R.id).filter(function(x,i){return m[i];});}\n"
         f"process.stdout.write(JSON.stringify((function(){{{body}}})()));"
     )
-    out = subprocess.run([NODE, "-e", script], capture_output=True, text=True, check=True)
+    # stdin, not -e: META outgrows Linux's 128 KB limit on one argument
+    out = subprocess.run([NODE, "-"], input=script, capture_output=True, text=True, check=True)
     return json.loads(out.stdout)
 
 
