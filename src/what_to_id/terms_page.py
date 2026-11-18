@@ -170,6 +170,7 @@ def views(dates: dict | None = None) -> list[tuple[str, str, str]]:
     )
     confusion = re.sub(r"<dt>Built</dt><dd>__BUILT__</dd>\s*", "", confusion)  # set per build
     tree = _cut((HERE / "tree_assets/tree.html").read_text(), r'<p id="about" hidden>(.*?)</p>')
+    tree = tree.replace("__POOL_DATE__", "")  # set per build
     space = _cut(
         (HERE / "embeddings_assets/embeddings.html").read_text(),
         r'<p class="note" id="honest">(.*?)</p>',
