@@ -8,9 +8,8 @@ Read-only: public GETs of /v1/observations with field:Eating or field:Eaten by i
 fields. Eating (field 13) holds a taxon (the prey) or text; Eaten by (field 879) holds a taxon
 (the predator) or text. Each record keeps its own taxon, what the field names (f: [name, id] for
 a taxon, x: text), the comment count (their text is not kept), quality grade, date, place and
-photo: {"obs": [{id, t: [name, id, common], k: "eating"|"by", f, x, c, q, on, at, ph, np, nt}], "n":
-{...}}. np is the photo count and nt is 1 when the description or a comment mentions food (the
-text itself is not kept); both come from the same response, no further request.
+photo: {"obs": [{id, t: [name, id, common], k: "eating"|"by", f, x, c, q, on, at, ph, np}], "n":
+{...}}. np is the photo count, from the same response.
 
 `--metaweb FILE` also writes foodweb-text.json beside it: BC observations of a metaweb predator
 species whose description (words eating, eats, ate, feeding, prey, caught) or tags (predation,
@@ -22,7 +21,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
 import time
 from datetime import date
@@ -35,11 +33,7 @@ BC_PLACE_ID = 7085
 FIELDS = {"eating": ("Eating", 13), "by": ("Eaten by", 879)}
 PER_PAGE = 200
 TEXT = 80  # characters of a field's text kept
-# a description or comment that talks about food: a feeding word or a Latin name (Genus species)
-FOOD = re.compile(
-    r"\b(eat\w*|ate|feed\w*|fed|prey\w*|devour\w*|kill\w*|hunt\w*|caught|catch\w*|carry\w*|"
-    r"carcass|scaveng\w*|bit(?:e|ing)|swallow\w*|consum\w*)\b|\b[A-Z][a-z]{2,} [a-z]{3,}\b"
-)
+LIMIT = 10000  # iNaturalist refuses page * per_page beyond this
 
 
 def slim(o: dict, kind: str) -> dict | None:
@@ -60,12 +54,6 @@ def slim(o: dict, kind: str) -> dict | None:
         "ll": ll,
         "ph": ph.replace("/square.", "/medium."),
         "np": len(o["photos"]),
-        "nt": int(
-            any(
-                FOOD.search(t or "")
-                for t in [o.get("description"), *(c.get("body") for c in o.get("comments") or [])]
-            )
-        ),
     }
     for f in o.get("ofvs") or []:
         if f.get("field_id") != name:
@@ -94,6 +82,9 @@ def fetch(kind: str, pause: float = 1.0) -> list[dict]:
         res = r.json()["results"]
         out += [x for x in (slim(o, kind) for o in res) if x]
         if len(res) < PER_PAGE:
+            return out
+        if (page + 1) * PER_PAGE > LIMIT:
+            print(f"{kind}: cut at iNaturalist's {LIMIT} result limit", file=sys.stderr)
             return out
         page += 1
         time.sleep(pause)
@@ -147,6 +138,9 @@ def fetch_text(preds: set[str], pause: float = 1.0) -> list[dict]:
                 if rec:
                     out.setdefault(rec["id"], rec)
             if len(res) < PER_PAGE:
+                break
+            if (page + 1) * PER_PAGE > LIMIT:
+                print(f"{word}: cut at iNaturalist's {LIMIT} result limit", file=sys.stderr)
                 break
             page += 1
             time.sleep(pause)
