@@ -5,9 +5,10 @@
 Reads GloBI's interaction API (eats and preysOn in a BC bounding box; GloBI returns each record
 once per direction, so the inverse types add nothing) and writes
 {"eats": {name: [[partner, records], ...]}, "eatenBy": {...}, "n": records}. Names are GloBI taxon
-names; each species also counts towards its genus (the first word), so a record labelled at genus
-finds its partners. Only animal-on-animal pairs are kept (both paths name Animalia or Metazoa):
-GloBI's eats also holds grazing and fungus eating. TOP partners per taxon, most records first.
+names, each record filed under its own two names only (a record labelled at genus stays at genus;
+nothing is rolled up from species). Only animal-on-animal pairs are kept (both paths name Animalia
+or Metazoa): GloBI's eats also holds grazing and fungus eating. Every partner is kept, most records
+first.
 """
 
 from __future__ import annotations
@@ -21,7 +22,6 @@ from collections import Counter, defaultdict
 API = "https://api.globalbioticinteractions.org/interaction"
 BC_BBOX = "-139.06,48.30,-114.03,60.00"  # w,s,e,n around British Columbia
 TYPES = ("eats", "preysOn")
-TOP = 6
 FILE = "foodweb.json"  # beside identify.html; page_identify turns the filter on when it is there
 PAGE = 4096
 
@@ -38,7 +38,7 @@ def _animal(r: dict, side: str) -> bool:
     return "Animalia" in path or "Metazoa" in path
 
 
-def pairs(rows: list[dict], top: int = TOP) -> dict:
+def pairs(rows: list[dict]) -> dict:
     """The eats / eatenBy tables out of GloBI rows; skips other types and nameless rows."""
     eats: dict[str, Counter] = defaultdict(Counter)
     by: dict[str, Counter] = defaultdict(Counter)
@@ -50,14 +50,12 @@ def pairs(rows: list[dict], top: int = TOP) -> dict:
         if not a or not b or a == b or not (_animal(r, "source") and _animal(r, "target")):
             continue
         n += 1
-        for k in {a, a.split()[0]}:
-            eats[k][b] += 1
-        for k in {b, b.split()[0]}:
-            by[k][a] += 1
+        eats[a][b] += 1
+        by[b][a] += 1
 
     def cut(t: dict[str, Counter]) -> dict:
         return {
-            k: [[p, c] for p, c in sorted(v.items(), key=lambda x: (-x[1], x[0]))[:top]]
+            k: [[p, c] for p, c in sorted(v.items(), key=lambda x: (-x[1], x[0]))]
             for k, v in sorted(t.items())
         }
 

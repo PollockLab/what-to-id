@@ -11,7 +11,7 @@ def row(t, a, b, pa=None, pb=None):
     }
 
 
-def test_pairs_count_roll_up_to_genus_and_skip_other_types():
+def test_pairs_count_own_names_and_skip_other_types():
     owl = "Animalia | Aves | Bubo virginianus"
     rows = [
         row("eats", "Ardea herodias", "Oncorhynchus kisutch"),
@@ -26,14 +26,28 @@ def test_pairs_count_roll_up_to_genus_and_skip_other_types():
     t = pairs(rows)
     assert t["n"] == 4
     assert t["eats"]["Ardea herodias"] == [["Oncorhynchus kisutch", 2]]
-    assert t["eats"]["Ardea"] == [["Oncorhynchus kisutch", 2], ["Rana aurora", 1]]
-    assert t["eatenBy"]["Oncorhynchus"] == [["Ardea herodias", 2]]
+    assert t["eats"]["Ardea alba"] == [["Rana aurora", 1]]
+    assert "Ardea" not in t["eats"]
+    assert "Oncorhynchus" not in t["eatenBy"]
     assert t["eats"]["Bubo virginianus"] == [["Microtus", 1]]
     assert "Larus glaucescens" not in t["eats"]
     assert "Ariolimax" not in t["eats"]
 
 
-def test_pairs_cap_and_empty():
+def test_pairs_keep_every_partner_and_empty():
     rows = [row("eats", "Ardea herodias", f"Prey{k} sp") for k in range(9)]
-    assert len(pairs(rows, top=3)["eats"]["Ardea herodias"]) == 3
+    assert len(pairs(rows)["eats"]["Ardea herodias"]) == 9
     assert pairs([]) == {"eats": {}, "eatenBy": {}, "n": 0}
+
+
+def test_pairs_congeners_make_no_genus_predator():
+    rows = [
+        row("eats", "Larus glaucescens", "Mytilus edulis"),
+        row("eats", "Larus occidentalis", "Engraulis mordax"),
+        row("eats", "Larus", "Clupea"),  # recorded at genus: stays
+    ]
+    t = pairs(rows)
+    assert t["eats"]["Larus"] == [["Clupea", 1]]
+    assert t["eats"]["Larus glaucescens"] == [["Mytilus edulis", 1]]
+    rows.pop()
+    assert "Larus" not in pairs(rows)["eats"]
