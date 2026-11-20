@@ -18,12 +18,13 @@ async function encoder(){
   if(!mf.text_encoder)throw new Error('This index has no text search model yet.');
   var mb=Enc.megabytes(mf.text_encoder),fresh=!await Enc.isCached(new URL(mf.text_encoder.onnx,DATA).href);
   if(fresh)say('Downloading the search model, about '+mb+' MB, once. It is kept in this browser.');
-  S.enc=await Enc.load(mf,DATA,{onProgress:function(f){if(fresh)say('Downloading the search model, about '+mb+' MB, once: '+Math.round(f*100)+'%.');}});
+  S.enc=await Enc.load(mf,DATA,{onProgress:function(f){if(fresh)say(f<1?'Downloading the search model, about '+mb+' MB, once: '+Math.round(f*100)+'%.':'Starting the search model...');}});
   return S.enc;
 }
 // each subject on its own, then min-fused (the photo must show both animals), as the photo-search page does
 async function hits(text){
   var parts=Meta.subjects(text),texts=parts.length>1?[text].concat(parts):[text],enc=await encoder(),opts={k:parts.length>1?K*3:K};
+  say('Searching photos...');
   var lists=await Promise.all(texts.map(async function(t,i){
     var v=(i&&await S.index.taxonVector(t))||await enc.encode(i?'a photo of a '+t.replace(/^an? /i,''):t);
     return S.index.search(v,opts);}));

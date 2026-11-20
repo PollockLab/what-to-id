@@ -52,7 +52,7 @@ async function modelBytes(url,total,onProgress,fetchFn){
     if(onProgress&&total)onProgress(Math.min(1,n/total));
   }
   buf=buf.subarray(0,n);
-  if(c)try{await c.put(url,new Response(buf));}catch(e){/* quota: fine, fetched once more next visit */}
+  if(c)try{await c.put(url,new Response(buf));}catch(e){console.warn('Search model not cached, it downloads again next visit:',e.message);}
   return buf;
 }
 function normalize(v){
