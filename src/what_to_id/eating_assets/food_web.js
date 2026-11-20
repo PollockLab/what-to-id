@@ -178,10 +178,17 @@ function sentence(h){
   if(h.q==='eaten')b.append('What eats ',pk('y','Prey',h.y,yn,'prey','Prey'),'?');
   if(h.q==='does')b.append('Does ',pk('x','Predator',h.x,pn,'pred','Predator'),' eat ',pk('y','Prey',h.y,yn,'prey','Prey'),'?');
 }
+// a radiogroup of buttons [value, text, full question] in the box: arrows move and pick, one tab stop, ticked() marks the current value
+function seg(box,items,pick){
+  items.forEach(function(x,i){var b=el('button',null,x[1]);b.type='button';b.setAttribute('role','radio');b.dataset.q=x[0];b.setAttribute('aria-label',x[2]);b.title=x[2];
+    b.onclick=function(){pick(x[0]);};b.onkeydown=function(e){var j=e.key==='ArrowRight'||e.key==='ArrowDown'?1:e.key==='ArrowLeft'||e.key==='ArrowUp'?-1:0;
+      if(j){e.preventDefault();var n=box.children[(i+j+items.length)%items.length];n.focus();n.click();}};box.append(b);});
+}
+function ticked(box,v){[].forEach.call(box.children,function(b){b.setAttribute('aria-checked',String(b.dataset.q===v));b.tabIndex=b.dataset.q===v?0:-1;});}
 function paint(){
   var h=resolve(hash()),now=Object.keys(h).filter(function(k){return h[k];}).map(function(k){return k+'='+encodeURIComponent(h[k]);}).join('&');
   if(now!==location.hash.slice(1)&&(h.q||location.hash.length>1))history.replaceState(null,'','#'+now);  // a blank or unknown taxon shows as the default
-  [].forEach.call($('modes').children,function(b){b.setAttribute('aria-checked',String(b.dataset.q===h.q));b.tabIndex=b.dataset.q===h.q?0:-1;});
+  ticked($('modes'),h.q);ticked($('classes'),L.cls());
   sentence(h);matrix(h);network(h);L.ask({x:h.q==='eats'||h.q==='does'?h.x:null,y:h.q==='eaten'||h.q==='does'?h.y:null});
 }
 function again(){var h=resolve(hash());matrix(h);network(h);}
@@ -190,9 +197,9 @@ function get(u,soft){return fetch(u).then(function(r){if(!r.ok)throw new Error(u
 // the 1.4 MB food-word file loads after the first paint; the evidence stage fills in when it lands
 Promise.all([get(C.metaweb),get(C.obs)]).then(function(d){
   E.init(d[0],d[1],null);M=E.M();ALL=E.all();L.init(E,again);$('exportnet').onclick=exportNet;$('src').textContent=E.how(d[1],d[2]);
-  var ms=$('modes');MODES.forEach(function(x,i){var b=el('button',null,x[1]);b.type='button';b.setAttribute('role','radio');b.dataset.q=x[0];b.setAttribute('aria-label',x[2]);b.title=x[2];
-    b.onclick=function(){go(x[0]?{q:x[0]}:{});};b.onkeydown=function(e){var j=e.key==='ArrowRight'||e.key==='ArrowDown'?1:e.key==='ArrowLeft'||e.key==='ArrowUp'?-1:0;
-      if(j){e.preventDefault();var n=ms.children[(i+j+MODES.length)%MODES.length];n.focus();n.click();}};ms.append(b);});
+  seg($('modes'),MODES,function(q){go(q?{q:q}:{});});
+  // the predator's class limits the cards; ticked() on the click too, as the hash does not change
+  seg($('classes'),L.CLASSES.map(function(c){return [c[0],c[1],c[0]?c[1]+' ('+c[0]+')':'Predators of any class'];}),function(c){L.setClass(c);ticked($('classes'),c);});
   var tr=$('try');TRY.forEach(function(x){var h={};Object.keys(x[2]).forEach(function(k){h[k]=k==='q'?x[2][k]:E.find(x[2][k],ALL);});
     if(Object.keys(h).some(function(k){return !h[k];}))return;
     var b=el('button','chip');b.type='button';b.onclick=function(){go(h);};b.append(el('span',null,x[0]),el('em',null,x[1]));tr.append(b);$('tryw').hidden=false;});

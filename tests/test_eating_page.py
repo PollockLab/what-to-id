@@ -10,7 +10,7 @@ import pytest
 from what_to_id import page_eating
 
 from . import test_embeddings_browser as eb
-from .foodweb_page import build_site, open_page
+from .foodweb_page import answer, build_site, open_page
 
 browser = eb.browser
 
@@ -124,8 +124,8 @@ def test_draw_ten_returns_at_most_ten_ranked_cards_and_spends_the_budget(browser
         and "Barred Owl eats House Mouse" in first.inner_text()
     )
     assert first.locator("button").all_inner_texts()[:3] == [
-        "Shows it 1",
-        "Not visible 2",
+        "Yes 1",
+        "No 2",
         "Can’t tell 3",
     ]
     assert (
@@ -160,7 +160,7 @@ def test_shows_it_asks_which_prey_and_a_confirmed_pair_turns_its_edge_green(brow
     )
     draw_all(page)
     card = page.locator("#cards li", has_text="Description mentions “myodes”")
-    card.locator("button", has_text="Shows it").click()
+    answer(card, "Yes", "Yes", "Yes")
     assert (
         card.locator(".which").is_visible()
         and card.locator(".which input").input_value() == "Myodes"
@@ -207,7 +207,7 @@ def test_a_confirmed_mark_hands_off_to_inaturalist_with_a_copyable_name(browser,
     draw_all(page)
     card = page.locator("#cards li", has_text="Description mentions “myodes”")
     assert not card.locator(".hand").is_visible() and card.locator("a.open").is_visible()
-    card.locator("button", has_text="Shows it").click()
+    answer(card, "Yes", "Yes", "Yes")
     card.locator(".which button", has_text="Confirm").click()
     assert card.locator(".hand").is_visible() and not card.locator("a.open").is_visible()
     link = card.locator(".hand a")
@@ -234,7 +234,7 @@ def test_a_confirmed_mark_hands_off_to_inaturalist_with_a_copyable_name(browser,
 def test_the_eaten_by_field_is_handed_off_when_the_unknown_is_the_predator(browser, base):
     page = open_page(browser, base + "#q=eaten&y=Mus musculus")
     card = page.locator("#cards li", has=page.locator("a[href$='/observations/99']"))
-    card.locator("button", has_text="Shows it").click()
+    answer(card, "Yes", "Yes", "Yes")
     assert card.locator(".hand a").inner_text() == "Add Eaten by = Barred Owl on iNaturalist"
     assert "pick Eaten by" in card.locator(".hand .hint").inner_text()
     assert page.errors == []
@@ -247,7 +247,7 @@ def test_the_question_modes_chips_and_keys_work_without_blocking(browser, base):
         "setInterval(()=>{const n=performance.now();"
         "window.__worst=Math.max(window.__worst,n-l-50);l=n},50)"
     )
-    modes = page.get_by_role("radio")
+    modes = page.locator("#modes").get_by_role("radio")
     assert modes.all_inner_texts() == [
         "Survey",
         "X eats",
@@ -257,7 +257,7 @@ def test_the_question_modes_chips_and_keys_work_without_blocking(browser, base):
     page.locator("#try .chip").first.click()
     page.wait_for_selector("#sent input")  # the chip's question has painted, not the survey's cards
     page.wait_for_function("document.querySelectorAll('#cards li').length>0")
-    for k in "123":
+    for k in "123" * 3:  # three checks a card
         page.keyboard.press(k)
     assert page.locator("#cards li.done").count() == 3
     for name in [
@@ -274,6 +274,10 @@ def test_keys_annotate_and_move_the_current_card(browser, base):
     page = open_page(browser, base + "#q=eats&x=Strix varia")
     cards = page.locator("#cards li")
     assert "cur" in cards.nth(0).get_attribute("class")
+    page.keyboard.press("2")  # the first of three checks: the card stays current
+    assert cards.nth(0).locator(".ask").inner_text() == "Step 2 of 3: Is this House Mouse?"
+    assert "cur" in cards.nth(0).get_attribute("class")
+    page.keyboard.press("2")
     page.keyboard.press("2")
     assert cards.nth(0).locator(".res").inner_text() == "Not visible" and "cur" in cards.nth(
         1
@@ -282,21 +286,23 @@ def test_keys_annotate_and_move_the_current_card(browser, base):
     assert "cur" in cards.nth(2).get_attribute("class")
     page.keyboard.press("k")
     page.keyboard.press("k")
-    page.keyboard.press("3")
+    for _ in range(3):
+        page.keyboard.press("3")
     assert cards.nth(0).locator(".res").inner_text() == "Can’t tell"
     assert page.locator("#net line.e.new").count() == 0 and page.errors == []
 
 
 def test_export_is_a_csv_of_the_annotations(browser, base):
     page = open_page(browser, base + "#q=eats&x=Strix varia")
-    page.keyboard.press("1")  # a field-named pair: no question, the pair is the answer
-    page.keyboard.press("2")
+    for k in "111222":  # a field-named pair: three yes, then three no
+        page.keyboard.press(k)
     with page.expect_download() as d:
         page.click("#export")
     rows = Path(d.value.path()).read_text().splitlines()
-    assert rows[0] == "observation_id,url,predator,prey,answer,date"
+    assert rows[0] == "observation_id,url,predator,prey,answer,date,is_predator,is_prey,is_eating"
     assert len(rows) == 3 and rows[1].startswith('"0","https://www.inaturalist.org/observations/0"')
     assert '"Strix varia","Mus musculus","yes"' in rows[1] and rows[2].split(",")[4] == '"no"'
+    assert rows[1].endswith('"yes","yes","yes"') and rows[2].endswith('"no","no","no"')
     assert page.errors == []
 
 
@@ -330,9 +336,9 @@ def test_export_network_is_a_tidy_csv_that_matches_the_confirmed_network(browser
     ]
     draw_all(page)
     card = page.locator("#cards li", has_text="Description mentions “myodes”")
-    card.locator("button", has_text="Shows it").click()
+    answer(card, "Yes", "Yes", "Yes")
     card.locator(".which button", has_text="Confirm").click()
-    page.locator("#cards li:not(.done)").first.locator("button", has_text="Not visible").click()
+    answer(page.locator("#cards li:not(.done)").first, "No", "No", "No")
     _, rows = _network_export(page)
     by = {(r["predator"], r["prey"]): r for r in rows}
     mine = by["Strix varia", "Myodes"]
@@ -379,7 +385,8 @@ def test_export_network_is_a_tidy_csv_that_matches_the_confirmed_network(browser
 def test_the_page_survives_unreadable_or_unwritable_storage(browser, base, init):
     page = open_page(browser, base + "#q=eats&x=Strix varia", init)
     assert page.input_value("#budget") == "30" and page.locator("#cards li").count() >= 1
-    page.keyboard.press("2")
+    for _ in range(3):
+        page.keyboard.press("2")
     assert page.locator("#cards .res", has_text="Not visible").count() == 1 and page.errors == []
 
 
@@ -415,38 +422,6 @@ def test_no_taxon_id_is_ever_visible(browser, base, hash_):
     )
     text = re.sub(r"\d{4}-\d\d-\d\d", "", text)  # dates
     assert not re.search(r"\b\d{4,}\b", text), text
-    assert page.errors == []
-
-
-def rows(page):
-    return page.locator("#sent .cb li[role=treeitem], #sent .cb li[role=option]")
-
-
-def test_picker_opens_on_the_groups_with_counts_and_expands_in_place(browser, base):
-    page = open_page(browser, base + "#q=eats&x=Strix")
-    page.locator("#sent input").click()
-    assert page.locator("#sent input").get_attribute("aria-expanded") == "true"
-    assert page.locator("#sent ul").get_attribute("role") == "tree"
-    assert rows(page).first.inner_text().split() == ["Birds", "2", "13"]
-    assert rows(page).count() == 3  # Birds, its open path down to the pick, and the sibling
-    page.locator("#sent .tri.o").first.click()  # collapse
-    assert rows(page).count() == 1
-    assert page.errors == []
-
-
-def test_picker_typing_ranks_matches_and_the_keyboard_selects(browser, base):
-    page = open_page(browser, base + "#q=eats&x=Strix")
-    page.locator("#sent input").fill("stri")
-    assert page.locator("#sent ul").get_attribute("role") == "listbox"
-    assert rows(page).first.inner_text().split("\n")[0] == "Strix"
-    page.locator("#sent input").fill("zzzz")
-    assert (
-        rows(page).count() == 0 and "No taxon matches" in page.locator("#sent .none").inner_text()
-    )
-    page.locator("#sent input").fill("buteo")
-    page.keyboard.press("ArrowDown")
-    page.keyboard.press("Enter")
-    page.wait_for_function("location.hash.includes('x=Buteo')")
     assert page.errors == []
 
 

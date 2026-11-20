@@ -120,3 +120,9 @@ def open_page(browser, url, init=None):
     page.goto(url)
     page.wait_for_function("window.__food && window.__text")
     return page
+
+
+def answer(card, *steps):
+    """Click the card's answers in order: the three checks, each Yes, No or Can’t tell."""
+    for step in steps:
+        card.locator(".mk button", has_text=step).click()

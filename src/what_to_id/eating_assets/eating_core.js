@@ -36,6 +36,8 @@ function within0(n,clade){
   for(var k=0;n&&k<40;k++,n=M.parent&&M.parent[n])if(n===clade)return true;
   return clade.indexOf(' ')<0&&g===clade;
 }
+// whether a predator is in a class: by its ancestors in the metaweb, a species the table lacks by its genus
+function inClass(n,c){return within(n,c)||within(genus(n),c);}
 function roles(o){return o.k==='by'?{o:o,pred:o.f?o.f[0]:null,prey:o.t[0]}:{o:o,pred:o.t[0],prey:o.f?o.f[0]:null};}
 // the animal is unresolved when unnamed or named above species
 function open(x,side){var n=x[side];return !n||n.indexOf(' ')<0;}
@@ -57,6 +59,6 @@ function init(metaweb,file,text){
 // the page's "How this is made" note
 function how(file,text){return 'Pairs: '+M.source+'. '+M.rule+'. Photographed before: '+pl(file.n.obs,'observation')+' with the Eating or Eaten by field (fetched '+file.fetched+'), '+file.n.named+' name a taxon in the field.'+
   (text?' Searched for food: '+pl(text.n,'observation')+' of a metaweb predator whose description or tags say eating, eats, ate, feeding, prey or caught, or are tagged predation, eating or feeding. Comments cannot be searched through the iNaturalist API, so they are not read.':' The description and tag search was not available.');}
-return {init:init,taxonId:taxonId,el:el,pl:pl,label:label,find:find,hit:hit,cov:cov,within:within,open:open,p:p,seen:seen,preys:preys,preds:preds,words:words,how:how,
+return {init:init,taxonId:taxonId,el:el,pl:pl,label:label,find:find,hit:hit,cov:cov,within:within,inClass:inClass,open:open,p:p,seen:seen,preys:preys,preds:preds,words:words,how:how,
   R:R,M:function(){return M;},all:function(){return ALL;}};
 })();
