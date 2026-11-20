@@ -81,7 +81,7 @@ function drawNet(Ls,Rs,edges,desc,nm){
   side(Ls,152,'end',0);side(Rs,228,'start',1);box.append(svg);
 }
 function drawStar(hub,parts,edges,desc,eats){
-  var box=$('net'),svg=s('svg',{viewBox:'0 0 380 '+(n<5?300:370),role:'img','aria-label':desc}),cx=190,cy=n<5?150:185,n=parts.length,rx=95,ry=n<5?85:132,at=[];box.replaceChildren();
+  var n=parts.length,box=$('net'),svg=s('svg',{viewBox:'0 0 380 '+(n<5?300:370),role:'img','aria-label':desc}),cx=190,cy=n<5?150:185,rx=95,ry=n<5?85:132,at=[];box.replaceChildren();
   parts.forEach(function(nm,i){var a=-Math.PI/2+i*2*Math.PI/n;at.push([cx+rx*Math.cos(a),cy+ry*Math.sin(a),Math.cos(a),Math.sin(a)]);});
   edges.forEach(function(e){var q=at[e[0]],g=s('line',{x1:cx,y1:cy,x2:q[0],y2:q[1],class:'e '+e[1]});g.append(s('title',null,eats?tip(hub,parts[e[0]],e[1]):tip(parts[e[0]],hub,e[1])));svg.append(g);});
   parts.forEach(function(nm,i){

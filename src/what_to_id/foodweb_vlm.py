@@ -32,11 +32,11 @@ def genus(name: str | None) -> str:
 def slim(row: dict) -> dict:
     """One CSV row as the file's record."""
     r = {"p": round(float(row["p_feeding"]), 3)}
-    if row.get("prey_bbox_0_1000"):
-        r["box"] = [round(float(v)) for v in json.loads(row["prey_bbox_0_1000"])]
     name = (row.get("prey_name_qwen") or "").strip()
     if name and "none" not in name.lower():  # "none" and "X (none)": the model saw no prey
         r["name"] = name
+        if row.get("prey_bbox_0_1000"):  # a box without a prey is drawn on nothing
+            r["box"] = [round(float(v)) for v in json.loads(row["prey_bbox_0_1000"])]
     own = {genus(row.get("taxon_name")), genus(row.get("predator_canmw"))} - {""}
     prey = []
     for i in (1, 2, 3):
