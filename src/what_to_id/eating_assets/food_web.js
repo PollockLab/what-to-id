@@ -190,6 +190,7 @@ function paint(){
   if(now!==location.hash.slice(1)&&(h.q||location.hash.length>1))history.replaceState(null,'','#'+now);  // a blank or unknown taxon shows as the default
   ticked($('modes'),h.q);ticked($('classes'),L.cls());
   sentence(h);matrix(h);network(h);L.ask({x:h.q==='eats'||h.q==='does'?h.x:null,y:h.q==='eaten'||h.q==='does'?h.y:null});
+  if(window.FoodSearch)FoodSearch.ask(h);
 }
 function again(){var h=resolve(hash());matrix(h);network(h);}
 window.addEventListener('hashchange',paint);
