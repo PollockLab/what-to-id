@@ -152,7 +152,8 @@ function exportCsv(){
 }
 function reload(){
   var ids=new Set(E.R.all.map(function(r){return r.o.id;}));
-  ITEMS=E.R.all.concat(E.R.text.filter(function(r){return !ids.has(r.o.id);})).map( // a field record also found by the text search is one cardfunction(r){return {r:r,es:entries(r)};}).filter(function(it){return it.es.length;});
+  // a field record also found by the text search is one card
+  ITEMS=E.R.all.concat(E.R.text.filter(function(r){return !ids.has(r.o.id);})).map(function(r){return {r:r,es:entries(r)};}).filter(function(it){return it.es.length;});
 }
 function init(core,onChange){
   E=core;change=onChange;load();
