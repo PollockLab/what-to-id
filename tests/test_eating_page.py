@@ -34,7 +34,7 @@ def test_the_survey_is_the_default_and_lists_pairs_in_the_matrix_and_network(bro
         page = open_page(browser, base + hash_)
         page.wait_for_selector("#mx table")
         assert page.locator("#mx td button").count() >= 4 and page.locator("#mx th").count() >= 3
-        assert page.inner_text("#sent") == "What evidence is there for the BC food web?"
+        assert page.inner_text("#sent") == "What evidence is there for the food web?"
         assert page.locator("#modes button[aria-checked=true]").inner_text() == "Survey"
         assert (
             page.locator("#net line.e.before").count() >= 1
@@ -74,8 +74,6 @@ def test_a_matrix_cell_click_asks_does_x_eat_y_and_highlights_the_cell(browser, 
 
 
 def draw_all(page):
-    page.fill("#budget", "50")
-    page.press("#budget", "Tab")
     page.click("#draw")
 
 
@@ -113,12 +111,11 @@ def test_a_blank_zero_or_unknown_taxon_falls_back_to_a_default_and_never_shows_z
     assert page.errors == []
 
 
-def test_draw_ten_returns_at_most_ten_ranked_cards_and_spends_the_budget(browser, base):
+def test_ten_ranked_cards_show_first_and_more_photos_adds_the_rest(browser, base):
     page = open_page(browser, base + "#q=eats&x=Strix varia")
     assert page.inner_text("#cand").startswith("6 candidate observations")  # 16, ten already drawn
-    assert page.locator("#cards li").count() == 10 and page.inner_text("#used") == "10 used"
-    assert page.get_attribute("#mbar", "aria-valuenow") == "10"
-    assert page.inner_text("#draw") == "Draw ten more"
+    assert page.locator("#cards li").count() == 10
+    assert page.inner_text("#draw") == "More photos"
     first = page.locator("#cards li").first
     assert (
         "The field names the pair" in first.inner_text()
@@ -134,11 +131,9 @@ def test_draw_ten_returns_at_most_ten_ranked_cards_and_spends_the_budget(browser
         .get_attribute("href")
         .startswith("https://www.inaturalist.org/observations/")
     )
-    page.fill("#budget", "12")
-    page.press("#budget", "Tab")
     page.click("#draw")
-    assert page.locator("#cards li").count() == 12 and page.inner_text("#used") == "12 used"
-    assert page.locator("#draw").is_disabled() and "Budget spent" in page.inner_text("#cand")
+    assert page.locator("#cards li").count() == 16
+    assert page.locator("#draw").is_disabled() and "No more" in page.inner_text("#cand")
     assert page.errors == []
 
 
@@ -177,26 +172,25 @@ def test_shows_it_asks_which_prey_and_a_confirmed_pair_turns_its_edge_green(brow
     assert stored["ann"]["502"]["v"] == "yes" and stored["ann"]["502"]["prey"] == "Myodes"
     page.reload()
     page.wait_for_function("window.__food && window.__text")
-    assert page.locator("#net line.e.new").count() == 1 and page.inner_text("#used") == "10 used"
+    assert page.locator("#net line.e.new").count() == 1 and page.locator("#cards li").count() == 10
     assert page.errors == []
 
 
-def test_switching_to_the_survey_draws_nothing_and_each_question_has_its_own_budget(browser, base):
+def test_switching_to_the_survey_draws_nothing_and_each_question_starts_over(browser, base):
     page = open_page(browser, base + "#q=eats&x=Strix varia")
-    assert page.inner_text("#used") == "10 used"
-    page.get_by_role("radio", name="What evidence is there for the BC food web?").click()
+    assert page.locator("#cards li").count() == 10
+    page.get_by_role("radio", name="What evidence is there for the food web?").click()
     page.wait_for_function("document.querySelectorAll('#cards li').length==0")
-    assert page.inner_text("#used") == "0 used"
     assert "Pick a species" in page.inner_text("#cand") and page.locator("#draw").is_enabled()
     page.evaluate("location.hash='#q=eats&x=Strix varia'")
     page.wait_for_function("document.querySelectorAll('#cards li').length==10")
-    assert page.inner_text("#used") == "10 used" and "No more" not in page.inner_text("#cand")
+    assert "No more" not in page.inner_text("#cand")
     assert page.errors == []
 
 
 def test_the_survey_draws_its_first_ten_on_load_only(browser, base):
     page = open_page(browser, base)
-    assert page.locator("#cards li").count() > 0 and page.inner_text("#used") != "0 used"
+    assert page.locator("#cards li").count() > 0
 
 
 def test_a_confirmed_mark_hands_off_to_inaturalist_with_a_copyable_name(browser, base):
@@ -265,7 +259,7 @@ def test_the_question_modes_chips_and_keys_work_without_blocking(browser, base):
         "What does X eat?",
         "What eats Y?",
         "Does X eat Y?",
-        "What evidence is there for the BC food web?",
+        "What evidence is there for the food web?",
     ]:
         page.get_by_role("radio", name=name).click()
     assert page.evaluate("window.__worst") < 1000 and page.errors == []
@@ -319,9 +313,9 @@ def _network_export(page):
 def test_export_network_is_a_tidy_csv_that_matches_the_confirmed_network(browser, base):
     page = open_page(browser, base + "#q=eats&x=Strix varia")
     head, rows = _network_export(page)
-    assert [h.split(":")[0] for h in head] == ["# question", "# metaweb", "# date", "# budget_used"]
+    assert [h.split(":")[0] for h in head] == ["# question", "# metaweb", "# date", "# shown"]
     assert head[0] == "# question: What does Barred Owl eat?" and "test" in head[1]
-    assert head[3] == "# budget_used: 10 of 30 photos for this question"
+    assert head[3] == "# shown: 10"
     assert list(rows[0]) == [
         "predator",
         "predator_taxon_id",
@@ -385,7 +379,7 @@ def test_export_network_is_a_tidy_csv_that_matches_the_confirmed_network(browser
 )
 def test_the_page_survives_unreadable_or_unwritable_storage(browser, base, init):
     page = open_page(browser, base + "#q=eats&x=Strix varia", init)
-    assert page.input_value("#budget") == "30" and page.locator("#cards li").count() >= 1
+    assert page.locator("#cards li").count() >= 1
     for _ in range(3):
         page.keyboard.press("2")
     assert page.locator("#cards .res", has_text="Not visible").count() == 1 and page.errors == []
@@ -447,7 +441,7 @@ def test_the_page_paints_before_the_food_word_file_arrives(browser, base):
     assert page.locator("#cards li").count() == 0  # nothing is drawn from a partial search
     held[0].continue_()
     page.wait_for_function("window.__text")
-    assert page.locator("#cards li").count() == 10 and page.inner_text("#draw") == "Draw ten more"
+    assert page.locator("#cards li").count() == 10 and page.inner_text("#draw") == "More photos"
     assert page.inner_text("#cand").startswith("6 candidate observations")
 
 
@@ -476,7 +470,7 @@ def test_the_food_word_file_does_not_block_the_main_thread(browser, base):
 
 def test_the_matrix_has_a_legend_and_full_names_are_reachable(browser, base):
     page = open_page(browser, base + "#q=eats&x=Strix varia")
-    assert "photographed in BC" in page.inner_text("#mxkey")
+    assert "photographed" in page.inner_text("#mxkey")
     assert page.get_attribute("#mx", "tabindex") == "0"
     assert page.locator("#mx th button").first.get_attribute("title")
     assert page.locator("#mx th.v button").first.inner_text() in ("House Mouse", "Myodes")
@@ -519,3 +513,10 @@ def test_an_observation_with_both_fields_is_one_card(browser, audit):
 def test_a_hub_with_few_partners_gets_the_small_star(browser, base):
     page = open_page(browser, base + "#q=eats&x=Strix")
     assert page.get_attribute("#net svg", "viewBox") == "0 0 380 300"
+
+
+def test_answering_the_last_card_shows_the_next_ten(browser, base):
+    page = open_page(browser, base + "#q=eats&x=Strix varia")
+    for _ in range(30):
+        page.keyboard.press("2")
+    assert page.locator("#cards li").count() == 16 and page.errors == []

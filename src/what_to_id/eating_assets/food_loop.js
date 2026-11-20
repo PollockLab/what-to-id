@@ -1,6 +1,7 @@
-// The evidence search of the Food web page: "Draw ten" pulls the ten most promising BC observations for the question, each with the
+// The evidence search of the Food web page: shows the most promising BC observations for the question ten at a time, each with the
 // pair it may show and why it was drawn, and the reader answers three checks (is this the predator, is this the prey, is it eating it: yes, no or can't tell). Annotations,
-// the budget and the annotations live in localStorage only (one key, read defensively); nothing goes to iNaturalist.
+// the annotations live in localStorage only (one key, read defensively); nothing goes to iNaturalist.
+// The next ten come when the last card is answered, or on More photos.
 // Rank = the pair's p in the metaweb x the evidence: 4 the field names the pair, 3 it names a coarse ancestor of one animal, 2 the
 // description, tags or field text mention a candidate (common or Latin name), 1 they only talk about food or the field is empty.
 // FoodLoop.init(E, onChange); FoodLoop.ask({x, y}) when the question changes; FoodLoop.state(pred, prey) is 'before', 'new' or ''.
@@ -9,10 +10,10 @@ var FoodLoop=(function(){
 // the predator classes the filter offers: [iNaturalist class, button]; '' is all
 var CLASSES=[['','All classes'],['Aves','Birds'],['Mammalia','Mammals'],['Reptilia','Reptiles'],['Amphibia','Amphibians'],['Insecta','Insects']],ANS=['yes','no','unsure'],
   KEY='wtid-loop',OBS='https://www.inaturalist.org/observations/',TEN=10,$=function(id){return document.getElementById(id);};
-var S={budget:30,ann:{},cls:''},H=null,E=null,Q={x:null,y:null},ITEMS=[],deck=[],cur=-1,change=function(){},TOK=new Map(),ready=false,booted=false;
+var S={ann:{},cls:''},H=null,E=null,Q={x:null,y:null},ITEMS=[],deck=[],cur=-1,change=function(){},TOK=new Map(),ready=false,booted=false;
 function load(){
-  try{var v=JSON.parse(localStorage.getItem(KEY)),b=Number(v&&v.budget);
-    if(v&&typeof v==='object'){S.budget=isFinite(b)&&b>=0?Math.floor(b):30;S.ann=v.ann&&typeof v.ann==='object'&&!Array.isArray(v.ann)?v.ann:{};
+  try{var v=JSON.parse(localStorage.getItem(KEY));
+    if(v&&typeof v==='object'){S.ann=v.ann&&typeof v.ann==='object'&&!Array.isArray(v.ann)?v.ann:{};
     S.cls=CLASSES.some(function(c){return c[0]===v.cls;})?v.cls:'';}}catch(e){}
 }
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
@@ -70,12 +71,9 @@ function hint(o,a,d){
 }
 function pairText(e){return E.label(e.pred)+(e.tier===4?' eats ':' may be eating ')+E.label(e.prey);}
 function meter(){
-  var used=deck.length,left=S.budget-used,n=ranked().length,bar=$('mbar');
-  $('budget').value=S.budget;$('used').textContent=used+' used';
-  $('mfill').style.width=(S.budget?Math.min(100,used/S.budget*100):100)+'%';bar.setAttribute('aria-valuenow',used);bar.setAttribute('aria-valuemax',S.budget);
-  bar.setAttribute('aria-valuetext',used+' of '+S.budget+' photos');bar.classList.toggle('full',left<=0);
-  $('draw').textContent=deck.length?'Draw ten more':'Draw ten';$('draw').disabled=left<=0||!n||!ready;
-  $('cand').textContent=!ready?E.pl(n,'candidate observation')+' so far. Searching descriptions and tags.':left<=0?'Budget spent. Raise it to draw more.':n?E.pl(n,'candidate observation')+(deck.length||Q.x||Q.y?' for this question.':' across the whole web. Pick a species in the question to draw its photos, or draw ten from all of them.'):'No more observations for this question.';
+  var n=ranked().length;
+  $('draw').textContent=deck.length?'More photos':'Show photos';$('draw').disabled=!n||!ready;
+  $('cand').textContent=!ready?E.pl(n,'candidate observation')+' so far. Searching descriptions and tags.':n?E.pl(n,'candidate observation')+(deck.length||Q.x||Q.y?' for this question.':' across the whole web. Pick a species in the question to draw its photos, or show photos from all of them.'):'No more observations for this question.';
 }
 // the three answers of a mark: a saved single mark (yes, no, unsure) is the same answer to all three
 function steps(a){var t=a&&a.st;return Array.isArray(t)&&t.length===3&&t.every(function(x){return ANS.indexOf(x)>=0;})?t:a&&ANS.indexOf(a.v)>=0?[a.v,a.v,a.v]:[];}
@@ -93,7 +91,7 @@ function status(c){
   if(y){var by=c.r.o.k==='by',n=E.label(by?a.pred:a.prey),f=by?'Eaten by':'Eating';h.dataset.name=n;
     h.querySelector('a').textContent='Add '+f+' = '+n+' on iNaturalist';h.querySelector('.hint').textContent='On the observation, open Observation fields, pick '+f+', enter '+(by?'the predator':'the prey')+'.';h.querySelector('.cp').textContent='Copy';}
 }
-function next(){for(var k=1;k<=deck.length;k++){var i=(cur+k)%deck.length;if(!S.ann[deck[i].r.o.id]){focus(i);return;}}}
+function next(){for(var k=1;k<=deck.length;k++){var i=(cur+k)%deck.length;if(!S.ann[deck[i].r.o.id]){focus(i);return;}}draw();}
 function focus(i,quiet){
   cur=i;deck.forEach(function(c,j){c.li.classList.toggle('cur',j===i);});
   if(deck[i]&&!quiet)deck[i].li.scrollIntoView({block:'nearest',behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'});
@@ -149,22 +147,21 @@ function card(c){
   status(c);return li;
 }
 function draw(auto){
-  var n=Math.min(TEN,S.budget-deck.length);if(n<=0)return;
-  var got=ranked().slice(0,n),ul=$('cards'),first=deck.length;
+  var got=ranked().slice(0,TEN),ul=$('cards'),first=deck.length;
   got.forEach(function(c){deck.push(c);ul.append(card(c));});
   save();meter();if(got.length)focus(first,auto===true);
 }
-// the budget is per question: asking resets it. The first ten are drawn when the question has a species (or on the first load, so the
-// survey is not empty), once the food-word file has settled. Switching to the survey draws nothing: pick a species or press Draw ten.
+// asking starts over. The first ten are drawn when the question has a species (or on the first load, so the
+// survey is not empty), once the food-word file has settled. Switching to the survey draws nothing: pick a species or press Show photos.
 function ask(q){Q=q;deck=[];cur=-1;$('cards').replaceChildren();meter();if(!ready)return;var a=!!(q.x||q.y)||!booted;booted=true;if(a)draw(true);}
-// what the network export needs: every mark (yes carries its pair, any mark the pair its card asked about), the pairs drawn, the budget
+// what the network export needs: every mark (yes carries its pair, any mark the pair its card asked about), the pairs drawn, the photos shown
 function marks(){return Object.keys(S.ann).filter(function(i){return S.ann[i];}).map(function(i){var a=S.ann[i];return {id:i,v:a.v,pred:a.pred,prey:a.prey,ask:a.ask};});}
 function searched(pred,prey){
   var m=function(p){return p&&p[0]===pred&&p[1]===prey;};
   return deck.some(function(c){return c.e.pred===pred&&c.e.prey===prey;})||marks().some(function(a){return m(a.ask);});
 }
 function setClass(c){if(CLASSES.some(function(k){return k[0]===c;})){S.cls=c;save();ask(Q);}}
-function budget(){return {used:deck.length,total:S.budget};}
+function shown(){return deck.length;}
 function csv(){
   var q=function(v){return '"'+String(v==null?'':v).replace(/"/g,'""')+'"';};
   return ['observation_id,url,predator,prey,answer,date,is_predator,is_prey,is_eating'].concat(Object.keys(S.ann).map(function(i){var a=S.ann[i]||{};
@@ -182,7 +179,6 @@ function init(core,onChange){
   E=core;change=onChange;load();
   reload();
   $('draw').onclick=function(){draw();};$('export').onclick=exportCsv;
-  $('budget').onchange=function(){var b=Math.floor(Number(this.value));S.budget=isFinite(b)&&b>=0?b:S.budget;save();meter();};
   document.addEventListener('keydown',function(e){
     var t=e.target;if(e.ctrlKey||e.metaKey||e.altKey||/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)||!deck.length)return;
     if(e.key==='j'||e.key==='k'){e.preventDefault();focus(Math.max(0,Math.min(deck.length-1,(cur<0?0:cur)+(e.key==='j'?1:-1))));return;}
@@ -191,5 +187,5 @@ function init(core,onChange){
 }
 function go(){ready=true;}
 function hints(v){H=v&&v.obs?v:null;}
-return {hints:hints,init:init,reload:reload,go:go,ask:ask,state:state,pairs:pairs,marks:marks,searched:searched,budget:budget,csv:csv,CLASSES:CLASSES,cls:function(){return S.cls;},setClass:setClass,steps:steps,verdict:verdict,entries:entries,S:S};
+return {hints:hints,init:init,reload:reload,go:go,ask:ask,state:state,pairs:pairs,marks:marks,searched:searched,shown:shown,csv:csv,CLASSES:CLASSES,cls:function(){return S.cls;},setClass:setClass,steps:steps,verdict:verdict,entries:entries,S:S};
 })();

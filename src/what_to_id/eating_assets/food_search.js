@@ -54,7 +54,7 @@ async function search(){
 }
 function ask(h){
   S.run++;S.text=query(h);box.hidden=!S.text;btn.disabled=false;out.replaceChildren();
-  say(S.text?'Looks for "'+S.text+'" in BC photos. The first search downloads a search model.':'');
+  say(S.text?'Looks for "'+S.text+'" in photos. The first search downloads a search model.':'');
 }
 if(box&&CFG.dataUrl){
   btn=E.el('button','btn quiet','Search photos');btn.type='button';btn.onclick=search;
