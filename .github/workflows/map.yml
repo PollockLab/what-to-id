@@ -78,7 +78,7 @@ jobs:
       id-token: write
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.redeploy.outputs.page_url }}
     env:
       GH_TOKEN: ${{ github.token }}
       PYTHONPATH: src
@@ -276,7 +276,24 @@ jobs:
       - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:
           path: _site
+      - name: Wait until the Pages artifact is listed
+        # deploy-pages looks the artifact up once and fails the run when the list lags the upload
+        run: |
+          set -euo pipefail
+          for _ in $(seq 30); do
+            n="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" -q '[.artifacts[]|select(.name=="github-pages")]|length')"
+            if [ "$n" -gt 0 ]; then exit 0; fi
+            sleep 10
+          done
+          echo "::error::the github-pages artifact was not listed after 5 minutes"; exit 1
       - id: deployment
+        continue-on-error: true
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+      - name: Pause before the second deploy attempt
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 60
+      - id: redeploy
+        if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
       - name: Save the map pool
         run: |
