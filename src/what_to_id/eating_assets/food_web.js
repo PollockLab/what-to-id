@@ -195,8 +195,8 @@ function again(){var h=resolve(hash());matrix(h);network(h);}
 window.addEventListener('hashchange',paint);
 function get(u,soft){return fetch(u).then(function(r){if(!r.ok)throw new Error(u+' '+r.status);return r.json();}).catch(function(e){if(soft)return null;throw e;});}
 // the 1.4 MB food-word file loads after the first paint; the evidence stage fills in when it lands
-Promise.all([get(C.metaweb),get(C.obs)]).then(function(d){
-  E.init(d[0],d[1],null);M=E.M();ALL=E.all();L.init(E,again);$('exportnet').onclick=exportNet;$('src').textContent=E.how(d[1],d[2]);
+Promise.all([get(C.metaweb),get(C.obs),get(C.vlm,true)]).then(function(d){
+  E.init(d[0],d[1],null);M=E.M();ALL=E.all();L.hints(d[2]);L.init(E,again);$('exportnet').onclick=exportNet;$('src').textContent=E.how(d[1],null);
   seg($('modes'),MODES,function(q){go(q?{q:q}:{});});
   // the predator's class limits the cards; ticked() on the click too, as the hash does not change
   seg($('classes'),L.CLASSES.map(function(c){return [c[0],c[1],c[0]?c[1]+' ('+c[0]+')':'Predators of any class'];}),function(c){L.setClass(c);ticked($('classes'),c);});
