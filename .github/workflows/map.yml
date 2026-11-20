@@ -223,6 +223,18 @@ jobs:
           if [ -z "$ATLAS_HF_REPO" ]; then echo "no ATLAS_HF_REPO; no confused pairs page"; exit 0; fi
           python -m what_to_id.page_confusion --out _site \
             --data-url "https://huggingface.co/datasets/${ATLAS_HF_REPO}/resolve/main/"
+      # food-web.html: BC predator-prey pairs from GloBI (the metaweb) and the feeding photos and food-word
+      # searches from iNaturalist that test them. The Food web tab hides itself when the page is missing.
+      - name: Add the Food web page
+        continue-on-error: true
+        timeout-minutes: 30
+        run: |
+          set -euo pipefail
+          python -m what_to_id.foodweb --out _site/foodweb.json
+          python -m what_to_id.metaweb --foodweb _site/foodweb.json --meta _site/map-meta.json \
+            --taxa "_site/$(jq -r .taxa _site/map-meta.json)" --out _site/metaweb.json
+          python -m what_to_id.foodweb_obs --out _site/foodweb-obs.json --metaweb _site/metaweb.json
+          python -m what_to_id.page_eating _site
       # terms.html: the glossary and each view's explanation, read from their templates. After the Identify
       # step, whose scoring dates it prints, and with the index manifest for its Methods numbers. No tab: the
       # toggletips' More links are the way in.
