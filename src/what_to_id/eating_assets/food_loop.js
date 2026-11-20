@@ -24,7 +24,7 @@ function mention(text,tok){for(var i=text.indexOf(tok);i>=0;i=text.indexOf(tok,i
 function entries(r){
   var o=r.o,eat=o.k!=='by',known=eat?r.pred:r.prey,named=eat?r.prey:r.pred,out=[];
   if(!known||known.indexOf(' ')<0)return out;
-  var all=(eat?E.preys(known):E.preds(known)).map(function(q){return q[eat?1:0];});
+  var all=(eat?E.preys(known):E.preds(known)).map(function(q){return q[eat?1:0];}).filter(function(n,i,a){return a.indexOf(n)===i;}); // subspecies pairs repeat a partner
   function add(n,tier,why){out.push(eat?{pred:known,prey:n,tier:tier,why:why}:{pred:n,prey:known,tier:tier,why:why});}
   if(named&&!E.open(r,eat?'prey':'pred')){add(named,4,'The field names the pair');return out;}
   if(named){all.filter(function(n){return E.within(n,named);}).forEach(function(n){add(n,3,'The field names '+E.label(named)+', not a species');});return out;}
@@ -151,7 +151,8 @@ function exportCsv(){
   var u=URL.createObjectURL(new Blob([csv()],{type:'text/csv'})),a=E.el('a');a.href=u;a.download='food-web-annotations.csv';document.body.append(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u);},1000);
 }
 function reload(){
-  ITEMS=E.R.all.concat(E.R.text).map(function(r){return {r:r,es:entries(r)};}).filter(function(it){return it.es.length;});
+  var ids=new Set(E.R.all.map(function(r){return r.o.id;}));
+  ITEMS=E.R.all.concat(E.R.text.filter(function(r){return !ids.has(r.o.id);})).map( // a field record also found by the text search is one cardfunction(r){return {r:r,es:entries(r)};}).filter(function(it){return it.es.length;});
 }
 function init(core,onChange){
   E=core;change=onChange;load();
