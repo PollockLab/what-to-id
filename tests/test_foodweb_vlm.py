@@ -23,6 +23,8 @@ def test_same_genus_below_the_floor_and_none_names_are_dropped():
         "prey": [["Anaxyrus boreas", 0.5]],
     }
     assert "name" not in foodweb_vlm.slim(row(prey_name_qwen="none"))
+    assert "box" not in foodweb_vlm.slim(row(prey_name_qwen="none"))
+    assert "box" not in foodweb_vlm.slim(row(prey_name_qwen=""))
     assert "name" not in foodweb_vlm.slim(row(prey_name_qwen="Toad (none)"))
 
 

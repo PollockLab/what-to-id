@@ -9,6 +9,7 @@ import pytest
 
 from what_to_id import page_eating
 
+from . import foodweb_page
 from . import test_embeddings_browser as eb
 from .foodweb_page import answer, build_site, open_page
 
@@ -479,3 +480,42 @@ def test_the_matrix_has_a_legend_and_full_names_are_reachable(browser, base):
     assert page.get_attribute("#mx", "tabindex") == "0"
     assert page.locator("#mx th button").first.get_attribute("title")
     assert page.locator("#mx th.v button").first.inner_text() in ("House Mouse", "Myodes")
+
+
+@pytest.fixture(scope="module")
+def audit(tmp_path_factory, monkeypatch_module):
+    """The sample site plus id 99 as an eating record too, and a "mousetrap" hit."""
+    dup = {**foodweb_page.OBS["obs"][0], "id": 99, "f": ["Mus musculus", 3]}
+    monkeypatch_module.setattr(
+        foodweb_page, "OBS", {**foodweb_page.OBS, "obs": [*foodweb_page.OBS["obs"], dup]}
+    )
+    text = {
+        **foodweb_page.TEXT,
+        "obs": [*foodweb_page.TEXT["obs"], foodweb_page.hit(504, "Barred Owl near a mousetrap")],
+    }
+    monkeypatch_module.setattr(foodweb_page, "TEXT", text)
+    yield from build_site(tmp_path_factory.mktemp("audit-site"))
+
+
+@pytest.fixture(scope="module")
+def monkeypatch_module():
+    with pytest.MonkeyPatch.context() as m:
+        yield m
+
+
+def test_a_word_that_only_starts_with_a_candidate_is_not_a_mention(browser, audit):
+    page = open_page(browser, audit + "#q=eats&x=Strix varia")
+    draw_all(page)
+    card = page.locator("#cards li", has=page.locator("a[href$='/observations/504']")).inner_text()
+    assert "Description or tags mention food" in card and "mentions" not in card
+
+
+def test_an_observation_with_both_fields_is_one_card(browser, audit):
+    page = open_page(browser, audit + "#q=eats&x=Strix varia")
+    draw_all(page)
+    assert page.locator("#cards li", has=page.locator("a[href$='/observations/99']")).count() == 1
+
+
+def test_a_hub_with_few_partners_gets_the_small_star(browser, base):
+    page = open_page(browser, base + "#q=eats&x=Strix")
+    assert page.get_attribute("#net svg", "viewBox") == "0 0 380 300"

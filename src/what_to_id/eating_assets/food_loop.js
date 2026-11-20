@@ -22,7 +22,7 @@ function tokens(n){
   if(!TOK.has(n)){var t=[lc(n)],c=lc(E.label(n));if(c!==t[0]){t.push(c);var w=c.split(/[ -]/).pop();if(w.length>=4&&t.indexOf(w)<0)t.push(w);}TOK.set(n,t);}
   return TOK.get(n);
 }
-function mention(text,tok){for(var i=text.indexOf(tok);i>=0;i=text.indexOf(tok,i+1))if(i===0||!/[a-z]/.test(text[i-1]))return true;return false;}
+function mention(text,tok){for(var i=text.indexOf(tok);i>=0;i=text.indexOf(tok,i+1))if((i===0||!/[a-z]/.test(text[i-1]))&&/^(e?s)?([^a-z]|$)/.test(text.slice(i+tok.length)))return true;return false;}  // a plural may end the word ("voles"), not "shrewd"
 // the pairs one record may show, each with its evidence tier and the reason, as [{pred, prey, tier, why}]
 function entries(r){
   var o=r.o,eat=o.k!=='by',known=eat?r.pred:r.prey,named=eat?r.prey:r.pred,out=[];
@@ -47,7 +47,8 @@ function ranked(){
     if(seen.has(it.r.o.id))return;
     var b=null;it.es.forEach(function(e){if(ok(e)&&(!b||score(e)>score(b)))b=e;});
     if(b)out.push({r:it.r,e:b,s:score(b)});});
-  return out.sort(function(a,b){return b.s-a.s||(b.r.o.on>a.r.o.on?1:-1);});
+  var one=new Set();  // an observation with both fields is two records: its best one only
+  return out.sort(function(a,b){return b.s-a.s||(a.r.o.on===b.r.o.on?a.r.o.id-b.r.o.id:b.r.o.on>a.r.o.on?1:-1);}).filter(function(c){return !one.has(c.r.o.id)&&one.add(c.r.o.id);});
 }
 function state(pred,prey){
   if(E.seen(pred,prey))return 'before';
