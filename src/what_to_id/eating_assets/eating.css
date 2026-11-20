@@ -116,3 +116,7 @@ kbd{font:11px ui-monospace,monospace;border:1px solid currentColor;border-radius
 .tri.no{width:12px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 @media(max-width:480px){.cbp li{min-height:40px}.cb{width:100%}.cb input{width:100%}}
+.fsearch{margin:var(--s3) 0 0}
+.thumbs{list-style:none;margin:var(--s2) 0 0;padding:0;display:grid;gap:var(--s2);grid-template-columns:repeat(auto-fill,minmax(110px,1fr))}
+.thumbs img{display:block;width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;background:var(--chip)}
+.fsearch .err{color:var(--warn);background:var(--warnbg);padding:var(--s2) var(--s3);border-radius:6px}

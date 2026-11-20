@@ -109,14 +109,14 @@ def serve(root, name):
     server.shutdown()
 
 
-def build_site(root, vlm=True):
+def build_site(root, vlm=True, data_url=""):
     (root / page_eating.OBS_FILE).write_text(json.dumps(OBS))
     assert page_eating.build(root / "none") is None  # no data files, no page
     (root / page_eating.METAWEB_FILE).write_text(json.dumps(META))
     (root / page_eating.TEXT_FILE).write_text(json.dumps(TEXT))
     if vlm:
         (root / page_eating.VLM_FILE).write_text(json.dumps(VLM))
-    assert page_eating.build(root).name == "food-web.html"
+    assert page_eating.build(root, data_url).name == "food-web.html"
     return serve(root, "food-web.html")
 
 

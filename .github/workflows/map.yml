@@ -228,6 +228,8 @@ jobs:
       - name: Add the Food web page
         continue-on-error: true
         timeout-minutes: 30
+        env:
+          ATLAS_HF_REPO: ${{ vars.ATLAS_HF_REPO }}
         run: |
           set -euo pipefail
           python -m what_to_id.foodweb --out _site/foodweb.json
@@ -235,7 +237,9 @@ jobs:
             --taxa "_site/$(jq -r .taxa _site/map-meta.json)" --out _site/metaweb.json
           python -m what_to_id.foodweb_obs --out _site/foodweb-obs.json --metaweb _site/metaweb.json
           python -m what_to_id.foodweb_vlm --out _site/foodweb-vlm.json
-          python -m what_to_id.page_eating _site
+          # with the atlas index the page gets a "Search photos" control (the model downloads only on a click)
+          data=(); if [ -n "$ATLAS_HF_REPO" ]; then data=("https://huggingface.co/datasets/${ATLAS_HF_REPO}/resolve/main/"); fi
+          python -m what_to_id.page_eating _site "${data[@]}"
       # terms.html: the glossary and each view's explanation, read from their templates. After the Identify
       # step, whose scoring dates it prints, and with the index manifest for its Methods numbers. No tab: the
       # toggletips' More links are the way in.

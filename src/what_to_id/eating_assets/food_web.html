@@ -27,7 +27,8 @@ __SITE_NAV__
 <div class="meter"><div class="mbar" id="mbar" role="progressbar" aria-label="Budget used" aria-valuemin="0" aria-valuenow="0" aria-valuemax="30"><i id="mfill"></i></div>
 <div class="mrow"><span id="used"></span><label>of <input id="budget" type="number" min="0" max="500" step="5" value="30" aria-label="Budget, photos to draw"> photos</label></div></div>
 <p class="keys muted">Three checks per card (predator, prey, eating): <kbd>1</kbd> yes <kbd>2</kbd> no <kbd>3</kbd> can’t tell, <kbd>j</kbd> <kbd>k</kbd> move. Saved in this browser.</p>
-<ul class="cards" id="cards"></ul></section>
+<ul class="cards" id="cards"></ul>
+<div id="fsearch" class="fsearch" hidden></div></section>
 <section class="st4" aria-labelledby="s4"><h2 id="s4"><span>4</span>Confirmed network</h2>
 <div class="key"><span><i class="g"></i>first photograph, confirmed here</span><span><i></i>photographed before</span><span><i class="none"></i>nothing found</span></div>
 <div id="net"></div><p id="netnote" aria-live="polite"></p></section>
@@ -43,5 +44,6 @@ __SITE_NAV__
 <script>__EATING_PICKER_JS__</script>
 <script>__EATING_CORE_JS__</script>
 <script>__FOOD_LOOP_JS__</script>
+<script>__FOOD_SEARCH_JS__</script>
 <script>__EATING_JS__</script>
 </body></html>
