@@ -14,6 +14,7 @@ button{font:inherit;color:var(--ink)}
 @media(min-width:1180px){.flow{grid-template-columns:minmax(320px,1fr) minmax(440px,1.6fr) minmax(320px,1fr);grid-template-areas:"q e n" "m e n";grid-template-rows:auto 1fr}.st4{position:sticky;top:var(--s2)}}
 .seg{display:flex;margin:0 0 var(--s3)}
 .seg button{flex:1 1 0;min-height:32px;padding:2px var(--s2);background:var(--chip);border:1px solid var(--line);margin-left:-1px;cursor:pointer;white-space:nowrap}
+.seg.cls{flex-wrap:wrap}.seg.cls button{flex:0 1 auto}
 .seg button:hover{border-color:var(--muted)}
 .seg button:first-child{border-radius:20px 0 0 20px;margin-left:0}.seg button:last-child{border-radius:0 20px 20px 0}
 .seg button[aria-checked=true]{background:var(--on);color:var(--onink);border-color:var(--on);position:relative}
@@ -77,6 +78,7 @@ kbd{font:11px ui-monospace,monospace;border:1px solid currentColor;border-radius
 .cards .hand{margin:6px 0;padding:0}.hand[hidden]{display:none}.hand a{display:block;font-weight:600;margin-bottom:var(--s1);overflow-wrap:anywhere}
 .hand .cp{min-height:32px;padding:2px var(--s3);border:1px solid var(--line);border-radius:20px;background:var(--chip);cursor:pointer}
 .hand .cs{margin-left:var(--s2);color:var(--muted)}
+.cards .ask{margin:var(--s2) 0 0;font-weight:600}
 .res{min-height:1.2em;color:var(--muted)}
 .key{display:flex;flex-wrap:wrap;gap:var(--s1) var(--s4);font-size:12px;color:var(--muted);margin:var(--s1) 0 var(--s2)}
 .key i{display:inline-block;width:26px;height:0;border-top:3px solid var(--before);vertical-align:middle;margin-right:var(--s1)}

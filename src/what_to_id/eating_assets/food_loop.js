@@ -1,16 +1,19 @@
 // The evidence search of the Food web page: "Draw ten" pulls the ten most promising BC observations for the question, each with the
-// pair it may show and why it was drawn, and the reader marks it Shows it (and which animal), Not visible or Can't tell. Annotations,
+// pair it may show and why it was drawn, and the reader answers three checks (is this the predator, is this the prey, is it eating it: yes, no or can't tell). Annotations,
 // the budget and the annotations live in localStorage only (one key, read defensively); nothing goes to iNaturalist.
 // Rank = the pair's p in the metaweb x the evidence: 4 the field names the pair, 3 it names a coarse ancestor of one animal, 2 the
 // description, tags or field text mention a candidate (common or Latin name), 1 they only talk about food or the field is empty.
 // FoodLoop.init(E, onChange); FoodLoop.ask({x, y}) when the question changes; FoodLoop.state(pred, prey) is 'before', 'new' or ''.
 var FoodLoop=(function(){
 'use strict';
-var KEY='wtid-loop',OBS='https://www.inaturalist.org/observations/',TEN=10,$=function(id){return document.getElementById(id);};
-var S={budget:30,ann:{}},E=null,Q={x:null,y:null},ITEMS=[],deck=[],cur=-1,change=function(){},TOK=new Map(),ready=false,booted=false;
+// the predator classes the filter offers: [iNaturalist class, button]; '' is all
+var CLASSES=[['','All classes'],['Aves','Birds'],['Mammalia','Mammals'],['Reptilia','Reptiles'],['Amphibia','Amphibians'],['Insecta','Insects']],ANS=['yes','no','unsure'],
+  KEY='wtid-loop',OBS='https://www.inaturalist.org/observations/',TEN=10,$=function(id){return document.getElementById(id);};
+var S={budget:30,ann:{},cls:''},E=null,Q={x:null,y:null},ITEMS=[],deck=[],cur=-1,change=function(){},TOK=new Map(),ready=false,booted=false;
 function load(){
   try{var v=JSON.parse(localStorage.getItem(KEY)),b=Number(v&&v.budget);
-    if(v&&typeof v==='object'){S.budget=isFinite(b)&&b>=0?Math.floor(b):30;S.ann=v.ann&&typeof v.ann==='object'&&!Array.isArray(v.ann)?v.ann:{};}}catch(e){}
+    if(v&&typeof v==='object'){S.budget=isFinite(b)&&b>=0?Math.floor(b):30;S.ann=v.ann&&typeof v.ann==='object'&&!Array.isArray(v.ann)?v.ann:{};
+    S.cls=CLASSES.some(function(c){return c[0]===v.cls;})?v.cls:'';}}catch(e){}
 }
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
 function lc(s){return String(s||'').toLowerCase();}
@@ -36,7 +39,7 @@ function entries(r){
   return out;
 }
 function score(e){return Math.max(E.p(e.pred,e.prey),0.1)*e.tier;}
-function ok(e){return (!Q.x||E.hit(e.pred,Q.x))&&(!Q.y||E.hit(e.prey,Q.y));}
+function ok(e){return (!Q.x||E.hit(e.pred,Q.x))&&(!Q.y||E.hit(e.prey,Q.y))&&(!S.cls||E.inClass(e.pred,S.cls));}
 // the records for the question not yet drawn or answered, best first, each with its best pair
 function ranked(){
   var seen=new Set(deck.map(function(c){return c.r.o.id;}).concat(Object.keys(S.ann).map(Number))),out=[];
@@ -66,12 +69,19 @@ function meter(){
   $('draw').textContent=deck.length?'Draw ten more':'Draw ten';$('draw').disabled=left<=0||!n||!ready;
   $('cand').textContent=!ready?E.pl(n,'candidate observation')+' so far. Searching descriptions and tags.':left<=0?'Budget spent. Raise it to draw more.':n?E.pl(n,'candidate observation')+(deck.length||Q.x||Q.y?' for this question.':' across the whole web. Pick a species in the question to draw its photos, or draw ten from all of them.'):'No more observations for this question.';
 }
+// the three answers of a mark: a saved single mark (yes, no, unsure) is the same answer to all three
+function steps(a){var t=a&&a.st;return Array.isArray(t)&&t.length===3&&t.every(function(x){return ANS.indexOf(x)>=0;})?t:a&&ANS.indexOf(a.v)>=0?[a.v,a.v,a.v]:[];}
+// Shows it only when the animals are eating and neither photo-check said no; else Not visible if any said no, else Can't tell
+function verdict(t){return t[2]==='yes'&&t[0]!=='no'&&t[1]!=='no'?'yes':t.indexOf('no')>=0?'no':'unsure';}
+var STEPS=['Predator','Prey','Eating'],SAY={yes:'yes',no:'no',unsure:'can’t tell'};
+function question(c,i){var p=E.label(c.e.pred),q=E.label(c.e.prey);return i===2?'Is '+p+' eating '+q+'?':'Is this '+(i?q:p)+'?';}
 function status(c){
-  var a=S.ann[c.r.o.id],li=c.li,s=li.querySelector('.res');
-  [].forEach.call(li.querySelectorAll('.mk button'),function(b){b.setAttribute('aria-pressed',String(!!a&&b.dataset.v===a.v));});
-  s.textContent=!a?'':a.v==='yes'?'Shows it'+(a.pred&&a.prey?': '+pairText({pred:a.pred,prey:a.prey,tier:4}).replace(' eats ',' eating '):''):a.v==='no'?'Not visible':'Can’t tell';
+  var a=S.ann[c.r.o.id],li=c.li,s=li.querySelector('.res'),busy=!!c.ans&&c.ans.length<3,got=c.ans||steps(a),n=a&&!busy?3:got.length;
+  li.querySelector('.ask').textContent=n<3?'Step '+(n+1)+' of 3: '+question(c,n):'';
+  li.querySelector('.sum').textContent=got.map(function(x,i){return STEPS[i]+': '+SAY[x];}).join(' · ');
+  s.textContent=!a||busy?'':a.v==='yes'?'Shows it'+(a.pred&&a.prey?': '+pairText({pred:a.pred,prey:a.prey,tier:4}).replace(' eats ',' eating '):''):a.v==='no'?'Not visible':'Can’t tell';
   li.classList.toggle('done',!!a);
-  var h=li.querySelector('.hand'),y=!!a&&a.v==='yes'&&!!a.pred&&!!a.prey;h.hidden=!y;li.querySelector('a.open').hidden=y;  // one link to the observation: the hand-off, else the plain one
+  var h=li.querySelector('.hand'),y=!!a&&!busy&&a.v==='yes'&&!!a.pred&&!!a.prey;h.hidden=!y;li.querySelector('a.open').hidden=y;  // one link to the observation: the hand-off, else the plain one
   if(y){var by=c.r.o.k==='by',n=E.label(by?a.pred:a.prey),f=by?'Eaten by':'Eating';h.dataset.name=n;
     h.querySelector('a').textContent='Add '+f+' = '+n+' on iNaturalist';h.querySelector('.hint').textContent='On the observation, open Observation fields, pick '+f+', enter '+(by?'the predator':'the prey')+'.';h.querySelector('.cp').textContent='Copy';}
 }
@@ -80,8 +90,8 @@ function focus(i,quiet){
   cur=i;deck.forEach(function(c,j){c.li.classList.toggle('cur',j===i);});
   if(deck[i]&&!quiet)deck[i].li.scrollIntoView({block:'nearest',behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'});
 }
-function put(c,v,pred,prey){
-  var a={v:v,on:new Date().toISOString().slice(0,10),ask:[c.e.pred,c.e.prey]};if(pred){a.pred=pred;a.prey=prey;}
+function put(c,t,pred,prey){
+  var a={v:verdict(t),st:t.slice(),on:new Date().toISOString().slice(0,10),ask:[c.e.pred,c.e.prey]};if(pred){a.pred=pred;a.prey=prey;}
   S.ann[c.r.o.id]=a;save();status(c);change();next();
 }
 // Shows it on a card whose field does not name the pair: which animal, from the candidates (or any in the metaweb)
@@ -97,21 +107,24 @@ function which(c){
   function uniq(l){return Array.from(new Set(l));}
   fill(uniq((eat?E.preys(known):E.preds(known)).map(function(q){return q[eat?1:0];})));
   box.querySelector('.all').onclick=function(){fill(uniq(M.pairs.map(function(q){return q[eat?1:0];})));};
-  box.querySelector('.ok').onclick=function(){if(pick){box.hidden=true;put(c,'yes',eat?known:pick,eat?pick:known);}};
+  box.querySelector('.ok').onclick=function(){if(pick){box.hidden=true;put(c,c.ans,eat?known:pick,eat?pick:known);}};
   box.querySelector('.ok').focus();
 }
-function mark(c,v){
-  if(v!=='yes'){c.li.querySelector('.which').hidden=true;return put(c,v);}
-  if(c.e.tier===4)return put(c,'yes',c.e.pred,c.e.prey);
-  which(c);
+// one answer to the card's current step; the third finishes the mark (Shows it on a card whose field does not name the pair asks which animal)
+function answer(c,v){
+  if(!c.ans||c.ans.length>=3)c.ans=[];  // a finished card starts over
+  c.ans.push(v);c.li.querySelector('.which').hidden=true;
+  if(c.ans.length<3)return status(c);
+  if(verdict(c.ans)==='yes'&&c.e.tier!==4)return status(c),which(c);
+  put(c,c.ans,verdict(c.ans)==='yes'?c.e.pred:undefined,c.e.prey);
 }
 function card(c){
   var o=c.r.o,li=E.el('li'),a=E.el('a'),d=E.el('div'),b=E.el('p','mk');c.li=li;
   a.href=OBS+o.id;a.target='_blank';a.rel='noopener';a.append(photo(o,a));
   d.append(E.el('p','pair',pairText(c.e)),E.el('p','evl','Why: '+c.e.why+'.'),
     E.el('p','evl',E.pl(o.np||1,'photo')+(o.c?' · '+E.pl(o.c,'comment'):'')+' · '+(o.on||'Date unknown')+' · '+(o.at||'Place unknown')));
-  [['yes','Shows it','1'],['no','Not visible','2'],['unsure','Can’t tell','3']].forEach(function(x){
-    var k=E.el('button',null,x[1]+' ');k.type='button';k.dataset.v=x[0];k.setAttribute('aria-pressed','false');k.append(E.el('kbd',null,x[2]));k.onclick=function(){focus(deck.indexOf(c));mark(c,x[0]);};b.append(k);});
+  [['yes','Yes','1'],['no','No','2'],['unsure','Can’t tell','3']].forEach(function(x){
+    var k=E.el('button',null,x[1]+' ');k.type='button';k.dataset.v=x[0];k.append(E.el('kbd',null,x[2]));k.onclick=function(){focus(deck.indexOf(c));answer(c,x[0]);};b.append(k);});
   var w=E.el('div','which'),pk=E.el('div','pk'),all=E.el('button','lnk all','Not in this list'),ok=E.el('button','ok','Confirm');
   w.hidden=true;all.type=ok.type='button';
   w.append(E.el('span','lab','Which '+(o.k==='by'?'predator':'prey')+'?'),pk,ok,all);
@@ -122,7 +135,7 @@ function card(c){
     (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(function(){cs.textContent='Copied';},function(){cs.textContent='Copy failed';});};
   hd.append(ha,cp,cs,E.el('p','hint evl'));
   var go=E.el('a','open','Open on iNaturalist');go.href=OBS+o.id;go.target='_blank';go.rel='noopener';
-  d.append(b,w,E.el('p','res'),hd,go);li.append(a,d);
+  d.append(E.el('p','ask'),b,w,E.el('p','res'),E.el('p','sum evl'),hd,go);li.append(a,d);
   li.onclick=function(){if(cur!==deck.indexOf(c))focus(deck.indexOf(c));};
   status(c);return li;
 }
@@ -141,18 +154,20 @@ function searched(pred,prey){
   var m=function(p){return p&&p[0]===pred&&p[1]===prey;};
   return deck.some(function(c){return c.e.pred===pred&&c.e.prey===prey;})||marks().some(function(a){return m(a.ask);});
 }
+function setClass(c){if(CLASSES.some(function(k){return k[0]===c;})){S.cls=c;save();ask(Q);}}
 function budget(){return {used:deck.length,total:S.budget};}
 function csv(){
   var q=function(v){return '"'+String(v==null?'':v).replace(/"/g,'""')+'"';};
-  return ['observation_id,url,predator,prey,answer,date'].concat(Object.keys(S.ann).map(function(i){var a=S.ann[i]||{};
-    return [i,OBS+i,a.pred,a.prey,a.v,a.on].map(q).join(',');})).join('\n')+'\n';
+  return ['observation_id,url,predator,prey,answer,date,is_predator,is_prey,is_eating'].concat(Object.keys(S.ann).map(function(i){var a=S.ann[i]||{};
+    return [i,OBS+i,a.pred,a.prey,a.v,a.on].concat(steps(a).length?steps(a):['','','']).map(q).join(',');})).join('\n')+'\n';
 }
 function exportCsv(){
   var u=URL.createObjectURL(new Blob([csv()],{type:'text/csv'})),a=E.el('a');a.href=u;a.download='food-web-annotations.csv';document.body.append(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u);},1000);
 }
 function reload(){
   var ids=new Set(E.R.all.map(function(r){return r.o.id;}));
-  ITEMS=E.R.all.concat(E.R.text.filter(function(r){return !ids.has(r.o.id);})).map( // a field record also found by the text search is one cardfunction(r){return {r:r,es:entries(r)};}).filter(function(it){return it.es.length;});
+  // a field record also found by the text search is one card
+  ITEMS=E.R.all.concat(E.R.text.filter(function(r){return !ids.has(r.o.id);})).map(function(r){return {r:r,es:entries(r)};}).filter(function(it){return it.es.length;});
 }
 function init(core,onChange){
   E=core;change=onChange;load();
@@ -162,9 +177,9 @@ function init(core,onChange){
   document.addEventListener('keydown',function(e){
     var t=e.target;if(e.ctrlKey||e.metaKey||e.altKey||/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)||!deck.length)return;
     if(e.key==='j'||e.key==='k'){e.preventDefault();focus(Math.max(0,Math.min(deck.length-1,(cur<0?0:cur)+(e.key==='j'?1:-1))));return;}
-    var v={1:'yes',2:'no',3:'unsure'}[e.key];if(v&&cur>=0){e.preventDefault();mark(deck[cur],v);}
+    var v={1:'yes',2:'no',3:'unsure'}[e.key];if(v&&cur>=0){e.preventDefault();answer(deck[cur],v);}
   });
 }
 function go(){ready=true;}
-return {init:init,reload:reload,go:go,ask:ask,state:state,pairs:pairs,marks:marks,searched:searched,budget:budget,csv:csv,entries:entries,S:S};
+return {init:init,reload:reload,go:go,ask:ask,state:state,pairs:pairs,marks:marks,searched:searched,budget:budget,csv:csv,CLASSES:CLASSES,cls:function(){return S.cls;},setClass:setClass,steps:steps,verdict:verdict,entries:entries,S:S};
 })();
