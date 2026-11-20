@@ -18,6 +18,10 @@ name: map
 # id-range counts, dropping what iNaturalist no longer holds, and warns if the pool's size still
 # drifts from iNaturalist's count.
 #
+# Only the scheduled run asks iNaturalist for changes, reconciles, and fetches the Food web data. A manual
+# run or one after the daily build redeploys the saved pool and the live site's Food web data, which is
+# what a page change needs; tick "fetch" on a manual run to do the full refresh.
+#
 # Each run also logs the records that left the pool, with the quality grade they left for, into
 # resolved.parquet on the release (60 days). The build turns the last 30 days of it into
 # pool-resolved.bin, which the map reads for its "Left needs-ID" control. If that step fails the map
@@ -49,6 +53,11 @@ on:
     workflows: [daily]
     types: [completed]
   workflow_dispatch:
+    inputs:
+      fetch:
+        description: Also fetch the day's changes and the Food web data from iNaturalist and GloBI
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -82,6 +91,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       PYTHONPATH: src
+      FETCH: ${{ github.event_name == 'schedule' || inputs.fetch == true }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -105,12 +115,14 @@ jobs:
           gh release download "$STATE_TAG" -D state -p projects.bin --clobber || echo "no projects.bin yet; this run starts it"
           gh release download "$STATE_TAG" -D state -p resolved.parquet --clobber || echo "no resolved.parquet yet; this run starts it"
       - name: Apply every change since the last run
+        if: env.FETCH == 'true'
         run: |
           set -euo pipefail
           python -m what_to_id.pool_state sync --pool state/pool.parquet --state state/sync.json \
             --since "$MAP_SINCE" --d1 "$D1" --left state/resolved.parquet
       - name: Drop records iNaturalist no longer holds
         id: reconcile
+        if: env.FETCH == 'true'
         continue-on-error: true
         timeout-minutes: 30  # the site build still fits in the job's hour
         run: |
@@ -232,10 +244,21 @@ jobs:
           ATLAS_HF_REPO: ${{ vars.ATLAS_HF_REPO }}
         run: |
           set -euo pipefail
-          python -m what_to_id.foodweb --out _site/foodweb.json
-          python -m what_to_id.metaweb --foodweb _site/foodweb.json --meta _site/map-meta.json \
-            --taxa "_site/$(jq -r .taxa _site/map-meta.json)" --out _site/metaweb.json
-          python -m what_to_id.foodweb_obs --out _site/foodweb-obs.json --metaweb _site/metaweb.json
+          # without a fetch, the live site's data; any file missing there means fetching after all
+          kept=false
+          if [ "$FETCH" != true ]; then
+            live="$(gh api "repos/$GITHUB_REPOSITORY/pages" -q .html_url || true)"
+            kept=true
+            for f in foodweb.json metaweb.json foodweb-obs.json foodweb-text.json; do
+              curl -fsS --retry 2 -o "_site/$f" "${live%/}/$f" || kept=false
+            done
+          fi
+          if [ "$kept" != true ]; then
+            python -m what_to_id.foodweb --out _site/foodweb.json
+            python -m what_to_id.metaweb --foodweb _site/foodweb.json --meta _site/map-meta.json \
+              --taxa "_site/$(jq -r .taxa _site/map-meta.json)" --out _site/metaweb.json
+            python -m what_to_id.foodweb_obs --out _site/foodweb-obs.json --metaweb _site/metaweb.json
+          fi
           python -m what_to_id.foodweb_vlm --out _site/foodweb-vlm.json
           # with the atlas index the page gets a "Search photos" control (the model downloads only on a click)
           data=(); if [ -n "$ATLAS_HF_REPO" ]; then data=("https://huggingface.co/datasets/${ATLAS_HF_REPO}/resolve/main/"); fi
