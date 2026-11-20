@@ -329,8 +329,9 @@ def pack_fit(
         held[str(name)] = b
     fit = np.zeros(len(rows), bool)
     look = np.asarray(looks, dtype=object)[rows]
-    for name in {str(v) for v in look[pd.notna(look)]} & held.keys():
-        hit = (look == name) & (cell >= 0)
+    at = pd.Series(look).groupby(look).indices  # each name's rows, found once
+    for name in at.keys() & held.keys():
+        hit = at[name][cell[at[name]] >= 0]
         fit[hit] = held[name][cell[hit]]
     return gzip.compress(np.packbits(fit, bitorder="little").tobytes(), mtime=0)
 
