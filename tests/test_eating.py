@@ -108,11 +108,36 @@ def test_slim_text_keeps_a_photographed_predator_species_with_its_words():
     assert foodweb_obs.predators(META) == {"Strix", "Buteo"}
 
 
-def test_slim_keeps_the_photo_count_and_whether_the_text_mentions_food():
+def test_slim_keeps_the_photo_count_and_no_text():
     two = [{"url": "https://x/photos/1/square.jpg"}] * 2
-    quiet = foodweb_obs.slim(obs(7, comments=[{"body": "nice shot"}], description="Gull"), "eating")
-    assert quiet["np"] == 1 and quiet["nt"] == 0 and "nice shot" not in json.dumps(quiet)
-    said = foodweb_obs.slim(obs(8, photos=two, description="eating a fish"), "eating")
-    assert said["np"] == 2 and said["nt"] == 1
-    named = foodweb_obs.slim(obs(9, comments=[{"body": "Looks like Clupea pallasii"}]), "eating")
-    assert named["nt"] == 1
+    r = foodweb_obs.slim(obs(7, photos=two, comments=[{"body": "nice shot"}]), "eating")
+    assert r["np"] == 2 and "nt" not in r and "nice shot" not in json.dumps(r)
+
+
+def test_fetches_stop_before_inaturalists_10000_result_limit(monkeypatch, capsys):
+    import requests
+
+    seen = []
+
+    class R:
+        def __init__(self, page):
+            self.page = page
+
+        def raise_for_status(self):
+            assert self.page * foodweb_obs.PER_PAGE <= foodweb_obs.LIMIT
+
+        def json(self):
+            return {"results": [{"id": 1}] * foodweb_obs.PER_PAGE}
+
+    def get(url, params, **kw):
+        seen.append(params["page"])
+        return R(params["page"])
+
+    monkeypatch.setattr(requests, "get", get)
+    monkeypatch.setattr(foodweb_obs, "slim", lambda o, k: None)
+    foodweb_obs.fetch("eating", pause=0)
+    assert max(seen) == foodweb_obs.LIMIT // foodweb_obs.PER_PAGE
+    seen.clear()
+    foodweb_obs.fetch_text({"Strix"}, pause=0)
+    assert max(seen) == foodweb_obs.LIMIT // foodweb_obs.PER_PAGE
+    assert "cut at iNaturalist's 10000 result limit" in capsys.readouterr().err
