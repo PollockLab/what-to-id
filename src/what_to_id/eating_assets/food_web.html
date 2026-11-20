@@ -8,7 +8,7 @@ __EATING_CSS__
 __SITE_NAV__
 <main id="main-content">
 <h1>Food web in BC</h1>
-<p class="lead">Which predator-prey pairs are documented in BC, and which photos could show a new one. Draw the most promising photos for a question, mark what you can see, and watch the network fill in. Nothing is written to iNaturalist.</p>
+<p class="lead">Which predator-prey pairs are documented, and which photos could show a new one. Pick a question, mark what you can see in the most promising photos, and watch the network fill in. Marks stay in this browser for now.</p>
 <div class="flow">
 <section class="st1" aria-labelledby="s1"><h2 id="s1"><span>1</span>Question</h2>
 <div class="seg" id="modes" role="radiogroup" aria-label="Kind of question"></div>
@@ -18,27 +18,25 @@ __SITE_NAV__
 <section class="st2" aria-labelledby="s2"><h2 id="s2"><span>2</span>Predicted web</h2>
 <p class="muted">Predicted from the expert food web (GloBI stand-in). Click a cell to ask about that pair, or a name to ask what it eats or what eats it.</p>
 <div class="mx" id="mx" tabindex="0" role="region" aria-label="Predicted food web, scrolls sideways"></div>
-<div class="key" id="mxkey"><span><i class="sw a"></i><i class="sw b"></i><i class="sw c"></i>one, two, three or more records</span><span><i class="sw ev"></i>photographed in BC</span><span><i class="sw"></i>no pair</span></div></section>
+<div class="key" id="mxkey"><span><i class="sw a"></i><i class="sw b"></i><i class="sw c"></i>one, two, three or more records</span><span><i class="sw ev"></i>photographed</span><span><i class="sw"></i>no pair</span></div></section>
 <section class="st3" aria-labelledby="s3"><h2 id="s3"><span>3</span>Evidence search</h2>
 <p id="cand" aria-live="polite">Loading.</p>
-<div class="bar"><button type="button" class="btn" id="draw" disabled>Draw ten</button>
-<button type="button" class="btn quiet" id="export">Export annotations (CSV)</button>
-<button type="button" class="btn quiet" id="exportnet">Export network (CSV)</button></div>
-<div class="meter"><div class="mbar" id="mbar" role="progressbar" aria-label="Budget used" aria-valuemin="0" aria-valuenow="0" aria-valuemax="30"><i id="mfill"></i></div>
-<div class="mrow"><span id="used"></span><label>of <input id="budget" type="number" min="0" max="500" step="5" value="30" aria-label="Budget, photos to draw"> photos</label></div></div>
-<p class="keys muted">Three checks per card (predator, prey, eating): <kbd>1</kbd> yes <kbd>2</kbd> no <kbd>3</kbd> can’t tell, <kbd>j</kbd> <kbd>k</kbd> move. Saved in this browser.</p>
+<p class="keys muted"><kbd>1</kbd> yes <kbd>2</kbd> no <kbd>3</kbd> can’t tell, <kbd>j</kbd> <kbd>k</kbd> move. Saved in this browser.</p>
 <ul class="cards" id="cards"></ul>
+<div class="bar"><button type="button" class="btn quiet" id="draw" disabled>Show photos</button></div>
 <div id="fsearch" class="fsearch" hidden></div></section>
 <section class="st4" aria-labelledby="s4"><h2 id="s4"><span>4</span>Confirmed network</h2>
 <div class="key"><span><i class="g"></i>first photograph, confirmed here</span><span><i></i>photographed before</span><span><i class="none"></i>nothing found</span></div>
-<div id="net"></div><p id="netnote" aria-live="polite"></p></section>
+<div id="net"></div><p id="netnote" aria-live="polite"></p>
+<div class="bar"><button type="button" class="btn quiet" id="export">Export annotations (CSV)</button>
+<button type="button" class="btn quiet" id="exportnet">Export network (CSV)</button></div></section>
 </div>
 <details class="how"><summary>How this is made</summary>
 <p id="src"></p>
 <p>A card’s rank is the pair’s p in the metaweb times the evidence: the field names the pair, the field names a coarse ancestor of one animal, the description, tags or field text mention a candidate prey, or they only talk about food. Cards link out to iNaturalist; add the prey as the Eating field there if the photo shows it.</p>
 <p>Class filter: limits the cards to predators of one class (birds, mammals, reptiles, amphibians or insects), read from the ancestors in the metaweb. A predator whose class the metaweb does not know is left out while a class is chosen.</p>
 <p>Three checks per card: is this the predator, is this the prey, and is the predator eating the prey, each answered yes, no or can’t tell. A card counts as shows it, in the confirmed network and the exports, only when the third is yes and neither of the first two is no. Marks saved before the three checks load as the same answer to all three.</p>
-<p>Export network: a CSV for an ecology pipeline, with <code># key: value</code> header lines (question, metaweb, date, budget used; read it with comment="#"), then one row per predator-prey pair of the question. Columns: <code>predator</code>, <code>predator_taxon_id</code>, <code>prey</code>, <code>prey_taxon_id</code> (blank when no observation names the taxon), <code>status</code> (<code>confirmed_here</code> first photograph, <code>photographed_before</code>, <code>nothing_found</code> searched without a confirmed mark, <code>not_searched</code>), <code>shows_it</code>, <code>not_visible</code>, <code>cant_tell</code> (marks for the pair), <code>shows_it_observation_ids</code> (separated by ;), <code>prior_records</code> (observations whose field names the pair), <code>metaweb_p</code>. Export annotations: one row per mark, <code>observation_id</code>, <code>url</code>, <code>predator</code>, <code>prey</code>, <code>answer</code>, <code>date</code>, then <code>is_predator</code>, <code>is_prey</code>, <code>is_eating</code> (the three checks).</p></details>
+<p>Export network: a CSV for an ecology pipeline, with <code># key: value</code> header lines (question, metaweb, date, shown, the photos shown; read it with comment="#"), then one row per predator-prey pair of the question. Columns: <code>predator</code>, <code>predator_taxon_id</code>, <code>prey</code>, <code>prey_taxon_id</code> (blank when no observation names the taxon), <code>status</code> (<code>confirmed_here</code> first photograph, <code>photographed_before</code>, <code>nothing_found</code> searched without a confirmed mark, <code>not_searched</code>), <code>shows_it</code>, <code>not_visible</code>, <code>cant_tell</code> (marks for the pair), <code>shows_it_observation_ids</code> (separated by ;), <code>prior_records</code> (observations whose field names the pair), <code>metaweb_p</code>. Export annotations: one row per mark, <code>observation_id</code>, <code>url</code>, <code>predator</code>, <code>prey</code>, <code>answer</code>, <code>date</code>, then <code>is_predator</code>, <code>is_prey</code>, <code>is_eating</code> (the three checks).</p></details>
 </main>
 <script>var EATING_CONFIG=__CONFIG__;</script>
 <script>__EATING_PICKER_JS__</script>

@@ -6,7 +6,7 @@
 'use strict';
 var E=EatingCore,L=FoodLoop,C=EATING_CONFIG,$=function(id){return document.getElementById(id);},el=E.el,label=E.label,M=null,ALL=null,NS='http://www.w3.org/2000/svg';
 // the verb control: a short label, and the question it asks in full
-var MODES=[['','Survey','What evidence is there for the BC food web?'],['eats','X eats','What does X eat?'],['eaten','eats Y','What eats Y?'],['does','X eats Y','Does X eat Y?']];
+var MODES=[['','Survey','What evidence is there for the food web?'],['eats','X eats','What does X eat?'],['eaten','eats Y','What eats Y?'],['does','X eats Y','Does X eat Y?']];
 var TRY=[['Barred Owl','expanding west',{q:'eats',x:'Barred Owl'}],['Northern Leopard Frog','at risk',{q:'eaten',y:'Northern Leopard Frog'}],
   ['Northwestern Crow on American Red Squirrel','unconfirmed',{q:'does',x:'Northwestern Crow',y:'American Red Squirrel'}]];
 function hash(){var h={};location.hash.slice(1).split('&').forEach(function(kv){var i=kv.indexOf('=');if(i>0)h[kv.slice(0,i)]=decodeURIComponent(kv.slice(i+1));});return h;}
@@ -151,8 +151,8 @@ function network(h){
 // and the photographed ones. Status: confirmed_here, photographed_before, nothing_found (searched, no yes) or not_searched.
 var STATUS={new:'confirmed_here',before:'photographed_before'};
 function netCsv(h){
-  var q=function(v){return '"'+String(v==null?'':v).replace(/"/g,'""')+'"';},m=new Map(),b=L.budget(),mk=L.marks(),
-    ask=h.q==='eats'?'What does '+label(h.x)+' eat?':h.q==='eaten'?'What eats '+label(h.y)+'?':h.q==='does'?'Does '+label(h.x)+' eat '+label(h.y)+'?':'What evidence is there for the BC food web?';
+  var q=function(v){return '"'+String(v==null?'':v).replace(/"/g,'""')+'"';},m=new Map(),mk=L.marks(),
+    ask=h.q==='eats'?'What does '+label(h.x)+' eat?':h.q==='eaten'?'What eats '+label(h.y)+'?':h.q==='does'?'Does '+label(h.x)+' eat '+label(h.y)+'?':'What evidence is there for the food web?';
   function add(a,c){m.set(a+'|'+c,[a,c]);}
   if(h.q==='does')add(h.x,h.y);
   else{M.pairs.filter(function(r){return h.q==='eats'?E.cov(h.x,r[0]):h.q==='eaten'?E.cov(h.y,r[1]):true;}).forEach(function(r){add(r[0],r[1]);});
@@ -162,7 +162,7 @@ function netCsv(h){
       before=E.R.all.filter(function(x){return x.pred&&x.prey&&E.hit(x.pred,r[0])&&E.hit(x.prey,r[1]);}).length;
     return [q(r[0]),E.taxonId(r[0]),q(r[1]),E.taxonId(r[1]),STATUS[L.state(r[0],r[1])]||(L.searched(r[0],r[1])?'nothing_found':'not_searched'),yes.length,ex('no'),ex('unsure'),
       q(yes.map(function(a){return a.id;}).join(';')),before,E.p(r[0],r[1])].join(',');});
-  return ['# question: '+ask,'# metaweb: '+M.source+'; '+M.rule,'# date: '+new Date().toISOString().slice(0,10),'# budget_used: '+b.used+' of '+b.total+' photos for this question',
+  return ['# question: '+ask,'# metaweb: '+M.source+'; '+M.rule,'# date: '+new Date().toISOString().slice(0,10),'# shown: '+L.shown(),
     'predator,predator_taxon_id,prey,prey_taxon_id,status,shows_it,not_visible,cant_tell,shows_it_observation_ids,prior_records,metaweb_p'].concat(rows).join('\n')+'\n';
 }
 function exportNet(){
@@ -173,7 +173,7 @@ function sentence(h){
   b.replaceChildren();
   function pk(id,ph,val,all,side,name){var d=EatingPicker.create({id:id,ph:ph,value:val,names:all,obs:E.R.all.map(function(r){return r[side];}).filter(Boolean),parent:M.parent,rank:M.rank,groups:M.groups,label:label,
     onPick:function(n){var g=resolve(hash());g[id]=n;go(g);}});var i=d.querySelector('input');i.setAttribute('aria-label',name);i.title=val?label(val):name;return d;}
-  if(!h.q)b.append('What evidence is there for the BC food web?');
+  if(!h.q)b.append('What evidence is there for the food web?');
   if(h.q==='eats')b.append('What does ',pk('x','Predator',h.x,pn,'pred','Predator'),' eat?');
   if(h.q==='eaten')b.append('What eats ',pk('y','Prey',h.y,yn,'prey','Prey'),'?');
   if(h.q==='does')b.append('Does ',pk('x','Predator',h.x,pn,'pred','Predator'),' eat ',pk('y','Prey',h.y,yn,'prey','Prey'),'?');
