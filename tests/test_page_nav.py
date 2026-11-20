@@ -28,7 +28,13 @@ def test_explore_header_carries_the_page_links_in_place_of_the_switcher():
     assert html.index("id=bar") < html.index('id="hmbtn"')  # the bar, then the links at the end
     assert 'href="terms.html"' in html and 'href="explore.html"' not in html
     # the views come before the help, and the list shows without the button from 900 px
-    assert html.index('href="confusion.html"') < html.index('href="terms.html"')
+    assert (
+        html.index('href="confusion.html"')
+        < html.index('href="food-web.html"')
+        < html.index('href="terms.html"')
+    )
+    # Identify is built before the Food web page, so the menu probes for it rather than skipping it
+    assert 'href="food-web.html" data-drop' in page_nav.help_bar()
     assert "@media (min-width:900px){.hm>button{display:none}" in page_nav.HELP_CSS
 
 

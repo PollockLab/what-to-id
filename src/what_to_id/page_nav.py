@@ -322,6 +322,7 @@ def nav(
 HELP_LINKS = (
     ("explore.html", "Explore", " data-show hidden"),
     ("confusion.html", "Confused pairs", " data-drop"),
+    ("food-web.html", "Food web", " data-drop"),
     ("terms.html", "How it works", ""),
 )
 HELP_CSS = """
