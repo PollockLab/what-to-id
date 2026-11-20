@@ -15,6 +15,7 @@ PAGE_NAME = "food-web.html"
 OLD_NAME = "eating.html"
 OBS_FILE = "foodweb-obs.json"
 TEXT_FILE = "foodweb-text.json"
+VLM_FILE = "foodweb-vlm.json"
 METAWEB_FILE = "metaweb.json"
 REDIRECT = (
     '<!doctype html><meta charset="utf-8"><title>Food web</title>'
@@ -26,7 +27,9 @@ REDIRECT = (
 
 def render() -> str:
     html = (ASSETS / "food_web.html").read_text()
-    config = json.dumps({"obs": OBS_FILE, "metaweb": METAWEB_FILE, "text": TEXT_FILE})
+    config = json.dumps(
+        {"obs": OBS_FILE, "metaweb": METAWEB_FILE, "text": TEXT_FILE, "vlm": VLM_FILE}
+    )
     for key, value in {
         "__SITE_CSS__": page_nav.CSS,
         "__SITE_NAV__": page_nav.nav(PAGE_NAME),

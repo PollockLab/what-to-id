@@ -234,6 +234,7 @@ jobs:
           python -m what_to_id.metaweb --foodweb _site/foodweb.json --meta _site/map-meta.json \
             --taxa "_site/$(jq -r .taxa _site/map-meta.json)" --out _site/metaweb.json
           python -m what_to_id.foodweb_obs --out _site/foodweb-obs.json --metaweb _site/metaweb.json
+          python -m what_to_id.foodweb_vlm --out _site/foodweb-vlm.json
           python -m what_to_id.page_eating _site
       # terms.html: the glossary and each view's explanation, read from their templates. After the Identify
       # step, whose scoring dates it prints, and with the index manifest for its Methods numbers. No tab: the

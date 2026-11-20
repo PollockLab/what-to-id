@@ -9,7 +9,7 @@ var FoodLoop=(function(){
 // the predator classes the filter offers: [iNaturalist class, button]; '' is all
 var CLASSES=[['','All classes'],['Aves','Birds'],['Mammalia','Mammals'],['Reptilia','Reptiles'],['Amphibia','Amphibians'],['Insecta','Insects']],ANS=['yes','no','unsure'],
   KEY='wtid-loop',OBS='https://www.inaturalist.org/observations/',TEN=10,$=function(id){return document.getElementById(id);};
-var S={budget:30,ann:{},cls:''},E=null,Q={x:null,y:null},ITEMS=[],deck=[],cur=-1,change=function(){},TOK=new Map(),ready=false,booted=false;
+var S={budget:30,ann:{},cls:''},H=null,E=null,Q={x:null,y:null},ITEMS=[],deck=[],cur=-1,change=function(){},TOK=new Map(),ready=false,booted=false;
 function load(){
   try{var v=JSON.parse(localStorage.getItem(KEY)),b=Number(v&&v.budget);
     if(v&&typeof v==='object'){S.budget=isFinite(b)&&b>=0?Math.floor(b):30;S.ann=v.ann&&typeof v.ann==='object'&&!Array.isArray(v.ann)?v.ann:{};
@@ -59,6 +59,13 @@ function photo(o,a){
   var img=E.el('img');img.src=o.ph;img.alt='Photo of '+E.label(o.t[0]);img.loading='lazy';
   img.onerror=function(){a.replaceChildren(E.el('span','nophoto','Photo not shown here'));};
   return img;
+}
+// the vision-model hint of an observation (foodweb-vlm.json, absent is fine): one muted line, and the prey box over the photo (0-1000 coords)
+function hint(o,a,d){
+  var h=H&&H.obs[o.id];if(!h)return;
+  var g=h.name||(h.prey[0]&&h.prey[0][0]),b=h.box;
+  d.append(E.el('p','evl vlm','Model: '+(h.p>=0.5?'likely':'unlikely')+' feeding ('+h.p.toFixed(2)+')'+(g?' · prey guess: '+E.label(g):'')));
+  if(b){var x=E.el('span','pbox');x.style.cssText='left:'+b[0]/10+'%;top:'+b[1]/10+'%;width:'+(b[2]-b[0])/10+'%;height:'+(b[3]-b[1])/10+'%';a.append(x);}
 }
 function pairText(e){return E.label(e.pred)+(e.tier===4?' eats ':' may be eating ')+E.label(e.prey);}
 function meter(){
@@ -123,6 +130,7 @@ function card(c){
   a.href=OBS+o.id;a.target='_blank';a.rel='noopener';a.append(photo(o,a));
   d.append(E.el('p','pair',pairText(c.e)),E.el('p','evl','Why: '+c.e.why+'.'),
     E.el('p','evl',E.pl(o.np||1,'photo')+(o.c?' · '+E.pl(o.c,'comment'):'')+' · '+(o.on||'Date unknown')+' · '+(o.at||'Place unknown')));
+  hint(o,a,d);
   [['yes','Yes','1'],['no','No','2'],['unsure','Can’t tell','3']].forEach(function(x){
     var k=E.el('button',null,x[1]+' ');k.type='button';k.dataset.v=x[0];k.append(E.el('kbd',null,x[2]));k.onclick=function(){focus(deck.indexOf(c));answer(c,x[0]);};b.append(k);});
   var w=E.el('div','which'),pk=E.el('div','pk'),all=E.el('button','lnk all','Not in this list'),ok=E.el('button','ok','Confirm');
@@ -181,5 +189,6 @@ function init(core,onChange){
   });
 }
 function go(){ready=true;}
-return {init:init,reload:reload,go:go,ask:ask,state:state,pairs:pairs,marks:marks,searched:searched,budget:budget,csv:csv,CLASSES:CLASSES,cls:function(){return S.cls;},setClass:setClass,steps:steps,verdict:verdict,entries:entries,S:S};
+function hints(v){H=v&&v.obs?v:null;}
+return {hints:hints,init:init,reload:reload,go:go,ask:ask,state:state,pairs:pairs,marks:marks,searched:searched,budget:budget,csv:csv,CLASSES:CLASSES,cls:function(){return S.cls;},setClass:setClass,steps:steps,verdict:verdict,entries:entries,S:S};
 })();

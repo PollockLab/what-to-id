@@ -93,6 +93,13 @@ TEXT = {
 }
 
 
+# a model hint for observation 0 (the first card of the owl question): feeding, a box, a prey guess
+VLM = {
+    "model": "test",
+    "obs": {"0": {"p": 0.95, "box": [100, 200, 600, 800], "prey": [["Mus musculus", 0.6]]}},
+}
+
+
 def serve(root, name):
     handler = partial(SimpleHTTPRequestHandler, directory=str(root))
     handler.log_message = lambda *a: None
@@ -102,11 +109,13 @@ def serve(root, name):
     server.shutdown()
 
 
-def build_site(root):
+def build_site(root, vlm=True):
     (root / page_eating.OBS_FILE).write_text(json.dumps(OBS))
     assert page_eating.build(root / "none") is None  # no data files, no page
     (root / page_eating.METAWEB_FILE).write_text(json.dumps(META))
     (root / page_eating.TEXT_FILE).write_text(json.dumps(TEXT))
+    if vlm:
+        (root / page_eating.VLM_FILE).write_text(json.dumps(VLM))
     assert page_eating.build(root).name == "food-web.html"
     return serve(root, "food-web.html")
 
