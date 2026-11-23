@@ -70,7 +70,7 @@ return function(ctx){
   function build(){
     box=el('aside');box.id='cpanel';box.setAttribute('role','dialog');box.setAttribute('aria-labelledby','cphead');box.tabIndex=-1;box.hidden=true;
     box.innerHTML='<div class="cptop"><h2 id="cphead"></h2><span id="cpat" class="muted"></span>'+
-      '<button type="button" id="cpx" class="arrow" aria-label="Close (Esc)">×</button></div>'+
+      '<button id="cpsh"></button><button type="button" id="cpx" class="arrow" aria-label="Close (Esc)">×</button></div>'+
       '<p id="cplive" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)"></p>'+
       '<div class="cpbody"><div class="cpl"><div id="cpobs"></div><div id="cpdet"></div></div>'+
       '<div class="cpr"><p id="cpkeys" class="muted"></p><div id="cpwhy"></div><details id="cpexp"><summary>Why this card?</summary><ul></ul></details><div id="cprefs"></div></div></div>'+
@@ -79,6 +79,7 @@ return function(ctx){
       '<button type="button" id="cps" class="more" aria-keyshortcuts="s" title="Skip (s)">Skip</button>'+
       '<span id="cpc"></span><span id="cpt" class="muted" role="status"></span><button type="button" id="cpo" class="btn" aria-keyshortcuts="Enter" title="Identify on iNaturalist (Enter)">Identify (Enter)</button></div>';
     document.body.appendChild(box);
+    WtidCarry.share(box.querySelector('#cpsh'),function(){return cur?['record='+cur.dataset.id]:[];});
     if(matchMedia('(pointer: coarse)').matches){box.querySelector('#cpo').textContent='Identify';box.querySelector('#cpkeys').hidden=true;}  // no Enter key on touch
     else box.querySelector('#cpkeys').textContent=TXT.keys;
     box.querySelector('#cprefs').addEventListener('click',function(e){var c=e.target.closest('.cpref');if(c)pick_(rows.indexOf(c));});
@@ -116,7 +117,11 @@ return function(ctx){
     if(d>0&&at===all.length-1&&ctx.more){ctx.more();all=cards();}
     var n=all[at+d];if(n)open(n);else if(d>0)close();
   }
-  function close(){if(!box||box.hidden)return;box.hidden=true;if(ctx.lend)ctx.lend(null);document.body.classList.remove('cpon');
+  // the open card's record in the address (#record=<id>, what a shared link opens); in Explore the page holds the address
+  function mark(id){if(parent!==window)return;
+    var t=location.hash.slice(1).split('&').filter(function(x){return x&&x.indexOf('record=')!==0;});if(id)t.push('record='+id);
+    history.replaceState(null,'','#'+t.join('&'));}
+  function close(){if(!box||box.hidden)return;box.hidden=true;mark(0);if(ctx.lend)ctx.lend(null);document.body.classList.remove('cpon');
     if(cur&&cur.isConnected){cur.focus({preventScroll:true});cur.scrollIntoView({block:'nearest'});}cur=null;}
   // the candidate on show: its row is ringed and its photos answer the arrow keys
   var rows=[],act=0,ZM=IdentifyZoom(TXT,size),
@@ -194,7 +199,7 @@ return function(ctx){
     var y=why(li),wy=box.querySelector('#cpwhy');wy.replaceChildren();if(y)wy.append(IdentifyNarrow.why(y[0],y[1]));
     explain(li);
     obs(li);refs(li);if(ctx.lend)ctx.lend(li,box.querySelector('#cpdet'));
-    box.hidden=false;document.body.classList.add('cpon');li.scrollIntoView({block:'nearest'});
+    box.hidden=false;document.body.classList.add('cpon');li.scrollIntoView({block:'nearest'});mark(li.dataset.id);
     [].forEach.call(document.querySelectorAll('.card.cur'),function(x){x.classList.remove('cur');});li.classList.add('cur');
     if(!box.contains(document.activeElement)||document.activeElement===box)box.focus({preventScroll:true});box.scrollTop=0;  // a button in use keeps focus; #cplive names the card
     if(!quiet&&parent!==window)parent.postMessage({type:'wtid-record',id:+li.dataset.id},location.origin);  // j, k, Skip and Enter move the map's card too

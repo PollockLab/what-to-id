@@ -52,7 +52,32 @@ addEventListener('hashchange',soon);
   var a=ev.target.closest&&ev.target.closest('a[href]');if(a)link(a,now());},true);});
 function start(){sweep();new MutationObserver(soon).observe(document.body,{childList:true,subtree:true});}
 if(document.body)start();else addEventListener('DOMContentLoaded',start);
-return {KEYS:KEYS,NAME:NAME,take:take,held:held,sweep:sweep,link:function(a){link(a,now());},
+// A record's address: its own tokens (record=<id>), then the page's hash (or, with filters, only the shared filters, for a
+// page whose hash is a query). Inside Explore, Explore's address with its panes and the record as its id=<id>.
+function shareUrl(own,filters){
+  var w=window;try{if(parent!==window&&parent.location.pathname)w=parent;}catch(e){}
+  if(w!==window)own=own.map(function(t){return t.replace(/^record=/,'id=');});
+  var ks=own.map(key),rest=(filters&&w===window?now():w.location.hash.slice(1).split('&')).filter(function(t){return t&&ks.indexOf(key(t))<0;});
+  return w.location.origin+w.location.pathname+w.location.search+'#'+own.concat(rest).join('&');}
+// a Share button, the same small icon on every page: the share sheet where there is one (phones), else the clipboard
+// (a tick for 2 s), else a box to copy from; own() the tokens. Its base style has no specificity, so a page can place it.
+var ICON='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3M7 8l5-5 5 5M5 13v7h14v-7"/></svg>',
+  TICK='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>';
+function share(b,own,filters){
+  if(!document.getElementById('wshare-css')){var st=document.createElement('style');st.id='wshare-css';
+    st.textContent=':where(.wshare){display:inline-grid;place-items:center;width:28px;height:28px;padding:0;border:0;border-radius:999px;'+
+      'background:transparent;color:inherit;cursor:pointer;vertical-align:middle}:where(.wshare:hover){background:rgba(128,128,128,.2)}'+
+      '.wshare svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}';
+    document.head.appendChild(st);}
+  b.type='button';b.classList.add('wshare');b.innerHTML=ICON;b.title='Copy link';b.setAttribute('aria-label','Copy a link to this record');
+  b.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();
+    var u=shareUrl(own(),filters),ask=function(){prompt('Copy this link',u);};
+    if(navigator.share&&matchMedia('(hover:none)').matches)navigator.share({url:u}).catch(function(){});
+    else if(navigator.clipboard)navigator.clipboard.writeText(u).then(function(){b.innerHTML=TICK;b.title='Link copied';
+      setTimeout(function(){b.innerHTML=ICON;b.title='Copy link';},2e3);},ask);
+    else ask();});
+  return b;}
+return {KEYS:KEYS,NAME:NAME,take:take,held:held,sweep:sweep,link:function(a){link(a,now());},shareUrl:shareUrl,share:share,
   // a view that does not apply every filter names the keys it does (or a function of them), for the note
   own:function(o){OWN=o;soon();},
   // a Clear filters button: shown while a filter is set; a click hands go() the address without them

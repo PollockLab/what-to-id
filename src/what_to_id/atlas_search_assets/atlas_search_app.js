@@ -185,7 +185,8 @@ function cardEl(c,i){
     el('span',{'class':'muted',title:'How close the photo is to the query, 0 to 1. Compare within this list only: a sentence scores lower than a photo-to-photo search.'},
       ['#'+(i+1)+' · Similarity '+c.score.toFixed(3)]),
     el('div',{'class':'links'},[more,pick(c),
-      el('a',{'class':'btn',href:CFG.mapUrl+'#record='+c.id,target:'_blank',rel:'noopener'},['Show on map'])])
+      el('a',{'class':'btn',href:CFG.mapUrl+'#record='+c.id,target:'_blank',rel:'noopener'},['Show on map']),
+      WtidCarry.share(el('button',{}),function(){return ['id='+c.id];},true)])
   ]);
   return el('li',{'class':'card'},[
     el('a',{'class':'photo',href:obsUrl(c.id),target:'_blank',rel:'noopener',

@@ -25,7 +25,7 @@ return function(ctx){
     var d=car.querySelector('.dots');d.replaceChildren();
     for(var j=0;n>1&&j<n;j++)d.appendChild(el('span',j===k?'on':null));
     car.querySelector('.cap').textContent=k?(fs[k].querySelector('figcaption')||{}).textContent||'':'';
-    [].forEach.call(car.querySelectorAll('.flip'),function(b){b.hidden=n<2;});
+    [].forEach.call(car.querySelectorAll('.flip:not(.shr)'),function(b){b.hidden=n<2;});
   }
   function runner(f){
     f.dataset.asked=1;
@@ -41,7 +41,10 @@ return function(ctx){
     [['flip prv','Previous photo','M15 5l-7 7 7 7',-1],['flip nxt','Next photo','M9 5l7 7-7 7',1]].forEach(function(x){
       var b=el('button',x[0]);b.type='button';b.setAttribute('aria-label',x[1]);b.hidden=true;b.appendChild(svg(x[2]));
       b.onclick=function(e){e.stopPropagation();flip(c,x[3]);};c.appendChild(b);});
-    c.prepend(ph);c.append(tag,cap,dots);
+    // Share: the card's own address, #record=<id>, which opens its level with it first
+    var sh=el('button','flip shr');
+    WtidCarry.share(sh,function(){var li=c.closest('.card');return li?['record='+li.dataset.id]:[];});
+    c.prepend(ph);c.append(tag,cap,dots,sh);
     var x0=null;  // a swipe flips, and its click does not open the panel
     c.addEventListener('pointerdown',function(e){x0=e.pointerType==='mouse'?null:e.clientX;});
     c.addEventListener('pointerup',function(e){if(x0==null)return;var dx=e.clientX-x0;x0=null;

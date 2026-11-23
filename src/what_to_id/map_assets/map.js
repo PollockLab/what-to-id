@@ -385,6 +385,7 @@ function openCard(i){
     'href="https://www.inaturalist.ca/observations/'+id+'">Help identify on iNaturalist</a>'+
     '<p class="attr" id="attr"></p></div>';
   card.querySelector('.body').insertBefore(SavedRecords.controls(id),$('rng'));
+  var sh=document.createElement('button');sh.className='x sh';card.append(WtidCarry.share(sh,function(){return ['record='+id];}));
   card.hidden=false;card.querySelector('.x').onclick=closeCard;card.querySelector('.x').focus();
   MC.wire(card);
   layers();writeHash();MC.show(i);

@@ -229,3 +229,30 @@ def test_the_how_it_works_page_ends_with_the_footer(monkeypatch):
 
     monkeypatch.setenv("GITHUB_SHA", "abcdef0123")
     assert "<code>abcdef0</code>" in terms_page.render().split("</main>")[1]
+
+
+def test_share_link_is_the_record_with_the_page_hash_or_only_the_filters(browser):
+    pg = _open(browser, "map.html", "#record=1&groups=Insecta&at=9/49/-123&q=owl")
+    url = "http://site.test/map.html#"
+    own = pg.evaluate("WtidCarry.shareUrl(['record=42'])")
+    assert own == url + "record=42&groups=Insecta&at=9/49/-123&q=owl"
+    # a page whose hash is a query (photo search) passes on only the shared filters
+    assert pg.evaluate("WtidCarry.shareUrl(['id=42'],true)") == url + "id=42&groups=Insecta"
+
+
+def test_share_button_copies_the_link_and_says_so(browser):
+    ctx = browser.new_context(permissions=["clipboard-read", "clipboard-write"])
+    pg = ctx.new_page()
+    html = PAGE % (CSS, nav("map.html"))
+    # the clipboard is only there on a secure origin
+    pg.route("https://site.test/**", lambda r: r.fulfill(body=html, content_type="text/html"))
+    pg.goto("https://site.test/map.html#groups=Aves")
+    pg.evaluate("""var b=document.createElement('button');b.id='sh';document.body.append(b);
+      WtidCarry.share(b,function(){return ['record=7'];})""")
+    pg.click("#sh")
+    pg.wait_for_function("document.getElementById('sh').title==='Link copied'")
+    assert (
+        pg.evaluate("navigator.clipboard.readText()")
+        == "https://site.test/map.html#record=7&groups=Aves"
+    )
+    ctx.close()
