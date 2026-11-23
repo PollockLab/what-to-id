@@ -42,3 +42,15 @@ def test_id_gap_ranks_the_under_identified_cell_first():
     assert gap.idxmax() == 1 and gap.loc[1] == 1.0
     s = challenges.scores(_ids("u", 3, 55.0, -125.0, 5), TAXA, CELLS, gap)
     assert s.loc["u", "id_gap"] == 1.0
+
+
+def test_unique_counts_units_no_one_else_covers():
+    ids = pd.concat(
+        [
+            _ids("a", 3, 49.0, -123.0, 4),
+            _ids("b", 3, 49.0, -123.0, 1),
+            _ids("b", 5, 55.0, -125.0, 1),
+        ]
+    )
+    s = challenges.scores(ids, TAXA, CELLS)
+    assert s.loc["a", "unique"] == 0.0 and s.loc["b", "unique"] == 1.0
