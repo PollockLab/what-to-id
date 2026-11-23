@@ -6,9 +6,11 @@ cell stop paying after `cap`, while breadth keeps paying.
 
 - tree: units are every taxon on the lineage of each ID'd taxon, weight 1, so the score is a
   unit-branch Faith PD of what was identified, weighted by how often (Tree of Life challenge).
-- climate: units are 25 km where-to-blitz cells, weighted by their `env` axis, the
+- climate: units are the top fifth of 25 km where-to-blitz cells by their `env` axis, the
   under-sampled-environment score (climate space challenge).
-- checklist: units are the same cells weighted by `1 - discover`, cells closest to a species list.
+- checklist: the top fifth of cells by `1 - discover`, cells closest to a species list.
+- id_gap: the top fifth of cells by needs-ID over research-grade records there, as a
+  percentile, so any constant sampling fraction of either input cancels.
 """
 
 from __future__ import annotations
@@ -24,6 +26,10 @@ from scipy.spatial import cKDTree
 from what_to_id import cells as cells_mod
 
 CAP = 5
+# Cell challenges count only their top fifth of cells: with graded weights every cell score ranks
+# people by how many cells they touched (Spearman 0.81 to 0.92 on the BC sample), with a top fifth
+# they rank them apart (0.17 to 0.45).
+TOP = 0.8
 
 
 def unit_credit(ids: pd.DataFrame, weight: Mapping | None = None, cap: int = CAP) -> pd.Series:
@@ -59,31 +65,71 @@ def cell_index(cells: pd.DataFrame, lat, lon, max_km: float = 20.0) -> np.ndarra
     return np.where(cells_mod._chord_to_km(chord) <= max_km, idx, np.nan)
 
 
-def scores(ids: pd.DataFrame, taxa: Mapping[str, list], cells: pd.DataFrame) -> pd.DataFrame:
-    """Challenge scores per `user` from IDs with `user`, `taxon_id`, `lat`, `lon`."""
+def id_gap(
+    cells: pd.DataFrame, needs_id: pd.DataFrame, research: pd.DataFrame, min_n: int = 20
+) -> pd.Series:
+    """Per cell row with at least `min_n` records, the percentile of (needs-ID + 0.5) over
+    (research grade + 0.5), from two record tables with `lat`, `lon`."""
+    n = pd.DataFrame(
+        {
+            k: pd.Series(cell_index(cells, d.lat, d.lon)).dropna().astype(int).value_counts()
+            for k, d in (("nid", needs_id), ("rg", research))
+        }
+    ).fillna(0.0)
+    n = n[n.nid + n.rg >= min_n]
+    return ((n.nid + 0.5) / (n.rg + 0.5)).rank(pct=True)
+
+
+def top_cells(w: pd.Series, q: float = TOP) -> pd.Series:
+    """1 for cells at or above the `q` quantile of `w`, else 0."""
+    return (w >= w.quantile(q)).astype(float)
+
+
+def scores(
+    ids: pd.DataFrame,
+    taxa: Mapping[str, list],
+    cells: pd.DataFrame,
+    gap: Mapping | None = None,
+) -> pd.DataFrame:
+    """Challenge scores per `user` from IDs with `user`, `taxon_id`, `lat`, `lon`; `id_gap` only
+    when `gap` (from `id_gap`) is given."""
     lin = lineages(taxa)
     tree = ids[["user"]].assign(unit=[lin(int(t)) for t in ids.taxon_id]).explode("unit").dropna()
-    cell = ids[["user"]].assign(unit=cell_index(cells, ids.lat, ids.lon)).dropna()
-    return pd.DataFrame(
+    cell = (
+        ids[["user"]]
+        .assign(unit=cell_index(cells, ids.lat, ids.lon))
+        .dropna()
+        .astype({"unit": int})
+    )
+    out = pd.DataFrame(
         {
             "n_ids": ids.groupby("user").size(),
             "tree": unit_credit(tree),
-            "climate": unit_credit(cell, cells["env"]),
-            "checklist": unit_credit(cell, 1.0 - cells["discover"]),
+            "climate": unit_credit(cell, top_cells(cells["env"])),
+            "checklist": unit_credit(cell, top_cells(1.0 - cells["discover"])),
         }
-    ).fillna(0.0)
+    )
+    if gap is not None:
+        out["id_gap"] = unit_credit(cell, top_cells(pd.Series(gap)))
+    return out.fillna(0.0)
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Blitz challenge scores per identifier")
     ap.add_argument("ids", help="parquet with user, taxon_id, lat, lon (one row per ID)")
     ap.add_argument("taxonomy", help="taxonomy json with a `taxa` table")
+    ap.add_argument("--gap", nargs=2, metavar=("NEEDS_ID", "RESEARCH"), help="record parquets")
     ap.add_argument("--out", required=True)
     a = ap.parse_args(argv)
     ids = pd.read_parquet(a.ids).dropna(subset=["user", "taxon_id", "lat", "lon"])
     with open(a.taxonomy) as fh:
         taxa = json.load(fh)["taxa"]
-    scores(ids, taxa, cells_mod.load_cells(cells_mod.FALLBACK_GROUP)).to_csv(a.out)
+    cells = cells_mod.load_cells(cells_mod.FALLBACK_GROUP)
+    gap = None
+    if a.gap:
+        nid, rg = (pd.read_parquet(f).dropna(subset=["lat", "lon"]) for f in a.gap)
+        gap = id_gap(cells, nid, rg)
+    scores(ids, taxa, cells, gap).to_csv(a.out)
     return 0
 
 

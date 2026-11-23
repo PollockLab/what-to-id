@@ -27,9 +27,18 @@ def test_spam_saturates_and_breadth_wins():
     assert s.loc["spammer", "n_ids"] > s.loc["broad", "n_ids"]
     assert s.loc["broad", "tree"] > s.loc["spammer", "tree"]
     assert s.loc["spammer", "tree"] == 3.0  # three lineage nodes, each capped at full credit
-    assert s.loc["broad", "climate"] > s.loc["spammer", "climate"]
+    assert s.loc["broad", "climate"] == s.loc["spammer", "climate"] == 1.0  # only cell 1 is top
 
 
 def test_off_grid_and_unknown_taxon_score_zero():
     s = challenges.scores(_ids("u", 999, 0.0, 0.0, 3), TAXA, CELLS)
     assert s.loc["u", ["tree", "climate", "checklist"]].tolist() == [0.0, 0.0, 0.0]
+
+
+def test_id_gap_ranks_the_under_identified_cell_first():
+    nid = pd.concat([_ids("x", 3, 55.0, -125.0, 15), _ids("x", 3, 49.0, -123.0, 5)])
+    rg = pd.concat([_ids("x", 3, 55.0, -125.0, 10), _ids("x", 3, 49.0, -123.0, 30)])
+    gap = challenges.id_gap(CELLS, nid, rg)
+    assert gap.idxmax() == 1 and gap.loc[1] == 1.0
+    s = challenges.scores(_ids("u", 3, 55.0, -125.0, 5), TAXA, CELLS, gap)
+    assert s.loc["u", "id_gap"] == 1.0
