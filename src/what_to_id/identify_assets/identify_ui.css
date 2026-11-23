@@ -19,8 +19,9 @@ ol{gap:16px 12px;grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}
   border:0;border-radius:50%;background:rgba(255,255,255,.94);color:#1b1b1b;cursor:pointer;opacity:0;box-shadow:0 1px 4px rgba(0,0,0,.3)}
 .flip svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
 .flip.prv{left:6px}.flip.nxt{right:6px}
+.flip.shr{top:8px;right:8px;margin-top:0;width:28px;height:28px}
 .card:hover .flip,.card:focus-within .flip{opacity:1}
-@media (hover:none){.flip{opacity:1;width:28px;height:28px;margin-top:-14px}}
+@media (hover:none){.flip{opacity:1;width:28px;height:28px;margin-top:-14px}.flip.shr{margin-top:0}}
 .card .title>:not(.face),.card>.when,.card>a.btn,.card>.det>:not(.sp){display:none}
 .card>.det{padding:0 2px}.card>.det .sp{background:none;border:0;padding:0;color:var(--muted);font:inherit;font-size:.85em;text-decoration:underline;cursor:pointer;display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
 .face .hl,.face .from{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

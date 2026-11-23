@@ -10,6 +10,8 @@ var FoodLoop=(function(){
 // the predator classes the filter offers: [iNaturalist class, button]; '' is all
 var CLASSES=[['','All classes'],['Aves','Birds'],['Mammalia','Mammals'],['Reptilia','Reptiles'],['Amphibia','Amphibians'],['Insecta','Insects']],ANS=['yes','no','unsure'],
   KEY='wtid-loop',OBS='https://www.inaturalist.org/observations/',TEN=10,$=function(id){return document.getElementById(id);};
+// #record=<id> (a shared card): read before the page rewrites its hash, drawn first once it fits the question
+var WANT=+((/(?:^|&)record=(\d+)(?:&|$)/.exec(location.hash.slice(1))||[])[1]||0);
 var S={ann:{},cls:''},H=null,E=null,Q={x:null,y:null},ITEMS=[],deck=[],cur=-1,change=function(){},TOK=new Map(),ready=false,booted=false;
 function load(){
   try{var v=JSON.parse(localStorage.getItem(KEY));
@@ -142,12 +144,14 @@ function card(c){
     (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(function(){cs.textContent='Copied';},function(){cs.textContent='Copy failed';});};
   hd.append(ha,cp,cs,E.el('p','hint evl'));
   var go=E.el('a','open','Open on iNaturalist');go.href=OBS+o.id;go.target='_blank';go.rel='noopener';
-  d.append(E.el('p','ask'),b,w,E.el('p','res'),E.el('p','sum evl'),hd,go);li.append(a,d);
+  var sh=E.el('button');WtidCarry.share(sh,function(){return ['record='+o.id];});
+  d.append(E.el('p','ask'),b,w,E.el('p','res'),E.el('p','sum evl'),hd,go,sh);li.append(a,d);
   li.onclick=function(){if(cur!==deck.indexOf(c))focus(deck.indexOf(c));};
   status(c);return li;
 }
 function draw(auto){
-  var got=ranked().slice(0,TEN),ul=$('cards'),first=deck.length;
+  var r=ranked(),w=WANT?r.findIndex(function(c){return c.r.o.id===WANT;}):-1;if(w>0)r.unshift(r.splice(w,1)[0]);if(w>=0)WANT=0;
+  var got=r.slice(0,TEN),ul=$('cards'),first=deck.length;
   got.forEach(function(c){deck.push(c);ul.append(card(c));});
   save();meter();if(got.length)focus(first,auto===true);
 }

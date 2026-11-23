@@ -248,21 +248,20 @@ def test_a_close_call_chip_gives_the_note_and_opens_the_map_by_click_and_keyboar
     assert page.errors == []
 
 
-def test_the_hash_record_opens_its_range_popover_under_only_far_outside(browser, site):
+def test_the_hash_record_opens_its_panel_not_its_range_popover(browser, site):
     page = opened(browser, site, "#lvl=1&out=1&record=3000")
-    page.wait_for_selector("#rpop:not([hidden])")
+    page.wait_for_selector("#cpanel:not([hidden])")
     assert shown(page, 1) == [2] and picked(page) == "Only far outside 1"
-    assert page.locator("#cpdet .rchip").get_attribute("aria-expanded") == "true"
+    assert page.locator("#rpop").count() == 0 or page.locator("#rpop").is_hidden()
     assert page.errors == []
 
 
 def test_the_hash_record_picks_its_level_and_leads_it(browser, site):
     last = opened(browser, site, "#lvl=5&out=0").evaluate("__identify.view()")[1][-1]
     page = opened(browser, site, f"#lvl=5&out=0&record={last}")
-    page.wait_for_selector("#rpop:not([hidden])")
+    page.wait_for_selector("#cpanel:not([hidden])")
     assert page.evaluate("__identify.level()") == 1
     assert page.evaluate("__identify.view()")[1][0] == last
-    assert page.locator("#cpdet .rchip").get_attribute("aria-expanded") == "true"
     assert page.errors == []
 
 

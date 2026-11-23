@@ -374,6 +374,7 @@ function select(i,fly){
   var actions=el('div',{'class':'actions'},[
     link('https://www.inaturalist.ca/observations/'+id,'Help identify on iNaturalist','primary'),
     link(CFG.searchUrl+'#id='+id,'More like this'),link(CFG.mapUrl+'#record='+id,'Show on map','show')]);
+  var sh=WtidCarry.share(el('button',{'class':'sh'}),function(){return ['id='+id];});
   // in Explore the map pane opens the card, so the search, filters and photo space stay as they are
   if(parent!==window)actions.querySelector('.show').addEventListener('click',function(e){e.preventDefault();parent.postMessage({type:'wtid-show',id:id},location.origin);});
   var tx=S.TAXA&&P.tax&&P.tax[i]!==65535&&S.TAXA[P.tax[i]];
@@ -381,7 +382,7 @@ function select(i,fly){
   if(P.grp)actions.appendChild(onlyGroup(P.grp[i]));
   var title=el('h2',{},[t.common||t.latin||t.group||'Observation '+id]);
   card.textContent='';
-  [resizer(),x,mn,ph,el('div',{'class':'body'},[title,sub,place,actions,SavedRecords.controls(id),el('p',{'class':'muted','data-explain':'closest-matches'},['Closest matches, from the full image space']),nbNote,nb])]
+  [resizer(),x,mn,sh,ph,el('div',{'class':'body'},[title,sub,place,actions,SavedRecords.controls(id),el('p',{'class':'muted','data-explain':'closest-matches'},['Closest matches, from the full image space']),nbNote,nb])]
     .forEach(function(c){card.appendChild(c);});
   card.hidden=false;minCard(MIN);x.focus();
   // the shards arrived after this card opened: fill in what they know, unless iNaturalist's answer already did
