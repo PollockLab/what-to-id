@@ -14,7 +14,7 @@ var FoodLoop=(function(){
 var CLASSES=[['','All classes'],['Aves','Birds'],['Mammalia','Mammals'],['Reptilia','Reptiles'],['Amphibia','Amphibians'],['Insecta','Insects']],ANS=['yes','no','unsure'],
   // FOOD: the words foodweb_obs.SEARCHES looked for; the four options of a card's question and the three checks each one saves; only eating shows it (and asks which animal when the field did not name it)
   OPTS=[['Not this predator',['no','unsure','unsure']],['Not eating',['yes','yes','no']],['Can’t tell',['unsure','unsure','unsure']],['Eating',['yes','yes','yes']]],
-  KEY='wtid-loop',FOOD=['eating','eats','ate','feeding','prey','caught','predation'],OBS='https://www.inaturalist.org/observations/',API='https://api.inaturalist.org/v1/',TEN=10,W=(typeof EATING_CONFIG!=='undefined'&&EATING_CONFIG.words)||{},CAND=W.cand||'candidate observation',SHOW=8,$=function(id){return document.getElementById(id);};
+  KEY='wtid-loop',FOOD=['eating','eats','ate','feeding','prey','caught','predation'],WEAK=['prey','caught'],OBS='https://www.inaturalist.org/observations/',API='https://api.inaturalist.org/v1/',TEN=10,W=(typeof EATING_CONFIG!=='undefined'&&EATING_CONFIG.words)||{},CAND=W.cand||'candidate observation',SHOW=8,$=function(id){return document.getElementById(id);};
 // #record=<id> (a shared card): read before the page rewrites its hash, drawn first once it fits the question
 var WANT=+((/(?:^|&)record=(\d+)(?:&|$)/.exec(location.hash.slice(1))||[])[1]||0);
 var S={ann:{},cls:''},H=null,E=null,Q={x:null,y:null},ITEMS=[],deck=[],cur=-1,change=function(){},TOK=new Map(),ready=false,booted=false;
@@ -55,9 +55,13 @@ function entries(r){
   function add(n,tier,why){out.push(eat?{pred:known,prey:n,tier:tier,why:why}:{pred:n,prey:known,tier:tier,why:why});}
   if(named&&!E.open(r,eat?'prey':'pred')){add(named,4,'The field names the pair');return out;}
   if(named){all.filter(function(n){return E.within(n,named);}).forEach(function(n){add(n,3,'The field names '+E.label(named)+', not a species');});return out;}
+  // the description links the observer's own record of the prey: its taxon is the prey
+  if(o.lk&&eat){add(o.lk[0],3,'The description links the prey’s observation');return out;}
   var src=[['Description',o.d],['Tags',(o.g||[]).join(' ')],['The field text',o.x]].filter(function(s){return s[1];});
   src.forEach(function(s){var low=lc(s[1]),cl=credit(low),m=VERB.exec(cl),post=m?cl.slice(m.index+m[0].length):cl,how=s[0]+(s[0]==='Tags'?' mention ':' mentions ');
     // "X kills the <this animal>": the animal in the photo is the victim, so the text names no prey for it
+    // "caught in a web", "caught on camera": the animal is caught, it caught nothing
+    if(eat&&m&&m[0]==='caught'&&/^\s+(?:in|on|at|by|under|up)\b/.test(post))return;
     if(eat&&tokens(known).some(function(t){return new RegExp('\\b(?:the|an?|this|that) '+t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?![a-z])').test(post);}))return;
     all.forEach(function(n){var t=tokens(n).filter(function(k){return mention(low,k);})[0];
       if(t)add(n,2,how+'“'+t+'”');});
@@ -68,8 +72,9 @@ function entries(r){
     g.filter(function(w){return !g.some(function(v){return v!==w&&v.indexOf(w)>=0;});}).forEach(function(w){var c=GROUP[w];if(c!==known&&!out.some(function(e){return e.prey===c;}))add(c,2,how+'“'+w+'”');});});
   if(out.length)return out;
   // only a food word (the text search's): no prey is named, so the card asks about any prey, not the metaweb's likeliest
-  if(o.k==='text'){var f=null;src.forEach(function(s){var low=credit(lc(s[1]));FOOD.forEach(function(w){if(!f&&mention(low,w))f=s[0]+(s[0]==='Tags'?' mention ':' mentions ')+'“'+w+'”';});});
-    add('',1,f||'Description or tags mention food');return out;}
+  // "caught" and "prey" alone name the victim as often ("caught in a web"): such a hit is no card
+  if(o.k==='text'){var f=null,weak=false;src.forEach(function(s){var low=credit(lc(s[1]));FOOD.forEach(function(w){if(!f&&mention(low,w)){if(WEAK.indexOf(w)<0)f=s[0]+(s[0]==='Tags'?' mention ':' mentions ')+'“'+w+'”';else weak=true;}});});
+    if(!f&&weak)return out;add('',1,f||'Description or tags mention food');return out;}
   // the model's own guess (a taxon, else a group word) is the card's prey; with neither, it asks about any prey, not the metaweb's likeliest
   if(o.k==='model'){var h=H&&H.obs[o.id],l=h?[h.name].concat((h.prey||[]).map(function(q){return q[0];})):[],why='A vision model flagged feeding';
     var g=l.map(function(n){return String(n||'').replace(/ \(.*$/,'');}).filter(function(n){return E.all().has(n);})[0];
@@ -307,6 +312,7 @@ function reload(){
   // a field record also found by the text search is one card, the field's. A model record also found by it is one card too: the model's
   // (its P(feeding), its rank), but a prey the description names wins over the model's guess
   var merged=new Map();
+  E.R.text.forEach(function(r){var l=r.o.lk;if(l)E.add(l[0],l[2],l[1]);});
   E.R.text.forEach(function(r){var m=mod.get(r.o.id);if(m&&!fld.has(r.o.id)){var es=entries(r).filter(function(e){return e.prey;});if(es.length)merged.set(m,es);}});
   ITEMS=E.R.all.concat(E.R.text.filter(function(r){return !ids.has(r.o.id);})).map(function(r){return {r:r,es:merged.get(r)||entries(r)};}).filter(function(it){return it.es.length;});
 }
