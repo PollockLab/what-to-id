@@ -83,3 +83,26 @@ def test_the_prey_picker_starts_on_the_models_guess_with_a_copyable_eating_value
     card.locator(".which .cp").click()
     assert page.evaluate("window.__c") == "House Mouse"
     assert card.locator(".which .cs").inner_text() == "Copied" and page.errors == []
+
+
+def test_a_model_card_names_the_models_guess_a_group_or_something(browser, tmp_path, monkeypatch):
+    obs = json.loads(json.dumps(foodweb_page.OBS))
+    model = {**obs["obs"][0], "id": 200, "k": "model"}
+    del model["f"]
+    obs["obs"] = [{**model, "id": i} for i in (200, 201, 202)]
+    hints = {
+        "200": {"p": 0.9, "name": "Mus musculus", "prey": []},  # a taxon
+        "201": {"p": 0.9, "name": "mouse", "prey": []},  # a word with no group
+        "202": {"p": 0.9, "name": "rodent", "prey": [["Mus", 0.4]]},  # a genus in the metaweb
+    }
+    monkeypatch.setattr(foodweb_page, "OBS", obs)
+    monkeypatch.setattr(foodweb_page, "TEXT", {"fetched": "2026-11-13", "n": 0, "obs": []})
+    monkeypatch.setattr(foodweb_page, "VLM", {"model": "t", "obs": hints})
+    page = open_page(browser, next(build_site(tmp_path)) + HASH)
+    cards = {
+        i: page.locator("#cards li", has=page.locator(f"a[href$='/observations/{i}']")).inner_text()
+        for i in (200, 201, 202)
+    }
+    assert "Barred Owl may be eating House Mouse" in cards[200]
+    assert "Barred Owl may be eating something" in cards[201]
+    assert "Barred Owl may be eating Mus" in cards[202] and page.errors == []

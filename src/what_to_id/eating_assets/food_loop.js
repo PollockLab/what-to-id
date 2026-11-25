@@ -51,6 +51,11 @@ function entries(r){
   // only a food word (the text search's): no prey is named, so the card asks about any prey, not the metaweb's likeliest
   if(o.k==='text'){var f=null;src.forEach(function(s){var low=credit(lc(s[1]));FOOD.forEach(function(w){if(!f&&mention(low,w))f=s[0]+(s[0]==='Tags'?' mention ':' mentions ')+'“'+w+'”';});});
     add('',1,f||'Description or tags mention food');return out;}
+  // the model's own guess (a taxon, else a group word) is the card's prey; with neither, it asks about any prey, not the metaweb's likeliest
+  if(o.k==='model'){var h=H&&H.obs[o.id],l=h?[h.name].concat((h.prey||[]).map(function(q){return q[0];})):[],why='A vision model flagged feeding';
+    var g=l.map(function(n){return String(n||'').replace(/ \(.*$/,'');}).filter(function(n){return E.all().has(n);})[0];
+    if(!g)l.some(function(n){return Object.keys(GROUP).some(function(w){var c=GROUP[w];return mention(lc(n),w)&&all.some(function(m){return E.within(m,c);})&&(g=c);});});
+    add(g||'',1,why);return out;}
   all.forEach(function(n){add(n,1,o.k==='text'?'Description or tags mention food':o.k==='model'?'A vision model flagged feeding':'The '+(eat?'Eating':'Eaten by')+' field '+(o.x?'has text, no taxon':'is empty'));});
   return out;
 }
