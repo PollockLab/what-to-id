@@ -183,3 +183,8 @@ def test_model_flagged_ids_are_fetched_in_batches_and_kept_as_model_records(
     assert [len(b) for b in batches] == [200, 200, 1] and len(out) == 401
     assert out[0]["k"] == "model" and "f" not in out[0] and out[0]["ph"].endswith("/medium.jpg")
     assert foodweb_obs.fetch_ids([], pause=0) == []
+
+
+def test_text_search_skips_words_that_name_the_victim():
+    words = {w for on, w in foodweb_obs.SEARCHES if on == "description"}
+    assert {"eating", "feeding"} <= words and not words & {"caught", "prey"}
