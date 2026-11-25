@@ -133,3 +133,28 @@ kbd{font:11px ui-monospace,monospace;border:1px solid currentColor;border-radius
 .thumbs img{display:block;width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;background:var(--chip)}
 .fsearch .err{color:var(--warn);background:var(--warnbg);padding:var(--s2) var(--s3);border-radius:6px}
 .cards .lk .post{margin-top:var(--s1)}
+.qf>summary{display:none}
+/* model study: a focused labeling tool, the question and sections 2 and 4 folded away, the cards at full width */
+.slead{display:none}.study .lead{display:none}.study .slead{display:block}
+/* study mode: section 1 is one row (sources, then the folded question), no heading or box */
+.study .st1{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s2);padding:0;border:0;background:none;box-shadow:none}.study .st1>h2{display:none}.study .st1 .seg{margin:0}
+.study .qf>summary{display:list-item;cursor:pointer;margin:0}
+.study .fold>summary{pointer-events:auto;list-style:revert;cursor:pointer}.study .fold>summary::-webkit-details-marker{display:revert}.study .fold:not([open])>summary .one{display:block}
+.study .flow{grid-template-columns:minmax(0,1fr);grid-template-areas:"q" "e" "m" "n";grid-template-rows:none}
+.study .st4{position:static}
+.study .cards{grid-template-columns:minmax(0,1fr)}
+.study .cards li{flex-direction:row}.study .cards li>figure{flex:1 1 55%;min-width:0}.study .cards li>div{flex:1 1 45%;min-width:0}
+.study .cards img{aspect-ratio:auto;max-height:75vh;object-fit:contain}
+.study .mk{flex-direction:column;align-items:stretch}.study .mk button{text-align:left}.study .mk kbd{margin-right:var(--s1)}
+@media(max-width:699px){.study .cards li{flex-direction:column}.study .mk{flex-direction:row}}
+.study .keys{display:none}
+/* the nav already names the page: the title stays for screen readers only */
+.study main>h1{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.study .slead{margin-top:var(--s2)}
+.about{display:none}.study .about{display:block;max-width:70ch;margin:var(--s2) 0}.about>summary{cursor:pointer}.about p{margin:var(--s1) 0}
+.study .st3>h2>span{display:none}
+.study .st1 .qf[open]{flex-basis:100%}
+.study .qf>:not(summary){max-width:36rem}
+/* study cards: the prey step is just the picker and Confirm, no iNat field copy or check summary */
+.study .which .ev,.study .which .cp,.study .which .cs,.study .sum{display:none}
+.study #draw{display:none}

@@ -9,20 +9,28 @@ __SITE_NAV__
 <main id="main-content">
 <h1>Food web in BC</h1>
 <p class="lead">Which predator-prey pairs are documented, and which photos could show a new one. Pick a question, mark what you can see in the most promising photos, and watch the network fill in. Marks stay in this browser for now.</p>
+<p class="lead slead">For each photo: is the predator eating, and if so, which species?</p>
 <div class="seg" id="kind" role="radiogroup" aria-label="Kind of web" hidden></div>
+<details class="about"><summary>What these photos are for</summary>
+<p>A predicted food web for Canada lists thousands of pairs that may eat each other. Most have never been documented here. A vision model went through about 300,000 BC photos of predators and kept about 3,200 that may show one eating. Your answers check those photos and become a test set for a search that looks for new interactions on iNaturalist.</p>
+<p><strong>Please name the prey to species.</strong> An interaction only counts as new if we know exactly which species was eaten, so "a bird" or "a frog" does not help.</p>
+<p>Eating means the predator holds, carries, kills or swallows an animal. A chick or nestling counts. Eggs and carrion have their own keys. The model's guess is hidden so your answers stay independent of it. You can change an answer at any time.</p>
+</details>
 <div class="flow">
 <section class="st1" aria-labelledby="s1"><h2 id="s1"><span>1</span>Question</h2>
+<details class="qf" id="qf" open><summary>Food web question</summary>
 <div class="seg" id="modes" role="radiogroup" aria-label="Kind of question"></div>
 <div class="seg cls" id="classes" role="radiogroup" aria-label="Predator class"></div>
+<div class="seg cls" id="sources" role="radiogroup" aria-label="Source of the photos" hidden></div>
 <p class="sent" id="sent" aria-live="polite"></p>
-<div class="try" id="tryw" hidden><p id="tryh">For example</p><div id="try" role="group" aria-labelledby="tryh"></div></div></section>
+<div class="try" id="tryw" hidden><p id="tryh">For example</p><div id="try" role="group" aria-labelledby="tryh"></div></div></details></section>
 <section class="st2" aria-labelledby="s2"><details class="fold" open><summary><h2 id="s2"><span>2</span>Predicted web</h2><span class="one" id="s2sum"></span></summary>
 <p class="muted">Predicted from the expert food web (GloBI stand-in). Click a cell to ask about that pair, or a name to ask what it eats or what eats it.</p>
 <div class="mx" id="mx" tabindex="0" role="region" aria-label="Predicted food web, scrolls sideways"></div>
 <div class="key" id="mxkey"><span><i class="sw a"></i><i class="sw b"></i><i class="sw c"></i>one, two, three or more records</span><span><i class="sw ev"></i>photographed</span><span><i class="sw"></i>no pair</span></div></details></section>
 <section class="st3" aria-labelledby="s3"><h2 id="s3"><span>3</span>Evidence search</h2>
 <p id="cand" aria-live="polite">Loading.</p>
-<p class="keys muted"><kbd>1</kbd> not this predator <kbd>2</kbd> not eating <kbd>3</kbd> can’t tell <kbd>4</kbd> eating, <kbd>j</kbd> <kbd>k</kbd> move. Saved in this browser.</p>
+<p class="keys muted"><kbd>1</kbd> not this predator <kbd>2</kbd> not eating <kbd>3</kbd> can’t tell <kbd>4</kbd> eating (model study cards add <kbd>5</kbd> eggs <kbd>6</kbd> carrion), <kbd>j</kbd> <kbd>k</kbd> move. Saved in this browser.</p>
 <ul class="cards" id="cards"></ul>
 <div class="bar"><button type="button" class="btn quiet" id="draw" disabled>Show photos</button></div>
 <div id="fsearch" class="fsearch" hidden></div></section>

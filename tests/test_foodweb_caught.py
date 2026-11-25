@@ -120,17 +120,13 @@ def negated(tmp_path_factory):
 def test_caught_or_prey_names_a_prey_or_draws_no_card(browser, caught):
     page = open_page(browser, caught + "#q=eats&x=Strix varia")
     draw_all(page)
-    assert "Barred Owl may be eating Caridea" in card_of(page, 801)
+    assert "may be eating" not in card_of(page, 801)  # a model-study card is blind
     assert "Barred Owl may be eating Pricklebacks" in card_of(page, 804)
     assert "links the prey’s observation" in card_of(page, 804)
-    assert "may be eating something" in card_of(page, 805)  # a strong food word still counts
+    assert "may be eating" not in card_of(page, 805)
     assert "Barred Owl may be eating Caridea" in card_of(page, 808)
     assert "may be eating something" in card_of(page, 810)  # the mobbers are no prey
-    # the text names the prey, so the model line drops its own guess
-    vlm = page.locator("#cards li:has(a[href$='/observations/801']) .vlm")
-    assert vlm.inner_text() == "Very likely feeding"
-    vlm = page.locator("#cards li:has(a[href$='/observations/805']) .vlm")  # no prey in the text
-    assert vlm.inner_text() == "Very likely feeding · prey guess: House Mouse"
+    assert page.locator("#cards .vlm").count() == 0
     # no prey in the observer's credit ("caught by me", "caught on camera"), nor on the scat it eats
     for i in (802, 803, 806, 807, 809, 811, 812):
         assert page.locator(f"#cards a[href$='/observations/{i}']").count() == 0

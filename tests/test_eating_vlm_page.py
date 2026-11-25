@@ -17,21 +17,6 @@ def base(tmp_path_factory):
     yield from build_site(tmp_path_factory.mktemp("eating-vlm-site"))
 
 
-def test_a_card_with_a_model_hint_shows_the_model_line_and_the_prey_box(browser, base):
-    page = open_page(browser, base + HASH)
-    first = page.locator("#cards li").first
-    # the field names the prey, so the model line keeps its bar and drops its guess
-    assert first.locator(".vlm").inner_text() == "Very likely feeding"
-    assert first.locator(".vlm").get_attribute("title") == "Model P(feeding) 0.95"
-    assert first.locator(".vbar i").get_attribute("style") == "width: 95%;"
-    assert (
-        first.locator("> div > :first-child").get_attribute("class") == "evl vlm"
-    )  # the first line
-    style = first.locator(".pbox").get_attribute("style")
-    assert style == "left: 10%; top: 20%; width: 50%; height: 60%;"
-    assert page.locator(".vlm").count() == 1  # only the observation in the file
-
-
 def test_the_page_works_without_the_model_file(browser, tmp_path):
     url = next(build_site(tmp_path, vlm=False))
     page = open_page(browser, url + HASH)
@@ -39,7 +24,7 @@ def test_the_page_works_without_the_model_file(browser, tmp_path):
     assert page.errors == []
 
 
-def test_cards_rank_by_the_models_signal_and_model_only_cards_follow_the_field(
+def test_pairs_the_field_already_names_come_after_the_model_studys_open_cards(
     browser, tmp_path, monkeypatch
 ):
     obs = json.loads(json.dumps(foodweb_page.OBS))
@@ -58,54 +43,125 @@ def test_cards_rank_by_the_models_signal_and_model_only_cards_follow_the_field(
     ids = page.locator("#cards li > figure > a").evaluate_all(
         "a => a.map(x => x.href.split('/').pop())"
     )
-    assert ids == [
-        "1",
-        "0",
-        "200",
-    ]  # 1 rises on the model, 0 sinks but stays above the model-only card
+    assert ids == ["1", "200", "0"]  # 0's field names the pair, so iNaturalist has it: last
     assert page.errors == []
 
 
-def test_the_prey_picker_starts_on_the_models_guess_with_a_copyable_eating_value(
-    browser, tmp_path, monkeypatch
-):
-    stub = (
-        "Object.defineProperty(navigator,'clipboard',{configurable:true,"
-        "value:{writeText:t=>(window.__c=t,Promise.resolve())}})"
+def test_a_part_link_draws_only_that_annotators_share(browser, base):
+    page = open_page(browser, base + HASH.replace("#", "#part=2/2&"))
+    ids = page.locator("#cards li > figure > a").evaluate_all(
+        "a => a.map(x => +x.href.split('/').pop())"
     )
-    hints = {
-        "1": {"p": 0.99, "prey": [["Mus musculus", 0.6]]}
-    }  # card 1's field names only the genus Mus
-    monkeypatch.setattr(foodweb_page, "VLM", {"model": "t", "obs": hints})
-    page = open_page(browser, next(build_site(tmp_path)) + HASH, stub)
-    card = page.locator("#cards li").first
-    assert card.locator("a").first.get_attribute("href").endswith("/observations/1")
-    page.keyboard.press("4")
-    assert card.locator(".which input").input_value() == "House Mouse"
-    assert card.locator(".which .ev").inner_text() == "Eating = House Mouse"
-    card.locator(".which .cp").click()
-    assert page.evaluate("window.__c") == "House Mouse"
-    assert card.locator(".which .cs").inner_text() == "Copied" and page.errors == []
+    assert ids and all(i % 2 == 1 for i in ids)
+    assert page.locator("#cand").inner_text().startswith("Your share: part 2 of 2.")
+    assert page.errors == []
 
 
-def test_a_model_card_names_the_models_guess_a_group_or_something(browser, tmp_path, monkeypatch):
+def test_the_source_filter_keeps_one_source(browser, tmp_path, monkeypatch):
     obs = json.loads(json.dumps(foodweb_page.OBS))
     model = {**obs["obs"][0], "id": 200, "k": "model"}
     del model["f"]
-    obs["obs"] = [{**model, "id": i} for i in (200, 201, 202)]
-    hints = {
-        "200": {"p": 0.9, "name": "Mus musculus", "prey": []},  # a taxon
-        "201": {"p": 0.9, "name": "mouse", "prey": []},  # a word with no group
-        "202": {"p": 0.9, "name": "rodent", "prey": [["Mus", 0.4]]},  # a genus in the metaweb
-    }
+    obs["obs"] = [obs["obs"][0], obs["obs"][1], model]
     monkeypatch.setattr(foodweb_page, "OBS", obs)
     monkeypatch.setattr(foodweb_page, "TEXT", {"fetched": "2026-11-13", "n": 0, "obs": []})
-    monkeypatch.setattr(foodweb_page, "VLM", {"model": "t", "obs": hints})
+    monkeypatch.setattr(foodweb_page, "VLM", {"model": "t", "obs": {"200": {"p": 0.9, "prey": []}}})
     page = open_page(browser, next(build_site(tmp_path)) + HASH)
-    cards = {
-        i: page.locator("#cards li", has=page.locator(f"a[href$='/observations/{i}']")).inner_text()
-        for i in (200, 201, 202)
-    }
-    assert "Barred Owl may be eating House Mouse" in cards[200]
-    assert "Barred Owl may be eating something" in cards[201]
-    assert "Barred Owl may be eating Mus" in cards[202] and page.errors == []
+    page.locator("#sources button", has_text="Model study").click()
+    ids = page.locator("#cards li > figure > a").evaluate_all(
+        "a => a.map(x => x.href.split('/').pop())"
+    )
+    assert ids == ["200"] and page.errors == []
+
+
+def _study_page(browser, tmp_path, monkeypatch):
+    monkeypatch.setattr(foodweb_page, "VLM", {"model": "t", "obs": {"1": {"p": 0.99, "prey": []}}})
+    return open_page(browser, next(build_site(tmp_path)) + HASH, study=True)
+
+
+def test_a_study_card_is_blind_and_shows_the_six_options(browser, tmp_path, monkeypatch):
+    page = _study_page(browser, tmp_path, monkeypatch)
+    card = page.locator("#cards li").first
+    assert card.locator("a").first.get_attribute("href").endswith("/observations/1")
+    assert card.locator(".ask").inner_text() == "Is Barred Owl (Strix varia) eating something?"
+    assert card.locator(".mk button b").all_inner_texts() == [
+        "Predator not here",
+        "Not eating",
+        "Cannot tell",
+        "Eating",
+        "Eggs",
+        "Carrion",
+    ]
+    assert card.locator(".mk button").nth(0).inner_text() == "1 Predator not here"
+    third = card.locator(".mk button").nth(2)
+    assert "cannot show whether it is eating prey" in third.get_attribute("title")
+    assert third.get_attribute("aria-description") == third.get_attribute("title")
+    assert "cannot show whether" not in third.inner_text()
+    text = card.inner_text()
+    assert "may be eating" not in text and "Why:" not in text
+    assert card.locator(".vlm, .pbox, .pair").count() == 0 and page.errors == []
+
+
+def test_key_6_saves_carrion_with_its_label_in_the_csv(browser, tmp_path, monkeypatch):
+    page = _study_page(browser, tmp_path, monkeypatch)
+    page.keyboard.press("6")
+    rows = page.evaluate("FoodLoop.csv()").strip().split("\n")
+    assert rows[0].endswith(",is_eating,label")
+    assert rows[1].endswith('"yes","unsure","no","carrion"') and rows[1].startswith('"1",')
+    assert page.errors == []
+
+
+def test_key_4_on_a_study_card_opens_the_picker_with_no_guess(browser, tmp_path, monkeypatch):
+    page = _study_page(browser, tmp_path, monkeypatch)
+    page.keyboard.press("4")
+    assert page.locator("#cards li").first.locator(".which input").input_value() == ""
+    assert page.evaluate("FoodLoop.csv()").strip().count("\n") == 0  # not saved until Confirm
+    assert page.errors == []
+
+
+def test_study_mode_tucks_the_question_and_sections_2_and_4_away(browser, tmp_path, monkeypatch):
+    page = _study_page(browser, tmp_path, monkeypatch)
+    page.set_viewport_size({"width": 1400, "height": 900})
+    assert "study" in page.evaluate("document.body.className")
+    qf = page.locator("#qf")
+    assert qf.evaluate("e => e.open") is False and page.locator("#modes").is_hidden()
+    assert page.locator("#sources").is_visible() and page.locator("#export").is_visible()
+    for sel in (".st2 details", ".st4 details"):
+        assert page.locator(sel).evaluate("e => e.open") is False
+    page.locator(".st2 summary").click()
+    qf.locator("summary").click()
+    assert page.locator("#mx").is_visible() and page.locator("#modes").is_visible()
+    page.locator(".st2 summary").click()  # a study fold closes again, even on a wide screen
+    assert page.locator(".st2 details").evaluate("e => e.open") is False
+    assert page.errors == []
+
+
+def test_leaving_study_mode_restores_the_layout(browser, tmp_path, monkeypatch):
+    page = _study_page(browser, tmp_path, monkeypatch)
+    page.set_viewport_size({"width": 1400, "height": 900})
+    page.locator("#sources button", has_text="All sources").click()
+    assert "study" not in page.evaluate("document.body.className")
+    assert (
+        page.locator("#qf").evaluate("e => e.open") is True and page.locator("#modes").is_visible()
+    )
+    assert page.locator(".st2 details").evaluate("e => e.open") is True
+    assert page.locator("#export").evaluate("e => e.nextElementSibling.id") == "exportnet"
+    assert page.locator("#classes").evaluate("e => e.nextElementSibling.id") == "sources"
+    page.locator("#sources button", has_text="Model study").click()
+    assert "study" in page.evaluate("document.body.className")
+    assert page.errors == []
+
+
+def test_a_study_card_shows_the_photo_beside_the_answers_and_stacks_on_a_phone(
+    browser, tmp_path, monkeypatch
+):
+    page = _study_page(browser, tmp_path, monkeypatch)
+    page.set_viewport_size({"width": 1400, "height": 900})
+
+    def box(sel):
+        return page.locator("#cards li").first.locator(sel).first.bounding_box()
+
+    ph, mk = box("figure"), box(".mk")
+    assert ph["x"] < mk["x"] and ph["width"] > 400
+    page.set_viewport_size({"width": 390, "height": 844})
+    ph, mk = box("figure"), box(".mk")
+    assert mk["y"] > ph["y"] + ph["height"] - 1

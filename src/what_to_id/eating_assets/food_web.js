@@ -190,7 +190,7 @@ function ticked(box,v){[].forEach.call(box.children,function(b){b.setAttribute('
 function paint(){
   var h=resolve(hash()),now=Object.keys(h).filter(function(k){return h[k];}).map(function(k){return k+'='+encodeURIComponent(h[k]);}).join('&');
   if(now!==location.hash.slice(1)&&(h.q||location.hash.length>1))history.replaceState(null,'','#'+now);  // a blank or unknown taxon shows as the default
-  ticked($('modes'),h.q);ticked($('classes'),L.cls());
+  ticked($('modes'),h.q);ticked($('classes'),L.cls());ticked($('sources'),L.src());
   sentence(h);matrix(h);network(h);fold();L.ask({x:h.q==='eats'||h.q==='does'?h.x:null,y:h.q==='eaten'||h.q==='does'?h.y:null});
   if(window.FoodSearch)FoodSearch.ask(h);
 }
@@ -207,12 +207,20 @@ Promise.all([get(C.metaweb),get(C.obs),get(C.vlm,true)]).then(function(d){
   seg($('modes'),MODES,function(q){go(q?{q:q}:{});});
   // the predator's class limits the cards; ticked() on the click too, as the hash does not change
   seg($('classes'),L.CLASSES.map(function(c){return [c[0],c[1],c[0]?c[1]+' ('+c[0]+')':'Predators of any class'];}),function(c){L.setClass(c);ticked($('classes'),c);});
+  // the source filter only means something with the model study's file
+  if(d[2]){$('sources').hidden=false;seg($('sources'),L.SOURCES,function(c){L.setSource(c);ticked($('sources'),c);study();});}
   var tr=$('try');TRY.forEach(function(x){var h={};Object.keys(x[2]).forEach(function(k){h[k]=k==='q'?x[2][k]:E.find(x[2][k],ALL);});
     if(Object.keys(h).some(function(k){return !h[k];}))return;
     var b=el('button','chip');b.type='button';b.onclick=function(){go(h);};b.append(el('span',null,x[0]),el('em',null,x[1]));tr.append(b);$('tryw').hidden=false;});
   // sections 2 and 4 start collapsed under 700px and cannot be closed above it
   var wide=matchMedia('(min-width:700px)');
-  [].forEach.call(document.querySelectorAll('.fold'),function(f){f.open=wide.matches;f.addEventListener('toggle',function(){if(wide.matches&&!f.open)f.open=true;});});
+  [].forEach.call(document.querySelectorAll('.fold'),function(f){f.open=wide.matches;f.addEventListener('toggle',function(){if(wide.matches&&!f.open&&!document.body.classList.contains('study'))f.open=true;});});
+  // the model study is a focused labeling tool: the question and sections 2 and 4 are tucked into closed folds, the source row and the annotations export stay in view
+  function study(){var on=!!d[2]&&L.src()==='study';if(on===document.body.classList.contains('study'))return;
+    document.body.classList.toggle('study',on);$('qf').open=!on;
+    if(on){$('qf').before($('sources'));$('draw').parentNode.append($('export'));}else{$('classes').after($('sources'));$('exportnet').before($('export'));}
+    [].forEach.call(document.querySelectorAll('.fold'),function(f){f.open=!on&&wide.matches;});}
+  study();
   paint();window.__food=true;
   get(C.text,true).then(function(t){L.go();if(t){E.init(d[0],d[1],t);M=E.M();ALL=E.all();L.reload();$('src').textContent=E.how(d[1],t);}
     paint();window.__text=true;});
