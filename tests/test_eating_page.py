@@ -500,6 +500,15 @@ def test_a_word_that_only_starts_with_a_candidate_is_not_a_mention(browser, audi
     assert "Description or tags mention food" in card and "mentions" not in card
 
 
+def test_a_food_word_alone_names_no_prey_and_quotes_the_word(browser, audit):
+    page = open_page(browser, audit + "#q=eats&x=Strix varia")
+    draw_all(page)
+    card = page.locator("#cards li", has=page.locator("a[href$='/observations/503']")).inner_text()
+    # no prey name matched: not the predator's top metaweb prey (House Mouse)
+    assert "Barred Owl may be eating something" in card and "House Mouse" not in card
+    assert "Tags mention “predation”" in card and page.errors == []
+
+
 def test_an_observation_with_both_fields_is_one_card(browser, audit):
     page = open_page(browser, audit + "#q=eats&x=Strix varia")
     draw_all(page)

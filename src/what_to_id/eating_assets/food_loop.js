@@ -4,15 +4,15 @@
 // the annotations live in localStorage only (one key, read defensively); nothing goes to iNaturalist.
 // The next ten come when the last card is answered, or on More photos.
 // Rank = the pair's p in the metaweb x the evidence: 4 the field names the pair, 3 it names a coarse ancestor of one animal, 2 the
-// description, tags or field text mention a candidate (common or Latin name), 1 they only talk about food or the field is empty.
+// description, tags or field text mention a candidate (common or Latin name), 1 they only talk about food (a text hit then names no prey) or the field is empty.
 // FoodLoop.init(E, onChange); FoodLoop.ask({x, y}) when the question changes; FoodLoop.state(pred, prey) is 'before', 'new' or ''.
 var FoodLoop=(function(){
 'use strict';
 // the predator classes the filter offers: [iNaturalist class, button]; '' is all
 var CLASSES=[['','All classes'],['Aves','Birds'],['Mammalia','Mammals'],['Reptilia','Reptiles'],['Amphibia','Amphibians'],['Insecta','Insects']],ANS=['yes','no','unsure'],
-  // the four options of a card's question and the three checks each one saves; only eating shows it (and asks which animal when the field did not name it)
+  // FOOD: the words foodweb_obs.SEARCHES looked for; the four options of a card's question and the three checks each one saves; only eating shows it (and asks which animal when the field did not name it)
   OPTS=[['Not this predator',['no','unsure','unsure']],['Not eating',['yes','yes','no']],['Can’t tell',['unsure','unsure','unsure']],['Eating',['yes','yes','yes']]],
-  KEY='wtid-loop',OBS='https://www.inaturalist.org/observations/',TEN=10,$=function(id){return document.getElementById(id);};
+  KEY='wtid-loop',FOOD=['eating','eats','ate','feeding','prey','caught','predation'],OBS='https://www.inaturalist.org/observations/',TEN=10,$=function(id){return document.getElementById(id);};
 // #record=<id> (a shared card): read before the page rewrites its hash, drawn first once it fits the question
 var WANT=+((/(?:^|&)record=(\d+)(?:&|$)/.exec(location.hash.slice(1))||[])[1]||0);
 var S={ann:{},cls:''},H=null,E=null,Q={x:null,y:null},ITEMS=[],deck=[],cur=-1,change=function(){},TOK=new Map(),ready=false,booted=false;
@@ -41,6 +41,9 @@ function entries(r){
   src.forEach(function(s){var low=lc(s[1]);all.forEach(function(n){var t=tokens(n).filter(function(k){return mention(low,k);})[0];
     if(t)add(n,2,s[0]+(s[0]==='Tags'?' mention ':' mentions ')+'“'+t+'”');});});
   if(out.length)return out;
+  // only a food word (the text search's): no prey is named, so the card asks about any prey, not the metaweb's likeliest
+  if(o.k==='text'){var f=null;src.forEach(function(s){var low=lc(s[1]);FOOD.forEach(function(w){if(!f&&mention(low,w))f=s[0]+(s[0]==='Tags'?' mention ':' mentions ')+'“'+w+'”';});});
+    add('',1,f||'Description or tags mention food');return out;}
   all.forEach(function(n){add(n,1,o.k==='text'?'Description or tags mention food':o.k==='model'?'A vision model flagged feeding':'The '+(eat?'Eating':'Eaten by')+' field '+(o.x?'has text, no taxon':'is empty'));});
   return out;
 }
@@ -77,7 +80,7 @@ function hint(o,a,d){
   l.title='Model P(feeding) '+h.p.toFixed(2);f.style.width=Math.round(h.p*100)+'%';m.append(f);l.prepend(m);d.append(l);
   if(b){var x=E.el('span','pbox');x.style.cssText='left:'+b[0]/10+'%;top:'+b[1]/10+'%;width:'+(b[2]-b[0])/10+'%;height:'+(b[3]-b[1])/10+'%';a.append(x);}
 }
-function pairText(e){return E.label(e.pred)+(e.tier===4?' eats ':' may be eating ')+E.label(e.prey);}
+function pairText(e){return E.label(e.pred)+(e.tier===4?' eats ':' may be eating ')+(e.prey?E.label(e.prey):'something');}
 function meter(){
   var n=ranked().length;
   $('draw').textContent=deck.length?'More photos':'Show photos';$('draw').disabled=!n||!ready;
@@ -88,7 +91,7 @@ function steps(a){var t=a&&a.st;return Array.isArray(t)&&t.length===3&&t.every(f
 // Shows it only when the animals are eating and neither photo-check said no; else Not visible if any said no, else Can't tell
 function verdict(t){return t[2]==='yes'&&t[0]!=='no'&&t[1]!=='no'?'yes':t.indexOf('no')>=0?'no':'unsure';}
 var STEPS=['Predator','Prey','Eating'],SAY={yes:'yes',no:'no',unsure:'can’t tell'};
-function question(c){return 'Is '+E.label(c.e.pred)+' eating '+E.label(c.e.prey)+'?';}
+function question(c){return 'Is '+E.label(c.e.pred)+' eating '+(c.e.prey?E.label(c.e.prey):'anything')+'?';}
 function status(c){
   var a=S.ann[c.r.o.id],li=c.li,s=li.querySelector('.res'),busy=!li.querySelector('.which').hidden,got=busy?c.ans:steps(a);
   li.querySelector('.ask').textContent=a&&!busy?'':question(c);
@@ -120,7 +123,7 @@ function which(c){
   if(!box.hidden)return;
   box.hidden=false;
   function fill(names){
-    var g=eat?guess(c,names):null,v=g||(eat?c.e.prey:c.e.pred),h=box.querySelector('.pk');if(g&&names.indexOf(g)<0)names=names.concat(g);
+    var g=eat?guess(c,names):null,v=g||(eat?c.e.prey:c.e.pred)||null,h=box.querySelector('.pk');if(g&&names.indexOf(g)<0)names=names.concat(g);
     h.replaceChildren(EatingPicker.create({id:'w'+o.id,ph:'Which '+(eat?'prey':'predator')+'?',value:v,names:names,obs:[],parent:M.parent,rank:M.rank,groups:M.groups,label:E.label,
       onPick:function(n){pick=n;value(n);}}));
     h.querySelector('input').setAttribute('aria-label','Which '+(eat?'prey':'predator')+' does the photo show?');pick=v;value(v);

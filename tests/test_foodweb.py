@@ -51,3 +51,11 @@ def test_pairs_congeners_make_no_genus_predator():
     assert t["eats"]["Larus glaucescens"] == [["Mytilus edulis", 1]]
     rows.pop()
     assert "Larus" not in pairs(rows)["eats"]
+
+
+def test_pairs_fold_a_subspecies_or_form_into_its_species():
+    pigeon, feral = "Columba livia", "Columba livia domestica"
+    rows = [row("eats", "Falco columbarius", pigeon), row("eats", "Falco columbarius", feral)]
+    t = pairs(rows)
+    assert t["eats"]["Falco columbarius"] == [[pigeon, 2]]
+    assert list(t["eatenBy"]) == [pigeon]
