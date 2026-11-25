@@ -541,3 +541,62 @@ def test_sections_two_and_four_collapse_to_one_line_summaries_on_a_phone(browser
     assert page.locator("#mx table").is_hidden()
     page.click("#s2")
     assert page.locator("#mx table").is_visible() and not page.locator("#s2sum").is_visible()
+
+
+@pytest.fixture(scope="module")
+def words(tmp_path_factory, monkeypatch_module):
+    """An owl eating shrimp (a Caridea) and "Butterflies and Moths", with credit hits."""
+    meta = {
+        **foodweb_page.META,
+        "pairs": [
+            *foodweb_page.META["pairs"],
+            ["Strix", "Pandalus danae", 0.5],
+            ["Strix", "Lepidoptera", 0.4],
+        ],
+        "common": {**foodweb_page.META["common"], "Lepidoptera": "Butterflies and Moths"},
+        "parent": {
+            **foodweb_page.META["parent"],
+            "Pandalus danae": "Pandalidae",
+            "Pandalidae": "Caridea",
+            "Caridea": "Decapoda",
+        },
+    }
+    texts = {
+        601: "A moth for the owl",
+        602: "Caught a shrimp",
+        603: "Caught a crab",
+        604: "Caught by @sam, a fine owl",
+        605: "Photo by @sam eating lunch. A barred owl",
+    }
+    text = {**foodweb_page.TEXT, "obs": [foodweb_page.hit(i, d) for i, d in texts.items()]}
+    monkeypatch_module.setattr(foodweb_page, "META", meta)
+    monkeypatch_module.setattr(foodweb_page, "TEXT", text)
+    yield from build_site(tmp_path_factory.mktemp("words-site"))
+
+
+def card_of(page, i):
+    return page.locator("#cards li", has=page.locator(f"a[href$='/observations/{i}']")).inner_text()
+
+
+def test_a_singular_in_the_text_matches_a_plural_common_name(browser, words):
+    page = open_page(browser, words + "#q=eats&x=Strix varia")
+    draw_all(page)
+    card = card_of(page, 601)
+    assert "Barred Owl may be eating Butterflies and Moths" in card and "mentions “moths”" in card
+
+
+def test_a_group_word_names_the_group_only_when_the_predator_eats_in_it(browser, words):
+    page = open_page(browser, words + "#q=eats&x=Strix varia")
+    draw_all(page)
+    assert "Barred Owl may be eating Caridea" in card_of(page, 602)
+    assert "mentions “shrimp”" in card_of(page, 602)
+    assert "Barred Owl may be eating something" in card_of(page, 603)
+
+
+def test_a_credit_is_not_a_food_word(browser, words):
+    page = open_page(browser, words + "#q=eats&x=Strix varia")
+    draw_all(page)
+    for i in (604, 605):
+        card = card_of(page, i)
+        assert "Description or tags mention food" in card and "mentions “" not in card
+    assert page.errors == []

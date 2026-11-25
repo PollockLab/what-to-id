@@ -28,7 +28,13 @@ function tokens(n){
   if(!TOK.has(n)){var t=[lc(n)],c=lc(E.label(n));if(c!==t[0]){t.push(c);var w=c.split(/[ -]/).pop();if(w.length>=4&&t.indexOf(w)<0)t.push(w);}TOK.set(n,t);}
   return TOK.get(n);
 }
-function mention(text,tok){for(var i=text.indexOf(tok);i>=0;i=text.indexOf(tok,i+1))if((i===0||!/[a-z]/.test(text[i-1]))&&/^(e?s)?([^a-z]|$)/.test(text.slice(i+tok.length)))return true;return false;}  // a plural may end the word ("voles"), not "shrewd"
+function sg(w){return w.length<4?w:/ies$/.test(w)?w.slice(0,-3)+'y':/(ss|us|is)$/.test(w)?w:/(x|ch|sh|ss)es$/.test(w)?w.slice(0,-2):/s$/.test(w)?w.slice(0,-1):w;}  // tiny plural normalizer: s, es, ies to y
+function word(text,tok){for(var i=text.indexOf(tok);i>=0;i=text.indexOf(tok,i+1))if((i===0||!/[a-z]/.test(text[i-1]))&&/^(e?s)?([^a-z]|$)/.test(text.slice(i+tok.length)))return true;return false;}  // a plural may end the word ("voles"), not "shrewd"
+function mention(text,tok){var s=sg(tok);return word(text,tok)||word(text,s)||/y$/.test(s)&&word(text,s.slice(0,-1)+'ies');}  // "moths" in the metaweb, "a moth" in the text
+// the observer's credit is not predation: "caught by @user", "photo by Sam", and what follows an @user in its sentence
+function credit(t){return t.replace(/\b(?:caught|photo(?:graph(?:ed)?)?|picture|image|taken|credit)\s+by\b(?:\s+@\w[\w.]*[^.!?\n]*|\s+\w+)?/g,' ').replace(/@\w[\w.]*[^.!?\n]*/g,' ');}
+// group words to a clade name in the metaweb's parent table (hand-curated): named only when the predator has prey under that clade
+var GROUP={shrimp:'Caridea',crab:'Brachyura',crayfish:'Astacidea',fish:'Actinopterygii',prickleback:'Stichaeidae',sculpin:'Cottidae',salmon:'Salmonidae',herring:'Clupeidae',insect:'Insecta',moth:'Lepidoptera',butterfly:'Lepidoptera',caterpillar:'Lepidoptera',dragonfly:'Odonata',beetle:'Coleoptera',fly:'Diptera',bee:'Anthophila',grasshopper:'Orthoptera',spider:'Araneae',snail:'Gastropoda',slug:'Gastropoda',clam:'Bivalvia',mussel:'Bivalvia',frog:'Anura',snake:'Serpentes',bird:'Aves',duck:'Anatidae',squirrel:'Sciuridae',rabbit:'Leporidae'};
 // the pairs one record may show, each with its evidence tier and the reason, as [{pred, prey, tier, why}]
 function entries(r){
   var o=r.o,eat=o.k!=='by',known=eat?r.pred:r.prey,named=eat?r.prey:r.pred,out=[];
@@ -39,10 +45,11 @@ function entries(r){
   if(named){all.filter(function(n){return E.within(n,named);}).forEach(function(n){add(n,3,'The field names '+E.label(named)+', not a species');});return out;}
   var src=[['Description',o.d],['Tags',(o.g||[]).join(' ')],['The field text',o.x]].filter(function(s){return s[1];});
   src.forEach(function(s){var low=lc(s[1]);all.forEach(function(n){var t=tokens(n).filter(function(k){return mention(low,k);})[0];
-    if(t)add(n,2,s[0]+(s[0]==='Tags'?' mention ':' mentions ')+'“'+t+'”');});});
+    if(t)add(n,2,s[0]+(s[0]==='Tags'?' mention ':' mentions ')+'“'+t+'”');});
+    if(eat)Object.keys(GROUP).forEach(function(w){var c=GROUP[w];if(mention(low,w)&&!out.some(function(e){return e.prey===c;})&&all.some(function(n){return E.within(n,c);}))add(c,2,s[0]+(s[0]==='Tags'?' mention ':' mentions ')+'“'+w+'”');});});
   if(out.length)return out;
   // only a food word (the text search's): no prey is named, so the card asks about any prey, not the metaweb's likeliest
-  if(o.k==='text'){var f=null;src.forEach(function(s){var low=lc(s[1]);FOOD.forEach(function(w){if(!f&&mention(low,w))f=s[0]+(s[0]==='Tags'?' mention ':' mentions ')+'“'+w+'”';});});
+  if(o.k==='text'){var f=null;src.forEach(function(s){var low=credit(lc(s[1]));FOOD.forEach(function(w){if(!f&&mention(low,w))f=s[0]+(s[0]==='Tags'?' mention ':' mentions ')+'“'+w+'”';});});
     add('',1,f||'Description or tags mention food');return out;}
   all.forEach(function(n){add(n,1,o.k==='text'?'Description or tags mention food':o.k==='model'?'A vision model flagged feeding':'The '+(eat?'Eating':'Eaten by')+' field '+(o.x?'has text, no taxon':'is empty'));});
   return out;
