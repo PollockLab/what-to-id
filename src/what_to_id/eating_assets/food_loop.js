@@ -33,14 +33,14 @@ function tokens(n){
 function sg(w){return w.length<4?w:/ies$/.test(w)?w.slice(0,-3)+'y':/(ss|us|is)$/.test(w)?w:/(x|ch|sh|ss)es$/.test(w)?w.slice(0,-2):/s$/.test(w)?w.slice(0,-1):w;}  // tiny plural normalizer: s, es, ies to y
 function word(text,tok){for(var i=text.indexOf(tok);i>=0;i=text.indexOf(tok,i+1))if((i===0||!/[a-z]/.test(text[i-1]))&&/^(e?s)?([^a-z]|$)/.test(text.slice(i+tok.length)))return true;return false;}  // a plural may end the word ("voles"), not "shrewd"
 function mention(text,tok){var s=sg(tok);return word(text,tok)||word(text,s)||/y$/.test(s)&&word(text,s.slice(0,-1)+'ies');}  // "moths" in the metaweb, "a moth" in the text
-// the observer's credit is not predation: "caught by @user", "photo by Sam", and what follows an @user in its sentence
-function credit(t){return t.replace(/\b(?:caught|photo(?:graph(?:ed)?)?|picture|image|taken|credit)\s+by\b(?:\s+@\w[\w.]*[^.!?\n]*|\s+\w+)?/g,' ').replace(/@\w[\w.]*[^.!?\n]*/g,' ');}
+// the observer's credit is not predation: "caught by @user", "photo by Sam", "caught on trail camera", and what follows an @user in its sentence
+function credit(t){return t.replace(/\bcaught on (?:\w+ )?(?:cam\w*|video|film)\b/g,' ').replace(/\b(?:caught|photo(?:graph(?:ed)?)?|picture|image|taken|credit)\s+by\b(?:\s+@\w[\w.]*[^.!?\n]*|\s+\w+)?/g,' ').replace(/@\w[\w.]*[^.!?\n]*/g,' ');}
 // group words to a clade name in the metaweb's parent table (hand-curated): named only when the predator has prey under that clade
 var GROUP={shrimp:'Caridea',crab:'Brachyura',crayfish:'Astacidea',fish:'Actinopterygii',prickleback:'Stichaeidae',sculpin:'Cottidae',salmon:'Salmonidae',herring:'Clupeidae',insect:'Insecta',moth:'Lepidoptera',butterfly:'Lepidoptera',caterpillar:'Lepidoptera',dragonfly:'Odonata',beetle:'Coleoptera',fly:'Diptera',bee:'Anthophila',grasshopper:'Orthoptera',spider:'Araneae',snail:'Gastropoda',slug:'Gastropoda',clam:'Bivalvia',mussel:'Bivalvia',frog:'Anura',snake:'Serpentes',bird:'Aves',duck:'Anatidae',squirrel:'Sciuridae',rabbit:'Leporidae',damselfly:'Zygoptera','damsel fly':'Zygoptera',ladybug:'Coccinellidae',swallowtail:'Lepidoptera',meadowhawk:'Sympetrum',midge:'Diptera',stickleback:'Gasterosteidae','honey bee':'Apis mellifera'};
 // the verbs of eating and killing: what follows the first one is the prey ("Damsel fly eating a moth"), unless it is the predator itself ("kills the darner")
 var VERB=/\b(?:eat\w*|ate|feed\w*|fed|devour\w*|prey\w*|caught|catch\w*|captur\w*|kill\w*)\b/;
 // what names no prey of the animal: "bird of prey", and its own predator ("caught by a bald eagle")
-function quiet(t){return t.replace(/\bbirds? of prey\b/g,' ').replace(/\b(?:caught|killed|eaten) by (?:an?|the) [^.!?\n]*/g,' ');}
+function quiet(t){return t.replace(/\bbirds? of prey\b/g,' ').replace(/[^.!?\n]*\b(?:mobb\w*|harass\w*|dive-?bomb\w*|diving at)\b[^.!?\n]*/g,' ').replace(/\b(?:caught|killed|eaten) by (?:an?|the) [^.!?\n]*/g,' ');}
 // "X kills the <this animal>" after the verb: the animal is the victim
 function victim(n,post){return tokens(n).some(function(t){return new RegExp('\\b(?:the|an?|this|that) '+t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?![a-z])').test(post);});}
 // the first verb that names a prey: "caught" only before a determiner ("caught a shrimp", not "caught in a web", "caught my eye")
@@ -62,12 +62,17 @@ function entries(r){
   if(named&&!E.open(r,eat?'prey':'pred')){add(named,4,'The field names the pair');return out;}
   if(named){all.filter(function(n){return E.within(n,named);}).forEach(function(n){add(n,3,'The field names '+E.label(named)+', not a species');});return out;}
   // the description links the observer's own record of the prey: its taxon is the prey
-  // not when it is the predator ("prey of", "killed by", "feeding on the <this animal>"), a chick fed, a flock or a duplicate of the same genus
+  // not when it is the predator ("prey of", "killed by", "feeding on the <this animal>"), a chick fed, a flock, or a duplicate of the same genus
+  // an animal on scat feeds on scat (not "on the dung fly"): what else the text names (the flies on it, the coyote that left it) is not its prey
+  if(o.k==='text'&&/\bon\b[^.!?\n]{0,30}\b(?:scat|dung|droppings)\b(?! fl)/.test(lc(o.d)))return out;
   if(o.lk&&eat){var d=quiet(credit(lc(o.d))),m=verb(d);
     if(!/\bprey (?:of|to)\b|\b(?:killed|eaten|caught) by\b|\bfeeding (?:an?|the|its) (?!\w+ on\b)|\bflock|\baggregation/.test(lc(o.d))&&!(m&&victim(known,d.slice(m.index)))&&o.lk[0].split(' ')[0]!==known.split(' ')[0]){
       add(o.lk[0],3,'The description links the prey’s observation');return out;}}
   var src=[['Description',o.d],['Tags',(o.g||[]).join(' ')],['The field text',o.x]].filter(function(s){return s[1];});
-  src.forEach(function(s){var low=quiet(lc(s[1])),cl=credit(low),m=verb(cl),post=m?cl.slice(m.index+m[0].length):VERB.test(cl)?'':cl,how=s[0]+(s[0]==='Tags'?' mention ':' mentions ');
+  // a text hit whose only food word was the observer's credit ("caught by me") or the mobbers' sentence names no prey
+  function fed(t){return VERB.test(t)||FOOD.some(function(w){return mention(t,w);});}
+  var none=o.k==='text'&&src.some(function(s){return fed(lc(s[1]));})&&!src.some(function(s){return fed(credit(quiet(lc(s[1]))));});
+  if(!none)src.forEach(function(s){var low=quiet(lc(s[1])),cl=credit(low),m=verb(cl),post=m?cl.slice(m.index+m[0].length):VERB.test(cl)?'':cl,how=s[0]+(s[0]==='Tags'?' mention ':' mentions ');
     // "X kills the <this animal>": the animal in the photo is the victim, so the text names no prey for it
     if(eat&&victim(known,post))return;
     all.forEach(function(n){var t=tokens(n).filter(function(k){return mention(low,k);})[0];
@@ -194,9 +199,10 @@ function zoom(c){
   Z.d.showModal();Z.img.focus();flip(c,c.pi||0);
 }
 // the vision-model hint of an observation (foodweb-vlm.json, absent is fine): the card's first line with a P(feeding) bar, and the prey box over the photo (0-1000 coords)
-function hint(o,a,d){
+// its prey guess only when the model is the card's one source of prey (tier 1): the text or field's prey wins
+function hint(o,a,d,own){
   var h=H&&H.obs[o.id];if(!h)return;
-  var g=h.name||(h.prey[0]&&h.prey[0][0]),b=h.box;
+  var g=own?null:h.name||(h.prey[0]&&h.prey[0][0]),b=h.box;
   var l=E.el('p','evl vlm',(h.p>=0.9?'Very likely':h.p>=0.5?'Likely':'Unlikely')+' feeding'+(g?' · prey guess: '+E.label(g):'')),m=E.el('span','vbar'),f=E.el('i');
   l.title='Model P(feeding) '+h.p.toFixed(2);f.style.width=Math.round(h.p*100)+'%';m.append(f);l.prepend(m);d.append(l);
   if(b){var x=E.el('span','pbox');x.style.cssText='left:'+b[0]/10+'%;top:'+b[1]/10+'%;width:'+(b[2]-b[0])/10+'%;height:'+(b[3]-b[1])/10+'%';a.append(x);}
@@ -281,7 +287,7 @@ function card(c){
   if((o.np||1)>1){pn.textContent='1 / '+o.np;[['‹','Previous photo',-1],['›','Next photo',1]].forEach(function(x){
     var k=E.el('button','pv',x[0]);k.type='button';k.setAttribute('aria-label',x[1]);k.onclick=function(){flip(c,(c.pi||0)+x[2]);};f.append(k);});}
   if(o.k==='visit')return insect(c,li,f,d);
-  hint(o,a,d);
+  hint(o,a,d,c.e.tier>1);
   d.append(E.el('p','pair',pairText(c.e)),E.el('p','evl','Why: '+c.e.why+'.'),
     E.el('p','evl',E.pl(o.np||1,'photo')+(o.c?' · '+E.pl(o.c,'comment'):'')+' · '+(o.on||'Date unknown')+' · '+(o.at||'Place unknown')));
   OPTS.forEach(function(x,i){

@@ -215,7 +215,8 @@ def linked(recs: list[dict], pause: float = 1.0) -> None:
         r = requests.get(API, params=p, timeout=60, headers={"User-Agent": "what-to-id"})
         r.raise_for_status()
         for o in r.json()["results"]:
-            if t := o.get("taxon"):
+            # a plant or fungus is what the animal visits or sits on, not its prey
+            if (t := o.get("taxon")) and t.get("iconic_taxon_name") not in ("Plantae", "Fungi"):
                 taxa[o["id"]] = [_species(t), t["id"], t.get("preferred_common_name") or ""]
         time.sleep(pause)
     for r in recs:
