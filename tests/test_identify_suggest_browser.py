@@ -59,34 +59,58 @@ def row(page, seg, text):
     return page.locator(f"#sg{seg} .sgr", has_text=text).first
 
 
-def test_a_backlog_row_sets_the_groups_key_and_a_second_tap_clears_it(browser, site):
+def test_a_group_row_sets_the_groups_key_and_a_second_tap_clears_it(browser, site):
     base, pts = site
     page = opened(browser, base, "what")
-    first = page.locator("#sgwhat .sgr[data-k^='b:']").first
+    first = page.locator("#sgwhat .sgr[data-k^='g:']").first
     g = first.get_attribute("data-k")[2:]
     n = int((pts["iconic_taxon"] == g).sum())  # the top bar's denominator: every record to identify
-    assert f"{n:,} of the records to identify" in first.inner_text()
+    assert f"{n:,} to identify" in first.inner_text()
     first.click()
     assert f"groups={g}" in hash_(page)
     assert ib.ids(page) == sorted(pts["id"][pts["iconic_taxon"] == g].tolist())
-    assert page.locator(f"#sgwhat .sgr[data-k='b:{g}']").get_attribute("aria-pressed") == "true"
-    page.locator(f"#sgwhat .sgr[data-k='b:{g}']").click()
+    assert page.locator(f"#sgwhat .sgr[data-k='g:{g}']").get_attribute("aria-pressed") == "true"
+    page.locator(f"#sgwhat .sgr[data-k='g:{g}']").click()
     assert "groups=" not in hash_(page) and len(ib.ids(page)) == N
     assert page.errors == []
 
 
-def test_blitz_targets_count_threatened_records_and_a_group_pick_is_remembered(browser, site):
+@pytest.mark.parametrize(
+    "pri, fact",
+    [("pri=risk:100", "at risk"), ("pri=conf:100,risk:60", "at risk"), ("pri=conf:100", None)],
+)
+def test_each_group_is_listed_once_with_the_heaviest_prioritizers_count(browser, site, pri, fact):
     base, pts = site
+    page = opened(browser, base, "what", f"#{pri}")
+    keys = page.eval_on_selector_all("#sgwhat .sgr", "rs => rs.map(r => r.dataset.k)")
+    assert keys and len(keys) == len(set(keys))
+    assert page.eval_on_selector_all("#sgwhat .sgh", "hs => hs.map(h => h.textContent)") == [
+        "Quick picks"
+    ]
+    for r in page.locator("#sgwhat .sgr[data-k^='g:']").all():
+        g, sub = r.get_attribute("data-k")[2:], r.locator(".sgs").inner_text()
+        if fact:  # every fifth record is threatened
+            n = int(((pts["iconic_taxon"] == g) & pts["threatened"]).sum())
+            assert sub.endswith(f" · {n:,} {fact}")
+        else:
+            assert "·" not in sub  # Level order picks out no records
+    assert page.errors == []
+
+
+def test_a_recent_group_is_tagged_on_its_own_row(browser, site):
+    base, _ = site
     page = opened(browser, base, "what")
-    blitz = page.locator("#sgwhat .sgr[data-k^='z:']")
-    assert blitz.count() == 3 and "at risk or introduced" in blitz.first.inner_text()
-    g = blitz.first.get_attribute("data-k")[2:]
-    blitz.first.click()
+    rows = page.locator("#sgwhat .sgr[data-k^='g:']")
+    last = rows.nth(rows.count() - 1)
+    g = last.get_attribute("data-k")[2:]
+    assert "Recently used" not in last.inner_text()
+    last.click()
     page.reload()
     page.wait_for_function("window.__identify")
     page.click("#bwhat")
-    page.wait_for_selector("#sgwhat .sgr[data-k^='r:']")
-    assert page.locator("#sgwhat .sgr[data-k^='r:']").first.get_attribute("data-k") == f"r:g{g}"
+    page.wait_for_selector("#sgwhat .sgr")
+    mine = page.locator(f"#sgwhat .sgr[data-k='g:{g}']")
+    assert mine.count() == 1 and "Recently used" in mine.locator(".sgtag").inner_text()
 
 
 def test_the_when_cards_set_the_dates_the_presets_set(browser, site):

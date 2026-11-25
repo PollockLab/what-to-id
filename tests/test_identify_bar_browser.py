@@ -9,6 +9,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from what_to_id.page import GROUP_NAMES
+
 from . import test_embeddings_browser as eb
 from . import test_identify_browser as ib
 from .embeddings_fixture import GROUPS
@@ -201,3 +203,42 @@ def test_without_the_totals_the_top_line_counts_the_records_to_identify(browser,
     page.wait_for_function("__identify.ids().length > 0")
     page.wait_for_load_state("networkidle")
     assert page.inner_text("#mixn") == f"{len(pts):,} records to identify" and page.errors == []
+
+
+@pytest.fixture(scope="module")
+def every_group_site(tmp_path_factory):
+    pytest.importorskip("pyarrow")
+    ids = np.random.default_rng(1).choice(2**32 - 2, ib.N, replace=False) + 1
+    frame = ib.pool_frame(ids)
+    frame["iconic_taxon"] = [list(GROUP_NAMES)[i % len(GROUP_NAMES)] for i in range(len(frame))]
+    score = np.random.default_rng(2).normal(size=ib.N).astype("float32")
+    server, _ = ib.serve(tmp_path_factory.mktemp("every-group"), frame, score)
+    yield f"http://127.0.0.1:{server.server_port}"
+    server.shutdown()
+
+
+@pytest.mark.parametrize("width", [1280, 1024, 390])
+@pytest.mark.parametrize("plants", ["inat", "split"])
+def test_every_group_tab_scrolls_into_view_and_is_named_in_full(
+    browser, every_group_site, plants, width
+):
+    page = ib.open_identify(browser, every_group_site, f"?plants={plants}", size=(width, 800))
+    page.wait_for_function("__identify.ids().length > 0")
+    names = {"Other plants" if g == "Plantae" else n for g, n in GROUP_NAMES.items()}
+    if plants == "inat":  # the three plant groups and Plantae's own are one Plants tab
+        split = {GROUP_NAMES[g] for g in ("Tracheophyta", "Bryophytes", "Algae")}
+        names = names - split - {"Other plants"} | {"Plants"}
+    row = page.locator("#cats")
+    assert row.locator(".cat").count() == len(names) + 1
+    box = row.bounding_box()
+    for name in sorted(names):
+        tab = row.get_by_role("button", name=name, exact=True)
+        tab.scroll_into_view_if_needed()
+        b = tab.bounding_box()
+        assert box["x"] - 1 <= b["x"] and b["x"] + b["width"] <= box["x"] + box["width"] + 1, name
+    if plants == "split":  # the vascular tab's word can't be mistaken for "Other plants"
+        vascular = row.get_by_role("button", name="Vascular plants", exact=True)
+        assert vascular.inner_text().strip() == "Vascular"
+    combine = page.get_by_role("button", name="Combine", exact=True)
+    assert combine.is_visible() and combine.bounding_box()["x"] >= box["x"] + box["width"] - 1
+    assert page.errors == []

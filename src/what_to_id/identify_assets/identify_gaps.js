@@ -272,6 +272,8 @@ var F=function(ctx){
     },
     // 0 lit or no data, 1 a gap, 2 a big gap
     tier:function(i){return tier?tier[i]:0;},
+    tiers:function(){return tier;},  // every record's, null until the checklist loads
+    weights:function(){var w={};KEYS.forEach(function(k){w[k]=disp(k);});return w;},  // as the sliders show them
     risk:function(){return st.w.risk>0;},
     // what shapes record i of level lv in the order and the cut, for its card's explanation: [prioritizers with a weight that count for it, filters that kept it], each [glossary key, name, detail]
     why:function(i,lv){
