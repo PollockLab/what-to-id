@@ -114,6 +114,15 @@ def test_slim_keeps_the_photo_count_and_no_text():
     assert r["np"] == 2 and "nt" not in r and "nice shot" not in json.dumps(r)
 
 
+def test_slim_names_a_subspecies_by_its_species():
+    pigeon = {"name": "Columba livia domestica", "id": 3, "rank": "subspecies"}
+    field = {"field_id": 13, "taxon": pigeon}
+    r = foodweb_obs.slim(
+        obs(8, field, taxon={**pigeon, "preferred_common_name": "Feral Pigeon"}), "eating"
+    )
+    assert r["t"][0] == "Columba livia" and r["f"] == ["Columba livia", 3]
+
+
 def test_fetches_stop_before_inaturalists_10000_result_limit(monkeypatch, capsys):
     import requests
 
