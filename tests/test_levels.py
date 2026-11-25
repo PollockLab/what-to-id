@@ -277,6 +277,19 @@ def test_weird_wins_at_any_rank():
     assert np.allclose(out["score"].iloc[-5:], s["top"].iloc[-5:])
 
 
+def test_a_look_alike_never_comes_from_another_kingdom():
+    # "F c" under its own kingdom: its records that look like "G a" share a photo, not a misID
+    tree = {**TREE, 10: [0, "K2", "", "kingdom"], 6: [10, "F", "", "genus"]}
+    pool, E, ids, taxa, T = identify_bundle()
+    before = identify.identify_scores(pool, E, ids, taxa, T, TREE)
+    assert (before.loc[before["taxon_name"] == "F c", "other_name"] == "G a").any()
+    s = identify.identify_scores(pool, E, ids, taxa, T, tree)
+    fc = s["taxon_name"] == "F c"
+    assert s.loc[fc, "other"].isna().all() and s.loc[fc, "other_name"].isna().all()
+    assert set(s.loc[(s["rank"] == "species") & ~fc, "other_name"]) == {"G a", "G b"}
+    assert identify.identify_levels(s)["looks_like"][fc.to_numpy()].isna().all()
+
+
 def mislabel_levels(margin, bc, top=0.9):
     """Levels of a species row at `margin` whose look-alike has `bc` BC records, among 49 others;
     the group's Close calls cut is 0.02."""
