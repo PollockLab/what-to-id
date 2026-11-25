@@ -124,6 +124,15 @@ def identify_scores(
     order = np.array(order, dtype=object)
     col = pd.Series(np.arange(len(order)), index=order)
     in_tree = max((hi for _, hi in clades.values()), default=0)  # the rest has no clade
+
+    def kingdom(tid: int) -> int | None:
+        for _ in range(64):  # guard against a cycle in a malformed tree
+            node = tree.get(int(tid))
+            if node is None or node[3] == "kingdom":
+                return int(tid) if node else None
+            tid = node[0]
+        return None
+
     p = pool[["id", "taxon_id", "taxon_name", "rank", "iconic_taxon"]].dropna(
         subset=["id", "taxon_id"]
     )
@@ -138,6 +147,8 @@ def identify_scores(
         own_col = np.where(species, q["taxon_name"].map(col).fillna(-1), -1).astype(int)
         span = np.array([clades.get(t, (0, 0)) for t in q["taxon_id"].astype(np.int64)])
         span = span.reshape(-1, 2)
+        kspan = np.array([clades.get(kingdom(t), (0, len(order))) for t in q["taxon_id"]])
+        kspan = kspan.reshape(-1, 2)
         n = len(q)
         r = {
             k: np.full(n, nan) for k in ("top", "own", "other", "in_best", "in_second", "out_best")
@@ -156,12 +167,17 @@ def identify_scores(
             r["own"][sl][ok] = sims[ar[ok], oc[ok]]
             sp = sims[ok].copy()
             sp[np.arange(len(sp)), oc[ok]] = -np.inf
+            # a look-alike from another kingdom is the host plant or substrate sharing the photo
+            # (gall mite on maple, bee on goldenrod), not a misID: keep `other` in-kingdom
+            klo, khi = kspan[sl][ok, :1], kspan[sl][ok, 1:]
+            cols = np.arange(sp.shape[1])
+            sp[(cols < klo) | (cols >= khi)] = -np.inf
             if sp.shape[1] > 1:
                 best = sp.argmax(1)
                 other = r["other"][sl]
                 other[ok] = sp[np.arange(len(sp)), best]
                 other[ok & ~np.isfinite(other)] = nan
-                r["other_name"][sl][ok] = order[best]
+                r["other_name"][sl][ok] = np.where(np.isfinite(other[ok]), order[best], None)
             for i in np.flatnonzero(span[sl, 1] > span[sl, 0]):
                 lo, hi = span[c + i]
                 seg = sims[i, lo:hi]
