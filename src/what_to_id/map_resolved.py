@@ -38,7 +38,7 @@ import pandas as pd
 from what_to_id import site_files
 from what_to_id.inat import BC_PLACE_ID, PER_PAGE, SLEEP, _frame, _results, flatten, make_session
 from what_to_id.map_points import DAY_FLOOR, EARLY_OBS, EARLY_UP, NO_DAY, _dates, _flags, _gz
-from what_to_id.taxonomy import NO_TAXON, load_tree, taxa_table
+from what_to_id.taxonomy import NO_TAXON, load_tree, split_plants, taxa_table
 
 NAME = "pool-resolved.bin"
 KEEP_DAYS = 60
@@ -135,6 +135,7 @@ def encode_left(
     if log is None or log.empty:
         return _gz(struct.pack("<HHHH", build, build, build, 0))
     log = log[~log["id"].isin(pool["id"])]  # a write that failed can leave a record that is back
+    pool, log = split_plants(pool, tree), split_plants(log, tree)  # the map's groups
     start = int(_days(log["left"]).min()) if len(log) else build
     full = log[log["reason"] != BACKFILL]
     live = int(_days(full["left"]).min()) if len(full) else start

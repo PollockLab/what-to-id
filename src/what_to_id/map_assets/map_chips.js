@@ -8,10 +8,13 @@ var CH=(function(){
 var NEXT={'':'inc',inc:'not',not:''};
 function next(st,three){var n=NEXT[st||'']||'';return n==='not'&&!three?'':n;}
 // The hash value back to states over the known keys. Old links listed picked keys only, which read
-// as picked; a minus on a key in two (the two-state keys) is dropped.
+// as picked; a minus on a key in two (the two-state keys) is dropped. Plantae, from before the
+// plants split into PLANTS (taxonomy.PLANT_GROUPS), reads as all of them.
+var PLANTS=['Tracheophyta','Bryophytes','Algae'];
 function read(s,keys,two){var out={};
   String(s||'').split(',').forEach(function(t){t=t.trim();var not=t.charAt(0)==='-',k=not?t.slice(1):t;
-    if(keys.indexOf(k)>=0&&!(k in out)&&!(not&&two&&two.indexOf(k)>=0))out[k]=not?'not':'inc';});
+    (k==='Plantae'&&keys.indexOf(PLANTS[0])>=0?[k].concat(PLANTS):[k]).forEach(function(k){
+      if(keys.indexOf(k)>=0&&!(k in out)&&!(not&&two&&two.indexOf(k)>=0))out[k]=not?'not':'inc';});});
   return out;}
 function write(st,keys){return keys.filter(function(k){return st[k];}).map(function(k){
   return (st[k]==='not'?'-':'')+encodeURIComponent(k);}).join(',');}
@@ -26,14 +29,17 @@ function groupPass(st,keys,taxa){var some=picked(st,keys,'inc').length>0;
 // which already leaves the others out. With included taxa they go in as their taxa beside them
 // (taxa). Left-out groups go in without_taxon_id (not). A group with no taxon id cannot: without
 // taxa, iconic_taxa then names every group but the left-out ones, which is exact; with taxa,
-// inc and not name the groups the link cannot add or leave out.
+// inc and not name the groups the link cannot add or leave out. PLANTS are no iconic taxa of
+// iNaturalist, so picked they go in as their taxa (a group's id may be a list of taxa), and a
+// left-out one stays subtracted by its taxa when the link names the other groups.
 function groupLink(st,keys,gid,taxa){
   var pi=picked(st,keys,'inc'),pn=picked(st,keys,'not'),out={groups:[],taxa:[],not:[],inc:[],out:[]};
-  if(!taxa){if(pi.length){out.groups=pi;return out;}
-    if(pn.some(function(g){return !gid[g];})){out.groups=keys.filter(function(k){return st[k]!=='not';});
+  if(!taxa){if(pi.length&&!pi.some(function(g){return PLANTS.indexOf(g)>=0;})){out.groups=pi;return out;}
+    if(!pi.length&&pn.some(function(g){return !gid[g];})){out.groups=keys.filter(function(k){return st[k]!=='not';});
+      pn.forEach(function(g){if(PLANTS.indexOf(g)>=0)out.not=out.not.concat(gid[g]);});  // iconic Plantae spans them
       return out;}}
-  pi.forEach(function(g){if(gid[g])out.taxa.push(gid[g]);else out.inc.push(g);});
-  pn.forEach(function(g){if(gid[g])out.not.push(gid[g]);else out.out.push(g);});
+  pi.forEach(function(g){if(gid[g])out.taxa=out.taxa.concat(gid[g]);else out.inc.push(g);});
+  pn.forEach(function(g){if(gid[g])out.not=out.not.concat(gid[g]);else out.out.push(g);});
   return out;}
 // Shows a chip button's state. Picked and left out are both pressed; a left-out chip reads
 // "not <label>", in text and accessible name, in the not style the taxon and project chips share.

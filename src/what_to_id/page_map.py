@@ -62,7 +62,7 @@ from what_to_id.map_projects import add_projects
 from what_to_id.page import ARM_WORDS
 from what_to_id.sdm_manifest import sdm_meta
 from what_to_id.site_files import META_NAME, dump, hashed, read_meta, write_meta
-from what_to_id.taxonomy import load_tree
+from what_to_id.taxonomy import PLANT_GROUPS, load_tree, split_plants
 
 MAP_NAME = "map.html"
 TOTAL_GRADES = "needs_id,research"
@@ -130,6 +130,15 @@ MAP_JS = (
 )
 
 
+def _plant_params(g: str, groups: list[str]) -> dict:
+    """A split plant group asks by its phyla; Plantae beside them leaves those phyla out."""
+    if g in PLANT_GROUPS:
+        return {"iconic_taxa": None, "taxon_id": ",".join(map(str, PLANT_GROUPS[g]))}
+    if g == "Plantae" and PLANT_GROUPS.keys() & set(groups):
+        return {"without_taxon_id": ",".join(str(p) for ids in PLANT_GROUPS.values() for p in ids)}
+    return {}
+
+
 def fetch_totals(groups: list[str], *, on: str, session=None, sleep: float = SLEEP) -> dict:
     """Monthly counts of every BC record with a photo that needs an ID or is Research Grade.
 
@@ -153,6 +162,7 @@ def fetch_totals(groups: list[str], *, on: str, session=None, sleep: float = SLE
                     "date_field": field,
                     "interval": "month",
                     **extra,
+                    **_plant_params(g, groups),
                 }
                 r = session.get(f"{INAT}/histogram", params=params, timeout=TIMEOUT)
                 r.raise_for_status()
@@ -348,6 +358,7 @@ def main(argv: list[str] | None = None) -> int:
     tree = load_tree(a.tree) or None
     if a.tree and tree is None:
         _warn(f"no taxon tree at {a.tree}; building the map without clade search")
+    pool = split_plants(pool, tree)  # the map's groups: Plantae by phylum
     totals = None
     if a.totals:
         groups = sorted(pool["iconic_taxon"].fillna("Unknown").astype(str).unique())

@@ -161,8 +161,10 @@ function identifyUrl(st,b,meta,extra){
     q.set('nelng',r(b.e,180));}
   for(var k in extra||{})q.set(k,extra[k]);
   var g=st.groups;
-  // iNaturalist names the Unknown group 'unknown' and finds nothing for 'Unknown' (as in page_map.py's totals)
-  if(g.length&&g.length<st.all&&g.indexOf('rest')<0)q.set('iconic_taxa',g.map(function(x){return x==='Unknown'?'unknown':x;}).join(','));
+  // iNaturalist names the Unknown group 'unknown' and finds nothing for 'Unknown' (as in page_map.py's totals);
+  // the split plant groups are its Plantae (a left-out one comes back out through without_taxon_id)
+  if(g.length&&g.length<st.all&&g.indexOf('rest')<0)q.set('iconic_taxa',g.map(function(x){return x==='Unknown'?'unknown':/^(Tracheophyta|Bryophytes|Algae)$/.test(x)?'Plantae':x;})
+    .filter(function(x,i,a){return a.indexOf(x)===i;}).join(','));
   if(st.d1)q.set(st.up?'created_d1':'d1',st.d1);if(st.d2)q.set(st.up?'created_d2':'d2',st.d2);
   if(st.months.length)q.set('month',st.months.join(','));
   // iNaturalist has a search parameter for each status filter, so Identify opens the same records; a

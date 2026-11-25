@@ -42,7 +42,7 @@ var CL=MapOnly.clades({S:S,box:$('clades'),wrap:$('cladebox'),pk:PK,presets:META
 // groups; when every name lies inside the groups the picks alone say the same, so the groups clear.
 function oldQuery(){if(!S.oldq)return;
   var T=o.taxa(),got=TX.resolve(T,S.oldq,counts()),gid=META.group_ids||{},
-    gs=CH.picked(S.groups,META.groups,'inc').filter(function(g){return gid[g];}).map(function(g){return gid[g];});
+    gs=CH.picked(S.groups,META.groups,'inc').reduce(function(a,g){return gid[g]?a.concat(gid[g]):a;},[]);
   if(!got.length)$('q').value=S.oldq;S.oldq='';
   got.forEach(function(p){S.picks.push(p);});
   if(got.length&&!CH.any(S.groups)&&got.every(function(p){return p.not||TX.within(T,p.id,gs);}))

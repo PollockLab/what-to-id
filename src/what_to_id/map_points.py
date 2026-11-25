@@ -18,6 +18,7 @@ from what_to_id.taxonomy import (
     INVASIVE,
     NO_RANK,
     NO_TAXON,
+    PLANT_GROUPS,
     PRESETS,
     taxa_table,
 )
@@ -122,7 +123,8 @@ def encode_points(pool: pd.DataFrame, tree: dict | None = None) -> tuple[dict[st
         "days": last + 1,
         "hist0": _hist_start(obs_off, day0),
         "groups": groups,
-        "names": {g: group_name(g) for g in groups},
+        "names": {g: group_name(g) for g in groups}
+        | ({"Plantae": "Other plants"} if PLANT_GROUPS.keys() & set(groups) else {}),
         "group_ids": {g: GROUP_TAXA[g] for g in groups if g in GROUP_TAXA},
         "ranks": ranks,
         "flags": with_one_id(df, known),
