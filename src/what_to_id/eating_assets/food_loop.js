@@ -40,7 +40,12 @@ var GROUP={shrimp:'Caridea',crab:'Brachyura',crayfish:'Astacidea',fish:'Actinopt
 // the verbs of eating and killing: what follows the first one is the prey ("Damsel fly eating a moth"), unless it is the predator itself ("kills the darner")
 var VERB=/\b(?:eat\w*|ate|feed\w*|fed|devour\w*|prey\w*|caught|catch\w*|captur\w*|kill\w*)\b/;
 // what names no prey of the animal: "bird of prey", and its own predator ("caught by a bald eagle")
-function quiet(t){return t.replace(/\bbirds? of prey\b/g,' ').replace(/[^.!?\n]*\b(?:mobb\w*|harass\w*|dive-?bomb\w*|diving at)\b[^.!?\n]*/g,' ').replace(/\b(?:caught|killed|eaten) by (?:an?|the) [^.!?\n]*/g,' ');}
+// a negated or failed catch ("could not see if it caught anything", "didn't catch", "missed") runs to its clause's end, and "no prey" names none
+// a bee fly, robber fly, bee-eater or beewolf is no bee or fly prey; a parenthetical meal after another animal's name ("looking for ducks (eating dead salmon)") is that animal's
+var NEG=/\b(?:\w+n['’]t|(?:could|did|does|do|was|were|is|are)nt|cannot|not|never|unable to|failed to|miss(?:ed|es)?|without)\b[^.!?\n,;]*|\bno (?:\w+ )?prey\b/g,
+  COMPOUND=/\b(?:bee|robber)[ -]fl(?:y|ies)\b|\bbee[ -]?(?:eater|wolf)s?\b/g,
+  OTHER=new RegExp('\\b(?:'+Object.keys(GROUP).join('|')+')s?\\b[^.!?\\n(]*\\((?:eating|feeding|eats)[^)]*\\)','g');
+function quiet(t){return t.replace(NEG,' ').replace(COMPOUND,' ').replace(OTHER,' ').replace(/\bbirds? of prey\b/g,' ').replace(/[^.!?\n]*\b(?:mobb\w*|harass\w*|dive-?bomb\w*|diving at)\b[^.!?\n]*/g,' ').replace(/\b(?:caught|killed|eaten) by (?:an?|the) [^.!?\n]*/g,' ');}
 // "X kills the <this animal>" after the verb: the animal is the victim
 function victim(n,post){return tokens(n).some(function(t){return new RegExp('\\b(?:the|an?|this|that) '+t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?![a-z])').test(post);});}
 // the first verb that names a prey: "caught" only before a determiner ("caught a shrimp", not "caught in a web", "caught my eye")
