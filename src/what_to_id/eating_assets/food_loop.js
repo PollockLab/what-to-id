@@ -5,7 +5,8 @@
 // The next ten come when the last card is answered, or on More photos.
 // Rank = the pair's p in the metaweb x the evidence: 4 the field names the pair, 3 it names a coarse ancestor of one animal, 2 the
 // description, tags or field text mention a candidate (common or Latin name), 1 they only talk about food (a text hit then names no prey) or the field is empty.
-// A Visited flower of record (k visit, pollination page) whose animal is above species or needs ID, and whose plant is named, is an insect card: the likely visitors of that plant inside the animal's taxon, no question.
+// A Visited flower of record (k visit, pollination page) whose plant is named is an insect card, no question: above species it lists the likely visitors of that plant inside
+// the animal's taxon (narrow), a species at needs ID shows what GloBI has on the pair (confirm), a research-grade species is read-only evidence once a question names a side (seen).
 // FoodLoop.init(E, onChange); FoodLoop.ask({x, y}) when the question changes; FoodLoop.state(pred, prey) is 'before', 'new' or ''.
 var FoodLoop=(function(){
 'use strict';
@@ -13,7 +14,7 @@ var FoodLoop=(function(){
 var CLASSES=[['','All classes'],['Aves','Birds'],['Mammalia','Mammals'],['Reptilia','Reptiles'],['Amphibia','Amphibians'],['Insecta','Insects']],ANS=['yes','no','unsure'],
   // FOOD: the words foodweb_obs.SEARCHES looked for; the four options of a card's question and the three checks each one saves; only eating shows it (and asks which animal when the field did not name it)
   OPTS=[['Not this predator',['no','unsure','unsure']],['Not eating',['yes','yes','no']],['Can’t tell',['unsure','unsure','unsure']],['Eating',['yes','yes','yes']]],
-  KEY='wtid-loop',FOOD=['eating','eats','ate','feeding','prey','caught','predation'],OBS='https://www.inaturalist.org/observations/',API='https://api.inaturalist.org/v1/',TEN=10,CAND=((typeof EATING_CONFIG!=='undefined'&&EATING_CONFIG.words)||{}).cand||'candidate observation',SHOW=8,$=function(id){return document.getElementById(id);};
+  KEY='wtid-loop',FOOD=['eating','eats','ate','feeding','prey','caught','predation'],OBS='https://www.inaturalist.org/observations/',API='https://api.inaturalist.org/v1/',TEN=10,W=(typeof EATING_CONFIG!=='undefined'&&EATING_CONFIG.words)||{},CAND=W.cand||'candidate observation',SHOW=8,$=function(id){return document.getElementById(id);};
 // #record=<id> (a shared card): read before the page rewrites its hash, drawn first once it fits the question
 var WANT=+((/(?:^|&)record=(\d+)(?:&|$)/.exec(location.hash.slice(1))||[])[1]||0);
 var S={ann:{},cls:''},H=null,E=null,Q={x:null,y:null},ITEMS=[],deck=[],cur=-1,change=function(){},TOK=new Map(),ready=false,booted=false;
@@ -79,9 +80,10 @@ function entries(r){
 }
 // an insect card's one pair; a species already confirmed, or a record with no plant named, has none
 function visiting(r){
-  var o=r.o;
-  return r.prey&&(r.pred.indexOf(' ')<0||o.q==='needs_id')?[{pred:r.pred,prey:r.prey,tier:4,why:'The field names the plant'}]:[];
+  var o=r.o,kind=r.pred.indexOf(' ')<0?'narrow':o.q==='needs_id'?'confirm':o.q==='research'?'seen':'';
+  return r.prey&&kind?[{pred:r.pred,prey:r.prey,tier:4,why:'The field names the plant',kind:kind}]:[];
 }
+var KINDS=['narrow','confirm','seen'];
 // the species GloBI has on the plant (a genus or species) inside the animal's taxon, most records first; records on several plants of a genus add up (1-0.5^n)
 function likely(pred,plant){
   var m=new Map();
@@ -92,21 +94,23 @@ function taxon(n){var i=E.taxonId(n);return 'https://www.inaturalist.org/taxa/'+
 var QUALITY={needs_id:'Needs ID',research:'Research grade',casual:'Casual'};
 // the insect card's body: the likely visitors, each linking to its iNaturalist taxon page
 function insect(c,li,f,d){
-  var o=c.r.o,e=c.e,l=likely(e.pred,e.prey),coarse=e.pred.indexOf(' ')<0,ol=E.el('ol','lk');
+  var o=c.r.o,e=c.e,l=e.kind==='narrow'?likely(e.pred,e.prey):[],coarse=e.pred.indexOf(' ')<0,ol=E.el('ol','lk'),g=E.preds(e.prey).filter(function(q){return q[0]===e.pred;})[0];
   l.slice(0,SHOW).forEach(function(x){
     var i=E.el('li'),a=E.el('a',null,E.label(x[0]));a.href=taxon(x[0]);a.target='_blank';a.rel='noopener';
     i.append(a,E.el('em',null,(E.label(x[0])===x[0]?'':x[0]+' · ')+E.words(x[1])));ol.append(i);});
   d.append(E.el('p','pair',E.label(e.pred)+' on '+E.label(e.prey)),
     E.el('p','evl',(QUALITY[o.q]||o.q)+' · '+E.pl(o.np||1,'photo')+(o.c?' · '+E.pl(o.c,'comment'):'')+' · '+(o.on||'Date unknown')+' · '+(o.at||'Place unknown')),
+    e.kind==='seen'?E.el('p','ask','Already identified.'):e.kind==='confirm'?E.el('p','ask',g?'GloBI has '+E.words(g[2])+' of this species on '+E.label(e.prey)+', '+(g[3]||'visits')+'.':'GloBI has no record of this species on '+E.label(e.prey)+'.'):
     E.el('p','ask','Likely visitors of '+E.label(e.prey)+(coarse?', '+E.label(e.pred)+' only':'')+(l.length?' (most GloBI records first):':': none recorded in GloBI.')),ol);
   if(l.length>SHOW)d.append(E.el('p','evl','and '+(l.length-SHOW)+' more'));
-  var go=E.el('a','open','Open on iNaturalist'),sh=E.el('button');go.href=OBS+o.id;go.target='_blank';go.rel='noopener';WtidCarry.share(sh,function(){return ['record='+o.id];});
+  li.classList.toggle('done',e.kind==='seen');
+  var go=E.el('a','open',e.kind==='confirm'?'Agree on iNaturalist':'Open on iNaturalist'),sh=E.el('button');go.href=OBS+o.id;go.target='_blank';go.rel='noopener';WtidCarry.share(sh,function(){return ['record='+o.id];});
   d.append(go,sh);li.append(f,d);li.onclick=function(){if(cur!==deck.indexOf(c))focus(deck.indexOf(c));};
   return li;
 }
 // the model's P(feeding) for the observation scales the rank (0.5, the neutral, when it has no hint)
 function score(e,id){var h=H&&H.obs[id];return Math.max(E.p(e.pred,e.prey),0.1)*e.tier*(h?Math.max(h.p,0.1):0.5);}
-function ok(e){return (!Q.x||E.hit(e.pred,Q.x))&&(!Q.y||E.hit(e.prey,Q.y))&&(!S.cls||E.inClass(e.pred,S.cls));}
+function ok(e){return (e.kind!=='seen'||Q.x||Q.y)&&(!Q.x||E.hit(e.pred,Q.x))&&(!Q.y||E.hit(e.prey,Q.y))&&(!S.cls||E.inClass(e.pred,S.cls));}
 // the records for the question not yet drawn or answered, best first, each with its best pair
 function ranked(){
   var seen=new Set(deck.map(function(c){return c.r.o.id;}).concat(Object.keys(S.ann).map(Number))),out=[];
@@ -116,7 +120,8 @@ function ranked(){
     if(b)out.push({r:it.r,e:b,s:score(b,it.r.o.id)});});
   var one=new Set();  // an observation with both fields is two records: its best one only
   // model-only cards (3,000+) rank after every observer-reported card, so the field's records are not buried
-  return out.sort(function(a,b){return (a.r.o.k==='model')-(b.r.o.k==='model')||b.s-a.s||(a.r.o.on===b.r.o.on?a.r.o.id-b.r.o.id:b.r.o.on>a.r.o.on?1:-1);}).filter(function(c){return !one.has(c.r.o.id)&&one.add(c.r.o.id);});
+  // insect cards: narrow, then confirm, then the already identified
+  return out.sort(function(a,b){return (a.r.o.k==='model')-(b.r.o.k==='model')||KINDS.indexOf(a.e.kind)-KINDS.indexOf(b.e.kind)||b.s-a.s||(a.r.o.on===b.r.o.on?a.r.o.id-b.r.o.id:b.r.o.on>a.r.o.on?1:-1);}).filter(function(c){return !one.has(c.r.o.id)&&one.add(c.r.o.id);});
 }
 function state(pred,prey){
   if(E.seen(pred,prey))return 'before';
@@ -173,9 +178,12 @@ function hint(o,a,d){
 }
 function pairText(e){return E.label(e.pred)+(e.tier===4?' eats ':' may be eating ')+(e.prey?E.label(e.prey):'something');}
 function meter(){
-  var n=ranked().length;
-  $('draw').textContent=deck.length?'More photos':'Show photos';$('draw').disabled=!n||!ready;
-  $('cand').textContent=!ready?E.pl(n,CAND)+' so far. Searching descriptions and tags.':n?E.pl(n,CAND)+(deck.length||Q.x||Q.y?' for this question.':' across the whole web. Pick a species in the question to draw its photos, or show photos from all of them.'):'No more observations for this question.';
+  var r=ranked(),n=r.length,k=function(x){return r.filter(function(c){return c.e.kind===x;}).length;},m=n-k('confirm')-k('seen'),
+    // the pollination page counts its insect cards apart: to narrow, to confirm, already identified
+    got=[m||!k('confirm')&&!k('seen')?E.pl(m,CAND)+(k('narrow')?' to narrow':''):'',k('confirm')?k('confirm')+' to confirm':'',k('seen')?k('seen')+' already identified':''].filter(Boolean).join(', '),
+    none=!n&&ready&&W.nophoto;  // nothing (more) to draw: no button, and say why
+  $('draw').textContent=deck.length?'More photos':'Show photos';$('draw').disabled=!n||!ready;$('draw').hidden=!!none;
+  $('cand').textContent=!ready?E.pl(n,CAND)+' so far. Searching descriptions and tags.':n?got+(deck.length||Q.x||Q.y?' for this question.':' across the whole web. Pick a species in the question to draw its photos, or show photos from all of them.'):none?(deck.length?(deck.length>1?'All '+E.pl(deck.length,'card')+' for this question are shown.':'The one card for this question is shown.'):Q.x&&Q.y?W.nophoto:W.noquestion):'No more observations for this question.';
 }
 // the three answers of a mark: a saved single mark (yes, no, unsure) is the same answer to all three
 function steps(a){var t=a&&a.st;return Array.isArray(t)&&t.length===3&&t.every(function(x){return ANS.indexOf(x)>=0;})?t:a&&ANS.indexOf(a.v)>=0?[a.v,a.v,a.v]:[];}
