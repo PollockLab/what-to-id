@@ -252,14 +252,18 @@ jobs:
             for f in foodweb.json metaweb.json foodweb-obs.json foodweb-text.json; do
               curl -fsS --retry 2 -o "_site/$f" "${live%/}/$f" || kept=false
             done
+            # the BC feeding run's cards come only from a fetch with --ids
+            jq -e '[.obs[]|select(.k=="model")]|length>0' _site/foodweb-obs.json >/dev/null || kept=false
           fi
           if [ "$kept" != true ]; then
             python -m what_to_id.foodweb --out _site/foodweb.json
             python -m what_to_id.metaweb --foodweb _site/foodweb.json --meta _site/map-meta.json \
               --taxa "_site/$(jq -r .taxa _site/map-meta.json)" --out _site/metaweb.json
-            python -m what_to_id.foodweb_obs --out _site/foodweb-obs.json --metaweb _site/metaweb.json
+            python -m what_to_id.foodweb_obs --out _site/foodweb-obs.json --metaweb _site/metaweb.json \
+              --ids src/what_to_id/foodweb_vlm_bc.csv
           fi
-          python -m what_to_id.foodweb_vlm --out _site/foodweb-vlm.json
+          python -m what_to_id.foodweb_vlm --out _site/foodweb-vlm.json --csv src/what_to_id/foodweb_vlm_bc.csv \
+            --model "Qwen2.5-VL-7B (P feeding from the Yes logit); Qwen3-VL-8B (prey box, open name); BioCLIP 2 (prey top 3 over 2,267 BC species and 7 coarse groups)"
           # with the atlas index the page gets a "Search photos" control (the model downloads only on a click)
           data=(); if [ -n "$ATLAS_HF_REPO" ]; then data=("https://huggingface.co/datasets/${ATLAS_HF_REPO}/resolve/main/"); fi
           python -m what_to_id.page_eating _site "${data[@]}"
