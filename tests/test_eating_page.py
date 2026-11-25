@@ -117,10 +117,7 @@ def test_ten_ranked_cards_show_first_and_more_photos_adds_the_rest(browser, base
     assert page.locator("#cards li").count() == 10
     assert page.inner_text("#draw") == "More photos"
     first = page.locator("#cards li").first
-    assert (
-        "The field names the pair" in first.inner_text()
-        and "Barred Owl eats House Mouse" in first.inner_text()
-    )
+    assert "The field names Mus, not a species" in first.inner_text()
     assert first.locator(".mk button").all_inner_texts()[:4] == [
         "Not this predator 1",
         "Not eating 2",
@@ -134,6 +131,11 @@ def test_ten_ranked_cards_show_first_and_more_photos_adds_the_rest(browser, base
     )
     page.click("#draw")
     assert page.locator("#cards li").count() == 16
+    study = page.locator("#cards li", has=page.locator("a[href$='/observations/0']"))
+    assert (
+        "Is Barred Owl (Strix varia) eating something?" in study.inner_text()
+    )  # in the model study: blind
+    assert study.locator(".mk button").count() == 6 and "Why:" not in study.inner_text()
     assert page.locator("#draw").is_disabled() and "No more" in page.inner_text("#cand")
     assert page.errors == []
 
@@ -230,6 +232,8 @@ def test_a_confirmed_mark_hands_off_to_inaturalist_with_a_copyable_name(browser,
 def test_the_eaten_by_field_is_handed_off_when_the_unknown_is_the_predator(browser, base):
     page = open_page(browser, base + "#q=eaten&y=Mus musculus")
     card = page.locator("#cards li", has=page.locator("a[href$='/observations/99']"))
+    draw_all(page)  # the field-named pairs come after the other sources
+    card = page.locator("#cards li", has=page.locator("a[href$='/observations/99']"))
     answer(card, "Eating")
     assert card.locator(".hand a").inner_text() == "Add Eaten by = Barred Owl on iNaturalist"
     assert "pick Eaten by" in card.locator(".hand .hint").inner_text()
@@ -286,15 +290,23 @@ def test_keys_annotate_and_move_the_current_card(browser, base):
 
 def test_export_is_a_csv_of_the_annotations(browser, base):
     page = open_page(browser, base + "#q=eats&x=Strix varia")
-    for k in "42":  # a field-named pair: eating, then not eating
+    draw_all(page)
+    for i, k in ((0, "6"), (1, "2")):  # a model-study card: carrion; a field card: not eating
+        page.locator("#cards li", has=page.locator(f"a[href$='/observations/{i}']")).locator(
+            ".ask"
+        ).click()
         page.keyboard.press(k)
     with page.expect_download() as d:
         page.click("#export")
     rows = Path(d.value.path()).read_text().splitlines()
-    assert rows[0] == "observation_id,url,predator,prey,answer,date,is_predator,is_prey,is_eating"
+    assert (
+        rows[0]
+        == "observation_id,url,predator,prey,answer,date,is_predator,is_prey,is_eating,label"
+    )
     assert len(rows) == 3 and rows[1].startswith('"0","https://www.inaturalist.org/observations/0"')
-    assert '"Strix varia","Mus musculus","yes"' in rows[1] and rows[2].split(",")[4] == '"no"'
-    assert rows[1].endswith('"yes","yes","yes"') and rows[2].endswith('"yes","yes","no"')
+    assert rows[1].split(",")[4] == '"no"' and rows[2].split(",")[4] == '"no"'
+    assert rows[1].endswith('"yes","unsure","no","carrion"')
+    assert rows[2].endswith('"yes","yes","no",""')  # no label off the model study
     assert page.errors == []
 
 
@@ -428,6 +440,7 @@ def test_the_page_is_the_food_web_tab(base):
 
 def test_the_page_paints_before_the_food_word_file_arrives(browser, base):
     page = browser.new_page()
+    page.add_init_script(foodweb_page.ALL_SOURCES)
     held = []
     page.route("**/foodweb-text.json", lambda route: held.append(route))
     page.goto(base + "#q=eats&x=Strix varia")
@@ -644,8 +657,8 @@ def test_a_prey_the_description_names_wins_over_the_models_guess_but_not_the_fie
     page = open_page(browser, described + "#q=eats&x=Strix varia")
     draw_all(page)
     card = card_of(page, 701)
-    assert "Barred Owl may be eating Caridea" in card and "Description mentions “shrimp”" in card
-    assert "Very likely feeding" in card  # the model's P(feeding) stays
+    assert "Is Barred Owl (Strix varia) eating something?" in card  # a model-study card is blind
+    assert "may be eating" not in card and "Very likely feeding" not in card
     assert "Barred Owl eats House Mouse" in card_of(page, 702)
     assert page.locator("#cards li", has=page.locator("a[href$='/observations/701']")).count() == 1
 

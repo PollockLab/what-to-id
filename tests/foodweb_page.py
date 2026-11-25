@@ -120,10 +120,18 @@ def build_site(root, vlm=True, data_url=""):
     return serve(root, "food-web.html")
 
 
-def open_page(browser, url, init=None):
+# the model study is the default source; tests start on all sources unless study=True
+ALL_SOURCES = (
+    "if(!localStorage.getItem('wtid-loop'))localStorage.setItem('wtid-loop','{\"src\":\"\"}')"
+)
+
+
+def open_page(browser, url, init=None, study=False):
     page = browser.new_page()
     page.errors = []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
+    if not study:
+        page.add_init_script(ALL_SOURCES)
     if init:
         page.add_init_script(init)
     page.goto(url)
