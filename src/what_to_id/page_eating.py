@@ -12,7 +12,7 @@ import json
 import re
 from pathlib import Path
 
-from what_to_id import atlas_search_page, page_nav
+from what_to_id import atlas_search_page, page_identify, page_nav
 
 ASSETS = Path(__file__).parent / "eating_assets"
 PAGE_NAME = "food-web.html"
@@ -104,10 +104,17 @@ def render(data_url: str = "", kind: str = "predation", toggle: bool = False) ->
     kind "pollination" is the other page; `toggle` adds the link between the two."""
     html = (ASSETS / "food_web.html").read_text()
     cfg = {"obs": OBS_FILE, "metaweb": METAWEB_FILE, "text": TEXT_FILE, "vlm": VLM_FILE}
-    search = ""
+    search = inat = ""
     if kind == "pollination":
         cfg = {"obs": POLLINATION_OBS, "metaweb": POLLINATION_METAWEB, "words": WORDS}
         cfg["csv"] = "pollination-network.csv"
+        # Identify's iNaturalist app: its redirect page (identify.html) finishes the sign in and
+        # returns to the page that started it, so the insect cards can post IDs
+        cfg["oauth"] = {
+            "client": page_identify.INAT_CLIENT_ID,
+            "redirect": page_identify.INAT_REDIRECT,
+        }
+        inat = (page_identify.ASSETS / "identify_inat.js").read_text()
         for old, new in SWAPS:
             assert old in html, old
             html = html.replace(old, new)
@@ -127,6 +134,7 @@ def render(data_url: str = "", kind: str = "predation", toggle: bool = False) ->
         "__EATING_CORE_JS__": (ASSETS / "eating_core.js").read_text(),
         "__FOOD_LOOP_JS__": (ASSETS / "food_loop.js").read_text(),
         "__FOOD_SEARCH_JS__": search,
+        "__INAT_JS__": inat,
         "__EATING_JS__": (ASSETS / "food_web.js").read_text(),
     }.items():
         html = html.replace(key, value)

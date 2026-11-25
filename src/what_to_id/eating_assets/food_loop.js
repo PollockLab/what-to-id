@@ -104,19 +104,32 @@ function likely(pred,plant){
 }
 function taxon(n){var i=E.taxonId(n);return 'https://www.inaturalist.org/taxa/'+(i?i+'':'search?q='+encodeURIComponent(n));}
 var QUALITY={needs_id:'Needs ID',research:'Research grade',casual:'Casual'};
+// a signed-in viewer posts an ID from an insect card, as Identify's Agree does (identify_inat.js); no oauth config (Food web) or no client: links only
+var IN=typeof IdentifyInat!=='undefined'&&EATING_CONFIG.oauth?IdentifyInat(EATING_CONFIG.oauth):null;
+// the taxon's iNaturalist id: from the data, else its exact name in /v1/taxa (the metaweb carries no ids)
+function taxonOf(n){var i=E.taxonId(n);return i?Promise.resolve(+i):fetch(API+'taxa?is_active=true&q='+encodeURIComponent(n)).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();})
+  .then(function(j){var t=(j.results||[]).filter(function(x){return x.name===n;})[0];if(!t)throw new Error('No taxon');return t.id;});}
+function post(text,obs,n,label){
+  var b=E.el('button','post',text);b.type='button';b.setAttribute('aria-label',label);
+  b.onclick=function(){b.disabled=true;b.textContent='Posting…';
+    taxonOf(n).then(function(t){return IN.identify(obs,t);}).then(function(){b.textContent='Posted';},function(){b.disabled=false;b.textContent='Not posted. Use iNaturalist';});};
+  return b;
+}
 // the insect card's body: the likely visitors, each linking to its iNaturalist taxon page
 function insect(c,li,f,d){
-  var o=c.r.o,e=c.e,l=e.kind==='narrow'?likely(e.pred,e.prey):[],coarse=e.pred.indexOf(' ')<0,ol=E.el('ol','lk'),g=E.preds(e.prey).filter(function(q){return q[0]===e.pred;})[0];
+  var o=c.r.o,e=c.e,me=IN&&IN.on&&IN.user(),l=e.kind==='narrow'?likely(e.pred,e.prey):[],coarse=e.pred.indexOf(' ')<0,ol=E.el('ol','lk'),g=E.preds(e.prey).filter(function(q){return q[0]===e.pred;})[0];
   l.slice(0,SHOW).forEach(function(x){
     var i=E.el('li'),a=E.el('a',null,E.label(x[0]));a.href=taxon(x[0]);a.target='_blank';a.rel='noopener';
-    i.append(a,E.el('em',null,(E.label(x[0])===x[0]?'':x[0]+' · ')+E.words(x[1])));ol.append(i);});
+    i.append(a,E.el('em',null,(E.label(x[0])===x[0]?'':x[0]+' · ')+E.words(x[1])));if(me)i.append(post('Post ID',o.id,x[0],'Identify as '+E.label(x[0])+' on iNaturalist'));ol.append(i);});
   d.append(E.el('p','pair',E.label(e.pred)+' on '+E.label(e.prey)),
     E.el('p','evl',(QUALITY[o.q]||o.q)+' · '+E.pl(o.np||1,'photo')+(o.c?' · '+E.pl(o.c,'comment'):'')+' · '+(o.on||'Date unknown')+' · '+(o.at||'Place unknown')),
     e.kind==='seen'?E.el('p','ask','Already identified.'):e.kind==='confirm'?E.el('p','ask',g?'GloBI has '+E.words(g[2])+' of this species on '+E.label(e.prey)+', '+(g[3]||'visits')+'.':'GloBI has no record of this species on '+E.label(e.prey)+'.'):
     E.el('p','ask','Likely visitors of '+E.label(e.prey)+(coarse?', '+E.label(e.pred)+' only':'')+(l.length?' (most GloBI records first):':': none recorded in GloBI.')),ol);
   if(l.length>SHOW)d.append(E.el('p','evl','and '+(l.length-SHOW)+' more'));
   li.classList.toggle('done',e.kind==='seen');
-  var go=E.el('a','open',e.kind==='confirm'?'Agree on iNaturalist':'Open on iNaturalist'),sh=E.el('button');go.href=OBS+o.id;go.target='_blank';go.rel='noopener';WtidCarry.share(sh,function(){return ['record='+o.id];});
+  if(me&&e.kind==='confirm')d.append(post('Agree',o.id,e.pred,'Agree with '+E.label(e.pred)+' on iNaturalist'));
+  else if(IN&&IN.on&&!me&&e.kind!=='seen'){var si=E.el('button','lnk','Sign in with iNaturalist'),sp=E.el('p','evl');si.type='button';si.onclick=IN.start;sp.append(si,' to post IDs from here');d.append(sp);}
+  var go=E.el('a','open',e.kind==='confirm'&&!me?'Agree on iNaturalist':'Open on iNaturalist'),sh=E.el('button');go.href=OBS+o.id;go.target='_blank';go.rel='noopener';WtidCarry.share(sh,function(){return ['record='+o.id];});
   d.append(go,sh);li.append(f,d);li.onclick=function(){if(cur!==deck.indexOf(c))focus(deck.indexOf(c));};
   return li;
 }
