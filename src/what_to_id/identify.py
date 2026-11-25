@@ -107,6 +107,16 @@ def clade_columns(
     return order + [n for n in proto_names if n in wanted], clades
 
 
+# Kingdoms whose look-alikes are real, both ways: slime molds (Protozoa) vs fungi, brown algae
+# (Chromista) vs red algae (Plantae)
+CONFUSABLE_KINGDOMS = {
+    "Protozoa": "Fungi",
+    "Fungi": "Protozoa",
+    "Chromista": "Plantae",
+    "Plantae": "Chromista",
+}
+
+
 def identify_scores(
     pool: pd.DataFrame, E: np.ndarray, ids: np.ndarray, taxa: pd.Series, T: np.ndarray, tree: dict
 ) -> pd.DataFrame:
@@ -124,6 +134,8 @@ def identify_scores(
     order = np.array(order, dtype=object)
     col = pd.Series(np.arange(len(order)), index=order)
     in_tree = max((hi for _, hi in clades.values()), default=0)  # the rest has no clade
+
+    kings = {v[1]: k for k, v in tree.items() if v[3] == "kingdom"}
 
     def kingdom(tid: int) -> int | None:
         for _ in range(64):  # guard against a cycle in a malformed tree
@@ -147,8 +159,14 @@ def identify_scores(
         own_col = np.where(species, q["taxon_name"].map(col).fillna(-1), -1).astype(int)
         span = np.array([clades.get(t, (0, 0)) for t in q["taxon_id"].astype(np.int64)])
         span = span.reshape(-1, 2)
-        kspan = np.array([clades.get(kingdom(t), (0, len(order))) for t in q["taxon_id"]])
-        kspan = kspan.reshape(-1, 2)
+        ks = [kingdom(t) for t in q["taxon_id"]]
+        kspan = np.array([clades.get(k, (0, len(order))) for k in ks]).reshape(-1, 2)
+        pspan = np.array(
+            [
+                clades.get(kings.get(CONFUSABLE_KINGDOMS.get(tree[k][1] if k else "")), (0, 0))
+                for k in ks
+            ]
+        ).reshape(-1, 2)
         n = len(q)
         r = {
             k: np.full(n, nan) for k in ("top", "own", "other", "in_best", "in_second", "out_best")
@@ -170,8 +188,9 @@ def identify_scores(
             # a look-alike from another kingdom is the host plant or substrate sharing the photo
             # (gall mite on maple, bee on goldenrod), not a misID: keep `other` in-kingdom
             klo, khi = kspan[sl][ok, :1], kspan[sl][ok, 1:]
+            plo, phi = pspan[sl][ok, :1], pspan[sl][ok, 1:]
             cols = np.arange(sp.shape[1])
-            sp[(cols < klo) | (cols >= khi)] = -np.inf
+            sp[((cols < klo) | (cols >= khi)) & ((cols < plo) | (cols >= phi))] = -np.inf
             if sp.shape[1] > 1:
                 best = sp.argmax(1)
                 other = r["other"][sl]
