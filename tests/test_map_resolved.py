@@ -134,7 +134,9 @@ def test_build_command_writes_a_file_decode_reads_back(tmp_path):
     argv = ["build", "--log", str(log), "--pool", str(pool), "--out", str(out)]
     assert mr.main(argv) == 0  # no log yet
     assert mr.decode_left(site_files.path(out, "resolved").read_bytes())["id"].size == 0
-    log_frame([1, 2, 3], [0, 3, 8]).to_parquet(log, index=False)
+    rows = log_frame([1, 2, 3], [0, 3, 8])
+    rows["left"] += pd.Timestamp.now("UTC") - NOW  # build reads the real clock
+    rows.to_parquet(log, index=False)
     assert mr.main(argv) == 0
     got = mr.decode_left(site_files.path(out, "resolved").read_bytes())
     assert got["id"].tolist() == [1, 2, 3] and got["reason"].tolist() == [1, 1, 1]
