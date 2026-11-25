@@ -29,7 +29,8 @@ RULE = "p = 1 - 0.5^records; drop a mollusc predator of a vertebrate (scavenging
 
 def groups(taxa: list, group_ids: dict) -> dict[str, str]:
     """Group name by taxon name, from the taxa table rows."""
-    by_id = {v: k for k, v in group_ids.items()}
+    # a group may be several taxa (Bryophytes and Algae are lists of phyla)
+    by_id = {i: k for k, v in group_ids.items() for i in (v if isinstance(v, list) else [v])}
     out = {}
     for t in taxa:
         j, hops = t, 0
