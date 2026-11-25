@@ -1,4 +1,4 @@
-"""The Pollination page in Chromium: the Food web template on pollination data, without cards."""
+"""The Pollination page in Chromium: the Food web template on pollination data, with insect cards"""
 
 import json
 
@@ -14,28 +14,46 @@ browser = eb.browser
 POLLEN = {
     "source": "test",
     "rule": "r",
-    "pairs": [["Apis", "Trifolium repens", 0.9], ["Bombus", "Trifolium repens", 0.5]],
-    "common": {"Trifolium repens": "White Clover"},
-    "parent": {"Trifolium repens": "Plantae"},
+    "pairs": [
+        ["Apis mellifera", "Trifolium repens", 0.9],
+        ["Bombus mixtus", "Trifolium repens", 0.5],
+        ["Bombus vosnesenskii", "Trifolium repens", 0.75],
+        ["Bombus vosnesenskii", "Trifolium", 0.5],  # a genus-level record adds to the species'
+        ["Bombus flavifrons", "Rosa", 0.5],  # another plant
+    ],
+    "common": {"Trifolium repens": "White Clover", "Bombus mixtus": "Fuzzy-horned Bumble Bee"},
+    "parent": {"Trifolium repens": "Plantae", "Bombus mixtus": "Bombus", "Apis mellifera": "Apis"},
     "rank": {},
     "groups": {},
 }
+
+
+def visit(id_, taxon, plant, q="needs_id"):
+    return {
+        "id": id_,
+        "t": [taxon, id_, ""],
+        "k": "visit",
+        "c": 0,
+        "q": q,
+        "on": "",
+        "at": "",
+        "ph": "",
+        "np": 1,
+        "f": [plant, 2],
+    }
+
+
+# a bumble bee genus on clover (insect card), a research-grade honey bee (none), a genus with no
+# plant named (none), and a Bombus mixtus at needs ID on Rosa (a card, no candidate in its taxon)
 POLLEN_OBS = {
     "fetched": "2026-11-25",
     "field": "Interaction->Visited flower of",
-    "n": {"obs": 1, "named": 1},
+    "n": {"obs": 4, "named": 3},
     "obs": [
-        {
-            "id": 1,
-            "t": ["Apis mellifera", 1, "Western Honey Bee"],
-            "k": "visit",
-            "c": 0,
-            "q": "research",
-            "on": "",
-            "at": "",
-            "ph": "",
-            "f": ["Trifolium repens", 2],
-        }
+        visit(1, "Bombus", "Trifolium repens"),
+        visit(2, "Apis mellifera", "Trifolium repens", "research"),
+        {k: v for k, v in visit(3, "Bombus", "").items() if k != "f"},
+        visit(4, "Bombus mixtus", "Rosa"),
     ],
 }
 
@@ -60,7 +78,7 @@ def test_the_pollination_page_asks_about_visits_and_leaves_the_cards_out(browser
     assert page.locator("h1").inner_text() == "Pollination in BC"
     assert page.inner_text("#sent") == "What evidence is there for the pollination web?"
     assert [b.inner_text() for b in page.locator("#modes button").all()][1] == "X visits"
-    assert not page.is_visible("#cards") and not page.is_visible("#classes")
+    assert not page.is_visible("#classes") and not page.is_visible("#export")
     assert page.is_visible("#mx") and page.is_visible("#net")
     assert page.locator("#net line.e.before").count() == 1
     page.click("#modes [data-q=eaten]")
@@ -76,3 +94,38 @@ def test_the_toggle_swaps_between_the_two_pages(browser, sites):
     page.wait_for_function("window.__food")
     assert page.locator("h1").inner_text() == "Food web in BC"
     assert page.locator("#kind [aria-checked=true]").inner_text() == "Predation"
+
+
+def test_likely_visitors_stay_inside_the_taxon_and_rank_by_records(browser, sites):
+    page = open_page(browser, sites[0])
+    # genus Bombus on clover: no honey bee; vosnesenskii (0.75 and 0.5 add to 0.875) before mixtus
+    got = page.evaluate("FoodLoop.likely('Bombus', 'Trifolium repens')")
+    assert [n for n, _ in got] == ["Bombus vosnesenskii", "Bombus mixtus"]
+    assert got[0][1] == pytest.approx(0.875)
+    assert [
+        n for n, _ in page.evaluate("FoodLoop.likely('Apis mellifera', 'Trifolium repens')")
+    ] == ["Apis mellifera"]
+    assert page.evaluate("FoodLoop.likely('Bombus', 'Rosa')")[0][0] == "Bombus flavifrons"
+    assert page.evaluate("FoodLoop.likely('Osmia', 'Trifolium repens')") == []
+
+
+def test_an_insect_card_lists_the_candidates_and_only_coarse_or_unconfirmed_records_get_one(
+    browser, sites
+):
+    page = open_page(browser, sites[0])
+    cards = page.locator("#cards > li")
+    page.wait_for_function("document.querySelectorAll('#cards > li').length > 0")
+    assert cards.count() == 2  # records 1 and 4; research-grade species and no plant get none
+    card = page.locator("#cards > li", has_text="Likely visitors of White Clover")
+    assert [a.inner_text() for a in card.locator(".lk a").all()] == [
+        "Bombus vosnesenskii",
+        "Fuzzy-horned Bumble Bee",
+    ]
+    assert (
+        card.locator(".lk a")
+        .nth(0)
+        .get_attribute("href")
+        .endswith("search?q=Bombus%20vosnesenskii")
+    )
+    assert "Honey" not in card.inner_text() and card.locator(".mk").count() == 0
+    assert "—" not in page.inner_text("body") and page.errors == []

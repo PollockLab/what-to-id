@@ -18,8 +18,7 @@ button{font:inherit;color:var(--ink)}
 .seg{display:flex;margin:0 0 var(--s3)}
 .seg button{flex:1 1 0;min-height:32px;padding:2px var(--s2);background:var(--chip);border:1px solid var(--line);margin-left:-1px;cursor:pointer;white-space:nowrap}
 #kind{max-width:24em}
-.nocards .st3,.nocards #export,.nocards #classes{display:none}
-@media(min-width:1180px){.flow.nocards{grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);grid-template-areas:"q m" "n n";grid-template-rows:auto}.flow.nocards .st4{position:static}}
+.pollen #export,.pollen #classes,.pollen .keys{display:none}
 .seg.cls{flex-wrap:wrap}.seg.cls button{flex:0 1 auto}
 .seg button:hover{border-color:var(--muted)}
 .seg button:first-child{border-radius:20px 0 0 20px;margin-left:0}.seg button:last-child{border-radius:0 20px 20px 0}
@@ -61,6 +60,7 @@ button{font:inherit;color:var(--ink)}
 .cards img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;background:var(--chip)}
 .cards div{padding:var(--s2) var(--s3)}
 .cards p{margin:var(--s1) 0}
+.cards .lk{margin:var(--s1) 0;padding-left:20px}.cards .lk li{display:list-item;border:0;border-radius:0;background:none;overflow:visible}.cards .lk em{display:block;font-size:12px;color:var(--muted)}
 .cards .ph{position:relative;margin:0}.cards .ph>a{position:relative;display:block}
 .ph button{position:absolute;min-width:32px;min-height:32px;padding:0 var(--s2);border:0;border-radius:999px;background:rgba(0,0,0,.55);color:#fff;cursor:pointer;font-size:13px}
 .ph button:hover,.ph button:focus-visible{background:rgba(0,0,0,.8)}

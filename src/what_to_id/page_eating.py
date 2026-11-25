@@ -2,7 +2,8 @@
 
 eating.html stays as a redirect, so the page's first address and its hashes keep working.
 pollination.html is the same template on pollination-metaweb.json and the Visited flower of
-observations, with the evidence cards left out; each page links to the other when both are built.
+observations, with insect cards in place of the evidence cards; each page links to the other when
+both are built.
 """
 
 from __future__ import annotations
@@ -49,7 +50,8 @@ WORDS = {
     "kin": "plant",
     "drop": "not known to be a plant",
     "none": "No pair has a photograph yet.",
-    "cards": False,
+    "cards": False,  # no marks to confirm, so the network counts only photographed pairs
+    "cand": "insect",  # pl() adds the s, so one word
     "tries": [
         ["Western Honey Bee", "a common visitor", {"q": "eats", "x": "Apis mellifera"}],
         ["White Clover", "who visits it", {"q": "eaten", "y": "Trifolium repens"}],
@@ -63,7 +65,10 @@ HOW = (
     "and a plant. A pair is marked pollinates when any record says the animal pollinates the "
     "plant, and visits when the records only say it visits the flowers, which does not show "
     "pollination. Photographed before counts iNaturalist observations whose Interaction -> "
-    "Visited flower of field names the plant. Export network is the Food web page's CSV, with "
+    "Visited flower of field names the plant. An insect card is a record whose animal is above "
+    "species or needs ID and whose plant is named: it lists the species GloBI has on that plant "
+    "inside the animal's taxon, most records first, and links each to iNaturalist. Export network "
+    "is the Food web page's CSV, with "
     "the pollinator in the predator columns and the plant in the prey columns.</p></details>"
 )
 # (food_web.html text, pollination text), each once in the template
@@ -75,10 +80,11 @@ SWAPS = [
         "question, mark what you can see in the most promising photos, and watch the network "
         "fill in. Marks stay in this browser for now.",
         "Which pollinators are documented visiting which flowers in BC. Pick a question and "
-        "read the predicted web, then see which pairs have a photograph.",
+        "read the predicted web, see which pairs have a photograph, then narrow a record's insect "
+        "by the plant it visits.",
     ),
-    ('<div class="flow">', '<div class="flow nocards">'),
-    ("<span>4</span>", "<span>3</span>"),
+    ('<div class="flow">', '<div class="flow pollen">'),
+    ("<span>3</span>Evidence search", "<span>3</span>Identify the pollinator"),
     (
         "Predicted from the expert food web (GloBI stand-in). Click a cell to ask about that "
         "pair, or a name to ask what it eats or what eats it.",
