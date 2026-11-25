@@ -11,8 +11,7 @@ var KEY='wtid-plants',SPLIT=['Tracheophyta','Bryophytes','Algae'];
 function mode(){var m=/[?&]plants=(inat|split)(&|#|$)/.exec(location.search);
   if(m)return m[1];try{return localStorage.getItem(KEY)==='split'?'split':'inat';}catch(e){return 'inat';}}
 // This page's address with plants=m (the hash kept).
-function url(m){var q=location.search.replace(/([?&])plants=[^&#]*&?/,'$1').replace(/[?&]$/,'');
-  return location.pathname+q+(q?'&':'?')+'plants='+m+location.hash;}
+function url(m){var u=new URL(location.href);u.searchParams.set('plants',m);return u.href;}  // absolute: a '//host' path can't redirect off-site
 function MapGroups(META){
   var G=META.groups,out=[];
   META.plants=MapGroups.current=mode();META.canSplit=SPLIT.some(function(g){return G.indexOf(g)>=0;});
