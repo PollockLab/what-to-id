@@ -3,7 +3,8 @@ file.
 
     python -m what_to_id.metaweb --foodweb foodweb.json --taxa TAXA --meta META --out OUT
 
-{"source": text, "rule": text, "pairs": [[predator, prey, p], ...]}. Names are Latin names, at
+{"source": text, "rule": text, "pairs": [[predator, prey, p], ...]}; a pollination
+pair has a fourth element, "pollinates" or "visits". Names are Latin names, at
 species or a higher rank (a predator named at genus covers its species). A predicted food web in
 this format replaces the file; nothing else changes. The stand-in builds it from GloBI's BC
 pairs (foodweb.py): p = 1 - 0.5^records, so one record is 0.5 and each further one halves the
@@ -60,10 +61,10 @@ def build(
     group = group or {}
     pairs = []
     for pred, preys in sorted(web["eats"].items()):
-        for prey, n in preys:
+        for prey, n, *kind in preys:  # a pollination pair adds "pollinates" or "visits"
             if scavenging and group.get(pred) == "Mollusca" and group.get(prey) in VERTEBRATES:
                 continue
-            pairs.append([pred, prey, round(1 - 0.5**n, 3)])
+            pairs.append([pred, prey, round(1 - 0.5**n, 3), *kind])
     named = {n for p in pairs for n in p[:2]}
     common = {t[0]: t[1] for t in taxa or [] if t[1] and t[0] in named}
     parent: dict[str, str] = {}  # each name's parent, for the ancestors of the names in the pairs

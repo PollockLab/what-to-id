@@ -60,7 +60,9 @@ WORDS = {
 HOW = (
     '<details class="how"><summary>How this is made</summary>\n<p id="src"></p>\n'
     "<p>Pairs are GloBI records of pollinates and visitsFlowersOf in British Columbia, an animal "
-    "and a plant. Photographed before counts iNaturalist observations whose Interaction -> "
+    "and a plant. A pair is marked pollinates when any record says the animal pollinates the "
+    "plant, and visits when the records only say it visits the flowers, which does not show "
+    "pollination. Photographed before counts iNaturalist observations whose Interaction -> "
     "Visited flower of field names the plant. Export network is the Food web page's CSV, with "
     "the pollinator in the predator columns and the plant in the prey columns.</p></details>"
 )
