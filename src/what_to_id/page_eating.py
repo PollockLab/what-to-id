@@ -52,6 +52,9 @@ WORDS = {
     "none": "No pair has a photograph yet.",
     "cards": False,  # no marks to confirm, so the network counts only photographed pairs
     "cand": "insect",  # pl() adds the s, so one word
+    # step 3 with no card at all: the button hides and this says why
+    "nophoto": "No photo of this pair yet.",
+    "noquestion": "No photo for this question yet.",
     "tries": [
         ["Western Honey Bee", "a common visitor", {"q": "eats", "x": "Apis mellifera"}],
         ["White Clover", "who visits it", {"q": "eaten", "y": "Trifolium repens"}],

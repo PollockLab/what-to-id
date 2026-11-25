@@ -20,6 +20,7 @@ POLLEN = {
         ["Bombus vosnesenskii", "Trifolium repens", 0.75],
         ["Bombus vosnesenskii", "Trifolium", 0.5],  # a genus-level record adds to the species'
         ["Bombus flavifrons", "Rosa", 0.5],  # another plant
+        ["Bombus mixtus", "Rosa", 0.5, "pollinates"],
     ],
     "common": {"Trifolium repens": "White Clover", "Bombus mixtus": "Fuzzy-horned Bumble Bee"},
     "parent": {"Trifolium repens": "Plantae", "Bombus mixtus": "Bombus", "Apis mellifera": "Apis"},
@@ -129,3 +130,26 @@ def test_an_insect_card_lists_the_candidates_and_only_coarse_or_unconfirmed_reco
     )
     assert "Honey" not in card.inner_text() and card.locator(".mk").count() == 0
     assert "—" not in page.inner_text("body") and page.errors == []
+
+
+def test_a_needs_id_species_is_a_confirm_card_with_what_globi_has(browser, sites):
+    page = open_page(browser, sites[0] + "#q=does&x=Bombus%20mixtus&y=Rosa")
+    page.wait_for_function("window.__text && document.querySelectorAll('#cards > li').length > 0")
+    card = page.locator("#cards > li").first
+    assert "GloBI has one record of this species on Rosa, pollinates." in card.inner_text()
+    assert card.locator("a.open").inner_text() == "Agree on iNaturalist"
+    assert page.inner_text("#cand") == "The one card for this question is shown."
+    assert not page.is_visible("#draw") and page.errors == []
+
+
+def test_research_records_are_read_only_evidence_and_nothing_hides_the_button(browser, sites):
+    page = open_page(browser, sites[0] + "#q=does&x=Apis%20mellifera&y=Trifolium%20repens")
+    page.wait_for_function("window.__text && document.querySelectorAll('#cards > li').length > 0")
+    card = page.locator("#cards > li").first
+    assert "Already identified." in card.inner_text() and card.locator("button kbd").count() == 0
+    assert page.inner_text("#cand") == "The one card for this question is shown."
+    page.goto(sites[0] + "#q=does&x=Bombus%20vosnesenskii&y=Rosa")
+    page.wait_for_function("window.__text")
+    page.wait_for_function("document.getElementById('cand').textContent.startsWith('No photo')")
+    assert page.inner_text("#cand") == "No photo of this pair yet."
+    assert not page.is_visible("#draw")
