@@ -403,3 +403,10 @@ def test_close_calls_cut_is_per_group():
     _, tax = levels.species_masks(s, pd.Series(False, index=s.index), pd.Series({"y": 100}))
     got = s[tax].set_index("margin")["iconic_taxon"].to_dict()
     assert got == {-0.01: "A", -0.1: "B"}
+
+
+def test_identify_walks_to_a_root_without_a_parent():
+    pool, E, ids, taxa, T = identify_bundle()
+    # no kingdom on the way up: the walk reaches Life, whose parent is None
+    rooted = {**TREE, 0: [None, "Life", "", "stateofmatter"], 1: [0, "Root", "", "phylum"]}
+    assert len(identify.identify_scores(pool, E, ids, taxa, T, rooted)) == len(pool)
