@@ -136,7 +136,11 @@ def test_keys_1_to_4_answer_the_current_card_with_one_press(browser, base):
     for k in "123":
         page.keyboard.press(k)
     res = page.locator("#cards .res").all_inner_texts()
-    assert res[:3] == ["Not visible", "Not visible", "Can’t tell"]  # card 1 saved no, unsure, unsure
+    assert res[:3] == [
+        "Not visible",
+        "Not visible",
+        "Can’t tell",
+    ]  # card 1 saved no, unsure, unsure
     assert page.locator("#cards li.done").count() == 3
     page.keyboard.press("4")  # eating on a card whose field names a genus asks which prey
     assert page.locator("#cards li.cur .which").is_visible()

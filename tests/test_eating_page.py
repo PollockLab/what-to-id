@@ -520,13 +520,15 @@ def test_answering_the_last_card_shows_the_next_ten(browser, base):
 
 def test_sections_two_and_four_collapse_to_one_line_summaries_on_a_phone(browser, base):
     page = open_page(browser, base + "#q=eats&x=Strix varia")
-    assert page.locator("details.fold[open]").count() == 2 and not page.locator(".one").first.is_visible()
+    assert page.locator("details.fold[open]").count() == 2
+    assert not page.locator(".one").first.is_visible()
     page.close()
     page = browser.new_page(viewport={"width": 390, "height": 844})
     page.goto(base + "#q=eats&x=Strix varia")
     page.wait_for_function("window.__food && window.__text")
     assert page.locator("details.fold[open]").count() == 0
     assert page.inner_text("#s2sum") == "2 cells, 1 photographed."
-    assert page.inner_text("#s4sum").endswith("confirmed here.") and page.locator("#mx table").is_hidden()
+    assert page.inner_text("#s4sum").endswith("confirmed here.")
+    assert page.locator("#mx table").is_hidden()
     page.click("#s2")
     assert page.locator("#mx table").is_visible() and not page.locator("#s2sum").is_visible()
