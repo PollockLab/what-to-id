@@ -284,3 +284,27 @@ def test_range_chip_needs_the_flag_and_round_trips_in_the_hash():
     assert "more than 50 km outside" in got[2][0][3]
     got = run("var S=MF.read(new URLSearchParams('only=range'));return [MF.write(S),S.only];")
     assert got == [[], {}]
+
+
+def test_old_plantae_link_reads_as_every_split_plant_group():
+    keys = ["Algae", "Aves", "Bryophytes", "Plantae", "Tracheophyta"]
+    got = run(
+        f"var K={json.dumps(keys)};"
+        "return [CH.read('-Plantae,Aves',K),CH.read('Plantae',['Plantae'])];"
+    )
+    plants = {g: "not" for g in ("Plantae", "Tracheophyta", "Bryophytes", "Algae")}
+    assert got == [{**plants, "Aves": "inc"}, {"Plantae": "inc"}]
+
+
+def test_picked_plant_groups_link_as_their_phyla():
+    keys = ["Aves", "Bryophytes", "Tracheophyta"]
+    gid = {"Aves": 3, "Bryophytes": [311249, 64615, 56327], "Tracheophyta": 211194}
+    st = {"groups": ["Tracheophyta", "Bryophytes", "Aves"], "all": 4, "months": [], "only": {}}
+    got = run(
+        f"var K={json.dumps(keys)},G={json.dumps(gid)};"
+        "return [CH.groupLink({Bryophytes:'inc'},K,G,false),CH.groupLink({Aves:'inc'},K,G,false),"
+        f"TX.identifyUrl({json.dumps(st)},null,{{}}).url];"
+    )
+    assert got[0]["taxa"] == [311249, 64615, 56327] and got[0]["groups"] == []
+    assert got[1]["groups"] == ["Aves"]
+    assert "iconic_taxa=Plantae%2CAves" in got[2]

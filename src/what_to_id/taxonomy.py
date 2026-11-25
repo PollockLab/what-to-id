@@ -83,6 +83,15 @@ GROUP_TAXA = {
     "Protozoa": 47686,
     "Reptilia": 26036,
 }
+# Plantae split by phylum into the map's groups (iNaturalist ids); plants in none, as Picozoa or
+# records left at Plantae, stay in Plantae. Only the pages split: the pool keeps iconic_taxon.
+PLANT_GROUPS = {
+    "Tracheophyta": [211194],
+    "Bryophytes": [311249, 64615, 56327],  # Bryophyta, Marchantiophyta, Anthocerotophyta
+    "Algae": [311313, 50863, 311312, 57774],  # Charophyta, Chlorophyta, Glaucophyta, Rhodophyta
+}
+# Bryophytes and Algae have no single taxon, so their entry lists their phyla.
+GROUP_TAXA |= {g: ids[0] if len(ids) == 1 else ids for g, ids in PLANT_GROUPS.items()}
 
 log = logging.getLogger("what_to_id")
 
@@ -191,6 +200,26 @@ def update_tree(tree: dict[int, list], ids: Iterable[int], *, session=None, slee
             tree.update(fetch_taxa(batch, session=session))
         need = sorted(missing_ancestors(tree) - asked)
     return len(tree) - before
+
+
+def split_plants(df: pd.DataFrame, tree: dict[int, list] | None) -> pd.DataFrame:
+    """df with each Plantae record's iconic_taxon its PLANT_GROUPS group, found up the tree."""
+    if not tree or "taxon_id" not in df or "iconic_taxon" not in df:
+        return df
+    plant = df["iconic_taxon"].eq("Plantae") & df["taxon_id"].notna()
+    if not plant.any():
+        return df
+    phylum = {p: g for g, ids in PLANT_GROUPS.items() for p in ids}
+
+    def group(t: int) -> str:
+        while t is not None and t not in phylum and t in tree:
+            t = tree[t][0]
+        return phylum.get(t, "Plantae")
+
+    ids = df.loc[plant, "taxon_id"].astype(int)
+    df = df.copy()
+    df.loc[plant, "iconic_taxon"] = ids.map({t: group(t) for t in ids.unique()})
+    return df
 
 
 def taxa_table(df: pd.DataFrame, tree: dict[int, list] | None = None):

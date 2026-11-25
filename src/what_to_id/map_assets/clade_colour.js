@@ -68,7 +68,7 @@ function order(m){if(ORD[m])return ORD[m];var b=1,o=[],i,r,k;while(b<m)b*=2;
 // (as the tree has them), gr the row of each group's taxon by group name.
 function build(T,META){
   var n=T.length,par=new Int32Array(n),tot=new Float64Array(n),kids=[],col=new Array(n),gr={},G={},i,j,has=n&&T[0].length>5;
-  Object.keys(META.group_ids||{}).forEach(function(g){G[META.group_ids[g]]=g;});
+  Object.keys(META.group_ids||{}).forEach(function(g){[].concat(META.group_ids[g]).forEach(function(id){G[id]=g;});});  // an id may list taxa
   if(META.groups.indexOf('Animalia')>=0)G[1]=G[1]||'Animalia';  // iNaturalist's iconic Animalia, as the tree reads it
   for(i=0;i<n;i++){kids.push([]);par[i]=G[T[i][2]]||!(T[i].length>4)?-1:T[i][4];}
   for(i=0;i<n;i++)if(T[i][5])for(j=i;j>=0;j=par[j])tot[j]+=T[i][5];

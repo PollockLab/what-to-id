@@ -22,6 +22,9 @@ GROUP_NAMES = {
     "Mammalia": "Mammals",
     "Mollusca": "Molluscs",
     "Plantae": "Plants",
+    "Tracheophyta": "Vascular plants",
+    "Bryophytes": "Mosses, liverworts and hornworts",
+    "Algae": "Green and red algae",
     "Protozoa": "Slime moulds",
     "Reptilia": "Reptiles",
 }

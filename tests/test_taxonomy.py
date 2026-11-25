@@ -259,3 +259,27 @@ def test_taxonomy_cli_caches_french_names_only_with_fr(tmp_path, monkeypatch):
     assert taxonomy.main([*args, "--fr", str(tmp_path / "fr.json")]) == 0
     fr = taxonomy.load_fr(tmp_path / "fr.json")
     assert fr[5] == "Sphaigne brune" and fr[2] == "Plantes" and set(fr) == set(TREE)
+
+
+def test_split_plants_relabels_plantae_by_phylum_and_keeps_the_rest():
+    # TREE's Bryophyta (3) under its iNaturalist id, and Picozoa (7) a phylum in no plant group
+    tree = {k: [311249 if v[0] == 3 else v[0], *v[1:]] for k, v in TREE.items() if k != 3}
+    tree |= {311249: TREE[3], 7: [2, "Picozoa", "", "phylum"]}
+    pool = pd.DataFrame(
+        {
+            "iconic_taxon": ["Plantae", "Plantae", "Plantae", "Aves", "Plantae", None],
+            "taxon_id": pd.array([5, 7, 2, 5, None, None], dtype="Int64"),
+        }
+    )
+    got = taxonomy.split_plants(pool, tree)["iconic_taxon"].fillna("Unknown").tolist()
+    assert got == ["Bryophytes", "Plantae", "Plantae", "Aves", "Plantae", "Unknown"]
+    assert pool["iconic_taxon"].iloc[0] == "Plantae"  # the pool itself is left as it was
+    assert taxonomy.split_plants(pool, None) is pool
+
+
+def test_map_names_the_leftover_plantae_other_plants_only_beside_the_split_groups():
+    plain = make_pool(4).assign(iconic_taxon=["Aves", "Plantae", "Plantae", "Aves"])
+    assert encode_points(plain)[1]["names"]["Plantae"] == "Plants (Plantae)"
+    split = plain.assign(iconic_taxon=["Aves", "Plantae", "Algae", "Bryophytes"])
+    names = encode_points(split)[1]["names"]
+    assert names["Plantae"] == "Other plants" and names["Algae"] == "Green and red algae (Algae)"

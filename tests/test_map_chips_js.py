@@ -312,3 +312,17 @@ def test_selection_bar_lists_the_date_range_and_its_x_clears_it():
     assert got["up"] == [["Uploaded day40 to day60", False, "Remove Uploaded day40 to day60"]]
     assert got["bare"] == [["Uploaded start to now", False, "Remove Uploaded start to now"]]
     assert got["S"] == [0, 99, False] and got["hidden"] is True and got["log"] == ["redraw"]
+
+
+def test_identify_leaves_a_plant_group_out_by_its_phyla_when_the_link_names_the_other_groups():
+    keys = ["Animalia", "Aves", "Plantae", "Tracheophyta", "Algae"]
+    ids = {"Aves": 3, "Plantae": 47126, "Tracheophyta": [211194], "Algae": [311313, 50863]}
+    gl = run(
+        f"return CH.groupLink({{Animalia:'not',Algae:'not'}},{json.dumps(keys)},"
+        f"{json.dumps(ids)},false);"
+    )
+    assert gl["groups"] == ["Aves", "Plantae", "Tracheophyta"] and gl["not"] == [311313, 50863]
+    st = {"groups": gl["groups"], "all": 5, "months": [], "only": {}, "acc": "", "not": gl["not"]}
+    u = run(f"return TX.identifyUrl({json.dumps(st)},BOX,META).url;")
+    q = {k: v[0] for k, v in parse_qs(urlparse(u).query).items()}
+    assert q["iconic_taxa"] == "Aves,Plantae" and q["without_taxon_id"] == "311313,50863"
