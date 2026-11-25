@@ -99,6 +99,14 @@ var box=document.getElementById("main-content"),frames={},last=MapFilter.tokens(
   rest=h0.filter(function(t){return MapFilter.tokens(t)==='';}),PL=(/[?&]plants=(inat|split)/.exec(location.search)||[])[1];
 // The Life groups setting (map_groups.js): a pane that switches reloads itself and the others; the address follows.
 MapGroups.watch(function(m){if(PL){PL=m;history.replaceState(null,'',MapGroups.url(m));}});
+// A pane switched (map_groups.js posts it, then reloads, so e.source may be gone): the address and every pane not
+// yet on the mode follow, with or without localStorage.
+addEventListener('message',function(e){var m=e.data&&e.data.m;
+  if(e.origin!==location.origin||(m!=='inat'&&m!=='split')||e.data.type!=='wtid-plants'||m===PL)return;
+  PL=m;history.replaceState(null,'',MapGroups.url(m));
+  Object.keys(frames).forEach(function(o){var u=new URL(frames[o].src);
+    try{if(new URL(frames[o].contentWindow.location.href).searchParams.get('plants')===m)return;}catch(x){}
+    u.searchParams.set('plants',m);u.hash=hashFor(o);frames[o].src=u.href;});});
 // My groups (group_list.js): a link that names no groups opens every pane with the ones kept in this browser.
 try{var mine=localStorage.getItem('wtid-my-groups');if(mine&&!/(^|&)groups=/.test(last))last=(last?last+'&':'')+'groups='+mine;}catch(e){}
 if(!FILES.tree)delete FILES.tree;  // a site built without the taxon tree
