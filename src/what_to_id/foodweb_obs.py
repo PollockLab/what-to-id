@@ -19,7 +19,7 @@ id, any place) as k "model" records: the observed taxon is the predator, no fiel
 asks for the prey like an empty Eating field.
 
 `--metaweb FILE` also writes foodweb-text.json beside it: BC observations of a metaweb predator
-species whose description (words eating, eats, ate, feeding, prey, caught) or tags (predation,
+species whose description (words eating, eats, ate, feeding) or tags (predation,
 eating, feeding) talk about food, with the description and tags kept (k "text"). The evidence
 search ranks them against the candidate prey. Comments are not searchable through the API.
 """
@@ -132,7 +132,8 @@ def read_ids(path: str) -> list[int]:
         return list(dict.fromkeys(int(r["obs_id"]) for r in csv.DictReader(f)))
 
 
-SEARCHES = [("description", w) for w in ("eating", "eats", "ate", "feeding", "prey", "caught")] + [
+# not "caught" or "prey": they name the victim as often (caught in a web, Song Sparrow prey)
+SEARCHES = [("description", w) for w in ("eating", "eats", "ate", "feeding")] + [
     ("tags", w) for w in ("predation", "eating", "feeding")
 ]
 TEXT_FILE = "foodweb-text.json"
