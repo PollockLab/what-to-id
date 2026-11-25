@@ -8,7 +8,7 @@
 <script>if(/[?&]embed=1/.test(location.search))document.documentElement.classList.add('embed');
 if(/[?&]peer=1/.test(location.search))document.documentElement.classList.add('peer');
 (function(){var q=location.search;if(/[?&](embed|standalone)=1/.test(q)||!/\/embeddings\.html$/.test(location.pathname))return;
-fetch('explore.html',{method:'HEAD'}).then(function(r){if(r.ok)location.replace('explore.html?view=space'+location.hash);}).catch(function(){});})();</script>
+fetch('explore.html',{method:'HEAD'}).then(function(r){if(r.ok)location.replace('explore.html?view=space'+(/[?&]plants=(inat|split)/.exec(location.search)||[''])[0].replace('?','&')+location.hash);}).catch(function(){});})();</script>
 <style>
 __SITE_CSS__
 __SELECT_CSS__
@@ -169,6 +169,7 @@ __SITE_NAV__<header>
 <script>__SAVED_RECORDS__</script>
 <script>__MAP_RINGS__</script>
 <script>__MAP_AREA__</script>
+<script>__MAP_GROUPS__</script>
 <script>__MAP_FILTER__</script>
 <script>__TAXON_TREE__</script>
 <script>__FETCH_ONCE__</script>

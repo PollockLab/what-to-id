@@ -82,6 +82,7 @@ SCRIPTS = {
     "__GROUP_LIST__": HERE / "map_assets" / "group_list.js",
     "__MAP_HIST__": HERE / "map_assets" / "map_hist.js",
     "__MAP_TIME__": HERE / "map_assets" / "map_time.js",
+    "__MAP_GROUPS__": HERE / "map_assets" / "map_groups.js",
     "__MAP_FILTER__": HERE / "map_assets" / "map_filter.js",
     "__EMBEDDINGS_LAYOUT__": HERE / "embeddings_assets" / "embeddings_layout.js",
     "__FETCH_ONCE__": HERE / "site_assets" / "fetch_once.js",

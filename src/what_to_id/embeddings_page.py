@@ -27,6 +27,7 @@ SCRIPTS = {
     "__SAVED_RECORDS__": HERE / "site_assets" / "saved_records.js",
     "__MAP_RINGS__": HERE / "map_assets" / "map_rings.js",
     "__MAP_AREA__": HERE / "map_assets" / "map_area.js",
+    "__MAP_GROUPS__": HERE / "map_assets" / "map_groups.js",
     "__MAP_FILTER__": HERE / "map_assets" / "map_filter.js",
     "__TAXON_TREE__": ASSETS / "taxon_tree.js",
     "__EMBEDDINGS_LAYOUT__": ASSETS / "embeddings_layout.js",

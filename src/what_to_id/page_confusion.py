@@ -49,6 +49,7 @@ DATA_NAME = "confusion-data.bin"
 NO_PHOTO = 255
 PHOTO = r"^(https?://.+/)(\d+)/medium\.([A-Za-z0-9]+)(?:\?.*)?$"
 SCRIPTS = {
+    "__MAP_GROUPS__": HERE / "map_assets" / "map_groups.js",
     "__EMBEDDINGS_LAYOUT__": HERE / "embeddings_assets" / "embeddings_layout.js",
     "__FETCH_ONCE__": HERE / "site_assets" / "fetch_once.js",
     "__IDENTIFY_LINKS__": HERE / "map_assets" / "identify_links.js",

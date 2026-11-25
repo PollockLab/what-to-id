@@ -2,7 +2,7 @@
 'use strict';
 function $(id){return document.getElementById(id);}
 var dark=matchMedia('(prefers-color-scheme: dark)').matches;
-MapGroups(META);
+MapGroups(META);MapGroups.watch();
 var MF=MapFilter(META),DAY=MF.DAY,D0=MF.D0,NO=MF.NO,NOTAX=MF.NOTAX,LAST=MF.LAST;
 var FLAG=MF.FLAG,ONLYFLAG=MF.ONLYFLAG,ONLYKEYS=MF.ONLYKEYS,nf=new Intl.NumberFormat('en-CA'),
   iso=MF.iso;

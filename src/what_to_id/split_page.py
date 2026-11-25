@@ -39,6 +39,7 @@ LEVELS_FORWARD = (
     f'<a href="{PAGE_NAME}?view=identify-map">Explore</a>'
 )
 SCRIPTS = {
+    "__MAP_GROUPS__": HERE / "map_assets" / "map_groups.js",
     "__MAP_FILTER__": HERE / "map_assets" / "map_filter.js",
     "__STATE_BAR__": ASSETS / "state_bar.js",
     "__CLIP_TOKENIZER__": HERE / "atlas_assets" / "clip_tokenizer.js",

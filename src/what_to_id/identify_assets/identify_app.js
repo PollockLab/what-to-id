@@ -420,7 +420,7 @@ function firstOf(F){
     var out=r.map(function(x){var i=id.length;id.push(x[0]);tax.push(x[1]);lk.push(x[2]);if(x[3])MORE.set(i,x[3]);return i;});
     out.n=s.n[lv];return out;});});
   F.P={id:id,tax:tax,n:id.length};TAXA=I18N.taxa(F.taxa,F.fr);LOOKS={names:F.looks,lo:lk,hi:new Uint8Array(id.length)};  // lo holds the whole index
-  FIRST=F;if(F.groups)IdentifyBar.row(META,F.groups,nf,/^groups=[^&]*$/.test(sel())&&F.s[sel()]?decodeURIComponent(sel().slice(7)):'');early();  // the life-form row with the first cards
+  F.groups=MapGroups.sum(META,F.groups);FIRST=F;if(F.groups)IdentifyBar.row(META,F.groups,nf,/^groups=[^&]*$/.test(sel())&&F.s[sel()]?decodeURIComponent(sel().slice(7)):'');early();  // the life-form row with the first cards
 }
 // The first list of the selection while the records load, when it is one built (no filter or one group) with no area, lasso,
 // photo search or range toggle, and a map view that takes in every record: the split view's map posts its view on load,
@@ -487,14 +487,14 @@ function looks(buf,why){
 }
 async function load(){
   status('Reading the map data…');
-  var mp=L.fetchMapMeta(MAP,fetch),drawn_=new Promise(function(ok){if(!CFG.first)return ok();setTimeout(ok,2000);  // the bulk files wait for the first cards' paint (2 s at most), then their first row's photos
+  MapGroups.watch();var mp=L.fetchMapMeta(MAP,fetch).then(MapGroups),drawn_=new Promise(function(ok){if(!CFG.first)return ok();setTimeout(ok,2000);  // the bulk files wait for the first cards' paint (2 s at most), then their first row's photos
     Promise.all([get(new URL(CFG.first,MAP)),mp]).then(function(b){if(!MF)firstOf(JSON.parse(new TextDecoder().decode(b[0])));}).catch(function(){}).then(ok);});  // optional
   META=await mp;
   WW=IdentifyWWW({value:META.value,invasive:META.invasive,taxa:function(){return TAXA;},look:function(i){return looksOf(i)||(P.tax[i]!==NOTAX&&TAXA[P.tax[i]]?TAXA[P.tax[i]][0]:null);},why:whyOf,redraw:function(){if(P)redraw();}});  // the suggestion, else the record's own taxon
   function file(k){var f=META.files[k];return f?get(new URL(f,MAP)):Promise.reject(new Error('the map lists no '+k+' file'));}
   await drawn_;await CARD.row(2e4);
   var taxa=Promise.all([get(new URL(META.taxa,MAP)),I18N.lang==='fr'&&META.files.taxa_fr?file('taxa_fr').catch(function(){return null;}):null]).then(function(r){return I18N.taxa(JSON.parse(new TextDecoder().decode(r[0])),r[1]&&JSON.parse(new TextDecoder().decode(r[1])));});
-  var shards=Promise.all(META.shards.map(function(s){return get(new URL(s.file,MAP)).then(function(b){return L.decodeShard(b,s.n);});}));
+  var shards=Promise.all(META.shards.map(function(s){return get(new URL(s.file,MAP)).then(function(b){var d=L.decodeShard(b,s.n);MapGroups.grp(META,d.grp);return d;});}));
   var lev=file('levels'),lkp=null,rkp=null,pcp=null,rg=file('range').catch(function(){return null;}),ftp=META.files.fit?file('fit').catch(function(){return null;}):null;  // optional: no range maps without it; ftp: level 3's fits-the-suggestion bits
   function lk(){return lkp||(lkp=file('looks').catch(function(){return null;}));}function rk(){return rkp||(rkp=file('rank').catch(function(){return null;}));}  // optional: level 3 by score bucket without it
   function rank(b){var m=0,j,k=0,r;for(j=0;j<P.n;j++)if(KIND[j]===3)m++;if(!b||b.byteLength!==4*m)return false;b=new Uint8Array(b);r=new Uint32Array(P.n);for(j=0;j<P.n;j++)if(KIND[j]===3){r[j]=(b[k]|b[m+k]<<8|b[2*m+k]<<16|b[3*m+k]<<24)>>>0;k++;}RK=r;N3=m;return true;}  // byte planes of the level-3 records only

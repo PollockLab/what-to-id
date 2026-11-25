@@ -53,8 +53,11 @@ function preys(x){if(!PY.has(x))PY.set(x,M.pairs.filter(function(q){return cov(x
 function preds(y){if(!PD.has(y))PD.set(y,M.pairs.filter(function(q){return cov(y,q[1]);}).sort(function(a,b){return b[2]-a[2];}));return PD.get(y);}
 // the stand-in's p = 1 - 0.5^records as the records it counts
 function words(p){return p<0.6?'one record':p<0.8?'two records':'three or more records';}
+// The picker's groups follow the Life groups setting (map_groups.js): in iNaturalist mode Plantae holds the split ones.
+function plants(G){var m=MapGroups({groups:Object.keys(G||{})});if(!m.gmap)return G;var o={};
+  m.groups.forEach(function(g){o[g]=g==='Plantae'?'Plants':G[g];});return o;}
 function init(metaweb,file,text){
-  M=metaweb;PY.clear();PD.clear();var O=file.obs,T=(text&&text.obs)||[];R.all=O.map(roles);R.text=T.map(roles);names=common(M,O.concat(T));ids=idsOf(O.concat(T));tid=new Map();O.concat(T).forEach(function(o){tid.set(o.t[0],o.t[1]);if(o.f)tid.set(o.f[0],o.f[1]);});ALL=new Map();
+  metaweb.groups=plants(metaweb.groups);M=metaweb;PY.clear();PD.clear();var O=file.obs,T=(text&&text.obs)||[];R.all=O.map(roles);R.text=T.map(roles);names=common(M,O.concat(T));ids=idsOf(O.concat(T));tid=new Map();O.concat(T).forEach(function(o){tid.set(o.t[0],o.t[1]);if(o.f)tid.set(o.f[0],o.f[1]);});ALL=new Map();
   M.pairs.forEach(function(x){ALL.set(x[0],1);ALL.set(x[1],1);});Object.keys(M.parent||{}).forEach(function(n){ALL.set(n,1);ALL.set(M.parent[n],1);});
   O.concat(T).forEach(function(o){ALL.set(o.t[0],1);if(o.f)ALL.set(o.f[0],1);});
 }

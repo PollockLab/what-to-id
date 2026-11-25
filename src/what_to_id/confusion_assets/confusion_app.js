@@ -51,6 +51,10 @@ function photoUrl(i){
 function margin(i){var r=D.head.score;return r[0]+D.score[i]/255*(r[1]-r[0]);}
 function pairOf(t,l){for(var k=0;k<D.pairs.length;k++)
   if(D.pairs[k][0]===t&&D.pairs[k][1]===l)return D.pairs[k];return null;}
+// The Life groups setting (map_groups.js): in iNaturalist mode the split plant groups count as one Plantae tab.
+function plants(d){var M=MapGroups({groups:d.head.groups.map(function(x){return x[0];})});MapGroups.watch();if(!M.gmap)return d;
+  var c=MapGroups.sum(M,d.head.groups.map(function(x){return x[1];}));d.head.groups=M.groups.map(function(g,k){return [g,c[k]];});
+  d.taxa.forEach(function(t){if(t[2]!=null)t[2]=M.gmap[t[2]];});return d;}
 function groupName(g){return g!=null&&g>=0?D.head.groups[g][0]:'';}
 
 WtidCarry.own([]);  // the pairs are not filtered: the filters are held for the other views
@@ -61,6 +65,7 @@ function readHash(){
     p=D.pairs.find(function(x){return x[0]===t;});S.l=p?p[1]:-1;return;}
   var h=new URLSearchParams(location.hash.slice(1)),g=h.get('g');
   if(g)S.g=D.head.groups.findIndex(function(x){return x[0]===g;});
+  if(g&&S.g<0)S.g=D.head.groups.findIndex(function(x){return x[0]==='Plantae';});  // a split plant group's link, plants not split
   S.q=h.get('q')||'';
   if(SORTS[h.get('sort')])S.s=h.get('sort');
   S.d=dflt(S.s);
@@ -253,6 +258,6 @@ document.addEventListener('keydown',function(e){
 addEventListener('hashchange',function(){readHash();$('q').value=S.q;update(true);});
 
 fetchOnce(CONFIG.data).then(EmbeddingsLayout.gunzip).then(function(buf){
-  D=decode(buf);readHash();$('q').value=S.q;update(true);
+  D=plants(decode(buf));readHash();$('q').value=S.q;update(true);
 }).catch(function(e){$('status').textContent='Could not load the pairs: '+e.message;});
 })();

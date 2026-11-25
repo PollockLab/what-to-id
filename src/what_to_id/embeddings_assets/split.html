@@ -83,6 +83,7 @@ __SITE_NAV__
 <main id="main-content" tabindex="-1"><h1 class="site-vh">Explore</h1></main>
 <div class="sbar" id="sbar" role="region" aria-label="Your selection"><span class="sbn" id="sbn" aria-live="polite"></span><ul class="sbc" id="sbc" aria-label="Active filters"></ul><button type="button" id="sbx" aria-label="Clear filters: What, When, Where, Who, At risk, Introduced and Best x%" hidden>Clear filters</button><button type="button" id="sbl" aria-expanded="false" aria-controls="map">Legend</button><button type="button" id="sbf" aria-expanded="false" aria-controls="map">Filters</button></div>
 <script>
+__MAP_GROUPS__
 __MAP_FILTER__
 __STATE_BAR__
 __CLIP_TOKENIZER__
@@ -95,7 +96,9 @@ var box=document.getElementById("main-content"),frames={},last=MapFilter.tokens(
   qs=new URLSearchParams(location.search).get('q')||'',
   LEVELS=__LEVELS__,FILES={identify:__IDENTIFY_FILE__,map:__MAP_FILE__,space:__SPACE_FILE__,tree:__TREE_FILE__},view,
   ORDER=['map','identify','space','tree'],ALIAS={side:'map-space',tree:'map-tree'},
-  rest=h0.filter(function(t){return MapFilter.tokens(t)==='';});
+  rest=h0.filter(function(t){return MapFilter.tokens(t)==='';}),PL=(/[?&]plants=(inat|split)/.exec(location.search)||[])[1];
+// The Life groups setting (map_groups.js): a pane that switches reloads itself and the others; the address follows.
+MapGroups.watch(function(m){if(PL){PL=m;history.replaceState(null,'',MapGroups.url(m));}});
 // My groups (group_list.js): a link that names no groups opens every pane with the ones kept in this browser.
 try{var mine=localStorage.getItem('wtid-my-groups');if(mine&&!/(^|&)groups=/.test(last))last=(last?last+'&':'')+'groups='+mine;}catch(e){}
 if(!FILES.tree)delete FILES.tree;  // a site built without the taxon tree
@@ -137,7 +140,7 @@ function sendSel(n,sel){post(n,{type:'wtid-selection',sel:sel});}
 function mk(n){
   var f=document.createElement('iframe');f.id=n;f.title={identify:'Identify',map:'Map',space:'Photo space',tree:'Taxonomy'}[n];
   if(n==='map')f.allow='geolocation';  // the map's locate button
-  f.src=new URL(FILES[n],location.href).href.replace(/#.*/,'')+'?embed=1'+(n==='space'&&view.indexOf('map')>=0?'&peer=1':'')+'#'+hashFor(n);
+  f.src=new URL(FILES[n],location.href).href.replace(/#.*/,'')+'?embed=1'+(PL?'&plants='+PL:'')+(n==='space'&&view.indexOf('map')>=0?'&peer=1':'')+'#'+hashFor(n);
   // what the other frame sent while this one was still loading
   f.addEventListener('load',function(){Object.keys(late).forEach(function(k){if(k!=='wtid-view'||visible('map'))post(n,late[k]);});
     if(n==='tree')tally(true);if(n==='map'){colour();rail();}});
