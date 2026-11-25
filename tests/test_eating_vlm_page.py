@@ -54,7 +54,9 @@ def test_cards_rank_by_the_models_signal_and_model_only_cards_follow_the_field(
     monkeypatch.setattr(foodweb_page, "TEXT", {"fetched": "2026-11-13", "n": 0, "obs": []})
     monkeypatch.setattr(foodweb_page, "VLM", {"model": "t", "obs": hints})
     page = open_page(browser, next(build_site(tmp_path)) + HASH)
-    ids = page.locator("#cards li > a").evaluate_all("a => a.map(x => x.href.split('/').pop())")
+    ids = page.locator("#cards li > figure > a").evaluate_all(
+        "a => a.map(x => x.href.split('/').pop())"
+    )
     assert ids == [
         "1",
         "0",
