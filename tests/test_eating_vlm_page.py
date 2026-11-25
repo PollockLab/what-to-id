@@ -51,3 +51,23 @@ def test_cards_rank_by_the_models_signal_and_model_only_cards_follow_the_field(
     ids = page.locator("#cards li > a").evaluate_all("a => a.map(x => x.href.split('/').pop())")
     assert ids == ["1", "0", "200"]  # 1 rises on the model, 0 sinks but stays above the model-only card
     assert page.errors == []
+
+
+def test_the_prey_picker_starts_on_the_models_guess_with_a_copyable_eating_value(
+    browser, tmp_path, monkeypatch
+):
+    stub = (
+        "Object.defineProperty(navigator,'clipboard',{configurable:true,"
+        "value:{writeText:t=>(window.__c=t,Promise.resolve())}})"
+    )
+    hints = {"1": {"p": 0.99, "prey": [["Mus musculus", 0.6]]}}  # card 1's field names only the genus Mus
+    monkeypatch.setattr(foodweb_page, "VLM", {"model": "t", "obs": hints})
+    page = open_page(browser, next(build_site(tmp_path)) + HASH, stub)
+    card = page.locator("#cards li").first
+    assert card.locator("a").first.get_attribute("href").endswith("/observations/1")
+    page.keyboard.press("4")
+    assert card.locator(".which input").input_value() == "House Mouse"
+    assert card.locator(".which .ev").inner_text() == "Eating = House Mouse"
+    card.locator(".which .cp").click()
+    assert page.evaluate("window.__c") == "House Mouse"
+    assert card.locator(".which .cs").inner_text() == "Copied" and page.errors == []

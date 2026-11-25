@@ -108,16 +108,26 @@ function put(c,t,pred,prey){
   var a={v:verdict(t),st:t.slice(),on:new Date().toISOString().slice(0,10),ask:[c.e.pred,c.e.prey]};if(pred){a.pred=pred;a.prey=prey;}
   S.ann[c.r.o.id]=a;save();status(c);change();next();
 }
+function copy(t,cs){(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(function(){cs.textContent='Copied';},function(){cs.textContent='Copy failed';});}
+// the model's best prey guess for an observation among the names, or a species within the card's prey (its Latin name, "Latin (common)" read as Latin)
+function guess(c,names){
+  var h=H&&H.obs[c.r.o.id],l=h?[h.name].concat((h.prey||[]).map(function(q){return q[0];})):[];
+  return l.map(function(n){return String(n||'').replace(/ \(.*$/,'');}).filter(function(n){return E.all().has(n)&&(names.indexOf(n)>=0||E.hit(n,c.e.prey));})[0]||null;
+}
 // Shows it on a card whose field does not name the pair: which animal, from the candidates (or any in the metaweb)
 function which(c){
   var li=c.li,o=c.r.o,eat=o.k!=='by',known=eat?c.e.pred:c.e.prey,M=E.M(),box=li.querySelector('.which'),pick=null;
   if(!box.hidden)return;
   box.hidden=false;
   function fill(names){
-    var h=box.querySelector('.pk');h.replaceChildren(EatingPicker.create({id:'w'+o.id,ph:'Which '+(eat?'prey':'predator')+'?',value:eat?c.e.prey:c.e.pred,names:names,obs:[],parent:M.parent,rank:M.rank,groups:M.groups,label:E.label,
-      onPick:function(n){pick=n;}}));
-    h.querySelector('input').setAttribute('aria-label','Which '+(eat?'prey':'predator')+' does the photo show?');pick=eat?c.e.prey:c.e.pred;
+    var g=eat?guess(c,names):null,v=g||(eat?c.e.prey:c.e.pred),h=box.querySelector('.pk');if(g&&names.indexOf(g)<0)names=names.concat(g);
+    h.replaceChildren(EatingPicker.create({id:'w'+o.id,ph:'Which '+(eat?'prey':'predator')+'?',value:v,names:names,obs:[],parent:M.parent,rank:M.rank,groups:M.groups,label:E.label,
+      onPick:function(n){pick=n;value(n);}}));
+    h.querySelector('input').setAttribute('aria-label','Which '+(eat?'prey':'predator')+' does the photo show?');pick=v;value(v);
   }
+  // the iNaturalist field value for the animal picked, to copy before Confirm
+  function value(n){box.querySelector('.ev').textContent=(eat?'Eating':'Eaten by')+' = '+E.label(n);box.querySelector('.cs').textContent='';}
+  box.querySelector('.cp').onclick=function(){copy(E.label(pick),box.querySelector('.cs'));};
   function uniq(l){return Array.from(new Set(l));}
   fill(uniq((eat?E.preys(known):E.preds(known)).map(function(q){return q[eat?1:0];})));
   box.querySelector('.all').onclick=function(){fill(uniq(M.pairs.map(function(q){return q[eat?1:0];})));};
@@ -140,12 +150,12 @@ function card(c){
     var k=E.el('button',null,x[0]+' ');k.type='button';k.append(E.el('kbd',null,i+1));k.onclick=function(){focus(deck.indexOf(c));answer(c,i);};b.append(k);});
   var w=E.el('div','which'),pk=E.el('div','pk'),all=E.el('button','lnk all','Not in this list'),ok=E.el('button','ok','Confirm');
   w.hidden=true;all.type=ok.type='button';
-  w.append(E.el('span','lab','Which '+(o.k==='by'?'predator':'prey')+'?'),pk,ok,all);
+  w.append(E.el('span','lab','Which '+(o.k==='by'?'predator':'prey')+'?'),pk,E.el('span','ev'),E.el('button','cp','Copy'),E.el('span','cs'),ok,all);
+  w.querySelector('.cp').type='button';w.querySelector('.cs').setAttribute('aria-live','polite');
   // the hand-off: the page never writes to iNaturalist, so a confirmed mark sends the reader to add the field there
   var hd=E.el('div','hand'),ha=E.el('a'),cp=E.el('button','cp','Copy'),cs=E.el('span','cs');
   hd.hidden=true;ha.href=OBS+o.id;ha.target='_blank';ha.rel='noopener';cp.type='button';cs.setAttribute('aria-live','polite');
-  cp.onclick=function(){var t=hd.dataset.name;
-    (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(function(){cs.textContent='Copied';},function(){cs.textContent='Copy failed';});};
+  cp.onclick=function(){copy(hd.dataset.name,cs);};
   hd.append(ha,cp,cs,E.el('p','hint evl'));
   var go=E.el('a','open','Open on iNaturalist');go.href=OBS+o.id;go.target='_blank';go.rel='noopener';
   var sh=E.el('button');WtidCarry.share(sh,function(){return ['record='+o.id];});
