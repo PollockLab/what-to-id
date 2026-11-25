@@ -57,6 +57,9 @@ def caught(tmp_path_factory):
             "lk": ["Stichaeidae", 49, "Pricklebacks"],
         },
         foodweb_page.hit(805, "Caught it eating"),
+        foodweb_page.hit(806, "Caught my eye, a bird of prey"),
+        foodweb_page.hit(807, "Caught by a crab"),
+        foodweb_page.hit(808, "Caught in the act of eating a shrimp"),
     ]
     with pytest.MonkeyPatch.context() as m:
         m.setattr(foodweb_page, "META", meta)
@@ -71,6 +74,7 @@ def test_caught_or_prey_names_a_prey_or_draws_no_card(browser, caught):
     assert "Barred Owl may be eating Pricklebacks" in card_of(page, 804)
     assert "links the prey’s observation" in card_of(page, 804)
     assert "may be eating something" in card_of(page, 805)  # a strong food word still counts
-    for i in (802, 803):
+    assert "Barred Owl may be eating Caridea" in card_of(page, 808)
+    for i in (802, 803, 806, 807):
         assert page.locator(f"#cards a[href$='/observations/{i}']").count() == 0
     assert page.errors == []

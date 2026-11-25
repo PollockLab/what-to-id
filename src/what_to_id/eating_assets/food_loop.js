@@ -39,6 +39,12 @@ function credit(t){return t.replace(/\b(?:caught|photo(?:graph(?:ed)?)?|picture|
 var GROUP={shrimp:'Caridea',crab:'Brachyura',crayfish:'Astacidea',fish:'Actinopterygii',prickleback:'Stichaeidae',sculpin:'Cottidae',salmon:'Salmonidae',herring:'Clupeidae',insect:'Insecta',moth:'Lepidoptera',butterfly:'Lepidoptera',caterpillar:'Lepidoptera',dragonfly:'Odonata',beetle:'Coleoptera',fly:'Diptera',bee:'Anthophila',grasshopper:'Orthoptera',spider:'Araneae',snail:'Gastropoda',slug:'Gastropoda',clam:'Bivalvia',mussel:'Bivalvia',frog:'Anura',snake:'Serpentes',bird:'Aves',duck:'Anatidae',squirrel:'Sciuridae',rabbit:'Leporidae',damselfly:'Zygoptera','damsel fly':'Zygoptera',ladybug:'Coccinellidae',swallowtail:'Lepidoptera',meadowhawk:'Sympetrum',midge:'Diptera',stickleback:'Gasterosteidae','honey bee':'Apis mellifera'};
 // the verbs of eating and killing: what follows the first one is the prey ("Damsel fly eating a moth"), unless it is the predator itself ("kills the darner")
 var VERB=/\b(?:eat\w*|ate|feed\w*|fed|devour\w*|prey\w*|caught|catch\w*|captur\w*|kill\w*)\b/;
+// what names no prey of the animal: "bird of prey", and its own predator ("caught by a bald eagle")
+function quiet(t){return t.replace(/\bbirds? of prey\b/g,' ').replace(/\b(?:caught|killed|eaten) by (?:an?|the) [^.!?\n]*/g,' ');}
+// "X kills the <this animal>" after the verb: the animal is the victim
+function victim(n,post){return tokens(n).some(function(t){return new RegExp('\\b(?:the|an?|this|that) '+t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?![a-z])').test(post);});}
+// the first verb that names a prey: "caught" only before a determiner ("caught a shrimp", not "caught in a web", "caught my eye")
+function verb(t){var re=new RegExp(VERB.source,'g'),m;while((m=re.exec(t))&&m[0]==='caught'&&!/^\s+(?:an?|the|some|its|his|her|their|this|that|one|two|three|several|another|\d+)\b/.test(t.slice(m.index+6)));return m;}
 // every known animal's Latin and full common name (not its last word: "bee" is not a honey bee), for a prey the predator's metaweb row lacks
 var EXT=null,EXTA=null;
 function pool(){
@@ -56,13 +62,14 @@ function entries(r){
   if(named&&!E.open(r,eat?'prey':'pred')){add(named,4,'The field names the pair');return out;}
   if(named){all.filter(function(n){return E.within(n,named);}).forEach(function(n){add(n,3,'The field names '+E.label(named)+', not a species');});return out;}
   // the description links the observer's own record of the prey: its taxon is the prey
-  if(o.lk&&eat){add(o.lk[0],3,'The description links the prey’s observation');return out;}
+  // not when it is the predator ("prey of", "killed by", "feeding on the <this animal>"), a chick fed, a flock or a duplicate of the same genus
+  if(o.lk&&eat){var d=quiet(credit(lc(o.d))),m=verb(d);
+    if(!/\bprey (?:of|to)\b|\b(?:killed|eaten|caught) by\b|\bfeeding (?:an?|the|its) (?!\w+ on\b)|\bflock|\baggregation/.test(lc(o.d))&&!(m&&victim(known,d.slice(m.index)))&&o.lk[0].split(' ')[0]!==known.split(' ')[0]){
+      add(o.lk[0],3,'The description links the prey’s observation');return out;}}
   var src=[['Description',o.d],['Tags',(o.g||[]).join(' ')],['The field text',o.x]].filter(function(s){return s[1];});
-  src.forEach(function(s){var low=lc(s[1]),cl=credit(low),m=VERB.exec(cl),post=m?cl.slice(m.index+m[0].length):cl,how=s[0]+(s[0]==='Tags'?' mention ':' mentions ');
+  src.forEach(function(s){var low=quiet(lc(s[1])),cl=credit(low),m=verb(cl),post=m?cl.slice(m.index+m[0].length):VERB.test(cl)?'':cl,how=s[0]+(s[0]==='Tags'?' mention ':' mentions ');
     // "X kills the <this animal>": the animal in the photo is the victim, so the text names no prey for it
-    // "caught in a web", "caught on camera": the animal is caught, it caught nothing
-    if(eat&&m&&m[0]==='caught'&&/^\s+(?:in|on|at|by|under|up)\b/.test(post))return;
-    if(eat&&tokens(known).some(function(t){return new RegExp('\\b(?:the|an?|this|that) '+t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?![a-z])').test(post);}))return;
+    if(eat&&victim(known,post))return;
     all.forEach(function(n){var t=tokens(n).filter(function(k){return mention(low,k);})[0];
       if(t)add(n,2,how+'“'+t+'”');});
     if(!eat||out.length)return;
@@ -73,7 +80,7 @@ function entries(r){
   if(out.length)return out;
   // only a food word (the text search's): no prey is named, so the card asks about any prey, not the metaweb's likeliest
   // "caught" and "prey" alone name the victim as often ("caught in a web"): such a hit is no card
-  if(o.k==='text'){var f=null,weak=false;src.forEach(function(s){var low=credit(lc(s[1]));FOOD.forEach(function(w){if(!f&&mention(low,w)){if(WEAK.indexOf(w)<0)f=s[0]+(s[0]==='Tags'?' mention ':' mentions ')+'“'+w+'”';else weak=true;}});});
+  if(o.k==='text'){var f=null,weak=false;src.forEach(function(s){var low=credit(quiet(lc(s[1])));FOOD.forEach(function(w){if(!f&&WEAK.indexOf(w)<0&&mention(low,w))f=s[0]+(s[0]==='Tags'?' mention ':' mentions ')+'“'+w+'”';});weak=weak||WEAK.some(function(w){return mention(lc(s[1]),w);});});
     if(!f&&weak)return out;add('',1,f||'Description or tags mention food');return out;}
   // the model's own guess (a taxon, else a group word) is the card's prey; with neither, it asks about any prey, not the metaweb's likeliest
   if(o.k==='model'){var h=H&&H.obs[o.id],l=h?[h.name].concat((h.prey||[]).map(function(q){return q[0];})):[],why='A vision model flagged feeding';
