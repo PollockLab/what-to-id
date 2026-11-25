@@ -19,9 +19,10 @@ id, any place) as k "model" records: the observed taxon is the predator, no fiel
 asks for the prey like an empty Eating field.
 
 `--metaweb FILE` also writes foodweb-text.json beside it: BC observations of a metaweb predator
-species whose description (words eating, eats, ate, feeding) or tags (predation,
-eating, feeding) talk about food, with the description and tags kept (k "text"). The evidence
-search ranks them against the candidate prey. Comments are not searchable through the API.
+species (or of a predator's genus or family) whose description (words eating, eats, ate,
+feeding) or tags (predation, eating, feeding) talk about food, with the description and tags
+kept (k "text"). The evidence search ranks them against the candidate prey. Comments are not
+searchable through the API.
 """
 
 from __future__ import annotations
@@ -143,11 +144,49 @@ def predators(metaweb: dict) -> set[str]:
     return {p[0] for p in metaweb["pairs"]}
 
 
-def slim_text(o: dict, preds: set[str]) -> dict | None:
-    """A text-search hit as a record, or None unless it is a photographed species of a predator."""
+def families(metaweb: dict) -> set[str]:
+    """Family names of the metaweb's predators, up its parent map (hops capped against cycles)."""
+    out = set()
+    for p in predators(metaweb):
+        for _ in range(40):
+            if metaweb["rank"].get(p) == "family":
+                out.add(p)
+                break
+            p = metaweb["parent"].get(p)
+            if not p:
+                break
+    return out
+
+
+def family_ids(names: set[str], pause: float = 1.0) -> set[int]:
+    """iNaturalist taxon ids of family names, which an observation's taxon.ancestor_ids holds."""
+    import requests
+
+    out = set()
+    for n in sorted(names):
+        p = {"q": n, "rank": "family", "per_page": 5}
+        r = requests.get(
+            "https://api.inaturalist.org/v1/taxa",
+            params=p,
+            timeout=60,
+            headers={"User-Agent": "what-to-id"},
+        )
+        r.raise_for_status()
+        out |= {t["id"] for t in r.json()["results"] if t["name"] == n}
+        time.sleep(pause)
+    return out
+
+
+def slim_text(o: dict, preds: set[str], fams: set[int] = frozenset()) -> dict | None:
+    """A text-search hit as a record, or None unless it is a photographed species of a predator,
+    of a predator's genus, or of a predator's family (fams: taxon ids, card asks "something")"""
     t = o.get("taxon") or {}
     name = t.get("name") or ""
-    if t.get("rank") != "species" or not (name in preds or name.split(" ")[0] in preds):
+    if t.get("rank") != "species" or not (
+        name in preds
+        or name.split(" ")[0] in preds
+        or fams.intersection(t.get("ancestor_ids") or ())
+    ):
         return None
     r = slim(o, "eating")
     if not r:
@@ -158,7 +197,7 @@ def slim_text(o: dict, preds: set[str]) -> dict | None:
     return r
 
 
-def fetch_text(preds: set[str], pause: float = 1.0) -> list[dict]:
+def fetch_text(preds: set[str], pause: float = 1.0, fams: set[int] = frozenset()) -> list[dict]:
     import requests
 
     out: dict[int, dict] = {}
@@ -177,7 +216,7 @@ def fetch_text(preds: set[str], pause: float = 1.0) -> list[dict]:
             r.raise_for_status()
             res = r.json()["results"]
             for o in res:
-                rec = slim_text(o, preds)
+                rec = slim_text(o, preds, fams)
                 if rec:
                     out.setdefault(rec["id"], rec)
             if len(res) < PER_PAGE:
@@ -237,7 +276,8 @@ def main(argv: list[str] | None = None) -> int:
     ).exists():  # the map reads it as META.files.foodobs, for its feeding photos
         publish(site, "foodobs", Path(a.out).name, Path(a.out).read_bytes())
     if a.metaweb:
-        text = fetch_text(predators(json.loads(Path(a.metaweb).read_text())))
+        mw = json.loads(Path(a.metaweb).read_text())
+        text = fetch_text(predators(mw), fams=family_ids(families(mw)))
         (site / TEXT_FILE).write_text(
             json.dumps(
                 {"fetched": date.today().isoformat(), "n": len(text), "obs": text},

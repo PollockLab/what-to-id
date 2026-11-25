@@ -109,6 +109,22 @@ def test_slim_text_keeps_a_photographed_predator_species_with_its_words():
     assert foodweb_obs.predators(META) == {"Strix", "Buteo"}
 
 
+def test_slim_text_keeps_a_species_of_a_predator_family_by_ancestor_ids():
+    taxon = {"name": "Aeshna palmata", "id": 5, "rank": "species", "ancestor_ids": [1, 77, 5]}
+    hit = {**obs(11, description="eating a damselfly"), "taxon": taxon}
+    assert foodweb_obs.slim_text(hit, {"Anax"}) is None
+    assert foodweb_obs.slim_text(hit, {"Anax"}, {77})["id"] == 11
+    assert foodweb_obs.slim_text(hit, {"Anax"}, {78}) is None
+    assert (
+        foodweb_obs.slim_text({**hit, "taxon": {**taxon, "ancestor_ids": None}}, set(), {77})
+        is None
+    )
+    meta = {"rank": {"Anax": "genus", "Aeshnidae": "family"}, "parent": {"Anax": "Aeshnidae"}}
+    assert foodweb_obs.families({**meta, "pairs": [["Anax", "x", 1], ["Strix", "y", 1]]}) == {
+        "Aeshnidae"
+    }
+
+
 def test_slim_keeps_the_photo_count_and_no_text():
     two = [{"url": "https://x/photos/1/square.jpg"}] * 2
     r = foodweb_obs.slim(obs(7, photos=two, comments=[{"body": "nice shot"}]), "eating")
