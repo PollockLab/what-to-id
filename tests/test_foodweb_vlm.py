@@ -41,3 +41,10 @@ def test_the_file_keeps_only_the_hint_fields(tmp_path):
     assert d["obs"] == {"9": {"p": 0.2, "prey": []}} and "Qwen3-VL-8B" in d["model"]
     src.write_text("obs_id,p_feeding\n")
     assert foodweb_vlm.main(["--csv", str(src), "--out", str(out)]) == 1
+
+
+def test_model_provenance_can_be_overridden(tmp_path):
+    out, src = tmp_path / "v.json", tmp_path / "s.csv"
+    src.write_text("obs_id,p_feeding\n9,0.2\n")
+    assert foodweb_vlm.main(["--csv", str(src), "--out", str(out), "--model", "run B"]) == 0
+    assert json.loads(out.read_text())["model"] == "run B"
