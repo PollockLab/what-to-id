@@ -30,14 +30,15 @@ var S={ann:{},cls:'',src:'study',part:null},H=null,E=null,Q={x:null,y:null},ITEM
 function load(){
   try{var v=JSON.parse(localStorage.getItem(KEY));
     if(v&&typeof v==='object'){S.ann=v.ann&&typeof v.ann==='object'&&!Array.isArray(v.ann)?v.ann:{};
-    S.cls=CLASSES.some(function(c){return c[0]===v.cls;})?v.cls:'';if(SOURCES.some(function(c){return c[0]===v.src;}))S.src=v.src;S.part=v.part;}}catch(e){}
+    S.by=v.by&&typeof v.by==='object'?v.by:{};var c=S.by[location.pathname];S.cls=CLASSES.some(function(k){return k[0]===c;})?c:'';if(SOURCES.some(function(c){return c[0]===v.src;}))S.src=v.src;S.part=v.part;}}catch(e){}
   if(PART)S.part=[+PART[1],+PART[2]];
   if(!(Array.isArray(S.part)&&S.part[0]>=1&&S.part[0]<=S.part[1]))S.part=null;
 }
 function source(r){return H&&H.obs[r.o.id]?'study':r.o.k==='text'?'text':'field';}
 function study(c){return source(c.r)==='study';}
 function mine(id){return !S.part||id%S.part[1]===S.part[0]-1;}
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
+// food web and pollination share the marks, but each page keeps its own class filter
+function save(){S.by=S.by||{};S.by[location.pathname]=S.cls;try{localStorage.setItem(KEY,JSON.stringify({ann:S.ann,src:S.src,part:S.part,by:S.by}));}catch(e){}}
 function lc(s){return String(s||'').toLowerCase();}
 // the words that name a prey in a text: its Latin and common name, and the common name's last word ("vole")
 function tokens(n){
