@@ -4,7 +4,8 @@
 // loads: MapGroups(META) rewrites META.groups, names and group_ids and sets META.gmap (old group index to new, or
 // absent when nothing merged) for MapGroups.grp (a group column), MapGroups.sum (per-group counts or rows) and
 // MapGroups.totals. The choice is the URL's plants=inat|split, else the one kept in localStorage (which may be
-// blocked); the pages share the origin, so MapGroups.watch() reloads a page another page switched.
+// blocked); the pages share the origin, so MapGroups.watch() reloads a page another page switched;
+// an embedded page also tells its parent (Explore), which switches the other panes without storage.
 var MapGroups=(function(){
 'use strict';
 var KEY='wtid-plants',SPLIT=['Tracheophyta','Bryophytes','Algae'];
@@ -21,6 +22,7 @@ function MapGroups(META){
   META.groups=out;META.names=Object.assign({},META.names,{Plantae:'Plants (Plantae)'});
   META.group_ids=Object.assign({},META.group_ids,{Plantae:(META.group_ids||{}).Plantae||47126});
   SPLIT.forEach(function(g){delete META.group_ids[g];});
+  if(META.presets)META.presets=META.presets.filter(function(c){return SPLIT.indexOf(c[0])<0;});  // a split group's chip
   return META;}
 MapGroups.KEY=KEY;MapGroups.mode=mode;MapGroups.url=url;
 // A group column (old indexes), merged in place.
@@ -49,6 +51,7 @@ MapGroups.ui=function(META,box){
     b.setAttribute('aria-pressed',String(b.dataset.m===META.plants));
     b.onclick=function(){if(b.dataset.m===META.plants)return;
       try{localStorage.setItem(KEY,b.dataset.m);}catch(e){}
+      if(parent!==window)parent.postMessage({type:'wtid-plants',m:b.dataset.m},location.origin);  // Explore switches the other panes, storage or not
       location.href=url(b.dataset.m);};});};
 return MapGroups;
 })();
