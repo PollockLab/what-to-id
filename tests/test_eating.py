@@ -141,3 +141,35 @@ def test_fetches_stop_before_inaturalists_10000_result_limit(monkeypatch, capsys
     foodweb_obs.fetch_text({"Strix"}, pause=0)
     assert max(seen) == foodweb_obs.LIMIT // foodweb_obs.PER_PAGE
     assert "cut at iNaturalist's 10000 result limit" in capsys.readouterr().err
+
+
+def test_model_flagged_ids_are_fetched_in_batches_and_kept_as_model_records(
+    monkeypatch, tmp_path, capsys
+):
+    import requests
+
+    ids = list(range(1, 402)) + [5]  # a repeat in the CSV is read once
+    csv_path = tmp_path / "ids.csv"
+    csv_path.write_text("obs_id,p\n" + "".join(f"{i},0.9\n" for i in ids))
+    assert foodweb_obs.read_ids(str(csv_path)) == list(range(1, 402))
+    batches = []
+
+    class R:
+        def __init__(self, got):
+            self.got = got
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"results": [obs(int(i)) for i in self.got] + [{**obs(0), "photos": []}]}
+
+    def get(url, params, **kw):
+        batches.append(params["id"].split(","))
+        return R(batches[-1])
+
+    monkeypatch.setattr(requests, "get", get)
+    out = foodweb_obs.fetch_ids(foodweb_obs.read_ids(str(csv_path)), pause=0)
+    assert [len(b) for b in batches] == [200, 200, 1] and len(out) == 401
+    assert out[0]["k"] == "model" and "f" not in out[0] and out[0]["ph"].endswith("/medium.jpg")
+    assert foodweb_obs.fetch_ids([], pause=0) == []

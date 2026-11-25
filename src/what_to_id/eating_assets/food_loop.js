@@ -38,7 +38,7 @@ function entries(r){
   src.forEach(function(s){var low=lc(s[1]);all.forEach(function(n){var t=tokens(n).filter(function(k){return mention(low,k);})[0];
     if(t)add(n,2,s[0]+(s[0]==='Tags'?' mention ':' mentions ')+'“'+t+'”');});});
   if(out.length)return out;
-  all.forEach(function(n){add(n,1,o.k==='text'?'Description or tags mention food':'The '+(eat?'Eating':'Eaten by')+' field '+(o.x?'has text, no taxon':'is empty'));});
+  all.forEach(function(n){add(n,1,o.k==='text'?'Description or tags mention food':o.k==='model'?'A vision model flagged feeding':'The '+(eat?'Eating':'Eaten by')+' field '+(o.x?'has text, no taxon':'is empty'));});
   return out;
 }
 function score(e){return Math.max(E.p(e.pred,e.prey),0.1)*e.tier;}
