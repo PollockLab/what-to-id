@@ -20,9 +20,11 @@ asks for the prey like an empty Eating field.
 
 `--metaweb FILE` also writes foodweb-text.json beside it: BC observations of a metaweb predator
 species (or of a predator's genus or family) whose description (words eating, eats, ate,
-feeding) or tags (predation, eating, feeding) talk about food, with the description and tags
-kept (k "text"). The evidence search ranks them against the candidate prey. Comments are not
-searchable through the API.
+feeding, prey, caught) or tags (predation, eating, feeding) talk about food, with the
+description and tags kept (k "text"). The evidence search ranks them against the candidate
+prey. Comments are not searchable through the API. A description that links another iNaturalist
+observation (the observer's own record of the prey) keeps that observation's taxon as lk:
+[name, id, common].
 """
 
 from __future__ import annotations
@@ -30,6 +32,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 import sys
 import time
 from datetime import date
@@ -133,11 +136,13 @@ def read_ids(path: str) -> list[int]:
         return list(dict.fromkeys(int(r["obs_id"]) for r in csv.DictReader(f)))
 
 
-# not "caught" or "prey": they name the victim as often (caught in a web, Song Sparrow prey)
-SEARCHES = [("description", w) for w in ("eating", "eats", "ate", "feeding")] + [
+# "caught" and "prey" name the victim as often (caught in a web, Song Sparrow prey): the page keeps
+# their hits only when a prey is named after the verb, or linked (lk)
+SEARCHES = [("description", w) for w in ("eating", "eats", "ate", "feeding", "prey", "caught")] + [
     ("tags", w) for w in ("predation", "eating", "feeding")
 ]
 TEXT_FILE = "foodweb-text.json"
+LINK = re.compile(r"inaturalist\.(?:org|ca)/observations/(\d+)")
 
 
 def predators(metaweb: dict) -> set[str]:
@@ -191,10 +196,32 @@ def slim_text(o: dict, preds: set[str], fams: set[int] = frozenset()) -> dict | 
     r = slim(o, "eating")
     if not r:
         return None
-    r.update(
-        k="text", d=(o.get("description") or "").strip()[: TEXT * 3], g=(o.get("tags") or [])[:8]
-    )
+    d = (o.get("description") or "").strip()
+    r.update(k="text", d=d[: TEXT * 3], g=(o.get("tags") or [])[:8])
+    m = LINK.search(d)
+    if m and int(m.group(1)) != o["id"]:
+        r["lk"] = int(m.group(1))
     return r
+
+
+def linked(recs: list[dict], pause: float = 1.0) -> None:
+    """Replace each record's linked observation id (lk) by that observation's taxon, or drop it."""
+    import requests
+
+    ids = list({r["lk"] for r in recs if "lk" in r})
+    taxa = {}
+    for i in range(0, len(ids), PER_PAGE):
+        p = {"id": ",".join(map(str, ids[i : i + PER_PAGE])), "per_page": PER_PAGE}
+        r = requests.get(API, params=p, timeout=60, headers={"User-Agent": "what-to-id"})
+        r.raise_for_status()
+        for o in r.json()["results"]:
+            if t := o.get("taxon"):
+                taxa[o["id"]] = [_species(t), t["id"], t.get("preferred_common_name") or ""]
+        time.sleep(pause)
+    for r in recs:
+        t = taxa.get(r.pop("lk", None))
+        if t and t[0] != r["t"][0]:
+            r["lk"] = t
 
 
 def fetch_text(preds: set[str], pause: float = 1.0, fams: set[int] = frozenset()) -> list[dict]:
@@ -226,6 +253,7 @@ def fetch_text(preds: set[str], pause: float = 1.0, fams: set[int] = frozenset()
                 break
             page += 1
             time.sleep(pause)
+    linked(list(out.values()), pause)
     return list(out.values())
 
 

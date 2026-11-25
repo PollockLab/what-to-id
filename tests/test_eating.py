@@ -201,6 +201,6 @@ def test_model_flagged_ids_are_fetched_in_batches_and_kept_as_model_records(
     assert foodweb_obs.fetch_ids([], pause=0) == []
 
 
-def test_text_search_skips_words_that_name_the_victim():
+def test_text_search_keeps_caught_and_prey_for_the_page_to_filter():
     words = {w for on, w in foodweb_obs.SEARCHES if on == "description"}
-    assert {"eating", "feeding"} <= words and not words & {"caught", "prey"}
+    assert {"eating", "feeding", "caught", "prey"} <= words

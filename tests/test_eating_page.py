@@ -596,9 +596,9 @@ def test_a_group_word_names_the_group_only_when_the_predator_eats_in_it(browser,
 def test_a_credit_is_not_a_food_word(browser, words):
     page = open_page(browser, words + "#q=eats&x=Strix varia")
     draw_all(page)
-    for i in (604, 605):
-        card = card_of(page, i)
-        assert "Description or tags mention food" in card and "mentions “" not in card
+    card = card_of(page, 605)
+    assert "Description or tags mention food" in card and "mentions “" not in card
+    assert page.locator("#cards a[href$='/observations/604']").count() == 0  # only "caught"
     assert page.errors == []
 
 
