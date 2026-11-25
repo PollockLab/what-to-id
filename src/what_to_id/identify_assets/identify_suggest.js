@@ -1,15 +1,15 @@
 // One-tap suggestions at the top of each What, When, Where and Who panel on Identify, above the full filters. Each applies
 // filters that already exist (the same address keys), so a suggestion can be undone with the filter it set. Hidden in Batches.
 // IdentifySuggest(o), o {S, META, mf, nf, P(), taxa(), allc() (records per group), short(g), tm (MapTime), changed(), rewrite(drop, add),
+// prio {w() Prioritize's weights by key, gap() each record's survey gap tier and out() 1 per record far outside its range, each null until loaded},
 // area(rings, hash, label) (the area changed, the map reloads), get(url), user() (the viewer's login: the iNaturalist sign in, else the progress box's, else ''), show() (opens the Who panel), embedded}. Returns update(), after every change.
 // where() starts the park list's fetch, called when Where opens; who() fetches the top identifiers and shows Your IDs (the viewer's IDs that others replied to) when their folds under the login are open. Your IDs is also fetched once in the background when a person is known, kept 10 minutes in sessionStorage, and the replies not yet seen are counted in #rep (and in a wtid-replies event for the sign in line); it listens for wtid-person (a sign out, or a new login in the progress box). Needs group_icons.js, identify_unconfirmed.js (the area's box), map_area.js (the park list's address and MapArea.encode) and the panels' #sgwhat, #sgwhen, #sgwhere, #sgwho.
 var IdentifySuggest=(function(){
 'use strict';
 // Every English string, in one place for the translation file to take over; {n} and {d} are filled in.
 var T={
-  what:'Suggested',recent:'Recently used',recentSub:'Recently used',backlog:'Biggest backlogs',backlogSub:'{n} of the records to identify',
-  blitz:'Blitz targets',blitzSub:'{n} at risk or introduced',lists:'Suggestions',
-  when:'Quick picks',visit:'Since your last visit',visitSub:'From {d}',allSub:'Every record',rangeSub:'{a} to {b}',
+  picks:'Quick picks',recent:'Recently used',toId:'{n} to identify',
+  gap:'{n} in a survey gap',risk:'{n} at risk',inv:'{n} introduced',out:'{n} out of range',visit:'Since your last visit',visitSub:'From {d}',allSub:'Every record',rangeSub:'{a} to {b}',
   near:'Near me',nearSub:'Within 50 km of where you are',nearWait:'Finding where you are…',
   denied:'Location is blocked for this site. Allow it in the browser, or draw an area below.',
   unavailable:'Your location is not available. Draw an area below instead.',outside:'You seem to be outside this map’s area.',
@@ -62,13 +62,12 @@ function circle(lon,lat){
 }
 return function(o){
 var S=o.S,META=o.META,MF=o.mf,G=META.groups,box={},bt=function(){return document.body.classList.contains('bt');},
-  rows={what:[],when:[],where:[],who:[]},msg={where:'',who:''},PN=null,PS=0,IDS={},BLZ=null,seen=null,prev=null,LV=null;
+  rows={what:[],when:[],where:[],who:[]},msg={where:'',who:''},PN=null,PS=0,IDS={},CNT={},seen=null,prev=null,LV=null;
 ['what','when','where','who'].forEach(function(k){box[k]=document.getElementById('sg'+k);});
 var TOP=document.getElementById('topids'),TN=document.getElementById('topn'),MY=document.getElementById('myids'),REP=document.getElementById('rep'),MINE={},LOOK={};
 if(TOP){TN.value=get(STORE.topn)||'5';if(!TN.value)TN.value='5';TOP.addEventListener('toggle',who);TN.onchange=function(){put(STORE.topn,TN.value);who();};}
 if(MY){MY.addEventListener('toggle',yours);document.addEventListener('wtid-person',yours);
   REP.querySelector('button').onclick=function(){MY.open=true;o.show();MY.scrollIntoView({block:'nearest'});};}
-var hasFlags=META.flags.indexOf('threatened')>=0||META.flags.indexOf('introduced')>=0;
 
 // Recently used: the last groups and taxa picked, newest first, kept on this device
 function recent(){var r=get(STORE.recent);return Array.isArray(r)?r:[];}
@@ -88,29 +87,42 @@ function note(){
 function groupOn(g){return S.groups[g]==='inc'&&Object.keys(S.groups).length===1;}
 function pickGroup(g){var on=groupOn(g);S.groups={};if(!on)S.groups[g]='inc';o.changed();}
 function pickTaxon(id){var on=S.picks.length===1&&S.picks[0].id===id&&!S.picks[0].not;S.picks=on?[]:[{id:id,not:false}];o.changed();}
-function blitz(){
-  if(BLZ||!hasFlags)return BLZ;
-  var P=o.P(),c=new Uint32Array(G.length),i;
-  if(!P.flags)return null;
-  for(i=0;i<P.n;i++)if(P.flags[i]&3)c[P.grp[i]]++;
-  return (BLZ=c);
+// What: one row per group, the three biggest backlogs and the groups used recently, by records to identify, then the taxa used recently.
+// Each group's line is its records to identify and those the heaviest Prioritize weight that a record has or not picks out (Survey gap,
+// At risk, Introduced or Out of range), in that slider's words; Level order and Newest pick out none.
+function lead(){
+  var w=o.prio.w();
+  return ['gap','risk','inv','out'].filter(function(k){return w[k]>0;}).sort(function(a,b){return w[b]-w[a];})[0]||null;
+}
+// the records per group that prioritizer k picks out, null while its data is missing; kept until that data changes
+function facts(k){
+  var P=o.P(),F={risk:['threatened',2],inv:['introduced',1]}[k],a=k==='gap'?o.prio.gap():k==='out'?o.prio.out():
+    META.flags.indexOf(F[0])>=0?P.flags:null,c,i;
+  if(!a)return null;
+  if(CNT[k]&&CNT[k][0]===a)return CNT[k][1];
+  c=new Uint32Array(G.length);
+  for(i=0;i<P.n;i++)if(F?a[i]&F[1]:a[i])c[P.grp[i]]++;
+  CNT[k]=[a,c];return c;
 }
 function top(c,n){
   return G.map(function(g,k){return k;}).filter(function(k){return c[k]>0&&!/^(Animalia|Unknown)$/.test(G[k]);})
     .sort(function(a,b){return c[b]-c[a]||a-b;}).slice(0,n);
 }
-function grow(k,pre,c,sub){return {k:pre+G[k],g:G[k],j:k,t:o.short(G[k]),s:fmt(sub,{n:o.nf.format(c[k])}),on:groupOn(G[k]),fn:function(){pickGroup(G[k]);}};}
 function whatRows(){
-  var out=[],P=o.P(),ac=o.allc(),b=blitz(),tx=o.taxa();
-  var rc=recent().slice(0,3).map(function(x){
-    if(x.g)return G.indexOf(x.g)<0?null:{k:'r:g'+x.g,g:x.g,j:G.indexOf(x.g),t:o.short(x.g),s:T.recentSub,on:groupOn(x.g),fn:function(){pickGroup(x.g);}};
+  var ac=o.allc(),tx=o.taxa(),k=lead(),c=k&&facts(k),rc=recent().slice(0,3),
+    gs=rc.filter(function(x){return x.g&&G.indexOf(x.g)>=0;}).map(function(x){return G.indexOf(x.g);}),ids=META.group_ids||{};
+  if(!ac)return [];
+  top(ac,3).forEach(function(j){if(gs.indexOf(j)<0)gs.push(j);});
+  var out=gs.sort(function(a,b){return ac[b]-ac[a]||a-b;}).map(function(j){var g=G[j];
+    return {k:'g:'+g,g:g,j:j,t:o.short(g),tag:rc.some(function(x){return x.g===g;})?T.recent:'',
+      s:[fmt(T.toId,{n:o.nf.format(ac[j])})].concat(c?[' · ',fmt(T[k],{n:o.nf.format(c[j])})]:[]),on:groupOn(g),fn:function(){pickGroup(g);}};});
+  rc.forEach(function(x){
+    // a taxon that is a listed group's own (Plantae with Plants) is that group's row
+    if(!x.t||gs.some(function(j){return ids[G[j]]===x.t;}))return;
     var r=tx.filter(function(t){return t[2]===x.t;})[0];
-    return r?{k:'r:t'+x.t,i:'leaf',t:r[1]||r[0],s:T.recentSub+(r[1]?' · '+r[0]:''),on:S.picks.length===1&&S.picks[0].id===x.t,fn:function(){pickTaxon(x.t);}}:null;
-  }).filter(Boolean);
-  if(rc.length)out.push({h:T.recent,rows:rc});
-  if(ac&&P.n)out.push({h:T.backlog,rows:top(ac,3).map(function(k){return grow(k,'b:',ac,T.backlogSub);})});
-  if(b&&top(b,1).length)out.push({h:T.blitz,rows:top(b,3).map(function(k){return grow(k,'z:',b,T.blitzSub);})});
-  return out;
+    if(r)out.push({k:'t:'+x.t,i:'leaf',t:r[1]||r[0],tag:T.recent,s:r[1]?r[0]:'',on:S.picks.length===1&&S.picks[0].id===x.t&&!S.picks[0].not,fn:function(){pickTaxon(x.t);}});
+  });
+  return [{h:T.picks,rows:out}];
 }
 
 // When: the presets (the existing buttons do the work) and the days since the last visit
@@ -131,7 +143,7 @@ function whenRows(){
   var d=prev?MF.dayOf(prev):null;
   if(d!=null&&d<=MF.LAST)r.unshift({k:'w:visit',i:'eye',t:T.visit,s:fmt(T.visitSub,{d:prev}),on:S.lo===MF.clamp(d)&&S.hi===MF.LAST,
     fn:function(){S.lo=MF.clamp(d);S.hi=MF.LAST;o.changed();}});
-  return [{h:T.when,rows:r}];
+  return [{h:T.picks,rows:r}];
 }
 
 // Where: Near me on tap, and the two parks with the most records to identify, under the map. A park's boundary comes from the map, which reloads.
@@ -288,12 +300,13 @@ function whoRows(){
 
 // Drawing: the rows are rebuilt and the focused one found again by its key
 function row(r){
-  var li=el('li'),b=el('button','sgr'),t=el('span','sgi'),x=el('span','sgx'),s=el('span','sgs',r.s);
-  b.type='button';b.dataset.k=r.k;
+  var li=el('li'),b=el('button','sgr'),t=el('span','sgi'),x=el('span','sgx'),s=el('span','sgs');
+  b.type='button';b.dataset.k=r.k;s.append.apply(s,[].concat(r.s));  // parts are text nodes, so each is translated on its own
   if(r.g){t.appendChild(svg('<path d="'+(GROUP_ICONS[r.g]||GROUP_ICONS.Unknown)+'" transform="translate(0 480) scale(1 -1)"/>',true));
     t.style.setProperty('--c','rgb('+MapFilter.color(r.g,r.j).join(',')+')');t.classList.add('grp');}
   else t.appendChild(svg(ICON[r.i||'leaf']));
-  x.append(el('span','sgt2',r.t),s);b.append(t,x);
+  var t2=el('span','sgt2',r.t);if(r.tag)t2.append(' ',el('span','sgtag',r.tag));
+  x.append(t2,s);b.append(t,x);
   if(r.on!=null)b.setAttribute('aria-pressed',String(!!r.on));
   if(r.dis){b.setAttribute('aria-disabled','true');b.title=r.why;
     var hint=el('span','vh',' '+r.why);x.appendChild(hint);b.onclick=function(){msg.who=r.why;draw();};}
@@ -323,6 +336,6 @@ function update(){
   if(LV===null){visit();LV=true;}
   msg.who='';note();draw();who();yours();
 }
-return {update:update,where:parks,who:function(){who();yours();}};
+return {update:update,what:function(){if(o.P().n)section(whatRows(),'what');},where:parks,who:function(){who();yours();}};
 };
 })();

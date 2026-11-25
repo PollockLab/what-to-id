@@ -7,7 +7,7 @@
 // IdentifyBar(o), o {S, META, mf (MapFilter(META)), nf, taxa(), P(), tf() (the taxon filter), mask(st) (1 per record
 // st keeps at the chosen level), all(st) (the same at every level), tab() ({name, has(i)}: the chosen
 // level), changed() (S changed), rewrite(drop, add) (the address's tokens), where(rings, hash) (the area changed), get(url), user() (the viewer's login: the iNaturalist sign in, else the progress box's, else ''), leave() (out of Batches), map (the map
-// page's address), key() (the selection as text), embedded}.
+// page's address), key() (the selection as text), prio (Prioritize's, for the What suggestions: identify_suggest.js), embedded}.
 // Returns update(), called after every selection and level change. Needs map_taxa.js, map_chips.js, map_area.js,
 // group_list.js, map_hist.js, map_time.js, map_only.js, identify_where.js and identify_suggest.js.
 var IdentifyBar=(function(){
@@ -23,13 +23,15 @@ function nm(META,g){return (META.names[g]||g).replace(/ \([^)]*\)$/,'');}
 // the What panel's: Combine opens it and names how many it picked, and the row lights every group picked, strikes those left out.
 // IdentifyBar.row(META, allc (the records per group), nf, g0 (the one group picked, '' none)) draws it before the records land, from
 // the first lists' totals (pool_levels.py), its tabs disabled until the bar takes them; the bar draws it itself without.
-var REST=/^(Animalia|Unknown)$/,NS='http://www.w3.org/2000/svg',ROW=null;
+var REST=/^(Animalia|Unknown)$/,NS='http://www.w3.org/2000/svg',ROW=null,
+  SHORT={Tracheophyta:'Vascular',Fungi:'Fungi',Bryophytes:'Mosses',Arachnida:'Spiders',Algae:'Algae',Chromista:'Kelp'};  // a tab's word, its full name its accessible name
 function cat(META,allc,g,j){
   var b=el('button','cat'),v=document.createElementNS(NS,'svg'),p=document.createElementNS(NS,'path');
   b.type='button';b.disabled=true;v.setAttribute('viewBox','0 0 512 512');v.setAttribute('aria-hidden','true');
   p.setAttribute('d',GROUP_ICONS[g||'All']||GROUP_ICONS.Unknown);p.setAttribute('transform','translate(0 480) scale(1 -1)');v.appendChild(p);
   if(g)b.style.setProperty('--c','rgb('+MapFilter.color(g,j).join(',')+')');
-  b.append(v,el('span',null,g?nm(META,g):'All'));
+  b.append(v,el('span',null,g?SHORT[g]||nm(META,g):'All'));
+  if(g&&SHORT[g])b.setAttribute('aria-label',nm(META,g));  // the tooltip, its full name and counts, comes with the records: cats()
   if(g){
     var s=el('i');s.style.flexGrow=allc[j];s.dataset.k=nm(META,g);s.style.setProperty('--c',b.style.getPropertyValue('--c'));
     $('mix').appendChild(s);
@@ -46,7 +48,9 @@ function row(META,allc,nf,g0){
   m.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2.4"/><circle cx="15" cy="17" r="2.4"/></svg><span>Combine</span>';
   $('cats').after(m);  // outside the scroller, always in reach
   $('mixn').textContent=nf.format(META.n)+' records to identify';
-  var over=function(){var c=$('cats');c.classList.toggle('over',c.scrollWidth>c.clientWidth+1);};over();addEventListener('resize',over);
+  // the row fades at the side it scrolls on to, so the tabs past the edge are seen to be there
+  var c=$('cats'),edge=function(){var m=c.scrollWidth-c.clientWidth;c.classList.toggle('l',m>1&&c.scrollLeft>1);c.classList.toggle('r',m>1&&c.scrollLeft<m-1);};
+  edge();addEventListener('resize',edge);c.addEventListener('scroll',edge,{passive:true});
   return (ROW={cats:cs,more:m});
 }
 function make(o){
@@ -127,7 +131,7 @@ function tc(){
 if(META.files.totals)o.get(META.files.totals).then(function(b){TOT=MapGroups.totals(META,JSON.parse(new TextDecoder().decode(b)));update();}).catch(function(){});
 var TM=MapTime({S:S,mf:MF,render:o.changed,refilter:o.changed,byObs:$('byObs'),byUp:$('byUp'),presets:$('presets'),from:$('from'),to:$('to'),
   months:$('months'),mclear:$('mclear')});
-var SG=IdentifySuggest({S:S,META:META,mf:MF,nf:o.nf,P:o.P,taxa:o.taxa,allc:function(){return ALLC;},short:short,tm:TM,changed:o.changed,rewrite:o.rewrite,
+var SG=IdentifySuggest({S:S,META:META,mf:MF,nf:o.nf,P:o.P,taxa:o.taxa,allc:function(){return ALLC;},short:short,tm:TM,prio:o.prio,changed:o.changed,rewrite:o.rewrite,
   area:function(rings,h,l){LBL=l;o.where(rings,h);if(W)W.reset();},get:o.get,user:o.user,show:function(){o.leave();if(phone.matches)sheet(3);else open(3);},embedded:o.embedded});
 var MH=MapHist({S:S,META:META,mf:MF,nf:o.nf,over:$('over'),hist:$('hist'),htip:$('htip'),unit:$('unit'),cum:cum,sub:{cum:function(){cum();return SUB;},name:function(){return o.tab().name;}},tc:tc,render:o.changed});
 
@@ -177,7 +181,7 @@ var XL=$('xlinks'),XM=$('xmap');
 if(XL&&!o.embedded)fetch('explore.html',{method:'HEAD'}).then(function(r){XL.hidden=XM.hidden=!r.ok;}).catch(function(){});
 function fill(k){
   if(!visible(k))return;
-  if(k===0)counts();
+  if(k===0){counts();SG.what();}  // Prioritize may have changed since
   else if(k===1)MH.draw();
   else if(k===2){if(W)W.show();SG.where();}
   else{SG.who();[].forEach.call(SEG[3].p.querySelectorAll('details details'),function(d){d.open=true;});}  // Who: the threshold sits in a closed Adjust
