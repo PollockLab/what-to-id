@@ -173,7 +173,7 @@ obs_id,p_feeding,taxon_name,predator_canmw,prey_name_qwen,prey_bbox_0_1000,prey_
 249531014,1.0,Strix nebulosa,Strix nebulosa,,"[328.0, 464.0, 440.0, 687.0]",Zapodidae,0.346,Synaptomys,0.092,Dicrostonyx,0.064
 341897834,0.995,Strix nebulosa,Strix nebulosa,,"[447.0, 385.0, 475.0, 488.0]",fish,0.462,Asteroidea,0.152,Mus musculus,0.058
 27791705,1.0,Strix varia,Strix varia,,"[298.0, 580.0, 595.0, 748.0]",Sciurus carolinensis,0.293,Aplodontia,0.19,Glaucomys volans,0.109
-31185151,0.0,Strix varia,Strix varia,,,Mniotilta varia,0.458,Strigiformes,0.192,Tyto,0.166
+31185151,0.0,Strix varia,Strix varia,,,Synaptomys cooperi,0.91,Ondatra zibethicus,0.04,Microtus pinetorum,0.033
 34519185,0.0,Strix varia,Strix varia,,"[258.0, 740.0, 404.0, 915.0]",Aplodontia,0.533,Erethizon dorsatus,0.194,Erethizontidae,0.108
 54992315,1.0,Strix varia,Strix varia,,"[388.0, 195.0, 628.0, 464.0]",Mus,0.666,Mus musculus,0.293,Muridae,0.014
 62351220,0.852,Strix varia,Strix varia,,,Synaptomys cooperi,0.571,Glaucomys volans,0.251,Glaucomys sabrinus,0.105
@@ -215,7 +215,7 @@ obs_id,p_feeding,taxon_name,predator_canmw,prey_name_qwen,prey_bbox_0_1000,prey_
 169678295,0.003,Bubo virginianus,Bubo virginianus,,,Aplodontia rufa,0.579,Marmota vancouverensis,0.357,Sciurus carolinensis,0.015
 291288000,0.001,Bubo virginianus,Bubo virginianus,,,Microtus montanus,0.525,Thomomys,0.195,Marmota flaviventris,0.063
 347625269,0.881,Bubo virginianus,Bubo virginianus,,"[372.0, 492.0, 429.0, 525.0]",Arvicolinae,0.128,fish,0.097,Erethizontidae,0.094
-9131461,1.0,Asio flammeus,Asio flammeus,,"[156.0, 339.0, 381.0, 695.0]",Sebastes caurinus,0.359,fish,0.334,Sebastes auriculatus,0.143
+9131461,1.0,Asio flammeus,Asio flammeus,,"[156.0, 339.0, 381.0, 695.0]",Arvicolinae,0.494,Neotoma cinerea,0.175,Dicrostonyx,0.151
 144946919,0.991,Asio flammeus,Asio flammeus,,"[321.0, 475.0, 365.0, 565.0]",fish,0.427,Arvicolinae,0.099,Alexandromys,0.086
 147650727,0.011,Asio flammeus,Asio flammeus,,,Dicrostonyx richardsoni,0.448,Buteo lagopus,0.243,Synaptomys borealis,0.184
 148351216,0.0,Asio flammeus,Asio flammeus,,,Synaptomys borealis,0.556,Lemmus trimucronatus,0.335,Dicrostonyx richardsoni,0.041
@@ -376,16 +376,16 @@ obs_id,p_feeding,taxon_name,predator_canmw,prey_name_qwen,prey_bbox_0_1000,prey_
 375275017,0.997,Rana aurora,Rana aurora,,"[0.0, 48.0, 515.0, 531.0]",Thamnophis sirtalis,1.0,Thamnophis,0.0,Plethodon cinereus,0.0
 85729928,0.223,Coluber constrictor mormon,Coluber constrictor,,"[317.0, 351.0, 385.0, 406.0]",Polystoechotes punctata,0.196,Hemileuca eglanterina,0.118,Seiurus,0.107
 189219797,0.0,Coluber constrictor mormon,Coluber constrictor,,,Charina bottae,0.906,Squamata,0.059,Crotalus,0.013
-281169880,0.731,Coluber constrictor,Coluber constrictor,,,Charina bottae,0.932,Elgaria coerulea,0.021,Crotalus oreganus,0.014
-282931481,0.5,Coluber constrictor,Coluber constrictor,,"[470.0, 310.0, 588.0, 408.0]",Neurotrichus gibbsii,0.453,Blarina brevicauda,0.23,Sorex trowbridgii,0.112
+281169880,0.731,Coluber constrictor,Coluber constrictor,,,Dipodomys ordii,0.61,Poliocitellus,0.158,Urocitellus,0.051
+282931481,0.5,Coluber constrictor,Coluber constrictor,,"[470.0, 310.0, 588.0, 408.0]",Neurotrichus gibbsii,0.232,Neotoma cinerea,0.227,Blarina brevicauda,0.118
 24620459,1.0,Thamnophis sirtalis,Thamnophis sirtalis,,"[304.0, 200.0, 788.0, 578.0]",Rana aurora,0.997,Lithobates sylvaticus,0.003,Lithobates palustris,0.0
 45696789,0.679,Thamnophis sirtalis fitchi,Thamnophis sirtalis,,,Blarina brevicauda,0.29,Viperidae,0.287,Plethodon cinereus,0.205
-59373761,1.0,Thamnophis sirtalis fitchi,Thamnophis sirtalis,,"[337.0, 55.0, 656.0, 385.0]",Acris blanchardi,0.367,Acris crepitans,0.281,Anura,0.13
+59373761,1.0,Thamnophis sirtalis fitchi,Thamnophis sirtalis,,"[337.0, 55.0, 656.0, 385.0]",Lithobates catesbeianus,0.401,Rana aurora,0.236,Lithobates,0.129
 61713860,0.622,Thamnophis sirtalis,Thamnophis sirtalis,,"[333.0, 181.0, 552.0, 308.0]",Blarina brevicauda,0.391,Soricidae,0.19,Sorex arcticus,0.139
 99147993,0.0,Thamnophis sirtalis,Thamnophis sirtalis,,"[0.0, 250.0, 392.0, 812.0]",Blarina brevicauda,0.582,Plethodon cinereus,0.156,Sorex cinereus,0.063
 103940795,1.0,Thamnophis sirtalis,Thamnophis sirtalis,,"[171.0, 111.0, 638.0, 458.0]",Blarina brevicauda,0.748,Plethodon cinereus,0.137,Lithobates palustris,0.077
-117729845,0.993,Thamnophis sirtalis,Thamnophis sirtalis,,,Ameiurus nebulosus,0.546,Salvelinus fontinalis,0.203,Lithobates clamitans,0.154
-117742051,0.998,Thamnophis sirtalis,Thamnophis sirtalis,,,Porichthys notatus,0.919,Liparis pulchellus,0.044,Xiphister mucosus,0.017
+117729845,0.993,Thamnophis sirtalis,Thamnophis sirtalis,,,Lithobates clamitans,0.765,Lithobates sylvaticus,0.189,Lithobates catesbeianus,0.017
+117742051,0.998,Thamnophis sirtalis,Thamnophis sirtalis,,,Lithobates clamitans,0.448,Rana aurora,0.284,Lithobates catesbeianus,0.212
 130068615,0.777,Thamnophis sirtalis,Thamnophis sirtalis,,,Plethodon cinereus,0.389,Blarina brevicauda,0.301,Eurycea bislineata,0.144
 138470391,0.995,Thamnophis sirtalis,Thamnophis sirtalis,,,Plethodon cinereus,0.408,Lithobates palustris,0.213,Blarina brevicauda,0.099
 200357673,1.0,Thamnophis sirtalis fitchi,Thamnophis sirtalis,,"[625.0, 424.0, 885.0, 953.0]",Anaxyrus boreas,1.0,Anaxyrus,0.0,Anaxyrus hemiophrys,0.0
@@ -401,15 +401,15 @@ obs_id,p_feeding,taxon_name,predator_canmw,prey_name_qwen,prey_bbox_0_1000,prey_
 286591190,0.986,Thamnophis sirtalis pickeringii,Thamnophis sirtalis,,"[52.0, 437.0, 175.0, 575.0]",Enteroctopus dofleini,0.235,Cryptotis,0.133,worm,0.111
 287985323,1.0,Thamnophis sirtalis,Thamnophis sirtalis,,"[355.0, 450.0, 455.0, 615.0]",Blarina brevicauda,0.257,Blarina,0.228,Limax maximus,0.139
 289625515,0.998,Thamnophis sirtalis,Thamnophis sirtalis,,"[450.0, 668.0, 788.0, 875.0]",Rana pretiosa,0.65,Rana luteiventris,0.3,Rana aurora,0.05
-290780286,0.0,Thamnophis sirtalis,Thamnophis sirtalis,,,Alitta williami,0.532,Lithobates palustris,0.208,Viperidae,0.054
+290780286,0.0,Thamnophis sirtalis,Thamnophis sirtalis,,,Lithobates palustris,0.99,Lithobates pipiens,0.009,Lithobates sylvaticus,0.001
 292211935,0.986,Thamnophis sirtalis,Thamnophis sirtalis,,"[317.0, 135.0, 458.0, 361.0]",Oncorhynchus kisutch,0.513,Nautichthys oculofasciatus,0.316,Sebastes caurinus,0.092
 293298920,0.148,Thamnophis sirtalis fitchi,Thamnophis sirtalis,,,Petrochelidon pyrrhonota,0.592,Aeronautes saxatalis,0.383,Riparia riparia,0.019
 305299482,0.999,Thamnophis sirtalis,Thamnophis sirtalis,,"[88.0, 264.0, 364.0, 404.0]",Podothecus accipenserinus,0.257,Myoxocephalus polyacanthocephalus,0.121,Sebastes nebulosus,0.113
-307857813,1.0,Thamnophis sirtalis fitchi,Thamnophis sirtalis,,"[364.0, 588.0, 514.0, 815.0]",Sorex trowbridgii,0.279,Pholisora catullus,0.197,Sorex hoyi,0.168
-311175891,0.852,Thamnophis sirtalis,Thamnophis sirtalis,,"[492.0, 437.0, 571.0, 562.0]",Cryptotis,0.194,Blarina brevicauda,0.117,Talpidae,0.106
+307857813,1.0,Thamnophis sirtalis fitchi,Thamnophis sirtalis,,"[364.0, 588.0, 514.0, 815.0]",Desmognathus fuscus,0.184,Aneides ferreus,0.132,Aneides vagrans,0.125
+311175891,0.852,Thamnophis sirtalis,Thamnophis sirtalis,,"[492.0, 437.0, 571.0, 562.0]",Cryptotis,0.13,Geomys,0.088,Blarina brevicauda,0.078
 358016117,1.0,Thamnophis sirtalis,Thamnophis sirtalis,,"[445.0, 427.0, 600.0, 554.0]",Lithobates palustris,0.616,Blarina brevicauda,0.231,Sorex,0.038
 361543932,1.0,Thamnophis sirtalis pickeringii,Thamnophis sirtalis,,"[340.0, 225.0, 450.0, 317.0]",Ameiurus nebulosus,0.55,Ameiurus natalis,0.254,Lithobates catesbeianus,0.103
-371090503,0.991,Thamnophis sirtalis,Thamnophis sirtalis,,"[335.0, 700.0, 500.0, 825.0]",fish,0.477,Enteroctopus dofleini,0.09,Dermochelys,0.064
+371090503,0.991,Thamnophis sirtalis,Thamnophis sirtalis,,"[335.0, 700.0, 500.0, 825.0]",Anaxyrus cognatus,0.446,Scaphiopodidae,0.093,Ascaphus montanus,0.078
 373145062,1.0,Thamnophis sirtalis fitchi,Thamnophis sirtalis,,"[570.0, 437.0, 747.0, 585.0]",Anaxyrus boreas,0.992,Spea intermontana,0.004,Anaxyrus cognatus,0.003
 374760628,0.0,Thamnophis sirtalis fitchi,Thamnophis sirtalis,,,Sorex palustris,0.83,Lithobates pipiens,0.037,Sorex arcticus,0.033
 378496494,1.0,Thamnophis sirtalis,Thamnophis sirtalis,,"[486.0, 567.0, 750.0, 725.0]",Lithobates clamitans,0.648,Pseudacris crucifer,0.12,Anura,0.074
@@ -433,27 +433,27 @@ obs_id,p_feeding,taxon_name,predator_canmw,prey_name_qwen,prey_bbox_0_1000,prey_
 303631599,1.0,Thamnophis ordinoides,Thamnophis ordinoides,,"[177.0, 375.0, 555.0, 552.0]",Arion hortensis,0.957,Limax maximus,0.016,Deroceras laeve,0.012
 368543693,0.182,Thamnophis ordinoides,Thamnophis ordinoides,,"[244.0, 725.0, 556.0, 825.0]",Charina bottae,0.473,Necturus maculosus,0.117,Xiphister mucosus,0.062
 381217465,1.0,Thamnophis ordinoides,Thamnophis ordinoides,,"[550.0, 675.0, 800.0, 810.0]",Doryteuthis opalescens,0.762,Bankia setacea,0.07,Neotoma cinerea,0.047
-1724666,0.999,Thamnophis elegans vagrans,Thamnophis elegans,,"[520.0, 478.0, 640.0, 610.0]",fish,0.309,Mola mola,0.173,Anarrhichthys ocellatus,0.088
+1724666,0.999,Thamnophis elegans vagrans,Thamnophis elegans,,"[520.0, 478.0, 640.0, 610.0]",Dicrostonyx,0.33,Neotoma cinerea,0.123,Dicrostonyx nunatakensis,0.117
 27086929,1.0,Thamnophis elegans,Thamnophis elegans,,"[308.0, 475.0, 548.0, 866.0]",Porichthys notatus,0.917,Leptocottus armatus,0.082,Podothecus accipenserinus,0.001
 27351892,1.0,Thamnophis elegans,Thamnophis elegans,,"[222.0, 440.0, 820.0, 571.0]",fish,0.586,Cymatogaster aggregata,0.116,Oncorhynchus clarkii,0.083
 28068827,0.119,Thamnophis elegans,Thamnophis elegans,,"[328.0, 638.0, 430.0, 730.0]",Porichthys notatus,0.578,fish,0.084,Anoplarchus purpurescens,0.049
-35829326,1.0,Thamnophis elegans vagrans,Thamnophis elegans,,"[575.0, 400.0, 1000.0, 765.0]",Neurotrichus gibbsii,0.974,Sorex trowbridgii,0.011,Cryptotis,0.01
+35829326,1.0,Thamnophis elegans vagrans,Thamnophis elegans,,"[575.0, 400.0, 1000.0, 765.0]",Neotoma cinerea,0.868,Lemmiscus curtatus,0.039,Reithrodontomys megalotis,0.014
 47781601,0.997,Thamnophis elegans,Thamnophis elegans,,"[408.0, 564.0, 714.0, 835.0]",Anaxyrus boreas,0.825,Spea intermontana,0.09,Rana luteiventris,0.032
 52164882,0.963,Thamnophis elegans,Thamnophis elegans,,,Viperidae,0.604,Squamata,0.132,Crotalus,0.09
 53892970,0.029,Thamnophis elegans vagrans,Thamnophis elegans,,"[661.0, 470.0, 730.0, 558.0]",fish,0.667,Hypomesus pretiosus,0.094,Nautichthys oculofasciatus,0.088
-58465013,0.999,Thamnophis elegans vagrans,Thamnophis elegans,,"[0.0, 222.0, 488.0, 750.0]",Talpidae,0.497,Microtus richardsoni,0.335,Microtus townsendii,0.1
+58465013,0.999,Thamnophis elegans vagrans,Thamnophis elegans,,"[0.0, 222.0, 488.0, 750.0]",Microtus richardsoni,0.686,Microtus townsendii,0.205,Microtus montanus,0.04
 79337386,1.0,Thamnophis elegans vagrans,Thamnophis elegans,,"[419.0, 500.0, 548.0, 656.0]",fish,0.571,Porichthys notatus,0.328,Anarrhichthys ocellatus,0.041
 80939891,0.999,Thamnophis elegans,Thamnophis elegans,,"[188.0, 500.0, 445.0, 885.0]",Squamata,0.512,Arvicolinae,0.22,Talpidae,0.192
-98766875,0.005,Thamnophis elegans,Thamnophis elegans,,,Prosopium williamsoni,0.797,Catostomus macrocheilus,0.068,Ammodytes personatus,0.031
+98766875,0.005,Thamnophis elegans,Thamnophis elegans,,,Spea intermontana,0.983,Rana luteiventris,0.014,Spea bombifrons,0.001
 101013318,0.002,Thamnophis elegans,Thamnophis elegans,,"[398.0, 750.0, 515.0, 875.0]",Echidnocerus foraminatus,0.713,Boidae,0.096,mollusc,0.061
 125941764,1.0,Thamnophis elegans,Thamnophis elegans,,"[225.0, 117.0, 998.0, 548.0]",Enophrys bison,0.522,Gobiesox maeandricus,0.111,Asemichthys taylori,0.079
 128617104,0.997,Thamnophis elegans,Thamnophis elegans,,"[0.0, 630.0, 385.0, 998.0]",Apodichthys flavidus,0.426,Xiphister atropurpureus,0.188,Parophrys vetulus,0.065
-132469984,0.905,Thamnophis elegans vagrans,Thamnophis elegans,,"[100.0, 640.0, 988.0, 1000.0]",Mola mola,0.379,Nautichthys oculofasciatus,0.228,fish,0.116
+132469984,0.905,Thamnophis elegans vagrans,Thamnophis elegans,,"[100.0, 640.0, 988.0, 1000.0]",Corynorhinus townsendii,0.398,Puma,0.046,Eptesicus,0.037
 133537941,0.881,Thamnophis elegans,Thamnophis elegans,,,Hexagrammos stelleri,0.701,Prosopium williamsoni,0.107,Leptocottus armatus,0.088
-133544406,0.953,Thamnophis elegans,Thamnophis elegans,,,Alitta williami,0.948,Monochamus scutellatus,0.015,Charina bottae,0.009
+133544406,0.953,Thamnophis elegans,Thamnophis elegans,,,Zapus trinotatus,0.649,Zapus princeps,0.199,Neotoma cinerea,0.051
 136499774,0.982,Thamnophis elegans,Thamnophis elegans,,"[242.0, 125.0, 500.0, 658.0]",Charina bottae,0.974,Phrynosoma hernandesi,0.01,Sorex ugyunak,0.005
 177616782,1.0,Thamnophis elegans vagrans,Thamnophis elegans,,"[298.0, 0.0, 506.0, 485.0]",Cottus asper,0.815,Cottus cognatus,0.084,Leptocottus armatus,0.039
-178284502,0.953,Thamnophis elegans,Thamnophis elegans,,"[345.0, 430.0, 525.0, 625.0]",Bankia setacea,0.154,Platynereis bicanaliculata,0.102,Hololepida magna,0.1
+178284502,0.953,Thamnophis elegans,Thamnophis elegans,,"[345.0, 430.0, 525.0, 625.0]",Ascaphus montanus,0.988,Ascaphus,0.004,Ascaphus truei,0.003
 179289522,0.998,Thamnophis elegans vagrans,Thamnophis elegans,,"[38.0, 158.0, 580.0, 825.0]",Anaxyrus boreas,0.844,Ascaphus truei,0.138,Ascaphus montanus,0.015
 179630502,0.777,Thamnophis elegans,Thamnophis elegans,,"[478.0, 403.0, 638.0, 852.0]",Anoplarchus purpurescens,0.416,Hololepida magna,0.41,Xiphister mucosus,0.119
 185260884,0.999,Thamnophis elegans vagrans,Thamnophis elegans,,"[424.0, 444.0, 572.0, 550.0]",Boidae,0.907,bird egg,0.05,Soricidae,0.01
@@ -463,7 +463,7 @@ obs_id,p_feeding,taxon_name,predator_canmw,prey_name_qwen,prey_bbox_0_1000,prey_
 231507759,0.998,Thamnophis elegans,Thamnophis elegans,,"[275.0, 375.0, 497.0, 504.0]",Blarina brevicauda,0.579,Blarina,0.191,Soricidae,0.084
 236360313,1.0,Thamnophis elegans vagrans,Thamnophis elegans,,"[81.0, 304.0, 700.0, 835.0]",Onychomys leucogaster,0.996,Perognathus parvus,0.003,Lemmiscus curtatus,0.001
 239049761,0.0,Thamnophis elegans vagrans,Thamnophis elegans,,,Anoplarchus purpurescens,0.532,Monochamus scutellatus,0.295,Catostomus macrocheilus,0.077
-298845982,1.0,Thamnophis elegans,Thamnophis elegans,,"[478.0, 238.0, 575.0, 425.0]",Erethizontidae,0.928,Talpidae,0.02,Blarina,0.005
+298845982,1.0,Thamnophis elegans,Thamnophis elegans,,"[478.0, 238.0, 575.0, 425.0]",Sorex maritimensis,0.307,Sorex haydeni,0.235,Sorex hoyi,0.145
 304867528,0.009,Thamnophis elegans,Thamnophis elegans,,,Anoplarchus purpurescens,0.627,Mytilus californianus,0.181,Charina bottae,0.042
 305570646,0.991,Thamnophis elegans vagrans,Thamnophis elegans,,"[421.0, 228.0, 617.0, 464.0]",Prosopium williamsoni,0.674,Catostomus catostomus,0.151,Catostomus macrocheilus,0.079
 366070785,0.009,Thamnophis elegans vagrans,Thamnophis elegans,,,Lumpenus sagitta,0.554,Anoplarchus purpurescens,0.15,Xiphister mucosus,0.121
@@ -544,7 +544,7 @@ obs_id,p_feeding,taxon_name,predator_canmw,prey_name_qwen,prey_bbox_0_1000,prey_
 97587873,0.989,Ursus arctos horribilis,Ursus arctos,,,Urocitellus parryii,0.899,Ovibos,0.023,Oncorhynchus nerka,0.02
 99551514,1.0,Ursus arctos horribilis,Ursus arctos,,"[562.0, 645.0, 825.0, 802.0]",Oncorhynchus kisutch,0.844,Ptychocheilus oregonensis,0.075,fish,0.044
 131044525,0.999,Ursus arctos horribilis,Ursus arctos,,"[630.0, 758.0, 718.0, 885.0]",Mola mola,0.395,Sebastes nebulosus,0.133,Oncorhynchus keta,0.11
-137826672,1.0,Ursus arctos horribilis,Ursus arctos,,"[621.0, 552.0, 685.0, 695.0]",Sebastes caurinus,0.283,Anarrhichthys ocellatus,0.222,Mola mola,0.116
+137826672,1.0,Ursus arctos horribilis,Ursus arctos,,"[621.0, 552.0, 685.0, 695.0]",Bonasa,0.993,Canachites,0.006,Centrocercus urophasianus,0.001
 138940461,0.0,Ursus arctos horribilis,Ursus arctos,,,Oncorhynchus gorbuscha,0.67,Oncorhynchus nerka,0.249,Gadus chalcogrammus,0.037
 140659307,0.924,Ursus arctos horribilis,Ursus arctos,,,Oncorhynchus gorbuscha,0.968,Oncorhynchus keta,0.023,Oncorhynchus nerka,0.004
 141678372,0.991,Ursus arctos horribilis,Ursus arctos,,"[488.0, 543.0, 575.0, 578.0]",fish,0.683,Mola mola,0.273,Anarrhichthys ocellatus,0.006
@@ -1568,7 +1568,7 @@ obs_id,p_feeding,taxon_name,predator_canmw,prey_name_qwen,prey_bbox_0_1000,prey_
 175657377,1.0,Crotalus oreganus oreganus,Crotalus oreganus,,"[286.0, 384.0, 595.0, 562.0]",Arvicolinae,0.49,Onychomys leucogaster,0.071,Heteromyidae,0.052
 176705803,1.0,Crotalus oreganus oreganus,Crotalus oreganus,,"[375.0, 468.0, 685.0, 781.0]",Aplodontia,0.474,Aplodontiidae,0.114,Tamias amoenus,0.078
 287791542,1.0,Crotalus oreganus oreganus,Crotalus oreganus,,"[0.0, 410.0, 750.0, 725.0]",Neotoma cinerea,0.814,Urocitellus richardsonii,0.13,Arvicolinae,0.017
-302221779,0.002,Crotalus oreganus oreganus,Crotalus oreganus,,,Poliocitellus franklinii,0.937,Pantherophis spiloides,0.062,Neotoma cinerea,0.0
+302221779,0.002,Crotalus oreganus oreganus,Crotalus oreganus,,,Poliocitellus franklinii,1.0,Urocitellus parryii,0.0,Ictidomys tridecemlineatus,0.0
 307974779,0.999,Crotalus oreganus oreganus,Crotalus oreganus,,"[505.0, 284.0, 575.0, 388.0]",fish,0.933,Arvicolinae,0.023,Oncorhynchus kisutch,0.004
 324194702,0.622,Crotalus oreganus oreganus,Crotalus oreganus,,"[497.0, 500.0, 650.0, 571.0]",Aplodontiidae,0.44,Arvicolinae,0.346,Phenacomys intermedius,0.031
 350989001,0.0,Crotalus oreganus oreganus,Crotalus oreganus,,,Tamiasciurus douglasii,0.458,Bombus vosnesenskii,0.186,Neotoma cinerea,0.183
@@ -2039,11 +2039,11 @@ obs_id,p_feeding,taxon_name,predator_canmw,prey_name_qwen,prey_bbox_0_1000,prey_
 27356494,0.007,Buteo swainsoni,Buteo swainsoni,,,Cynomys ludovicianus,0.999,Urocitellus richardsonii,0.001,Geomys bursarius,0.0
 117248652,1.0,Buteo swainsoni,Buteo swainsoni,,"[680.0, 488.0, 738.0, 715.0]",fish,0.735,Arvicolinae,0.056,Lemmiscus,0.016
 137488259,0.223,Buteo swainsoni,Buteo swainsoni,,"[345.0, 619.0, 458.0, 680.0]",mollusc,0.405,Bartramia,0.158,fish,0.13
-358725483,0.777,Buteo swainsoni,Buteo swainsoni,,"[334.0, 658.0, 588.0, 817.0]",Castor canadensis,0.252,Geomys bursarius,0.235,Geomys,0.152
+358725483,0.777,Buteo swainsoni,Buteo swainsoni,,"[334.0, 658.0, 588.0, 817.0]",Castor canadensis,0.334,Geomys bursarius,0.31,Geomys,0.201
 383016643,0.996,Buteo swainsoni,Buteo swainsoni,,"[540.0, 444.0, 650.0, 525.0]",Echidnocerus cibarius,0.244,Aplodontiidae,0.087,Nautichthys oculofasciatus,0.086
 105253250,0.562,Buteo lagopus,Buteo lagopus,,"[488.0, 488.0, 515.0, 550.0]",Alexandromys,0.19,Aplodontiidae,0.177,Geomyidae,0.052
 260765242,0.852,Buteo lagopus,Buteo lagopus,,"[468.0, 640.0, 550.0, 815.0]",Dicrostonyx hudsonius,0.528,Dicrostonyx richardsoni,0.174,Neotoma cinerea,0.15
-145432,0.0,Buteo jamaicensis,Buteo jamaicensis,,"[630.0, 562.0, 730.0, 619.0]",Crassadoma gigantea,0.097,Mus musculus,0.096,fish,0.093
+145432,0.0,Buteo jamaicensis,Buteo jamaicensis,,"[630.0, 562.0, 730.0, 619.0]",Mus musculus,0.41,Zapodidae,0.164,Alexandromys,0.096
 8578093,1.0,Buteo jamaicensis,Buteo jamaicensis,,"[197.0, 288.0, 273.0, 588.0]",Dicrostonyx nunatakensis,0.286,Lemmiscus curtatus,0.273,Dicrostonyx richardsoni,0.214
 9569554,0.037,Buteo jamaicensis,Buteo jamaicensis,,,Tamiasciurus douglasii,0.98,Callospermophilus saturatus,0.01,Neotoma cinerea,0.003
 9625603,0.818,Buteo jamaicensis,Buteo jamaicensis,,,Tamiasciurus douglasii,0.483,Marmota vancouverensis,0.144,Accipitriformes,0.071

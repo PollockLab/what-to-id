@@ -263,7 +263,7 @@ jobs:
               --ids src/what_to_id/foodweb_vlm_bc.csv
           fi
           python -m what_to_id.foodweb_vlm --out _site/foodweb-vlm.json --csv src/what_to_id/foodweb_vlm_bc.csv \
-            --model "Qwen3-VL-8B (P feeding from the Yes logit); Qwen3-VL-32B (prey box, or none); BioCLIP 2.5 ViT-H (prey top 3 over 2,267 BC species and 7 coarse groups, predator genus and family excluded, weighted toward the prey order a Qwen3-VL-32B pick from the predator's food-web prey names)"
+            --model "Qwen3-VL-8B (P feeding from the Yes logit); Qwen3-VL-32B (prey box, or none); BioCLIP 2.5 ViT-H (prey top 3 over 2,267 BC species and 7 coarse groups, predator genus and family excluded, weighted toward the prey order a Qwen3-VL-32B pick from the predator's food-web prey names, or limited to the prey group the observer recorded)"
           # with the atlas index the page gets a "Search photos" control (the model downloads only on a click)
           data=(); if [ -n "$ATLAS_HF_REPO" ]; then data=("https://huggingface.co/datasets/${ATLAS_HF_REPO}/resolve/main/"); fi
           python -m what_to_id.page_eating _site "${data[@]}"
