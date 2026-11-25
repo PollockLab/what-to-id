@@ -20,6 +20,8 @@ function idsOf(O){var m=new Map();O.forEach(function(o){m.set(String(o.t[1]),o.t
 // iNaturalist taxon id by Latin name, '' when no observation names the taxon (the metaweb carries no ids)
 function taxonId(n){return tid.get(n)||'';}
 function label(n){return names.get(n)||n;}
+// a taxon from outside the data (the picker's iNaturalist search): its common name and id, so labels and exports carry it
+function add(n,c,id){if(c&&!names.has(n))names.set(n,c);if(id&&!tid.has(n))tid.set(n,id);}
 // a hash value (Latin name, common name or taxon id) as a Latin name the data knows, or null
 function find(v,pool){
   if(!v||v==='0')return null;
@@ -59,6 +61,6 @@ function init(metaweb,file,text){
 // the page's "How this is made" note
 function how(file,text){return 'Pairs: '+M.source+'. '+M.rule+'. Photographed before: '+pl(file.n.obs,'observation')+' with the Eating or Eaten by field (fetched '+file.fetched+'), '+file.n.named+' name a taxon in the field.'+
   (text?' Searched for food: '+pl(text.n,'observation')+' of a metaweb predator whose description or tags say eating, eats, ate, feeding, prey or caught, or are tagged predation, eating or feeding. Comments cannot be searched through the iNaturalist API, so they are not read.':' The description and tag search was not available.');}
-return {init:init,taxonId:taxonId,el:el,pl:pl,label:label,find:find,hit:hit,cov:cov,within:within,inClass:inClass,open:open,p:p,seen:seen,preys:preys,preds:preds,words:words,how:how,
+return {init:init,taxonId:taxonId,add:add,el:el,pl:pl,label:label,find:find,hit:hit,cov:cov,within:within,inClass:inClass,open:open,p:p,seen:seen,preys:preys,preds:preds,words:words,how:how,
   R:R,M:function(){return M;},all:function(){return ALL;}};
 })();

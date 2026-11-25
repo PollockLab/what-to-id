@@ -121,7 +121,7 @@ def test_ten_ranked_cards_show_first_and_more_photos_adds_the_rest(browser, base
         "The field names the pair" in first.inner_text()
         and "Barred Owl eats House Mouse" in first.inner_text()
     )
-    assert first.locator("button").all_inner_texts()[:4] == [
+    assert first.locator(".mk button").all_inner_texts()[:4] == [
         "Not this predator 1",
         "Not eating 2",
         "Can’t tell 3",
