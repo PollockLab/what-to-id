@@ -4,10 +4,11 @@
 // no line is nothing found. Link out only; annotations stay in localStorage.
 (function(){
 'use strict';
-var E=EatingCore,L=FoodLoop,C=EATING_CONFIG,$=function(id){return document.getElementById(id);},el=E.el,label=E.label,M=null,ALL=null,NS='http://www.w3.org/2000/svg';
+var E=EatingCore,L=FoodLoop,C=EATING_CONFIG,W=Object.assign({eat:'eat',eats:'eats',ing:'eating',pred:'Predator',preds:'predators',prey:'Prey',web:'the food web',kin:'animal',
+  drop:'a plant, a fungus or not known to be an animal',none:'No pair has a photograph yet. Mark what you see in the cards and it appears here.'},C.words),$=function(id){return document.getElementById(id);},el=E.el,label=E.label,M=null,ALL=null,NS='http://www.w3.org/2000/svg';
 // the verb control: a short label, and the question it asks in full
-var MODES=[['','Survey','What evidence is there for the food web?'],['eats','X eats','What does X eat?'],['eaten','eats Y','What eats Y?'],['does','X eats Y','Does X eat Y?']];
-var TRY=[['Barred Owl','expanding west',{q:'eats',x:'Barred Owl'}],['Northern Leopard Frog','at risk',{q:'eaten',y:'Northern Leopard Frog'}],
+var MODES=[['','Survey','What evidence is there for '+W.web+'?'],['eats','X '+(W.lab||W.eats),'What does X '+W.eat+'?'],['eaten',(W.lab||W.eats)+' Y','What '+W.eats+' Y?'],['does','X '+(W.lab||W.eats)+' Y','Does X '+W.eat+' Y?']];
+var TRY=W.tries||[['Barred Owl','expanding west',{q:'eats',x:'Barred Owl'}],['Northern Leopard Frog','at risk',{q:'eaten',y:'Northern Leopard Frog'}],
   ['Northwestern Crow on American Red Squirrel','unconfirmed',{q:'does',x:'Northwestern Crow',y:'American Red Squirrel'}]];
 function hash(){var h={};location.hash.slice(1).split('&').forEach(function(kv){var i=kv.indexOf('=');if(i>0)h[kv.slice(0,i)]=decodeURIComponent(kv.slice(i+1));});return h;}
 function go(h){location.hash=Object.keys(h).filter(function(k){return h[k];}).map(function(k){return k+'='+encodeURIComponent(h[k]);}).join('&');}
@@ -40,15 +41,15 @@ function axes(h){
 function matrix(h){
   var a=axes(h),box=$('mx'),t=el('table'),hd=el('tr');box.replaceChildren();
   if(!a.rows.length||!a.cols.length){box.append(el('p','muted','The metaweb has no pair for this question.'));return;}
-  hd.append(el('td','corner',null));hd.firstChild.append(el('span',null,'rows eat columns'));
-  a.cols.forEach(function(c){var th=el('th','v'),b=el('button',null,label(c));b.type='button';b.title='What eats '+label(c)+'?';b.onclick=function(){go({q:'eaten',y:c});};th.append(b);hd.append(th);});
+  hd.append(el('td','corner',null));hd.firstChild.append(el('span',null,'rows '+W.eat+' columns'));
+  a.cols.forEach(function(c){var th=el('th','v'),b=el('button',null,label(c));b.type='button';b.title='What '+W.eats+' '+label(c)+'?';b.onclick=function(){go({q:'eaten',y:c});};th.append(b);hd.append(th);});
   t.append(hd);
   a.rows.forEach(function(r){
-    var tr=el('tr'),th=el('th'),b=el('button',null,label(r));b.type='button';b.title='What does '+label(r)+' eat?';b.onclick=function(){go({q:'eats',x:r});};th.append(b);tr.append(th);
+    var tr=el('tr'),th=el('th'),b=el('button',null,label(r));b.type='button';b.title='What does '+label(r)+' '+W.eat+'?';b.onclick=function(){go({q:'eats',x:r});};th.append(b);tr.append(th);
     a.cols.forEach(function(c){
       var td=el('td'),v=E.p(r,c),st=L.state(r,c),b=el('button'),tip=label(r)+' and '+label(c)+': '+(v?E.words(v)+' in the metaweb':'not in the metaweb')+
         (st==='before'?', photographed before':st==='new'?', first photograph confirmed here':', nothing found yet');
-      b.type='button';b.title=tip;b.setAttribute('aria-label',tip+'. Does '+label(r)+' eat '+label(c)+'?');
+      b.type='button';b.title=tip;b.setAttribute('aria-label',tip+'. Does '+label(r)+' '+W.eat+' '+label(c)+'?');
       if(v)b.style.background='rgba(32,109,203,'+(0.14+0.55*v)+')';
       if(st)td.className='ev';if(h.q==='does'&&c===h.y)td.className+=' sel';
       b.onclick=function(){go({q:'does',x:r,y:c});};td.append(b);tr.append(td);});
@@ -60,7 +61,7 @@ function wrap(t,n){var out=[],cur='';t.split(' ').forEach(function(w){if(cur&&(c
 function s(tag,at,text){var e=document.createElementNS(NS,tag);Object.keys(at||{}).forEach(function(k){e.setAttribute(k,at[k]);});if(text!=null)e.textContent=text;return e;}
 // stage 4: a line for each pair with evidence. A question about one animal is a star (it in the middle, its partners around it, a hollow
 // node and no line for nothing found); the survey and Does X eat Y? are two columns, ordered so the lines cross as little as they can.
-function tip(a,b,st){return label(a)+' eats '+label(b)+': '+(st==='new'?'first photograph (confirmed here)':'photographed before');}
+function tip(a,b,st){return label(a)+' '+W.eats+' '+label(b)+': '+(st==='new'?'first photograph (confirmed here)':'photographed before');}
 function words2(g,t,x,y,anchor,n,k){var tx=s('text',{x:x,y:y,'text-anchor':anchor,class:k||''});wrap(t,n).forEach(function(l,j){tx.append(s('tspan',{x:x,dy:j?13:0},l));});g.append(tx);return tx;}
 function drawNet(Ls,Rs,edges,desc,nm){
   var box=$('net'),n=Math.max(Ls.length,Rs.length),RH=36,H=n*RH+8,svg=s('svg',{viewBox:'0 0 380 '+H,role:'img','aria-label':desc});box.replaceChildren();nm=nm||label;
@@ -91,7 +92,6 @@ function drawStar(hub,parts,edges,desc,eats){
     svg.append(s('circle',{cx:q[0],cy:q[1],r:5,class:on?'on':''}),t);});
   svg.append(s('circle',{cx:cx,cy:cy,r:9,class:'hub'}));words2(svg,label(hub),cx,cy+26,'middle',18,'hubt');box.append(svg);
 }
-var DROP='a plant, a fungus or not known to be an animal';
 // the kingdom of a name by the metaweb's parent table (a species it lacks by its genus): plant, fungus, animal or ''
 function kingdom(n){
   var P=M.parent||{};if(!(n in P)&&sp(n))n=n.split(' ')[0];
@@ -115,7 +115,7 @@ function pairsOf(){var m=new Map();E.R.all.forEach(function(r){if(r.pred&&r.prey
 function network(h){
   var note=$('netnote'),hid=0,tail='',desc;
   function link(ls,rs){var out=[];ls.forEach(function(a,i){rs.forEach(function(b,j){var st=L.state(a,b);if(st)out.push([i,j,st]);});});return out;}
-  function count(es){var b=es.filter(function(e){return e[e.length-1]==='before';}).length;return E.pl(b,'pair')+' photographed before, '+(es.length-b)+' confirmed here.';}
+  function count(es){var b=es.filter(function(e){return e[e.length-1]==='before';}).length;return E.pl(b,'pair')+' photographed before'+(W.cards===false?'.':', '+(es.length-b)+' confirmed here.');}
   if(h.q==='eats'||h.q==='eaten'){
     var eats=h.q==='eats',hub=eats?h.x:h.y,k=eats?1:0,st=function(n){return eats?L.state(hub,n):L.state(n,hub);},
       seen=pairsOf().filter(function(q){return E.hit(q[1-k],hub);}).map(function(q){return q[k];}),
@@ -124,27 +124,29 @@ function network(h){
     parts=parts.slice(0,Math.max(8,parts.filter(st).length));
     var es=[];parts.forEach(function(n,i){var v=st(n);if(v)es.push([i,v]);});
     note.textContent=count(es);
-    if(!parts.length){$('net').replaceChildren(el('p','muted','The metaweb names no '+(eats?'prey':'predator')+' for '+label(hub)+'.'));return;}
+    if(!parts.length){$('net').replaceChildren(el('p','muted','The metaweb names no '+(eats?W.prey:W.pred).toLowerCase()+' for '+label(hub)+'.'));return;}
     drawStar(hub,parts,es,note.textContent,eats);return;
   }
   var L0,R0,E0,nm=label;
   if(h.q==='does'){L0=[h.x];R0=[h.y];E0=link(L0,R0);}
   else{
-    var ps=pairsOf(),keep=ps.filter(function(q){return E.p(q[0],q[1])>0||kingdom(q[0])==='animal'&&kingdom(q[1])==='animal';}),deg=new Map(),rd=new Map(),top=[];hid=ps.length-keep.length;
+    var ps=pairsOf(),keep=ps.filter(function(q){return E.p(q[0],q[1])>0||kingdom(q[0])==='animal'&&kingdom(q[1])===W.kin;}),deg=new Map(),rd=new Map(),top=[];hid=ps.length-keep.length;
     // the ten predators with most pairs and those pairs' prey: a region's whole web is a matrix, not a drawing
     keep.forEach(function(q){deg.set(q[0],(deg.get(q[0])||0)+1);});
     top=Array.from(deg.keys()).sort(function(a,b){return deg.get(b)-deg.get(a)||(label(a)<label(b)?-1:1);}).slice(0,10);
     keep=keep.filter(function(q){return top.indexOf(q[0])>=0;});
+    if(W.cap){var pd=new Map();keep.forEach(function(q){pd.set(q[1],(pd.get(q[1])||0)+1);});
+      var tp=Array.from(pd.keys()).sort(function(a,b){return pd.get(b)-pd.get(a)||(label(a)<label(b)?-1:1);}).slice(0,W.cap);keep=keep.filter(function(q){return tp.indexOf(q[1])>=0;});}
     function names(i){return Array.from(new Set(keep.map(function(q){return q[i];}))).sort(function(a,b){return label(a)<label(b)?-1:1;});}
     L0=names(0);R0=names(1);E0=link(L0,R0);
-    nm=function(n){var g=kingdom(n);return label(n)+(g==='plant'||g==='fungus'?' ('+g+')':'');};
+    nm=function(n){var g=kingdom(n);return label(n)+((g==='plant'||g==='fungus')&&g!==W.kin?' ('+g+')':'');};
     var o=bary(L0,R0,E0);L0=o.L;R0=o.R;E0=o.E;
-    if(deg.size>top.length)tail=' The '+top.length+' of '+deg.size+' predators with most pairs.';
-    if(hid)tail+=' '+E.pl(hid,'pair')+' hidden, the partner is '+DROP+'.';
+    if(deg.size>top.length)tail=' The '+top.length+' of '+deg.size+' '+W.preds+' with most pairs.';
+    if(hid)tail+=' '+E.pl(hid,'pair')+' hidden, the partner is '+W.drop+'.';
   }
-  note.textContent=h.q==='does'?(E0.length?label(h.x)+' eating '+label(h.y)+': '+(E0[0][2]==='new'?'first photograph, confirmed here.':'photographed before.'):'Nothing found yet for '+label(h.x)+' eating '+label(h.y)+'.')
+  note.textContent=h.q==='does'?(E0.length?label(h.x)+' '+W.ing+' '+label(h.y)+': '+(E0[0][2]==='new'?'first photograph, confirmed here.':'photographed before.'):'Nothing found yet for '+label(h.x)+' '+W.ing+' '+label(h.y)+'.')
     :count(E0)+tail;
-  if(!L0.length||!R0.length){$('net').replaceChildren(el('p','muted','No pair has a photograph yet. Mark what you see in the cards and it appears here.'));return;}
+  if(!L0.length||!R0.length){$('net').replaceChildren(el('p','muted',W.none));return;}
   drawNet(L0,R0,E0,note.textContent,nm);
 }
 // the network as a tidy CSV: `# key: value` header lines (pandas comment='#'), then one row per pair of the question, the metaweb's
@@ -152,7 +154,7 @@ function network(h){
 var STATUS={new:'confirmed_here',before:'photographed_before'};
 function netCsv(h){
   var q=function(v){return '"'+String(v==null?'':v).replace(/"/g,'""')+'"';},m=new Map(),mk=L.marks(),
-    ask=h.q==='eats'?'What does '+label(h.x)+' eat?':h.q==='eaten'?'What eats '+label(h.y)+'?':h.q==='does'?'Does '+label(h.x)+' eat '+label(h.y)+'?':'What evidence is there for the food web?';
+    ask=h.q==='eats'?'What does '+label(h.x)+' '+W.eat+'?':h.q==='eaten'?'What '+W.eats+' '+label(h.y)+'?':h.q==='does'?'Does '+label(h.x)+' '+W.eat+' '+label(h.y)+'?':'What evidence is there for '+W.web+'?';
   function add(a,c){m.set(a+'|'+c,[a,c]);}
   if(h.q==='does')add(h.x,h.y);
   else{M.pairs.filter(function(r){return h.q==='eats'?E.cov(h.x,r[0]):h.q==='eaten'?E.cov(h.y,r[1]):true;}).forEach(function(r){add(r[0],r[1]);});
@@ -166,17 +168,17 @@ function netCsv(h){
     'predator,predator_taxon_id,prey,prey_taxon_id,status,shows_it,not_visible,cant_tell,shows_it_observation_ids,prior_records,metaweb_p'].concat(rows).join('\n')+'\n';
 }
 function exportNet(){
-  var u=URL.createObjectURL(new Blob([netCsv(resolve(hash()))],{type:'text/csv'})),a=el('a');a.href=u;a.download='food-web-network.csv';document.body.append(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u);},1000);
+  var u=URL.createObjectURL(new Blob([netCsv(resolve(hash()))],{type:'text/csv'})),a=el('a');a.href=u;a.download=C.csv||'food-web-network.csv';document.body.append(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u);},1000);
 }
 function sentence(h){
   var b=$('sent'),pn=Array.from(new Set(M.pairs.map(function(x){return x[0];}))).sort(),yn=Array.from(new Set(M.pairs.map(function(x){return x[1];}))).sort();
   b.replaceChildren();
   function pk(id,ph,val,all,side,name){var d=EatingPicker.create({id:id,ph:ph,value:val,names:all,obs:E.R.all.map(function(r){return r[side];}).filter(Boolean),parent:M.parent,rank:M.rank,groups:M.groups,label:label,
     onPick:function(n){var g=resolve(hash());g[id]=n;go(g);}});var i=d.querySelector('input');i.setAttribute('aria-label',name);i.title=val?label(val):name;return d;}
-  if(!h.q)b.append('What evidence is there for the food web?');
-  if(h.q==='eats')b.append('What does ',pk('x','Predator',h.x,pn,'pred','Predator'),' eat?');
-  if(h.q==='eaten')b.append('What eats ',pk('y','Prey',h.y,yn,'prey','Prey'),'?');
-  if(h.q==='does')b.append('Does ',pk('x','Predator',h.x,pn,'pred','Predator'),' eat ',pk('y','Prey',h.y,yn,'prey','Prey'),'?');
+  if(!h.q)b.append('What evidence is there for '+W.web+'?');
+  if(h.q==='eats')b.append('What does ',pk('x',W.pred,h.x,pn,'pred',W.pred),' '+W.eat+'?');
+  if(h.q==='eaten')b.append('What '+W.eats+' ',pk('y',W.prey,h.y,yn,'prey',W.prey),'?');
+  if(h.q==='does')b.append('Does ',pk('x',W.pred,h.x,pn,'pred',W.pred),' '+W.eat+' ',pk('y',W.prey,h.y,yn,'prey',W.prey),'?');
 }
 // a radiogroup of buttons [value, text, full question] in the box: arrows move and pick, one tab stop, ticked() marks the current value
 function seg(box,items,pick){
@@ -197,10 +199,11 @@ function fold(){var c=$('mx').querySelectorAll('td button').length,e=$('mx').que
   $('s2sum').textContent=c?E.pl(c,'cell')+', '+e+' photographed.':'No pair for this question.';$('s4sum').textContent=$('netnote').textContent;}
 function again(){var h=resolve(hash());matrix(h);network(h);fold();}
 window.addEventListener('hashchange',paint);
-function get(u,soft){return fetch(u).then(function(r){if(!r.ok)throw new Error(u+' '+r.status);return r.json();}).catch(function(e){if(soft)return null;throw e;});}
+function get(u,soft){if(!u)return Promise.resolve(null);return fetch(u).then(function(r){if(!r.ok)throw new Error(u+' '+r.status);return r.json();}).catch(function(e){if(soft)return null;throw e;});}
 // the 1.4 MB food-word file loads after the first paint; the evidence stage fills in when it lands
 Promise.all([get(C.metaweb),get(C.obs),get(C.vlm,true)]).then(function(d){
   E.init(d[0],d[1],null);M=E.M();ALL=E.all();L.hints(d[2]);L.init(E,again);$('exportnet').onclick=exportNet;$('src').textContent=E.how(d[1],null);
+  if(C.page){$('kind').hidden=false;seg($('kind'),[['food-web.html','Predation','Predation: who eats whom'],['pollination.html','Pollination','Pollination: who visits flowers of what']],function(u){location.href=u;});ticked($('kind'),C.page);}
   seg($('modes'),MODES,function(q){go(q?{q:q}:{});});
   // the predator's class limits the cards; ticked() on the click too, as the hash does not change
   seg($('classes'),L.CLASSES.map(function(c){return [c[0],c[1],c[0]?c[1]+' ('+c[0]+')':'Predators of any class'];}),function(c){L.setClass(c);ticked($('classes'),c);});

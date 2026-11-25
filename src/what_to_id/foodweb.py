@@ -9,6 +9,10 @@ names, each record filed under its own two names only (a record labelled at genu
 nothing is rolled up from species, but a subspecies or form is its species). Only animal-on-animal
 pairs are kept (both paths name Animalia or Metazoa): GloBI's eats also holds grazing and fungus
 eating. Every partner is kept, most records first.
+
+`--kind pollination` reads pollinates and visitsFlowersOf instead and keeps animal-on-plant pairs,
+writing pollination.json in the same shape: "eats" maps a pollinator to its plants, "eatenBy" a
+plant to its pollinators.
 """
 
 from __future__ import annotations
@@ -23,6 +27,18 @@ API = "https://api.globalbioticinteractions.org/interaction"
 BC_BBOX = "-139.06,48.30,-114.03,60.00"  # w,s,e,n around British Columbia
 TYPES = ("eats", "preysOn")
 FILE = "foodweb.json"  # beside identify.html; page_identify turns the filter on when it is there
+POLLINATION = ("pollinates", "visitsFlowersOf")
+POLLINATION_FILE = "pollination.json"
+# GloBI paths name the plant kingdom as Plantae, Viridiplantae or only by a clade below it
+PLANT = (
+    "Plantae",
+    "Viridiplantae",
+    "Streptophyta",
+    "Embryophyt",
+    "Tracheophyt",
+    "Spermatophyt",
+    "Angiosperm",
+)
 PAGE = 4096
 
 
@@ -38,16 +54,25 @@ def _animal(r: dict, side: str) -> bool:
     return "Animalia" in path or "Metazoa" in path
 
 
-def pairs(rows: list[dict]) -> dict:
-    """The eats / eatenBy tables out of GloBI rows; skips other types and nameless rows."""
+def _plant(r: dict, side: str) -> bool:
+    path = r.get(f"{side}_taxon_path") or ""
+    return any(k in path for k in PLANT)
+
+
+def pairs(rows: list[dict], kind: str = "predation") -> dict:
+    """The eats / eatenBy tables out of GloBI rows; skips other types and nameless rows.
+    Predation keeps animal-on-animal rows, pollination animal-on-plant rows."""
+    types = POLLINATION if kind == "pollination" else TYPES
     eats: dict[str, Counter] = defaultdict(Counter)
     by: dict[str, Counter] = defaultdict(Counter)
     n = 0
     for r in rows:
-        if r.get("interaction_type") not in TYPES:
+        if r.get("interaction_type") not in types:
             continue
         a, b = _name(r, "source"), _name(r, "target")
-        if not a or not b or a == b or not (_animal(r, "source") and _animal(r, "target")):
+        if not a or not b or a == b or not _animal(r, "source"):
+            continue
+        if not (_plant(r, "target") if kind == "pollination" else _animal(r, "target")):
             continue
         n += 1
         eats[a][b] += 1
@@ -62,7 +87,7 @@ def pairs(rows: list[dict]) -> dict:
     return {"eats": cut(eats), "eatenBy": cut(by), "n": n}
 
 
-def fetch(bbox: str = BC_BBOX, pause: float = 1.0) -> list[dict]:
+def fetch(bbox: str = BC_BBOX, pause: float = 1.0, types: tuple = TYPES) -> list[dict]:
     import requests
 
     fields = [
@@ -75,7 +100,7 @@ def fetch(bbox: str = BC_BBOX, pause: float = 1.0) -> list[dict]:
     rows, off = [], 0
     while True:
         p = [("bbox", bbox), ("type", "json.v2"), ("limit", PAGE), ("offset", off)]
-        p += [("interactionType", t) for t in TYPES] + [("field", f) for f in fields]
+        p += [("interactionType", t) for t in types] + [("field", f) for f in fields]
         r = requests.get(API, params=p, timeout=180)
         r.raise_for_status()
         page = r.json()
@@ -89,16 +114,17 @@ def fetch(bbox: str = BC_BBOX, pause: float = 1.0) -> list[dict]:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--out", required=True)
+    ap.add_argument("--kind", choices=("predation", "pollination"), default="predation")
     ap.add_argument("--rows", help="a saved GloBI JSON response instead of the API")
     a = ap.parse_args(argv)
     if a.rows:
         with open(a.rows) as f:
             rows = json.load(f)
     else:
-        rows = fetch()
-    t = pairs(rows)
+        rows = fetch(types=POLLINATION if a.kind == "pollination" else TYPES)
+    t = pairs(rows, a.kind)
     if not t["n"]:
-        print("no predator-prey records read", file=sys.stderr)
+        print(f"no {a.kind} records read", file=sys.stderr)
         return 1
     with open(a.out, "w") as f:
         json.dump(t, f, separators=(",", ":"))

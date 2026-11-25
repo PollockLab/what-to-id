@@ -11,6 +11,9 @@ a taxon, x: text), the comment count (their text is not kept), quality grade, da
 photo: {"obs": [{id, t: [name, id, common], k: "eating"|"by", f, x, c, q, on, at, ph, np}], "n":
 {...}}. np is the photo count, from the same response.
 
+`--kind pollination` reads only field 3126, Interaction->Visited flower of (a taxon: the plant the
+observed animal visits), as k "visit" records in pollination-obs.json, for pollination.html.
+
 `--ids FILE` adds the observations of a vision model's run (CSV with an obs_id column, fetched by
 id, any place) as k "model" records: the observed taxon is the predator, no field, so the card
 asks for the prey like an empty Eating field.
@@ -35,7 +38,15 @@ from what_to_id.site_files import publish
 
 API = "https://api.inaturalist.org/v1/observations"
 BC_PLACE_ID = 7085
-FIELDS = {"eating": ("Eating", 13), "by": ("Eaten by", 879)}
+FIELDS = {
+    "eating": ("Eating", 13),
+    "by": ("Eaten by", 879),
+    "visit": (
+        "Interaction->Visited flower of",
+        3126,
+    ),  # a taxon: the plant the observed animal visits
+}
+POLLINATION_FILE = "pollination-obs.json"
 PER_PAGE = 200
 TEXT = 80  # characters of a field's text kept
 LIMIT = 10000  # iNaturalist refuses page * per_page beyond this
@@ -192,9 +203,20 @@ def counts(obs: list[dict]) -> dict:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--out", required=True)
+    ap.add_argument("--kind", choices=("predation", "pollination"), default="predation")
     ap.add_argument("--metaweb", help="metaweb.json: also write foodweb-text.json beside --out")
     ap.add_argument("--ids", help="CSV with an obs_id column: add those observations as k model")
     a = ap.parse_args(argv)
+    if a.kind == "pollination":  # only the Visited flower of field; no text search, no map copy
+        obs = fetch("visit")
+        if not obs:
+            print("no flower-visit observations read", file=sys.stderr)
+            return 1
+        doc = {"fetched": date.today().isoformat(), "field": FIELDS["visit"][0]}
+        doc |= {"n": counts(obs), "obs": obs}
+        Path(a.out).write_text(json.dumps(doc, separators=(",", ":")))
+        print(doc["n"], "->", a.out)
+        return 0
     obs = fetch("eating") + fetch("by")
     if a.ids:
         seen = {o["id"] for o in obs}
