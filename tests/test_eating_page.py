@@ -590,7 +590,7 @@ def test_a_group_word_names_the_group_only_when_the_predator_eats_in_it(browser,
     draw_all(page)
     assert "Barred Owl may be eating Caridea" in card_of(page, 602)
     assert "mentions “shrimp”" in card_of(page, 602)
-    assert "Barred Owl may be eating something" in card_of(page, 603)
+    assert "Barred Owl may be eating Brachyura" in card_of(page, 603)  # no pair needed
 
 
 def test_a_credit_is_not_a_food_word(browser, words):
@@ -600,3 +600,64 @@ def test_a_credit_is_not_a_food_word(browser, words):
         card = card_of(page, i)
         assert "Description or tags mention food" in card and "mentions “" not in card
     assert page.errors == []
+
+
+@pytest.fixture(scope="module")
+def described(tmp_path_factory, monkeypatch_module):
+    """Model and field records the description also names, and prey with no metaweb pair."""
+    meta = {
+        **foodweb_page.META,
+        "pairs": [
+            *foodweb_page.META["pairs"],
+            ["Strix", "Pandalus danae", 0.5],
+            ["Buteo", "Columba livia", 0.3],
+        ],
+        "common": {**foodweb_page.META["common"], "Columba livia": "Rock Pigeon"},
+        "parent": {**foodweb_page.META["parent"], "Pandalus danae": "Caridea"},
+    }
+    base = {**foodweb_page.OBS["obs"][0], "id": 0, "k": "model", "np": 1}
+    obs = {
+        **foodweb_page.OBS,
+        "obs": [
+            *foodweb_page.OBS["obs"],
+            {**base, "id": 701},  # the model guesses a mouse, the description says shrimp
+            {**base, "id": 702, "k": "eating", "f": ["Mus musculus", 3]},  # the field says mouse
+        ],
+    }
+    texts = {
+        701: "Eating a shrimp",
+        702: "Eating a shrimp",
+        703: "Eating a damselfly",
+        704: "Eating a rock pigeon",
+        705: "A hornet kills and eats the barred owl",
+    }
+    vlm = {**foodweb_page.VLM, "obs": {"701": {"p": 0.9, "prey": [["Mus musculus", 0.6]]}}}
+    text = {**foodweb_page.TEXT, "obs": [foodweb_page.hit(i, d) for i, d in texts.items()]}
+    for name, val in (("META", meta), ("OBS", obs), ("TEXT", text), ("VLM", vlm)):
+        monkeypatch_module.setattr(foodweb_page, name, val)
+    yield from build_site(tmp_path_factory.mktemp("described-site"))
+
+
+def test_a_prey_the_description_names_wins_over_the_models_guess_but_not_the_field(
+    browser, described
+):
+    page = open_page(browser, described + "#q=eats&x=Strix varia")
+    draw_all(page)
+    card = card_of(page, 701)
+    assert "Barred Owl may be eating Caridea" in card and "Description mentions “shrimp”" in card
+    assert "Very likely feeding" in card  # the model's P(feeding) stays
+    assert "Barred Owl eats House Mouse" in card_of(page, 702)
+    assert page.locator("#cards li", has=page.locator("a[href$='/observations/701']")).count() == 1
+
+
+def test_a_prey_without_a_metaweb_pair_is_named_from_the_description(browser, described):
+    page = open_page(browser, described + "#q=eats&x=Strix varia")
+    draw_all(page)
+    assert "Barred Owl may be eating Zygoptera" in card_of(page, 703)
+    assert "Barred Owl may be eating Rock Pigeon" in card_of(page, 704)
+
+
+def test_the_victim_of_another_animal_names_no_prey_for_itself(browser, described):
+    page = open_page(browser, described + "#q=eats&x=Strix varia")
+    draw_all(page)
+    assert "Barred Owl may be eating something" in card_of(page, 705)

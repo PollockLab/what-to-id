@@ -35,7 +35,16 @@ function mention(text,tok){var s=sg(tok);return word(text,tok)||word(text,s)||/y
 // the observer's credit is not predation: "caught by @user", "photo by Sam", and what follows an @user in its sentence
 function credit(t){return t.replace(/\b(?:caught|photo(?:graph(?:ed)?)?|picture|image|taken|credit)\s+by\b(?:\s+@\w[\w.]*[^.!?\n]*|\s+\w+)?/g,' ').replace(/@\w[\w.]*[^.!?\n]*/g,' ');}
 // group words to a clade name in the metaweb's parent table (hand-curated): named only when the predator has prey under that clade
-var GROUP={shrimp:'Caridea',crab:'Brachyura',crayfish:'Astacidea',fish:'Actinopterygii',prickleback:'Stichaeidae',sculpin:'Cottidae',salmon:'Salmonidae',herring:'Clupeidae',insect:'Insecta',moth:'Lepidoptera',butterfly:'Lepidoptera',caterpillar:'Lepidoptera',dragonfly:'Odonata',beetle:'Coleoptera',fly:'Diptera',bee:'Anthophila',grasshopper:'Orthoptera',spider:'Araneae',snail:'Gastropoda',slug:'Gastropoda',clam:'Bivalvia',mussel:'Bivalvia',frog:'Anura',snake:'Serpentes',bird:'Aves',duck:'Anatidae',squirrel:'Sciuridae',rabbit:'Leporidae'};
+var GROUP={shrimp:'Caridea',crab:'Brachyura',crayfish:'Astacidea',fish:'Actinopterygii',prickleback:'Stichaeidae',sculpin:'Cottidae',salmon:'Salmonidae',herring:'Clupeidae',insect:'Insecta',moth:'Lepidoptera',butterfly:'Lepidoptera',caterpillar:'Lepidoptera',dragonfly:'Odonata',beetle:'Coleoptera',fly:'Diptera',bee:'Anthophila',grasshopper:'Orthoptera',spider:'Araneae',snail:'Gastropoda',slug:'Gastropoda',clam:'Bivalvia',mussel:'Bivalvia',frog:'Anura',snake:'Serpentes',bird:'Aves',duck:'Anatidae',squirrel:'Sciuridae',rabbit:'Leporidae',damselfly:'Zygoptera','damsel fly':'Zygoptera',ladybug:'Coccinellidae',swallowtail:'Lepidoptera',meadowhawk:'Sympetrum',midge:'Diptera',stickleback:'Gasterosteidae','honey bee':'Apis mellifera'};
+// the verbs of eating and killing: what follows the first one is the prey ("Damsel fly eating a moth"), unless it is the predator itself ("kills the darner")
+var VERB=/\b(?:eat\w*|ate|feed\w*|fed|devour\w*|prey\w*|caught|catch\w*|captur\w*|kill\w*)\b/;
+// every known animal's Latin and full common name (not its last word: "bee" is not a honey bee), for a prey the predator's metaweb row lacks
+var EXT=null,EXTA=null;
+function pool(){
+  var a=E.all();
+  if(EXTA!==a){EXTA=a;EXT=[];a.forEach(function(_,n){[lc(n),lc(E.label(n))].filter(function(t,i,l){return t.length>=4&&l.indexOf(t)===i;}).forEach(function(t){EXT.push([t,n,sg(t).replace(/y$/,"")]);});});}
+  return EXT;
+}
 // the pairs one record may show, each with its evidence tier and the reason, as [{pred, prey, tier, why}]
 function entries(r){
   if(r.o.k==='visit')return visiting(r);
@@ -46,9 +55,16 @@ function entries(r){
   if(named&&!E.open(r,eat?'prey':'pred')){add(named,4,'The field names the pair');return out;}
   if(named){all.filter(function(n){return E.within(n,named);}).forEach(function(n){add(n,3,'The field names '+E.label(named)+', not a species');});return out;}
   var src=[['Description',o.d],['Tags',(o.g||[]).join(' ')],['The field text',o.x]].filter(function(s){return s[1];});
-  src.forEach(function(s){var low=lc(s[1]);all.forEach(function(n){var t=tokens(n).filter(function(k){return mention(low,k);})[0];
-    if(t)add(n,2,s[0]+(s[0]==='Tags'?' mention ':' mentions ')+'“'+t+'”');});
-    if(eat)Object.keys(GROUP).forEach(function(w){var c=GROUP[w];if(mention(low,w)&&!out.some(function(e){return e.prey===c;})&&all.some(function(n){return E.within(n,c);}))add(c,2,s[0]+(s[0]==='Tags'?' mention ':' mentions ')+'“'+w+'”');});});
+  src.forEach(function(s){var low=lc(s[1]),cl=credit(low),m=VERB.exec(cl),post=m?cl.slice(m.index+m[0].length):cl,how=s[0]+(s[0]==='Tags'?' mention ':' mentions ');
+    // "X kills the <this animal>": the animal in the photo is the victim, so the text names no prey for it
+    if(eat&&tokens(known).some(function(t){return new RegExp('\\b(?:the|an?|this|that) '+t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?![a-z])').test(post);}))return;
+    all.forEach(function(n){var t=tokens(n).filter(function(k){return mention(low,k);})[0];
+      if(t)add(n,2,how+'“'+t+'”');});
+    if(!eat||out.length)return;
+    // a prey the metaweb has no pair for: named all the same, it joins the network only once confirmed
+    pool().forEach(function(x){if(post.indexOf(x[2])>=0&&mention(post,x[0])&&x[1]!==known&&!E.within(known,x[1])&&!out.some(function(e){return e.prey===x[1];}))add(x[1],2,how+'“'+x[0]+'”');});
+    var g=Object.keys(GROUP).filter(function(w){return mention(post,w);});
+    g.filter(function(w){return !g.some(function(v){return v!==w&&v.indexOf(w)>=0;});}).forEach(function(w){var c=GROUP[w];if(c!==known&&!out.some(function(e){return e.prey===c;}))add(c,2,how+'“'+w+'”');});});
   if(out.length)return out;
   // only a food word (the text search's): no prey is named, so the card asks about any prey, not the metaweb's likeliest
   if(o.k==='text'){var f=null;src.forEach(function(s){var low=credit(lc(s[1]));FOOD.forEach(function(w){if(!f&&mention(low,w))f=s[0]+(s[0]==='Tags'?' mention ':' mentions ')+'“'+w+'”';});});
@@ -278,9 +294,13 @@ function exportCsv(){
   var u=URL.createObjectURL(new Blob([csv()],{type:'text/csv'})),a=E.el('a');a.href=u;a.download='food-web-annotations.csv';document.body.append(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u);},1000);
 }
 function reload(){
-  var ids=new Set(E.R.all.map(function(r){return r.o.id;}));
-  // a field record also found by the text search is one card
-  ITEMS=E.R.all.concat(E.R.text.filter(function(r){return !ids.has(r.o.id);})).map(function(r){return {r:r,es:entries(r)};}).filter(function(it){return it.es.length;});
+  var ids=new Set(E.R.all.map(function(r){return r.o.id;})),mod=new Map(E.R.all.filter(function(r){return r.o.k==='model';}).map(function(r){return [r.o.id,r];})),
+    fld=new Set(E.R.all.filter(function(r){return r.o.k!=='model';}).map(function(r){return r.o.id;}));
+  // a field record also found by the text search is one card, the field's. A model record also found by it is one card too: the model's
+  // (its P(feeding), its rank), but a prey the description names wins over the model's guess
+  var merged=new Map();
+  E.R.text.forEach(function(r){var m=mod.get(r.o.id);if(m&&!fld.has(r.o.id)){var es=entries(r).filter(function(e){return e.prey;});if(es.length)merged.set(m,es);}});
+  ITEMS=E.R.all.concat(E.R.text.filter(function(r){return !ids.has(r.o.id);})).map(function(r){return {r:r,es:merged.get(r)||entries(r)};}).filter(function(it){return it.es.length;});
 }
 function init(core,onChange){
   E=core;change=onChange;load();
