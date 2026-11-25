@@ -191,9 +191,13 @@ function paint(){
   var h=resolve(hash()),now=Object.keys(h).filter(function(k){return h[k];}).map(function(k){return k+'='+encodeURIComponent(h[k]);}).join('&');
   if(now!==location.hash.slice(1)&&(h.q||location.hash.length>1))history.replaceState(null,'','#'+now);  // a blank or unknown taxon shows as the default
   ticked($('modes'),h.q);ticked($('classes'),L.cls());ticked($('sources'),L.src());
+  // folded in study mode, the question still filters the photos: name any non-default choice on the fold
+  said();
   sentence(h);matrix(h);network(h);fold();L.ask({x:h.q==='eats'||h.q==='does'?h.x:null,y:h.q==='eaten'||h.q==='does'?h.y:null});
   if(window.FoodSearch)FoodSearch.ask(h);
 }
+function said(){var on=[$('modes'),$('classes')].map(function(b){var t=b.querySelector('[aria-checked=true]');return t&&t!==b.firstElementChild?t.textContent:'';}).filter(Boolean);
+  $('qf').querySelector('summary').textContent='Food web question'+(on.length?': '+on.join(', '):'');}
 // the one line a collapsed section shows on a phone
 function fold(){var c=$('mx').querySelectorAll('td button').length,e=$('mx').querySelectorAll('td.ev').length;
   $('s2sum').textContent=c?E.pl(c,'cell')+', '+e+' photographed.':'No pair for this question.';$('s4sum').textContent=$('netnote').textContent;}
@@ -206,7 +210,7 @@ Promise.all([get(C.metaweb),get(C.obs),get(C.vlm,true)]).then(function(d){
   if(C.page){$('kind').hidden=false;seg($('kind'),[['food-web.html','Predation','Predation: who eats whom'],['pollination.html','Pollination','Pollination: who visits flowers of what']],function(u){location.href=u;});ticked($('kind'),C.page);}
   seg($('modes'),MODES,function(q){go(q?{q:q}:{});});
   // the predator's class limits the cards; ticked() on the click too, as the hash does not change
-  seg($('classes'),L.CLASSES.map(function(c){return [c[0],c[1],c[0]?c[1]+' ('+c[0]+')':'Predators of any class'];}),function(c){L.setClass(c);ticked($('classes'),c);});
+  seg($('classes'),L.CLASSES.map(function(c){return [c[0],c[1],c[0]?c[1]+' ('+c[0]+')':'Predators of any class'];}),function(c){L.setClass(c);ticked($('classes'),c);said();});
   // the source filter only means something with the model study's file
   if(d[2]){$('sources').hidden=false;seg($('sources'),L.SOURCES,function(c){L.setSource(c);ticked($('sources'),c);study();});}
   var tr=$('try');TRY.forEach(function(x){var h={};Object.keys(x[2]).forEach(function(k){h[k]=k==='q'?x[2][k]:E.find(x[2][k],ALL);});
