@@ -131,7 +131,9 @@ def open_page(browser, url, init=None):
     return page
 
 
-def answer(card, *steps):
-    """Click the card's answers in order: the three checks, each Yes, No or Can’t tell."""
-    for step in steps:
-        card.locator(".mk button", has_text=step).click()
+OPTIONS = ["Not this predator", "Not eating", "Can’t tell", "Eating"]
+
+
+def answer(card, option):
+    """Click one of the card's four options (keys 1-4)."""
+    card.locator(".mk button").nth(OPTIONS.index(option)).click()

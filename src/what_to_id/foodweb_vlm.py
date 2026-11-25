@@ -48,17 +48,18 @@ def slim(row: dict) -> dict:
     return r
 
 
-def build(rows) -> dict:
-    return {"model": MODEL, "obs": {str(r["obs_id"]).strip(): slim(r) for r in rows}}
+def build(rows, model: str = MODEL) -> dict:
+    return {"model": model, "obs": {str(r["obs_id"]).strip(): slim(r) for r in rows}}
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--out", required=True)
     ap.add_argument("--csv", default=str(SAMPLE))
+    ap.add_argument("--model", default=MODEL, help="provenance line shown on the page")
     a = ap.parse_args(argv)
     with open(a.csv, newline="") as f:
-        out = build(csv.DictReader(f))
+        out = build(csv.DictReader(f), a.model)
     if not out["obs"]:
         print("no model rows read", file=sys.stderr)
         return 1

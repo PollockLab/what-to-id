@@ -11,6 +11,10 @@ a taxon, x: text), the comment count (their text is not kept), quality grade, da
 photo: {"obs": [{id, t: [name, id, common], k: "eating"|"by", f, x, c, q, on, at, ph, np}], "n":
 {...}}. np is the photo count, from the same response.
 
+`--ids FILE` adds the observations of a vision model's run (CSV with an obs_id column, fetched by
+id, any place) as k "model" records: the observed taxon is the predator, no field, so the card
+asks for the prey like an empty Eating field.
+
 `--metaweb FILE` also writes foodweb-text.json beside it: BC observations of a metaweb predator
 species whose description (words eating, eats, ate, feeding, prey, caught) or tags (predation,
 eating, feeding) talk about food, with the description and tags kept (k "text"). The evidence
@@ -20,6 +24,7 @@ search ranks them against the candidate prey. Comments are not searchable throug
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import sys
 import time
@@ -38,7 +43,7 @@ LIMIT = 10000  # iNaturalist refuses page * per_page beyond this
 
 def slim(o: dict, kind: str) -> dict | None:
     """One observation as the file's record, or None when it has no taxon or photo."""
-    t, name = o.get("taxon"), FIELDS[kind][1]
+    t, name = o.get("taxon"), FIELDS.get(kind, (None, None))[1]
     ph = (o.get("photos") or [{}])[0].get("url")
     if not t or not ph:
         return None
@@ -88,6 +93,26 @@ def fetch(kind: str, pause: float = 1.0) -> list[dict]:
             return out
         page += 1
         time.sleep(pause)
+
+
+def fetch_ids(ids: list[int], pause: float = 1.0) -> list[dict]:
+    """Records (k "model", no field) for observations a vision model flagged, by id in batches."""
+    import requests
+
+    out = []
+    for i in range(0, len(ids), PER_PAGE):
+        p = {"id": ",".join(map(str, ids[i : i + PER_PAGE])), "per_page": PER_PAGE}
+        r = requests.get(API, params=p, timeout=60, headers={"User-Agent": "what-to-id"})
+        r.raise_for_status()
+        out += [x for x in (slim(o, "model") for o in r.json()["results"]) if x]
+        time.sleep(pause)
+    return out
+
+
+def read_ids(path: str) -> list[int]:
+    """The obs_id column of a CSV, in order, without repeats."""
+    with open(path, newline="") as f:
+        return list(dict.fromkeys(int(r["obs_id"]) for r in csv.DictReader(f)))
 
 
 SEARCHES = [("description", w) for w in ("eating", "eats", "ate", "feeding", "prey", "caught")] + [
@@ -162,8 +187,12 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--out", required=True)
     ap.add_argument("--metaweb", help="metaweb.json: also write foodweb-text.json beside --out")
+    ap.add_argument("--ids", help="CSV with an obs_id column: add those observations as k model")
     a = ap.parse_args(argv)
     obs = fetch("eating") + fetch("by")
+    if a.ids:
+        seen = {o["id"] for o in obs}
+        obs += [o for o in fetch_ids(read_ids(a.ids)) if o["id"] not in seen]
     if not obs:
         print("no feeding observations read", file=sys.stderr)
         return 1

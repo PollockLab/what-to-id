@@ -15,27 +15,27 @@ __SITE_NAV__
 <div class="seg cls" id="classes" role="radiogroup" aria-label="Predator class"></div>
 <p class="sent" id="sent" aria-live="polite"></p>
 <div class="try" id="tryw" hidden><p id="tryh">For example</p><div id="try" role="group" aria-labelledby="tryh"></div></div></section>
-<section class="st2" aria-labelledby="s2"><h2 id="s2"><span>2</span>Predicted web</h2>
+<section class="st2" aria-labelledby="s2"><details class="fold" open><summary><h2 id="s2"><span>2</span>Predicted web</h2><span class="one" id="s2sum"></span></summary>
 <p class="muted">Predicted from the expert food web (GloBI stand-in). Click a cell to ask about that pair, or a name to ask what it eats or what eats it.</p>
 <div class="mx" id="mx" tabindex="0" role="region" aria-label="Predicted food web, scrolls sideways"></div>
-<div class="key" id="mxkey"><span><i class="sw a"></i><i class="sw b"></i><i class="sw c"></i>one, two, three or more records</span><span><i class="sw ev"></i>photographed</span><span><i class="sw"></i>no pair</span></div></section>
+<div class="key" id="mxkey"><span><i class="sw a"></i><i class="sw b"></i><i class="sw c"></i>one, two, three or more records</span><span><i class="sw ev"></i>photographed</span><span><i class="sw"></i>no pair</span></div></details></section>
 <section class="st3" aria-labelledby="s3"><h2 id="s3"><span>3</span>Evidence search</h2>
 <p id="cand" aria-live="polite">Loading.</p>
-<p class="keys muted"><kbd>1</kbd> yes <kbd>2</kbd> no <kbd>3</kbd> can’t tell, <kbd>j</kbd> <kbd>k</kbd> move. Saved in this browser.</p>
+<p class="keys muted"><kbd>1</kbd> not this predator <kbd>2</kbd> not eating <kbd>3</kbd> can’t tell <kbd>4</kbd> eating, <kbd>j</kbd> <kbd>k</kbd> move. Saved in this browser.</p>
 <ul class="cards" id="cards"></ul>
 <div class="bar"><button type="button" class="btn quiet" id="draw" disabled>Show photos</button></div>
 <div id="fsearch" class="fsearch" hidden></div></section>
-<section class="st4" aria-labelledby="s4"><h2 id="s4"><span>4</span>Confirmed network</h2>
+<section class="st4" aria-labelledby="s4"><details class="fold" open><summary><h2 id="s4"><span>4</span>Confirmed network</h2><span class="one" id="s4sum"></span></summary>
 <div class="key"><span><i class="g"></i>first photograph, confirmed here</span><span><i></i>photographed before</span><span><i class="none"></i>nothing found</span></div>
 <div id="net"></div><p id="netnote" aria-live="polite"></p>
 <div class="bar"><button type="button" class="btn quiet" id="export">Export annotations (CSV)</button>
-<button type="button" class="btn quiet" id="exportnet">Export network (CSV)</button></div></section>
+<button type="button" class="btn quiet" id="exportnet">Export network (CSV)</button></div></details></section>
 </div>
 <details class="how"><summary>How this is made</summary>
 <p id="src"></p>
 <p>A card’s rank is the pair’s p in the metaweb times the evidence: the field names the pair, the field names a coarse ancestor of one animal, the description, tags or field text mention a candidate prey, or they only talk about food. Cards link out to iNaturalist; add the prey as the Eating field there if the photo shows it.</p>
 <p>Class filter: limits the cards to predators of one class (birds, mammals, reptiles, amphibians or insects), read from the ancestors in the metaweb. A predator whose class the metaweb does not know is left out while a class is chosen.</p>
-<p>Three checks per card: is this the predator, is this the prey, and is the predator eating the prey, each answered yes, no or can’t tell. A card counts as shows it, in the confirmed network and the exports, only when the third is yes and neither of the first two is no. Marks saved before the three checks load as the same answer to all three.</p>
+<p>One question per card, is the predator eating the prey, with four options: not this predator, not eating, can’t tell, eating. A card counts as shows it, in the confirmed network and the exports, only for eating. The annotations export keeps the three checks per mark (predator, prey, eating): not this predator saves no, can’t tell, can’t tell; not eating saves yes, yes, no; can’t tell saves can’t tell three times; eating saves yes three times. Marks saved earlier load as they were.</p>
 <p>Export network: a CSV for an ecology pipeline, with <code># key: value</code> header lines (question, metaweb, date, shown, the photos shown; read it with comment="#"), then one row per predator-prey pair of the question. Columns: <code>predator</code>, <code>predator_taxon_id</code>, <code>prey</code>, <code>prey_taxon_id</code> (blank when no observation names the taxon), <code>status</code> (<code>confirmed_here</code> first photograph, <code>photographed_before</code>, <code>nothing_found</code> searched without a confirmed mark, <code>not_searched</code>), <code>shows_it</code>, <code>not_visible</code>, <code>cant_tell</code> (marks for the pair), <code>shows_it_observation_ids</code> (separated by ;), <code>prior_records</code> (observations whose field names the pair), <code>metaweb_p</code>. Export annotations: one row per mark, <code>observation_id</code>, <code>url</code>, <code>predator</code>, <code>prey</code>, <code>answer</code>, <code>date</code>, then <code>is_predator</code>, <code>is_prey</code>, <code>is_eating</code> (the three checks).</p></details>
 </main>
 <script>var EATING_CONFIG=__CONFIG__;</script>
