@@ -65,12 +65,16 @@ def obs_links(page):
 def test_tabs_filter_the_pairs(browser, site):
     page = open_page(browser, site)
     assert page.locator("#pairs .pair").count() == 3
-    assert page.locator("#tabs button").all_inner_texts() == ["All 6", "Plantae 4", "Fungi 2"]
-    page.get_by_role("button", name="Fungi, 2 records").click()
+    assert page.locator("#tabs button").all_inner_texts() == [
+        "All 6",
+        "Plants 4",
+        "Fungi and lichens 2",
+    ]
+    page.get_by_role("button", name="Fungi and lichens, 2 records").click()
     assert page.locator("#pairs .pair").all_inner_texts() == [
         "Labelled Eus fus → looks like Cus dus\n9 of 12 photos (75%)"
     ]
-    page.get_by_role("button", name="Plantae, 4 records").click()
+    page.get_by_role("button", name="Plants, 4 records").click()
     assert page.locator("#pairs .pair i").all_inner_texts() == [
         "Aus bus",
         "Gus hus",

@@ -52,9 +52,11 @@ function margin(i){var r=D.head.score;return r[0]+D.score[i]/255*(r[1]-r[0]);}
 function pairOf(t,l){for(var k=0;k<D.pairs.length;k++)
   if(D.pairs[k][0]===t&&D.pairs[k][1]===l)return D.pairs[k];return null;}
 // The Life groups setting (map_groups.js): in iNaturalist mode the split plant groups count as one Plantae tab.
-function plants(d){var M=MapGroups({groups:d.head.groups.map(function(x){return x[0];})});MapGroups.watch();if(!M.gmap)return d;
+function plants(d){var M=MapGroups({groups:d.head.groups.map(function(x){return x[0];}),names:d.head.names});MapGroups.watch();d.head.names=M.names;if(!M.gmap)return d;
   var c=MapGroups.sum(M,d.head.groups.map(function(x){return x[1];}));d.head.groups=M.groups.map(function(g,k){return [g,c[k]];});
   d.taxa.forEach(function(t){if(t[2]!=null)t[2]=M.gmap[t[2]];});return d;}
+// A tab's label: the name the Identify chips show, without the Latin group in brackets.
+function tabName(g){return (D.head.names[g]||g).replace(/ \([^)]*\)$/,'');}
 function groupName(g){return g!=null&&g>=0?D.head.groups[g][0]:'';}
 
 WtidCarry.own([]);  // the pairs are not filtered: the filters are held for the other views
@@ -93,7 +95,7 @@ function writeHash(){
 
 function drawTabs(){
   var box=$('tabs');box.textContent='';
-  [[-1,'All',D.n]].concat(D.head.groups.map(function(x,k){return [k,x[0],x[1]];}))
+  [[-1,'All',D.n]].concat(D.head.groups.map(function(x,k){return [k,tabName(x[0]),x[1]];}))
     .forEach(function(a){
       var b=el('button',null,a[1]+(a[2]?' '+a[2].toLocaleString():''));b.type='button';
       b.setAttribute('aria-pressed',String(S.g===a[0]));

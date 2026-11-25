@@ -17,8 +17,9 @@ which the tree page reads for its "Often confused with" link) and confusion-data
     as columns: id u32[n], photo u32[n], taxon u16[n], looks u16[n], score u8[n], meta u8[n]
 
 The header holds ``taxa`` (index -> [taxon_id or null, name, group index or null]), ``groups``
-([name, records] by records desc), ``pairs`` ([taxon, looks, n_photos, n_species_photos] by
-n_photos desc), ``n``, ``score`` ([lo, hi]: score s is margin lo + s / 255 * (hi - lo)),
+([name, records] by records desc), ``names`` (group -> plain name),
+``pairs`` ([taxon, looks, n_photos, n_species_photos] by n_photos desc), ``n``,
+``score`` ([lo, hi]: score s is margin lo + s / 255 * (hi - lo)),
 ``hosts`` and ``exts``. Records run by taxon, worst margin first. A photo URL is
 ``hosts[meta // len(exts)] + photo + "/medium." + exts[meta % len(exts)]``; meta 255 has none.
 """
@@ -39,6 +40,7 @@ import pandas as pd
 
 from what_to_id import page_nav
 from what_to_id.confusion import RECORD_COLUMNS
+from what_to_id.page import group_name
 from what_to_id.page_lookalike import _fetch
 
 HERE = Path(__file__).parent
@@ -133,6 +135,7 @@ def encode(pairs: pd.DataFrame, records: pd.DataFrame | None, built_at: str = ""
         "built_at": built_at,
         "taxa": taxa,
         "groups": groups,
+        "names": {g: group_name(g) for g, _ in groups},
         "pairs": pair_rows.tolist(),
         "n": len(recs),
         "score": [lo, hi],

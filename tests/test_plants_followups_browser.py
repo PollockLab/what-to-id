@@ -43,12 +43,16 @@ def tabs(browser, url):
 
 
 def test_confused_pairs_tabs_merge_the_split_plants_by_default(browser, confusion):
-    # the tabs name the pool's group keys, not the long names: Plantae, or the split groups
-    assert tabs(browser, f"{confusion}/confusion.html") == ["All 6", "Plantae 4", "Fungi 2"]
+    # the tabs carry the Identify chips' names: Plants, or the split groups' own
+    assert tabs(browser, f"{confusion}/confusion.html") == [
+        "All 6",
+        "Plants 4",
+        "Fungi and lichens 2",
+    ]
     assert tabs(browser, f"{confusion}/confusion.html?plants=split") == [
         "All 6",
-        "Tracheophyta 4",
-        "Fungi 2",
+        "Vascular plants 4",
+        "Fungi and lichens 2",
     ]
 
 
