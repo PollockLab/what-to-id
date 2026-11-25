@@ -27,6 +27,7 @@ var TM=MapTime({S:S,mf:MF,render:render,refilter:refilter,byObs:$('byObs'),byUp:
 // Like the months: with no group picked every group shows. The list's rows pick and leave out groups.
 var GL=GroupList({box:$('groups'),bar:$('gbar'),keep:$('gkeep'),mine:$('mine'),S:S,META:META,nf:nf,changed:refilter,taxa:o.taxa,P:o.P,
   pass:o.pass,inside:o.inside,pk:function(){return PK;}}),showGroups=GL.show;
+MapGroups.ui(META,$('gmode'));
 $('gall').onclick=function(){S.groups={};showGroups();refilter();};
 // Show only chips and the location accuracy (map_only.js).
 var OL=MapOnly({S:S,META:META,mf:MF,box:$('flagbox'),flags:$('flags'),acclbl:$('acclbl'),acc:$('acc'),accr:$('accr'),refilter:refilter}),

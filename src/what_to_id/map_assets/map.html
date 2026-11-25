@@ -32,6 +32,7 @@ fetch('explore.html',{method:'HEAD'}).then(function(r){if(r.ok)location.replace(
 <button type="button" id="sdmbtn" class="sdmbtn" aria-pressed="false" hidden>Show modelled range</button>
 <details class="sec" id="grpsec" open><summary data-explain="life-groups">Groups <span class="n" id="ngroups"></span><span id="gbar" class="gbar" role="img" aria-label="No records in view"></span></summary>
 <p class="muted"><button type="button" id="gall" class="link">All groups</button> <button type="button" id="gkeep" class="link" hidden></button></p>
+<p class="muted" id="gmode" hidden><span id="gmodelbl">Life groups</span> <span class="seg" role="group" aria-labelledby="gmodelbl"><button type="button" data-m="inat" aria-pressed="true">iNaturalist</button><button type="button" data-m="split" aria-pressed="false">Split plants</button></span></p>
 <ul id="groups" class="gl" role="list" aria-label="Taxon groups"></ul>
 </details>
 <details class="sec" id="taxsec" open><summary data-explain="taxa-filter">Taxa <span class="n" id="ntaxa"></span></summary>

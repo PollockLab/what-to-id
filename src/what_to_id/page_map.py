@@ -109,6 +109,7 @@ MAP_JS = (
     "map_projects.js",
     "map_user.js",
     "map_resolved.js",
+    "map_groups.js",
     "map_chips.js",
     "map_filter.js",
     "clade_colour.js",

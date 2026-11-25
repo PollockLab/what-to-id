@@ -2,6 +2,7 @@
 'use strict';
 function $(id){return document.getElementById(id);}
 var dark=matchMedia('(prefers-color-scheme: dark)').matches;
+MapGroups(META);
 var MF=MapFilter(META),DAY=MF.DAY,D0=MF.D0,NO=MF.NO,NOTAX=MF.NOTAX,LAST=MF.LAST;
 var FLAG=MF.FLAG,ONLYFLAG=MF.ONLYFLAG,ONLYKEYS=MF.ONLYKEYS,nf=new Intl.NumberFormat('en-CA'),
   iso=MF.iso;
@@ -52,7 +53,7 @@ var P={n:0,id:new Uint32Array(0),pos:new Float32Array(0),obs:new Uint16Array(0),
 var ORDER=false,VR=null,TAXA=null,TF=TX.filter(null,[]),GONE={},GONE_NEW=false,KEEP=new Uint8Array(0),BK=KEEP,VM=KEEP,SEL=-1,NBR=[],
   CUM=new Float64Array(META.days+1),TOT=null,TC=null,NODAY=0,PER=null,ALT=0,TK0=null,MOVED=!!S.at;
 function get(url){return fetchOnce(url).then(MapShard.unzip,function(e){throw new Error('HTTP '+e.message);});}
-function addShard(buf,n){P=MapShard.append(P,buf,n,META.bbox);}
+function addShard(buf,n){P=MapShard.append(P,buf,n,META.bbox,META.gmap);}
 function rowOf(id){return MapShard.rowOf(P,id);}
 
 // The map filters on the GPU. Each record carries its observed and uploaded day (-1 for none) as
@@ -491,5 +492,5 @@ META.shards.forEach(function(s,k){
 });
 chain.catch(function(e){LERR='Could not load the records ('+e.message+')';$('count').textContent=LERR;});
 // the all-record counts are optional and the bulk of the page, so they load beside the shards
-if(META.files.totals)get(META.files.totals).then(function(b){TOT=JSON.parse(new TextDecoder().decode(b));if(P.n)refilter();}).catch(function(){});
+if(META.files.totals)get(META.files.totals).then(function(b){TOT=MapGroups.totals(META,JSON.parse(new TextDecoder().decode(b)));if(P.n)refilter();}).catch(function(){});
 })();
