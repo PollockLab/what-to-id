@@ -290,6 +290,17 @@ def test_a_look_alike_never_comes_from_another_kingdom():
     assert identify.identify_levels(s)["looks_like"][fc.to_numpy()].isna().all()
 
 
+def test_a_look_alike_may_come_from_a_confusable_kingdom_both_ways():
+    pool, E, ids, taxa, T = identify_bundle()
+    for other, allowed in (("Chromista", True), ("Animalia", False)):
+        tree = {**TREE, 1: [0, "Plantae", "", "kingdom"], 10: [0, other, "", "kingdom"]}
+        tree[6] = [10, "F", "", "genus"]
+        for names in (tree, {**tree, 1: tree[10], 10: tree[1]}):  # "F c" in either kingdom
+            s = identify.identify_scores(pool, E, ids, taxa, T, names)
+            fc = s["taxon_name"] == "F c"
+            assert s.loc[fc, "other_name"].notna().all() == allowed
+
+
 def mislabel_levels(margin, bc, top=0.9):
     """Levels of a species row at `margin` whose look-alike has `bc` BC records, among 49 others;
     the group's Close calls cut is 0.02."""
