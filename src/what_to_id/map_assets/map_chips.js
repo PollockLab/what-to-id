@@ -13,6 +13,7 @@ function next(st,three){var n=NEXT[st||'']||'';return n==='not'&&!three?'':n;}
 var PLANTS=['Tracheophyta','Bryophytes','Algae'];
 function read(s,keys,two){var out={};
   String(s||'').split(',').forEach(function(t){t=t.trim();var not=t.charAt(0)==='-',k=not?t.slice(1):t;
+    if(PLANTS.indexOf(k)>=0&&keys.indexOf(PLANTS[0])<0){if(not)return;k='Plantae';}  // plants not split: one Plantae
     (k==='Plantae'&&keys.indexOf(PLANTS[0])>=0?[k].concat(PLANTS):[k]).forEach(function(k){
       if(keys.indexOf(k)>=0&&!(k in out)&&!(not&&two&&two.indexOf(k)>=0))out[k]=not?'not':'inc';});});
   return out;}

@@ -10,7 +10,7 @@ function unzip(buf){
 }
 // A shard stores each wider column byte by byte (every value's low byte, then the next), and ids
 // as steps from the previous id.
-function append(P,buf,n,b){
+function append(P,buf,n,b,gmap){
   if(buf.byteLength!==17*n)throw new Error('unexpected size');
   var sx=(b[2]-b[0])/65535,sy=(b[3]-b[1])/65535,o=0,u=new Uint8Array(buf);
   function col(T,w){if(w===1){o+=n;return u.slice(o-n,o);}
@@ -19,6 +19,7 @@ function append(P,buf,n,b){
   var id=col(Uint32Array,4),qx=col(Uint16Array,2),qy=col(Uint16Array,2),obs=col(Uint16Array,2),
     up=col(Uint16Array,2),tax=col(Uint16Array,2),grp=col(Uint8Array,1),ids=col(Uint8Array,1),
     fl=col(Uint8Array,1),pos=new Float32Array(2*n);
+  if(gmap)for(var g=0;g<n;g++)grp[g]=gmap[grp[g]];  // the merged groups
   for(var s=0,i=0;i<n;i++)id[i]=s=(s+id[i])>>>0;
   for(i=0;i<n;i++){pos[2*i]=b[0]+qx[i]*sx;pos[2*i+1]=b[1]+qy[i]*sy;}
   return {n:P.n+n,id:cat(P.id,id),pos:cat(P.pos,pos),obs:cat(P.obs,obs),up:cat(P.up,up),

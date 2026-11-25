@@ -44,7 +44,7 @@ var words={
 "No accuracy reported for the location. Click to pick.":"Aucune précision signalée pour la localisation. Cliquez pour choisir.",
 "Any":"Peu importe","Known":"Connue","Unknown only":"Inconnue seulement","Leave out":"Exclure","Clear the species filter":"Effacer le filtre d'espèce","Clear filters":"Effacer les filtres","Clear filters: What, When, Where, Who, At risk, Introduced and Best x%":"Effacer les filtres : Quoi, Quand, Où, Qui, À risque, Introduites et Meilleurs x %",
 "Reload for this view":"Recharger pour cette vue","No records in view":"Aucune observation en vue","Loading your filters…":"Chargement de vos filtres…",
-"Amphibians":"Amphibiens","Birds":"Oiseaux","Fish":"Poissons","Insects":"Insectes","Mammals":"Mammifères","Molluscs":"Mollusques","Plants":"Plantes",
+"Amphibians":"Amphibiens","Birds":"Oiseaux","Fish":"Poissons","Insects":"Insectes","Mammals":"Mammifères","Molluscs":"Mollusques","Plants":"Plantes","Life groups":"Groupes du vivant","Split plants":"Plantes subdivisées",
 "Reptiles":"Reptiles","Other animals":"Autres animaux","Spiders and allies":"Araignées et apparentés","Kelp and allies":"Varech et apparentés",
 "Fungi and lichens":"Champignons et lichens","Slime moulds":"Myxomycètes","Unknown":"Inconnu","Bryophytes":"Bryophytes","Lichens":"Lichens",
 "Hornworts, mosses and liverworts":"Anthocérotes, mousses et hépatiques","Fungi Including Lichens":"Champignons, lichens compris",
