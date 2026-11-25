@@ -189,10 +189,13 @@ function paint(){
   var h=resolve(hash()),now=Object.keys(h).filter(function(k){return h[k];}).map(function(k){return k+'='+encodeURIComponent(h[k]);}).join('&');
   if(now!==location.hash.slice(1)&&(h.q||location.hash.length>1))history.replaceState(null,'','#'+now);  // a blank or unknown taxon shows as the default
   ticked($('modes'),h.q);ticked($('classes'),L.cls());
-  sentence(h);matrix(h);network(h);L.ask({x:h.q==='eats'||h.q==='does'?h.x:null,y:h.q==='eaten'||h.q==='does'?h.y:null});
+  sentence(h);matrix(h);network(h);fold();L.ask({x:h.q==='eats'||h.q==='does'?h.x:null,y:h.q==='eaten'||h.q==='does'?h.y:null});
   if(window.FoodSearch)FoodSearch.ask(h);
 }
-function again(){var h=resolve(hash());matrix(h);network(h);}
+// the one line a collapsed section shows on a phone
+function fold(){var c=$('mx').querySelectorAll('td button').length,e=$('mx').querySelectorAll('td.ev').length;
+  $('s2sum').textContent=c?E.pl(c,'cell')+', '+e+' photographed.':'No pair for this question.';$('s4sum').textContent=$('netnote').textContent;}
+function again(){var h=resolve(hash());matrix(h);network(h);fold();}
 window.addEventListener('hashchange',paint);
 function get(u,soft){return fetch(u).then(function(r){if(!r.ok)throw new Error(u+' '+r.status);return r.json();}).catch(function(e){if(soft)return null;throw e;});}
 // the 1.4 MB food-word file loads after the first paint; the evidence stage fills in when it lands
@@ -204,6 +207,9 @@ Promise.all([get(C.metaweb),get(C.obs),get(C.vlm,true)]).then(function(d){
   var tr=$('try');TRY.forEach(function(x){var h={};Object.keys(x[2]).forEach(function(k){h[k]=k==='q'?x[2][k]:E.find(x[2][k],ALL);});
     if(Object.keys(h).some(function(k){return !h[k];}))return;
     var b=el('button','chip');b.type='button';b.onclick=function(){go(h);};b.append(el('span',null,x[0]),el('em',null,x[1]));tr.append(b);$('tryw').hidden=false;});
+  // sections 2 and 4 start collapsed under 700px and cannot be closed above it
+  var wide=matchMedia('(min-width:700px)');
+  [].forEach.call(document.querySelectorAll('.fold'),function(f){f.open=wide.matches;f.addEventListener('toggle',function(){if(wide.matches&&!f.open)f.open=true;});});
   paint();window.__food=true;
   get(C.text,true).then(function(t){L.go();if(t){E.init(d[0],d[1],t);M=E.M();ALL=E.all();L.reload();$('src').textContent=E.how(d[1],t);}
     paint();window.__text=true;});

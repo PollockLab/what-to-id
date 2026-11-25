@@ -10,6 +10,9 @@ button{font:inherit;color:var(--ink)}
 .flow h2{font-size:15px;margin:0 0 var(--s2);display:flex;align-items:center;gap:var(--s2)}
 .flow h2 span{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--on);color:var(--onink);font-size:12px}
 .flow p{margin:var(--s1) 0 var(--s2)}
+.fold>summary{cursor:pointer}.fold>summary h2{display:inline-flex}.fold[open]>summary .one{display:none}
+.one{display:block;margin:var(--s1) 0 0;font-size:12px;color:var(--muted)}
+@media(min-width:700px){.fold>summary{pointer-events:none;list-style:none}.fold>summary::-webkit-details-marker{display:none}.one{display:none}}
 @media(min-width:720px){.flow{grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);grid-template-areas:"q m" "e e" "n n"}.st1{grid-area:q}.st2{grid-area:m}.st3{grid-area:e}.st4{grid-area:n}}
 @media(min-width:1180px){.flow{grid-template-columns:minmax(320px,1fr) minmax(440px,1.6fr) minmax(320px,1fr);grid-template-areas:"q e n" "m e n";grid-template-rows:auto 1fr}.st4{position:sticky;top:var(--s2)}}
 .seg{display:flex;margin:0 0 var(--s3)}
