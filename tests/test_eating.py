@@ -69,6 +69,7 @@ def test_metaweb_probability_halves_the_doubt_and_drops_a_slug_eating_a_bird():
     taxa += [["Aves", "", 3, "class", -1, 0], ["Robin", "", 4, "species", 2, 0]]
     group = metaweb.groups(taxa, {"Mollusca": 1, "Aves": 3})
     assert group == {"Mollusca": "Mollusca", "Slug": "Mollusca", "Aves": "Aves", "Robin": "Aves"}
+    assert metaweb.groups(taxa, {"Animals": [1, 3]})["Robin"] == "Animals"  # a group of several
     pairs = metaweb.build(web, group)["pairs"]
     assert pairs == [["Owl", "Robin", 0.875], ["Slug", "Moss", 0.5]]
     assert len(metaweb.build(web)["pairs"]) == 3  # without groups nothing is dropped
