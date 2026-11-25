@@ -98,35 +98,46 @@ def test_marks_saved_before_the_three_checks_still_load(browser, base):
     assert rows["502"]["answer"] == "yes" and page.errors == []
 
 
-def test_a_mark_is_shows_it_only_when_eating_is_yes_and_neither_animal_is_no(browser, base):
+def test_the_four_options_save_the_three_checks_and_only_eating_shows_it(browser, base):
     page = open_page(browser, base + "#q=eats&x=Strix varia")
     while page.locator("#draw").is_enabled():
         page.click("#draw")
     card = page.locator("#cards li", has_text="Description mentions “myodes”")
-    assert card.locator(".ask").inner_text() == "Step 1 of 3: Is this Barred Owl?"
+    assert card.locator(".ask").inner_text() == "Is Barred Owl eating Myodes?"
     new = page.locator("#net line.e.new")
 
     def stored():
         return json.loads(page.evaluate("localStorage.getItem('wtid-loop')"))["ann"]["502"]
 
-    answer(card, "Yes", "Yes", "No")  # not eating
+    answer(card, "Not eating")
     assert card.locator(".res").inner_text() == "Not visible"
     assert not card.locator(".which").is_visible() and new.count() == 0
     assert stored()["st"] == ["yes", "yes", "no"] and stored()["v"] == "no"
-    answer(card, "Yes", "No", "Yes")  # eating, but it is not the prey
+    answer(card, "Not this predator")
     assert card.locator(".res").inner_text() == "Not visible"
     assert not card.locator(".which").is_visible() and new.count() == 0 and stored()["v"] == "no"
-    answer(card, "Can’t tell", "Can’t tell", "Can’t tell")
+    assert stored()["st"] == ["no", "unsure", "unsure"]
+    answer(card, "Can’t tell")
     assert card.locator(".res").inner_text() == "Can’t tell" and new.count() == 0
-    answer(card, "Can’t tell", "Can’t tell", "Yes")  # unsure animals do not veto eating
+    answer(card, "Eating")
     assert card.locator(".which").is_visible()
     card.locator(".which button", has_text="Confirm").click()
     assert new.count() == 1 and stored()["v"] == "yes"
-    assert stored()["st"] == ["unsure", "unsure", "yes"]
-    assert (
-        card.locator(".sum").inner_text() == "Predator: can’t tell · Prey: can’t tell · Eating: yes"
-    )
+    assert stored()["st"] == ["yes", "yes", "yes"]
+    assert card.locator(".sum").inner_text() == "Predator: yes · Prey: yes · Eating: yes"
     with page.expect_download() as d:
         page.click("#export")
     line = [r for r in Path(d.value.path()).read_text().splitlines() if r.startswith('"502"')][0]
-    assert line.endswith('"unsure","unsure","yes"') and page.errors == []
+    assert line.endswith('"yes","yes","yes"') and page.errors == []
+
+
+def test_keys_1_to_4_answer_the_current_card_with_one_press(browser, base):
+    page = open_page(browser, base + "#q=eats&x=Strix varia")
+    for k in "123":
+        page.keyboard.press(k)
+    res = page.locator("#cards .res").all_inner_texts()
+    assert res[:3] == ["Not visible", "Not visible", "Can’t tell"]  # card 1 saved no, unsure, unsure
+    assert page.locator("#cards li.done").count() == 3
+    page.keyboard.press("4")  # eating on a card whose field names a genus asks which prey
+    assert page.locator("#cards li.cur .which").is_visible()
+    assert page.errors == []

@@ -121,10 +121,11 @@ def test_ten_ranked_cards_show_first_and_more_photos_adds_the_rest(browser, base
         "The field names the pair" in first.inner_text()
         and "Barred Owl eats House Mouse" in first.inner_text()
     )
-    assert first.locator("button").all_inner_texts()[:3] == [
-        "Yes 1",
-        "No 2",
+    assert first.locator("button").all_inner_texts()[:4] == [
+        "Not this predator 1",
+        "Not eating 2",
         "Can’t tell 3",
+        "Eating 4",
     ]
     assert (
         first.locator("a.open")
@@ -156,7 +157,7 @@ def test_shows_it_asks_which_prey_and_a_confirmed_pair_turns_its_edge_green(brow
     )
     draw_all(page)
     card = page.locator("#cards li", has_text="Description mentions “myodes”")
-    answer(card, "Yes", "Yes", "Yes")
+    answer(card, "Eating")
     assert (
         card.locator(".which").is_visible()
         and card.locator(".which input").input_value() == "Myodes"
@@ -202,7 +203,7 @@ def test_a_confirmed_mark_hands_off_to_inaturalist_with_a_copyable_name(browser,
     draw_all(page)
     card = page.locator("#cards li", has_text="Description mentions “myodes”")
     assert not card.locator(".hand").is_visible() and card.locator("a.open").is_visible()
-    answer(card, "Yes", "Yes", "Yes")
+    answer(card, "Eating")
     card.locator(".which button", has_text="Confirm").click()
     assert card.locator(".hand").is_visible() and not card.locator("a.open").is_visible()
     link = card.locator(".hand a")
@@ -229,7 +230,7 @@ def test_a_confirmed_mark_hands_off_to_inaturalist_with_a_copyable_name(browser,
 def test_the_eaten_by_field_is_handed_off_when_the_unknown_is_the_predator(browser, base):
     page = open_page(browser, base + "#q=eaten&y=Mus musculus")
     card = page.locator("#cards li", has=page.locator("a[href$='/observations/99']"))
-    answer(card, "Yes", "Yes", "Yes")
+    answer(card, "Eating")
     assert card.locator(".hand a").inner_text() == "Add Eaten by = Barred Owl on iNaturalist"
     assert "pick Eaten by" in card.locator(".hand .hint").inner_text()
     assert page.errors == []
@@ -252,7 +253,7 @@ def test_the_question_modes_chips_and_keys_work_without_blocking(browser, base):
     page.locator("#try .chip").first.click()
     page.wait_for_selector("#sent input")  # the chip's question has painted, not the survey's cards
     page.wait_for_function("document.querySelectorAll('#cards li').length>0")
-    for k in "123" * 3:  # three checks a card
+    for k in "123":  # one question a card
         page.keyboard.press(k)
     assert page.locator("#cards li.done").count() == 3
     for name in [
@@ -269,11 +270,8 @@ def test_keys_annotate_and_move_the_current_card(browser, base):
     page = open_page(browser, base + "#q=eats&x=Strix varia")
     cards = page.locator("#cards li")
     assert "cur" in cards.nth(0).get_attribute("class")
-    page.keyboard.press("2")  # the first of three checks: the card stays current
-    assert cards.nth(0).locator(".ask").inner_text() == "Step 2 of 3: Is this House Mouse?"
-    assert "cur" in cards.nth(0).get_attribute("class")
-    page.keyboard.press("2")
-    page.keyboard.press("2")
+    assert cards.nth(0).locator(".ask").inner_text() == "Is Barred Owl eating House Mouse?"
+    page.keyboard.press("2")  # not eating: one key finishes the card
     assert cards.nth(0).locator(".res").inner_text() == "Not visible" and "cur" in cards.nth(
         1
     ).get_attribute("class")
@@ -281,15 +279,14 @@ def test_keys_annotate_and_move_the_current_card(browser, base):
     assert "cur" in cards.nth(2).get_attribute("class")
     page.keyboard.press("k")
     page.keyboard.press("k")
-    for _ in range(3):
-        page.keyboard.press("3")
+    page.keyboard.press("3")
     assert cards.nth(0).locator(".res").inner_text() == "Can’t tell"
     assert page.locator("#net line.e.new").count() == 0 and page.errors == []
 
 
 def test_export_is_a_csv_of_the_annotations(browser, base):
     page = open_page(browser, base + "#q=eats&x=Strix varia")
-    for k in "111222":  # a field-named pair: three yes, then three no
+    for k in "42":  # a field-named pair: eating, then not eating
         page.keyboard.press(k)
     with page.expect_download() as d:
         page.click("#export")
@@ -297,7 +294,7 @@ def test_export_is_a_csv_of_the_annotations(browser, base):
     assert rows[0] == "observation_id,url,predator,prey,answer,date,is_predator,is_prey,is_eating"
     assert len(rows) == 3 and rows[1].startswith('"0","https://www.inaturalist.org/observations/0"')
     assert '"Strix varia","Mus musculus","yes"' in rows[1] and rows[2].split(",")[4] == '"no"'
-    assert rows[1].endswith('"yes","yes","yes"') and rows[2].endswith('"no","no","no"')
+    assert rows[1].endswith('"yes","yes","yes"') and rows[2].endswith('"yes","yes","no"')
     assert page.errors == []
 
 
@@ -331,9 +328,9 @@ def test_export_network_is_a_tidy_csv_that_matches_the_confirmed_network(browser
     ]
     draw_all(page)
     card = page.locator("#cards li", has_text="Description mentions “myodes”")
-    answer(card, "Yes", "Yes", "Yes")
+    answer(card, "Eating")
     card.locator(".which button", has_text="Confirm").click()
-    answer(page.locator("#cards li:not(.done)").first, "No", "No", "No")
+    answer(page.locator("#cards li:not(.done)").first, "Not this predator")
     _, rows = _network_export(page)
     by = {(r["predator"], r["prey"]): r for r in rows}
     mine = by["Strix varia", "Myodes"]
@@ -380,8 +377,7 @@ def test_export_network_is_a_tidy_csv_that_matches_the_confirmed_network(browser
 def test_the_page_survives_unreadable_or_unwritable_storage(browser, base, init):
     page = open_page(browser, base + "#q=eats&x=Strix varia", init)
     assert page.locator("#cards li").count() >= 1
-    for _ in range(3):
-        page.keyboard.press("2")
+    page.keyboard.press("2")
     assert page.locator("#cards .res", has_text="Not visible").count() == 1 and page.errors == []
 
 
@@ -517,6 +513,6 @@ def test_a_hub_with_few_partners_gets_the_small_star(browser, base):
 
 def test_answering_the_last_card_shows_the_next_ten(browser, base):
     page = open_page(browser, base + "#q=eats&x=Strix varia")
-    for _ in range(30):
+    for _ in range(10):
         page.keyboard.press("2")
     assert page.locator("#cards li").count() == 16 and page.errors == []

@@ -1,5 +1,6 @@
 // The evidence search of the Food web page: shows the most promising BC observations for the question ten at a time, each with the
-// pair it may show and why it was drawn, and the reader answers three checks (is this the predator, is this the prey, is it eating it: yes, no or can't tell). Annotations,
+// pair it may show and why it was drawn, and the reader answers one question with four options (keys 1-4: not this predator, not eating,
+// can't tell, eating), saved as the three checks (predator, prey, eating) the export has. Annotations,
 // the annotations live in localStorage only (one key, read defensively); nothing goes to iNaturalist.
 // The next ten come when the last card is answered, or on More photos.
 // Rank = the pair's p in the metaweb x the evidence: 4 the field names the pair, 3 it names a coarse ancestor of one animal, 2 the
@@ -9,6 +10,8 @@ var FoodLoop=(function(){
 'use strict';
 // the predator classes the filter offers: [iNaturalist class, button]; '' is all
 var CLASSES=[['','All classes'],['Aves','Birds'],['Mammalia','Mammals'],['Reptilia','Reptiles'],['Amphibia','Amphibians'],['Insecta','Insects']],ANS=['yes','no','unsure'],
+  // the four options of a card's question and the three checks each one saves; only eating shows it (and asks which animal when the field did not name it)
+  OPTS=[['Not this predator',['no','unsure','unsure']],['Not eating',['yes','yes','no']],['Can’t tell',['unsure','unsure','unsure']],['Eating',['yes','yes','yes']]],
   KEY='wtid-loop',OBS='https://www.inaturalist.org/observations/',TEN=10,$=function(id){return document.getElementById(id);};
 // #record=<id> (a shared card): read before the page rewrites its hash, drawn first once it fits the question
 var WANT=+((/(?:^|&)record=(\d+)(?:&|$)/.exec(location.hash.slice(1))||[])[1]||0);
@@ -85,10 +88,10 @@ function steps(a){var t=a&&a.st;return Array.isArray(t)&&t.length===3&&t.every(f
 // Shows it only when the animals are eating and neither photo-check said no; else Not visible if any said no, else Can't tell
 function verdict(t){return t[2]==='yes'&&t[0]!=='no'&&t[1]!=='no'?'yes':t.indexOf('no')>=0?'no':'unsure';}
 var STEPS=['Predator','Prey','Eating'],SAY={yes:'yes',no:'no',unsure:'can’t tell'};
-function question(c,i){var p=E.label(c.e.pred),q=E.label(c.e.prey);return i===2?'Is '+p+' eating '+q+'?':'Is this '+(i?q:p)+'?';}
+function question(c){return 'Is '+E.label(c.e.pred)+' eating '+E.label(c.e.prey)+'?';}
 function status(c){
-  var a=S.ann[c.r.o.id],li=c.li,s=li.querySelector('.res'),busy=!!c.ans&&c.ans.length<3,got=c.ans||steps(a),n=a&&!busy?3:got.length;
-  li.querySelector('.ask').textContent=n<3?'Step '+(n+1)+' of 3: '+question(c,n):'';
+  var a=S.ann[c.r.o.id],li=c.li,s=li.querySelector('.res'),busy=!li.querySelector('.which').hidden,got=busy?c.ans:steps(a);
+  li.querySelector('.ask').textContent=a&&!busy?'':question(c);
   li.querySelector('.sum').textContent=got.map(function(x,i){return STEPS[i]+': '+SAY[x];}).join(' · ');
   s.textContent=!a||busy?'':a.v==='yes'?'Shows it'+(a.pred&&a.prey?': '+pairText({pred:a.pred,prey:a.prey,tier:4}).replace(' eats ',' eating '):''):a.v==='no'?'Not visible':'Can’t tell';
   li.classList.toggle('done',!!a);
@@ -121,13 +124,11 @@ function which(c){
   box.querySelector('.ok').onclick=function(){if(pick){box.hidden=true;put(c,c.ans,eat?known:pick,eat?pick:known);}};
   box.querySelector('.ok').focus();
 }
-// one answer to the card's current step; the third finishes the mark (Shows it on a card whose field does not name the pair asks which animal)
-function answer(c,v){
-  if(!c.ans||c.ans.length>=3)c.ans=[];  // a finished card starts over
-  c.ans.push(v);c.li.querySelector('.which').hidden=true;
-  if(c.ans.length<3)return status(c);
-  if(verdict(c.ans)==='yes'&&c.e.tier!==4)return status(c),which(c);
-  put(c,c.ans,verdict(c.ans)==='yes'?c.e.pred:undefined,c.e.prey);
+// option i (0-3) of the card's question finishes the mark; Eating on a card whose field does not name the pair asks which animal
+function answer(c,i){
+  var t=OPTS[i][1],y=verdict(t)==='yes';c.ans=t;c.li.querySelector('.which').hidden=true;
+  if(y&&c.e.tier!==4)return which(c),status(c);
+  put(c,t,y?c.e.pred:undefined,c.e.prey);
 }
 function card(c){
   var o=c.r.o,li=E.el('li'),a=E.el('a'),d=E.el('div'),b=E.el('p','mk');c.li=li;
@@ -135,8 +136,8 @@ function card(c){
   hint(o,a,d);
   d.append(E.el('p','pair',pairText(c.e)),E.el('p','evl','Why: '+c.e.why+'.'),
     E.el('p','evl',E.pl(o.np||1,'photo')+(o.c?' · '+E.pl(o.c,'comment'):'')+' · '+(o.on||'Date unknown')+' · '+(o.at||'Place unknown')));
-  [['yes','Yes','1'],['no','No','2'],['unsure','Can’t tell','3']].forEach(function(x){
-    var k=E.el('button',null,x[1]+' ');k.type='button';k.dataset.v=x[0];k.append(E.el('kbd',null,x[2]));k.onclick=function(){focus(deck.indexOf(c));answer(c,x[0]);};b.append(k);});
+  OPTS.forEach(function(x,i){
+    var k=E.el('button',null,x[0]+' ');k.type='button';k.append(E.el('kbd',null,i+1));k.onclick=function(){focus(deck.indexOf(c));answer(c,i);};b.append(k);});
   var w=E.el('div','which'),pk=E.el('div','pk'),all=E.el('button','lnk all','Not in this list'),ok=E.el('button','ok','Confirm');
   w.hidden=true;all.type=ok.type='button';
   w.append(E.el('span','lab','Which '+(o.k==='by'?'predator':'prey')+'?'),pk,ok,all);
@@ -189,7 +190,7 @@ function init(core,onChange){
   document.addEventListener('keydown',function(e){
     var t=e.target;if(e.ctrlKey||e.metaKey||e.altKey||/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)||!deck.length)return;
     if(e.key==='j'||e.key==='k'){e.preventDefault();focus(Math.max(0,Math.min(deck.length-1,(cur<0?0:cur)+(e.key==='j'?1:-1))));return;}
-    var v={1:'yes',2:'no',3:'unsure'}[e.key];if(v&&cur>=0){e.preventDefault();answer(deck[cur],v);}
+    var v=['1','2','3','4'].indexOf(e.key);if(v>=0&&cur>=0){e.preventDefault();answer(deck[cur],v);}
   });
 }
 function go(){ready=true;}
