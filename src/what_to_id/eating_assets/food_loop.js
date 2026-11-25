@@ -41,17 +41,19 @@ function entries(r){
   all.forEach(function(n){add(n,1,o.k==='text'?'Description or tags mention food':o.k==='model'?'A vision model flagged feeding':'The '+(eat?'Eating':'Eaten by')+' field '+(o.x?'has text, no taxon':'is empty'));});
   return out;
 }
-function score(e){return Math.max(E.p(e.pred,e.prey),0.1)*e.tier;}
+// the model's P(feeding) for the observation scales the rank (0.5, the neutral, when it has no hint)
+function score(e,id){var h=H&&H.obs[id];return Math.max(E.p(e.pred,e.prey),0.1)*e.tier*(h?Math.max(h.p,0.1):0.5);}
 function ok(e){return (!Q.x||E.hit(e.pred,Q.x))&&(!Q.y||E.hit(e.prey,Q.y))&&(!S.cls||E.inClass(e.pred,S.cls));}
 // the records for the question not yet drawn or answered, best first, each with its best pair
 function ranked(){
   var seen=new Set(deck.map(function(c){return c.r.o.id;}).concat(Object.keys(S.ann).map(Number))),out=[];
   ITEMS.forEach(function(it){
     if(seen.has(it.r.o.id))return;
-    var b=null;it.es.forEach(function(e){if(ok(e)&&(!b||score(e)>score(b)))b=e;});
-    if(b)out.push({r:it.r,e:b,s:score(b)});});
+    var b=null;it.es.forEach(function(e){if(ok(e)&&(!b||score(e,it.r.o.id)>score(b,it.r.o.id)))b=e;});
+    if(b)out.push({r:it.r,e:b,s:score(b,it.r.o.id)});});
   var one=new Set();  // an observation with both fields is two records: its best one only
-  return out.sort(function(a,b){return b.s-a.s||(a.r.o.on===b.r.o.on?a.r.o.id-b.r.o.id:b.r.o.on>a.r.o.on?1:-1);}).filter(function(c){return !one.has(c.r.o.id)&&one.add(c.r.o.id);});
+  // model-only cards (3,000+) rank after every observer-reported card, so the field's records are not buried
+  return out.sort(function(a,b){return (a.r.o.k==='model')-(b.r.o.k==='model')||b.s-a.s||(a.r.o.on===b.r.o.on?a.r.o.id-b.r.o.id:b.r.o.on>a.r.o.on?1:-1);}).filter(function(c){return !one.has(c.r.o.id)&&one.add(c.r.o.id);});
 }
 function state(pred,prey){
   if(E.seen(pred,prey))return 'before';
@@ -64,11 +66,12 @@ function photo(o,a){
   img.onerror=function(){a.replaceChildren(E.el('span','nophoto','Photo not shown here'));};
   return img;
 }
-// the vision-model hint of an observation (foodweb-vlm.json, absent is fine): one muted line, and the prey box over the photo (0-1000 coords)
+// the vision-model hint of an observation (foodweb-vlm.json, absent is fine): the card's first line with a P(feeding) bar, and the prey box over the photo (0-1000 coords)
 function hint(o,a,d){
   var h=H&&H.obs[o.id];if(!h)return;
   var g=h.name||(h.prey[0]&&h.prey[0][0]),b=h.box;
-  d.append(E.el('p','evl vlm','Model: '+(h.p>=0.5?'likely':'unlikely')+' feeding ('+h.p.toFixed(2)+')'+(g?' · prey guess: '+E.label(g):'')));
+  var l=E.el('p','evl vlm',(h.p>=0.9?'Very likely':h.p>=0.5?'Likely':'Unlikely')+' feeding'+(g?' · prey guess: '+E.label(g):'')),m=E.el('span','vbar'),f=E.el('i');
+  l.title='Model P(feeding) '+h.p.toFixed(2);f.style.width=Math.round(h.p*100)+'%';m.append(f);l.prepend(m);d.append(l);
   if(b){var x=E.el('span','pbox');x.style.cssText='left:'+b[0]/10+'%;top:'+b[1]/10+'%;width:'+(b[2]-b[0])/10+'%;height:'+(b[3]-b[1])/10+'%';a.append(x);}
 }
 function pairText(e){return E.label(e.pred)+(e.tier===4?' eats ':' may be eating ')+E.label(e.prey);}
@@ -129,9 +132,9 @@ function answer(c,v){
 function card(c){
   var o=c.r.o,li=E.el('li'),a=E.el('a'),d=E.el('div'),b=E.el('p','mk');c.li=li;
   a.href=OBS+o.id;a.target='_blank';a.rel='noopener';a.append(photo(o,a));
+  hint(o,a,d);
   d.append(E.el('p','pair',pairText(c.e)),E.el('p','evl','Why: '+c.e.why+'.'),
     E.el('p','evl',E.pl(o.np||1,'photo')+(o.c?' · '+E.pl(o.c,'comment'):'')+' · '+(o.on||'Date unknown')+' · '+(o.at||'Place unknown')));
-  hint(o,a,d);
   [['yes','Yes','1'],['no','No','2'],['unsure','Can’t tell','3']].forEach(function(x){
     var k=E.el('button',null,x[1]+' ');k.type='button';k.dataset.v=x[0];k.append(E.el('kbd',null,x[2]));k.onclick=function(){focus(deck.indexOf(c));answer(c,x[0]);};b.append(k);});
   var w=E.el('div','which'),pk=E.el('div','pk'),all=E.el('button','lnk all','Not in this list'),ok=E.el('button','ok','Confirm');

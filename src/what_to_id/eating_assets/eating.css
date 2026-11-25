@@ -59,6 +59,8 @@ button{font:inherit;color:var(--ink)}
 .cards .pbox{position:absolute;border:1px solid #fff;outline:1px solid rgba(0,0,0,.6);pointer-events:none}
 .cards .pair{font-size:15px;line-height:1.3}
 .cards .evl{color:var(--muted);font-size:12px}
+.cards .vlm{display:flex;align-items:center;gap:var(--s2);margin-top:0}
+.vbar{flex:none;width:48px;height:var(--s2);border-radius:var(--s1);background:var(--line);overflow:hidden}.vbar i{display:block;height:100%;background:var(--first)}
 .cards .nophoto{display:flex;align-items:center;justify-content:center;aspect-ratio:4/3;background:var(--chip);color:var(--muted);font-size:12px}
 .mk{display:flex;flex-wrap:wrap;gap:var(--s1) 6px;margin:var(--s2) 0}
 .mk button,.which button{min-height:32px;padding:2px var(--s3);border:1px solid var(--line);border-radius:20px;background:var(--chip);cursor:pointer}
