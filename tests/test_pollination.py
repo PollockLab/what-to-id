@@ -26,10 +26,46 @@ def test_pairs_keeps_animal_on_plant_rows_of_both_types_and_drops_the_rest():
         row("eats"),  # another type
     ]
     t = foodweb.pairs(rows, "pollination")
-    assert t["n"] == 3 and t["eats"] == {"Apis mellifera": [["Trifolium repens", 3]]}
-    assert t["eatenBy"] == {"Trifolium repens": [["Apis mellifera", 3]]}
+    assert t["n"] == 3 and t["eats"] == {"Apis mellifera": [["Trifolium repens", 3, "pollinates"]]}
+    assert t["eatenBy"] == {"Trifolium repens": [["Apis mellifera", 3, "pollinates"]]}
     assert foodweb.pairs([], "pollination")["n"] == 0
     assert foodweb.pairs(rows)["n"] == 0  # predation reads neither type nor animal-on-plant rows
+
+
+def test_pairs_type_a_pair_pollinates_or_visits_and_rank_pollinates_first():
+    ladybird = "Animalia | Arthropoda | Insecta | Adalia bipunctata"
+    rows = [
+        row("visitsFlowersOf", ladybird),
+        row("visitsFlowersOf", ladybird),
+        row("visitsFlowersOf", ladybird, "Plantae | Achillea millefolium"),
+        row("pollinates", BEE, "Plantae | Achillea millefolium"),
+        row("visitsFlowersOf", BEE, "Plantae | Achillea millefolium"),
+        row("visitsFlowersOf", BEE),
+        row("visitsFlowersOf", BEE),
+        row("pollinates", BEE),
+    ]
+    t = foodweb.pairs(rows, "pollination")
+    assert t["eats"]["Adalia bipunctata"] == [
+        ["Trifolium repens", 2, "visits"],
+        ["Achillea millefolium", 1, "visits"],
+    ]
+    # one pollinates record makes the pair pollinates; the count stays all records
+    assert t["eats"]["Apis mellifera"] == [
+        ["Trifolium repens", 3, "pollinates"],
+        ["Achillea millefolium", 2, "pollinates"],
+    ]
+    assert t["eatenBy"]["Achillea millefolium"] == [
+        ["Apis mellifera", 2, "pollinates"],
+        ["Adalia bipunctata", 1, "visits"],
+    ]
+
+
+def test_the_metaweb_keeps_the_pair_type():
+    web = {"eats": {"Bee": [["Clover", 2, "visits"], ["Yarrow", 1]]}}
+    assert metaweb.build(web, scavenging=False)["pairs"] == [
+        ["Bee", "Clover", 0.75, "visits"],
+        ["Bee", "Yarrow", 0.5],
+    ]
 
 
 def test_the_scavenging_rule_is_off_for_pollination():

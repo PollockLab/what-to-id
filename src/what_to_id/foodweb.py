@@ -12,7 +12,10 @@ eating. Every partner is kept, most records first.
 
 `--kind pollination` reads pollinates and visitsFlowersOf instead and keeps animal-on-plant pairs,
 writing pollination.json in the same shape: "eats" maps a pollinator to its plants, "eatenBy" a
-plant to its pollinators.
+plant to its pollinators. Each pair carries a third element, "pollinates" when any record says so,
+else "visits" (only visitsFlowersOf), and the pollinates pairs sort before the visits ones. The
+records count covers both types. GloBI's json.v2 rows hold no study citation for these types, so
+sources cannot be counted.
 """
 
 from __future__ import annotations
@@ -65,6 +68,7 @@ def pairs(rows: list[dict], kind: str = "predation") -> dict:
     types = POLLINATION if kind == "pollination" else TYPES
     eats: dict[str, Counter] = defaultdict(Counter)
     by: dict[str, Counter] = defaultdict(Counter)
+    real: set[tuple[str, str]] = set()  # pollination pairs with a pollinates record
     n = 0
     for r in rows:
         if r.get("interaction_type") not in types:
@@ -77,14 +81,23 @@ def pairs(rows: list[dict], kind: str = "predation") -> dict:
         n += 1
         eats[a][b] += 1
         by[b][a] += 1
+        if r["interaction_type"] == "pollinates":
+            real.add((a, b))
 
-    def cut(t: dict[str, Counter]) -> dict:
-        return {
-            k: [[p, c] for p, c in sorted(v.items(), key=lambda x: (-x[1], x[0]))]
-            for k, v in sorted(t.items())
-        }
+    def cut(t: dict[str, Counter], flip: bool = False) -> dict:
+        if kind != "pollination":
+            return {
+                k: [[p, c] for p, c in sorted(v.items(), key=lambda x: (-x[1], x[0]))]
+                for k, v in sorted(t.items())
+            }
+        out = {}
+        for k, v in sorted(t.items()):
+            rows = [[p, c, "pollinates" if ((p, k) if flip else (k, p)) in real else "visits"]
+                    for p, c in v.items()]  # fmt: skip
+            out[k] = sorted(rows, key=lambda x: (x[2] != "pollinates", -x[1], x[0]))
+        return out
 
-    return {"eats": cut(eats), "eatenBy": cut(by), "n": n}
+    return {"eats": cut(eats), "eatenBy": cut(by, True), "n": n}
 
 
 def fetch(bbox: str = BC_BBOX, pause: float = 1.0, types: tuple = TYPES) -> list[dict]:
