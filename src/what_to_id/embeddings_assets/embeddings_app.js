@@ -440,7 +440,7 @@ function select(i,fly){
 async function load(){
   status('Reading the index…');
   // the map page and the index manifest are independent, so ask for both at once
-  var mapText=L.fetchMapMeta(MAP,function(u){return fetch(u);});
+  var mapText=L.fetchMapMeta(MAP,function(u){return fetch(u);}).then(MapGroups);MapGroups.watch();
   mapText.catch(function(){});
   S.idx=await openIndex();
   var lay=S.idx.manifest.layout;
@@ -456,7 +456,7 @@ async function load(){
   // groups and names: fetched once the layout is in, so the two do not share the connection's bandwidth
   var groups=mapText.then(function(meta){
     var taxa=get(new URL(meta.taxa,MAP)).then(function(b){return JSON.parse(new TextDecoder().decode(b));});
-    var shards=meta.shards.map(function(s){return get(new URL(s.file,MAP)).then(function(b){return L.decodeShard(b,s.n);});});
+    var shards=meta.shards.map(function(s){return get(new URL(s.file,MAP)).then(function(b){var d=L.decodeShard(b,s.n);MapGroups.grp(meta,d.grp);return d;});});
     return Promise.all([Promise.all(shards),taxa]).then(function(g){return {meta:meta,shards:g[0],taxa:g[1]};});
   });
   groups.catch(function(){});

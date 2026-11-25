@@ -22,6 +22,7 @@ HERE = Path(__file__).parent
 ASSETS = HERE / "tree_assets"
 PAGE_NAME = "tree.html"
 SCRIPTS = {
+    "__MAP_GROUPS__": HERE / "map_assets" / "map_groups.js",
     "__MAP_FILTER__": HERE / "map_assets" / "map_filter.js",
     "__CLADE_COLOUR__": HERE / "map_assets" / "clade_colour.js",
     "__MAP_USER__": HERE

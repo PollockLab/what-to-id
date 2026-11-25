@@ -65,6 +65,7 @@ var GL=GroupList({box:$('groups'),bar:$('gbar'),keep:$('gkeep'),mine:$('mine'),S
   pass:function(){return GM;},inside:function(r){var f=o.tf();return !!f.inc&&f.inc[r]===1;},pk:function(){return PK;},quiet:true});
 var CL=MapOnly.clades({S:S,box:$('clades'),wrap:$('cladebox'),pk:PK,presets:META.presets||[],refilter:o.changed}),
   OL=MapOnly({S:S,META:META,mf:MF,box:$('flagbox'),flags:$('flags'),acclbl:$('acclbl'),acc:$('acc'),accr:$('accr'),refilter:o.changed});
+MapGroups.ui(META,$('gmode'));
 $('gall').onclick=function(){S.groups={};GL.show();o.changed();};
 function tally(){
   var P=o.P(),c=new Uint32Array(G.length),i;
@@ -123,7 +124,7 @@ function tc(){
   if(TC===undefined)TC=MapHist.tc(TOT,S,MF,CH.groupPass(S.groups,G,false),o.blocked());
   return TC;
 }
-if(META.files.totals)o.get(META.files.totals).then(function(b){TOT=JSON.parse(new TextDecoder().decode(b));update();}).catch(function(){});
+if(META.files.totals)o.get(META.files.totals).then(function(b){TOT=MapGroups.totals(META,JSON.parse(new TextDecoder().decode(b)));update();}).catch(function(){});
 var TM=MapTime({S:S,mf:MF,render:o.changed,refilter:o.changed,byObs:$('byObs'),byUp:$('byUp'),presets:$('presets'),from:$('from'),to:$('to'),
   months:$('months'),mclear:$('mclear')});
 var SG=IdentifySuggest({S:S,META:META,mf:MF,nf:o.nf,P:o.P,taxa:o.taxa,allc:function(){return ALLC;},short:short,tm:TM,changed:o.changed,rewrite:o.rewrite,

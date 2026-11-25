@@ -3,10 +3,11 @@
 // the split view (?embed=1) "Show on map" sends the taxon as the shared selection, as the photo space does.
 (function(){
 'use strict';
-var CT=new Set(),M=TreeModel,L=EmbeddingsLayout,META=CFG.meta,nf=new Intl.NumberFormat('en'),
+var CT=new Set(),M=TreeModel,L=EmbeddingsLayout,META=MapGroups(CFG.meta),nf=new Intl.NumberFormat('en'),
   nc=new Intl.NumberFormat('en',{notation:'compact',maximumFractionDigits:1}),EMBED=/[?&]embed=1/.test(location.search),
   BUDGET=400,BAR=26,TH=24,MINF=11,MINR=420,reduce=matchMedia('(prefers-reduced-motion: reduce)'),
   D=null,S=null,V=null,G={},GS=[],COL=new Map(),CC=null,prev=null,anim=0,SEL='',SY=null,PS=-1,PH={},Q=[],qt=0,qlast=0,lt=0,split=false,OL=null;
+MapGroups.watch();
 function $(i){return document.getElementById(i);}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 function status(t,sr){var s=$('status');s.className=sr?'sr':'';s.textContent=t||'';}

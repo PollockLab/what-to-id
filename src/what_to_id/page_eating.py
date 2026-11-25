@@ -130,6 +130,7 @@ def render(data_url: str = "", kind: str = "predation", toggle: bool = False) ->
         "__SITE_NAV__": page_nav.nav(PAGE_NAME),
         "__EATING_CSS__": (ASSETS / "eating.css").read_text().rstrip(),
         "__CONFIG__": config,
+        "__MAP_GROUPS__": (ASSETS.parent / "map_assets" / "map_groups.js").read_text(),
         "__EATING_PICKER_JS__": (ASSETS / "eating_picker.js").read_text(),
         "__EATING_CORE_JS__": (ASSETS / "eating_core.js").read_text(),
         "__FOOD_LOOP_JS__": (ASSETS / "food_loop.js").read_text(),
