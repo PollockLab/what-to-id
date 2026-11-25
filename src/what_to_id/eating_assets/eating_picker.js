@@ -48,10 +48,11 @@ function mark(text,q){
   if(i<0){f.append(text);return f;}
   f.append(text.slice(0,i),el('mark',null,text.slice(i,i+q.length)),text.slice(i+q.length));return f;
 }
-// o = model input plus {id, ph, value (a name or null), onPick(name)}; returns the element
+// o = model input plus {id, ph, value (a name or null), onPick(name)}, and optionally more(q): a promise of Latin names from outside
+// the model (iNaturalist), listed after the model's matches; returns the element
 function create(o){
   var m=model(o),host=el('div','cb'),inp=el('input'),pop=el('div','cbp'),hd=el('div','cbh'),ul=el('ul'),live=el('span','sr'),uid='cb-'+o.id;
-  var open=new Set(),isOpen=false,typed=false,rows=[],act=-1,q='';
+  var open=new Set(),isOpen=false,typed=false,rows=[],act=-1,q='',X={q:'',l:[]},T=0;
   inp.setAttribute('role','combobox');inp.setAttribute('aria-controls',uid);inp.setAttribute('aria-expanded','false');inp.setAttribute('aria-autocomplete','list');
   inp.setAttribute('aria-label',o.ph);inp.placeholder=o.ph;inp.autocomplete='off';inp.spellcheck=false;
   ul.id=uid;ul.setAttribute('aria-label',o.ph+' suggestions');pop.hidden=true;live.setAttribute('aria-live','polite');
@@ -66,23 +67,28 @@ function create(o){
   function render(keep){
     q=typed?inp.value.trim().toLowerCase():'';
     rows=q?m.search(q).map(function(n){return {n:n,d:0,k:false};}):m.flat(open);
+    if(o.more&&q.length>=3){if(X.q===q)X.l.forEach(function(n){if(!rows.some(function(r){return r.n===n;}))rows.push({n:n,d:0,k:false,x:true});});else fetchMore(q);}
     ul.setAttribute('role',q?'listbox':'tree');inp.setAttribute('aria-haspopup',q?'listbox':'tree');ul.replaceChildren();
     rows.forEach(function(r,i){
-      var n=r.n,label=m.lab(n),li=el('li',m.obs(n)?'':'z'),t=el('span','t'),c=m.cnt(n);
+      var n=r.n,label=m.lab(n),li=el('li',m.obs(n)||r.x?'':'z'),t=el('span','t'),c=m.cnt(n);
       li.id=uid+'-'+i;li.setAttribute('role',q?'option':'treeitem');
       if(!q){li.setAttribute('aria-level',r.d+1);li.style.paddingLeft=(6+r.d*16)+'px';if(r.k)li.setAttribute('aria-expanded',String(open.has(n)));}
       li.setAttribute('aria-selected',String(n===o.value));li.title=n||'Other';
       li.append(el('i','tri'+(q?' no':r.k?open.has(n)?' o':'':' leaf')));
       var latin=n!==label&&n.toLowerCase().indexOf(q)>=0&&label.toLowerCase().indexOf(q)<0;
       t.append(mark(label,q));
-      if(q){var sub=el('small');if(latin)sub.append(mark(n,q),' · ');sub.append(m.crumb(n));t.append(sub);}
-      li.append(t,el('span','n',c>1?String(c):''),el('span','n',String(m.obs(n))));
+      if(q){var sub=el('small');if(latin||r.x&&n!==label)sub.append(mark(n,q),' · ');sub.append(r.x?'iNaturalist':m.crumb(n));t.append(sub);}
+      li.append(t,el('span','n',c>1?String(c):''),el('span','n',r.x?'':String(m.obs(n))));
       li.onmousedown=function(e){e.preventDefault();};
       li.onclick=function(e){if(r.k&&e.target.classList.contains('tri'))toggle(n);else pick(n);};
       ul.append(li);});
     hd.hidden=!rows.length;live.textContent=q?rows.length+' match'+(rows.length===1?'':'es'):'';
-    if(!rows.length&&q)ul.append(el('li','none','No taxon matches "'+inp.value.trim()+'".'));
+    if(!rows.length&&q)ul.append(el('li','none',o.more&&q.length>=3&&X.q!==q?'Searching iNaturalist...':'No taxon matches "'+inp.value.trim()+'".'));
     setAct(keep!==undefined?keep:q&&rows.length?0:-1);
+  }
+  function fetchMore(s){
+    clearTimeout(T);T=setTimeout(function(){
+      o.more(s).catch(function(){return [];}).then(function(l){X={q:s,l:l};if(isOpen&&q===s)render(act<0?undefined:act);});},250);
   }
   function toggle(n,on){if(on===undefined?open.has(n):!on)open.delete(n);else open.add(n);render(rows.findIndex(function(r){return r.n===n;}));}
   function show(){

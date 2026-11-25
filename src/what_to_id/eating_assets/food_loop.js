@@ -12,7 +12,7 @@ var FoodLoop=(function(){
 var CLASSES=[['','All classes'],['Aves','Birds'],['Mammalia','Mammals'],['Reptilia','Reptiles'],['Amphibia','Amphibians'],['Insecta','Insects']],ANS=['yes','no','unsure'],
   // FOOD: the words foodweb_obs.SEARCHES looked for; the four options of a card's question and the three checks each one saves; only eating shows it (and asks which animal when the field did not name it)
   OPTS=[['Not this predator',['no','unsure','unsure']],['Not eating',['yes','yes','no']],['Can’t tell',['unsure','unsure','unsure']],['Eating',['yes','yes','yes']]],
-  KEY='wtid-loop',FOOD=['eating','eats','ate','feeding','prey','caught','predation'],OBS='https://www.inaturalist.org/observations/',TEN=10,$=function(id){return document.getElementById(id);};
+  KEY='wtid-loop',FOOD=['eating','eats','ate','feeding','prey','caught','predation'],OBS='https://www.inaturalist.org/observations/',API='https://api.inaturalist.org/v1/',TEN=10,$=function(id){return document.getElementById(id);};
 // #record=<id> (a shared card): read before the page rewrites its hash, drawn first once it fits the question
 var WANT=+((/(?:^|&)record=(\d+)(?:&|$)/.exec(location.hash.slice(1))||[])[1]||0);
 var S={ann:{},cls:''},H=null,E=null,Q={x:null,y:null},ITEMS=[],deck=[],cur=-1,change=function(){},TOK=new Map(),ready=false,booted=false;
@@ -72,6 +72,40 @@ function photo(o,a){
   img.onerror=function(){a.replaceChildren(E.el('span','nophoto','Photo not shown here'));};
   return img;
 }
+// an observation's photos (medium), fetched from iNaturalist on the first flip or zoom only; the card's one photo if that fails
+function pics(c){
+  var o=c.r.o;
+  if(!c.pics)c.pics=fetch(API+'observations/'+o.id).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();})
+    .then(function(j){var l=((j.results||[])[0]||{}).photos||[];return l.length?l.map(function(p){return p.url.replace('/square.','/medium.');}):[o.ph];})
+    .catch(function(){c.pics=null;return [o.ph];});
+  return c.pics;
+}
+// photo i of the card (wraps), in the card and in the zoom view when it shows this card; the model's box is for the first photo only
+function flip(c,i){
+  return pics(c).then(function(l){
+    c.pi=(i+l.length)%l.length;var f=c.li.querySelector('.ph'),a=f.querySelector('a'),img=a.querySelector('img')||a.appendChild(photo(c.r.o,a));
+    img.src=l[c.pi];f.querySelector('.pn').textContent=(c.pi+1)+' / '+l.length;
+    var b=a.querySelector('.pbox');if(b)b.hidden=c.pi>0;
+    if(Z.c===c)Z.img.src=l[c.pi].replace('/medium.','/large.');
+  });
+}
+// the zoom view: one modal dialog for the page (Escape closes it), the photo fit to the screen, a click or Enter shows it at full size
+var Z={};
+function zoom(c){
+  if(!Z.d){
+    Z.d=E.el('dialog','zoom');Z.img=E.el('img');Z.img.alt='';Z.img.tabIndex=0;var x=E.el('button','zx','Close'),p=E.el('button',null,'‹'),n=E.el('button',null,'›');
+    x.type=p.type=n.type='button';p.setAttribute('aria-label','Previous photo');n.setAttribute('aria-label','Next photo');
+    Z.img.title='Click for full size';Z.img.onclick=function(){Z.d.classList.toggle('full');};
+    x.onclick=function(){Z.d.close();};p.onclick=function(){flip(Z.c,Z.c.pi-1);};n.onclick=function(){flip(Z.c,Z.c.pi+1);};
+    Z.d.onclose=function(){var f=Z.c&&Z.c.li.querySelector('.zb');Z.c=null;if(f)f.focus();};
+    Z.d.onkeydown=function(e){
+      if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();flip(Z.c,Z.c.pi+(e.key==='ArrowLeft'?-1:1));}
+      else if(e.key==='Enter'&&e.target===Z.img){e.preventDefault();Z.img.click();}};
+    var bar=E.el('div','zbar');bar.append(p,n,x);Z.d.append(bar,Z.img);document.body.append(Z.d);
+  }
+  Z.c=c;Z.d.classList.remove('full');Z.img.alt='Photo of '+E.label(c.r.o.t[0])+', larger';Z.img.src=c.r.o.ph.replace('/medium.','/large.');
+  Z.d.showModal();Z.img.focus();flip(c,c.pi||0);
+}
 // the vision-model hint of an observation (foodweb-vlm.json, absent is fine): the card's first line with a P(feeding) bar, and the prey box over the photo (0-1000 coords)
 function hint(o,a,d){
   var h=H&&H.obs[o.id];if(!h)return;
@@ -124,7 +158,7 @@ function which(c){
   box.hidden=false;
   function fill(names){
     var g=eat?guess(c,names):null,v=g||(eat?c.e.prey:c.e.pred)||null,h=box.querySelector('.pk');if(g&&names.indexOf(g)<0)names=names.concat(g);
-    h.replaceChildren(EatingPicker.create({id:'w'+o.id,ph:'Which '+(eat?'prey':'predator')+'?',value:v,names:names,obs:[],parent:M.parent,rank:M.rank,groups:M.groups,label:E.label,
+    h.replaceChildren(EatingPicker.create({id:'w'+o.id,ph:'Which '+(eat?'prey':'predator')+'?',value:v,names:names,obs:[],parent:M.parent,rank:M.rank,groups:M.groups,label:E.label,more:more,
       onPick:function(n){pick=n;value(n);}}));
     h.querySelector('input').setAttribute('aria-label','Which '+(eat?'prey':'predator')+' does the photo show?');pick=v;value(v);
   }
@@ -137,6 +171,11 @@ function which(c){
   box.querySelector('.ok').onclick=function(){if(pick){box.hidden=true;put(c,c.ans,eat?known:pick,eat?pick:known);}};
   box.querySelector('.ok').focus();
 }
+// any taxon, for an animal the metaweb lacks: iNaturalist's taxon search, the Latin name picked as the metaweb's are
+function more(q){
+  return fetch(API+'taxa/autocomplete?per_page=10&q='+encodeURIComponent(q)).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();})
+    .then(function(j){return (j.results||[]).filter(function(t){return t.name;}).map(function(t){E.add(t.name,t.preferred_common_name,t.id);return t.name;});});
+}
 // option i (0-3) of the card's question finishes the mark; Eating on a card whose field does not name the pair asks which animal
 function answer(c,i){
   var t=OPTS[i][1],y=verdict(t)==='yes';c.ans=t;c.li.querySelector('.which').hidden=true;
@@ -144,8 +183,13 @@ function answer(c,i){
   put(c,t,y?c.e.pred:undefined,c.e.prey);
 }
 function card(c){
-  var o=c.r.o,li=E.el('li'),a=E.el('a'),d=E.el('div'),b=E.el('p','mk');c.li=li;
-  a.href=OBS+o.id;a.target='_blank';a.rel='noopener';a.append(photo(o,a));
+  var o=c.r.o,li=E.el('li'),f=E.el('figure','ph'),a=E.el('a'),d=E.el('div'),b=E.el('p','mk');c.li=li;
+  a.href=OBS+o.id;a.target='_blank';a.rel='noopener';a.append(photo(o,a));f.append(a);
+  // flip through the observation's photos and zoom in, to tell the prey
+  var zb=E.el('button','zb','Zoom');zb.type='button';zb.setAttribute('aria-label','Zoom photo');zb.onclick=function(){zoom(c);};
+  var pn=E.el('span','pn');f.append(zb,pn);
+  if((o.np||1)>1){pn.textContent='1 / '+o.np;[['‹','Previous photo',-1],['›','Next photo',1]].forEach(function(x){
+    var k=E.el('button','pv',x[0]);k.type='button';k.setAttribute('aria-label',x[1]);k.onclick=function(){flip(c,(c.pi||0)+x[2]);};f.append(k);});}
   hint(o,a,d);
   d.append(E.el('p','pair',pairText(c.e)),E.el('p','evl','Why: '+c.e.why+'.'),
     E.el('p','evl',E.pl(o.np||1,'photo')+(o.c?' · '+E.pl(o.c,'comment'):'')+' · '+(o.on||'Date unknown')+' · '+(o.at||'Place unknown')));
@@ -162,7 +206,7 @@ function card(c){
   hd.append(ha,cp,cs,E.el('p','hint evl'));
   var go=E.el('a','open','Open on iNaturalist');go.href=OBS+o.id;go.target='_blank';go.rel='noopener';
   var sh=E.el('button');WtidCarry.share(sh,function(){return ['record='+o.id];});
-  d.append(E.el('p','ask'),b,w,E.el('p','res'),E.el('p','sum evl'),hd,go,sh);li.append(a,d);
+  d.append(E.el('p','ask'),b,w,E.el('p','res'),E.el('p','sum evl'),hd,go,sh);li.append(f,d);
   li.onclick=function(){if(cur!==deck.indexOf(c))focus(deck.indexOf(c));};
   status(c);return li;
 }
@@ -201,7 +245,7 @@ function init(core,onChange){
   reload();
   $('draw').onclick=function(){draw();};$('export').onclick=exportCsv;
   document.addEventListener('keydown',function(e){
-    var t=e.target;if(e.ctrlKey||e.metaKey||e.altKey||/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)||!deck.length)return;
+    var t=e.target;if(e.ctrlKey||e.metaKey||e.altKey||/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)||!deck.length||Z.c)return;
     if(e.key==='j'||e.key==='k'){e.preventDefault();focus(Math.max(0,Math.min(deck.length-1,(cur<0?0:cur)+(e.key==='j'?1:-1))));return;}
     var v=['1','2','3','4'].indexOf(e.key);if(v>=0&&cur>=0){e.preventDefault();answer(deck[cur],v);}
   });
