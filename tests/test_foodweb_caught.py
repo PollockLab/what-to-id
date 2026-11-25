@@ -58,12 +58,20 @@ def test_a_linked_plant_is_no_prey(monkeypatch):
     assert "lk" not in rec  # "Feeding on: <tansy>" is a flower visit
 
 
-@pytest.fixture(scope="module")
-def caught(tmp_path_factory):
+def site(tmp, hits, vlm):
     meta = {
         **foodweb_page.META,
         "parent": {**foodweb_page.META["parent"], "Pandalus danae": "Caridea"},
     }
+    with pytest.MonkeyPatch.context() as m:
+        m.setattr(foodweb_page, "META", meta)
+        m.setattr(foodweb_page, "TEXT", {**foodweb_page.TEXT, "obs": hits})
+        m.setattr(foodweb_page, "VLM", vlm)
+        yield from build_site(tmp)
+
+
+@pytest.fixture(scope="module")
+def caught(tmp_path_factory):
     hits = [
         foodweb_page.hit(801, "Caught a shrimp! "),
         foodweb_page.hit(802, "Caught in a spider web"),
@@ -83,11 +91,30 @@ def caught(tmp_path_factory):
     ]
     guess = {"p": 0.95, "prey": [["Mus musculus", 0.6]]}
     vlm = {**foodweb_page.VLM, "obs": {"801": guess, "805": guess}}
-    with pytest.MonkeyPatch.context() as m:
-        m.setattr(foodweb_page, "META", meta)
-        m.setattr(foodweb_page, "TEXT", {**foodweb_page.TEXT, "obs": hits})
-        m.setattr(foodweb_page, "VLM", vlm)
-        yield from build_site(tmp_path_factory.mktemp("caught-site"))
+    yield from site(tmp_path_factory.mktemp("caught-site"), hits, vlm)
+
+
+@pytest.fixture(scope="module")
+def negated(tmp_path_factory):
+    hits = [
+        foodweb_page.hit(813, "Could not see if it caught anything, a shrimp nearby"),
+        foodweb_page.hit(814, "It didn't catch the shrimp"),
+        foodweb_page.hit(815, "No prey, a shrimp in the water"),
+        foodweb_page.hit(816, "Dove and missed the shrimp"),
+        foodweb_page.hit(817, "Eating a bee fly"),
+        foodweb_page.hit(818, "Eating a robber-fly"),
+        foodweb_page.hit(819, "Eating a bee"),
+        foodweb_page.hit(
+            820, "caught on trail camera - looking for roosting ducks (eating dead and soft salmon)"
+        ),
+        foodweb_page.hit(
+            821, "Feeding on what appears to be a stickleback (it didn't actually swallow it)"
+        ),
+        foodweb_page.hit(
+            822, "Eating a feral rock pigeon/dove. Bird was calm with me a few feet away."
+        ),
+    ]
+    yield from site(tmp_path_factory.mktemp("negated-site"), hits, foodweb_page.VLM)
 
 
 def test_caught_or_prey_names_a_prey_or_draws_no_card(browser, caught):
@@ -107,4 +134,26 @@ def test_caught_or_prey_names_a_prey_or_draws_no_card(browser, caught):
     # no prey in the observer's credit ("caught by me", "caught on camera"), nor on the scat it eats
     for i in (802, 803, 806, 807, 809, 811, 812):
         assert page.locator(f"#cards a[href$='/observations/{i}']").count() == 0
+    assert page.errors == []
+
+
+def test_a_negated_catch_a_compound_name_or_another_animals_meal_names_no_prey(browser, negated):
+    page = open_page(browser, negated + "#q=eats&x=Strix varia")
+    draw_all(page)
+    # "could not see", "didn't catch", "no prey", "missed", and a meal the text gives to the ducks
+    for i, prey in (
+        (813, "Caridea"),
+        (814, "Caridea"),
+        (815, "Caridea"),
+        (816, "Caridea"),
+        (820, "almon"),
+    ):
+        cards = page.locator(f"#cards li:has(a[href$='/observations/{i}'])")
+        assert prey not in " ".join(cards.all_inner_texts())
+    # a bee fly or robber fly is no bee or fly prey, a plain bee still is
+    assert "may be eating something" in card_of(page, 817)
+    assert "may be eating something" in card_of(page, 818)
+    assert "Anthophila" in card_of(page, 819)
+    assert "Gasterosteidae" in card_of(page, 821)  # the stickleback text of 44693670
+    assert "may be eating Aves" in card_of(page, 822)  # the rock pigeon text of 329488383
     assert page.errors == []
