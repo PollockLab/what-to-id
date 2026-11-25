@@ -20,7 +20,8 @@ def base(tmp_path_factory):
 def test_a_card_with_a_model_hint_shows_the_model_line_and_the_prey_box(browser, base):
     page = open_page(browser, base + HASH)
     first = page.locator("#cards li").first
-    assert first.locator(".vlm").inner_text() == "Very likely feeding · prey guess: House Mouse"
+    # the field names the prey, so the model line keeps its bar and drops its guess
+    assert first.locator(".vlm").inner_text() == "Very likely feeding"
     assert first.locator(".vlm").get_attribute("title") == "Model P(feeding) 0.95"
     assert first.locator(".vbar i").get_attribute("style") == "width: 95%;"
     assert (
