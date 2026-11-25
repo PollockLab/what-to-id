@@ -5,6 +5,7 @@
 // The next ten come when the last card is answered, or on More photos.
 // Rank = the pair's p in the metaweb x the evidence: 4 the field names the pair, 3 it names a coarse ancestor of one animal, 2 the
 // description, tags or field text mention a candidate (common or Latin name), 1 they only talk about food (a text hit then names no prey) or the field is empty.
+// A Visited flower of record (k visit, pollination page) whose animal is above species or needs ID, and whose plant is named, is an insect card: the likely visitors of that plant inside the animal's taxon, no question.
 // FoodLoop.init(E, onChange); FoodLoop.ask({x, y}) when the question changes; FoodLoop.state(pred, prey) is 'before', 'new' or ''.
 var FoodLoop=(function(){
 'use strict';
@@ -12,7 +13,7 @@ var FoodLoop=(function(){
 var CLASSES=[['','All classes'],['Aves','Birds'],['Mammalia','Mammals'],['Reptilia','Reptiles'],['Amphibia','Amphibians'],['Insecta','Insects']],ANS=['yes','no','unsure'],
   // FOOD: the words foodweb_obs.SEARCHES looked for; the four options of a card's question and the three checks each one saves; only eating shows it (and asks which animal when the field did not name it)
   OPTS=[['Not this predator',['no','unsure','unsure']],['Not eating',['yes','yes','no']],['Can’t tell',['unsure','unsure','unsure']],['Eating',['yes','yes','yes']]],
-  KEY='wtid-loop',FOOD=['eating','eats','ate','feeding','prey','caught','predation'],OBS='https://www.inaturalist.org/observations/',API='https://api.inaturalist.org/v1/',TEN=10,$=function(id){return document.getElementById(id);};
+  KEY='wtid-loop',FOOD=['eating','eats','ate','feeding','prey','caught','predation'],OBS='https://www.inaturalist.org/observations/',API='https://api.inaturalist.org/v1/',TEN=10,CAND=((typeof EATING_CONFIG!=='undefined'&&EATING_CONFIG.words)||{}).cand||'candidate observation',SHOW=8,$=function(id){return document.getElementById(id);};
 // #record=<id> (a shared card): read before the page rewrites its hash, drawn first once it fits the question
 var WANT=+((/(?:^|&)record=(\d+)(?:&|$)/.exec(location.hash.slice(1))||[])[1]||0);
 var S={ann:{},cls:''},H=null,E=null,Q={x:null,y:null},ITEMS=[],deck=[],cur=-1,change=function(){},TOK=new Map(),ready=false,booted=false;
@@ -37,6 +38,7 @@ function credit(t){return t.replace(/\b(?:caught|photo(?:graph(?:ed)?)?|picture|
 var GROUP={shrimp:'Caridea',crab:'Brachyura',crayfish:'Astacidea',fish:'Actinopterygii',prickleback:'Stichaeidae',sculpin:'Cottidae',salmon:'Salmonidae',herring:'Clupeidae',insect:'Insecta',moth:'Lepidoptera',butterfly:'Lepidoptera',caterpillar:'Lepidoptera',dragonfly:'Odonata',beetle:'Coleoptera',fly:'Diptera',bee:'Anthophila',grasshopper:'Orthoptera',spider:'Araneae',snail:'Gastropoda',slug:'Gastropoda',clam:'Bivalvia',mussel:'Bivalvia',frog:'Anura',snake:'Serpentes',bird:'Aves',duck:'Anatidae',squirrel:'Sciuridae',rabbit:'Leporidae'};
 // the pairs one record may show, each with its evidence tier and the reason, as [{pred, prey, tier, why}]
 function entries(r){
+  if(r.o.k==='visit')return visiting(r);
   var o=r.o,eat=o.k!=='by',known=eat?r.pred:r.prey,named=eat?r.prey:r.pred,out=[];
   if(!known||known.indexOf(' ')<0)return out;
   var all=(eat?E.preys(known):E.preds(known)).map(function(q){return q[eat?1:0];}).filter(function(n,i,a){return a.indexOf(n)===i;}); // subspecies pairs repeat a partner
@@ -58,6 +60,33 @@ function entries(r){
     add(g||'',1,why);return out;}
   all.forEach(function(n){add(n,1,o.k==='text'?'Description or tags mention food':o.k==='model'?'A vision model flagged feeding':'The '+(eat?'Eating':'Eaten by')+' field '+(o.x?'has text, no taxon':'is empty'));});
   return out;
+}
+// an insect card's one pair; a species already confirmed, or a record with no plant named, has none
+function visiting(r){
+  var o=r.o;
+  return r.prey&&(r.pred.indexOf(' ')<0||o.q==='needs_id')?[{pred:r.pred,prey:r.prey,tier:4,why:'The field names the plant'}]:[];
+}
+// the species GloBI has on the plant (a genus or species) inside the animal's taxon, most records first; records on several plants of a genus add up (1-0.5^n)
+function likely(pred,plant){
+  var m=new Map();
+  E.preds(plant).forEach(function(q){if(q[0].indexOf(' ')>0&&E.within(q[0],pred))m.set(q[0],1-(1-(m.get(q[0])||0))*(1-q[2]));});
+  return Array.from(m.keys()).sort(function(a,b){return m.get(b)-m.get(a)||(a<b?-1:1);}).map(function(n){return [n,m.get(n)];});
+}
+function taxon(n){var i=E.taxonId(n);return 'https://www.inaturalist.org/taxa/'+(i?i+'':'search?q='+encodeURIComponent(n));}
+var QUALITY={needs_id:'Needs ID',research:'Research grade',casual:'Casual'};
+// the insect card's body: the likely visitors, each linking to its iNaturalist taxon page
+function insect(c,li,f,d){
+  var o=c.r.o,e=c.e,l=likely(e.pred,e.prey),coarse=e.pred.indexOf(' ')<0,ol=E.el('ol','lk');
+  l.slice(0,SHOW).forEach(function(x){
+    var i=E.el('li'),a=E.el('a',null,E.label(x[0]));a.href=taxon(x[0]);a.target='_blank';a.rel='noopener';
+    i.append(a,E.el('em',null,(E.label(x[0])===x[0]?'':x[0]+' · ')+E.words(x[1])));ol.append(i);});
+  d.append(E.el('p','pair',E.label(e.pred)+' on '+E.label(e.prey)),
+    E.el('p','evl',(QUALITY[o.q]||o.q)+' · '+E.pl(o.np||1,'photo')+(o.c?' · '+E.pl(o.c,'comment'):'')+' · '+(o.on||'Date unknown')+' · '+(o.at||'Place unknown')),
+    E.el('p','ask','Likely visitors of '+E.label(e.prey)+(coarse?', '+E.label(e.pred)+' only':'')+(l.length?' (most GloBI records first):':': none recorded in GloBI.')),ol);
+  if(l.length>SHOW)d.append(E.el('p','evl','and '+(l.length-SHOW)+' more'));
+  var go=E.el('a','open','Open on iNaturalist'),sh=E.el('button');go.href=OBS+o.id;go.target='_blank';go.rel='noopener';WtidCarry.share(sh,function(){return ['record='+o.id];});
+  d.append(go,sh);li.append(f,d);li.onclick=function(){if(cur!==deck.indexOf(c))focus(deck.indexOf(c));};
+  return li;
 }
 // the model's P(feeding) for the observation scales the rank (0.5, the neutral, when it has no hint)
 function score(e,id){var h=H&&H.obs[id];return Math.max(E.p(e.pred,e.prey),0.1)*e.tier*(h?Math.max(h.p,0.1):0.5);}
@@ -130,7 +159,7 @@ function pairText(e){return E.label(e.pred)+(e.tier===4?' eats ':' may be eating
 function meter(){
   var n=ranked().length;
   $('draw').textContent=deck.length?'More photos':'Show photos';$('draw').disabled=!n||!ready;
-  $('cand').textContent=!ready?E.pl(n,'candidate observation')+' so far. Searching descriptions and tags.':n?E.pl(n,'candidate observation')+(deck.length||Q.x||Q.y?' for this question.':' across the whole web. Pick a species in the question to draw its photos, or show photos from all of them.'):'No more observations for this question.';
+  $('cand').textContent=!ready?E.pl(n,CAND)+' so far. Searching descriptions and tags.':n?E.pl(n,CAND)+(deck.length||Q.x||Q.y?' for this question.':' across the whole web. Pick a species in the question to draw its photos, or show photos from all of them.'):'No more observations for this question.';
 }
 // the three answers of a mark: a saved single mark (yes, no, unsure) is the same answer to all three
 function steps(a){var t=a&&a.st;return Array.isArray(t)&&t.length===3&&t.every(function(x){return ANS.indexOf(x)>=0;})?t:a&&ANS.indexOf(a.v)>=0?[a.v,a.v,a.v]:[];}
@@ -202,6 +231,7 @@ function card(c){
   var pn=E.el('span','pn');f.append(zb,pn);
   if((o.np||1)>1){pn.textContent='1 / '+o.np;[['‹','Previous photo',-1],['›','Next photo',1]].forEach(function(x){
     var k=E.el('button','pv',x[0]);k.type='button';k.setAttribute('aria-label',x[1]);k.onclick=function(){flip(c,(c.pi||0)+x[2]);};f.append(k);});}
+  if(o.k==='visit')return insect(c,li,f,d);
   hint(o,a,d);
   d.append(E.el('p','pair',pairText(c.e)),E.el('p','evl','Why: '+c.e.why+'.'),
     E.el('p','evl',E.pl(o.np||1,'photo')+(o.c?' · '+E.pl(o.c,'comment'):'')+' · '+(o.on||'Date unknown')+' · '+(o.at||'Place unknown')));
@@ -259,10 +289,10 @@ function init(core,onChange){
   document.addEventListener('keydown',function(e){
     var t=e.target;if(e.ctrlKey||e.metaKey||e.altKey||/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)||!deck.length||Z.c)return;
     if(e.key==='j'||e.key==='k'){e.preventDefault();focus(Math.max(0,Math.min(deck.length-1,(cur<0?0:cur)+(e.key==='j'?1:-1))));return;}
-    var v=['1','2','3','4'].indexOf(e.key);if(v>=0&&cur>=0){e.preventDefault();answer(deck[cur],v);}
+    var v=['1','2','3','4'].indexOf(e.key);if(v>=0&&cur>=0&&deck[cur].r.o.k!=='visit'){e.preventDefault();answer(deck[cur],v);}
   });
 }
 function go(){ready=true;}
 function hints(v){H=v&&v.obs?v:null;}
-return {hints:hints,init:init,reload:reload,go:go,ask:ask,state:state,pairs:pairs,marks:marks,searched:searched,shown:shown,csv:csv,CLASSES:CLASSES,cls:function(){return S.cls;},setClass:setClass,steps:steps,verdict:verdict,entries:entries,S:S};
+return {likely:likely,hints:hints,init:init,reload:reload,go:go,ask:ask,state:state,pairs:pairs,marks:marks,searched:searched,shown:shown,csv:csv,CLASSES:CLASSES,cls:function(){return S.cls;},setClass:setClass,steps:steps,verdict:verdict,entries:entries,S:S};
 })();
