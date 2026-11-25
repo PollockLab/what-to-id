@@ -17,6 +17,9 @@ button{font:inherit;color:var(--ink)}
 @media(min-width:1180px){.flow{grid-template-columns:minmax(320px,1fr) minmax(440px,1.6fr) minmax(320px,1fr);grid-template-areas:"q e n" "m e n";grid-template-rows:auto 1fr}.st4{position:sticky;top:var(--s2)}}
 .seg{display:flex;margin:0 0 var(--s3)}
 .seg button{flex:1 1 0;min-height:32px;padding:2px var(--s2);background:var(--chip);border:1px solid var(--line);margin-left:-1px;cursor:pointer;white-space:nowrap}
+#kind{max-width:24em}
+.nocards .st3,.nocards #export,.nocards #classes{display:none}
+@media(min-width:1180px){.flow.nocards{grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);grid-template-areas:"q m" "n n";grid-template-rows:auto}.flow.nocards .st4{position:static}}
 .seg.cls{flex-wrap:wrap}.seg.cls button{flex:0 1 auto}
 .seg button:hover{border-color:var(--muted)}
 .seg button:first-child{border-radius:20px 0 0 20px;margin-left:0}.seg button:last-child{border-radius:0 20px 20px 0}

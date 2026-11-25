@@ -235,6 +235,29 @@ jobs:
           if [ -z "$ATLAS_HF_REPO" ]; then echo "no ATLAS_HF_REPO; no confused pairs page"; exit 0; fi
           python -m what_to_id.page_confusion --out _site \
             --data-url "https://huggingface.co/datasets/${ATLAS_HF_REPO}/resolve/main/"
+      # pollination.html: BC pollinator-plant pairs from GloBI and the Visited flower of observations from
+      # iNaturalist, read by the Food web step's page build, which links the two pages. Without them the
+      # Food web page ships alone.
+      - name: Add the Pollination data
+        continue-on-error: true
+        timeout-minutes: 30
+        run: |
+          set -euo pipefail
+          # without a fetch, the live site's data; any file missing there means fetching after all
+          kept=false
+          if [ "$FETCH" != true ]; then
+            live="$(gh api "repos/$GITHUB_REPOSITORY/pages" -q .html_url || true)"
+            kept=true
+            for f in pollination.json pollination-metaweb.json pollination-obs.json; do
+              curl -fsS --retry 2 -o "_site/$f" "${live%/}/$f" || kept=false
+            done
+          fi
+          if [ "$kept" != true ]; then
+            python -m what_to_id.foodweb --kind pollination --out _site/pollination.json
+            python -m what_to_id.metaweb --foodweb _site/pollination.json --meta _site/map-meta.json \
+              --taxa "_site/$(jq -r .taxa _site/map-meta.json)" --no-scavenging --out _site/pollination-metaweb.json
+            python -m what_to_id.foodweb_obs --kind pollination --out _site/pollination-obs.json
+          fi
       # food-web.html: BC predator-prey pairs from GloBI (the metaweb) and the feeding photos and food-word
       # searches from iNaturalist that test them. The Food web tab hides itself when the page is missing.
       - name: Add the Food web page
