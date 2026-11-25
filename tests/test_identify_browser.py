@@ -117,7 +117,7 @@ def open_identify(browser, base, hash_="", size=(600, 900), touch=False):
     )
     # the panel's taxa and look-alike lookups: empty answers, not the live API's 4xx for fake ids
     page.route(
-        "https://api.inaturalist.org/v1/**",
+        re.compile(r"https://api\.inaturalist\.org/v[12]/.*"),
         lambda r: r.fulfill(json={"results": []}, headers={"access-control-allow-origin": "*"}),
     )
     page.calls = eb.stub_inat(page, None)
