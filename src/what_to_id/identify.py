@@ -139,7 +139,7 @@ def identify_scores(
 
     def kingdom(tid: int) -> int | None:
         for _ in range(64):  # guard against a cycle in a malformed tree
-            node = tree.get(int(tid))
+            node = tree.get(int(tid)) if tid is not None else None  # the root has no parent
             if node is None or node[3] == "kingdom":
                 return int(tid) if node else None
             tid = node[0]
