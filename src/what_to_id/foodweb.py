@@ -6,9 +6,9 @@ Reads GloBI's interaction API (eats and preysOn in a BC bounding box; GloBI retu
 once per direction, so the inverse types add nothing) and writes
 {"eats": {name: [[partner, records], ...]}, "eatenBy": {...}, "n": records}. Names are GloBI taxon
 names, each record filed under its own two names only (a record labelled at genus stays at genus;
-nothing is rolled up from species). Only animal-on-animal pairs are kept (both paths name Animalia
-or Metazoa): GloBI's eats also holds grazing and fungus eating. Every partner is kept, most records
-first.
+nothing is rolled up from species, but a subspecies or form is its species). Only animal-on-animal
+pairs are kept (both paths name Animalia or Metazoa): GloBI's eats also holds grazing and fungus
+eating. Every partner is kept, most records first.
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ def _name(r: dict, side: str) -> str | None:
     """The taxon's own name: the last element of its path (GloBI's name can carry a common name)."""
     path = (r.get(f"{side}_taxon_path") or "").split(" | ")
     n = (path[-1] or r.get(f"{side}_taxon_name") or "").strip()
-    return n or None
+    return " ".join(n.split()[:2]) or None  # a subspecies or form (Feral Pigeon) is its species
 
 
 def _animal(r: dict, side: str) -> bool:
