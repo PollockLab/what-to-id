@@ -79,15 +79,15 @@ dialog.zoom::backdrop{background:rgba(0,0,0,.8)}
 .vbar{flex:none;width:48px;height:var(--s2);border-radius:6px;background:var(--line);overflow:hidden}.vbar i{display:block;height:100%;background:var(--first)}
 .cards .nophoto{display:flex;align-items:center;justify-content:center;aspect-ratio:4/3;background:var(--chip);color:var(--muted);font-size:12px}
 .mk{display:flex;flex-wrap:wrap;gap:var(--s1) 6px;margin:var(--s2) 0}
-.mk button,.which button{min-height:32px;padding:2px var(--s3);border:1px solid var(--line);border-radius:20px;background:var(--chip);cursor:pointer}
-.mk button:hover,.which button:hover{border-color:var(--muted)}
+.mk button,.which button,.cards .post{min-height:32px;padding:2px var(--s3);border:1px solid var(--line);border-radius:20px;background:var(--chip);cursor:pointer}
+.mk button:hover,.which button:hover,.cards .post:hover:not(:disabled){border-color:var(--muted)}
 .mk button[aria-pressed=true]{background:var(--on);color:var(--onink);border-color:var(--on)}
 kbd{font:11px ui-monospace,monospace;border:1px solid currentColor;border-radius:3px;padding:0 3px}
 .which{margin:6px 0}.which[hidden]{display:none}
 .which .lab{display:block;font-weight:600;margin-bottom:var(--s1)}
 .which .ev{font-weight:600;margin-right:var(--s2)}.which .cs{margin:0 var(--s2);color:var(--muted)}
 .which .pk{margin-bottom:6px}.which .pk .cb{display:block}
-.which button.lnk{background:none;border:0;color:var(--bar);text-decoration:underline;min-height:24px}
+.which button.lnk,.cards button.lnk{background:none;border:0;color:var(--bar);text-decoration:underline;min-height:24px}
 .which a{display:block;margin-top:var(--s1)}
 .cards .hand{margin:6px 0;padding:0}.hand[hidden]{display:none}.hand a{display:block;font-weight:600;margin-bottom:var(--s1);overflow-wrap:anywhere}
 .hand .cp{min-height:32px;padding:2px var(--s3);border:1px solid var(--line);border-radius:20px;background:var(--chip);cursor:pointer}
@@ -132,3 +132,4 @@ kbd{font:11px ui-monospace,monospace;border:1px solid currentColor;border-radius
 .thumbs{list-style:none;margin:var(--s2) 0 0;padding:0;display:grid;gap:var(--s2);grid-template-columns:repeat(auto-fill,minmax(110px,1fr))}
 .thumbs img{display:block;width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;background:var(--chip)}
 .fsearch .err{color:var(--warn);background:var(--warnbg);padding:var(--s2) var(--s3);border-radius:6px}
+.cards .lk .post{margin-top:var(--s1)}
