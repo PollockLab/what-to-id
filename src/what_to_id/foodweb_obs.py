@@ -41,6 +41,12 @@ TEXT = 80  # characters of a field's text kept
 LIMIT = 10000  # iNaturalist refuses page * per_page beyond this
 
 
+def _species(t: dict) -> str:
+    """A subspecies, variety or form named as its species (Feral Pigeon is Rock Pigeon)."""
+    n = t["name"]
+    return " ".join(n.split()[:2]) if t.get("rank") in ("subspecies", "variety", "form") else n
+
+
 def slim(o: dict, kind: str) -> dict | None:
     """One observation as the file's record, or None when it has no taxon or photo."""
     t, name = o.get("taxon"), FIELDS.get(kind, (None, None))[1]
@@ -50,7 +56,7 @@ def slim(o: dict, kind: str) -> dict | None:
     ll = [round(float(v), 4) for v in o["location"].split(",")] if o.get("location") else None
     r = {
         "id": o["id"],
-        "t": [t["name"], t["id"], t.get("preferred_common_name") or ""],
+        "t": [_species(t), t["id"], t.get("preferred_common_name") or ""],
         "k": kind,
         "c": o.get("comments_count") or 0,
         "q": o.get("quality_grade"),
@@ -64,7 +70,7 @@ def slim(o: dict, kind: str) -> dict | None:
         if f.get("field_id") != name:
             continue
         if f.get("taxon"):
-            r["f"] = [f["taxon"]["name"], f["taxon"]["id"]]
+            r["f"] = [_species(f["taxon"]), f["taxon"]["id"]]
         elif str(f.get("value") or "").strip():
             r["x"] = str(f["value"]).strip()[:TEXT]
         break
