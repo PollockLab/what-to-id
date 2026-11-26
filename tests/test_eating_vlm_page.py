@@ -165,3 +165,12 @@ def test_a_study_card_shows_the_photo_beside_the_answers_and_stacks_on_a_phone(
     page.set_viewport_size({"width": 390, "height": 844})
     ph, mk = box("figure"), box(".mk")
     assert mk["y"] > ph["y"] + ph["height"] - 1
+
+
+def test_a_class_with_no_study_photos_names_the_filter_not_a_finish(browser, tmp_path, monkeypatch):
+    page = _study_page(browser, tmp_path, monkeypatch)
+    page.locator("#qf summary").click()
+    page.locator("#classes button", has_text="Insects").click()
+    assert page.locator("#qf summary").inner_text().endswith("Insects")
+    assert page.inner_text("#cand").startswith("No photos left for this question.")
+    assert page.errors == []
