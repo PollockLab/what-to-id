@@ -351,8 +351,8 @@ function setClass(c){if(CLASSES.some(function(k){return k[0]===c;})){S.cls=c;sav
 function shown(){return deck.length;}
 function csv(){
   var q=function(v){return '"'+String(v==null?'':v).replace(/"/g,'""')+'"';};
-  return ['observation_id,url,predator,prey,answer,date,is_predator,is_prey,is_eating,label'].concat(Object.keys(S.ann).map(function(i){var a=S.ann[i]||{};
-    return [i,OBS+i,a.pred,a.prey,a.v,a.on].concat(steps(a).length?steps(a):['','',''],a.lab).map(q).join(',');})).join('\n')+'\n';
+  return ['observation_id,url,predator,prey,answer,date,is_predator,is_prey,is_eating,label,model_p'].concat(Object.keys(S.ann).map(function(i){var a=S.ann[i]||{};
+    return [i,OBS+i,a.pred,a.prey,a.v,a.on].concat(steps(a).length?steps(a):['','',''],a.lab,H&&H.obs[i]?H.obs[i].p:'').map(q).join(',');})).join('\n')+'\n';
 }
 function exportCsv(){
   var u=URL.createObjectURL(new Blob([csv()],{type:'text/csv'})),a=E.el('a');a.href=u;a.download='food-web-annotations.csv';document.body.append(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u);},1000);

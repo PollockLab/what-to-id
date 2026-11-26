@@ -128,7 +128,7 @@ def test_the_four_options_save_the_three_checks_and_only_eating_shows_it(browser
     with page.expect_download() as d:
         page.click("#export")
     line = [r for r in Path(d.value.path()).read_text().splitlines() if r.startswith('"502"')][0]
-    assert line.endswith('"yes","yes","yes",""') and page.errors == []
+    assert line.endswith('"yes","yes","yes","",""') and page.errors == []
 
 
 def test_keys_1_to_4_answer_the_current_card_with_one_press(browser, base):
