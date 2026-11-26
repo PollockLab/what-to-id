@@ -105,8 +105,8 @@ def test_key_6_saves_carrion_with_its_label_in_the_csv(browser, tmp_path, monkey
     page = _study_page(browser, tmp_path, monkeypatch)
     page.keyboard.press("6")
     rows = page.evaluate("FoodLoop.csv()").strip().split("\n")
-    assert rows[0].endswith(",is_eating,label")
-    assert rows[1].endswith('"yes","unsure","no","carrion"') and rows[1].startswith('"1",')
+    assert rows[0].endswith(",is_eating,label,model_p")
+    assert rows[1].endswith('"yes","unsure","no","carrion","0.99"') and rows[1].startswith('"1",')
     assert page.errors == []
 
 

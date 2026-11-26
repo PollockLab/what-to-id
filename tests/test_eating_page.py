@@ -300,13 +300,13 @@ def test_export_is_a_csv_of_the_annotations(browser, base):
         page.click("#export")
     rows = Path(d.value.path()).read_text().splitlines()
     assert (
-        rows[0]
-        == "observation_id,url,predator,prey,answer,date,is_predator,is_prey,is_eating,label"
+        rows[0] == "observation_id,url,predator,prey,answer,date,"
+        "is_predator,is_prey,is_eating,label,model_p"
     )
     assert len(rows) == 3 and rows[1].startswith('"0","https://www.inaturalist.org/observations/0"')
     assert rows[1].split(",")[4] == '"no"' and rows[2].split(",")[4] == '"no"'
-    assert rows[1].endswith('"yes","unsure","no","carrion"')
-    assert rows[2].endswith('"yes","yes","no",""')  # no label off the model study
+    assert rows[1].endswith('"yes","unsure","no","carrion","0.95"')
+    assert rows[2].endswith('"yes","yes","no","",""')  # no label off the model study
     assert page.errors == []
 
 
